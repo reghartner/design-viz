@@ -3281,6 +3281,25 @@ function renderPage(view, page, skin, backlinks){
   return ctl;
 }
 
+/* A re-render (workbench Render click, skin switch) rebuilds the DOM and so
+   resets every tabs block to its first tab. These helpers carry the reader's
+   place across renderPage calls: capture the active tab's slug per tabs
+   block, then re-select any slug that still exists in the new render. Blocks
+   are matched by position; a slug with no match in the new block keeps the
+   render default (first tab). */
+function activeTabSlugs(ctl){
+  if (!ctl || !ctl.tabBlocks || !ctl.tabBlocks.length) return null;
+  return ctl.tabBlocks.map(function(tb){ return tb.slugs[tb.active()]; });
+}
+function restoreActiveTabs(ctl, saved){
+  if (!ctl || !ctl.tabBlocks || !saved) return;
+  ctl.tabBlocks.forEach(function(tb, i){
+    var slug = i < saved.length ? saved[i] : null;
+    var idx = slug != null ? tb.slugs.indexOf(slug) : -1;
+    if (idx > 0) tb.select(idx, false);
+  });
+}
+
 /* ---------------- deep links: hash <-> complete viewer state -------------
    Legacy: numeric d/c section selectors and #t=<tab>&m/s for the first
    stepper in that tab. Canonical d/c selectors use unique heading slugs (or

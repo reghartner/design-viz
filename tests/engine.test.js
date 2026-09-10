@@ -25,6 +25,7 @@ function loadCore(overrides = {}){
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
     ' foldPhoneStates, phoneModel, phonePanelHTML, PANEL_TYPES,' +
     ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
+    ' activeTabSlugs, restoreActiveTabs,' +
     ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
     ' sectionHasProse, sectionIntroHTML, setProseCollapsed, createProseController, TONE_SET,' +
     ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES};';
@@ -678,6 +679,50 @@ test('applySkinClasses layers overlays on Aurora and rejects unknown tokens with
   const before = Array.from(body.classList.values).sort();
   assert.strictEqual(C.applySkinClasses(body, view, 'sepia'), false);
   assert.deepStrictEqual(Array.from(body.classList.values).sort(), before);
+});
+
+
+/* ---------------- tab restore across re-render ---------------- */
+
+function tabBlockMock(slugs, active){
+  return {
+    slugs, _active: active, selectCalls: [],
+    active(){ return this._active; },
+    select(i, focus){ this._active = i; this.selectCalls.push([i, focus]); }
+  };
+}
+
+test('activeTabSlugs captures the active tab slug of every tabs block', () => {
+  const ctl = {tabBlocks: [tabBlockMock(['flow', 'ota', 'guide'], 1), tabBlockMock(['x', 'y'], 0)]};
+  assert.deepStrictEqual(C.activeTabSlugs(ctl), ['ota', 'x']);
+  assert.strictEqual(C.activeTabSlugs(null), null);
+  assert.strictEqual(C.activeTabSlugs({tabBlocks: []}), null);
+});
+
+test('restoreActiveTabs re-selects a surviving slug without focusing it', () => {
+  const tb = tabBlockMock(['flow', 'ota', 'guide'], 0);
+  C.restoreActiveTabs({tabBlocks: [tb]}, ['ota']);
+  assert.strictEqual(tb._active, 1);
+  assert.deepStrictEqual(tb.selectCalls, [[1, false]]);
+});
+
+test('restoreActiveTabs keeps the default first tab when the slug is gone', () => {
+  const tb = tabBlockMock(['flow', 'guide'], 0);
+  C.restoreActiveTabs({tabBlocks: [tb]}, ['ota']);
+  assert.strictEqual(tb._active, 0);
+  assert.deepStrictEqual(tb.selectCalls, []);
+});
+
+test('restoreActiveTabs matches blocks by position and tolerates count changes', () => {
+  const first = tabBlockMock(['a', 'b'], 0);
+  const second = tabBlockMock(['c', 'd'], 0);
+  /* saved list came from a render with three blocks; block 2 keeps its tab,
+     block 1's old slug now only exists in block 2 and must not cross over */
+  C.restoreActiveTabs({tabBlocks: [first, second]}, ['d', 'd', 'gone']);
+  assert.strictEqual(first._active, 0);
+  assert.strictEqual(second._active, 1);
+  C.restoreActiveTabs({tabBlocks: [first, second]}, null);
+  assert.strictEqual(first._active, 0);
 });
 
 

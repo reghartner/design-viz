@@ -278,6 +278,7 @@ var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
 var activeSkin = null; /* null = follow spec */
 var lastPage = null;
+var lastCtl = null;  /* renderPage controller of the current render, for tab restore */
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears
    here without touching the skeleton */
@@ -293,7 +294,9 @@ var skinBtns = {};
     b.addEventListener('click', function(){
       activeSkin = name; setSkinButtons(name);
       if (lastPage){
-        renderPage(view, lastPage, name);
+        var openTabs = activeTabSlugs(lastCtl);
+        lastCtl = renderPage(view, lastPage, name);
+        restoreActiveTabs(lastCtl, openTabs);
         applySkinClasses(document.body, view, name);
       }
     });
@@ -348,7 +351,9 @@ function go(fromText){
   lastPage = page;
   var skin = currentSkin(page);
   setSkinButtons(skin);
-  renderPage(view, page, skin);
+  var openTabs = activeTabSlugs(lastCtl);
+  lastCtl = renderPage(view, page, skin);
+  restoreActiveTabs(lastCtl, openTabs);
   applySkinClasses(document.body, view, skin);
 }
 

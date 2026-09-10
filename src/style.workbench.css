@@ -24,6 +24,20 @@ h1{font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(30px,4.5vw,42
 h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .mdesc{color:var(--sub); max-width:80ch; margin:6px 0 14px; font-size:14.5px;}
 
+/* work area: rendered page on the left, spec editor on the right, so a render
+   click never requires scrolling back up. The editor column is sticky; below
+   the stack breakpoint the two fall back to the old top/bottom order. */
+.workwrap{max-width:1720px; margin:0 auto; padding:0 22px;}
+.workmain{min-width:0;}
+@media (min-width:1181px){
+  .workwrap{display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:16px; align-items:start;}
+  .workwrap .specbox{position:sticky; top:12px; margin-top:30px;}
+  /* fill the viewport beside the page; the 210px budget covers the sticky
+     offset, the summary bar, and the render row */
+  .workwrap .specbox textarea{height:calc(100vh - 210px);}
+  .workwrap .msgs{max-height:120px; overflow-y:auto;}
+}
+
 .toolrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:30px 0 12px;}
 .toolrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
 .skbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;

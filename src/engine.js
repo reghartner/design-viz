@@ -1132,6 +1132,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       markFragmentElement(lt, e);
       svg.appendChild(lt);
       labelEls.push({el: lt, fixed: !!(e.labelDx || e.labelDy)});
+      info.labelEl = lt; /* stepper lights the label together with its edge */
     }
   });
 
@@ -2806,6 +2807,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var info = board.edgeIds[key];
       var pe = document.getElementById(info.domId);
       if (pe) pe.classList.add('lit');
+      if (info.labelEl) info.labelEl.classList.add('lit');
     });
     applyStepNodeFocus(board.nodeEls, s, board.edgeIds);
     /* ordered packet chain: explicit packets list, else edges in step order */

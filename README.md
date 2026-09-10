@@ -65,7 +65,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | `template/flowview.html` | The render target (GENERATED — edit `src/`). Self-contained single file: layout engine, six skins, protocol-keyed legend, tabs, step player, containment groups, synchronized inspector panels (state machine, LEDs, gauge, log, camera screen), permalink affordances. Reads its spec from an embedded JSON block. |
 | `tools/inject.py` | The injection step: `inject.py <spec.json> <template.html> <out.html>`. Validates the JSON, refuses unescaped `</script`, sets the page title from `page.title`, and discovers derived sibling links when the conventional output root already has `crossref.json`. |
 | `tools/build_index.py` | Generates a root's `index.html` and `crossref.json` from `manifest.json` plus every named spec. The index groups pages by family and lists exact-title services shared by 2+ pages; the JSON catalog supplies derived per-page backlinks. |
-| `tools/mermaid2spec.py` | Converts a mermaid `sequenceDiagram` (bare, or the first ```mermaid fence in markdown) into a deliberately bland skeleton spec: `python3 tools/mermaid2spec.py <input.md\|.mmd> [-o out.json] [--title "..."]`. Enriching icons, tints, protocols, and prose stays the authoring LLM's job; unsupported mermaid constructs fail loud. |
+| `tools/mermaid2spec.py` | Converts a mermaid `sequenceDiagram` (bare, or the first ```mermaid fence in markdown) into a deliberately bland skeleton spec: `python3 tools/mermaid2spec.py <input.(md\|mmd)> [-o out.json] [--title "..."]`. Enriching icons, tints, protocols, and prose stays the authoring LLM's job; unsupported mermaid constructs fail loud. |
 | `contract/authoring-contract.md` | The complete authoring contract. Self-sufficient: hand this file plus a source document to any LLM and it can emit a valid spec with zero other context. |
 | `cookbook/` | Task-shaped recipes for authoring agents: one file per common request (temperature thresholds, battery drain, motion-detection geometry, wake-up mailbox, persistent-connection-while-awake, LP-chip MQTT relay, egress routing) plus `adjustments.md`, a phrase-to-knob table for visual feedback ("move that up and to the right"). Every ```json fence in it is a complete spec kept lint-clean by `tests/test_cookbook.py`. |
 | `workbench/flowspec.html` | Interactive workbench: the same engine plus an editable JSON panel with a Render button, schema reference, and known-limits notes. For hand-tuning specs. |
@@ -393,7 +393,7 @@ features you get for free” in `contract/authoring-contract.md`.
 Running the test suites locally (same invocations CI uses):
 
 ```
-python3 -m unittest discover -s tests
+python3 -m unittest discover -s tests -v
 node --test tests/*.test.js
 ```
 

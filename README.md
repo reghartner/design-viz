@@ -350,7 +350,9 @@ step clipped to the diagram itself — the board with its legend, the widget
 panels, and the step bar — with a `--margin` background border (default 16 px).
 Section headings, prose, and whatever follows the diagram stay out of frame,
 and a diagram taller than the viewport is captured in full. `--width` still
-sets the layout viewport width the page renders at. It uses Pillow when installed and otherwise
+sets the layout viewport width the page renders at, and `--scale` (default 2)
+renders each CSS pixel as that many device pixels, so text in the GIF stays
+sharp without changing the layout. It uses Pillow when installed and otherwise
 falls back to its bundled PNG reader and pure-Python GIF encoder, so the page
 itself remains zero-dependency and the exporter works with bare Python 3.
 Duplicate step ids or ids that collide with a positional fallback make the

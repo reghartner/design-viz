@@ -72,6 +72,22 @@ class PageBuildTest(unittest.TestCase):
         entry = json.loads((self.tmp / "out" / "manifest.json").read_text())["pages"][0]
         self.assertEqual(entry["family"], "out")
 
+    def test_symlinked_spec_and_root_keep_their_alias_names(self):
+        # Anchoring to the caller's cwd must not dereference symlinks: the
+        # alias names stay the output name and the manifest family.
+        (self.tmp / "alias.spec.json").symlink_to(self.spec.name)
+        real_root = self.tmp / "real-root"
+        real_root.mkdir()
+        (self.tmp / "linkroot").symlink_to("real-root")
+        r = subprocess.run(
+            ["python3", str(TOOL), "alias.spec.json", "--root", "linkroot"],
+            capture_output=True, text=True, cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((real_root / "alias.html").is_file())
+        entry = json.loads((real_root / "manifest.json").read_text())["pages"][0]
+        self.assertEqual(entry["file"], "alias.html")
+        self.assertEqual(entry["family"], "linkroot")
+
     def test_no_slug_accepts_plain_json_name(self):
         plain = self.tmp / "drip-commander.json"
         plain.write_text(clean_spec_text())

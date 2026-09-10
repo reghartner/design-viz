@@ -148,12 +148,16 @@ def main() -> int:
     spec_path = pathlib.Path(a.spec)
     if not spec_path.is_file():
         fail(f"spec not found: {spec_path}")
-    # Resolve inputs to absolute paths up front: the validate and inject
-    # subprocesses below run with cwd=ROOT, so a spec or --root given
-    # relative to the caller's directory would otherwise resolve inside
-    # this repo (or not at all) once handed to them.
-    spec_path = spec_path.resolve()
-    root_dir = pathlib.Path(a.root).resolve() if a.root is not None else None
+    # Anchor inputs to the caller's directory up front: the validate and
+    # inject subprocesses below run with cwd=ROOT, so a spec or --root
+    # given relative to the caller's directory would otherwise resolve
+    # inside this repo (or not at all) once handed to them. Anchoring
+    # only prepends the cwd — symlinks are not dereferenced, so an alias
+    # in the path keeps naming the outputs and the manifest family.
+    def absolute(path: pathlib.Path) -> pathlib.Path:
+        return path if path.is_absolute() else pathlib.Path.cwd() / path
+    spec_path = absolute(spec_path)
+    root_dir = absolute(pathlib.Path(a.root)) if a.root is not None else None
     if a.dest is not None:
         dest_parts = pathlib.PurePosixPath(a.dest).parts
         if (pathlib.PurePosixPath(a.dest).is_absolute()

@@ -296,7 +296,8 @@ inter-row gap with a negative `dy` (and shifted with `dx`). Like `bend` /
 
 An edge between a float and a row node attaches on the side each faces
 vertically: a float below its partner connects to the partner's bottom, a
-float above connects to its top.
+float above connects to its top. An arrow into a float lands at the center
+of the float's facing edge.
 
 ### edges
 

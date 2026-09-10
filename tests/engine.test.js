@@ -1163,6 +1163,38 @@ test('edgeAutoAdjust arcs same-row edges that skip over intermediate slots', () 
   assert.ok(adj[0].bend < 0, 'skip-over edge arcs above the row');
 });
 
+test('edge into a float lands at the center of its facing edge', () => {
+  const spec = {nodes: {a: {}, f: {}}, rows: [['a']],
+    floats: [{id: 'f', side: 'below'}], edges: [{from: 'a', to: 'f'}]};
+  const L = C.layout(spec);
+  const adj = C.edgeAutoAdjust(spec.edges, L);
+  C.resolveEdgeAvoidance(spec.edges, L, adj);
+  const pts = C.samplePathD(C.edgePath(spec.edges[0], L, adj[0]));
+  const end = pts[pts.length - 1];
+  assert.ok(Math.abs(end.x - L.pos.f.cx) < 0.001, 'lands at float center x, got ' + end.x);
+  assert.ok(Math.abs(end.y - (L.pos.f.cy - L.pos.f.h/2)) < 0.001, 'lands on float top edge');
+});
+
+test('blocked center landing on a float falls back to the corner attach', () => {
+  /* c sits directly between b (source, row 1) and the float above row 0 —
+     the same-column layout the cumulus "frozen" float exercises */
+  const spec = {
+    nodes: {x: {}, c: {}, y: {}, x2: {}, b: {}, y2: {}, f: {}},
+    rows: [['x', 'c', 'y'], ['x2', 'b', 'y2']],
+    floats: [{id: 'f'}],
+    edges: [{from: 'b', to: 'f'}]};
+  const L = C.layout(spec);
+  const adj = C.edgeAutoAdjust(spec.edges, L);
+  C.resolveEdgeAvoidance(spec.edges, L, adj);
+  const pts = C.samplePathD(C.edgePath(spec.edges[0], L, adj[0]));
+  const end = pts[pts.length - 1];
+  assert.ok(Math.abs(end.x - L.pos.f.cx) >= L.pos.f.w/2 - 0.001,
+    'blocked edge attaches at the float corner, got x=' + end.x + ' vs cx=' + L.pos.f.cx);
+  const cRect = {x: L.pos.c.cx - L.pos.c.w/2 - 3, y: L.pos.c.cy - L.pos.c.h/2 - 3,
+                 w: L.pos.c.w + 6, h: L.pos.c.h + 6};
+  assert.strictEqual(C.countPathRectHits(pts, [cRect]), 0, 'fallback path clears the blocking card');
+});
+
 test('float dx/dy nudge shifts a below float from its auto position', () => {
   const base = {nodes: {a: {}, b: {}, f: {}}, rows: [['a', 'b']],
     floats: [{id: 'f', side: 'below'}], edges: [{from: 'a', to: 'f'}]};

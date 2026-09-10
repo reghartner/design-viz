@@ -19,7 +19,10 @@ renders each CSS pixel as that many device pixels (default 2), so text
 stays sharp; layout is unchanged. --skin renders with that theme instead of
 the page's own default (validated against the page's skin list), and
 --dim-alpha overrides the step-mode non-highlighted opacity with one
-uniform value (it sets the page's --dv-dim CSS variable). Heading,
+uniform value (it sets the page's --dv-dim CSS variable). The margin around
+the diagram is always the theme's page ground color: the section box's
+per-accent background tint is repainted before capture, so every section of
+a page exports on the same background. Heading,
 prose, and everything after the diagram stay out of frame; a diagram taller
 than the viewport is captured in full. Pillow is used when available; a
 bundled PNG reader, fixed-palette quantizer, and simple GIF LZW stream keep
@@ -436,6 +439,34 @@ def dim_alpha_expression(alpha: float) -> str:
     ) % json.dumps(f"{alpha:g}")
 
 
+def ground_expression(section_reference: str) -> str:
+    """JS that repaints the captured section with the page ground color.
+
+    The section bounding box tints its background with the section accent
+    (7% accent over transparent), so the margin ring around the clipped
+    diagram would take a different color per section. Painting the section
+    with the rendered page's own ground color (the .docview background)
+    makes every export from one theme share the same background; the border
+    is cleared too so a wide --margin cannot pull the accent ring into
+    frame. Returns the applied color, or a failure string.
+    """
+    return (
+        "(function(){"
+        "var sec = document.getElementById('section-' + %s);"
+        "if (!sec) return 'section not found for background repaint';"
+        "var view = document.querySelector('.docview') || document.body;"
+        "var ground = getComputedStyle(view).backgroundColor;"
+        "if (!ground || ground === 'transparent' || ground === 'rgba(0, 0, 0, 0)')"
+        "ground = getComputedStyle(document.body).backgroundColor;"
+        "if (!ground || ground === 'transparent' || ground === 'rgba(0, 0, 0, 0)')"
+        "return 'page ground color could not be determined';"
+        "sec.style.setProperty('background', ground, 'important');"
+        "sec.style.setProperty('border-color', 'transparent', 'important');"
+        "return ground;"
+        "})()"
+    ) % json.dumps(str(section_reference))
+
+
 def capture_frames(
     page_path: pathlib.Path,
     fragments: Iterable[str],
@@ -526,6 +557,23 @@ def capture_frames(
                             "expression": dim_alpha_expression(dim_alpha),
                             "returnByValue": True,
                         })
+                    # Uniform export background: the margin ring around the
+                    # clip shows the section box, whose background carries a
+                    # per-section accent tint — repaint it with the page
+                    # ground so every section exports on the same color.
+                    # (Runs after a --skin switch so the repainted color is
+                    # the selected theme's ground.)
+                    if section_reference is not None:
+                        ground_result = devtools.command("Runtime.evaluate", {
+                            "expression": ground_expression(section_reference),
+                            "returnByValue": True,
+                        })
+                        ground_value = ground_result.get("result", {}).get("value")
+                        if not (isinstance(ground_value, str)
+                                and ground_value.startswith(("rgb", "#"))):
+                            raise RuntimeError(
+                                "background repaint failed: "
+                                f"{ground_value or 'no result from the page'}")
                     # Web fonts load with display=swap and reflow the page when
                     # they land; measuring the clip before that shift captures
                     # the wrong region, so wait for the font set to settle.

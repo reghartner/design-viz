@@ -372,7 +372,11 @@ skin list (`window.dvSkins`), so an unknown token fails with the valid names.
 `--dim-alpha <0..1>` overrides the step-mode non-highlighted opacity with one
 uniform value; it sets the page's `--dv-dim` CSS variable, which every dimmed
 step-mode element (edges, labels, nodes, coins) reads in place of its
-per-element default. It uses Pillow when installed and otherwise
+per-element default. The `--margin` background around the diagram is always
+the theme's page ground color: section boxes tint their background with the
+section accent, so without a repaint two sections of one page would export
+with two different background colors — the exporter paints the captured
+section with the rendered page ground before every frame. It uses Pillow when installed and otherwise
 falls back to its bundled PNG reader and pure-Python GIF encoder, so the page
 itself remains zero-dependency and the exporter works with bare Python 3.
 Duplicate step ids or ids that collide with a positional fallback make the

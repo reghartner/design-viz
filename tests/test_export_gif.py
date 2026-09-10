@@ -119,6 +119,14 @@ class ExportGifPureTests(unittest.TestCase):
         self.assertIn("--dv-dim", dim)
         self.assertIn('"0.35"', dim)
 
+    def test_ground_expression_embeds_reference_and_repaints_section(self):
+        expression = export_gif.ground_expression("delivery-flow")
+        self.assertIn("'section-' + \"delivery-flow\"", expression)
+        self.assertIn(".docview", expression)
+        self.assertIn("border-color", expression)
+        # References go through JSON so quotes cannot break the script.
+        self.assertIn('\\"', export_gif.ground_expression('a"b'))
+
     def test_clip_expression_embeds_reference_and_margin(self):
         expression = export_gif.clip_expression("delivery-flow", 16)
         self.assertIn("'section-' + \"delivery-flow\"", expression)
@@ -326,6 +334,42 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             # Alpha 1.0 un-dims every non-highlighted element, so the step
             # frame cannot be identical to the default dim.
             self.assertNotEqual(plain[0].read_bytes(), dim[0].read_bytes())
+
+    def test_two_accents_export_with_the_identical_background_color(self):
+        spec = {"page": {"title": "Ground check", "sections": [
+            {"heading": "Alpha", "accent": "green", "diagram": {
+                "nodes": {"a": {}, "b": {}}, "rows": [["a", "b"]],
+                "edges": [{"from": "a", "to": "b"}],
+                "steps": [{"edge": "a->b", "text": "hop"}]}},
+            {"heading": "Beta", "accent": "violet", "diagram": {
+                "nodes": {"c": {}, "d": {}}, "rows": [["c", "d"]],
+                "edges": [{"from": "c", "to": "d"}],
+                "steps": [{"edge": "c->d", "text": "hop"}]}},
+        ]}}
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            spec_path = temp_path / "ground.spec.json"
+            spec_path.write_text(json.dumps(spec))
+            page = temp_path / "ground.html"
+            subprocess.run(
+                [sys.executable, str(ROOT / "tools" / "inject.py"),
+                 str(spec_path), str(ROOT / "template" / "flowview.html"),
+                 str(page)],
+                check=True, capture_output=True)
+            corners = []
+            for section_number in (1, 2):
+                target = export_gif.choose_target(spec, section_number)
+                out_dir = temp_path / f"s{section_number}"
+                out_dir.mkdir()
+                shots = export_gif.capture_frames(
+                    page, [target.fragments[0]], CHROME, 1280, out_dir,
+                    section_reference=str(target.section_reference), scale=1)
+                _, _, rgb = export_gif.decode_png(shots[0].read_bytes())
+                corners.append(bytes(rgb[0:3]))
+            # The margin ring is the page ground for BOTH accents — identical
+            # color, and dark on the aurora default.
+            self.assertEqual(corners[0], corners[1])
+            self.assertLess(sum(corners[0]), 240)
 
     def test_unknown_skin_fails_with_the_page_token_list(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -898,6 +898,7 @@ body.sk-daylight{background:#F4F2EC;}
 /* ---------- step mode: dim everything but the lit step; protocol colors stay ---------- */
 .stepmode .edge.main, .stepmode .edge.retm{animation:none;} /* ties skin rules on specificity; later in sheet wins */
 .dv-step-tween .edge{transition:opacity .4s ease, stroke .4s ease;}
+.dv-step-tween .lbl{transition:opacity .4s ease;}
 .dv-step-tween .node,.dv-step-tween .coin{transition:opacity .4s ease;}
 .dv-step-tween .node .card,.dv-step-tween .coin circle{transition:fill .4s ease, stroke .4s ease;}
 .dv-step-tween .node .t1{transition:fill .4s ease;}
@@ -908,6 +909,7 @@ body.sk-daylight{background:#F4F2EC;}
 .stepmode .pkt.loopdot{display:none;}
 .stepmode .node:not(.lit){opacity:.35;}
 .stepmode .lbl{opacity:.25;}
+.stepmode .lbl.lit{opacity:1;}
 .stepmode .coin:not(.lit){opacity:.3;}
 .stepmode .grpbox, .stepmode .grptitle{opacity:.55;}
 .sk-aurora .stepmode .node.lit .card{stroke:#3E9FC4;}
@@ -950,7 +952,7 @@ body.sk-daylight{background:#F4F2EC;}
   .screenbox .walker{transform:translateX(160px);}
   .odot.cur{animation:none !important;}
   .wfrow, .wfbar, .odot, .pchip{transition:none !important;animation:none !important;}
-  .dv-step-tween .edge, .dv-step-tween .node, .dv-step-tween .coin,
+  .dv-step-tween .edge, .dv-step-tween .lbl, .dv-step-tween .node, .dv-step-tween .coin,
   .dv-step-tween .node .card, .dv-step-tween .coin circle,
   .dv-step-tween .node .t1, .node.tone-pulse .card,
   .stepline.dv-caption-old, .stepline.dv-caption-new{transition:none !important;animation:none !important;}
@@ -1333,6 +1335,7 @@ body.sk-editorial .halo{opacity:.035;}
 body.sk-editorial .pkt{filter:none !important;}
 body.sk-editorial .stepmode .node:not(.lit){opacity:.56;}
 body.sk-editorial .stepmode .lbl{opacity:.5;}
+body.sk-editorial .stepmode .lbl.lit{opacity:1;}
 body.sk-editorial .stepmode .edge:not(.lit){opacity:.21;}
 body.sk-editorial .stepmode .coin:not(.lit){opacity:.42;}
 body.sk-editorial .sk-aurora .stepmode .node.lit .card,
@@ -6054,6 +6057,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       markFragmentElement(lt, e);
       svg.appendChild(lt);
       labelEls.push({el: lt, fixed: !!(e.labelDx || e.labelDy)});
+      info.labelEl = lt; /* stepper lights the label together with its edge */
     }
   });
 
@@ -7728,6 +7732,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var info = board.edgeIds[key];
       var pe = document.getElementById(info.domId);
       if (pe) pe.classList.add('lit');
+      if (info.labelEl) info.labelEl.classList.add('lit');
     });
     applyStepNodeFocus(board.nodeEls, s, board.edgeIds);
     /* ordered packet chain: explicit packets list, else edges in step order */

@@ -56,6 +56,38 @@ class PageBuildTest(unittest.TestCase):
         self.assertEqual(entry["spec"], "temp.spec.json")
         self.assertEqual(entry["family"], self.tmp.name)
 
+    def test_relative_spec_and_root_resolve_against_caller_cwd_not_repo(self):
+        # The validate/inject subprocesses run with cwd=ROOT; a spec or
+        # --root given relative to the caller's directory must still
+        # resolve there (the documented consuming-project flow) and must
+        # write nothing inside this repo.
+        r = subprocess.run(
+            ["python3", str(TOOL), "temp.spec.json", "--root", "out"],
+            capture_output=True, text=True, cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((self.tmp / "out" / "temp.html").is_file())
+        self.assertTrue((self.tmp / "out" / "manifest.json").is_file())
+        self.assertFalse((ROOT / "out").exists(),
+                         "relative --root must not resolve inside the repo")
+        entry = json.loads((self.tmp / "out" / "manifest.json").read_text())["pages"][0]
+        self.assertEqual(entry["family"], "out")
+
+    def test_symlinked_spec_and_root_keep_their_alias_names(self):
+        # Anchoring to the caller's cwd must not dereference symlinks: the
+        # alias names stay the output name and the manifest family.
+        (self.tmp / "alias.spec.json").symlink_to(self.spec.name)
+        real_root = self.tmp / "real-root"
+        real_root.mkdir()
+        (self.tmp / "linkroot").symlink_to("real-root")
+        r = subprocess.run(
+            ["python3", str(TOOL), "alias.spec.json", "--root", "linkroot"],
+            capture_output=True, text=True, cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((real_root / "alias.html").is_file())
+        entry = json.loads((real_root / "manifest.json").read_text())["pages"][0]
+        self.assertEqual(entry["file"], "alias.html")
+        self.assertEqual(entry["family"], "linkroot")
+
     def test_no_slug_accepts_plain_json_name(self):
         plain = self.tmp / "drip-commander.json"
         plain.write_text(clean_spec_text())

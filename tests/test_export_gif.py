@@ -1,5 +1,6 @@
 """Pure encoder/link tests plus an optional Chrome capture smoke test."""
 
+import json
 import pathlib
 import socket
 import subprocess
@@ -91,6 +92,30 @@ class ExportGifPureTests(unittest.TestCase):
         self.assertEqual(encoded[:6], b"GIF89a")
         self.assertEqual(encoded[-1:], b";")
         self.assertEqual(export_gif.gif_frame_count(encoded), 2)
+
+    def test_pad_rgb_frame_grows_with_corner_color_and_keeps_pixels_in_place(self):
+        # 2x2 frame, top-left pixel white; grow to 3x3.
+        frame = bytes((255, 255, 255,  10, 20, 30,
+                       40, 50, 60,  70, 80, 90))
+        padded = export_gif.pad_rgb_frame(frame, 2, 2, 3, 3)
+        self.assertEqual(len(padded), 3 * 3 * 3)
+        self.assertEqual(padded[0:3], b"\xff\xff\xff")          # original corner
+        self.assertEqual(padded[3:6], bytes((10, 20, 30)))       # row 0 kept
+        self.assertEqual(padded[6:9], b"\xff\xff\xff")          # right pad
+        self.assertEqual(padded[9:12], bytes((40, 50, 60)))      # row 1 kept
+        self.assertEqual(padded[18:27], b"\xff\xff\xff" * 3)    # bottom pad row
+        self.assertEqual(export_gif.pad_rgb_frame(frame, 2, 2, 2, 2), frame)
+        with self.assertRaises(ValueError):
+            export_gif.pad_rgb_frame(frame, 2, 2, 1, 2)
+
+    def test_clip_expression_embeds_reference_and_margin(self):
+        expression = export_gif.clip_expression("delivery-flow", 16)
+        self.assertIn("'section-' + \"delivery-flow\"", expression)
+        self.assertIn("var pad = 16", expression)
+        self.assertIn(".boardgrid", expression)
+        self.assertIn(".termbar", expression)
+        # Reference goes through JSON so quotes cannot break the script.
+        self.assertIn('\\"', export_gif.clip_expression('a"b', 0))
 
     def test_section_selection_uses_canonical_heading_slug_address(self):
         spec = {"page": {"blocks": [{"tabs": [
@@ -204,7 +229,8 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             temp_path = pathlib.Path(temp)
             screenshots = export_gif.capture_frames(
-                page, fragments, CHROME, 1280, temp_path)
+                page, fragments, CHROME, 1280, temp_path,
+                section_reference=str(target.section_reference))
             self.assertEqual(len(screenshots), 2)
             self.assertTrue(all(path.read_bytes().startswith(export_gif.PNG_SIGNATURE)
                                 for path in screenshots))
@@ -214,13 +240,64 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                 "deep-linked step frames must not all capture identical page-top content",
             )
             width, height, rgb = export_gif.decode_png(screenshots[0].read_bytes())
-            self.assertEqual((width, height), (1280, 720))
+            # Clipped to the diagram: narrower than the 1280px viewport, and
+            # no longer hard-locked to the 720px 16:9 viewport height.
+            self.assertLess(width, 1280)
+            self.assertGreater(width, 320)
+            self.assertGreater(height, 100)
             self.assertEqual(len(rgb), width * height * 3)
             out = temp_path / "smoke.gif"
             export_gif.write_animated_gif(screenshots, out, 80)
             encoded = out.read_bytes()
             self.assertTrue(encoded.startswith(b"GIF8"))
             self.assertEqual(export_gif.gif_frame_count(encoded), len(fragments))
+
+    def test_clip_excludes_section_heading_and_covers_board_and_termbar(self):
+        page = ROOT / "examples" / "basecraft-keep" / "keep.html"
+        spec = export_gif.read_embedded_spec(page)
+        target = export_gif.choose_target(spec)
+        state = self.inspect_page(page, target.fragments[0], """
+          (function(){
+            var clip = %s;
+            var ref = %s;
+            var sec = document.getElementById('section-' + ref);
+            var grid = sec.querySelector('.boardgrid');
+            var bar = sec.querySelector('.termbar');
+            function pageRect(el){
+              var r = el.getBoundingClientRect();
+              return {top: r.top + window.scrollY, bottom: r.bottom + window.scrollY,
+                      left: r.left + window.scrollX, right: r.right + window.scrollX};
+            }
+            var gridRect = pageRect(grid);
+            var introBottom = null;
+            Array.prototype.forEach.call(sec.children, function(child){
+              if (child === grid || child === bar) return;
+              var r = pageRect(child);
+              if (r.bottom - r.top <= 0 || r.bottom > gridRect.top + 1) return;
+              if (introBottom === null || r.bottom > introBottom) introBottom = r.bottom;
+            });
+            return {
+              clip: clip,
+              introBottom: introBottom,
+              grid: gridRect,
+              bar: bar && !bar.hidden ? pageRect(bar) : null
+            };
+          })()
+        """ % (export_gif.clip_expression(str(target.section_reference), 16),
+               json.dumps(str(target.section_reference))))
+        clip = state["clip"]
+        self.assertIsNotNone(clip)
+        grid = state["grid"]
+        self.assertLessEqual(clip["x"], grid["left"])
+        self.assertLessEqual(clip["y"], grid["top"])
+        self.assertGreaterEqual(clip["x"] + clip["width"], grid["right"])
+        self.assertGreaterEqual(clip["y"] + clip["height"], grid["bottom"])
+        if state["bar"]:
+            self.assertGreaterEqual(clip["y"] + clip["height"], state["bar"]["bottom"])
+        if state["introBottom"] is not None:
+            self.assertGreaterEqual(
+                clip["y"], state["introBottom"],
+                "clip must start below the section's heading and prose")
 
     def test_composed_fragment_restores_tab_later_step_and_row_with_row_scroll_priority(self):
         page = ROOT / "examples" / "chime-radar" / "chime-radar.html"

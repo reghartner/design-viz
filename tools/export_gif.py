@@ -4,6 +4,7 @@
 Usage:
   python3 tools/export_gif.py <built-page.html> [--section <n>]
       [--width 1280] [--delay-ms 1600] [--margin 16] [--scale 2]
+      [--skin <name>] [--dim-alpha <0..1>]
       [--out <path.gif | directory>] [--chrome <path>]
 
 Output lands HERE by default: beside the page, named after it — with the
@@ -15,7 +16,10 @@ Chrome/Chromium captures one PNG for every canonical heading-slug step deep
 link, clipped to the section's diagram: the board with its legend, the
 widget panels, and the step bar, plus a --margin background border. --scale
 renders each CSS pixel as that many device pixels (default 2), so text
-stays sharp; layout is unchanged. Heading,
+stays sharp; layout is unchanged. --skin renders with that theme instead of
+the page's own default (validated against the page's skin list), and
+--dim-alpha overrides the step-mode non-highlighted opacity with one
+uniform value (it sets the page's --dv-dim CSS variable). Heading,
 prose, and everything after the diagram stay out of frame; a diagram taller
 than the viewport is captured in full. Pillow is used when available; a
 bundled PNG reader, fixed-palette quantizer, and simple GIF LZW stream keep
@@ -397,6 +401,41 @@ def clip_expression(section_reference: str, margin: int) -> str:
     ) % (json.dumps(str(section_reference)), margin)
 
 
+def skin_expression(skin: str) -> str:
+    """JS that switches the rendered page to ``skin`` via its own API.
+
+    Built pages expose ``window.dvSetSkin`` (the site-integration hook) and
+    ``window.dvSkins`` (the valid tokens). Returns ``true`` on success and a
+    human-readable failure string otherwise, so the caller can surface the
+    page's own token list instead of hardcoding one here.
+    """
+    return (
+        "(function(){"
+        "var name = %s;"
+        "if (typeof window.dvSetSkin !== 'function')"
+        "return 'this page does not expose window.dvSetSkin (rebuild it from current src/)';"
+        "if (window.dvSetSkin(name) !== true)"
+        "return 'unknown skin ' + JSON.stringify(name) + (Array.isArray(window.dvSkins) ?"
+        "' (valid: ' + window.dvSkins.join(', ') + ')' : '');"
+        "return true;"
+        "})()"
+    ) % json.dumps(skin)
+
+
+def dim_alpha_expression(alpha: float) -> str:
+    """JS that sets the step-mode dim override variable on the page root.
+
+    ``--dv-dim`` is read by every non-highlighted step-mode opacity rule, so
+    one value replaces the per-element defaults uniformly.
+    """
+    return (
+        "(function(){"
+        "document.documentElement.style.setProperty('--dv-dim', %s);"
+        "return true;"
+        "})()"
+    ) % json.dumps(f"{alpha:g}")
+
+
 def capture_frames(
     page_path: pathlib.Path,
     fragments: Iterable[str],
@@ -406,6 +445,8 @@ def capture_frames(
     section_reference: str | None = None,
     margin: int = 16,
     scale: int = 1,
+    skin: str | None = None,
+    dim_alpha: float | None = None,
 ) -> list[pathlib.Path]:
     """Capture one PNG per deep-link fragment.
 
@@ -414,7 +455,10 @@ def capture_frames(
     even where the diagram extends below the viewport; without it the whole
     16:9 viewport is captured (legacy behavior). ``scale`` renders each CSS
     pixel as that many device pixels (the layout is unchanged; the output
-    image is ``scale`` times larger in each direction)."""
+    image is ``scale`` times larger in each direction). ``skin`` switches the
+    page to that theme before measuring or capturing anything; ``dim_alpha``
+    overrides the step-mode non-highlighted opacity (the page's --dv-dim
+    variable) with one uniform value."""
     height = max(1, round(width * 9 / 16))
     screenshots: list[pathlib.Path] = []
     base_url = page_path.resolve().as_uri()
@@ -465,6 +509,23 @@ def capture_frames(
                     })
                     devtools.command("Page.navigate", {"url": base_url + fragment})
                     _wait_for_rendered_page(devtools, process, 20)
+                    # Theme and dim overrides go in before the font wait and
+                    # the clip measurement: a skin swap can pull fonts the
+                    # boot skin never used, and both change what gets drawn.
+                    if skin is not None:
+                        skin_result = devtools.command("Runtime.evaluate", {
+                            "expression": skin_expression(skin),
+                            "returnByValue": True,
+                        })
+                        skin_value = skin_result.get("result", {}).get("value")
+                        if skin_value is not True:
+                            raise RuntimeError(
+                                f"--skin {skin}: {skin_value or 'the page rejected the skin switch'}")
+                    if dim_alpha is not None:
+                        devtools.command("Runtime.evaluate", {
+                            "expression": dim_alpha_expression(dim_alpha),
+                            "returnByValue": True,
+                        })
                     # Web fonts load with display=swap and reflow the page when
                     # they land; measuring the clip before that shift captures
                     # the wrong region, so wait for the font set to settle.
@@ -1057,6 +1118,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scale", type=int, default=2,
                         help="device pixels per CSS pixel in the output "
                              "(default 2; 1 restores the previous size)")
+    parser.add_argument("--skin", metavar="name",
+                        help="render with this theme instead of the page's own "
+                             "default (validated against the page's skin list, "
+                             "e.g. aurora, daylight, editorial)")
+    parser.add_argument("--dim-alpha", type=float, metavar="0..1",
+                        help="override the step-mode non-highlighted opacity "
+                             "with one uniform value (default: the page's "
+                             "per-element CSS values)")
     parser.add_argument("--out", metavar="path.gif")
     parser.add_argument("--chrome", metavar="path")
     args = parser.parse_args(argv)
@@ -1075,6 +1144,10 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--margin must be between 0 and 200")
         if args.scale < 1 or args.scale > 4:
             raise ValueError("--scale must be between 1 and 4")
+        if args.skin is not None and not args.skin.strip():
+            raise ValueError("--skin must name a skin token")
+        if args.dim_alpha is not None and not 0 <= args.dim_alpha <= 1:
+            raise ValueError("--dim-alpha must be between 0 and 1")
         chrome = find_chrome(args.chrome)
         if chrome is None:
             if args.chrome:
@@ -1099,7 +1172,8 @@ def main(argv: list[str] | None = None) -> int:
             screenshots = capture_frames(
                 page_path, fragments, chrome, args.width, pathlib.Path(temp),
                 section_reference=str(target.section_reference),
-                margin=args.margin, scale=args.scale)
+                margin=args.margin, scale=args.scale,
+                skin=args.skin, dim_alpha=args.dim_alpha)
             encoder, width, height = write_animated_gif(
                 screenshots, out_path, args.delay_ms)
         reference_note = (

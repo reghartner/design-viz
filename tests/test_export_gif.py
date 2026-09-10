@@ -108,6 +108,17 @@ class ExportGifPureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             export_gif.pad_rgb_frame(frame, 2, 2, 1, 2)
 
+    def test_skin_and_dim_alpha_expressions_embed_values(self):
+        expression = export_gif.skin_expression("daylight")
+        self.assertIn("window.dvSetSkin", expression)
+        self.assertIn('"daylight"', expression)
+        self.assertIn("window.dvSkins", expression)
+        # Skin names go through JSON so quotes cannot break the script.
+        self.assertIn('\\"', export_gif.skin_expression('a"b'))
+        dim = export_gif.dim_alpha_expression(0.35)
+        self.assertIn("--dv-dim", dim)
+        self.assertIn('"0.35"', dim)
+
     def test_clip_expression_embeds_reference_and_margin(self):
         expression = export_gif.clip_expression("delivery-flow", 16)
         self.assertIn("'section-' + \"delivery-flow\"", expression)
@@ -273,6 +284,76 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             # only the rendered output (allow 1px rounding per edge).
             self.assertLessEqual(abs(w2 - 2 * w1), 2)
             self.assertLessEqual(abs(h2 - 2 * h1), 2)
+
+    def _inject_doorbell(self, temp_path):
+        # keep.html and the other committed example pages predate the
+        # --dv-dim CSS; build a fresh page from the current template so the
+        # skin and dim-alpha paths are exercised against current src/.
+        page = temp_path / "doorbell.html"
+        subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "inject.py"),
+             str(ROOT / "examples" / "doorbell" / "doorbell.spec.json"),
+             str(ROOT / "template" / "flowview.html"), str(page)],
+            check=True, capture_output=True)
+        return page
+
+    def test_skin_switch_and_dim_alpha_change_the_captured_frame(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            page = self._inject_doorbell(temp_path)
+            spec = export_gif.read_embedded_spec(page)
+            target = export_gif.choose_target(spec)
+            fragment = [target.fragments[0]]
+            for name in ("plain", "day", "dim"):
+                (temp_path / name).mkdir()
+            plain = export_gif.capture_frames(
+                page, fragment, CHROME, 1280, temp_path / "plain",
+                section_reference=str(target.section_reference), scale=1)
+            day = export_gif.capture_frames(
+                page, fragment, CHROME, 1280, temp_path / "day",
+                section_reference=str(target.section_reference), scale=1,
+                skin="daylight")
+            dim = export_gif.capture_frames(
+                page, fragment, CHROME, 1280, temp_path / "dim",
+                section_reference=str(target.section_reference), scale=1,
+                dim_alpha=1.0)
+            _, _, rgb_plain = export_gif.decode_png(plain[0].read_bytes())
+            _, _, rgb_day = export_gif.decode_png(day[0].read_bytes())
+            # Corner pixel sits in the margin around the diagram: dark on the
+            # aurora default, light once daylight is applied.
+            self.assertLess(sum(rgb_plain[0:3]), 240)
+            self.assertGreater(sum(rgb_day[0:3]), 500)
+            # Alpha 1.0 un-dims every non-highlighted element, so the step
+            # frame cannot be identical to the default dim.
+            self.assertNotEqual(plain[0].read_bytes(), dim[0].read_bytes())
+
+    def test_unknown_skin_fails_with_the_page_token_list(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            page = self._inject_doorbell(temp_path)
+            spec = export_gif.read_embedded_spec(page)
+            target = export_gif.choose_target(spec)
+            with self.assertRaises(RuntimeError) as ctx:
+                export_gif.capture_frames(
+                    page, [target.fragments[0]], CHROME, 1280, temp_path,
+                    section_reference=str(target.section_reference), scale=1,
+                    skin="sepia")
+            self.assertIn("sepia", str(ctx.exception))
+            self.assertIn("aurora", str(ctx.exception))
+
+    def test_dim_alpha_sets_the_variable_the_dim_rules_read(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            page = self._inject_doorbell(temp_path)
+            spec = export_gif.read_embedded_spec(page)
+            target = export_gif.choose_target(spec)
+            value = self.inspect_page(
+                page, target.fragments[0],
+                "(function(){" + export_gif.dim_alpha_expression(0.42) + ";"
+                "var edge = document.querySelector('.board.stepmode .edge:not(.lit)');"
+                "return edge ? getComputedStyle(edge).opacity : 'no dimmed edge found';"
+                "})()")
+            self.assertEqual(value, "0.42")
 
     def test_clip_excludes_section_heading_and_covers_board_and_termbar(self):
         page = ROOT / "examples" / "basecraft-keep" / "keep.html"

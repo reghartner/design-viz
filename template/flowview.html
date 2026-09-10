@@ -93,7 +93,7 @@ body.sk-daylight{background:#F4F2EC;}
 .lg{position:sticky; left:0; display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:10px 14px;}
 .sk-aurora .lg{background:#0B1220; border-bottom:1px dashed #25364F;}
 .sk-daylight .lg{background:#FBFAF6; border-bottom:1px dashed #E0DCD1;}
-.lg .li{display:flex; gap:7px; align-items:center; font:500 11px 'IBM Plex Mono',monospace;}
+.lg .li{display:flex; gap:7px; align-items:center; font:500 12px 'IBM Plex Mono',monospace;}
 .sk-aurora .lg .li{color:#93A7C9;}
 .sk-daylight .lg .li{color:#6B6F7A;}
 .lg .li svg{display:block; width:40px; height:10px; min-width:40px;}
@@ -126,10 +126,10 @@ body.sk-daylight{background:#F4F2EC;}
 .sk-daylight .edge.retm{animation:dash20 3.4s linear infinite;}
 .cpkt{visibility:hidden;}
 
-.t1{font:600 12.5px 'IBM Plex Sans',sans-serif;}
-.t2{font:500 9.5px 'IBM Plex Mono',monospace;}
-.lbl{font:500 10.5px 'IBM Plex Mono',monospace;}
-.coin text{font:700 10px 'IBM Plex Mono',monospace;}
+.t1{font:600 13.5px 'IBM Plex Sans',sans-serif;}
+.t2{font:500 10.5px 'IBM Plex Mono',monospace;}
+.lbl{font:500 11.5px 'IBM Plex Mono',monospace;}
+.coin text{font:700 11px 'IBM Plex Mono',monospace;}
 .icbg{fill:currentColor; opacity:.13;}
 
 /* containment groups (a device boundary drawn around member nodes) */
@@ -902,15 +902,19 @@ body.sk-daylight{background:#F4F2EC;}
 .dv-step-tween .node,.dv-step-tween .coin{transition:opacity .4s ease;}
 .dv-step-tween .node .card,.dv-step-tween .coin circle{transition:fill .4s ease, stroke .4s ease;}
 .dv-step-tween .node .t1{transition:fill .4s ease;}
-.stepmode .edge:not(.lit){opacity:.15;}
+/* Non-highlighted (dimmed) opacity in step mode. Defaults are per element
+   kind; setting --dv-dim on any ancestor (e.g. the root element) overrides
+   them all with one uniform alpha — tools/export_gif.py --dim-alpha uses
+   exactly that. */
+.stepmode .edge:not(.lit){opacity:var(--dv-dim, .25);}
 .stepmode .edge.main.lit{opacity:1; animation:dash16 .8s linear infinite;}
 .stepmode .edge.retm.lit{opacity:1; animation:dash20 1.2s linear infinite;}
 .stepmode .halo{opacity:.04;}
 .stepmode .pkt.loopdot{display:none;}
-.stepmode .node:not(.lit){opacity:.35;}
-.stepmode .lbl{opacity:.25;}
+.stepmode .node:not(.lit){opacity:var(--dv-dim, .45);}
+.stepmode .lbl{opacity:var(--dv-dim, .35);}
 .stepmode .lbl.lit{opacity:1;}
-.stepmode .coin:not(.lit){opacity:.3;}
+.stepmode .coin:not(.lit){opacity:var(--dv-dim, .4);}
 .stepmode .grpbox, .stepmode .grptitle{opacity:.55;}
 .sk-aurora .stepmode .node.lit .card{stroke:#3E9FC4;}
 .sk-aurora .stepmode .coin.lit circle{stroke:#8AE8FF;}
@@ -1333,11 +1337,11 @@ body.sk-editorial .sk-daylight .tint-mqtt,
 body.sk-editorial .sk-daylight .tint-dev{color:var(--ed-accent);}
 body.sk-editorial .halo{opacity:.035;}
 body.sk-editorial .pkt{filter:none !important;}
-body.sk-editorial .stepmode .node:not(.lit){opacity:.56;}
-body.sk-editorial .stepmode .lbl{opacity:.5;}
+body.sk-editorial .stepmode .node:not(.lit){opacity:var(--dv-dim, .64);}
+body.sk-editorial .stepmode .lbl{opacity:var(--dv-dim, .58);}
 body.sk-editorial .stepmode .lbl.lit{opacity:1;}
-body.sk-editorial .stepmode .edge:not(.lit){opacity:.21;}
-body.sk-editorial .stepmode .coin:not(.lit){opacity:.42;}
+body.sk-editorial .stepmode .edge:not(.lit){opacity:var(--dv-dim, .3);}
+body.sk-editorial .stepmode .coin:not(.lit){opacity:var(--dv-dim, .5);}
 body.sk-editorial .sk-aurora .stepmode .node.lit .card,
 body.sk-editorial .sk-daylight .stepmode .node.lit .card{stroke:var(--ed-accent); stroke-width:1.8;}
 body.sk-editorial .sk-aurora .stepmode .coin.lit circle,

@@ -5612,7 +5612,9 @@ function edgePath(e, L, adj){
          falls back to the near corner so the path can skirt the column. */
       var ex = adj.floatSide ? (b.cx > a.cx ? b.cx - b.w/2 : b.cx + b.w/2) : b.cx;
       var ey = b.cy + (bBelow ? -b.h/2 : b.h/2);
-      var c2x = adj.floatSide ? ex - (ex-sx)*0.3 + avX : ex + avX;
+      /* centered landing keeps the final control at ex so the approach stays
+         vertical even when an avoidance bow (avX) bends the mid-course */
+      var c2x = adj.floatSide ? ex - (ex-sx)*0.3 + avX : ex;
       return 'M ' + sx + ' ' + sy + ' C ' + (sx + (ex-sx)*0.25 + avX) + ' ' + (sy + (ey-sy)*0.5) + ' ' +
              c2x + ' ' + (ey - (ey-sy)*0.35) + ' ' + ex + ' ' + ey;
     }
@@ -5768,7 +5770,8 @@ function resolveEdgeAvoidance(edges, L, adj){
       adj[ei][key] = 0;
       adj[ei].floatSide = true;
       base = countPathRectHits(samplePathD(edgePath(e, L, adj[ei])), rects);
-      if (sweep() > bestHits){ adj[ei].floatSide = false; adj[ei][key] = centerVal; }
+      /* corner wins only when strictly fewer hits; ties keep the center */
+      if (sweep() >= bestHits){ adj[ei].floatSide = false; adj[ei][key] = centerVal; }
     }
   });
   return adj;

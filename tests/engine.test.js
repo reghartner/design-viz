@@ -25,7 +25,7 @@ function loadCore(overrides = {}){
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
     ' foldPhoneStates, phoneModel, phonePanelHTML, PANEL_TYPES,' +
     ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
-    ' activeTabSlugs, restoreActiveTabs,' +
+    ' activeTabReferences, restoreActiveTabs,' +
     ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
     ' sectionHasProse, sectionIntroHTML, setProseCollapsed, createProseController, TONE_SET,' +
     ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES};';
@@ -686,17 +686,17 @@ test('applySkinClasses layers overlays on Aurora and rejects unknown tokens with
 
 function tabBlockMock(slugs, active){
   return {
-    slugs, _active: active, selectCalls: [],
+    slugs, count: slugs.length, _active: active, selectCalls: [],
     active(){ return this._active; },
     select(i, focus){ this._active = i; this.selectCalls.push([i, focus]); }
   };
 }
 
-test('activeTabSlugs captures the active tab slug of every tabs block', () => {
+test('activeTabReferences captures a canonical reference per tabs block', () => {
   const ctl = {tabBlocks: [tabBlockMock(['flow', 'ota', 'guide'], 1), tabBlockMock(['x', 'y'], 0)]};
-  assert.deepStrictEqual(C.activeTabSlugs(ctl), ['ota', 'x']);
-  assert.strictEqual(C.activeTabSlugs(null), null);
-  assert.strictEqual(C.activeTabSlugs({tabBlocks: []}), null);
+  assert.deepStrictEqual(C.activeTabReferences(ctl), ['ota', 'x']);
+  assert.strictEqual(C.activeTabReferences(null), null);
+  assert.strictEqual(C.activeTabReferences({tabBlocks: []}), null);
 });
 
 test('restoreActiveTabs re-selects a surviving slug without focusing it', () => {
@@ -711,6 +711,17 @@ test('restoreActiveTabs keeps the default first tab when the slug is gone', () =
   C.restoreActiveTabs({tabBlocks: [tb]}, ['ota']);
   assert.strictEqual(tb._active, 0);
   assert.deepStrictEqual(tb.selectCalls, []);
+});
+
+test('a duplicate tab label round-trips through the positional reference', () => {
+  /* two tabs slugified to the same value: the active later duplicate is
+     captured as the deep-link positional form and restored to itself */
+  const before = tabBlockMock(['same', 'same', 'other'], 1);
+  const saved = C.activeTabReferences({tabBlocks: [before]});
+  assert.deepStrictEqual(saved, ['2']);
+  const after = tabBlockMock(['same', 'same', 'other'], 0);
+  C.restoreActiveTabs({tabBlocks: [after]}, saved);
+  assert.strictEqual(after._active, 1);
 });
 
 test('restoreActiveTabs matches blocks by position and tolerates count changes', () => {

@@ -8369,19 +8369,21 @@ function renderPage(view, page, skin, backlinks){
 
 /* A re-render (workbench Render click, skin switch) rebuilds the DOM and so
    resets every tabs block to its first tab. These helpers carry the reader's
-   place across renderPage calls: capture the active tab's slug per tabs
-   block, then re-select any slug that still exists in the new render. Blocks
-   are matched by position; a slug with no match in the new block keeps the
-   render default (first tab). */
-function activeTabSlugs(ctl){
+   place across renderPage calls: capture the active tab's canonical
+   reference per tabs block (the unique label slug, or the deep-link
+   positional form when labels collide — the same grammar the URL hash
+   uses), then re-select whatever it resolves to in the new render. Blocks
+   are matched by position; a reference with no match in the new block keeps
+   the render default (first tab). */
+function activeTabReferences(ctl){
   if (!ctl || !ctl.tabBlocks || !ctl.tabBlocks.length) return null;
-  return ctl.tabBlocks.map(function(tb){ return tb.slugs[tb.active()]; });
+  return ctl.tabBlocks.map(function(tb){ return tabReference(tb.slugs, tb.active()); });
 }
 function restoreActiveTabs(ctl, saved){
   if (!ctl || !ctl.tabBlocks || !saved) return;
   ctl.tabBlocks.forEach(function(tb, i){
-    var slug = i < saved.length ? saved[i] : null;
-    var idx = slug != null ? tb.slugs.indexOf(slug) : -1;
+    var ref = i < saved.length ? saved[i] : null;
+    var idx = ref != null ? tabIndexOf(ref, tb.slugs, tb.count) : -1;
     if (idx > 0) tb.select(idx, false);
   });
 }
@@ -9095,7 +9097,7 @@ var skinBtns = {};
     b.addEventListener('click', function(){
       activeSkin = name; setSkinButtons(name);
       if (lastPage){
-        var openTabs = activeTabSlugs(lastCtl);
+        var openTabs = activeTabReferences(lastCtl);
         lastCtl = renderPage(view, lastPage, name);
         restoreActiveTabs(lastCtl, openTabs);
         applySkinClasses(document.body, view, name);
@@ -9152,7 +9154,7 @@ function go(fromText){
   lastPage = page;
   var skin = currentSkin(page);
   setSkinButtons(skin);
-  var openTabs = activeTabSlugs(lastCtl);
+  var openTabs = activeTabReferences(lastCtl);
   lastCtl = renderPage(view, page, skin);
   restoreActiveTabs(lastCtl, openTabs);
   applySkinClasses(document.body, view, skin);

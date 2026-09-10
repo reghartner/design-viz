@@ -294,7 +294,7 @@ var skinBtns = {};
     b.addEventListener('click', function(){
       activeSkin = name; setSkinButtons(name);
       if (lastPage){
-        var openTabs = activeTabSlugs(lastCtl);
+        var openTabs = activeTabReferences(lastCtl);
         lastCtl = renderPage(view, lastPage, name);
         restoreActiveTabs(lastCtl, openTabs);
         applySkinClasses(document.body, view, name);
@@ -351,7 +351,7 @@ function go(fromText){
   lastPage = page;
   var skin = currentSkin(page);
   setSkinButtons(skin);
-  var openTabs = activeTabSlugs(lastCtl);
+  var openTabs = activeTabReferences(lastCtl);
   lastCtl = renderPage(view, page, skin);
   restoreActiveTabs(lastCtl, openTabs);
   applySkinClasses(document.body, view, skin);

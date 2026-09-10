@@ -1,0 +1,45 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests -v
+
+  node-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # *.test.js glob keeps local (any node >=20) and CI invocations identical;
+      # a bare directory arg behaves differently across node majors.
+      - run: node --test tests/*.test.js
+
+  examples-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: committed pages match src (build is fresh + deterministic)
+        run: |
+          python3 tools/build.py
+          git diff --exit-code template/ workbench/
+      - name: example pages inject cleanly
+        run: |
+          python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json template/flowview.html /tmp/cumulus.html
+          python3 tools/inject.py examples/doorbell/doorbell.spec.json template/flowview.html /tmp/doorbell.html
+          grep -q "403 Forbidden" /tmp/cumulus.html
+          grep -q "person-at-door-night" /tmp/doorbell.html
+      - name: example specs validate clean (CLI)
+        run: |
+          node tools/validate.js --quiet \
+            examples/cumulus/cumulus-page.spec.json \
+            examples/cumulus/cumulus-page.spec.v2.json \
+            examples/doorbell/doorbell.spec.json \
+            examples/doorbell-atlas/atlas.spec.json

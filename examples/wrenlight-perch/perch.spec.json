@@ -1,0 +1,1369 @@
+{
+  "page": {
+    "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module",
+    "contract": "1",
+    "protocols": {
+      "twig": {
+        "label": "TwigLink 908 MHz",
+        "color": "#FFB35C"
+      }
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "The price of waking up",
+            "sections": [
+              {
+                "heading": "The price of waking up",
+                "accent": "amber",
+                "text": [
+                  "Perch is wrenlight's ultra-low-power outdoor camera: two AA lithium cells, a two-year battery contract, and a wall-powered sync module — the **Loft** — that owns everything expensive. The camera sleeps at *4 µA* behind a PIR gate; a qualified event records a short clip and ships it over **TwigLink**, wrenlight's proprietary *908 MHz* sub-GHz link, to the Loft, which buffers and uploads over house Wi-Fi. Every design decision is an entry in one account book: *3300 mAh* over *730 days* is a daily allowance of *4.5 mAh*, and every wake-up is billed against it."
+                ],
+                "bullets": [
+                  "**Perch camera** — a dual-chip split: **Twig (WL-LP1)**, an always-on Cortex-M0+ at *4 µA* sleep that owns the PIR analog front end, the thermistor, the TwigLink radio MAC, and the power rail of its big sibling; **Bough (WL-AP4)**, a 1080p video SoC with a *400 ms* boot from retained RAM and *64 MB* of staging flash (about 3 clips), plus an 850 nm IR illuminator — no spotlight.",
+                  "Power: 2× AA lithium (Li-FeS₂) primary cells in series — *3300 mAh* at *3 V*; alkaline fits the holder but voids the two-year math.",
+                  "**TwigLink radio** — *908.4 MHz* FSK, *500 kbps*, AES-CCM-128, star topology; every camera is a leaf of exactly one Loft.",
+                  "**Perch Loft** — wall-powered; a Wi-Fi SoC plus the WL-C2 TwigLink concentrator, a *32 GB* eMMC store-and-forward buffer, USB-A for a local archive drive, and it serves up to *10* cameras.",
+                  "**Abacus** folds wake receipts into a per-camera forecast and raises the *months left* number the app shows.",
+                  "The **PIR** front end trips and wakes **Twig** out of its *4 µA* sleep.",
+                  "**Twig** runs an *800 ms* qualification pass at *2 mA* — PIR pulse shape plus lux check — and a rejected trip (heat shimmer, headlights) goes back to sleep having spent *0.0004 battery-days*.",
+                  "On a qualified trip, **Twig** raises **Bough**'s power rail; **Bough** boots from retained RAM in *400 ms* at *120 mA*.",
+                  "**Bough** records a *12 s* clip at *180 mA* — night adds *60 mA* of IR — into staging flash.",
+                  "*In parallel* **Twig** opens a TwigLink session to the **Loft** with an event pre-notice (camera, timestamp, estimated size).",
+                  "**Bough** hands the *2.4 MB* encoded clip to **Twig**, and the radio ships it in *8 s* at *45 mA*.",
+                  "The **Loft** acks the final chunk; **Twig** drops **Bough**'s rail and the camera is back at *4 µA*.",
+                  "**Twig** appends a wake receipt to its ledger: *0.91 mAh* total, or *0.20 battery-days* — one night event costs *a fifth of a day's allowance*.",
+                  "The **Loft** forwards the receipt with the clip manifest to **Abacus**.",
+                  "**Abacus** refolds the forecast — *five* night events a day spends the whole allowance, so today's *eleven* trims the display from *24* to *22* months — and the app graph updates.",
+                  "**Failure mode — battery low:** staged degradation — at *20%* live view is disabled, at *8%* clips cap at *5 s* and check-ins go daily, at *3%* the camera sends PIR text events only — *a last-gasp doorbell, not a camera*."
+                ],
+                "contract": {
+                  "title": "On the wire: wake receipt (camera → Loft → Abacus)",
+                  "fields": [
+                    {
+                      "k": "event_id",
+                      "v": "pc2214-9917",
+                      "g": "ties receipt to clip manifest"
+                    },
+                    {
+                      "k": "qual_ms",
+                      "v": "800",
+                      "g": "qualification time at 2 mA"
+                    },
+                    {
+                      "k": "rec_ms",
+                      "v": "12000",
+                      "g": "record time at 180 mA"
+                    },
+                    {
+                      "k": "ir",
+                      "v": "true",
+                      "g": "night event; +60 mA while recording"
+                    },
+                    {
+                      "k": "radio_ms",
+                      "v": "8200",
+                      "g": "TwigLink session length at 45 mA"
+                    },
+                    {
+                      "k": "mah",
+                      "v": "0.91",
+                      "g": "metered total for this wake",
+                      "hot": true
+                    },
+                    {
+                      "k": "days_cost",
+                      "v": "0.20",
+                      "g": "mAh ÷ 4.5 mAh daily allowance",
+                      "hot": true
+                    },
+                    {
+                      "k": "batt_pct",
+                      "v": "81",
+                      "g": "temperature-corrected gauge after the event"
+                    },
+                    {
+                      "k": "temp_c",
+                      "v": "-24",
+                      "g": "thermistor at wake"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "view": "step",
+                  "groups": {
+                    "cam": {
+                      "title": "Perch camera"
+                    }
+                  },
+                  "nodes": {
+                    "pir": {
+                      "title": "PIR front end",
+                      "sub": "analog gate",
+                      "icon": "antenna",
+                      "tint": "dev",
+                      "group": "cam"
+                    },
+                    "twig": {
+                      "title": "Twig WL-LP1",
+                      "sub": "4 µA sleeper",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "cam",
+                      "link": "https://github.com/wrenlight/perch-firmware/blob/main/twig/src/wake.c#L52"
+                    },
+                    "bough": {
+                      "title": "Bough WL-AP4",
+                      "sub": "video SoC",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "cam"
+                    },
+                    "loft": {
+                      "title": "Perch Loft",
+                      "sub": "sync module",
+                      "icon": "router",
+                      "tint": "cmd"
+                    },
+                    "abacus": {
+                      "title": "Abacus",
+                      "sub": "battery ledger",
+                      "icon": "cloud",
+                      "tint": "data",
+                      "link": "https://github.com/wrenlight/cloud/blob/main/services/abacus/forecast.go#L76"
+                    },
+                    "phone": {
+                      "title": "Owner phone",
+                      "sub": "forecast",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "pir",
+                        "twig",
+                        "bough"
+                      ],
+                      "loft"
+                    ],
+                    [
+                      "abacus",
+                      "phone"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "pir",
+                      "to": "twig",
+                      "kind": "int",
+                      "label": "trip"
+                    },
+                    {
+                      "from": "twig",
+                      "to": "bough",
+                      "kind": "int",
+                      "label": "rail"
+                    },
+                    {
+                      "from": "bough",
+                      "to": "twig",
+                      "kind": "int",
+                      "label": "clip"
+                    },
+                    {
+                      "from": "twig",
+                      "to": "loft",
+                      "kind": "twig",
+                      "label": "chunks 8 s"
+                    },
+                    {
+                      "from": "loft",
+                      "to": "abacus",
+                      "kind": "https",
+                      "label": "wake receipt"
+                    },
+                    {
+                      "from": "abacus",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "forecast"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "bat",
+                      "type": "battery",
+                      "title": "2× AA lithium",
+                      "unit": "%",
+                      "low": 20,
+                      "crit": 8,
+                      "initial": {
+                        "source": "cells",
+                        "charge": 81,
+                        "trend": "idle",
+                        "note": "24 months left",
+                        "cold": false
+                      }
+                    },
+                    {
+                      "id": "wf",
+                      "type": "waterfall",
+                      "title": "Wake budget",
+                      "spans": [
+                        {
+                          "id": "qual",
+                          "label": "qualify",
+                          "ms": 800
+                        },
+                        {
+                          "id": "boot",
+                          "label": "Bough boot · 120 mA",
+                          "ms": 400
+                        },
+                        {
+                          "id": "rec",
+                          "label": "record",
+                          "ms": 12000
+                        },
+                        {
+                          "id": "radio",
+                          "label": "TwigLink",
+                          "ms": 8200
+                        }
+                      ],
+                      "initial": {
+                        "reveal": 0
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Twig ledger",
+                      "tags": {
+                        "PWR": "#FFC53D",
+                        "QUAL": "#5AD8A6",
+                        "REC": "#38E1FF",
+                        "RF": "#FFB35C",
+                        "LEDGER": "#B58CFF"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "pir->twig",
+                      "text": "PIR trips; Twig wakes from 4 µA",
+                      "panels": {
+                        "bat": {
+                          "charge": 81,
+                          "trend": "draining",
+                          "note": "24 months left"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "twig awake"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "twig"
+                      ],
+                      "text": "800 ms qualification at 2 mA — real subject",
+                      "link": "https://github.com/wrenlight/perch-firmware/blob/main/twig/src/qualify.c#L118",
+                      "panels": {
+                        "wf": {
+                          "reveal": 1
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "QUAL",
+                              "text": "pulse+lux pass"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "twig->bough",
+                      "text": "Rail up; Bough boots in 400 ms at 120 mA",
+                      "panels": {
+                        "wf": {
+                          "reveal": 2
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "RF",
+                              "text": "pre-notice sent"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "bough"
+                      ],
+                      "text": "12 s clip records; night IR adds 60 mA",
+                      "panels": {
+                        "wf": {
+                          "reveal": 3
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "REC",
+                              "text": "12 s @ 240 mA"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "bough->twig",
+                      "text": "Clip handed to Twig for the radio",
+                      "panels": {}
+                    },
+                    {
+                      "edge": "twig->loft",
+                      "text": "TwigLink ships 2.4 MB in 8 s at 45 mA",
+                      "panels": {
+                        "wf": {
+                          "reveal": 4
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "RF",
+                              "text": "2.4 MB / 8 s @ 45 mA"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "twig"
+                      ],
+                      "text": "Final ack; rail drops; back to 4 µA",
+                      "panels": {
+                        "wf": {
+                          "reveal": 4,
+                          "total": "0.91 mAh = 0.20 battery-days"
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "loft->abacus",
+                        "abacus->phone"
+                      ],
+                      "text": "Receipt and clip manifest to Abacus; forecast refolds",
+                      "panels": {
+                        "bat": {
+                          "charge": 81,
+                          "note": "22 months at today's pace"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "LEDGER",
+                              "text": "11 events today"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "A leash made of sub-GHz",
+            "sections": [
+              {
+                "heading": "A leash made of sub-GHz",
+                "accent": "violet",
+                "text": [
+                  "**Roost** is the device registry and session service: each Loft holds one outbound persistent TLS channel to it, and it tracks per-camera supervision state; **Flitter** fans alerts out as a push. The TwigLink leash between **Twig** and the **Loft** is not persistent — it is a periodic check-in with a retry-and-backoff ladder, and going quiet for too long trips a supervision alarm."
+                ],
+                "bullets": [
+                  "Every *60 minutes* **Twig** wakes the radio for a *200 ms* check-in: sequence number, battery voltage, temperature, last RSSI.",
+                  "The **Loft** acks with a clock sync and pending flags — `settings changed`, `arm/disarm`, `firmware offer`. **Molt** (firmware staging) is the service behind the `firmware offer` flag: it *trickles* camera images over TwigLink in the supervision windows, so a sleeping camera never pays for a long download.",
+                  "On a missed ack **Twig** retries at *+2 s*, *+8 s*, and *+30 s*, hopping channels each attempt.",
+                  "Still unheard, **Twig** enters backoff — a check-in every *5 minutes* — while PIR rules stay armed locally and new clips park in the *64 MB* staging flash.",
+                  "After *two* silent check-in windows the **Loft** marks the camera `UNSUPERVISED` and reports it to **Roost**.",
+                  "**Roost** has **Flitter** push *\"Front gate unreachable since 14:20.\"*",
+                  "When the link returns, **Twig**'s check-in carries `missed=7, staged=2`, and the **Loft** pulls both staged clips.",
+                  "The **Loft** clears the supervision alarm through **Roost** and logs the RSSI history for the app's *placement advice*.",
+                  "**Failure mode — Loft loses power:** cameras stay armed on local rules, stage up to *3* clips in flash, and burn extra battery on retry backoff; **Roost** marks the site offline after *5* missed Loft heartbeats and pushes an outage alert. This is a site-wide failure, distinct from a single camera going `UNSUPERVISED` above.",
+                  "**Failure mode — RF interference on 908 MHz:** per-attempt channel hopping comes first, as above; if the noise floor stays high, the **Loft** raises an RF-environment alert with the RSSI history."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "twig": {
+                      "title": "Twig WL-LP1",
+                      "sub": "front gate cam",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "link": "https://github.com/wrenlight/perch-firmware/blob/main/twig/rf/mac.c#L207"
+                    },
+                    "loft": {
+                      "title": "Perch Loft",
+                      "sub": "concentrator",
+                      "icon": "router",
+                      "tint": "cmd"
+                    },
+                    "roost": {
+                      "title": "Roost",
+                      "sub": "supervision",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/wrenlight/cloud/blob/main/services/roost/supervise.go#L144"
+                    },
+                    "flitter": {
+                      "title": "Flitter",
+                      "sub": "push",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Owner phone",
+                      "sub": "app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "twig",
+                      "loft",
+                      "roost",
+                      "phone"
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "flitter",
+                      "side": "above"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "twig",
+                      "to": "loft",
+                      "kind": "twig",
+                      "label": "check-in"
+                    },
+                    {
+                      "from": "loft",
+                      "to": "twig",
+                      "kind": "twig",
+                      "ret": true,
+                      "label": "ack + flags"
+                    },
+                    {
+                      "from": "loft",
+                      "to": "roost",
+                      "kind": "https",
+                      "label": "unsupervised"
+                    },
+                    {
+                      "from": "roost",
+                      "to": "flitter",
+                      "kind": "int",
+                      "label": "alert"
+                    },
+                    {
+                      "from": "flitter",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "rf",
+                      "type": "signal",
+                      "title": "Links",
+                      "links": [
+                        {
+                          "id": "cam",
+                          "label": "Cam ↔ Loft",
+                          "transport": "subghz"
+                        },
+                        {
+                          "id": "wan",
+                          "label": "Loft ↔ cloud",
+                          "transport": "wifi"
+                        }
+                      ],
+                      "initial": {
+                        "cam": {
+                          "bars": 4,
+                          "state": "ok"
+                        },
+                        "wan": {
+                          "bars": 3,
+                          "state": "ok"
+                        }
+                      }
+                    },
+                    {
+                      "id": "sup",
+                      "type": "state",
+                      "title": "Supervision",
+                      "states": [
+                        "SUPERVISED",
+                        "RETRY",
+                        "UNSUPERVISED",
+                        "RECOVERED"
+                      ],
+                      "colors": {
+                        "UNSUPERVISED": "#FF6B6B",
+                        "RECOVERED": "#4ADE80"
+                      },
+                      "initial": {
+                        "state": "SUPERVISED"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Link journal",
+                      "tags": {
+                        "RF": "#FFB35C",
+                        "CAM": "#38E1FF",
+                        "APP": "#5AD8A6"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "twig->loft",
+                      "text": "Hourly 200 ms check-in: volts, temp, RSSI",
+                      "panels": {
+                        "rf": {
+                          "cam": {
+                            "bars": 4,
+                            "state": "ok"
+                          }
+                        },
+                        "sup": {
+                          "state": "SUPERVISED"
+                        }
+                      }
+                    },
+                    {
+                      "edge": "loft->twig",
+                      "text": "Ack carries clock sync and pending flags",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "RF",
+                              "text": "ack: no flags"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "twig",
+                        "loft"
+                      ],
+                      "text": "Ack missed — retry +2 s, +8 s, +30 s, hopping",
+                      "panels": {
+                        "rf": {
+                          "cam": {
+                            "bars": 1,
+                            "state": "retrying"
+                          }
+                        },
+                        "sup": {
+                          "state": "RETRY"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "RF",
+                              "text": "hopping channels each attempt"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "twig"
+                      ],
+                      "text": "Backoff: 5-min check-ins, clips park in 64 MB flash",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "CAM",
+                              "text": "staged=2, armed, 64 MB flash"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "loft->roost",
+                      "text": "Two silent windows → UNSUPERVISED to Roost",
+                      "panels": {
+                        "rf": {
+                          "cam": {
+                            "state": "lost"
+                          }
+                        },
+                        "sup": {
+                          "state": "UNSUPERVISED"
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "roost->flitter",
+                        "flitter->phone"
+                      ],
+                      "text": "\"Front gate unreachable since 14:20.\"",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "APP",
+                              "text": "outage push sent"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "twig",
+                        "loft"
+                      ],
+                      "text": "Link returns: missed=7, staged=2",
+                      "panels": {
+                        "rf": {
+                          "cam": {
+                            "bars": 4,
+                            "state": "ok"
+                          }
+                        },
+                        "sup": {
+                          "state": "RECOVERED"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "loft",
+                        "roost"
+                      ],
+                      "text": "Staged clips pulled; alarm cleared; RSSI logged",
+                      "panels": {
+                        "sup": {
+                          "state": "SUPERVISED"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "RF",
+                              "text": "rssi history saved"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "The module carries it home",
+            "sections": [
+              {
+                "heading": "The module carries it home",
+                "accent": "green",
+                "text": [
+                  "**Granary** is the clip object store for cloud-plan homes; it indexes USB-archive manifests for local-only homes *without holding their video*. Cameras never speak Wi-Fi at all — the **Loft** is the only hop onto the house network, so the radio link and the Wi-Fi uplink can fail independently."
+                ],
+                "bullets": [
+                  "**Twig** streams the clip as *1 KB* sequenced TwigLink chunks, each sealed with AES-CCM.",
+                  "The **Loft** writes chunks straight into its eMMC store-and-forward queue and acks with a window credit.",
+                  "Lost chunks are re-requested by NACK bitmap — *at most three* repair rounds, because retries bill the camera's battery, not the Loft's wall power.",
+                  "The **Loft** verifies the final MIC and acks `END`: responsibility transfers, and the camera is released to sleep.",
+                  "The **Loft** assembles the clip, computes its digest, and enqueues an upload manifest for **Granary**.",
+                  "The **Loft** uploads over house Wi-Fi TLS; on success the queue entry flips to `uploaded`.",
+                  "**Granary** triggers **Flitter**, and the push lands with a thumbnail.",
+                  "If Wi-Fi is down the queue simply holds — *32 GB* is about *three weeks* of clips — and drains oldest-first on return; USB-archive homes *skip the cloud leg entirely*.",
+                  "**Failure mode — house Wi-Fi drops:** cameras are unaffected (*they never speak Wi-Fi*); the **Loft** keeps taking clips into eMMC and drains the queue on return; pushes arrive late.",
+                  "**Failure mode — cloud down:** the **Loft** records and buffers as normal; USB-archive homes don't notice; cloud-plan homes see clips arrive in a burst afterward."
+                ],
+                "contract": {
+                  "title": "On the wire: TwigLink clip chunk (908.4 MHz frame)",
+                  "fields": [
+                    {
+                      "k": "net_id",
+                      "v": "0x7A31",
+                      "g": "Loft's network; leaves of other Lofts ignore it"
+                    },
+                    {
+                      "k": "cam_id",
+                      "v": "PC-2214",
+                      "g": "sending camera"
+                    },
+                    {
+                      "k": "seq",
+                      "v": "1847",
+                      "g": "chunk sequence within the clip"
+                    },
+                    {
+                      "k": "type",
+                      "v": "CLIP_CHUNK",
+                      "g": "frame class (CHECKIN, PRENOTICE, CLIP_CHUNK, END)"
+                    },
+                    {
+                      "k": "len",
+                      "v": "1024",
+                      "g": "payload bytes"
+                    },
+                    {
+                      "k": "mic",
+                      "v": "c41f…",
+                      "g": "AES-CCM tag; Loft drops the frame on mismatch",
+                      "hot": true
+                    }
+                  ]
+                },
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "twig": {
+                      "title": "Twig WL-LP1",
+                      "sub": "radio MAC",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "loft": {
+                      "title": "Perch Loft",
+                      "sub": "eMMC queue",
+                      "icon": "router",
+                      "tint": "cmd",
+                      "link": "https://github.com/wrenlight/loft-firmware/blob/main/src/queue/emmc_store.c#L91"
+                    },
+                    "granary": {
+                      "title": "Granary",
+                      "sub": "clip store",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/wrenlight/cloud/blob/main/services/granary/ingest.go#L60"
+                    },
+                    "flitter": {
+                      "title": "Flitter",
+                      "sub": "push",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Owner phone",
+                      "sub": "app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "twig",
+                      "loft",
+                      "granary",
+                      "phone"
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "flitter",
+                      "side": "above"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "twig",
+                      "to": "loft",
+                      "kind": "twig",
+                      "label": "1 KB chunks"
+                    },
+                    {
+                      "from": "loft",
+                      "to": "twig",
+                      "kind": "twig",
+                      "ret": true,
+                      "label": "credit / NACK"
+                    },
+                    {
+                      "from": "loft",
+                      "to": "granary",
+                      "kind": "https",
+                      "label": "upload TLS"
+                    },
+                    {
+                      "from": "granary",
+                      "to": "flitter",
+                      "kind": "int",
+                      "label": "notify"
+                    },
+                    {
+                      "from": "flitter",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push + thumb"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "mbx",
+                      "type": "queue",
+                      "title": "Loft — store-and-forward",
+                      "initial": {
+                        "state": "empty"
+                      }
+                    },
+                    {
+                      "id": "rf",
+                      "type": "signal",
+                      "title": "Links",
+                      "links": [
+                        {
+                          "id": "cam",
+                          "label": "Cam ↔ Loft",
+                          "transport": "subghz"
+                        },
+                        {
+                          "id": "wan",
+                          "label": "Loft ↔ cloud",
+                          "transport": "wifi"
+                        }
+                      ],
+                      "initial": {
+                        "cam": {
+                          "bars": 4,
+                          "state": "ok"
+                        },
+                        "wan": {
+                          "bars": 3,
+                          "state": "ok"
+                        }
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Queue journal",
+                      "tags": {
+                        "Q": "#5AD8A6",
+                        "RF": "#FFB35C",
+                        "APP": "#38E1FF"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "twig->loft",
+                      "text": "Sequenced AES-CCM chunks flow to the Loft",
+                      "panels": {
+                        "mbx": {
+                          "state": "enqueue",
+                          "label": "2.4 MB clip",
+                          "from": "Twig · TwigLink"
+                        },
+                        "rf": {
+                          "cam": {
+                            "bars": 4,
+                            "state": "ok"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "Q",
+                              "text": "1 KB chunks"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "loft->twig",
+                      "text": "Chunks land in the eMMC queue; credit returned",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "Q",
+                              "text": "window credit returned"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "loft",
+                        "twig"
+                      ],
+                      "text": "NACK bitmap repairs loss — 3 rounds max, battery pays",
+                      "panels": {
+                        "rf": {
+                          "cam": {
+                            "state": "retrying"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "RF",
+                              "text": "repair round 1"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "loft"
+                      ],
+                      "text": "Final MIC good; END acked — custody transfers, camera sleeps",
+                      "panels": {
+                        "mbx": {
+                          "state": "held",
+                          "reason": "custody with Loft — camera asleep"
+                        },
+                        "rf": {
+                          "cam": {
+                            "state": "ok"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "loft"
+                      ],
+                      "text": "Wi-Fi is down: the queue simply holds",
+                      "panels": {
+                        "rf": {
+                          "wan": {
+                            "bars": 0,
+                            "state": "lost"
+                          }
+                        },
+                        "mbx": {
+                          "reason": "Wi-Fi down — 32 GB holds 3 weeks"
+                        }
+                      }
+                    },
+                    {
+                      "edge": "loft->granary",
+                      "text": "Wi-Fi returns; upload drains oldest-first",
+                      "panels": {
+                        "rf": {
+                          "wan": {
+                            "bars": 3,
+                            "state": "ok"
+                          }
+                        },
+                        "mbx": {
+                          "state": "dequeue",
+                          "to": "→ Granary"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "Q",
+                              "text": "drain 1/1"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "granary"
+                      ],
+                      "text": "Digest verified; entry flips to uploaded",
+                      "panels": {
+                        "mbx": {
+                          "state": "empty"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "Q",
+                              "text": "sha256 ok"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "granary->flitter",
+                        "flitter->phone"
+                      ],
+                      "text": "Push lands with the thumbnail",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "APP",
+                              "text": "late, not lost"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "heading": "On the wire: the upload manifest",
+                "accent": "green",
+                "text": [
+                  "The Loft assembles the clip, computes its digest, and enqueues an upload manifest for Granary before it uploads over house Wi-Fi TLS."
+                ],
+                "contract": {
+                  "title": "On the wire: Loft → Granary upload manifest",
+                  "fields": [
+                    {
+                      "k": "clip_id"
+                    },
+                    {
+                      "k": "cam_id",
+                      "v": "PC-2214"
+                    },
+                    {
+                      "k": "sha256",
+                      "g": "digest checked after reassembly",
+                      "hot": true
+                    },
+                    {
+                      "k": "bytes"
+                    },
+                    {
+                      "k": "queued_at"
+                    },
+                    {
+                      "k": "attempts",
+                      "g": "counter"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Twenty-four below",
+            "sections": [
+              {
+                "heading": "Twenty-four below",
+                "accent": "#7DD3FC",
+                "text": [
+                  "Cold is the other side of Perch's battery math. **Sunrail** is the optional solar mount: a small panel plus a Li-ion buffer cell that *trickles* the AA rail, gated by a temperature-aware charge controller."
+                ],
+                "bullets": [
+                  "An *hourly* check-in reports the thermistor at *−24 °C*.",
+                  "The **Loft**'s next ack sets the camera's cold profile.",
+                  "**Twig** applies the limits: IR illuminator capped at *50%*, clip length capped *12 s → 8 s*, live view refused below *−30 °C*.",
+                  "The battery gauge switches models: Li-FeS₂ still delivers at *−24 °C* but sags under IR load, so **Twig** reads voltage under a known load and corrects along the temperature curve instead of trusting open-circuit volts.",
+                  "Qualification thresholds tighten — warm bodies against cold air trip the PIR harder, and small wildlife would otherwise wake **Bough** all night.",
+                  "On **Sunrail** mounts the charge controller suspends Li-ion charging below *0 °C* (plating risk) and reports `charge_suspended`; the panel still offsets daytime supervision draw.",
+                  "**Abacus** prices the cold in: *\"at −20 °C nightly, forecast 24 → 19 months.\"*",
+                  "If the discharge curve says alkaline, the app warns: *months not years*, and dead below *−10 °C* — lithium cells are *a requirement, not a suggestion*.",
+                  "**Failure mode — alkaline cells installed:** detected by discharge curve; the two-year contract is voided in the app copy and cold limits engage at *−10 °C* instead of *−30 °C*."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "groups": {
+                    "cam": {
+                      "title": "Perch camera"
+                    }
+                  },
+                  "nodes": {
+                    "twig": {
+                      "title": "Twig WL-LP1",
+                      "sub": "thermistor",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "cam",
+                      "link": "https://github.com/wrenlight/perch-firmware/blob/main/twig/src/coldprofile.c#L33"
+                    },
+                    "sunrail": {
+                      "title": "Sunrail mount",
+                      "sub": "solar buffer",
+                      "icon": "package",
+                      "tint": "dev",
+                      "group": "cam"
+                    },
+                    "loft": {
+                      "title": "Perch Loft",
+                      "sub": "cold profile",
+                      "icon": "router",
+                      "tint": "cmd"
+                    },
+                    "abacus": {
+                      "title": "Abacus",
+                      "sub": "forecast",
+                      "icon": "cloud",
+                      "tint": "data"
+                    },
+                    "phone": {
+                      "title": "Owner phone",
+                      "sub": "app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "twig",
+                        "sunrail"
+                      ],
+                      "loft"
+                    ],
+                    [
+                      "abacus",
+                      "phone"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "twig",
+                      "to": "loft",
+                      "kind": "twig",
+                      "label": "temp −24 °C"
+                    },
+                    {
+                      "from": "loft",
+                      "to": "twig",
+                      "kind": "twig",
+                      "ret": true,
+                      "label": "cold profile"
+                    },
+                    {
+                      "from": "sunrail",
+                      "to": "twig",
+                      "kind": "int",
+                      "label": "hold"
+                    },
+                    {
+                      "from": "loft",
+                      "to": "abacus",
+                      "kind": "https",
+                      "label": "cold report"
+                    },
+                    {
+                      "from": "abacus",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "forecast −5 mo"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "bat",
+                      "type": "battery",
+                      "title": "2× AA lithium",
+                      "unit": "%",
+                      "low": 20,
+                      "crit": 8,
+                      "initial": {
+                        "source": "cells",
+                        "trend": "draining",
+                        "note": "24 months left",
+                        "cold": false
+                      }
+                    },
+                    {
+                      "id": "prof",
+                      "type": "state",
+                      "title": "Cold profile",
+                      "states": [
+                        "NORMAL",
+                        "COLD",
+                        "DEEP-COLD"
+                      ],
+                      "colors": {
+                        "COLD": "#7DD3FC",
+                        "DEEP-COLD": "#38BDF8"
+                      },
+                      "initial": {
+                        "state": "NORMAL"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Cold journal",
+                      "tags": {
+                        "TEMP": "#7DD3FC",
+                        "PROF": "#B58CFF",
+                        "GAUGE": "#FFC53D",
+                        "QUAL": "#5AD8A6",
+                        "CHG": "#FF6B6B",
+                        "LEDGER": "#38E1FF"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "twig->loft",
+                      "text": "Hourly check-in reports −24 °C",
+                      "panels": {
+                        "bat": {
+                          "note": "24 months left"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "TEMP",
+                              "text": "−24 °C at wake"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "loft->twig",
+                      "text": "Ack sets the cold profile",
+                      "panels": {
+                        "prof": {
+                          "state": "COLD"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PROF",
+                              "text": "IR 50% · clip 12→8 s"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "twig"
+                      ],
+                      "text": "Gauge switches to voltage-under-load model",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "GAUGE",
+                              "text": "temperature-curve correction applied"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "twig"
+                      ],
+                      "text": "PIR thresholds tighten against wildlife trips",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "QUAL",
+                              "text": "qualification thresholds tightened"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "sunrail->twig",
+                      "text": "Sunrail suspends Li-ion charging below 0 °C",
+                      "panels": {
+                        "bat": {
+                          "source": "solar",
+                          "cold": true
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "CHG",
+                              "text": "charge_suspended — plating risk"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "loft->abacus",
+                      "text": "Cold report reaches Abacus",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "LEDGER",
+                              "text": "cold tax applied"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "abacus->phone",
+                      "text": "Forecast reprices: 24 → 19 months",
+                      "panels": {
+                        "bat": {
+                          "note": "19 months at −20 °C nights"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "twig"
+                      ],
+                      "text": "Deep cold: below −30 °C live view refuses",
+                      "panels": {
+                        "prof": {
+                          "state": "DEEP-COLD"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PROF",
+                              "text": "live view refused below −30 °C"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

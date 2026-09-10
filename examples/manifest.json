@@ -1,0 +1,360 @@
+{
+  "pages": [
+    {
+      "file": "auralis-presence/presence.html",
+      "spec": "auralis-presence/presence.spec.json",
+      "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy",
+      "family": "auralis-presence",
+      "description": "mmWave room sensing, fall check-in escalation, sleep/inactivity monitoring, and offline autonomy over Atrium",
+      "tags": [
+        "radar",
+        "mmwave",
+        "fall-detection",
+        "offline",
+        "mqtt"
+      ],
+      "widgets": [
+        "buffer",
+        "leds",
+        "log",
+        "radar",
+        "signal",
+        "state"
+      ]
+    },
+    {
+      "file": "basecraft-keep/keep.html",
+      "spec": "basecraft-keep/keep.spec.json",
+      "title": "Keep — Local AI Hub & Camera Fleet",
+      "family": "basecraft-keep",
+      "description": "Local-first hub pairs with Lookout cameras: face recognition on the Facet NPU, cross-camera tracking, storage rotation, and relay-brokered remote viewing.",
+      "tags": [
+        "security",
+        "camera",
+        "edge-ai",
+        "storage",
+        "e2ee"
+      ],
+      "widgets": [
+        "gauge",
+        "log",
+        "orbit",
+        "screen",
+        "state",
+        "tiles",
+        "xray"
+      ]
+    },
+    {
+      "file": "chime-radar/chime-radar.html",
+      "spec": "chime-radar/chime-radar.spec.json",
+      "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake",
+      "family": "chime-radar",
+      "description": "Radar-gated doorbell alerts, aerial visit paths, and radar-before-camera wake sequencing",
+      "tags": [
+        "radar",
+        "doorbell",
+        "distance-gating",
+        "visit-path"
+      ],
+      "widgets": [
+        "battery",
+        "buffer",
+        "leds",
+        "log",
+        "queue",
+        "radar",
+        "screen",
+        "signal",
+        "state",
+        "waterfall"
+      ]
+    },
+    {
+      "file": "cumulus/cumulus-flow.html",
+      "spec": "cumulus/cumulus-flow.spec.json",
+      "title": "Cumulus Command & OTA Paths",
+      "family": "cumulus",
+      "description": "Cloud video pipeline page generated from the cumulus design doc",
+      "tags": [
+        "cloud",
+        "pipeline"
+      ],
+      "widgets": []
+    },
+    {
+      "file": "doorbell/doorbell-from-spec.html",
+      "spec": "doorbell/doorbell-from-spec.spec.json",
+      "title": "Chime Doorbell — motion to clip",
+      "family": "doorbell",
+      "description": "Two-chip battery doorbell: motion to clip, plus the thermal envelope walkthrough",
+      "tags": [
+        "doorbell",
+        "dual-chip",
+        "thermal"
+      ],
+      "widgets": [
+        "gauge",
+        "leds",
+        "log",
+        "pir",
+        "queue",
+        "screen",
+        "state",
+        "thermo"
+      ]
+    },
+    {
+      "file": "doorbell-atlas/atlas.html",
+      "spec": "doorbell-atlas/atlas.spec.json",
+      "title": "Lookout Feature Atlas",
+      "family": "doorbell-atlas",
+      "description": "The doorbell feature atlas: six tabs covering the full device click-through",
+      "tags": [
+        "doorbell",
+        "atlas"
+      ],
+      "widgets": [
+        "gauge",
+        "leds",
+        "log",
+        "orbit",
+        "screen",
+        "state",
+        "waterfall",
+        "xray",
+        "zoneframe"
+      ]
+    },
+    {
+      "file": "farwatch-sentinel/sentinel.html",
+      "spec": "farwatch-sentinel/sentinel.spec.json",
+      "title": "Sentinel — Cellular Off-Grid Solar Camera",
+      "family": "farwatch-sentinel",
+      "description": "Sentinel off-grid solar camera: daily energy ledger, continuous ring recording with event indexing, cellular data-cap tiers, and cloudy-week degradation to preservation mode.",
+      "tags": [
+        "solar",
+        "battery",
+        "cellular",
+        "buffer",
+        "camera"
+      ],
+      "widgets": [
+        "battery",
+        "buffer",
+        "gauge",
+        "log",
+        "state"
+      ]
+    },
+    {
+      "file": "gridseye-bastion/bastion.html",
+      "spec": "gridseye-bastion/bastion.spec.json",
+      "title": "Bastion — PoE Camera Fleet & Stronghold NVR",
+      "family": "gridseye-bastion",
+      "description": "Bastion: PoE camera fleet & Stronghold NVR — edge detection, firmware rollout, UPS power domain, LAN-only viewing",
+      "tags": [
+        "camera",
+        "nvr",
+        "poe",
+        "firmware",
+        "ups",
+        "power",
+        "lan"
+      ],
+      "widgets": [
+        "battery",
+        "buffer",
+        "gauge",
+        "log",
+        "orbit",
+        "queue",
+        "screen",
+        "signal",
+        "state",
+        "tiles"
+      ]
+    },
+    {
+      "file": "halovista-aegis/aegis.html",
+      "spec": "halovista-aegis/aegis.spec.json",
+      "title": "HaloVista Aegis — cloud, keys, and a human in the loop",
+      "family": "halovista-aegis",
+      "description": "HaloVista Aegis: E2EE enrollment, AI history search, virtual guard, and plan lapse",
+      "tags": [
+        "e2ee",
+        "ai-search",
+        "virtual-guard",
+        "entitlements",
+        "camera"
+      ],
+      "widgets": [
+        "leds",
+        "log",
+        "screen",
+        "state",
+        "xray"
+      ]
+    },
+    {
+      "file": "halovista-mirrorline/mirrorline.html",
+      "spec": "halovista-mirrorline/mirrorline.spec.json",
+      "title": "Mirrorline — Event-Store Replication",
+      "family": "halovista-mirrorline",
+      "description": "Mirrorline event-store replication: quorum writes, read-your-writes, primary election, and WAL tail resync",
+      "tags": [
+        "database",
+        "replication",
+        "quorum",
+        "election"
+      ],
+      "widgets": [
+        "buffer",
+        "gauge",
+        "log",
+        "orbit",
+        "tiles",
+        "waterfall"
+      ]
+    },
+    {
+      "file": "hearthline-failover/failover.html",
+      "spec": "hearthline-failover/failover.spec.json",
+      "title": "hearthline Sentry Cloud — cross-region failover",
+      "family": "hearthline-failover",
+      "description": "Cross-region failover for hearthline Sentry Cloud: journal-first replication, region loss reconciliation, fencing, and failback",
+      "tags": [
+        "failover",
+        "cross-region",
+        "journal",
+        "fencing"
+      ],
+      "widgets": [
+        "buffer",
+        "log",
+        "orbit",
+        "signal",
+        "tiles"
+      ]
+    },
+    {
+      "file": "hearthline-sentry-panel/sentry-panel.html",
+      "spec": "hearthline-sentry-panel/sentry-panel.spec.json",
+      "title": "hearthline Sentry Panel — Monitored Alarm",
+      "family": "hearthline-sentry-panel",
+      "description": "hearthline's monitored alarm panel: broadband-to-cellular failover, walk-test sensor coverage, and the duress disarm's silent-upstream incident.",
+      "tags": [
+        "alarm",
+        "monitoring",
+        "failover",
+        "duress"
+      ],
+      "widgets": [
+        "leds",
+        "log",
+        "queue",
+        "signal",
+        "state",
+        "tiles"
+      ]
+    },
+    {
+      "file": "loomworks-trellis/trellis.html",
+      "spec": "loomworks-trellis/trellis.spec.json",
+      "title": "loomworks Trellis — Camera-as-Hub",
+      "family": "loomworks-trellis",
+      "description": "Camera-as-hub: BR failover, Zigbee-to-Matter bridging, offline automations, and dual-fabric commissioning",
+      "tags": [
+        "thread",
+        "zigbee",
+        "matter",
+        "camera",
+        "hub"
+      ],
+      "widgets": [
+        "leds",
+        "log",
+        "orbit",
+        "queue",
+        "signal",
+        "state",
+        "tiles"
+      ]
+    },
+    {
+      "file": "nestrel-warden/warden.html",
+      "spec": "nestrel-warden/warden.spec.json",
+      "title": "Nestrel Warden — a cloud camera that remembers the outage",
+      "family": "nestrel-warden",
+      "description": "Warden — wired cloud camera that buffers up to an hour offline and back-fills with dedup on reconnect",
+      "tags": [
+        "camera",
+        "offline-buffer",
+        "firmware-rollout",
+        "dedup"
+      ],
+      "widgets": [
+        "buffer",
+        "log",
+        "screen",
+        "signal",
+        "state"
+      ]
+    },
+    {
+      "file": "showcase/widgets.html",
+      "spec": "showcase/widgets.spec.json",
+      "title": "Widget Showcase — every panel type on one page",
+      "family": "showcase",
+      "description": "Reference gallery: all 19 inspector widgets on one page, each driven by a step-through",
+      "tags": [
+        "reference",
+        "showcase",
+        "widgets"
+      ],
+      "widgets": [
+        "battery",
+        "buffer",
+        "gauge",
+        "inflight",
+        "leds",
+        "log",
+        "orbit",
+        "phone",
+        "pir",
+        "queue",
+        "radar",
+        "screen",
+        "signal",
+        "state",
+        "thermo",
+        "tiles",
+        "waterfall",
+        "xray",
+        "zoneframe"
+      ]
+    },
+    {
+      "file": "wrenlight-perch/perch.html",
+      "spec": "wrenlight-perch/perch.spec.json",
+      "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module",
+      "family": "wrenlight-perch",
+      "description": "wrenlight Perch: battery-day ledger, TwigLink supervision, Loft clip upload, and cold-weather limits",
+      "tags": [
+        "battery",
+        "twiglink",
+        "iot-camera",
+        "supervision",
+        "cold-weather"
+      ],
+      "widgets": [
+        "battery",
+        "log",
+        "queue",
+        "signal",
+        "state",
+        "waterfall"
+      ]
+    }
+  ]
+}

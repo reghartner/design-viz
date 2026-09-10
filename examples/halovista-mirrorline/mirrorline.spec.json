@@ -1,0 +1,368 @@
+{
+  "page": {
+    "title": "Mirrorline — Event-Store Replication",
+    "contract": "1",
+    "protocols": {
+      "wal": { "label": "WAL stream", "color": "#A78BFA" }
+    },
+    "lanes": {
+      "WAL": { "color": "#38E1FF" },
+      "API": { "color": "#4ADE80" },
+      "ELECT": { "color": "#F471B5" },
+      "RS": { "color": "#7DD3FC" }
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Overview",
+            "sections": [
+              {
+                "heading": "Mirrorline: a replicated event store",
+                "accent": "blue",
+                "text": [
+                  "Mirrorline is the replicated event store behind Vault. A write commits only at quorum: the primary plus its same-region sync replica. A third replica in a second region follows asynchronously for disaster recovery.",
+                  "Elections are coordinated by **Marshal** with epoch fencing, so a deposed primary can never acknowledge writes."
+                ],
+                "bullets": [
+                  { "text": "**Safety property**: an acknowledged event record survives the loss of any one node with *zero* data loss, and survives the loss of a whole region with bounded, measured loss (the async lag)." },
+                  { "text": "**Hardware** — three store nodes:", "sub": [
+                    "`vault-a1` (primary) and `vault-a2` (sync replica) — region A, on separate racks and power feeds",
+                    "`vault-b1` (async replica) — region B"
+                  ] },
+                  "Each node: NVMe WAL device separate from the data volume."
+                ]
+              }
+            ]
+          },
+          {
+            "label": "Write quorum",
+            "sections": [
+              {
+                "heading": "A write means quorum",
+                "accent": "cyan",
+                "text": [
+                  "A write commits only at quorum — the primary plus its same-region sync replica — before it is acknowledged to the caller."
+                ],
+                "bullets": [
+                  "A camera event record arrives at Vault on `vault-a1` (primary, epoch 12).",
+                  "The primary appends to its WAL and hands the record to Sluice.",
+                  "Sluice streams it to `vault-a2` (sync) and `vault-b1` (async) in parallel.",
+                  "`vault-a2` fsyncs and acks offset 4181.",
+                  "Quorum reached (primary + sync): the write is ACKNOWLEDGED to the caller.",
+                  "`vault-b1` acks 2.4 s later; its lag is recorded, not waited on.",
+                  "Chronicle consumes the committed record and indexes it.",
+                  "Commit budget: append 2 ms, ship 3 ms, sync fsync+ack 9 ms, total 14 ms."
+                ],
+                "contract": {
+                  "title": "On the wire: WAL ship frame (Sluice)",
+                  "fields": [
+                    { "k": "epoch", "v": "12", "g": "writing primary's fencing epoch; followers refuse stale epochs" },
+                    { "k": "offset", "v": "4181", "g": "monotonic WAL position — the ack currency", "hot": true },
+                    { "k": "crc", "v": "0x9E441C02", "g": "frame checksum, verified before fsync" },
+                    { "k": "kind", "v": "\"event.put\"", "g": "record type in the frame" }
+                  ]
+                },
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "api": { "title": "Vault API", "sub": "event writes", "icon": "cloud", "tint": "cmd",
+                             "link": "https://github.com/halovista/platform/blob/main/vault/store.go#L112" },
+                    "a1": { "title": "vault-a1", "sub": "primary · epoch 12", "icon": "db", "tint": "data", "group": "rega" },
+                    "a2": { "title": "vault-a2", "sub": "sync replica", "icon": "db", "tint": "data", "group": "rega" },
+                    "b1": { "title": "vault-b1", "sub": "async replica", "icon": "db", "tint": "data", "group": "regb" },
+                    "chron": { "title": "Chronicle", "sub": "event index", "icon": "server", "tint": "data" }
+                  },
+                  "groups": {
+                    "rega": { "title": "Region A" },
+                    "regb": { "title": "Region B" }
+                  },
+                  "rows": [
+                    ["api", ["a1", "a2"], "b1"],
+                    ["chron"]
+                  ],
+                  "edges": [
+                    { "from": "api", "to": "a1", "kind": "int", "label": "event.put" },
+                    { "from": "a1", "to": "a2", "kind": "wal" },
+                    { "from": "a1", "to": "b1", "kind": "wal", "label": "async ship" },
+                    { "from": "a1", "to": "chron", "kind": "int", "label": "committed" }
+                  ],
+                  "panels": [
+                    { "id": "set", "type": "tiles", "title": "Replica set",
+                      "tiles": [ { "id": "a1", "label": "vault-a1" }, { "id": "a2", "label": "vault-a2" }, { "id": "b1", "label": "vault-b1" } ],
+                      "states": ["PRIMARY", "SYNC", "ASYNC", "DOWN", "FENCED", "RESYNC"],
+                      "colors": { "PRIMARY": "#4ADE80", "SYNC": "#38E1FF", "ASYNC": "#A78BFA", "DOWN": "#FF6B5E", "FENCED": "#FFB454", "RESYNC": "#7DD3FC" },
+                      "initial": { "a1": { "state": "PRIMARY", "sub": "epoch 12" }, "a2": { "state": "SYNC" }, "b1": { "state": "ASYNC" } } },
+                    { "id": "lat", "type": "waterfall", "title": "Commit budget",
+                      "spans": [
+                        { "id": "app", "label": "WAL append", "ms": 2 },
+                        { "id": "ship", "label": "ship to followers", "ms": 3 },
+                        { "id": "sync", "label": "sync fsync + ack", "ms": 9 }
+                      ],
+                      "initial": { "reveal": 0 } },
+                    { "id": "log", "type": "log", "tags": { "WAL": "#38E1FF", "IDX": "#A78BFA" } }
+                  ],
+                  "steps": [
+                    { "edge": "api->a1", "text": "A camera event record arrives at vault-a1 (primary, epoch 12)." },
+                    { "edges": ["a1->a2", "a1->b1"], "lane": "WAL",
+                      "text": "The primary appends to its WAL and hands the record to Sluice, which streams it to vault-a2 and vault-b1 in parallel.",
+                      "link": "https://github.com/halovista/platform/blob/main/sluice/ship.go#L64",
+                      "panels": { "lat": { "reveal": 2 }, "log": { "log": [ { "tag": "WAL", "text": "append @ 4181" } ] } } },
+                    { "nodes": ["a2"], "lane": "WAL",
+                      "text": "vault-a2 fsyncs and acks offset 4181 — quorum reached (primary + sync): the write is ACKNOWLEDGED to the caller.",
+                      "panels": { "lat": { "reveal": 3 }, "set": { "a2": { "state": "SYNC", "sub": "ack 4181" } },
+                                  "log": { "log": [ { "tag": "WAL", "text": "quorum 2/3 — ACK caller" } ] } } },
+                    { "nodes": ["b1"],
+                      "text": "vault-b1 acks 2.4 s later; its lag is recorded, not waited on.",
+                      "panels": { "set": { "b1": { "state": "ASYNC", "sub": "lag 2.4 s" } } } },
+                    { "edge": "a1->chron",
+                      "text": "Chronicle consumes the committed record and indexes it — commit budget: append 2 ms, ship 3 ms, sync fsync+ack 9 ms, total 14 ms.",
+                      "panels": { "log": { "log": [ { "tag": "IDX", "text": "indexed 4181" } ] } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Read your writes",
+            "sections": [
+              {
+                "heading": "Read your own writes",
+                "accent": "violet",
+                "text": [
+                  "A resident's own upload is always visible to their next read, even while the async replica lags behind."
+                ],
+                "bullets": [
+                  "A resident uploads a clip; the event commits at quorum in region A.",
+                  "The resident's app immediately lists recent events.",
+                  "Conduit sees the session's write token (offset 4188) and routes the read to a node at-or-past that offset: primary or sync replica.",
+                  "`vault-b1` is 8 s behind after a burst; reads without a token MAY land there (stale-tolerant surfaces only: dashboards, counts).",
+                  "The lag gauge tracks `vault-b1` seconds-behind; alerting at 30 s."
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "phone": { "title": "Resident App", "sub": "session app", "icon": "phone", "tint": "cmd" },
+                    "conduit": { "title": "Conduit", "sub": "API router", "icon": "cloud", "tint": "cmd" },
+                    "a1": { "title": "vault-a1", "sub": "primary", "icon": "db", "tint": "data", "group": "rega" },
+                    "a2": { "title": "vault-a2", "sub": "sync replica", "icon": "db", "tint": "data", "group": "rega" },
+                    "b1": { "title": "vault-b1", "sub": "async replica", "icon": "db", "tint": "data", "group": "regb" }
+                  },
+                  "groups": {
+                    "rega": { "title": "Region A" },
+                    "regb": { "title": "Region B" }
+                  },
+                  "rows": [
+                    ["phone", "conduit"],
+                    [["a1", "a2"], "b1"]
+                  ],
+                  "edges": [
+                    { "from": "phone", "to": "conduit", "kind": "https", "label": "list events" },
+                    { "from": "conduit", "to": "a2", "kind": "int", "label": "read @4188" },
+                    { "from": "conduit", "to": "b1", "kind": "int", "label": "stale-ok read" }
+                  ],
+                  "panels": [
+                    { "id": "lag", "type": "gauge", "title": "vault-b1 lag", "unit": "s", "max": 30, "initial": { "value": 0 } },
+                    { "id": "log", "type": "log", "tags": { "WAL": "#38E1FF", "API": "#4ADE80" } }
+                  ],
+                  "steps": [
+                    { "nodes": ["a1", "a2"], "lane": "WAL",
+                      "text": "A resident uploads a clip; the event commits at quorum in region A — session token = offset 4188.",
+                      "panels": { "log": { "log": [ { "tag": "WAL", "text": "token 4188 issued" } ] } } },
+                    { "edge": "phone->conduit", "lane": "API",
+                      "text": "The resident's app immediately lists recent events.",
+                      "panels": { "log": { "log": [ { "tag": "API", "text": "read-your-writes" } ] } } },
+                    { "edge": "conduit->a2", "lane": "API",
+                      "text": "Conduit sees the write token and routes the read to a node at-or-past offset 4188: primary or sync replica.",
+                      "panels": { "log": { "log": [ { "tag": "API", "text": "routed to sync — at-or-past 4188 ✓" } ] } } },
+                    { "edge": "conduit->b1", "lane": "API",
+                      "text": "vault-b1 is 8 s behind after a burst — tokenless reads MAY still land there (stale-tolerant surfaces only: dashboards, counts).",
+                      "panels": { "lag": { "value": 8 }, "log": { "log": [ { "tag": "API", "text": "stale-tolerant surface only" } ] } } },
+                    { "nodes": ["b1"], "lane": "API",
+                      "text": "The lag gauge tracks vault-b1's seconds-behind continuously — alerting at 30 s.",
+                      "panels": { "log": { "log": [ { "tag": "API", "text": "alert threshold 30 s" } ] } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Election",
+            "sections": [
+              {
+                "heading": "Eleven seconds without a primary",
+                "accent": "red",
+                "text": [
+                  "Epoch fencing means a deposed primary can never acknowledge writes again, and the default is safety over availability: writes block rather than accept a degraded single-node acknowledgment."
+                ],
+                "bullets": [
+                  "`vault-a1` loses both power feeds; heartbeats to Marshal stop.",
+                  "Marshal waits the miss budget (3 beats · 2 s), then opens an election.",
+                  "Only `vault-a2` is quorum-eligible (sync, offset-complete at 4203).",
+                  "Marshal mints epoch 13, fences epoch 12, promotes `vault-a2` to primary.",
+                  "Sluice re-targets: new primary streams to `vault-b1` (async, catching up).",
+                  "Writes stay BLOCKED: a lone primary cannot form quorum, and the default is safety over availability (§6) — no degraded single-node acknowledgments.",
+                  "`vault-b1` reaches offset parity; Marshal promotes it to SYNC.",
+                  "Writes resume; total write-unavailability 24 s (11 s to promotion, 13 s to a new sync). RPO through the crash: 0 — every acknowledged record was on the sync replica by definition.",
+                  "Chronicle resumes from the committed stream, no re-index needed."
+                ],
+                "contract": {
+                  "title": "On the wire: election result (Marshal)",
+                  "fields": [
+                    { "k": "epoch", "v": "13", "g": "new fencing epoch; embedded in every subsequent frame" },
+                    { "k": "primary", "v": "\"vault-a2\"", "g": "the only node allowed to acknowledge writes", "hot": true },
+                    { "k": "eligible", "v": "[\"vault-a2\"]", "g": "offset-complete candidates at election time" },
+                    { "k": "fenced", "v": "[\"vault-a1@12\"]", "g": "deposed writers and their dead epochs" }
+                  ]
+                },
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "marshal": { "title": "Marshal", "sub": "election coordinator", "icon": "key", "tint": "auth",
+                                 "link": "https://github.com/halovista/platform/blob/main/marshal/elect.go#L37" },
+                    "a1": { "title": "vault-a1", "sub": "primary · epoch 12", "icon": "db", "tint": "data", "group": "rega" },
+                    "a2": { "title": "vault-a2", "sub": "sync replica", "icon": "db", "tint": "data", "group": "rega" },
+                    "b1": { "title": "vault-b1", "sub": "async replica", "icon": "db", "tint": "data", "group": "regb" }
+                  },
+                  "groups": {
+                    "rega": { "title": "Region A" },
+                    "regb": { "title": "Region B" }
+                  },
+                  "rows": [
+                    ["marshal"],
+                    [["a1", "a2"], "b1"]
+                  ],
+                  "edges": [
+                    { "from": "marshal", "to": "a2", "kind": "int", "label": "promote e13" },
+                    { "from": "marshal", "to": "a1", "kind": "int", "label": "fence e12" },
+                    { "from": "a2", "to": "b1", "kind": "wal", "label": "resume ship" }
+                  ],
+                  "panels": [
+                    { "id": "set2", "type": "tiles", "title": "Replica set",
+                      "tiles": [ { "id": "a1", "label": "vault-a1" }, { "id": "a2", "label": "vault-a2" }, { "id": "b1", "label": "vault-b1" } ],
+                      "states": ["PRIMARY", "SYNC", "ASYNC", "DOWN", "FENCED", "RESYNC"],
+                      "colors": { "PRIMARY": "#4ADE80", "SYNC": "#38E1FF", "ASYNC": "#A78BFA", "DOWN": "#FF6B5E", "FENCED": "#FFB454", "RESYNC": "#7DD3FC" },
+                      "initial": { "a1": { "state": "PRIMARY", "sub": "epoch 12" }, "a2": { "state": "SYNC" }, "b1": { "state": "ASYNC" } } },
+                    { "id": "role", "type": "orbit", "title": "Election",
+                      "states": ["STEADY", "MISSING", "ELECTING", "FENCING", "PROMOTED"],
+                      "colors": { "STEADY": "#4ADE80", "MISSING": "#FFB454", "ELECTING": "#A78BFA", "FENCING": "#FF6B5E", "PROMOTED": "#4ADE80" },
+                      "initial": { "state": "STEADY" } },
+                    { "id": "log", "type": "log", "tags": { "ELECT": "#F471B5", "WAL": "#38E1FF" } }
+                  ],
+                  "steps": [
+                    { "nodes": ["a1"],
+                      "text": "Both feeds lost — vault-a1's heartbeats to Marshal stop.",
+                      "panels": { "set2": { "a1": { "state": "DOWN" } }, "role": { "state": "MISSING", "via": "heartbeats stopped" } } },
+                    { "nodes": ["marshal"], "lane": "ELECT",
+                      "text": "Marshal waits the miss budget — 3 beats at 2 s each — then opens an election: only vault-a2 (sync, offset-complete at 4203) is eligible.",
+                      "panels": { "role": { "state": "ELECTING" }, "log": { "log": [ { "tag": "ELECT", "text": "eligible: a2 @ 4203" } ] } } },
+                    { "edge": "marshal->a1", "lane": "ELECT",
+                      "text": "Epoch 13 is minted; epoch 12 is fenced.",
+                      "panels": { "role": { "state": "FENCING" }, "log": { "log": [ { "tag": "ELECT", "text": "fence a1@12" } ] } } },
+                    { "edge": "marshal->a2", "lane": "WAL",
+                      "text": "vault-a2 is promoted at 11 s — writes stay BLOCKED: a lone primary cannot form quorum, and the default is safety over availability (no degraded single-node acknowledgments).",
+                      "panels": { "set2": { "a2": { "state": "PRIMARY", "sub": "epoch 13 · blocked" } }, "role": { "state": "PROMOTED" },
+                                  "log": { "log": [ { "tag": "WAL", "text": "RPO 0 — every acked record was on the sync replica" }, { "tag": "WAL", "text": "writes blocked: quorum unmet" } ] } } },
+                    { "edge": "a2->b1",
+                      "text": "Sluice re-targets — the new primary streams to vault-b1, catching up.",
+                      "link": "https://github.com/halovista/platform/blob/main/sluice/ship.go#L64",
+                      "panels": { "set2": { "b1": { "state": "ASYNC", "sub": "catching up" } } } },
+                    { "nodes": ["b1"], "lane": "WAL",
+                      "text": "vault-b1 reaches offset parity 13 s later and is promoted to SYNC — writes resume; total write-unavailability was 24 s.",
+                      "panels": { "set2": { "b1": { "state": "SYNC", "sub": "parity @ 4203" }, "a2": { "state": "PRIMARY", "sub": "epoch 13" } },
+                                  "log": { "log": [ { "tag": "WAL", "text": "quorum restored — writes resume" } ] } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Resync",
+            "sections": [
+              {
+                "heading": "Rewind the tail that never happened",
+                "accent": "green",
+                "text": [
+                  "A rejoining node's diverged WAL tail is discarded, not merged — those records were never promised to any caller."
+                ],
+                "bullets": [
+                  "`vault-a1` returns with a diverged WAL tail: 12 records past 4203 that never reached quorum (never acknowledged to any caller).",
+                  "Drawbridge compares epochs: the tail belongs to fenced epoch 12 — it is discarded (those records were never promised to anyone).",
+                  "Drawbridge rewinds to the divergence point and replays epoch-13 WAL from the new primary.",
+                  "Checksums verify; `vault-a1` joins as the new sync replica.",
+                  "Roles settle: a2 primary, a1 sync, b1 async — quorum protection restored."
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "bridge": { "title": "Drawbridge", "sub": "resync", "icon": "gear", "tint": "cmd",
+                                "link": "https://github.com/halovista/platform/blob/main/drawbridge/rewind.go#L29" },
+                    "a1": { "title": "vault-a1", "sub": "diverged tail", "icon": "db", "tint": "data", "group": "rega" },
+                    "a2": { "title": "vault-a2", "sub": "primary · epoch 13", "icon": "db", "tint": "data", "group": "rega" }
+                  },
+                  "groups": {
+                    "rega": { "title": "Region A" }
+                  },
+                  "rows": [
+                    ["bridge"],
+                    [["a1", "a2"]]
+                  ],
+                  "edges": [
+                    { "from": "bridge", "to": "a1", "kind": "int", "label": "rewind" },
+                    { "from": "a2", "to": "a1", "kind": "wal" }
+                  ],
+                  "panels": [
+                    { "id": "set3", "type": "tiles", "title": "Replica set",
+                      "tiles": [ { "id": "a1", "label": "vault-a1" }, { "id": "a2", "label": "vault-a2" }, { "id": "b1", "label": "vault-b1" } ],
+                      "states": ["PRIMARY", "SYNC", "ASYNC", "DOWN", "FENCED", "RESYNC"],
+                      "colors": { "PRIMARY": "#4ADE80", "SYNC": "#38E1FF", "ASYNC": "#A78BFA", "DOWN": "#FF6B5E", "FENCED": "#FFB454", "RESYNC": "#7DD3FC" },
+                      "initial": { "a1": { "state": "DOWN" }, "a2": { "state": "PRIMARY", "sub": "epoch 13" }, "b1": { "state": "SYNC" } } },
+                    { "id": "tail", "type": "buffer", "title": "vault-a1 WAL tail", "segments": 12, "capacity": "12 diverged records",
+                      "initial": { "head": 0, "cells": [] } },
+                    { "id": "log", "type": "log", "tags": { "RS": "#4ADE80" } }
+                  ],
+                  "steps": [
+                    { "nodes": ["a1"],
+                      "text": "vault-a1 returns holding a diverged WAL tail — 12 records past offset 4203 that never reached quorum (never acknowledged to any caller).",
+                      "panels": { "tail": { "cells": ["buffered", "buffered", "buffered", "buffered", "buffered", "buffered", "buffered", "buffered", "buffered", "buffered", "buffered", "buffered"], "head": 11, "note": "12 unacked epoch-12 records" },
+                                  "set3": { "a1": { "state": "RESYNC" } } } },
+                    { "edge": "bridge->a1", "lane": "RS",
+                      "text": "Drawbridge compares epochs: the tail belongs to fenced epoch 12 — it is discarded (those records were never promised to anyone).",
+                      "panels": { "tail": { "mark": [[0, 11, "dropped"]], "note": "epoch-12 tail dropped" },
+                                  "log": { "log": [ { "tag": "RS", "text": "rewind to 4203" } ] } } },
+                    { "edge": "a2->a1",
+                      "text": "Drawbridge rewinds to the divergence point and replays epoch-13 WAL from the new primary.",
+                      "panels": { "tail": { "mark": [[0, 11, "uploading"]], "note": "replaying epoch 13" } } },
+                    { "nodes": ["a1"],
+                      "text": "Checksums verify; vault-a1 joins as the new sync replica.",
+                      "panels": { "tail": { "mark": [[0, 11, "uploaded"]], "note": "checksums verified" },
+                                  "set3": { "a1": { "state": "SYNC" } } } },
+                    { "nodes": ["a2"], "lane": "RS",
+                      "text": "Roles settle: a2 primary, a1 sync, b1 async — quorum protection restored.",
+                      "panels": { "set3": { "a2": { "state": "PRIMARY", "sub": "epoch 13" } },
+                                  "log": { "log": [ { "tag": "RS", "text": "a2 primary · a1 sync · b1 async" } ] } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Failure modes",
+            "sections": [
+              {
+                "heading": "Failure modes",
+                "accent": "amber",
+                "bullets": [
+                  "**Sync replica loss**: writes degrade to primary-only acknowledgment ONLY if the operator flips the documented degraded mode; default behavior is to block writes (safety over availability) while Marshal promotes `vault-b1` to sync after catch-up (the same rule §4.3 follows after an election).",
+                  "**Region B loss**: no write impact; DR copy lags until the region returns.",
+                  "**Sluice stall**: lag alarms fire; election is NOT triggered by lag alone.",
+                  "**Double primary**: prevented by epoch fencing — followers refuse frames from a fenced epoch, and acknowledgment requires follower acks."
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

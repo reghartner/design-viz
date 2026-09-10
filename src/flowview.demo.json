@@ -1,0 +1,36 @@
+{
+  "page": {
+    "__demo": true,
+    "title": "Flowview template — demo spec",
+    "skin": "aurora",
+    "sections": [
+      {
+        "heading": "Replace this spec",
+        "accent": "cyan",
+        "source": "https://example.com/hld/demo#overview",
+        "text": ["This is the built-in demo. Inject your own spec into the flowspec JSON block at the top of this file; the page renders it on load."],
+        "diagram": {
+          "nodes": {
+            "a": {"title": "Client", "sub": "mobile app", "icon": "phone", "tint": "cmd"},
+            "b": {"title": "API", "sub": "gateway", "icon": "cloud", "tint": "cmd", "link": "https://example.com/hld/demo#api"},
+            "c": {"title": "Broker", "sub": "MQTT", "icon": "antenna", "tint": "mqtt"},
+            "d": {"title": "Device", "sub": "t/1 subscriber", "icon": "chip", "tint": "dev"}
+          },
+          "rows": [["a", "b", "c", "d"]],
+          "edges": [
+            {"from": "a", "to": "b", "kind": "https", "label": "POST /msg"},
+            {"from": "b", "to": "c", "kind": "mqtt", "label": "PUBLISH t/1"},
+            {"from": "c", "to": "d", "kind": "mqtt", "label": "deliver"},
+            {"from": "d", "to": "c", "kind": "mqtt", "ret": true, "label": "PUBACK", "bend": 26, "labelDy": 22}
+          ],
+          "steps": [
+            {"edge": "a->b", "text": "Client sends the message"},
+            {"edge": "b->c", "text": "API publishes to the broker", "link": "https://example.com/hld/demo#publish"},
+            {"edge": "c->d", "text": "Broker delivers to the subscriber"},
+            {"edge": "d->c", "text": "Device acknowledges"}
+          ]
+        }
+      }
+    ]
+  }
+}

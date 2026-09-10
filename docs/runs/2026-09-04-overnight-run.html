@@ -1,0 +1,127 @@
+<title>Design Visualizer Overnight Run</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#F2F3F5; --ink:#1B2027; --sub:#5A6473; --line:#D9DCE2; --accent:#0B8FA9;
+    --card:#FFFFFF; --good:#177A45;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36; --accent:#43C8E0;
+      --card:#151A21; --good:#4ADE80;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36; --accent:#43C8E0;
+    --card:#151A21; --good:#4ADE80;
+  }
+  body{background:var(--bg); color:var(--ink); font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif;}
+  .wrap{max-width:960px; margin:0 auto; padding:42px 22px 60px;}
+  .eyebrow{font:600 11px/1 'IBM Plex Mono',monospace; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin:0 0 10px;}
+  h1{font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(26px,4vw,36px); letter-spacing:-.015em; margin:0 0 8px; text-wrap:balance;}
+  h2{font-family:'Sora',sans-serif; font-weight:600; font-size:19px; margin:34px 0 10px;}
+  .lede{color:var(--sub); max-width:70ch; margin:0;}
+  .stats{display:flex; gap:10px; flex-wrap:wrap; margin-top:18px;}
+  .stat{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 16px;}
+  .stat b{display:block; font:700 20px 'Sora',sans-serif; font-variant-numeric:tabular-nums;}
+  .stat span{font:500 11px 'IBM Plex Mono',monospace; color:var(--sub);}
+  .tblwrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--card);}
+  table{border-collapse:collapse; width:100%; font-size:13.5px;}
+  th{font:600 11px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.08em; color:var(--sub); text-align:left; padding:10px 14px; border-bottom:1px solid var(--line);}
+  td{padding:9px 14px; border-bottom:1px solid var(--line); vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  a{color:var(--accent); text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  a:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px;}
+  .mono{font:500 12px 'IBM Plex Mono',monospace;}
+  .trail{font:500 11.5px 'IBM Plex Mono',monospace; color:var(--sub);}
+  .trail b{color:var(--good); font-weight:600;}
+  ul{margin:8px 0; padding-left:22px;}
+  li{margin:4px 0;}
+  .note{color:var(--sub); font-size:13.5px;}
+  .green{color:var(--good); font-weight:600;}
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">reghartner/design-viz · overnight autonomous run · 2026-09-04</p>
+  <h1>Design Visualizer Overnight Run</h1>
+  <p class="lede">Everything below happened after you went to bed: six pull requests merged with
+  continuous integration green on every one, four engine waves, a seven-tab generated product atlas,
+  and a version trail on each artifact. Open any artifact's version picker to watch the progression.</p>
+
+  <div class="stats">
+    <div class="stat"><b>7</b><span>PRs merged</span></div>
+    <div class="stat"><b>82</b><span>unit tests (30 py · 52 node)</span></div>
+    <div class="stat"><b>3</b><span>CI jobs, all green</span></div>
+    <div class="stat"><b>9</b><span>artifact versions dropped</span></div>
+    <div class="stat"><b>4</b><span>new widget types</span></div>
+  </div>
+
+  <h2>Artifacts — the progression trail</h2>
+  <div class="tblwrap"><table>
+    <tr><th>page</th><th>what it is</th><th>version trail (oldest → newest)</th></tr>
+    <tr>
+      <td>Lookout Feature Atlas</td>
+      <td>Seven-tab fictional doorbell product story, generated entirely from one JSON spec</td>
+      <td class="trail">atlas-v1 → wave2-rebuild → atlas-v2-widgets → <b>atlas-v3-full</b> (THE definitive page: tab 2 now carries the complete 12-step device click-through — hardware panel, power gauge, log, full viewfinder REC sequence)</td>
+    </tr>
+    <tr>
+      <td>Flowspec Engine</td>
+      <td>Interactive workbench: editable spec + Render, schema reference, lint messages</td>
+      <td class="trail">initial → page-spec → tabs-and-stepper → permalinks → wave1-engine → wave2-meeting → wave3-widgets → <b>wave4-dx</b></td>
+    </tr>
+    <tr>
+      <td>Chime Doorbell Northstar</td>
+      <td>Three synchronized views: flow board, two-chip hardware, viewfinder REC moment</td>
+      <td class="trail">hand-built → <b>generated-from-json</b> (same experience, pure spec)</td>
+    </tr>
+    <tr>
+      <td>Cumulus Command &amp; OTA Paths</td>
+      <td>The pipeline proof: page a zero-context GPT-5.6 generated from a fixture design doc</td>
+      <td class="trail">generated-v1 → meeting-feedback-v2 → <b>wave2-auto-layout</b> (all manual nudges deleted)</td>
+    </tr>
+    <tr>
+      <td>Flowline Mockups</td>
+      <td>The four visual treatments; 04 Aurora Combined is the chosen direction</td>
+      <td class="trail">three-treatments → <b>aurora-combined-pick</b></td>
+    </tr>
+    <tr>
+      <td>Device Lens</td>
+      <td>Early device-inspector click-through exploration (pump scenario)</td>
+      <td class="trail">single version — superseded by the northstar</td>
+    </tr>
+  </table></div>
+
+  <h2>Pull requests — all merged, CI green</h2>
+  <div class="tblwrap"><table>
+    <tr><th>#</th><th>title</th><th>what it does</th></tr>
+    <tr><td class="mono">1</td><td>Doorbell Feature Atlas v1</td><td>Six-tab product page written only as a spec, on the day-one engine</td></tr>
+    <tr><td class="mono">2</td><td>Wave 1: engine + tests + CI</td><td>Engine single-sourced into src/ with a build script; 32 tests + GitHub Actions; containment groups, step lanes, edgeless steps, packet chains, five inspector-panel widget types; doorbell page regenerated from pure JSON as the acceptance gate</td></tr>
+    <tr><td class="mono">3</td><td>mermaid2spec</td><td>Sequence-diagram → skeleton-spec converter; unconvertible blocks land in a todos list</td></tr>
+    <tr><td class="mono">4</td><td>Wave 2: meeting + layout</td><td>Deep links (#tab&amp;step), presenter mode (fullscreen + keys), print view, stable step ids; automatic label/edge/float de-collision — manual nudge fields deleted from every example, zero residual overlap verified by scripted geometry checks</td></tr>
+    <tr><td class="mono">5</td><td>Widgets wave + Atlas v2</td><td>Latency waterfall, state-machine orbit, camera zone-frame with privacy-mask blackout, encryption x-ray (who-can-decrypt per hop); atlas grows the Offline &amp; Recovery tab</td></tr>
+    <tr><td class="mono">6</td><td>DX wave</td><td>Standalone validator CLI (same code as the in-page validator, cannot drift), five lint rule classes, contract version field, ?spec= adjacent-file loading, node-version test parity, seeded broken-spec fixtures</td></tr>
+    <tr><td class="mono">7</td><td>Atlas v3: one definitive page</td><td>The full 12-step device click-through folded into the atlas's tab 2 (two-chip hardware panel, power gauge, event log, complete viewfinder REC sequence); talk section deduplicated; spec-only change</td></tr>
+  </table></div>
+
+  <h2>The authoring path, as it now stands</h2>
+  <ul>
+    <li>Design doc's mermaid block → <span class="mono">tools/mermaid2spec.py</span> → skeleton spec</li>
+    <li>LLM agent + <span class="mono">contract/authoring-contract.md</span> enriches: prose facts, icons, permalinks, panels, steps</li>
+    <li><span class="mono">node tools/validate.js spec.json</span> — field-path errors + lint warnings, no browser needed</li>
+    <li><span class="mono">python3 tools/inject.py spec.json template/flowview.html out.html</span> — finished page</li>
+    <li>Meeting feedback in plain English → agent edits the JSON → re-inject → republish same URL</li>
+  </ul>
+
+  <h2>Honest gaps</h2>
+  <ul class="note">
+    <li>Spec diff view (visual before/after of two spec versions) not built — logged as planned in CHANGELOG.</li>
+    <li>Generated doorbell page vs the hand-built one: generic typed widgets instead of circuit-board art; simpler scene walk-in; no interrupt-line flare.</li>
+    <li>Inspector panels render in declaration order, single column — no per-panel layout control yet.</li>
+    <li>Containment-group members must sit adjacently; the boundary is a bounding box, not a layout constraint.</li>
+    <li>Widget catalog still unbuilt: power Sankey, day-strip timeline, clip-retention lifeline, duplex audio meter, ring buffer, spectrum, geo scatter.</li>
+    <li>Repo is private; making it public is your call.</li>
+  </ul>
+
+  <p class="note" style="margin-top:26px">Repo: <a href="https://github.com/reghartner/design-viz">github.com/reghartner/design-viz</a> · build drift <span class="green">zero</span> (committed pages reproduce byte-identical from src/)</p>
+</div>

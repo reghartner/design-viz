@@ -1,0 +1,3 @@
+{"page": {"blocks": [{"heading": "Unknown row node", "diagram": {
+  "nodes": {"a": {"title": "A"}},
+  "rows": [["a", "missing"]]}}]}}

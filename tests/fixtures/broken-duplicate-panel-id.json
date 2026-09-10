@@ -1,0 +1,5 @@
+{"page": {"blocks": [{"heading": "Dup panel", "diagram": {
+  "nodes": {"a": {"title": "A"}},
+  "rows": [["a"]],
+  "panels": [{"id": "p", "type": "state", "states": ["X"]},
+             {"id": "p", "type": "gauge", "max": 10}]}}]}}

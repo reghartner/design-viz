@@ -1,0 +1,1213 @@
+{
+  "page": {
+    "title": "Keep — Local AI Hub & Camera Fleet",
+    "contract": "1",
+    "skin": "aurora",
+    "protocols": {
+      "lanv": {
+        "label": "LAN video",
+        "color": "#5AD8A6"
+      },
+      "sealed": {
+        "label": "E2EE media",
+        "color": "#B58CFF"
+      }
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Name at the door",
+            "sections": [
+              {
+                "heading": "Name at the door",
+                "accent": "#2FBFA8",
+                "text": [
+                  "Flow 1 — hub-local face recognition on a motion event. The face gallery is enrolled on the LAN: the owner names a face crop in the app, Facewright embeds it on the NPU and back-tags past events; only a gallery version counter ever reaches Rollbook.",
+                  "Foundry — firmware image staging; the hub pulls images and re-serves cameras."
+                ],
+                "bullets": [
+                  "**Lookout B4's LP wake controller** trips on PIR and raises the video SoC's power rail.",
+                  "The camera starts encoding and pushes the stream to **Fleetd** over LAN Wi-Fi, with its on-camera detector's person boxes muxed in as a metadata track.",
+                  "**Fleetd** hands boxed frames to **Facewright**.",
+                  "**Facewright** crops the face and runs the embedding on the Facet NPU (`34 ms`/frame).",
+                  "**Facewright** matches against the gallery — \"Dana\", score `0.91` — and passes the identity to **Vaultd**.",
+                  "**Vaultd** writes the clip with the identity tag and indexes the event.",
+                  "The hub notifies **Beacon** over the control channel with text-only metadata: event id, camera name, \"Dana\". No pixels leave the LAN.",
+                  "**Beacon** hands the notice to **Crier**, which pushes \"Dana at the driveway\" to the owner's phone; a LAN app fetches the thumbnail from the hub directly, an off-LAN app opens Flow 4."
+                ],
+                "contract": {
+                  "title": "On the wire: control-channel event notice (hub → Beacon)",
+                  "fields": [
+                    {
+                      "k": "hub_id",
+                      "v": "K2-0F3A",
+                      "g": "claiming hub"
+                    },
+                    {
+                      "k": "event_id",
+                      "v": "ev_88213",
+                      "g": "hub-local event key"
+                    },
+                    {
+                      "k": "cam",
+                      "v": "driveway",
+                      "g": "owner-assigned camera name"
+                    },
+                    {
+                      "k": "kind",
+                      "v": "face_match",
+                      "g": "event class"
+                    },
+                    {
+                      "k": "who",
+                      "v": "Dana",
+                      "g": "gallery display name; empty for strangers",
+                      "hot": true
+                    },
+                    {
+                      "k": "ts",
+                      "v": "1757066112",
+                      "g": "event start, epoch seconds"
+                    },
+                    {
+                      "k": "clip_ref",
+                      "v": "vault://ev_88213",
+                      "g": "fetchable only via a hub session",
+                      "hot": true
+                    }
+                  ]
+                },
+                "diagram": {
+                  "groups": {
+                    "cam": {
+                      "title": "Lookout B4"
+                    },
+                    "hub": {
+                      "title": "Keep K2"
+                    }
+                  },
+                  "nodes": {
+                    "lp": {
+                      "title": "LB-LP0 wake",
+                      "sub": "6 µA PIR gate",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "cam",
+                      "link": "https://github.com/basecraft/lookout-firmware/blob/main/b4/lp0/wake.c#L44"
+                    },
+                    "soc": {
+                      "title": "LB-AP2 video",
+                      "sub": "2K encode",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "cam"
+                    },
+                    "fleetd": {
+                      "title": "Fleetd",
+                      "sub": "LAN links",
+                      "icon": "router",
+                      "tint": "cmd",
+                      "group": "hub",
+                      "link": "https://github.com/basecraft/keep-hub/blob/main/daemons/fleetd/pair.go#L61"
+                    },
+                    "facew": {
+                      "title": "Facewright",
+                      "sub": "Facet NPU",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "group": "hub",
+                      "link": "https://github.com/basecraft/keep-hub/blob/main/daemons/facewright/gallery.rs#L118"
+                    },
+                    "vault": {
+                      "title": "Vaultd",
+                      "sub": "segment store",
+                      "icon": "db",
+                      "tint": "data",
+                      "group": "hub",
+                      "link": "https://github.com/basecraft/keep-hub/blob/main/daemons/vaultd/rotate.go#L87"
+                    },
+                    "beacon": {
+                      "title": "Beacon",
+                      "sub": "ctl channel",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/basecraft/cloud/blob/main/services/beacon/broker.go#L233"
+                    },
+                    "crier": {
+                      "title": "Crier",
+                      "sub": "push fan-out",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Owner phone",
+                      "sub": "app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "lp",
+                        "soc"
+                      ],
+                      "fleetd",
+                      "facew",
+                      "vault"
+                    ],
+                    [
+                      "beacon",
+                      "crier",
+                      "phone"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "lp",
+                      "to": "soc",
+                      "kind": "int",
+                      "label": "wake"
+                    },
+                    {
+                      "from": "soc",
+                      "to": "fleetd",
+                      "kind": "lanv",
+                      "label": "stream+boxes"
+                    },
+                    {
+                      "from": "fleetd",
+                      "to": "facew",
+                      "kind": "int",
+                      "label": "boxed frames"
+                    },
+                    {
+                      "from": "facew",
+                      "to": "vault",
+                      "kind": "int",
+                      "label": "tag \"Dana\""
+                    },
+                    {
+                      "from": "fleetd",
+                      "to": "beacon",
+                      "kind": "https",
+                      "label": "notify (text)"
+                    },
+                    {
+                      "from": "beacon",
+                      "to": "crier",
+                      "kind": "int",
+                      "label": "push req"
+                    },
+                    {
+                      "from": "crier",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "cam",
+                      "type": "screen",
+                      "title": "Lookout B4",
+                      "scene": "person-at-door-night",
+                      "initial": {
+                        "mode": "off"
+                      }
+                    },
+                    {
+                      "id": "fw",
+                      "type": "state",
+                      "title": "Facewright",
+                      "states": [
+                        "IDLE",
+                        "EMBED",
+                        "MATCH"
+                      ],
+                      "colors": {
+                        "MATCH": "#38E1FF"
+                      },
+                      "initial": {
+                        "state": "IDLE"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Hub journal",
+                      "tags": {
+                        "PWR": "#FFC53D",
+                        "NPU": "#38E1FF",
+                        "NET": "#5AD8A6"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "lp->soc",
+                      "text": "PIR trips; LP raises the video rail",
+                      "panels": {
+                        "cam": {
+                          "mode": "boot"
+                        },
+                        "fw": {
+                          "state": "IDLE"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "B4 rail up"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "soc->fleetd",
+                      "text": "Camera streams to the hub, boxes muxed in",
+                      "panels": {
+                        "cam": {
+                          "mode": "live"
+                        }
+                      }
+                    },
+                    {
+                      "edge": "fleetd->facew",
+                      "text": "Fleetd hands boxed frames to Facewright",
+                      "panels": {
+                        "fw": {
+                          "state": "EMBED"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "facew"
+                      ],
+                      "text": "Embedding runs on the Facet NPU, 34 ms",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NPU",
+                              "text": "embed 34 ms"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "facew"
+                      ],
+                      "text": "Gallery match: Dana 0.91",
+                      "panels": {
+                        "fw": {
+                          "state": "MATCH"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NPU",
+                              "text": "Dana 0.91"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "facew->vault",
+                      "text": "Clip stored with identity tag",
+                      "panels": {
+                        "cam": {
+                          "mode": "rec"
+                        }
+                      }
+                    },
+                    {
+                      "edge": "fleetd->beacon",
+                      "text": "Text-only notice up the control channel",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "notify: no pixels"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "beacon->crier",
+                        "crier->phone"
+                      ],
+                      "text": "Push lands; thumbnail stays on the LAN",
+                      "panels": {
+                        "cam": {
+                          "mode": "save",
+                          "banner": "CLIP ON HUB"
+                        },
+                        "fw": {
+                          "state": "IDLE"
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Hand the runner off",
+            "sections": [
+              {
+                "heading": "Hand the runner off",
+                "accent": "violet",
+                "text": [
+                  "Flow 2 — cross-camera tracking and the one-clip incident."
+                ],
+                "bullets": [
+                  "The driveway camera's event reaches **Stitcher**, which opens a track with a body re-ID embedding (works without a face).",
+                  "**Stitcher** consults the adjacency graph and asks **Fleetd** to pre-wake the yard and porch cameras.",
+                  "**Fleetd** sends wake commands so the battery cameras skip their own PIR wait.",
+                  "The subject exits the driveway frame edge; **Stitcher** closes segment 1 and predicts the yard as next.",
+                  "The yard camera streams; **Stitcher** matches the re-ID embedding at `0.87` and appends segment 2 to the same track.",
+                  "The porch camera picks the subject up the same way; the track closes after `20 s` with no matches anywhere.",
+                  "**Stitcher** pulls the three segments from **Vaultd**, trims dead air, and concatenates one incident clip with per-camera chapter marks.",
+                  "**Vaultd** stores the assembled clip as a single event referencing its source segments.",
+                  "**Crier** pushes \"One visitor crossed 3 cameras — 48 s clip ready.\""
+                ],
+                "diagram": {
+                  "groups": {
+                    "hub": {
+                      "title": "Keep K2"
+                    }
+                  },
+                  "nodes": {
+                    "drive": {
+                      "title": "Driveway B4",
+                      "sub": "segment 1",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "yard": {
+                      "title": "Yard B4",
+                      "sub": "segment 2",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "porch": {
+                      "title": "Porch camera",
+                      "sub": "segment 3",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "stitch": {
+                      "title": "Stitcher",
+                      "sub": "re-ID tracks",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "group": "hub",
+                      "link": "https://github.com/basecraft/keep-hub/blob/main/daemons/stitcher/track.rs#L204"
+                    },
+                    "fleetd": {
+                      "title": "Fleetd",
+                      "sub": "wake fan-out",
+                      "icon": "router",
+                      "tint": "cmd",
+                      "group": "hub",
+                      "link": "https://github.com/basecraft/keep-hub/blob/main/daemons/fleetd/pair.go#L61"
+                    },
+                    "vault": {
+                      "title": "Vaultd",
+                      "sub": "segment store",
+                      "icon": "db",
+                      "tint": "data",
+                      "group": "hub",
+                      "link": "https://github.com/basecraft/keep-hub/blob/main/daemons/vaultd/rotate.go#L87"
+                    },
+                    "crier": {
+                      "title": "Crier",
+                      "sub": "push",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "drive",
+                        "yard",
+                        "porch"
+                      ],
+                      [
+                        "stitch",
+                        "fleetd",
+                        "vault"
+                      ],
+                      "crier"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "drive",
+                      "to": "stitch",
+                      "kind": "lanv",
+                      "label": "segment 1"
+                    },
+                    {
+                      "from": "stitch",
+                      "to": "fleetd",
+                      "kind": "int",
+                      "label": "wake"
+                    },
+                    {
+                      "from": "fleetd",
+                      "to": "yard",
+                      "kind": "int",
+                      "label": "wake cmd"
+                    },
+                    {
+                      "from": "fleetd",
+                      "to": "porch",
+                      "kind": "int",
+                      "label": "wake cmd"
+                    },
+                    {
+                      "from": "yard",
+                      "to": "stitch",
+                      "kind": "lanv",
+                      "label": "segment 2"
+                    },
+                    {
+                      "from": "porch",
+                      "to": "stitch",
+                      "kind": "lanv",
+                      "label": "segment 3"
+                    },
+                    {
+                      "from": "stitch",
+                      "to": "vault",
+                      "kind": "int",
+                      "label": "clip"
+                    },
+                    {
+                      "from": "vault",
+                      "to": "crier",
+                      "kind": "https",
+                      "label": "push (text)"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "fleet",
+                      "type": "tiles",
+                      "title": "Camera fleet",
+                      "tiles": [
+                        {
+                          "id": "drive",
+                          "label": "Driveway"
+                        },
+                        {
+                          "id": "yard",
+                          "label": "Yard"
+                        },
+                        {
+                          "id": "porch",
+                          "label": "Porch"
+                        },
+                        {
+                          "id": "door",
+                          "label": "Doorbell"
+                        }
+                      ],
+                      "initial": {
+                        "drive": {
+                          "state": "IDLE"
+                        },
+                        "yard": {
+                          "state": "IDLE"
+                        },
+                        "porch": {
+                          "state": "IDLE"
+                        },
+                        "door": {
+                          "state": "IDLE",
+                          "sub": "wired"
+                        }
+                      }
+                    },
+                    {
+                      "id": "trk",
+                      "type": "state",
+                      "title": "Cross-camera track",
+                      "states": [
+                        "OPEN",
+                        "HANDOFF",
+                        "CLOSED"
+                      ],
+                      "colors": {
+                        "HANDOFF": "#B58CFF"
+                      },
+                      "initial": {
+                        "state": "OPEN"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Stitcher journal",
+                      "tags": {
+                        "TRK": "#B58CFF",
+                        "CLIP": "#38E1FF",
+                        "NET": "#5AD8A6"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "drive->stitch",
+                      "text": "Driveway event opens a track (re-ID, no face needed)",
+                      "panels": {
+                        "trk": {
+                          "state": "OPEN"
+                        },
+                        "fleet": {
+                          "drive": {
+                            "state": "TRACKING"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "stitch->fleetd",
+                      "text": "Stitcher asks Fleetd to pre-wake the neighbors",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "TRK",
+                              "text": "adjacency: yard, porch"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "fleetd->yard",
+                        "fleetd->porch"
+                      ],
+                      "text": "Wake fan-out — battery cams skip their PIR wait",
+                      "panels": {
+                        "fleet": {
+                          "yard": {
+                            "state": "ARMED"
+                          },
+                          "porch": {
+                            "state": "ARMED"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "stitch"
+                      ],
+                      "text": "Subject leaves the driveway frame; segment 1 closes",
+                      "panels": {
+                        "trk": {
+                          "state": "HANDOFF"
+                        },
+                        "fleet": {
+                          "drive": {
+                            "state": "IDLE"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "yard->stitch",
+                      "text": "Yard matches the embedding at 0.87 — same track",
+                      "panels": {
+                        "fleet": {
+                          "yard": {
+                            "state": "TRACKING"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "TRK",
+                              "text": "re-ID 0.87 yard"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "porch->stitch",
+                      "text": "Porch takes the final leg; track closes after 20 s quiet",
+                      "panels": {
+                        "trk": {
+                          "state": "CLOSED"
+                        },
+                        "fleet": {
+                          "porch": {
+                            "state": "TRACKING"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "stitch->vault",
+                      "text": "Three segments trimmed into one incident clip",
+                      "panels": {
+                        "fleet": {
+                          "yard": {
+                            "state": "IDLE"
+                          },
+                          "porch": {
+                            "state": "IDLE"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "CLIP",
+                              "text": "3 segs → 48 s"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "vault->crier",
+                      "text": "\"One visitor, three cameras\" push",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "push text only"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "The disk never fills",
+            "sections": [
+              {
+                "heading": "The disk never fills",
+                "accent": "amber",
+                "text": [
+                  "Flow 3 — storage rotation with protected events."
+                ],
+                "bullets": [
+                  "**Vaultd** appends recording segments per camera until disk fill crosses the `92%` high-water mark.",
+                  "**Vaultd**'s rotation pass walks the segment index oldest-first.",
+                  "Unprotected segments are unlinked until fill drops to the `85%` low-water mark.",
+                  "*Protected events* — user-starred clips and alarm-tagged incidents — are skipped and survive overwrite regardless of age.",
+                  "If the protected share exceeds its `25%` cap, **Vaultd** stops auto-protecting new incidents and flags the app for review.",
+                  "**Vaultd** writes a rotation rollbook entry: bytes freed, oldest surviving day, protected count.",
+                  "The app's storage page reads the rollbook: \"62 days on disk · oldest May 3 · 214 protected.\""
+                ],
+                "diagram": {
+                  "groups": {
+                    "hub": {
+                      "title": "Keep K2"
+                    }
+                  },
+                  "nodes": {
+                    "cams": {
+                      "title": "Lookout fleet",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "vault": {
+                      "title": "Vaultd",
+                      "sub": "rotation pass",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "group": "hub",
+                      "link": "https://github.com/basecraft/keep-hub/blob/main/daemons/vaultd/rotate.go#L87"
+                    },
+                    "disk": {
+                      "title": "8 TB HDD",
+                      "sub": "segment store",
+                      "icon": "db",
+                      "tint": "data",
+                      "group": "hub"
+                    },
+                    "phone": {
+                      "title": "Owner phone",
+                      "sub": "storage page",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "cams",
+                      [
+                        "vault",
+                        "disk"
+                      ],
+                      "phone"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "cams",
+                      "to": "vault",
+                      "kind": "lanv",
+                      "label": "segments"
+                    },
+                    {
+                      "from": "vault",
+                      "to": "disk",
+                      "kind": "int",
+                      "label": "I/O"
+                    },
+                    {
+                      "from": "vault",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "rollbook view"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "fill",
+                      "type": "gauge",
+                      "title": "Disk fill",
+                      "unit": "%",
+                      "max": 100,
+                      "initial": {
+                        "value": 92
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Rotation rollbook",
+                      "tags": {
+                        "ROT": "#FFC53D",
+                        "APP": "#5AD8A6"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "cams->vault",
+                      "text": "Segments append; fill crosses the 92% high-water mark",
+                      "panels": {
+                        "fill": {
+                          "value": 92
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "ROT",
+                              "text": "high-water hit"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "vault->disk",
+                      "text": "Rotation pass walks the index oldest-first",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "ROT",
+                              "text": "scan from May 3"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "vault",
+                        "disk"
+                      ],
+                      "text": "Oldest unprotected segments unlinked"
+                    },
+                    {
+                      "nodes": [
+                        "disk"
+                      ],
+                      "text": "Protected incidents skipped — they survive overwrite",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "ROT",
+                              "text": "kept 214 protected"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "vault",
+                        "disk"
+                      ],
+                      "text": "Fill back at the 85% low-water mark; pass ends",
+                      "panels": {
+                        "fill": {
+                          "value": 85
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "vault"
+                      ],
+                      "text": "Protected share checked against its 25% cap"
+                    },
+                    {
+                      "edge": "vault->phone",
+                      "text": "Storage page: 62 days on disk, oldest May 3",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "APP",
+                              "text": "62 days · 214 kept"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Seen from afar, read by no one",
+            "sections": [
+              {
+                "heading": "Seen from afar, read by no one",
+                "accent": "green",
+                "text": [
+                  "Flow 4 — remote viewing brokered through the relay."
+                ],
+                "bullets": [
+                  "The off-LAN app asks **Beacon** for a session to hub `K2-0F3A`, presenting its auth token.",
+                  "**Beacon** checks ownership with **Rollbook** and issues a session ticket plus a relay candidate list.",
+                  "**Beacon** forwards the offer down the hub's persistent control channel to **Porter**.",
+                  "**Porter** and the app exchange connectivity candidates through **Beacon** — signaling only.",
+                  "A direct P2P path fails (symmetric NAT), so both sides attach to the same **Passage** relay node.",
+                  "**Porter** derives the media key from the pairing secret shared at claim time — a secret the cloud never held.",
+                  "**Passage** forwards encrypted frames both ways; it can count bytes but cannot decrypt one.",
+                  "The app decrypts and renders the live view with a \"relayed\" path badge.",
+                  "On teardown **Passage** logs byte counts only; off the hub's disk, the video exists nowhere at rest."
+                ],
+                "contract": {
+                  "title": "On the wire: relay session ticket (Beacon → app & hub)",
+                  "fields": [
+                    {
+                      "k": "ticket_id",
+                      "v": "tk_4d1c",
+                      "g": "one session, both parties present it"
+                    },
+                    {
+                      "k": "hub_id",
+                      "v": "K2-0F3A",
+                      "g": "target hub"
+                    },
+                    {
+                      "k": "relay",
+                      "v": "passage-iad-7:3478",
+                      "g": "assigned relay node"
+                    },
+                    {
+                      "k": "expires",
+                      "v": "1757066232",
+                      "g": "120 s validity",
+                      "hot": true
+                    },
+                    {
+                      "k": "hmac",
+                      "v": "9f31…",
+                      "g": "Beacon's signature; Passage verifies, learns no keys",
+                      "hot": true
+                    }
+                  ]
+                },
+                "diagram": {
+                  "groups": {
+                    "hub": {
+                      "title": "Keep K2"
+                    }
+                  },
+                  "floats": [
+                    {
+                      "id": "rollbook",
+                      "side": "above"
+                    }
+                  ],
+                  "nodes": {
+                    "phone": {
+                      "title": "Owner phone",
+                      "sub": "off-LAN",
+                      "icon": "phone",
+                      "tint": "dev"
+                    },
+                    "beacon": {
+                      "title": "Beacon",
+                      "sub": "signaling",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/basecraft/cloud/blob/main/services/beacon/broker.go#L233"
+                    },
+                    "rollbook": {
+                      "title": "Rollbook",
+                      "sub": "ownership",
+                      "icon": "db",
+                      "tint": "auth"
+                    },
+                    "passage": {
+                      "title": "Passage",
+                      "sub": "blind relay",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/basecraft/cloud/blob/main/services/passage/relay.go#L57"
+                    },
+                    "porter": {
+                      "title": "Porter",
+                      "sub": "session keys",
+                      "icon": "key",
+                      "tint": "auth",
+                      "group": "hub",
+                      "link": "https://github.com/basecraft/keep-hub/blob/main/daemons/porter/session.go#L142"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "phone",
+                      "beacon",
+                      "porter",
+                      "passage"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "phone",
+                      "to": "beacon",
+                      "kind": "https",
+                      "label": "session req"
+                    },
+                    {
+                      "from": "beacon",
+                      "to": "rollbook",
+                      "kind": "int",
+                      "label": "owns hub?"
+                    },
+                    {
+                      "from": "beacon",
+                      "to": "porter",
+                      "kind": "https",
+                      "label": "offer (ctl)"
+                    },
+                    {
+                      "from": "phone",
+                      "to": "passage",
+                      "kind": "sealed",
+                      "label": "attach"
+                    },
+                    {
+                      "from": "porter",
+                      "to": "passage",
+                      "kind": "sealed",
+                      "label": "attach"
+                    },
+                    {
+                      "from": "passage",
+                      "to": "phone",
+                      "kind": "sealed",
+                      "label": "ciphertext"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "xr",
+                      "type": "xray",
+                      "title": "Who can read the stream",
+                      "layers": [
+                        {
+                          "id": "e2ee",
+                          "label": "E2EE media",
+                          "holder": "hub + owner app"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "sess",
+                      "type": "orbit",
+                      "title": "Session",
+                      "states": [
+                        "REQUEST",
+                        "SIGNAL",
+                        "P2P-FAIL",
+                        "RELAY",
+                        "LIVE"
+                      ],
+                      "colors": {
+                        "LIVE": "#4ADE80",
+                        "P2P-FAIL": "#FFC53D"
+                      },
+                      "initial": {
+                        "state": "REQUEST"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "phone->beacon",
+                      "text": "Off-LAN app asks Beacon for a session",
+                      "panels": {
+                        "sess": {
+                          "state": "REQUEST"
+                        }
+                      }
+                    },
+                    {
+                      "edge": "beacon->rollbook",
+                      "text": "Rollbook confirms ownership; ticket issued"
+                    },
+                    {
+                      "edge": "beacon->porter",
+                      "text": "Offer rides the hub's control channel to Porter",
+                      "panels": {
+                        "sess": {
+                          "state": "SIGNAL"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "porter"
+                      ],
+                      "text": "Direct P2P probe fails — symmetric NAT",
+                      "panels": {
+                        "sess": {
+                          "state": "P2P-FAIL",
+                          "via": "NAT probe timeout"
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "phone->passage",
+                        "porter->passage"
+                      ],
+                      "text": "Both ends attach to the same Passage node",
+                      "panels": {
+                        "sess": {
+                          "state": "RELAY"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "porter"
+                      ],
+                      "text": "Porter derives the media key from the pairing secret shared at claim time",
+                      "panels": {
+                        "xr": {
+                          "hop": "Porter",
+                          "layers": [
+                            {
+                              "id": "e2ee",
+                              "open": true
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "passage->phone",
+                      "text": "Passage forwards bytes it cannot read",
+                      "panels": {
+                        "xr": {
+                          "hop": "Passage",
+                          "layers": [
+                            {
+                              "id": "e2ee",
+                              "open": false
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "phone"
+                      ],
+                      "text": "The app decrypts and renders the live view with a \"relayed\" path badge",
+                      "panels": {
+                        "sess": {
+                          "state": "LIVE"
+                        },
+                        "xr": {
+                          "hop": "Owner phone",
+                          "layers": [
+                            {
+                              "id": "e2ee",
+                              "open": true
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Failure modes",
+            "sections": [
+              {
+                "heading": "Failure modes",
+                "accent": "red",
+                "text": [
+                  "basecraft Keep's failure modes, from the HLD's failure-modes section (§6):"
+                ],
+                "bullets": [
+                  "**WAN drops** — recording, recognition, tracking, rotation all continue; push and remote viewing stop; a LAN app finds the hub by mDNS and works fully.",
+                  "**Hub power fails** — Lookout B4 stages up to `~15` events in its `200 MB` flash and back-fills Vaultd when the hub returns; wired cams go dark.",
+                  "**Disk pre-fail (SMART)** — Vaultd alerts and copies protected events to the USB mirror disk first if present; there is no cloud copy by design.",
+                  "**Camera Wi-Fi weak** — the stream downshifts; below threshold Fleetd switches the camera to snapshot-burst mode so Facewright still gets faces.",
+                  "**Beacon outage** — local operation unaffected; remote viewing fails closed rather than routing video through any third path."
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

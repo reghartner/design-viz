@@ -1,0 +1,1322 @@
+{
+  "page": {
+    "title": "hearthline Sentry Cloud — cross-region failover",
+    "contract": "1",
+    "protocols": {
+      "delivery": {
+        "label": "panel delivery",
+        "color": "#F87171"
+      },
+      "wan": {
+        "label": "inter-region",
+        "color": "#7DD3FC"
+      },
+      "repl": {
+        "label": "journal repl",
+        "color": "#A78BFA"
+      }
+    },
+    "lanes": {
+      "DEV": {
+        "color": "#FFB454"
+      },
+      "OPS": {
+        "color": "#F471B5"
+      },
+      "JRN": {
+        "color": "#38E1FF"
+      }
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Overview",
+            "sections": [
+              {
+                "heading": "Overview & backend services",
+                "accent": "slate",
+                "text": [
+                  "Org: `hearthline` (canon shared with Sentry Panel: Hearthgate device gateway, Overwatch alarm intake, Summons dispatch, Register entitlements). This HLD covers the cloud side only: how a monitored alarm survives the loss of an entire region.",
+                  "Sentry Cloud runs active/standby across two regions, Northline (active) and Southline (standby). Every alarm event is journaled before acknowledgment and the journal is replicated south continuously. When Northline is lost, traffic steering moves panels to Southline, which already holds the journal — an alarm mid-incident continues on the same sequence numbers."
+                ],
+                "bullets": [
+                  {
+                    "text": "**NO ACKNOWLEDGED ALARM IS LOST** — panels retain acknowledged events until their incident closes end-to-end, and every (re)connect starts with a watermark reconciliation that replays anything the region's journal lacks, so replay does not depend on a later event arriving."
+                  },
+                  {
+                    "text": "**DELIVERY TO THE MONITORING CENTER IS AT-LEAST-ONCE**, and the ticket effect is **exactly-once**: every event carries a stable incident id assigned by the panel when the incident opens (`INC-<acct>-<opening seq>`), the center keys its ticket by that incident id, and event updates within the ticket are deduped by (incident id, seq).",
+                    "sub": [
+                      "A replayed event that was already dispatched from the dead region lands as a replay-marked duplicate UPDATE of the same ticket — it can never open a second one.",
+                      "Journal dedup inside a region is an optimization, not the correctness mechanism; the incident key is."
+                    ]
+                  },
+                  {
+                    "text": "**Hardware**: cloud-only design; the device fleet is the existing Sentry Panel (dual-path broadband + cellular, 24 h battery). Each region runs an independent full stack; regions share nothing but the replication link and the steering layer."
+                  },
+                  {
+                    "text": "**Hearthgate** — per-region device gateway; terminates panel TLS sessions."
+                  },
+                  {
+                    "text": "**Overwatch** — per-region alarm intake: journals, dedupes on (account, seq), routes to monitoring. [source](https://github.com/hearthline/cloud/blob/main/overwatch/journal.go#L88)"
+                  },
+                  {
+                    "text": "**Summons** — dispatch integration to monitoring centers (region-pinned agents, cross-region account state). [source](https://github.com/hearthline/cloud/blob/main/summons/dispatch.go#L41)"
+                  },
+                  {
+                    "text": "**Register** — entitlements; replicated the same way as the journal."
+                  },
+                  {
+                    "text": "**Tether** — the cross-region journal replication link: ordered, ack'd, lag-monitored. [source](https://github.com/hearthline/cloud/blob/main/tether/ship.go#L23)"
+                  },
+                  {
+                    "text": "**Crossbar** — failover controller: probes both regions from three vantage points, owns the single fencing token, decides ACTIVE/FENCED/STANDBY. [source](https://github.com/hearthline/cloud/blob/main/crossbar/fence.go#L57)"
+                  },
+                  {
+                    "text": "**Pathfinder** — traffic steering (DNS + anycast): moves panel connections between regions. [source](https://github.com/hearthline/cloud/blob/main/pathfinder/steer.go#L19)"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "label": "4.1 Journal first, replicate always",
+            "sections": [
+              {
+                "heading": "\"Journal first, replicate always\"",
+                "accent": "cyan",
+                "bullets": [
+                  "A panel delivers alarm event seq 5201 to Pathfinder's steering address.",
+                  "Pathfinder routes the session to Northline Hearthgate (active region).",
+                  "Hearthgate hands the event to Northline Overwatch.",
+                  {
+                    "text": "Overwatch appends seq 5201 to the journal, THEN acknowledges the panel. An ack means \"journaled in the active region\" — the panel still RETAINS the event until the incident closes (that retention is the cross-region durability anchor during replication lag)."
+                  },
+                  "Tether ships the journal record to Southline Overwatch (typical lag 1.8 s).",
+                  "Southline Overwatch applies it and acks; Tether records parity at 5201.",
+                  "Crossbar's probes read both regions healthy; fencing token stays north."
+                ],
+                "contract": {
+                  "title": "On the wire: journal replication record (Tether)",
+                  "fields": [
+                    {
+                      "k": "acct",
+                      "v": "HL-88121",
+                      "g": "account the alarm belongs to"
+                    },
+                    {
+                      "k": "seq",
+                      "v": "5202",
+                      "g": "per-account alarm sequence — monotone, gap-checkable",
+                      "hot": true
+                    },
+                    {
+                      "k": "incident",
+                      "v": "INC-88121-5199",
+                      "g": "stable incident id (assigned at incident open) — the ticket key",
+                      "hot": true
+                    },
+                    {
+                      "k": "epoch",
+                      "v": "7",
+                      "g": "fencing epoch that wrote it; stale epochs are refused"
+                    },
+                    {
+                      "k": "kind",
+                      "v": "\"alarm.entry\"",
+                      "g": "event type"
+                    },
+                    {
+                      "k": "ts",
+                      "v": "unix ms",
+                      "g": "panel timestamp, not region receive time"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "nodes": {
+                    "panel": {
+                      "title": "Sentry Panel",
+                      "sub": "dual-path device",
+                      "icon": "shield",
+                      "tint": "dev"
+                    },
+                    "path": {
+                      "title": "Pathfinder",
+                      "sub": "traffic steering",
+                      "icon": "router",
+                      "tint": "cmd"
+                    },
+                    "ngate": {
+                      "title": "Hearthgate N",
+                      "sub": "device gateway",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "group": "north"
+                    },
+                    "nwatch": {
+                      "title": "Overwatch N",
+                      "sub": "intake + journal",
+                      "icon": "db",
+                      "tint": "data",
+                      "group": "north"
+                    },
+                    "sgate": {
+                      "title": "Hearthgate S",
+                      "sub": "device gateway",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "group": "south"
+                    },
+                    "swatch": {
+                      "title": "Overwatch S",
+                      "sub": "intake + journal",
+                      "icon": "db",
+                      "tint": "data",
+                      "group": "south"
+                    }
+                  },
+                  "groups": {
+                    "north": {
+                      "title": "Northline (active)"
+                    },
+                    "south": {
+                      "title": "Southline (standby)"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "panel",
+                      "path"
+                    ],
+                    [
+                      [
+                        "ngate",
+                        "nwatch"
+                      ],
+                      [
+                        "sgate",
+                        "swatch"
+                      ]
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "panel",
+                      "to": "path",
+                      "kind": "delivery",
+                      "label": "alarm 5201"
+                    },
+                    {
+                      "from": "path",
+                      "to": "ngate",
+                      "kind": "wan",
+                      "label": "route north"
+                    },
+                    {
+                      "from": "ngate",
+                      "to": "nwatch",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "nwatch",
+                      "to": "swatch",
+                      "kind": "repl",
+                      "label": "journal repl"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "grid",
+                      "type": "tiles",
+                      "title": "Regions",
+                      "tiles": [
+                        {
+                          "id": "ngate",
+                          "label": "Hearthgate N"
+                        },
+                        {
+                          "id": "nwatch",
+                          "label": "Overwatch N"
+                        },
+                        {
+                          "id": "sgate",
+                          "label": "Hearthgate S"
+                        },
+                        {
+                          "id": "swatch",
+                          "label": "Overwatch S"
+                        }
+                      ],
+                      "states": [
+                        "ACTIVE",
+                        "STANDBY",
+                        "FENCED",
+                        "DARK"
+                      ],
+                      "colors": {
+                        "ACTIVE": "#4ADE80",
+                        "STANDBY": "#38E1FF",
+                        "FENCED": "#FFB454",
+                        "DARK": "#FF6B5E"
+                      },
+                      "initial": {
+                        "ngate": {
+                          "state": "ACTIVE"
+                        },
+                        "nwatch": {
+                          "state": "ACTIVE"
+                        },
+                        "sgate": {
+                          "state": "STANDBY"
+                        },
+                        "swatch": {
+                          "state": "STANDBY"
+                        }
+                      }
+                    },
+                    {
+                      "id": "jrn",
+                      "type": "buffer",
+                      "title": "Tether — journal segments",
+                      "segments": 8,
+                      "capacity": "parity lag",
+                      "initial": {
+                        "head": 0,
+                        "cells": []
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "tags": {
+                        "DEV": "#FFB454",
+                        "JRN": "#38E1FF"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "panel->path",
+                      "lane": "DEV",
+                      "text": "Panel delivers alarm seq 5201 to the steering address",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "seq 5201 out"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "path->ngate",
+                      "text": "Routed to the active region",
+                      "panels": {
+                        "grid": {
+                          "ngate": {
+                            "state": "ACTIVE"
+                          },
+                          "sgate": {
+                            "state": "STANDBY"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "ngate->nwatch",
+                      "lane": "JRN",
+                      "text": "Journal append BEFORE ack",
+                      "panels": {
+                        "jrn": {
+                          "mark": [
+                            [
+                              0,
+                              4,
+                              "buffered"
+                            ]
+                          ],
+                          "head": 5,
+                          "note": "…5201 appended"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "JRN",
+                              "text": "append 5201 · ack panel"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "nwatch->swatch",
+                      "text": "Tether ships the record south — lag 1.8 s",
+                      "panels": {
+                        "jrn": {
+                          "mark": [
+                            [
+                              0,
+                              4,
+                              "uploading"
+                            ]
+                          ],
+                          "note": "shipping to Southline"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "swatch"
+                      ],
+                      "text": "Southline applies; parity at 5201",
+                      "panels": {
+                        "jrn": {
+                          "mark": [
+                            [
+                              0,
+                              4,
+                              "uploaded"
+                            ]
+                          ],
+                          "note": "parity @ 5201"
+                        },
+                        "grid": {
+                          "swatch": {
+                            "state": "STANDBY",
+                            "sub": "lag 1.8 s"
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "4.2 Region loss mid-incident",
+            "sections": [
+              {
+                "heading": "\"The region dies mid-incident\"",
+                "accent": "red",
+                "bullets": [
+                  "Seq 5201 is acked and dispatched; the incident is still open.",
+                  "Northline loses power and network together (region outage).",
+                  "The panel's delivery of seq 5202 times out; it holds the event and retries.",
+                  "Crossbar's three vantage probes all fail for the hold-down window (30 s).",
+                  "Crossbar moves the fencing token: Southline becomes ACTIVE.",
+                  "Pathfinder shifts steering; the panel's retry connects to Southline Hearthgate on the next attempt.",
+                  {
+                    "text": "**RECONNECT RECONCILIATION**, first thing on every connect: the panel sends hello (its high watermark 5202, unclosed incident `INC-88121-5199`); Overwatch answers hello-ack (journal at 5201, replay_from 5202). The panel then sends everything from replay_from out of its retained window — here that is exactly the held 5202: **THE RETRY AND THE REPLAY ARE THE SAME MECHANISM**. A final event with no successor is covered the same way, because replay is driven by connecting, never by observing a gap."
+                  },
+                  {
+                    "text": "Seq 5202 appends under incident `INC-88121-5199` and the SAME incident continues.",
+                    "sub": [
+                      "Had 5201 also died inside the 1.8 s lag, hello-ack would say replay_from 5201 and the panel would send both; if the dead region had already dispatched 5201, the center's ticket — keyed by the incident id — absorbs the duplicate as a replay-marked update, deduped by (incident id, seq)."
+                    ]
+                  },
+                  "Summons in Southline reaches the monitoring center; the dispatcher sees one incident, sequence unbroken; the panel gets its ack.",
+                  "Total detection-to-ack budget: 92 s against a 180 s RTO target."
+                ],
+                "contract": {
+                  "title": "On the wire: reconnect hello (panel → Hearthgate)",
+                  "fields": [
+                    {
+                      "k": "acct",
+                      "v": "HL-88121",
+                      "g": "account"
+                    },
+                    {
+                      "k": "panel_seq",
+                      "v": "5202",
+                      "g": "panel's high watermark — replay source of truth",
+                      "hot": true
+                    },
+                    {
+                      "k": "open_incidents",
+                      "v": "[\"INC-88121-5199\"]",
+                      "g": "unclosed incidents the panel still retains"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "nodes": {
+                    "panel": {
+                      "title": "Sentry Panel",
+                      "sub": "dual-path device",
+                      "icon": "shield",
+                      "tint": "dev"
+                    },
+                    "path": {
+                      "title": "Pathfinder",
+                      "sub": "traffic steering",
+                      "icon": "router",
+                      "tint": "cmd"
+                    },
+                    "ngate": {
+                      "title": "Hearthgate N",
+                      "sub": "device gateway",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "group": "north"
+                    },
+                    "nwatch": {
+                      "title": "Overwatch N",
+                      "sub": "intake + journal",
+                      "icon": "db",
+                      "tint": "data",
+                      "group": "north"
+                    },
+                    "sgate": {
+                      "title": "Hearthgate S",
+                      "sub": "device gateway",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "group": "south"
+                    },
+                    "swatch": {
+                      "title": "Overwatch S",
+                      "sub": "intake + journal",
+                      "icon": "db",
+                      "tint": "data",
+                      "group": "south"
+                    },
+                    "summons": {
+                      "title": "Summons S",
+                      "sub": "dispatch",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "group": "south"
+                    }
+                  },
+                  "groups": {
+                    "north": {
+                      "title": "Northline"
+                    },
+                    "south": {
+                      "title": "Southline"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "panel",
+                      "path"
+                    ],
+                    [
+                      [
+                        "ngate",
+                        "nwatch"
+                      ],
+                      [
+                        "sgate",
+                        "swatch"
+                      ]
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "summons",
+                      "side": "below"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "panel",
+                      "to": "path",
+                      "kind": "delivery",
+                      "label": "retry 5202"
+                    },
+                    {
+                      "from": "path",
+                      "to": "sgate",
+                      "kind": "wan",
+                      "label": "route south"
+                    },
+                    {
+                      "from": "sgate",
+                      "to": "path",
+                      "kind": "wan",
+                      "ret": true,
+                      "label": "hello-ack"
+                    },
+                    {
+                      "from": "sgate",
+                      "to": "swatch",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "swatch",
+                      "to": "summons",
+                      "kind": "int",
+                      "label": "dispatch"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "grid",
+                      "type": "tiles",
+                      "title": "Regions",
+                      "tiles": [
+                        {
+                          "id": "ngate",
+                          "label": "Hearthgate N"
+                        },
+                        {
+                          "id": "nwatch",
+                          "label": "Overwatch N"
+                        },
+                        {
+                          "id": "sgate",
+                          "label": "Hearthgate S"
+                        },
+                        {
+                          "id": "swatch",
+                          "label": "Overwatch S"
+                        }
+                      ],
+                      "states": [
+                        "ACTIVE",
+                        "STANDBY",
+                        "FENCED",
+                        "DARK"
+                      ],
+                      "colors": {
+                        "ACTIVE": "#4ADE80",
+                        "STANDBY": "#38E1FF",
+                        "FENCED": "#FFB454",
+                        "DARK": "#FF6B5E"
+                      },
+                      "initial": {
+                        "ngate": {
+                          "state": "ACTIVE"
+                        },
+                        "nwatch": {
+                          "state": "ACTIVE"
+                        },
+                        "sgate": {
+                          "state": "STANDBY"
+                        },
+                        "swatch": {
+                          "state": "STANDBY"
+                        }
+                      }
+                    },
+                    {
+                      "id": "links",
+                      "type": "signal",
+                      "title": "Region reachability",
+                      "links": [
+                        {
+                          "id": "nwan",
+                          "label": "Northline (wan)",
+                          "transport": "ethernet"
+                        },
+                        {
+                          "id": "swan",
+                          "label": "Southline (wan)",
+                          "transport": "ethernet"
+                        }
+                      ],
+                      "initial": {
+                        "nwan": {
+                          "state": "ok",
+                          "bars": 4
+                        },
+                        "swan": {
+                          "state": "ok",
+                          "bars": 4
+                        }
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "tags": {
+                        "DEV": "#FFB454",
+                        "JRN": "#38E1FF",
+                        "OPS": "#F471B5"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "ngate",
+                        "nwatch"
+                      ],
+                      "lane": "OPS",
+                      "text": "Northline goes dark mid-incident",
+                      "panels": {
+                        "grid": {
+                          "ngate": {
+                            "state": "DARK"
+                          },
+                          "nwatch": {
+                            "state": "DARK"
+                          }
+                        },
+                        "links": {
+                          "nwan": {
+                            "state": "lost",
+                            "bars": 0,
+                            "note": "3/3 probes down"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "Northline loses power + network"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "panel->path",
+                      "lane": "DEV",
+                      "text": "Panel holds seq 5202 and retries",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "5202 held · retrying"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "sgate",
+                        "swatch"
+                      ],
+                      "text": "Hold-down passes; token moves south",
+                      "panels": {
+                        "grid": {
+                          "sgate": {
+                            "state": "ACTIVE"
+                          },
+                          "swatch": {
+                            "state": "ACTIVE",
+                            "sub": "epoch 8"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "path->sgate",
+                      "lane": "JRN",
+                      "text": "Steering shifts; the session connects south and carries the hello: panel@5202, open incident INC-88121-5199",
+                      "panels": {
+                        "links": {
+                          "swan": {
+                            "state": "ok",
+                            "bars": 4,
+                            "note": "steered"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "JRN",
+                              "text": "hello: panel@5202"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "sgate->path",
+                      "lane": "JRN",
+                      "text": "Hello-ack back to the panel: journal@5201, replay_from 5202",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "JRN",
+                              "text": "hello-ack: replay_from 5202"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "sgate->swatch",
+                      "lane": "JRN",
+                      "text": "Panel resends 5202 — the held retry IS the replay; the gateway hands it to Overwatch",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "JRN",
+                              "text": "replay in: 5202"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "swatch"
+                      ],
+                      "lane": "JRN",
+                      "text": "5202 appends under incident INC-88121-5199 — a duplicate event update would be absorbed by (incident, seq) at the center's ticket",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "JRN",
+                              "text": "append 5202 · INC-88121-5199"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "swatch->summons",
+                      "lane": "OPS",
+                      "text": "The dispatcher's EXISTING ticket updates — one incident, sequence unbroken; panel acked",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "ack on southline"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              },
+              {
+                "heading": "Reconnect hello-ack — on the wire",
+                "accent": "red",
+                "text": [
+                  "Reconnect hello-ack (Hearthgate → panel, the response): the second half of the reconnect reconciliation rendered above."
+                ],
+                "contract": {
+                  "title": "On the wire: reconnect hello-ack (Hearthgate → panel)",
+                  "fields": [
+                    {
+                      "k": "journal_seq",
+                      "v": "5201",
+                      "g": "highest journaled seq for the account in this region"
+                    },
+                    {
+                      "k": "replay_from",
+                      "v": "5202",
+                      "g": "panel must (re)send everything from here out of retention",
+                      "hot": true
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "4.3 Fenced: no double dispatch",
+            "sections": [
+              {
+                "heading": "\"Fenced: no double dispatch\"",
+                "accent": "amber",
+                "bullets": [
+                  "Northline power returns; its stack boots and its Overwatch wakes.",
+                  "Northline Overwatch still believes it is active — it holds stale state.",
+                  "Its first journal append attempt requires the fencing token; Crossbar refuses: Northline is FENCED (read-only).",
+                  "Any late panel session reaching Northline is redirected by Hearthgate (fenced gateways refuse alarm traffic and return the steering address).",
+                  "Crossbar's probes must stay green for a full hold-down window before Northline may even become STANDBY. Nothing is dispatched twice."
+                ],
+                "contract": {
+                  "title": "On the wire: fencing decision (Crossbar)",
+                  "fields": [
+                    {
+                      "k": "token_holder",
+                      "v": "\"southline\"",
+                      "g": "the only region allowed to append + dispatch",
+                      "hot": true
+                    },
+                    {
+                      "k": "epoch",
+                      "v": "8",
+                      "g": "increments on every move; embedded in every append",
+                      "hot": true
+                    },
+                    {
+                      "k": "probes",
+                      "v": "3/3 down",
+                      "g": "vantage results that justified the move"
+                    },
+                    {
+                      "k": "holddown_s",
+                      "v": "30",
+                      "g": "how long probes must agree before a move"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "nodes": {
+                    "crossbar": {
+                      "title": "Crossbar",
+                      "sub": "fencing controller",
+                      "icon": "key",
+                      "tint": "auth"
+                    },
+                    "ngate": {
+                      "title": "Hearthgate N",
+                      "sub": "device gateway",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "group": "north"
+                    },
+                    "nwatch": {
+                      "title": "Overwatch N",
+                      "sub": "intake + journal",
+                      "icon": "db",
+                      "tint": "data",
+                      "group": "north"
+                    },
+                    "path": {
+                      "title": "Pathfinder",
+                      "sub": "traffic steering",
+                      "icon": "router",
+                      "tint": "cmd"
+                    }
+                  },
+                  "groups": {
+                    "north": {
+                      "title": "Northline"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "crossbar",
+                      "path"
+                    ],
+                    [
+                      [
+                        "ngate",
+                        "nwatch"
+                      ]
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "crossbar",
+                      "to": "nwatch",
+                      "kind": "int",
+                      "label": "epoch check"
+                    },
+                    {
+                      "from": "ngate",
+                      "to": "path",
+                      "kind": "wan",
+                      "ret": true,
+                      "label": "go south"
+                    },
+                    {
+                      "from": "path",
+                      "to": "ngate",
+                      "kind": "wan",
+                      "label": "late session"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "role",
+                      "type": "orbit",
+                      "title": "Northline role",
+                      "states": [
+                        "ACTIVE",
+                        "DARK",
+                        "BOOTING",
+                        "FENCED",
+                        "STANDBY"
+                      ],
+                      "colors": {
+                        "ACTIVE": "#4ADE80",
+                        "DARK": "#FF6B5E",
+                        "FENCED": "#FFB454",
+                        "STANDBY": "#38E1FF"
+                      },
+                      "initial": {
+                        "state": "DARK"
+                      }
+                    },
+                    {
+                      "id": "grid2",
+                      "type": "tiles",
+                      "title": "Northline services",
+                      "tiles": [
+                        {
+                          "id": "ngate",
+                          "label": "Hearthgate N"
+                        },
+                        {
+                          "id": "nwatch",
+                          "label": "Overwatch N"
+                        }
+                      ],
+                      "states": [
+                        "ACTIVE",
+                        "STANDBY",
+                        "BOOTING",
+                        "FENCED",
+                        "DARK"
+                      ],
+                      "colors": {
+                        "ACTIVE": "#4ADE80",
+                        "STANDBY": "#38E1FF",
+                        "FENCED": "#FFB454",
+                        "DARK": "#FF6B5E"
+                      },
+                      "initial": {
+                        "ngate": {
+                          "state": "DARK"
+                        },
+                        "nwatch": {
+                          "state": "DARK"
+                        }
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "tags": {
+                        "JRN": "#38E1FF",
+                        "OPS": "#F471B5"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "ngate",
+                        "nwatch"
+                      ],
+                      "text": "Northline boots; Overwatch holds stale-active state",
+                      "panels": {
+                        "role": {
+                          "state": "BOOTING"
+                        },
+                        "grid2": {
+                          "ngate": {
+                            "state": "BOOTING"
+                          },
+                          "nwatch": {
+                            "state": "ACTIVE"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "crossbar->nwatch",
+                      "lane": "JRN",
+                      "text": "Append refused: stale epoch 7 vs current 8",
+                      "panels": {
+                        "role": {
+                          "state": "FENCED",
+                          "via": "epoch 7 ≠ 8"
+                        },
+                        "grid2": {
+                          "ngate": {
+                            "state": "FENCED"
+                          },
+                          "nwatch": {
+                            "state": "FENCED"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "JRN",
+                              "text": "append REFUSED"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "path->ngate",
+                      "lane": "OPS",
+                      "text": "A late panel session is turned away",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "fenced gw refuses alarms"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "ngate->path",
+                      "lane": "OPS",
+                      "text": "Gateway answers with the steering address",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "redirect → southline"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "ngate",
+                        "nwatch"
+                      ],
+                      "text": "Probes green a full window: STANDBY earned",
+                      "panels": {
+                        "role": {
+                          "state": "STANDBY"
+                        },
+                        "grid2": {
+                          "ngate": {
+                            "state": "STANDBY"
+                          },
+                          "nwatch": {
+                            "state": "STANDBY"
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "4.4 Failback without a gap",
+            "sections": [
+              {
+                "heading": "\"Failback without a gap\"",
+                "accent": "green",
+                "bullets": [
+                  "Tether reverses: Southline ships the journal segments written while it was active (5202–5230) back to Northline.",
+                  "Northline applies the backlog; parity is reached at seq 5230.",
+                  "**Register** replays entitlement changes the same way.",
+                  "Crossbar verifies parity + green probes, then moves the fencing token north during a low-traffic window.",
+                  "Pathfinder returns steering; panels drift back over the next hour.",
+                  "Southline returns to STANDBY, still replicating, still ready."
+                ],
+                "diagram": {
+                  "nodes": {
+                    "swatch": {
+                      "title": "Overwatch S",
+                      "sub": "intake + journal",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "nwatch": {
+                      "title": "Overwatch N",
+                      "sub": "intake + journal",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "crossbar": {
+                      "title": "Crossbar",
+                      "sub": "fencing controller",
+                      "icon": "key",
+                      "tint": "auth"
+                    },
+                    "path": {
+                      "title": "Pathfinder",
+                      "sub": "traffic steering",
+                      "icon": "router",
+                      "tint": "cmd"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "swatch",
+                      "nwatch"
+                    ],
+                    [
+                      "crossbar",
+                      "path"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "swatch",
+                      "to": "nwatch",
+                      "kind": "repl",
+                      "label": "catch-up"
+                    },
+                    {
+                      "from": "crossbar",
+                      "to": "nwatch",
+                      "kind": "int",
+                      "label": "token north"
+                    },
+                    {
+                      "from": "crossbar",
+                      "to": "path",
+                      "kind": "int",
+                      "label": "steer north"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "cat",
+                      "type": "buffer",
+                      "title": "Reverse catch-up",
+                      "segments": 6,
+                      "capacity": "29 records",
+                      "initial": {
+                        "head": 0,
+                        "cells": []
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "tags": {
+                        "JRN": "#38E1FF",
+                        "OPS": "#F471B5"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "swatch->nwatch",
+                      "lane": "JRN",
+                      "text": "Tether reverses: 5202–5230 ship north",
+                      "panels": {
+                        "cat": {
+                          "mark": [
+                            [
+                              0,
+                              5,
+                              "uploading"
+                            ]
+                          ],
+                          "head": 5,
+                          "note": "29 records"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "JRN",
+                              "text": "reverse catch-up"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "nwatch"
+                      ],
+                      "text": "Backlog drains; parity at 5230",
+                      "panels": {
+                        "cat": {
+                          "mark": [
+                            [
+                              0,
+                              5,
+                              "uploaded"
+                            ]
+                          ],
+                          "note": "parity @ 5230"
+                        }
+                      }
+                    },
+                    {
+                      "edge": "crossbar->nwatch",
+                      "lane": "OPS",
+                      "text": "Parity + green probes: token moves north",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "epoch 9 → northline"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "crossbar->path",
+                      "lane": "OPS",
+                      "text": "Steering returns during the quiet window",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "panels drift back"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "swatch"
+                      ],
+                      "text": "Southline back to STANDBY, still replicating",
+                      "panels": {
+                        "cat": {
+                          "cells": [],
+                          "head": 0,
+                          "note": "forward replication resumed"
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Failure modes",
+            "sections": [
+              {
+                "heading": "Failure modes",
+                "accent": "pink",
+                "bullets": [
+                  {
+                    "text": "**Replication link loss only**: both regions healthy, Tether down — alarms keep flowing north; Southline lag alarm fires at 60 s; failover is *not* triggered by replication lag alone."
+                  },
+                  {
+                    "text": "**Steering flaps**: Pathfinder changes are rate-limited by the same hold-down; a flapping region cannot bounce the token."
+                  },
+                  {
+                    "text": "**Panel-side outage**: unchanged from the Sentry Panel HLD — cellular failover at the device layer is independent of region failover."
+                  },
+                  {
+                    "text": "**Region loss inside the replication lag**: the journal record may die with the region, but the panel still holds the event (retention until incident close); the hello/hello-ack reconciliation replays it — including a final event with no successor.",
+                    "sub": [
+                      "If the dead region had already dispatched it, the center's ticket (keyed by the incident id) absorbs the duplicate as a replay-marked update deduped by (incident id, seq); delivery is at-least-once, the ticket effect exactly-once."
+                    ]
+                  },
+                  {
+                    "text": "**Split brain**: impossible to dispatch twice by construction — appends and dispatch both require the current epoch token."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

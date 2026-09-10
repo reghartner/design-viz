@@ -1,0 +1,521 @@
+<title>Doorbell Northstar</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  /* Committed single-theme page: Aurora Combined language. All colors painted explicitly. */
+  body{background:#080D18; color:#EAF2FF; font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif;}
+  .wrap{max-width:1240px; margin:0 auto; padding:0 22px;}
+  header.wrap{padding-top:42px;}
+  .eyebrow{font:600 11px/1 'IBM Plex Mono',monospace; letter-spacing:.16em; text-transform:uppercase; color:#38E1FF; margin:0 0 10px;}
+  h1{font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(30px,4.5vw,40px); letter-spacing:-.015em; margin:0 0 10px; text-wrap:balance;}
+  .lede{color:#7E93B8; max-width:72ch; margin:0; font-size:15.5px;}
+
+  .legend{display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin:20px 0 12px;
+    font:500 11px 'IBM Plex Mono',monospace; color:#7E93B8;}
+  .lg{display:inline-flex; align-items:center; gap:7px;}
+  .sw{display:inline-block; width:26px; height:3px; border-radius:2px;}
+  .sw.https{background:#38E1FF;} .sw.mqtt{background:#F471B5;} .sw.int{background:#A78BFA;} .sw.rtp{background:#FFB454;}
+  .sw.ret{background:none; border-top:2px dashed #7E93B8; height:0;}
+
+  .panel{background:#0B1220; border:1px solid #1D2A44; border-radius:14px; overflow:hidden;}
+  .phead{padding:9px 14px; font:600 10px 'IBM Plex Mono',monospace; letter-spacing:.14em; color:#7E93B8;
+    border-bottom:1px solid #16233C; display:flex; justify-content:space-between; gap:10px;}
+  .board{overflow-x:auto;}
+  .board svg{display:block; min-width:1000px; width:100%; height:auto;}
+  .duo{display:grid; grid-template-columns:1.15fr 1fr; gap:14px; margin-top:14px;}
+  @media (max-width:920px){ .duo{grid-template-columns:1fr;} }
+  .duo svg{display:block; width:100%; height:auto;}
+
+  /* ---------- board ---------- */
+  .edge{fill:none; stroke-width:2; stroke-linecap:round; opacity:.3;}
+  .edge.https{stroke:#38E1FF;} .edge.mqtt{stroke:#F471B5;} .edge.int{stroke:#A78BFA;} .edge.rtp{stroke:#FFB454;}
+  .edge.dsh{stroke-dasharray:2 5;}
+  .edge.lit{opacity:1; stroke-width:2.4; stroke-dasharray:9 7; animation:dash16 .85s linear infinite;}
+  .edge.dsh.lit{stroke-dasharray:2 5; animation:dash14 .85s linear infinite;}
+  .edge.https.lit{filter:drop-shadow(0 0 5px rgba(56,225,255,.65));}
+  .edge.mqtt.lit{filter:drop-shadow(0 0 5px rgba(244,113,181,.65));}
+  .edge.int.lit{filter:drop-shadow(0 0 5px rgba(167,139,250,.65));}
+  .edge.rtp.lit{filter:drop-shadow(0 0 5px rgba(255,180,84,.65));}
+  @keyframes dash16{to{stroke-dashoffset:-16;}}
+  @keyframes dash14{to{stroke-dashoffset:-14;}}
+  .lbl{font:500 10px 'IBM Plex Mono',monospace; fill:#93A7C9;}
+  .card{fill:#101A2C; stroke:#25364F; stroke-width:1.2;}
+  .node .t1{font:600 12.5px 'IBM Plex Sans',sans-serif; fill:#EAF2FF;}
+  .node .t2{font:500 9px 'IBM Plex Mono',monospace; fill:#7E93B8;}
+  .node .icbg{fill:currentColor; opacity:.13;}
+  .node.lit .card{stroke:#5EC7E8; filter:drop-shadow(0 0 6px rgba(94,199,232,.35));}
+  .node.lit .t1{fill:#FFFFFF;}
+  .grp{fill:none; stroke:#24365B; stroke-width:1.3; stroke-dasharray:6 5;}
+  .grpt{font:600 10px 'IBM Plex Mono',monospace; letter-spacing:.1em; fill:#5D739F;}
+  .tint-https{color:#38E1FF;} .tint-mqtt{color:#F471B5;} .tint-int{color:#A78BFA;} .tint-rtp{color:#FFB454;}
+  .pkt{visibility:hidden;}
+  .pkt.https{fill:#9FF0FF; filter:drop-shadow(0 0 6px rgba(56,225,255,.95));}
+  .pkt.mqtt{fill:#FFB3DC; filter:drop-shadow(0 0 6px rgba(244,113,181,.95));}
+  .pkt.int{fill:#CDB6FF; filter:drop-shadow(0 0 6px rgba(167,139,250,.95));}
+  .pkt.rtp{fill:#FFD9A0; filter:drop-shadow(0 0 6px rgba(255,180,84,.95));}
+
+  /* ---------- hardware panel ---------- */
+  .led{fill:#22304F;}
+  .led.on-green{fill:#4ADE80; filter:drop-shadow(0 0 4px rgba(74,222,128,.9));}
+  .led.on-cyan{fill:#38E1FF; filter:drop-shadow(0 0 4px rgba(56,225,255,.9));}
+  .led.on-amber{fill:#FFB454; filter:drop-shadow(0 0 4px rgba(255,180,84,.9));}
+  .led.on-red{fill:#FF5D5D; filter:drop-shadow(0 0 4px rgba(255,93,93,.9));}
+  .led.blink{animation:ledpulse 1s ease-in-out infinite;}
+  @keyframes ledpulse{0%,100%{opacity:.25;} 50%{opacity:1;}}
+  .hwsilk{font:500 9px 'IBM Plex Mono',monospace; fill:#4E5E85;}
+  .hwt1{font:700 12px 'IBM Plex Sans',sans-serif; fill:#EAF2FF;}
+  .hwt2{font:500 8.5px 'IBM Plex Mono',monospace; fill:#7E93B8;}
+  .hwlbl{font:600 7.5px 'IBM Plex Mono',monospace; fill:#5D739F; letter-spacing:.08em;}
+  .hwstate{font:700 13px 'IBM Plex Mono',monospace;}
+  .chiprect{fill:#121C33; stroke:#2C3E63; stroke-width:1.3;}
+  .chiprect.lit{stroke:#5EC7E8;}
+  .pinstub{fill:#2C3E63;}
+  .irqline{stroke:#A78BFA; stroke-width:2.2; opacity:.3; fill:none;}
+  .irqline.lit{opacity:1; stroke-dasharray:7 6; animation:dash14 .5s linear infinite;
+    filter:drop-shadow(0 0 6px rgba(167,139,250,.9));}
+  .statepill{fill:rgba(74,222,128,.12); stroke:#4ADE80; stroke-width:1;}
+  .statetxt{font:700 9px 'IBM Plex Mono',monospace; fill:#4ADE80; letter-spacing:.06em;}
+  .trace{stroke:#1A2642; stroke-width:1.2; fill:none;}
+
+  /* ---------- camera panel ---------- */
+  .camlayer{visibility:hidden;}
+  [data-mode="off"]  .ly-off,
+  [data-mode="boot"] .ly-boot,
+  [data-mode="live"] .ly-scene, [data-mode="live"] .ly-live, [data-mode="live"] .ly-bar,
+  [data-mode="rec"]  .ly-scene, [data-mode="rec"]  .ly-live, [data-mode="rec"]  .ly-rec, [data-mode="rec"] .ly-bar,
+  [data-mode="save"] .ly-scene, [data-mode="save"] .ly-rec,  [data-mode="save"] .ly-save, [data-mode="save"] .ly-bar
+    {visibility:visible;}
+  .ly-boot .flick{animation:flicker .35s steps(2) infinite;}
+  @keyframes flicker{50%{opacity:.45;}}
+  .cam-person{animation:bob 2.6s ease-in-out infinite; transform-box:fill-box; transform-origin:center bottom;}
+  @keyframes bob{0%,100%{transform:translateY(0);} 50%{transform:translateY(-2.5px);}}
+  .cam-person.enter{animation:walkin 1.1s ease-out, bob 2.6s ease-in-out 1.1s infinite;}
+  @keyframes walkin{from{transform:translateX(-85px);} to{transform:translateX(0);}}
+  [data-mode="save"] .cam-person{animation-play-state:paused;}
+  .rec-dot{animation:blinkrec 1s steps(1,end) infinite;}
+  @keyframes blinkrec{50%{opacity:.15;}}
+  [data-mode="save"] .rec-dot{animation:none;}
+
+  /* ---------- controls ---------- */
+  .bar{border:1px solid #1D2A44; border-radius:14px; background:#0B1220; margin-top:14px;
+    padding:10px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .tbtn{background:#101A2C; border:1px solid #25364F; color:#93A7C9; font:600 12px 'IBM Plex Mono',monospace;
+    padding:5px 11px; border-radius:7px; cursor:pointer;}
+  .tbtn:hover{border-color:#38E1FF; color:#9FF0FF;}
+  .tbtn:focus-visible, .schip:focus-visible{outline:2px solid #38E1FF; outline-offset:2px;}
+  .schips{display:flex; gap:4px; flex-wrap:wrap;}
+  .schip{background:#101A2C; border:1px solid #25364F; color:#5D739F; font:700 10.5px 'IBM Plex Mono',monospace;
+    width:24px; height:24px; border-radius:6px; cursor:pointer; padding:0; border-bottom-width:2px;}
+  .schip.net{border-bottom-color:#1E5F70;} .schip.dev{border-bottom-color:#57499B;} .schip.cam{border-bottom-color:#8A3A69;}
+  .schip[aria-current="true"]{border-color:#38E1FF; color:#9FF0FF; background:#0E2733;}
+  .schip.dev[aria-current="true"]{border-color:#A78BFA; color:#CDB6FF; background:#1B1733;}
+  .schip.cam[aria-current="true"]{border-color:#F471B5; color:#FFB3DC; background:#2B1224;}
+  .capline{display:flex; align-items:center; gap:8px; flex:1 1 100%; margin-top:2px;}
+  .tagpill{font:700 9.5px 'IBM Plex Mono',monospace; letter-spacing:.08em; padding:3px 7px; border-radius:5px; border:1px solid;}
+  .tagpill.net{color:#38E1FF; border-color:#1E5F70; background:#0E2733;}
+  .tagpill.dev{color:#A78BFA; border-color:#57499B; background:#1B1733;}
+  .tagpill.cam{color:#F471B5; border-color:#8A3A69; background:#2B1224;}
+  .captext{font:500 13px 'IBM Plex Sans',sans-serif; color:#C4D3EA;}
+
+  footer.wrap{padding:30px 22px 52px; color:#5D739F; font-size:13px;}
+  footer b{color:#93A7C9;}
+
+  @media (prefers-reduced-motion: reduce){
+    .edge.lit, .irqline.lit, .led.blink, .rec-dot, .cam-person, .ly-boot .flick{animation:none !important;}
+    .pkt{display:none !important;}
+  }
+</style>
+
+<svg aria-hidden="true" style="position:absolute; width:0; height:0; overflow:hidden">
+  <defs>
+    <symbol id="i-chip" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><line x1="10" y1="7" x2="10" y2="3.5"/><line x1="14" y1="7" x2="14" y2="3.5"/><line x1="10" y1="20.5" x2="10" y2="17"/><line x1="14" y1="20.5" x2="14" y2="17"/><line x1="3.5" y1="10" x2="7" y2="10"/><line x1="3.5" y1="14" x2="7" y2="14"/><line x1="17" y1="10" x2="20.5" y2="10"/><line x1="17" y1="14" x2="20.5" y2="14"/></g></symbol>
+    <symbol id="i-cam" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="12" rx="2.5"/><circle cx="12" cy="13" r="3.5"/><line x1="8" y1="4.5" x2="16" y2="4.5"/></g></symbol>
+    <symbol id="i-ant" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="10" r="2"/><line x1="12" y1="12.4" x2="12" y2="20"/><path d="M8.6 13.4a4.8 4.8 0 0 1 0-6.8"/><path d="M15.4 6.6a4.8 4.8 0 0 1 0 6.8"/><path d="M6.2 15.8a8.2 8.2 0 0 1 0-11.6"/><path d="M17.8 4.2a8.2 8.2 0 0 1 0 11.6"/></g></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M13 3 6.5 13.5H11L10 21l7-10.5h-4.8Z"/></g></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a5 5 0 0 1 5 5v3.2l1.6 2.8H5.4L7 12.2V9a5 5 0 0 1 5-5Z"/><path d="M10.2 18.5a1.9 1.9 0 0 0 3.6 0"/></g></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5"/><path d="M10 8.8 15.2 12 10 15.2Z"/></g></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8V6"/><path d="M5 12c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8"/></g></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="7.5" y="3" width="9" height="18" rx="2.2"/><line x1="10.8" y1="18" x2="13.2" y2="18"/></g></symbol>
+  </defs>
+</svg>
+
+<header class="wrap">
+  <p class="eyebrow">Flowline &middot; Northstar target</p>
+  <h1>Doorbell Northstar</h1>
+  <p class="lede">The hand-built target the spec engine has to reach: one click-through, three
+  synchronized views. A visitor trips the doorbell camera's motion sensor; the always-on low-power
+  chip publishes over MQTT, the cloud pushes to the phone, and when the user taps <i>View live</i>
+  the low-power chip wakes the high-power camera chip over an interrupt line — board, silicon, and
+  viewfinder all telling the same step.</p>
+  <div class="legend">
+    <span class="lg"><span class="sw https"></span>HTTPS</span>
+    <span class="lg"><span class="sw mqtt"></span>MQTT</span>
+    <span class="lg"><span class="sw int"></span>INTERNAL</span>
+    <span class="lg"><span class="sw rtp"></span>RTP VIDEO</span>
+    <span class="lg"><span class="sw ret"></span>return / linkage (fine dash, protocol color)</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="panel board">
+    <div class="phead"><span>DATA FLOW &mdash; CUMULUS IOT &middot; DOORBELL EVENT &rarr; LIVE VIEW &rarr; CLIP</span><span>site-9 / door-1</span></div>
+    <svg viewBox="0 0 1180 470" role="img" aria-label="Data flow from a doorbell camera through the Cumulus IoT cloud to a phone: motion event over MQTT, push notification, live RTP video, clip upload" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="mk-https" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#38E1FF"/></marker>
+        <marker id="mk-mqtt" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#F471B5"/></marker>
+        <marker id="mk-int" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#A78BFA"/></marker>
+        <marker id="mk-rtp" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#FFB454"/></marker>
+        <pattern id="bgdots" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1.3" cy="1.3" r="1.2" fill="#16233C"/></pattern>
+      </defs>
+      <rect width="1180" height="470" fill="#0B1220"/>
+      <rect width="1180" height="470" fill="url(#bgdots)"/>
+
+      <rect class="grp" x="20" y="88" width="270" height="332" rx="14"/>
+      <text class="grpt" x="34" y="112">CHIME DB-2 &middot; DOORBELL</text>
+
+      <path id="m1" class="edge mqtt" d="M 270 150 C 315 140 335 110 370 94" marker-end="url(#mk-mqtt)"/>
+      <path id="m2" class="edge mqtt" d="M 540 97 L 600 97" marker-end="url(#mk-mqtt)"/>
+      <path id="h1" class="edge int"  d="M 770 97 L 830 97" marker-end="url(#mk-int)"/>
+      <path id="p1" class="edge https" d="M 920 124 C 950 210 1030 300 1058 370" marker-end="url(#mk-https)"/>
+      <path id="h2" class="edge https" d="M 950 395 C 870 385 810 330 770 272" marker-end="url(#mk-https)"/>
+      <path id="b1" class="edge int"  d="M 620 230 C 560 200 500 160 462 124" marker-end="url(#mk-int)"/>
+      <path id="m3" class="edge mqtt" d="M 370 112 C 335 132 315 156 270 170" marker-end="url(#mk-mqtt)"/>
+      <path id="i1" class="edge int"  d="M 155 195 L 155 315" marker-end="url(#mk-int)"/>
+      <path id="r1" class="edge rtp"  d="M 270 340 C 400 325 500 300 600 272" marker-end="url(#mk-rtp)"/>
+      <path id="r2" class="edge rtp"  d="M 770 246 C 870 240 970 300 1030 368" marker-end="url(#mk-rtp)"/>
+      <path id="u1" class="edge https" d="M 270 368 C 520 440 720 350 830 268" marker-end="url(#mk-https)"/>
+      <path id="v1" class="edge int dsh" d="M 890 230 C 850 190 780 150 720 124" marker-end="url(#mk-int)"/>
+
+      <text class="lbl" x="382" y="145" text-anchor="start">evt/site-9/door-1/motion</text>
+      <text class="lbl" x="570" y="86" text-anchor="middle">evt/#</text>
+      <text class="lbl" x="800" y="86" text-anchor="middle">rule hit</text>
+      <text class="lbl" x="1002" y="250" text-anchor="start">push: motion at front door</text>
+      <text class="lbl" x="852" y="345" text-anchor="start">start live session</text>
+      <text class="lbl" x="525" y="176" text-anchor="end">stream ctl</text>
+      <text class="lbl" x="290" y="200" text-anchor="start">cmd/&hellip;/stream_start</text>
+      <text class="lbl" x="170" y="258" text-anchor="start">WAKE_INT &#9889;</text>
+      <text class="lbl" x="446" y="296" text-anchor="middle">RTP video</text>
+      <text class="lbl" x="905" y="253" text-anchor="middle">live view</text>
+      <text class="lbl" x="602" y="360" text-anchor="middle">clip upload &middot; mp4</text>
+      <text class="lbl" x="795" y="170" text-anchor="start">clip &rarr; event</text>
+
+      <g class="node tint-int" id="n-lp" transform="translate(40 130)"><rect class="card" width="230" height="60" rx="12"/><rect class="icbg" x="12" y="16" width="26" height="26" rx="8"/><use href="#i-chip" x="17" y="21" width="16" height="16"/><text class="t1" x="48" y="27">Sentry LP core</text><text class="t2" x="48" y="44">wifi &middot; mqtt &middot; pir / button</text></g>
+      <g class="node tint-rtp" id="n-hp" transform="translate(40 320)"><rect class="card" width="230" height="60" rx="12"/><rect class="icbg" x="12" y="16" width="26" height="26" rx="8"/><use href="#i-cam" x="17" y="21" width="16" height="16"/><text class="t1" x="48" y="27">Vision HP core</text><text class="t2" x="48" y="44">camera &middot; h.264 &middot; rtp</text></g>
+      <g class="node tint-mqtt" id="n-relay" transform="translate(370 70)"><rect class="card" width="170" height="54" rx="12"/><rect class="icbg" x="12" y="14" width="26" height="26" rx="8"/><use href="#i-ant" x="17" y="19" width="16" height="16"/><text class="t1" x="46" y="25">Relay Broker</text><text class="t2" x="46" y="41">MQTT &middot; TLS :8883</text></g>
+      <g class="node tint-int" id="n-pulse" transform="translate(600 70)"><rect class="card" width="170" height="54" rx="12"/><rect class="icbg" x="12" y="14" width="26" height="26" rx="8"/><use href="#i-bolt" x="17" y="19" width="16" height="16"/><text class="t1" x="46" y="25">Pulse Events</text><text class="t2" x="46" y="41">rules &middot; event log</text></g>
+      <g class="node tint-https" id="n-herald" transform="translate(830 70)"><rect class="card" width="170" height="54" rx="12"/><rect class="icbg" x="12" y="14" width="26" height="26" rx="8"/><use href="#i-bell" x="17" y="19" width="16" height="16"/><text class="t1" x="46" y="25">Herald Push</text><text class="t2" x="46" y="41">APNs / FCM</text></g>
+      <g class="node tint-rtp" id="n-beam" transform="translate(600 230)"><rect class="card" width="170" height="54" rx="12"/><rect class="icbg" x="12" y="14" width="26" height="26" rx="8"/><use href="#i-play" x="17" y="19" width="16" height="16"/><text class="t1" x="46" y="25">Beam Media</text><text class="t2" x="46" y="41">live sessions</text></g>
+      <g class="node tint-https" id="n-vault" transform="translate(830 230)"><rect class="card" width="170" height="54" rx="12"/><rect class="icbg" x="12" y="14" width="26" height="26" rx="8"/><use href="#i-db" x="17" y="19" width="16" height="16"/><text class="t1" x="46" y="25">Vault Clips</text><text class="t2" x="46" y="41">clip storage</text></g>
+      <g class="node tint-https" id="n-phone" transform="translate(950 370)"><rect class="card" width="200" height="64" rx="12"/><rect class="icbg" x="12" y="19" width="26" height="26" rx="8"/><use href="#i-phone" x="17" y="24" width="16" height="16"/><text class="t1" x="48" y="30">Cumulus Home</text><text class="t2" x="48" y="47">phone app</text></g>
+
+      <circle class="pkt mqtt" r="4"><animateMotion id="am-m1" dur="0.9s" begin="indefinite" fill="freeze"><mpath href="#m1"/></animateMotion></circle>
+      <circle class="pkt mqtt" r="4"><animateMotion id="am-m2" dur="0.7s" begin="indefinite" fill="freeze"><mpath href="#m2"/></animateMotion></circle>
+      <circle class="pkt int" r="4"><animateMotion id="am-h1" dur="0.7s" begin="indefinite" fill="freeze"><mpath href="#h1"/></animateMotion></circle>
+      <circle class="pkt https" r="4"><animateMotion id="am-p1" dur="1.1s" begin="indefinite" fill="freeze"><mpath href="#p1"/></animateMotion></circle>
+      <circle class="pkt https" r="4"><animateMotion id="am-h2" dur="0.9s" begin="indefinite" fill="freeze"><mpath href="#h2"/></animateMotion></circle>
+      <circle class="pkt int" r="4"><animateMotion id="am-b1" dur="0.8s" begin="indefinite" fill="freeze"><mpath href="#b1"/></animateMotion></circle>
+      <circle class="pkt mqtt" r="4"><animateMotion id="am-m3" dur="0.8s" begin="indefinite" fill="freeze"><mpath href="#m3"/></animateMotion></circle>
+      <circle class="pkt int" r="4"><animateMotion id="am-i1" dur="0.6s" begin="indefinite" fill="freeze"><mpath href="#i1"/></animateMotion></circle>
+      <circle class="pkt rtp" r="4"><animateMotion id="am-r1" dur="1.0s" begin="indefinite" fill="freeze"><mpath href="#r1"/></animateMotion></circle>
+      <circle class="pkt rtp" r="4"><animateMotion id="am-r2" dur="1.0s" begin="indefinite" fill="freeze"><mpath href="#r2"/></animateMotion></circle>
+      <circle class="pkt https" r="4"><animateMotion id="am-u1" dur="1.3s" begin="indefinite" fill="freeze"><mpath href="#u1"/></animateMotion></circle>
+      <circle class="pkt int" r="4"><animateMotion id="am-v1" dur="0.9s" begin="indefinite" fill="freeze"><mpath href="#v1"/></animateMotion></circle>
+    </svg>
+  </div>
+
+  <div class="duo">
+    <div class="panel">
+      <div class="phead"><span>DEVICE HARDWARE &mdash; CHIME DB-2 MAINBOARD</span><span>rev C</span></div>
+      <svg viewBox="0 0 560 320" role="img" aria-label="Doorbell mainboard: always-on Sentry low-power chip, Vision high-power camera chip, and the WAKE_INT interrupt line between them" xmlns="http://www.w3.org/2000/svg">
+        <rect width="560" height="320" fill="#0B1220"/>
+        <rect x="10" y="10" width="540" height="300" rx="14" fill="#0D1425" stroke="#223252" stroke-width="1.2"/>
+        <circle cx="28" cy="28" r="4" fill="none" stroke="#223252"/><circle cx="532" cy="28" r="4" fill="none" stroke="#223252"/>
+        <circle cx="28" cy="292" r="4" fill="none" stroke="#223252"/><circle cx="532" cy="292" r="4" fill="none" stroke="#223252"/>
+        <text class="hwsilk" x="46" y="38">CHIME DB-2 &middot; MAINBOARD rev C</text>
+        <path class="trace" d="M 40 250 H 140 V 268 H 300"/>
+        <path class="trace" d="M 250 52 H 380 V 60"/>
+        <path class="trace" d="M 520 230 H 470 V 250"/>
+
+        <path id="hw-irq" class="irqline" d="M 240 135 L 310 135" marker-end="url(#mk-int)"/>
+        <text class="hwlbl" x="275" y="124" text-anchor="middle">WAKE_INT</text>
+
+        <g transform="translate(40 80)">
+          <rect class="pinstub" x="-6" y="18" width="6" height="3"/><rect class="pinstub" x="-6" y="38" width="6" height="3"/><rect class="pinstub" x="-6" y="58" width="6" height="3"/><rect class="pinstub" x="-6" y="78" width="6" height="3"/>
+          <rect class="pinstub" x="200" y="18" width="6" height="3"/><rect class="pinstub" x="200" y="38" width="6" height="3"/><rect class="pinstub" x="200" y="58" width="6" height="3"/><rect class="pinstub" x="200" y="78" width="6" height="3"/>
+          <rect class="chiprect lit" width="200" height="110" rx="9"/>
+          <text class="hwt1" x="14" y="26">SENTRY LP</text>
+          <text class="hwt2" x="14" y="42">wifi &middot; mqtt &middot; pir / button</text>
+          <rect class="statepill" x="14" y="56" width="64" height="20" rx="10"/>
+          <text class="statetxt" x="46" y="69.5" text-anchor="middle">ACTIVE</text>
+          <circle id="hw-led-radio" class="led" cx="120" cy="66" r="4"/>
+          <text class="hwlbl" x="120" y="84" text-anchor="middle">RADIO</text>
+          <circle id="hw-led-sensor" class="led" cx="168" cy="66" r="4"/>
+          <text class="hwlbl" x="168" y="84" text-anchor="middle">PIR</text>
+        </g>
+
+        <g transform="translate(310 60)">
+          <rect class="pinstub" x="-6" y="20" width="6" height="3"/><rect class="pinstub" x="-6" y="45" width="6" height="3"/><rect class="pinstub" x="-6" y="70" width="6" height="3"/><rect class="pinstub" x="-6" y="95" width="6" height="3"/><rect class="pinstub" x="-6" y="120" width="6" height="3"/>
+          <rect class="pinstub" x="210" y="20" width="6" height="3"/><rect class="pinstub" x="210" y="45" width="6" height="3"/><rect class="pinstub" x="210" y="70" width="6" height="3"/><rect class="pinstub" x="210" y="95" width="6" height="3"/><rect class="pinstub" x="210" y="120" width="6" height="3"/>
+          <rect id="hw-hp-chip" class="chiprect" width="210" height="150" rx="9"/>
+          <text class="hwt1" x="16" y="28">VISION HP</text>
+          <text class="hwt2" x="16" y="44">camera &middot; h.264 &middot; rtp</text>
+          <rect x="16" y="58" width="178" height="34" rx="8" fill="#0B1220" stroke="#223252"/>
+          <text id="hw-hp-state" class="hwstate" x="105" y="80" text-anchor="middle" fill="#55648A">OFF</text>
+          <circle id="hw-led-cam" class="led" cx="32" cy="120" r="4.5"/>
+          <text class="hwlbl" x="32" y="138" text-anchor="middle">CAM</text>
+          <circle id="hw-led-pwr" class="led" cx="82" cy="120" r="4.5"/>
+          <text class="hwlbl" x="82" y="138" text-anchor="middle">PWR</text>
+        </g>
+
+        <text class="hwsilk" x="46" y="296">PWR 5V &#9656; BUCK &#9656; 3V3 / CAM RAIL</text>
+      </svg>
+    </div>
+
+    <div class="panel" id="camwrap" data-mode="off">
+      <div class="phead"><span>CAMERA &mdash; FRONT DOOR</span><span>1080p &middot; night mode</span></div>
+      <svg viewBox="0 0 480 300" role="img" aria-label="Doorbell camera viewfinder: dark while the camera chip is off, then live video of a visitor at the door with a blinking REC indicator" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="nightgrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#0A1526"/><stop offset="1" stop-color="#0D1B30"/>
+          </linearGradient>
+          <pattern id="noisepat" width="8" height="8" patternUnits="userSpaceOnUse">
+            <rect width="8" height="8" fill="#0A0F1A"/>
+            <rect x="1" y="2" width="2" height="2" fill="#1E2A42"/>
+            <rect x="5" y="5" width="2" height="1" fill="#2A3A58"/>
+            <rect x="4" y="0" width="1" height="2" fill="#16203A"/>
+          </pattern>
+          <pattern id="scanpat" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="4" height="1" fill="rgba(56,225,255,.05)"/>
+          </pattern>
+          <clipPath id="scrclip"><rect x="14" y="14" width="452" height="244" rx="8"/></clipPath>
+        </defs>
+        <rect width="480" height="300" rx="16" fill="#0E1526" stroke="#223252" stroke-width="1.2"/>
+        <rect x="14" y="14" width="452" height="244" rx="8" fill="#04070E"/>
+
+        <g clip-path="url(#scrclip)">
+          <g class="camlayer ly-off">
+            <text x="240" y="140" text-anchor="middle" style="font:600 10px 'IBM Plex Mono',monospace; letter-spacing:.35em; fill:#223252">STANDBY</text>
+            <circle cx="240" cy="162" r="2" fill="#16233C"/>
+          </g>
+
+          <g class="camlayer ly-boot">
+            <rect class="flick" x="14" y="14" width="452" height="244" fill="url(#noisepat)"/>
+            <text x="240" y="140" text-anchor="middle" style="font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.15em; fill:#7E93B8">INITIALIZING SENSOR&hellip;</text>
+          </g>
+
+          <g class="camlayer ly-scene">
+            <rect x="14" y="14" width="452" height="244" fill="url(#nightgrad)"/>
+            <line x1="54" y1="30" x2="54" y2="210" stroke="#10203A" stroke-width="2"/>
+            <line x1="114" y1="26" x2="114" y2="210" stroke="#10203A" stroke-width="2"/>
+            <line x1="174" y1="22" x2="174" y2="210" stroke="#10203A" stroke-width="2"/>
+            <rect x="14" y="208" width="452" height="50" fill="#0C1930"/>
+            <line x1="14" y1="208" x2="466" y2="208" stroke="#16294A" stroke-width="1.5"/>
+            <rect x="348" y="28" width="94" height="182" fill="#0B1830" stroke="#1C3054" stroke-width="2"/>
+            <rect x="360" y="40" width="70" height="170" fill="#0E2038"/>
+            <circle cx="372" cy="128" r="3.2" fill="#2C4A78"/>
+            <g class="cam-person" id="cam-person" transform="translate(268 210)">
+              <circle cx="0" cy="-76" r="14" fill="#142845" stroke="#2E507E" stroke-width="1"/>
+              <path d="M -17 -60 C -17 -69 17 -69 17 -60 L 14 -4 C 14 1 -14 1 -14 -4 Z" fill="#142845" stroke="#2E507E" stroke-width="1"/>
+            </g>
+            <rect x="14" y="14" width="452" height="244" fill="url(#scanpat)"/>
+          </g>
+
+          <g class="camlayer ly-bar">
+            <rect x="14" y="232" width="452" height="26" fill="rgba(4,8,15,.78)"/>
+            <text x="26" y="249" style="font:500 8.5px 'IBM Plex Mono',monospace; fill:#7E93B8">FRONT DOOR &middot; DB-2 &middot; 1080p</text>
+            <rect x="424" y="245" width="4" height="6" fill="#38E1FF"/><rect x="431" y="242" width="4" height="9" fill="#38E1FF"/><rect x="438" y="239" width="4" height="12" fill="#38E1FF"/>
+          </g>
+
+          <g class="camlayer ly-live">
+            <rect x="26" y="26" width="56" height="20" rx="10" fill="rgba(56,225,255,.14)" stroke="#38E1FF"/>
+            <circle cx="39" cy="36" r="3" fill="#38E1FF"/>
+            <text x="62" y="39.5" text-anchor="middle" style="font:700 9.5px 'IBM Plex Mono',monospace; fill:#38E1FF">LIVE</text>
+          </g>
+
+          <g class="camlayer ly-rec">
+            <circle class="rec-dot" cx="356" cy="36" r="5" fill="#FF5D5D"/>
+            <text id="cam-tc" x="368" y="40" text-anchor="start" style="font:700 10.5px 'IBM Plex Mono',monospace; fill:#FFDADA">REC 00:00.0</text>
+          </g>
+
+          <g class="camlayer ly-save">
+            <rect x="120" y="108" width="240" height="44" rx="10" fill="rgba(255,180,84,.14)" stroke="#FFB454"/>
+            <text x="240" y="135" text-anchor="middle" style="font:700 11px 'IBM Plex Mono',monospace; fill:#FFB454">SAVING CLIP &rarr; VAULT</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button class="tbtn" id="btn-prev" aria-label="Previous step">&#8249;</button>
+    <button class="tbtn" id="btn-play" aria-label="Pause">&#10074;&#10074;</button>
+    <button class="tbtn" id="btn-next" aria-label="Next step">&#8250;</button>
+    <div class="schips" id="chips"></div>
+    <div class="capline"><span class="tagpill dev" id="cap-tag">DEV</span><span class="captext" id="cap-text"></span></div>
+  </div>
+
+</main>
+
+<footer class="wrap">
+  <b>Build note.</b> Hand-crafted northstar: three views (data-flow board, mainboard, viewfinder)
+  driven by one 12-step table, in the Aurora Combined protocol-keyed language plus a new
+  <b>rtp</b> protocol kind for video. Inline SVG + CSS + vanilla JS, no libraries. Reduced motion:
+  no autoplay, no packets, static REC frame.
+</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  /* One step table drives all three panels. */
+  var STEPS = [
+    {tag:'dev', text:'Motion at the door — the PIR on the Sentry core trips',
+     edges:[], nodes:['n-lp'], dots:[],
+     hw:{hp:'OFF', radio:'IDLE', sensor:true, cam:'OFF', irq:false}, cam:'off'},
+    {tag:'dev', text:'Sentry publishes the motion event over MQTT',
+     edges:['m1'], nodes:['n-lp','n-relay'], dots:['m1'],
+     hw:{hp:'OFF', radio:'TX', sensor:false, cam:'OFF', irq:false}, cam:'off'},
+    {tag:'net', text:'Relay routes evt/# to Pulse Events — the front-door rule matches',
+     edges:['m2'], nodes:['n-relay','n-pulse'], dots:['m2'],
+     hw:{hp:'OFF', radio:'IDLE', sensor:false, cam:'OFF', irq:false}, cam:'off'},
+    {tag:'net', text:'Herald pushes “Motion at your front door” to the phone',
+     edges:['h1','p1'], nodes:['n-pulse','n-herald','n-phone'], dots:['h1','p1'],
+     hw:{hp:'OFF', radio:'IDLE', sensor:false, cam:'OFF', irq:false}, cam:'off'},
+    {tag:'net', text:'User taps View live — the app asks Beam Media for a session',
+     edges:['h2'], nodes:['n-phone','n-beam'], dots:['h2'],
+     hw:{hp:'OFF', radio:'IDLE', sensor:false, cam:'OFF', irq:false}, cam:'off'},
+    {tag:'net', text:'stream_start rides MQTT back down to the Sentry core',
+     edges:['b1','m3'], nodes:['n-beam','n-relay','n-lp'], dots:['b1','m3'],
+     hw:{hp:'OFF', radio:'RX', sensor:false, cam:'OFF', irq:false}, cam:'off'},
+    {tag:'dev', text:'Sentry raises WAKE_INT — the Vision core powers on',
+     edges:['i1'], nodes:['n-lp','n-hp'], dots:['i1'],
+     hw:{hp:'WAKE IRQ', radio:'IDLE', sensor:false, cam:'OFF', irq:true}, cam:'off'},
+    {tag:'dev', text:'Vision core boots — camera rail up, encoder ready',
+     edges:[], nodes:['n-hp'], dots:[],
+     hw:{hp:'BOOT', radio:'IDLE', sensor:false, cam:'ON', irq:false}, cam:'boot'},
+    {tag:'cam', text:'Live — RTP video reaches the phone. There’s someone at the door',
+     edges:['r1','r2'], nodes:['n-hp','n-beam','n-phone'], dots:['r1','r2'],
+     hw:{hp:'STREAM', radio:'IDLE', sensor:false, cam:'ON', irq:false}, cam:'live'},
+    {tag:'cam', text:'Recording — REC rolls on-device while the stream continues',
+     edges:['r1','r2'], nodes:['n-hp'], dots:[],
+     hw:{hp:'RECORD', radio:'IDLE', sensor:false, cam:'REC', irq:false}, cam:'rec'},
+    {tag:'net', text:'Clip upload — the mp4 lands in Vault Clips, linked back to the event',
+     edges:['u1','v1'], nodes:['n-hp','n-vault','n-pulse'], dots:['u1','v1'],
+     hw:{hp:'UPLOAD', radio:'TX', sensor:false, cam:'ON', irq:false}, cam:'save'},
+    {tag:'dev', text:'Vision core back to OFF — Sentry keeps watch alone',
+     edges:[], nodes:['n-lp'], dots:[],
+     hw:{hp:'OFF', radio:'IDLE', sensor:false, cam:'OFF', irq:false}, cam:'off'}
+  ];
+
+  var HP_COLORS = {'OFF':'#55648A','WAKE IRQ':'#A78BFA','BOOT':'#FFB454','STREAM':'#38E1FF','RECORD':'#FF5D5D','UPLOAD':'#4ADE80'};
+  var TAGS = {net:'NET', dev:'DEV', cam:'CAM'};
+
+  var RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var cur = 0, timer = null, recTimer = null, recT = 0, lastTc = '00:04.2';
+  function el(id){ return document.getElementById(id); }
+
+  var chipsBox = el('chips');
+  var i;
+  for (i = 0; i < STEPS.length; i++){
+    (function(idx){
+      var b = document.createElement('button');
+      b.className = 'schip ' + STEPS[idx].tag;
+      b.textContent = idx + 1;
+      b.setAttribute('aria-label', 'Go to step ' + (idx + 1));
+      b.addEventListener('click', function(){ stopAuto(); setStep(idx); });
+      chipsBox.appendChild(b);
+    })(i);
+  }
+
+  function fmtTc(t){
+    var s = Math.floor(t), d = Math.floor((t - s) * 10);
+    return '00:' + (s < 10 ? '0' : '') + s + '.' + d;
+  }
+  function stopRec(){ if (recTimer){ window.clearInterval(recTimer); recTimer = null; } }
+
+  function setStep(n){
+    cur = ((n % STEPS.length) + STEPS.length) % STEPS.length;
+    var s = STEPS[cur], j;
+
+    /* board */
+    var lit = document.querySelectorAll('.board .lit');
+    for (j = 0; j < lit.length; j++) lit[j].classList.remove('lit');
+    var pks = document.querySelectorAll('.board .pkt');
+    for (j = 0; j < pks.length; j++) pks[j].style.visibility = 'hidden';
+    for (j = 0; j < s.edges.length; j++) el(s.edges[j]).classList.add('lit');
+    for (j = 0; j < s.nodes.length; j++) el(s.nodes[j]).classList.add('lit');
+    if (!RM){
+      for (j = 0; j < s.dots.length; j++){
+        var am = el('am-' + s.dots[j]);
+        if (am){
+          am.parentNode.style.visibility = 'visible';
+          if (am.beginElementAt && j > 0) am.beginElementAt(j * 0.45); else am.beginElement();
+        }
+      }
+    }
+
+    /* hardware */
+    var h = s.hw;
+    var st = el('hw-hp-state');
+    st.textContent = h.hp;
+    st.setAttribute('fill', HP_COLORS[h.hp] || '#55648A');
+    el('hw-hp-chip').classList.toggle('lit', h.hp !== 'OFF');
+    el('hw-irq').classList.toggle('lit', h.irq);
+    el('hw-led-radio').setAttribute('class', 'led' + (h.radio === 'IDLE' ? '' : ' on-cyan blink'));
+    el('hw-led-sensor').setAttribute('class', 'led' + (h.sensor ? ' on-amber blink' : ''));
+    el('hw-led-cam').setAttribute('class', 'led' + (h.cam === 'ON' ? ' on-amber' : h.cam === 'REC' ? ' on-red blink' : ''));
+    el('hw-led-pwr').setAttribute('class', 'led' + (h.hp !== 'OFF' ? ' on-green' : ''));
+
+    /* camera */
+    var prevMode = el('camwrap').getAttribute('data-mode');
+    el('camwrap').setAttribute('data-mode', s.cam);
+    var person = el('cam-person');
+    if (s.cam === 'live' && prevMode !== 'live' && prevMode !== 'rec' && prevMode !== 'save' && !RM){
+      person.classList.remove('enter');
+      void person.getBBox();
+      person.classList.add('enter');
+    }
+    stopRec();
+    var tc = el('cam-tc');
+    if (s.cam === 'rec'){
+      if (RM){ tc.textContent = 'REC 00:04.2'; lastTc = '00:04.2'; }
+      else {
+        recT = 0; tc.textContent = 'REC 00:00.0';
+        recTimer = window.setInterval(function(){
+          recT += 0.1; lastTc = fmtTc(recT);
+          tc.textContent = 'REC ' + lastTc;
+        }, 100);
+      }
+    } else if (s.cam === 'save'){
+      tc.textContent = 'REC ' + lastTc;
+    }
+
+    /* chips + caption */
+    var chips = chipsBox.children;
+    for (j = 0; j < chips.length; j++) chips[j].setAttribute('aria-current', j === cur ? 'true' : 'false');
+    var tag = el('cap-tag');
+    tag.textContent = TAGS[s.tag];
+    tag.className = 'tagpill ' + s.tag;
+    el('cap-text').textContent = (cur + 1) + '/' + STEPS.length + ' — ' + s.text;
+  }
+
+  var btnPlay = el('btn-play');
+  function startAuto(){
+    if (timer) return;
+    timer = window.setInterval(function(){ setStep(cur + 1); }, 2800);
+    btnPlay.innerHTML = '&#10074;&#10074;';
+    btnPlay.setAttribute('aria-label', 'Pause');
+  }
+  function stopAuto(){
+    if (timer){ window.clearInterval(timer); timer = null; }
+    btnPlay.innerHTML = '&#9654;';
+    btnPlay.setAttribute('aria-label', 'Play');
+  }
+  btnPlay.addEventListener('click', function(){ if (timer) stopAuto(); else startAuto(); });
+  el('btn-prev').addEventListener('click', function(){ stopAuto(); setStep(cur - 1); });
+  el('btn-next').addEventListener('click', function(){ stopAuto(); setStep(cur + 1); });
+
+  setStep(0);
+  if (!RM) startAuto(); else stopAuto();
+})();
+</script>

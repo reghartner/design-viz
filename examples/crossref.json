@@ -1,0 +1,1148 @@
+{
+  "services": {
+    "8 TB HDD": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Abacus": [
+      {
+        "file": "wrenlight-perch/perch.html",
+        "family": "wrenlight-perch",
+        "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
+      }
+    ],
+    "Ack Topic": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Agent Desk": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Agent console": [
+      {
+        "file": "hearthline-sentry-panel/sentry-panel.html",
+        "family": "hearthline-sentry-panel",
+        "title": "hearthline Sentry Panel — Monitored Alarm"
+      }
+    ],
+    "Almanac": [
+      {
+        "file": "farwatch-sentinel/sentinel.html",
+        "family": "farwatch-sentinel",
+        "title": "Sentinel — Cellular Off-Grid Solar Camera"
+      }
+    ],
+    "Archivist": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Armory": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Artifact Store": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Artifact store": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Backoff": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Beacon": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Beam Media": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      },
+      {
+        "file": "doorbell/doorbell-from-spec.html",
+        "family": "doorbell",
+        "title": "Chime Doorbell — motion to clip"
+      }
+    ],
+    "Bench": [
+      {
+        "file": "showcase/widgets.html",
+        "family": "showcase",
+        "title": "Widget Showcase — every panel type on one page"
+      }
+    ],
+    "Bench broker": [
+      {
+        "file": "showcase/widgets.html",
+        "family": "showcase",
+        "title": "Widget Showcase — every panel type on one page"
+      }
+    ],
+    "Bench hub": [
+      {
+        "file": "showcase/widgets.html",
+        "family": "showcase",
+        "title": "Widget Showcase — every panel type on one page"
+      }
+    ],
+    "Bench store": [
+      {
+        "file": "showcase/widgets.html",
+        "family": "showcase",
+        "title": "Widget Showcase — every panel type on one page"
+      }
+    ],
+    "Bridge": [
+      {
+        "file": "loomworks-trellis/trellis.html",
+        "family": "loomworks-trellis",
+        "title": "loomworks Trellis — Camera-as-Hub"
+      }
+    ],
+    "Casebook": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Cellular APN": [
+      {
+        "file": "hearthline-sentry-panel/sentry-panel.html",
+        "family": "hearthline-sentry-panel",
+        "title": "hearthline Sentry Panel — Monitored Alarm"
+      }
+    ],
+    "Chorus": [
+      {
+        "file": "auralis-presence/presence.html",
+        "family": "auralis-presence",
+        "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Chronicle": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      },
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "Clarion": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Clip Sealer": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Coldstore": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Concierge": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Conduit": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      },
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "Console Alert": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Console State": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Courier": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Crier": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Crossbar": [
+      {
+        "file": "hearthline-failover/failover.html",
+        "family": "hearthline-failover",
+        "title": "hearthline Sentry Cloud — cross-region failover"
+      }
+    ],
+    "Dead Letter": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Dispatch": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      },
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Dispatch Ack": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Drawbridge": [
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "E2EE Sealer": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Encore": [
+      {
+        "file": "auralis-presence/presence.html",
+        "family": "auralis-presence",
+        "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Facewright": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "First Contact": [
+      {
+        "file": "auralis-presence/presence.html",
+        "family": "auralis-presence",
+        "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Flash Ring": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Fleetd": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Flitter": [
+      {
+        "file": "wrenlight-perch/perch.html",
+        "family": "wrenlight-perch",
+        "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
+      }
+    ],
+    "Forge": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Foundry": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Frozen + Paged": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Gatehouse": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Graft": [
+      {
+        "file": "loomworks-trellis/trellis.html",
+        "family": "loomworks-trellis",
+        "title": "loomworks Trellis — Camera-as-Hub"
+      }
+    ],
+    "Granary": [
+      {
+        "file": "wrenlight-perch/perch.html",
+        "family": "wrenlight-perch",
+        "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
+      }
+    ],
+    "Halogate": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Hearthgate": [
+      {
+        "file": "hearthline-sentry-panel/sentry-panel.html",
+        "family": "hearthline-sentry-panel",
+        "title": "hearthline Sentry Panel — Monitored Alarm"
+      }
+    ],
+    "Hearthgate N": [
+      {
+        "file": "hearthline-failover/failover.html",
+        "family": "hearthline-failover",
+        "title": "hearthline Sentry Cloud — cross-region failover"
+      }
+    ],
+    "Hearthgate S": [
+      {
+        "file": "hearthline-failover/failover.html",
+        "family": "hearthline-failover",
+        "title": "hearthline Sentry Cloud — cross-region failover"
+      }
+    ],
+    "Heddle": [
+      {
+        "file": "loomworks-trellis/trellis.html",
+        "family": "loomworks-trellis",
+        "title": "loomworks Trellis — Camera-as-Hub"
+      }
+    ],
+    "Herald Push": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      },
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      },
+      {
+        "file": "doorbell/doorbell-from-spec.html",
+        "family": "doorbell",
+        "title": "Chime Doorbell — motion to clip"
+      }
+    ],
+    "Home WiFi": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Homestead": [
+      {
+        "file": "farwatch-sentinel/sentinel.html",
+        "family": "farwatch-sentinel",
+        "title": "Sentinel — Cellular Off-Grid Solar Camera"
+      }
+    ],
+    "Inlet": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Keymaster": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Keyring": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "LTE modem": [
+      {
+        "file": "farwatch-sentinel/sentinel.html",
+        "family": "farwatch-sentinel",
+        "title": "Sentinel — Cellular Off-Grid Solar Camera"
+      }
+    ],
+    "Lattice": [
+      {
+        "file": "loomworks-trellis/trellis.html",
+        "family": "loomworks-trellis",
+        "title": "loomworks Trellis — Camera-as-Hub"
+      }
+    ],
+    "Ledger": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Lens AI": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Marshal": [
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "Motif": [
+      {
+        "file": "auralis-presence/presence.html",
+        "family": "auralis-presence",
+        "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Muster": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Nimbus API": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      },
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "OS Push Network": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Ops Console": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Oracle": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Overture API": [
+      {
+        "file": "auralis-presence/presence.html",
+        "family": "auralis-presence",
+        "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Overwatch": [
+      {
+        "file": "hearthline-sentry-panel/sentry-panel.html",
+        "family": "hearthline-sentry-panel",
+        "title": "hearthline Sentry Panel — Monitored Alarm"
+      }
+    ],
+    "Overwatch N": [
+      {
+        "file": "hearthline-failover/failover.html",
+        "family": "hearthline-failover",
+        "title": "hearthline Sentry Cloud — cross-region failover"
+      }
+    ],
+    "Overwatch S": [
+      {
+        "file": "hearthline-failover/failover.html",
+        "family": "hearthline-failover",
+        "title": "hearthline Sentry Cloud — cross-region failover"
+      }
+    ],
+    "Owner Phone": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "PMIC": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Partner controller": [
+      {
+        "file": "loomworks-trellis/trellis.html",
+        "family": "loomworks-trellis",
+        "title": "loomworks Trellis — Camera-as-Hub"
+      }
+    ],
+    "Passage": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Pathfinder": [
+      {
+        "file": "hearthline-failover/failover.html",
+        "family": "hearthline-failover",
+        "title": "hearthline Sentry Cloud — cross-region failover"
+      }
+    ],
+    "Pathworks": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      }
+    ],
+    "Perch Loft": [
+      {
+        "file": "wrenlight-perch/perch.html",
+        "family": "wrenlight-perch",
+        "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
+      }
+    ],
+    "Porter": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Pulse Events": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      },
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      },
+      {
+        "file": "doorbell/doorbell-from-spec.html",
+        "family": "doorbell",
+        "title": "Chime Doorbell — motion to clip"
+      }
+    ],
+    "Quartermaster": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Register": [
+      {
+        "file": "hearthline-sentry-panel/sentry-panel.html",
+        "family": "hearthline-sentry-panel",
+        "title": "hearthline Sentry Panel — Monitored Alarm"
+      }
+    ],
+    "Registry": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      },
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      },
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Relay": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      },
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Relay Ack": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Relay Broker": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      },
+      {
+        "file": "doorbell/doorbell-from-spec.html",
+        "family": "doorbell",
+        "title": "Chime Doorbell — motion to clip"
+      }
+    ],
+    "Relay Queue": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Release Eng": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Release eng": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Resident App": [
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "Retry 1": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Retry 2": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Retry 3": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Rollbook": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Rollout Done": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Roost": [
+      {
+        "file": "wrenlight-perch/perch.html",
+        "family": "wrenlight-perch",
+        "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
+      }
+    ],
+    "Roster": [
+      {
+        "file": "hearthline-sentry-panel/sentry-panel.html",
+        "family": "hearthline-sentry-panel",
+        "title": "hearthline Sentry Panel — Monitored Alarm"
+      }
+    ],
+    "Rule engine": [
+      {
+        "file": "loomworks-trellis/trellis.html",
+        "family": "loomworks-trellis",
+        "title": "loomworks Trellis — Camera-as-Hub"
+      }
+    ],
+    "Scribe": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Second Contact": [
+      {
+        "file": "auralis-presence/presence.html",
+        "family": "auralis-presence",
+        "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Sentinel Auth": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      },
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      },
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Sentry LP": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake",
+        "scope": "family",
+        "families": [
+          "chime",
+          "chime-radar",
+          "doorbell"
+        ]
+      },
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas",
+        "scope": "family",
+        "families": [
+          "doorbell",
+          "doorbell-atlas"
+        ]
+      },
+      {
+        "file": "doorbell/doorbell-from-spec.html",
+        "family": "doorbell",
+        "title": "Chime Doorbell — motion to clip",
+        "scope": "family",
+        "families": [
+          "doorbell"
+        ]
+      }
+    ],
+    "Sentry Panel": [
+      {
+        "file": "hearthline-failover/failover.html",
+        "family": "hearthline-failover",
+        "title": "hearthline Sentry Cloud — cross-region failover",
+        "scope": "family",
+        "families": [
+          "hearthline",
+          "hearthline-failover"
+        ]
+      },
+      {
+        "file": "hearthline-sentry-panel/sentry-panel.html",
+        "family": "hearthline-sentry-panel",
+        "title": "hearthline Sentry Panel — Monitored Alarm",
+        "scope": "family",
+        "families": [
+          "hearthline",
+          "hearthline-sentry-panel"
+        ]
+      }
+    ],
+    "Sift": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      }
+    ],
+    "Skybridge": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Skylink": [
+      {
+        "file": "gridseye-bastion/bastion.html",
+        "family": "gridseye-bastion",
+        "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
+      }
+    ],
+    "Soak Window": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Solar Panel": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Stage Check": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Stage Gate": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Stitcher": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Summons": [
+      {
+        "file": "hearthline-sentry-panel/sentry-panel.html",
+        "family": "hearthline-sentry-panel",
+        "title": "hearthline Sentry Panel — Monitored Alarm"
+      }
+    ],
+    "Summons S": [
+      {
+        "file": "hearthline-failover/failover.html",
+        "family": "hearthline-failover",
+        "title": "hearthline Sentry Cloud — cross-region failover"
+      }
+    ],
+    "Tally": [
+      {
+        "file": "farwatch-sentinel/sentinel.html",
+        "family": "farwatch-sentinel",
+        "title": "Sentinel — Cellular Off-Grid Solar Camera"
+      }
+    ],
+    "Tempo": [
+      {
+        "file": "auralis-presence/presence.html",
+        "family": "auralis-presence",
+        "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Thumbnailer": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Timeline": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Timeout": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Undeliverable": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Vault": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Vault API": [
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "Vault Clips": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake"
+      },
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      },
+      {
+        "file": "doorbell/doorbell-from-spec.html",
+        "family": "doorbell",
+        "title": "Chime Doorbell — motion to clip"
+      }
+    ],
+    "Vaultd": [
+      {
+        "file": "basecraft-keep/keep.html",
+        "family": "basecraft-keep",
+        "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Verify Digest": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Version Report": [
+      {
+        "file": "cumulus/cumulus-flow.html",
+        "family": "cumulus",
+        "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Vigil": [
+      {
+        "file": "auralis-presence/presence.html",
+        "family": "auralis-presence",
+        "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
+      }
+    ],
+    "Vision HP": [
+      {
+        "file": "chime-radar/chime-radar.html",
+        "family": "chime-radar",
+        "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake",
+        "scope": "family",
+        "families": [
+          "chime",
+          "chime-radar",
+          "doorbell"
+        ]
+      },
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas",
+        "scope": "family",
+        "families": [
+          "doorbell",
+          "doorbell-atlas"
+        ]
+      },
+      {
+        "file": "doorbell/doorbell-from-spec.html",
+        "family": "doorbell",
+        "title": "Chime Doorbell — motion to clip",
+        "scope": "family",
+        "families": [
+          "doorbell"
+        ]
+      }
+    ],
+    "Vitals": [
+      {
+        "file": "nestrel-warden/warden.html",
+        "family": "nestrel-warden",
+        "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Warp": [
+      {
+        "file": "loomworks-trellis/trellis.html",
+        "family": "loomworks-trellis",
+        "title": "loomworks Trellis — Camera-as-Hub"
+      }
+    ],
+    "Watchtower": [
+      {
+        "file": "halovista-aegis/aegis.html",
+        "family": "halovista-aegis",
+        "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
+      }
+    ],
+    "Waystation": [
+      {
+        "file": "farwatch-sentinel/sentinel.html",
+        "family": "farwatch-sentinel",
+        "title": "Sentinel — Cellular Off-Grid Solar Camera"
+      }
+    ],
+    "WiFi Radio": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Wrangler": [
+      {
+        "file": "farwatch-sentinel/sentinel.html",
+        "family": "farwatch-sentinel",
+        "title": "Sentinel — Cellular Off-Grid Solar Camera"
+      }
+    ],
+    "Zone Policy": [
+      {
+        "file": "doorbell-atlas/atlas.html",
+        "family": "doorbell-atlas",
+        "title": "Lookout Feature Atlas"
+      }
+    ],
+    "microSD ring": [
+      {
+        "file": "farwatch-sentinel/sentinel.html",
+        "family": "farwatch-sentinel",
+        "title": "Sentinel — Cellular Off-Grid Solar Camera"
+      }
+    ],
+    "vault-a1": [
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "vault-a2": [
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ],
+    "vault-b1": [
+      {
+        "file": "halovista-mirrorline/mirrorline.html",
+        "family": "halovista-mirrorline",
+        "title": "Mirrorline — Event-Store Replication"
+      }
+    ]
+  }
+}

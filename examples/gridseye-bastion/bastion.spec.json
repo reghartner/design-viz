@@ -1,0 +1,1776 @@
+{
+  "page": {
+    "title": "Bastion \u2014 PoE Camera Fleet & Stronghold NVR",
+    "contract": "1",
+    "protocols": {
+      "rtsps": {
+        "label": "RTSPS",
+        "color": "#4ADE80"
+      },
+      "laneventtls": {
+        "label": "LAN event (TLS)",
+        "color": "#38E1FF"
+      },
+      "push": {
+        "label": "Push",
+        "color": "#FFB454"
+      },
+      "tunnel": {
+        "label": "Skylink tunnel",
+        "color": "#A78BFA"
+      },
+      "usbhid": {
+        "label": "USB-HID",
+        "color": "#FB7185"
+      },
+      "mdns": {
+        "label": "mDNS",
+        "color": "#2DD4BF"
+      },
+      "lantls": {
+        "label": "LAN TLS",
+        "color": "#60A5FA"
+      },
+      "dbimport": {
+        "label": "Database import",
+        "color": "#F472B6"
+      }
+    },
+    "lanes": {
+      "CAM": {
+        "color": "#FFB454",
+        "label": "CAM"
+      },
+      "NVR": {
+        "color": "#38E1FF",
+        "label": "NVR"
+      },
+      "NET": {
+        "color": "#A78BFA",
+        "label": "NET"
+      },
+      "OTA": {
+        "color": "#818CF8",
+        "label": "OTA"
+      },
+      "OPS": {
+        "color": "#4ADE80",
+        "label": "OPS"
+      },
+      "LAN": {
+        "color": "#2DD4BF",
+        "label": "LAN"
+      }
+    },
+    "blocks": [
+      {
+        "heading": "Bastion \u2014 wired fleet, local-first NVR",
+        "accent": "slate",
+        "text": [
+          "Bastion is gridseye's wired surveillance system: a fleet of PoE cameras recording continuously into the Stronghold NVR appliance on the owner's own LAN. Recording, detection, verification, and playback all run locally; the gridseye cloud exists only for identity, remote-access tunneling, firmware distribution, and opt-in health telemetry.",
+          "This document covers four flows: edge detection with an NVR second opinion, staged firmware rollouts, the UPS-backed power domain during a grid outage, and LAN-only viewing when the vendor cloud is unreachable, all at an example 14-camera small-business site."
+        ],
+        "bullets": [
+          {
+            "text": "**B6 camera family** (Bullet, Dome, PTZ): 8 MP sensor, Kestrel-V SoC with a 1.5-TOPS edge NPU, IR array, PoE 802.3af (PTZ 802.3at), dual A/B firmware slots. *No battery* \u2014 a B6 is dead without PoE."
+          },
+          {
+            "text": "**Stronghold NVR**: Condor-X SoC with a 26-TOPS NPU, 16 GB RAM, 2\u00d7 8 TB mirrored HDDs, 8-port PoE switch (120 W budget), USB-HID UPS port."
+          },
+          {
+            "text": "**Power split**: no low/high chip split \u2014 the split is **tiered power domains** under UPS:",
+            "sub": [
+              "tier 1 (NVR core, disks, recording) *never* sheds",
+              "tier 2 (interior cameras) sheds at low charge",
+              "tier 3 (IR, PTZ, chime, second-stage inference) sheds immediately on grid loss"
+            ]
+          }
+        ]
+      },
+      {
+        "tabs": [
+          {
+            "label": "Edge detection",
+            "sections": [
+              {
+                "heading": "Flow 1 \u2014 Edge detection, NVR second opinion",
+                "accent": "green",
+                "bullets": [
+                  "The B6 camera streams continuously to Archivist over RTSPS; segments land in the recording store regardless of everything below.",
+                  "The camera's edge NPU flags a person at 0.71 confidence and posts a detection event with a thumbnail to Muster on the LAN event channel.",
+                  "Muster writes the event into the timeline index as a *candidate* and hands the event id to Oracle for a second opinion.",
+                  "Oracle pulls the surrounding 8 seconds of keyframes from Archivist's segment store.",
+                  "Oracle runs the 26-TOPS model: confidence rises to 0.96 and the class upgrades from person to person+package.",
+                  "Oracle returns the verdict to Muster, which promotes the event from candidate to *confirmed*.",
+                  "Muster notifies Gatehouse, which forwards the confirmed event to Skylink for push delivery.",
+                  "Skylink pushes the notification with the thumbnail to the owner's phone.",
+                  "The owner taps through; the phone reaches Gatehouse via the Skylink tunnel and plays the clip from local disk.",
+                  "**Disk failure**: the mirror degrades to single-disk with a persistent banner; a second failure stops recording but never corrupts the index.",
+                  "**Oracle down**: candidate events still record and index, rendered \"unverified\"; notifications fall back to edge confidence at lower push priority."
+                ],
+                "contract": {
+                  "title": "On the wire: detection event (B6 camera \u2192 Muster)",
+                  "fields": [
+                    {
+                      "k": "cam_id",
+                      "v": "b6-drive-02",
+                      "g": "adopted camera identity"
+                    },
+                    {
+                      "k": "event_id",
+                      "v": "01JB8QK4X2",
+                      "g": "ULID, unique per detection"
+                    },
+                    {
+                      "k": "ts",
+                      "v": "2026-09-05T14:02:11Z",
+                      "g": "detection timestamp"
+                    },
+                    {
+                      "k": "class",
+                      "v": "person",
+                      "g": "edge NPU class label"
+                    },
+                    {
+                      "k": "conf",
+                      "v": "0.71",
+                      "g": "edge confidence, 0\u20131",
+                      "hot": true
+                    },
+                    {
+                      "k": "clip",
+                      "v": "{\"seg\":\"s-88412\",\"off_ms\":4180}",
+                      "g": "segment + offset for playback"
+                    },
+                    {
+                      "k": "thumb",
+                      "v": "ref:tmb/01JB8QK4X2",
+                      "g": "thumbnail object reference"
+                    },
+                    {
+                      "k": "npu",
+                      "v": "kestrel/1.5t/m14",
+                      "g": "model + hardware that scored it"
+                    }
+                  ],
+                  "note": "LAN event channel, protobuf over TLS."
+                },
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "cam": {
+                      "title": "B6 Camera",
+                      "sub": "bullet \u00b7 drive-02",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "archivist": {
+                      "title": "Archivist",
+                      "sub": "segment store",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/archivist/segments.go#L118"
+                    },
+                    "muster": {
+                      "title": "Muster",
+                      "sub": "fleet \u00b7 timeline",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/muster/index.go#L61"
+                    },
+                    "oracle": {
+                      "title": "Oracle",
+                      "sub": "2nd-stage AI",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/oracle/infer.go#L142"
+                    },
+                    "gatehouse": {
+                      "title": "Gatehouse",
+                      "sub": "local web/app",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/gatehouse/server.go#L77"
+                    },
+                    "skylink": {
+                      "title": "Skylink",
+                      "sub": "tunnel \u00b7 push",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/cloud/blob/main/skylink/tunnel.go#L91"
+                    },
+                    "phone": {
+                      "title": "Owner Phone",
+                      "sub": "companion app",
+                      "icon": "phone",
+                      "tint": "cmd"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "cam",
+                      "archivist",
+                      "muster",
+                      "oracle"
+                    ],
+                    [
+                      "gatehouse",
+                      "skylink",
+                      "phone"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "cam",
+                      "to": "archivist",
+                      "kind": "rtsps",
+                      "label": "RTSPS stream"
+                    },
+                    {
+                      "from": "cam",
+                      "to": "muster",
+                      "kind": "laneventtls",
+                      "label": "detection event"
+                    },
+                    {
+                      "from": "muster",
+                      "to": "oracle",
+                      "kind": "int",
+                      "label": "2nd opinion"
+                    },
+                    {
+                      "from": "oracle",
+                      "to": "archivist",
+                      "kind": "int",
+                      "label": "pull 8s keyframes"
+                    },
+                    {
+                      "from": "oracle",
+                      "to": "muster",
+                      "kind": "int",
+                      "ret": true,
+                      "label": "return verdict"
+                    },
+                    {
+                      "from": "muster",
+                      "to": "gatehouse",
+                      "kind": "int",
+                      "label": "notify confirmed"
+                    },
+                    {
+                      "from": "gatehouse",
+                      "to": "skylink",
+                      "kind": "push",
+                      "label": "forward for push"
+                    },
+                    {
+                      "from": "skylink",
+                      "to": "phone",
+                      "kind": "push",
+                      "label": "push notify"
+                    },
+                    {
+                      "from": "phone",
+                      "to": "skylink",
+                      "kind": "tunnel",
+                      "label": "open tunnel"
+                    },
+                    {
+                      "from": "skylink",
+                      "to": "gatehouse",
+                      "kind": "tunnel",
+                      "label": "relay: play clip"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "seg",
+                      "type": "buffer",
+                      "title": "Archivist \u2014 segment store",
+                      "segments": 12,
+                      "capacity": "continuous",
+                      "initial": {
+                        "cells": [
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered",
+                          "buffered"
+                        ],
+                        "head": 11,
+                        "note": "continuous recording \u2014 segments land regardless of detection"
+                      }
+                    },
+                    {
+                      "id": "evt",
+                      "type": "state",
+                      "title": "Muster \u2014 event state",
+                      "states": [
+                        "NONE",
+                        "CANDIDATE",
+                        "VERIFYING",
+                        "CONFIRMED"
+                      ],
+                      "colors": {
+                        "CANDIDATE": "#FFB454",
+                        "VERIFYING": "#38E1FF",
+                        "CONFIRMED": "#4ADE80"
+                      },
+                      "initial": {
+                        "state": "NONE"
+                      }
+                    },
+                    {
+                      "id": "view",
+                      "type": "screen",
+                      "title": "B6 Camera \u2014 driveway",
+                      "scene": "package-drop",
+                      "initial": {
+                        "mode": "live"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "tags": {
+                        "CAM": "#FFB454",
+                        "NVR": "#38E1FF",
+                        "NET": "#A78BFA"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "cam->archivist",
+                      "lane": "CAM",
+                      "text": "The camera streams continuously to Archivist over RTSPS \u2014 segments land regardless of anything else",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "CAM",
+                              "text": "cam->archivist: RTSPS stream \u2014 segment s-88412 written"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "cam->muster",
+                      "lane": "CAM",
+                      "text": "Edge NPU flags a person at 0.71 confidence \u2014 posts a detection event to Muster",
+                      "panels": {
+                        "view": {
+                          "mode": "rec"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "CAM",
+                              "text": "cam->muster: detection event, class=person conf=0.71"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "muster->oracle",
+                      "lane": "NVR",
+                      "text": "Muster logs the event as a candidate and hands it to Oracle for a second opinion",
+                      "panels": {
+                        "evt": {
+                          "state": "CANDIDATE"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NVR",
+                              "text": "muster: event 01JB8QK4X2 -> CANDIDATE, handed to Oracle"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "oracle->archivist",
+                      "lane": "NVR",
+                      "text": "Oracle pulls the surrounding 8 seconds of keyframes from Archivist's segment store",
+                      "panels": {
+                        "seg": {
+                          "mark": [
+                            [
+                              2,
+                              9,
+                              "protected"
+                            ]
+                          ],
+                          "note": "8 s window pulled by Oracle for re-inference"
+                        },
+                        "evt": {
+                          "state": "VERIFYING"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NVR",
+                              "text": "oracle->archivist: pull 8s keyframes around s-88412"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "oracle"
+                      ],
+                      "lane": "NVR",
+                      "text": "Oracle re-runs the 26-TOPS model \u2014 confidence rises to 0.96, class upgrades to person+package",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NVR",
+                              "text": "oracle: 26-TOPS re-infer \u2014 conf 0.71 -> 0.96, class person -> person+package"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "oracle->muster",
+                      "lane": "NVR",
+                      "text": "Oracle returns the verdict \u2014 Muster promotes the event to confirmed",
+                      "panels": {
+                        "evt": {
+                          "state": "CONFIRMED"
+                        },
+                        "seg": {
+                          "mark": [
+                            [
+                              2,
+                              9,
+                              "buffered"
+                            ]
+                          ],
+                          "note": "window released \u2014 recording continues"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NVR",
+                              "text": "muster: event 01JB8QK4X2 -> CONFIRMED"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "muster->gatehouse",
+                        "gatehouse->skylink"
+                      ],
+                      "lane": "NET",
+                      "text": "Muster notifies Gatehouse, which forwards the confirmed event to Skylink for push",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "gatehouse->skylink: forward confirmed event for push"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "skylink->phone",
+                      "lane": "NET",
+                      "text": "Skylink pushes the notification and thumbnail to the owner's phone",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "skylink->phone: push notify + thumbnail"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "phone->skylink",
+                        "skylink->gatehouse"
+                      ],
+                      "lane": "NET",
+                      "text": "The owner taps through and plays the clip from local disk via the Skylink tunnel",
+                      "panels": {
+                        "view": {
+                          "mode": "save",
+                          "banner": "person+package \u00b7 conf 0.96 \u00b7 seg s-88412"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "phone plays clip s-88412 from Gatehouse via Skylink tunnel"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Firmware rollout",
+            "sections": [
+              {
+                "heading": "Flow 2 \u2014 Staged firmware rollout",
+                "accent": "violet",
+                "bullets": [
+                  "A gridseye release engineer publishes B6 firmware 3.2.0 to Forge with a signed manifest.",
+                  "Armory polls Forge nightly, downloads the image once, and verifies the signature against the pinned gridseye release key.",
+                  "Armory opens the rollout in canary stage: one camera per hardware model at the site (3 of 14).",
+                  "Armory offers the image to each canary; the camera writes it to its inactive A/B slot, verifies the digest, and reboots into it.",
+                  "Each canary reports its running version and health counters to Muster inside the 2-minute boot deadline.",
+                  "Armory holds a 24-hour observe window, watching Muster's metrics for reboots, stream stalls, and detection-rate drift.",
+                  "Metrics stay clean, so Armory expands in waves of 4 cameras with a 30-minute soak between waves.",
+                  "A wave-2 dome reboot-loops on the new image; Armory halts the rollout and issues no further offers.",
+                  "Armory instructs the failing camera to boot its previous slot \u2014 rollback is one reboot, since the old image is still resident.",
+                  "Armory pins the fleet at mixed versions, marks the rollout HALTED, and files the camera's log bundle with [Gridlog](https://github.com/gridseye/cloud/blob/main/gridlog/ingest.go#L29) for the vendor ticket.",
+                  "**Camera offline**: marked in the fleet grid; others unaffected; on return it resumes from live only \u2014 a B6 has no local buffer to backfill from.",
+                  "**Forge unreachable**: rollouts pause where they stand; the fleet is always runnable at pinned mixed versions."
+                ],
+                "contract": {
+                  "title": "On the wire: rollout offer (Armory \u2192 B6 camera)",
+                  "fields": [
+                    {
+                      "k": "rollout_id",
+                      "v": "ro-2026-091",
+                      "g": "rollout this offer belongs to"
+                    },
+                    {
+                      "k": "image",
+                      "v": "b6-3.2.0",
+                      "g": "target firmware version"
+                    },
+                    {
+                      "k": "sha256",
+                      "v": "9f31\u2026c2aa",
+                      "g": "image digest the camera must verify",
+                      "hot": true
+                    },
+                    {
+                      "k": "url",
+                      "v": "https://stronghold.local/fw/b6-3.2.0.img",
+                      "g": "LAN fetch path \u2014 Forge is never contacted by cameras"
+                    },
+                    {
+                      "k": "slot",
+                      "v": "B",
+                      "g": "inactive A/B slot to flash"
+                    },
+                    {
+                      "k": "deadline_s",
+                      "v": "120",
+                      "g": "boot-report deadline before the offer counts as failed"
+                    },
+                    {
+                      "k": "stage",
+                      "v": "canary",
+                      "g": "rollout stage issuing the offer"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "forge": {
+                      "title": "Forge",
+                      "sub": "firmware images",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/cloud/blob/main/forge/manifest.go#L37"
+                    },
+                    "armory": {
+                      "title": "Armory",
+                      "sub": "rollout coordinator",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/armory/rollout.go#L203"
+                    },
+                    "fleet": {
+                      "title": "Camera Fleet",
+                      "sub": "14 \u00d7 B6",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "muster": {
+                      "title": "Muster",
+                      "sub": "fleet health",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/muster/index.go#L61"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "forge",
+                      "armory",
+                      "fleet"
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "muster",
+                      "side": "below"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "forge",
+                      "to": "armory",
+                      "kind": "dbimport",
+                      "label": "nightly image pull"
+                    },
+                    {
+                      "from": "armory",
+                      "to": "fleet",
+                      "kind": "https",
+                      "label": "stage + install"
+                    },
+                    {
+                      "from": "fleet",
+                      "to": "muster",
+                      "kind": "int",
+                      "label": "boot + health report"
+                    },
+                    {
+                      "from": "armory",
+                      "to": "muster",
+                      "kind": "int",
+                      "label": "watch metrics"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "grid",
+                      "type": "tiles",
+                      "title": "Fleet \u2014 rollout cohorts",
+                      "tiles": [
+                        {
+                          "id": "canary-bullet",
+                          "label": "Canary \u00b7 Bullet"
+                        },
+                        {
+                          "id": "canary-dome",
+                          "label": "Canary \u00b7 Dome"
+                        },
+                        {
+                          "id": "canary-ptz",
+                          "label": "Canary \u00b7 PTZ"
+                        },
+                        {
+                          "id": "wave1",
+                          "label": "Wave 1"
+                        },
+                        {
+                          "id": "wave2",
+                          "label": "Wave 2"
+                        },
+                        {
+                          "id": "wave3",
+                          "label": "Wave 3"
+                        }
+                      ],
+                      "states": [
+                        "CURRENT",
+                        "STAGING",
+                        "UPDATING",
+                        "HEALTHY",
+                        "FAULT",
+                        "ROLLED_BACK",
+                        "HELD"
+                      ],
+                      "colors": {
+                        "HEALTHY": "#4ADE80",
+                        "FAULT": "#FF6B5E",
+                        "ROLLED_BACK": "#FFB454",
+                        "HELD": "#55627A",
+                        "STAGING": "#38E1FF",
+                        "UPDATING": "#A78BFA"
+                      },
+                      "initial": {
+                        "canary-bullet": {
+                          "state": "CURRENT",
+                          "sub": "pre-rollout"
+                        },
+                        "canary-dome": {
+                          "state": "CURRENT",
+                          "sub": "pre-rollout"
+                        },
+                        "canary-ptz": {
+                          "state": "CURRENT",
+                          "sub": "pre-rollout"
+                        },
+                        "wave1": {
+                          "state": "CURRENT",
+                          "sub": "4 cameras"
+                        },
+                        "wave2": {
+                          "state": "CURRENT",
+                          "sub": "4 cameras"
+                        },
+                        "wave3": {
+                          "state": "CURRENT",
+                          "sub": "3 cameras"
+                        }
+                      }
+                    },
+                    {
+                      "id": "phase",
+                      "type": "state",
+                      "title": "Armory \u2014 rollout phase",
+                      "states": [
+                        "IDLE",
+                        "POLL",
+                        "CANARY",
+                        "OBSERVE",
+                        "WAVE 1",
+                        "HALTED",
+                        "ROLLBACK"
+                      ],
+                      "colors": {
+                        "CANARY": "#38E1FF",
+                        "OBSERVE": "#A78BFA",
+                        "WAVE 1": "#818CF8",
+                        "HALTED": "#FFB454",
+                        "ROLLBACK": "#FF6B5E"
+                      },
+                      "initial": {
+                        "state": "IDLE"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "tags": {
+                        "OTA": "#818CF8",
+                        "OPS": "#4ADE80"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "forge"
+                      ],
+                      "lane": "OTA",
+                      "text": "A gridseye release engineer publishes B6 firmware 3.2.0 to Forge with a signed manifest",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OTA",
+                              "text": "forge: fw b6-3.2.0 published, signed manifest"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "forge->armory",
+                      "lane": "OTA",
+                      "text": "Armory polls Forge nightly via a database import job, downloads the image once, and verifies the signature",
+                      "panels": {
+                        "phase": {
+                          "state": "POLL"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OTA",
+                              "text": "armory: b6-3.2.0 downloaded, signature verified"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "armory->fleet",
+                      "lane": "OTA",
+                      "text": "Armory opens the rollout in canary stage \u2014 one camera per hardware model (3 of 14)",
+                      "panels": {
+                        "phase": {
+                          "state": "CANARY"
+                        },
+                        "grid": {
+                          "canary-bullet": {
+                            "state": "STAGING",
+                            "sub": "canary"
+                          },
+                          "canary-dome": {
+                            "state": "STAGING",
+                            "sub": "canary"
+                          },
+                          "canary-ptz": {
+                            "state": "STAGING",
+                            "sub": "canary"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OTA",
+                              "text": "armory->fleet: rollout offer, stage=canary, 3 of 14"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "fleet"
+                      ],
+                      "lane": "OTA",
+                      "text": "Each canary writes the image to its inactive A/B slot, verifies the digest, and reboots into it",
+                      "panels": {
+                        "grid": {
+                          "canary-bullet": {
+                            "state": "UPDATING",
+                            "sub": "slot B"
+                          },
+                          "canary-dome": {
+                            "state": "UPDATING",
+                            "sub": "slot B"
+                          },
+                          "canary-ptz": {
+                            "state": "UPDATING",
+                            "sub": "slot B"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "fleet->muster",
+                      "lane": "OPS",
+                      "text": "Each canary reports its version and health counters to Muster inside the 2-minute boot deadline",
+                      "panels": {
+                        "grid": {
+                          "canary-bullet": {
+                            "state": "HEALTHY",
+                            "sub": "fw 3.2.0"
+                          },
+                          "canary-dome": {
+                            "state": "HEALTHY",
+                            "sub": "fw 3.2.0"
+                          },
+                          "canary-ptz": {
+                            "state": "HEALTHY",
+                            "sub": "fw 3.2.0"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "fleet->muster: canaries healthy, fw 3.2.0, within 120s deadline"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "armory->muster",
+                      "lane": "OPS",
+                      "text": "Armory holds a 24-hour observe window, watching Muster's metrics for reboots, stalls, and detection-rate drift",
+                      "panels": {
+                        "phase": {
+                          "state": "OBSERVE"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "armory: 24h observe window opened"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "armory",
+                        "fleet"
+                      ],
+                      "lane": "OTA",
+                      "text": "Metrics stay clean \u2014 Armory expands in waves of 4 cameras with a 30-minute soak between waves",
+                      "panels": {
+                        "phase": {
+                          "state": "WAVE 1"
+                        },
+                        "grid": {
+                          "wave1": {
+                            "state": "UPDATING",
+                            "sub": "4 cameras"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OTA",
+                              "text": "armory->fleet: rollout offer, stage=wave1, 4 cameras, 30 min soak"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "fleet",
+                        "muster"
+                      ],
+                      "lane": "OPS",
+                      "text": "A wave-2 dome reboot-loops on the new image; Armory halts the rollout and issues no further offers",
+                      "panels": {
+                        "grid": {
+                          "wave1": {
+                            "state": "HEALTHY",
+                            "sub": "4 cameras"
+                          },
+                          "wave2": {
+                            "state": "FAULT",
+                            "sub": "1 of 4 reboot-looping"
+                          }
+                        },
+                        "phase": {
+                          "state": "HALTED"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OPS",
+                              "text": "fleet->muster: wave-2 dome reboot-loop reported"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "armory",
+                        "fleet"
+                      ],
+                      "lane": "OTA",
+                      "text": "Armory instructs the failing camera to boot its previous slot \u2014 rollback is one reboot",
+                      "panels": {
+                        "grid": {
+                          "wave2": {
+                            "state": "ROLLED_BACK",
+                            "sub": "1 of 4, old slot"
+                          }
+                        },
+                        "phase": {
+                          "state": "ROLLBACK"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OTA",
+                              "text": "armory->fleet: boot previous slot (rollback)"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "armory"
+                      ],
+                      "lane": "OTA",
+                      "text": "Armory pins the fleet at mixed versions, marks the rollout HALTED, and files the log bundle with Gridlog",
+                      "panels": {
+                        "grid": {
+                          "wave3": {
+                            "state": "HELD",
+                            "sub": "never offered"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "OTA",
+                              "text": "armory: rollout ro-2026-091 HALTED, mixed versions pinned; log bundle filed with Gridlog"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Grid outage / UPS",
+            "sections": [
+              {
+                "heading": "Flow 3 \u2014 Grid outage on the UPS power domain",
+                "accent": "amber",
+                "bullets": [
+                  "Mains drops; the UPS switches to battery and raises an on-battery status frame to Quartermaster over USB-HID.",
+                  "Quartermaster reads the pack at 100% and computes runtime at the present 96 W draw: 41 minutes.",
+                  "Quartermaster sheds tier 3: IR illuminators off fleet-wide, PTZ patrols parked, chime muted \u2014 draw falls to 71 W.",
+                  "Quartermaster asks Oracle to suspend second-stage inference; camera-edge detection continues \u2014 draw 58 W, forecast 68 minutes.",
+                  "Muster keeps all 14 cameras powered on the PoE bus; recording continues untouched.",
+                  "Quartermaster posts the outage and runtime forecast to Gatehouse; the app shows \"on battery \u2014 ~68 min\".",
+                  "At 30% charge Quartermaster sheds tier 2: the 6 interior cameras power down, leaving the 8 perimeter cameras \u2014 draw 33 W.",
+                  "At 12% Quartermaster orders Archivist to flush journals and stop opening new segments, so the index survives a hard cut.",
+                  "Mains returns at 9%; the UPS reports line power and Quartermaster restores loads in reverse tier order as charge recovers.",
+                  "Archivist marks the honest recording gaps in the timeline and Muster re-adopts the six powered-down cameras.",
+                  "**Grid power loss** \u2014 without a UPS: a hard cut costs at most the open segment; Archivist replays its journal on boot and flags the gap."
+                ],
+                "contract": {
+                  "title": "On the wire: UPS status frame (USB-HID \u2192 Quartermaster)",
+                  "fields": [
+                    {
+                      "k": "status",
+                      "v": "on_battery",
+                      "g": "UPS operating mode"
+                    },
+                    {
+                      "k": "charge_pct",
+                      "v": "100",
+                      "g": "pack charge, 0\u2013100",
+                      "hot": true
+                    },
+                    {
+                      "k": "load_w",
+                      "v": "96",
+                      "g": "present power draw"
+                    },
+                    {
+                      "k": "runtime_s",
+                      "v": "2460",
+                      "g": "forecasted runtime at current draw (41 min)"
+                    }
+                  ],
+                  "note": "Emitted every 2 s; consumed only by Quartermaster."
+                },
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "ups": {
+                      "title": "UPS",
+                      "sub": "battery backup",
+                      "icon": "gear",
+                      "tint": "dev"
+                    },
+                    "quartermaster": {
+                      "title": "Quartermaster",
+                      "sub": "power manager",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/quartermaster/tiers.go#L54"
+                    },
+                    "oracle": {
+                      "title": "Oracle",
+                      "sub": "2nd-stage AI",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/oracle/infer.go#L142"
+                    },
+                    "gatehouse": {
+                      "title": "Gatehouse",
+                      "sub": "local web/app",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/gatehouse/server.go#L77"
+                    },
+                    "archivist": {
+                      "title": "Archivist",
+                      "sub": "segment store",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/archivist/segments.go#L118"
+                    },
+                    "muster": {
+                      "title": "Muster",
+                      "sub": "fleet \u00b7 timeline",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/muster/index.go#L61"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "ups",
+                      "quartermaster",
+                      "oracle"
+                    ],
+                    [
+                      "gatehouse",
+                      "archivist",
+                      "muster"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "ups",
+                      "to": "quartermaster",
+                      "kind": "usbhid",
+                      "label": "status frame"
+                    },
+                    {
+                      "from": "quartermaster",
+                      "to": "oracle",
+                      "kind": "int",
+                      "label": "suspend 2nd-stage"
+                    },
+                    {
+                      "from": "quartermaster",
+                      "to": "gatehouse",
+                      "kind": "int",
+                      "label": "post forecast"
+                    },
+                    {
+                      "from": "quartermaster",
+                      "to": "archivist",
+                      "kind": "int",
+                      "label": "flush + stop"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "batt",
+                      "type": "battery",
+                      "title": "UPS \u2014 pack charge",
+                      "low": 30,
+                      "crit": 12,
+                      "initial": {
+                        "charge": 100,
+                        "trend": "idle",
+                        "source": "wired",
+                        "note": "mains present \u2014 standby"
+                      }
+                    },
+                    {
+                      "id": "draw",
+                      "type": "gauge",
+                      "title": "Quartermaster \u2014 draw vs 120 W PoE budget",
+                      "unit": "W",
+                      "max": 120,
+                      "initial": {
+                        "value": 96
+                      }
+                    },
+                    {
+                      "id": "tier",
+                      "type": "state",
+                      "title": "Quartermaster \u2014 power state",
+                      "states": [
+                        "NORMAL",
+                        "ON_BATTERY",
+                        "TIER3_SHED",
+                        "TIER2_SHED",
+                        "CRIT_FLUSH",
+                        "RESTORING"
+                      ],
+                      "colors": {
+                        "ON_BATTERY": "#FFB454",
+                        "TIER3_SHED": "#FB923C",
+                        "TIER2_SHED": "#FF6B5E",
+                        "CRIT_FLUSH": "#F87171",
+                        "RESTORING": "#4ADE80"
+                      },
+                      "initial": {
+                        "state": "NORMAL"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "tags": {
+                        "PWR": "#FB7185"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "ups->quartermaster",
+                      "text": "Mains drops; the UPS switches to battery and raises an on-battery status frame over USB-HID",
+                      "panels": {
+                        "batt": {
+                          "trend": "idle",
+                          "source": "cells",
+                          "note": "on battery \u2014 mains lost"
+                        },
+                        "tier": {
+                          "state": "ON_BATTERY"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "ups->quartermaster: status=on_battery, charge_pct=100"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "quartermaster"
+                      ],
+                      "text": "Quartermaster reads the pack at 100% and computes runtime at the present 96 W draw: 41 minutes",
+                      "panels": {
+                        "batt": {
+                          "charge": 100,
+                          "note": "41 min forecast at 96 W"
+                        },
+                        "draw": {
+                          "value": 96
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "quartermaster: runtime forecast 41 min @ 96 W"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "quartermaster"
+                      ],
+                      "text": "Quartermaster sheds tier 3 \u2014 IR off fleet-wide, PTZ parked, chime muted \u2014 draw falls to 71 W",
+                      "panels": {
+                        "tier": {
+                          "state": "TIER3_SHED"
+                        },
+                        "draw": {
+                          "value": 71
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "quartermaster: tier 3 shed \u2014 IR, PTZ, chime off; draw 71 W"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "quartermaster->oracle",
+                      "text": "Quartermaster asks Oracle to suspend second-stage inference; edge detection continues \u2014 draw 58 W, forecast 68 min",
+                      "panels": {
+                        "draw": {
+                          "value": 58
+                        },
+                        "batt": {
+                          "note": "68 min forecast at 58 W"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "quartermaster->oracle: suspend 2nd-stage inference"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "muster"
+                      ],
+                      "text": "Muster keeps all 14 cameras powered on the PoE bus; recording continues untouched",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "muster: all 14 cameras held powered on PoE bus"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "quartermaster->gatehouse",
+                      "text": "Quartermaster posts the outage and runtime forecast to Gatehouse \u2014 the app shows \"on battery \u2014 ~68 min\"",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "quartermaster->gatehouse: outage + forecast posted"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "quartermaster"
+                      ],
+                      "text": "At 30% charge, Quartermaster sheds tier 2 \u2014 6 interior cameras power down, 8 perimeter remain \u2014 draw 33 W",
+                      "panels": {
+                        "batt": {
+                          "charge": 30
+                        },
+                        "tier": {
+                          "state": "TIER2_SHED"
+                        },
+                        "draw": {
+                          "value": 33
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "quartermaster: tier 2 shed at 30% \u2014 6 interior cameras off, 8 perimeter remain"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "quartermaster->archivist",
+                      "text": "At 12%, Quartermaster orders Archivist to flush journals and stop opening new segments",
+                      "panels": {
+                        "batt": {
+                          "charge": 12
+                        },
+                        "tier": {
+                          "state": "CRIT_FLUSH"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "quartermaster->archivist: flush journals, stop new segments"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "ups",
+                        "quartermaster"
+                      ],
+                      "text": "Mains returns at 9%; the UPS reports line power and loads restore in reverse tier order",
+                      "panels": {
+                        "batt": {
+                          "charge": 9,
+                          "trend": "charging",
+                          "source": "wired"
+                        },
+                        "tier": {
+                          "state": "RESTORING"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "ups->quartermaster: status=line_power at 9% \u2014 restoring loads in reverse tier order"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "archivist",
+                        "muster"
+                      ],
+                      "text": "Archivist marks the honest recording gaps in the timeline and Muster re-adopts the six powered-down cameras",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "PWR",
+                              "text": "archivist: gap flagged in timeline; muster: 6 cameras re-adopted"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "LAN-only viewing",
+            "sections": [
+              {
+                "heading": "Flow 4 \u2014 LAN-only viewing with the cloud unreachable",
+                "accent": "cyan",
+                "bullets": [
+                  "The site's ISP uplink dies; Gatehouse's Skylink keepalives fail and the cloud path is marked LOST.",
+                  "Recording, edge detection, and Oracle verification continue \u2014 nothing in the capture path touches the WAN.",
+                  "The owner's phone, on the same wifi, fails to reach Skylink and falls back to mDNS discovery.",
+                  "Gatehouse answers the mDNS query and the app pins the NVR's LAN address.",
+                  "The app authenticates against Gatehouse's local account replica with cached credentials, since Keymaster is unreachable.",
+                  "Gatehouse serves live view and timeline playback directly over LAN TLS (cert pinned at adoption).",
+                  "Push notifications queue in Gatehouse's outbox \u2014 Skylink is the only push path off the LAN.",
+                  "The WAN returns; the tunnel re-establishes, the outbox flushes with stale motion pushes collapsed, and the Keymaster session re-validates."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "phone": {
+                      "title": "Owner Phone",
+                      "sub": "companion app",
+                      "icon": "phone",
+                      "tint": "cmd"
+                    },
+                    "gatehouse": {
+                      "title": "Gatehouse",
+                      "sub": "local web/app",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/stronghold/blob/main/services/gatehouse/server.go#L77"
+                    },
+                    "skylink": {
+                      "title": "Skylink",
+                      "sub": "tunnel \u00b7 push",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/gridseye/cloud/blob/main/skylink/tunnel.go#L91"
+                    },
+                    "keymaster": {
+                      "title": "Keymaster",
+                      "sub": "identity \u00b7 SSO",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/gridseye/cloud/blob/main/keymaster/session.go#L44"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "phone",
+                      "gatehouse"
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "skylink",
+                      "side": "above"
+                    },
+                    {
+                      "id": "keymaster",
+                      "side": "above"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "gatehouse",
+                      "to": "skylink",
+                      "kind": "tunnel",
+                      "label": "keepalive"
+                    },
+                    {
+                      "from": "phone",
+                      "to": "skylink",
+                      "kind": "tunnel",
+                      "label": "reach attempt"
+                    },
+                    {
+                      "from": "phone",
+                      "to": "gatehouse",
+                      "kind": "mdns",
+                      "label": "mDNS query"
+                    },
+                    {
+                      "from": "gatehouse",
+                      "to": "phone",
+                      "kind": "lantls",
+                      "label": "live + playback"
+                    },
+                    {
+                      "from": "gatehouse",
+                      "to": "keymaster",
+                      "kind": "https",
+                      "label": "re-validate"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "net",
+                      "type": "signal",
+                      "title": "Site uplinks",
+                      "links": [
+                        {
+                          "id": "wan",
+                          "label": "WAN / Skylink",
+                          "transport": "ethernet"
+                        },
+                        {
+                          "id": "lan",
+                          "label": "Phone Wifi",
+                          "transport": "wifi"
+                        }
+                      ],
+                      "initial": {
+                        "wan": {
+                          "state": "ok",
+                          "bars": 4,
+                          "note": "ISP uplink"
+                        },
+                        "lan": {
+                          "state": "ok",
+                          "bars": 4,
+                          "note": "phone on LAN wifi"
+                        }
+                      }
+                    },
+                    {
+                      "id": "mode",
+                      "type": "orbit",
+                      "title": "Phone \u2014 connection mode",
+                      "states": [
+                        "CLOUD_TUNNEL",
+                        "RECONNECTING",
+                        "LAN_DIRECT"
+                      ],
+                      "colors": {
+                        "CLOUD_TUNNEL": "#4ADE80",
+                        "RECONNECTING": "#FFB454",
+                        "LAN_DIRECT": "#38E1FF"
+                      },
+                      "initial": {
+                        "state": "CLOUD_TUNNEL"
+                      }
+                    },
+                    {
+                      "id": "mbx",
+                      "type": "queue",
+                      "title": "Gatehouse \u2014 push outbox",
+                      "initial": {
+                        "state": "empty"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "tags": {
+                        "NET": "#A78BFA",
+                        "LAN": "#38E1FF"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "gatehouse->skylink",
+                      "lane": "NET",
+                      "text": "ISP uplink dies \u2014 Gatehouse's Skylink keepalives fail, the cloud path is marked LOST",
+                      "panels": {
+                        "net": {
+                          "wan": {
+                            "state": "lost",
+                            "bars": 0,
+                            "note": "ISP uplink down"
+                          }
+                        },
+                        "mode": {
+                          "state": "RECONNECTING",
+                          "via": "WAN lost"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "gatehouse->skylink: keepalive failed, cloud path LOST"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "gatehouse"
+                      ],
+                      "lane": "NET",
+                      "text": "Recording, edge detection, and Oracle verification continue \u2014 nothing in the capture path touches the WAN",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "capture path unaffected \u2014 local recording and detection continue"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "phone->skylink",
+                      "lane": "NET",
+                      "text": "The owner's phone, on the same wifi, fails to reach Skylink and falls back to mDNS discovery",
+                      "panels": {
+                        "net": {
+                          "lan": {
+                            "state": "ok",
+                            "bars": 4,
+                            "note": "still on wifi"
+                          }
+                        },
+                        "mode": {
+                          "state": "RECONNECTING",
+                          "via": "trying mDNS"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "phone->skylink: unreachable \u2014 falling back to mDNS"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "phone->gatehouse",
+                      "lane": "LAN",
+                      "text": "Gatehouse answers the mDNS query and the app pins the NVR's LAN address",
+                      "panels": {
+                        "mode": {
+                          "state": "RECONNECTING",
+                          "via": "mDNS resolved"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "LAN",
+                              "text": "gatehouse answers mDNS query \u2014 app pins LAN address"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "gatehouse",
+                        "phone"
+                      ],
+                      "lane": "LAN",
+                      "text": "The app authenticates against Gatehouse's local account replica with cached credentials \u2014 Keymaster is unreachable",
+                      "panels": {
+                        "mode": {
+                          "state": "LAN_DIRECT",
+                          "via": "cached credentials"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "LAN",
+                              "text": "phone authenticates against Gatehouse LAN auth replica (cached creds)"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "gatehouse->phone",
+                      "lane": "LAN",
+                      "text": "Gatehouse serves live view and timeline playback directly over LAN TLS (cert pinned at adoption)",
+                      "panels": {
+                        "net": {
+                          "lan": {
+                            "state": "ok",
+                            "bars": 4,
+                            "note": "LAN TLS, cert pinned"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "LAN",
+                              "text": "gatehouse->phone: live view + playback over LAN TLS"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "gatehouse"
+                      ],
+                      "lane": "NET",
+                      "text": "Push notifications queue in Gatehouse's outbox \u2014 Skylink is the only push path off the LAN",
+                      "panels": {
+                        "mbx": {
+                          "state": "held",
+                          "label": "motion pushes",
+                          "reason": "holding \u2014 Skylink unreachable"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "gatehouse: motion pushes held in outbox"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "gatehouse->keymaster",
+                        "gatehouse->skylink"
+                      ],
+                      "lane": "NET",
+                      "text": "WAN returns \u2014 the tunnel re-establishes, the outbox flushes with stale motion pushes collapsed, Keymaster re-validates",
+                      "panels": {
+                        "net": {
+                          "wan": {
+                            "state": "ok",
+                            "bars": 4,
+                            "note": "ISP uplink restored"
+                          }
+                        },
+                        "mode": {
+                          "state": "CLOUD_TUNNEL",
+                          "via": "WAN restored"
+                        },
+                        "mbx": {
+                          "state": "dequeue",
+                          "to": "\u2192 Skylink",
+                          "label": "stale pushes collapsed"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "tunnel re-established; outbox flushed; Keymaster session re-validated"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

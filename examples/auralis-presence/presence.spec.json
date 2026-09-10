@@ -1,0 +1,1551 @@
+{
+  "page": {
+    "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy",
+    "contract": "1",
+    "skin": "aurora",
+    "protocols": {
+      "lan": {
+        "label": "LAN local",
+        "color": "#4ADE80"
+      },
+      "thread": {
+        "label": "Thread",
+        "color": "#A78BFA"
+      },
+      "tel": {
+        "label": "PSTN voice",
+        "color": "#F471B5"
+      }
+    },
+    "lanes": {
+      "DEV": {
+        "color": "#FFB454"
+      },
+      "NET": {
+        "color": "#38E1FF"
+      },
+      "HUB": {
+        "color": "#4ADE80"
+      },
+      "TEL": {
+        "color": "#F471B5"
+      }
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Zones",
+            "sections": [
+              {
+                "heading": "Four zones, one track",
+                "accent": "cyan",
+                "text": [
+                  "Presence tracks position, not just motion, so it holds named zones (Bed, Desk, Kitchen, Entry) through stillness. No camera, no microphone — position, posture, and breathing are the only signals, which is the pitch for [bathrooms and bedrooms](https://github.com/auralis/presence/blob/main/docs/hld.md#overview)."
+                ],
+                "bullets": [
+                  "**Iris MW** acquires a track as the resident steps through the doorway and streams per-frame positions to **Aria MCU**.",
+                  "Aria MCU maps the position into the room's zone map and marks zone **Entry** occupied.",
+                  "Aria MCU publishes the `entry → occupied` edge to **Chorus** and mirrors the same event to **Atrium** over the LAN channel.",
+                  "Chorus delivers the event to **Motif**, which updates the room's zone ledger.",
+                  "The resident crosses to the desk; Aria MCU emits `entry → clear` and `desk → occupied` edge events to both Chorus and Atrium.",
+                  "Atrium matches `desk occupied` against its cached routine and switches the desk lamp on over Thread — *no cloud round trip*.",
+                  "Motif streams the zone timeline through Overture to the resident's open app.",
+                  "The resident sits still reading; Iris MW's micro-motion sensing keeps Desk occupied where a **PIR** would have timed out to vacant."
+                ],
+                "contract": {
+                  "title": "On the wire: zone edge event (MQTT)",
+                  "source": "https://github.com/auralis/presence/blob/main/docs/wire.md#zone-event",
+                  "fields": [
+                    {
+                      "k": "type",
+                      "v": "\"zone\"",
+                      "g": "zone occupancy edge"
+                    },
+                    {
+                      "k": "zone",
+                      "v": "\"desk\"",
+                      "g": "named zone id from the room map"
+                    },
+                    {
+                      "k": "state",
+                      "v": "\"occupied\"",
+                      "g": "occupied / clear",
+                      "hot": true
+                    },
+                    {
+                      "k": "trackId",
+                      "v": "3",
+                      "g": "which tracked person caused the edge"
+                    },
+                    {
+                      "k": "pos_m",
+                      "v": "[1.4, 2.1]",
+                      "g": "x/y meters from the sensor mount",
+                      "hot": true
+                    },
+                    {
+                      "k": "seq",
+                      "v": "8123",
+                      "g": "per-session sequence; Motif orders backfill by it"
+                    },
+                    {
+                      "k": "ts",
+                      "v": "unix ms",
+                      "g": "event time — preserved through store-and-forward"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "groups": {
+                    "sensor": {
+                      "title": "Presence sensor"
+                    }
+                  },
+                  "nodes": {
+                    "iris": {
+                      "title": "Iris MW",
+                      "sub": "mmWave · 60 GHz",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "sensor",
+                      "link": "https://github.com/auralis/presence/blob/main/fw/iris/tracker.c#L74"
+                    },
+                    "aria": {
+                      "title": "Aria MCU",
+                      "sub": "zones · wifi",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "sensor",
+                      "link": "https://github.com/auralis/presence/blob/main/fw/aria/zones.c#L112"
+                    },
+                    "atrium": {
+                      "title": "Atrium Hub",
+                      "sub": "routines · thread",
+                      "icon": "router",
+                      "tint": "dev",
+                      "link": "https://github.com/auralis/atrium/blob/main/hub/routines/local.go#L91"
+                    },
+                    "lamp": {
+                      "title": "Desk Lamp",
+                      "sub": "thread actuator",
+                      "icon": "gear",
+                      "tint": "dev"
+                    },
+                    "chorus": {
+                      "title": "Chorus",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "motif": {
+                      "title": "Motif",
+                      "sub": "zone ledger",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "overture": {
+                      "title": "Overture API",
+                      "sub": "api gateway",
+                      "icon": "server",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Resident Phone",
+                      "sub": "companion app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "iris",
+                        "aria"
+                      ],
+                      "chorus",
+                      "motif"
+                    ],
+                    [
+                      "overture",
+                      "phone"
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "atrium",
+                      "side": "below"
+                    },
+                    {
+                      "id": "lamp",
+                      "side": "below"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "iris",
+                      "to": "aria",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "aria",
+                      "to": "chorus",
+                      "kind": "mqtt",
+                      "label": "PUB evt/zone"
+                    },
+                    {
+                      "from": "aria",
+                      "to": "atrium",
+                      "kind": "lan",
+                      "label": "zone mirror"
+                    },
+                    {
+                      "from": "chorus",
+                      "to": "motif",
+                      "kind": "mqtt",
+                      "label": "deliver"
+                    },
+                    {
+                      "from": "atrium",
+                      "to": "lamp",
+                      "kind": "thread",
+                      "label": "lamp on"
+                    },
+                    {
+                      "from": "motif",
+                      "to": "overture",
+                      "kind": "int",
+                      "label": "timeline"
+                    },
+                    {
+                      "from": "overture",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "live timeline"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "rm",
+                      "type": "radar",
+                      "title": "Iris MW — room map",
+                      "sensor": {
+                        "x": 160,
+                        "y": 90
+                      },
+                      "spread": 360,
+                      "range": 4.2,
+                      "scale": {
+                        "pxPerUnit": 18,
+                        "unit": "m"
+                      },
+                      "rings": [
+                        1,
+                        2,
+                        3,
+                        4
+                      ],
+                      "zones": [
+                        {
+                          "id": "desk",
+                          "label": "Desk",
+                          "r": [
+                            1.0,
+                            2.4
+                          ],
+                          "deg": [
+                            190,
+                            230
+                          ]
+                        },
+                        {
+                          "id": "bed",
+                          "label": "Bed",
+                          "r": [
+                            2.2,
+                            3.6
+                          ],
+                          "deg": [
+                            235,
+                            275
+                          ]
+                        },
+                        {
+                          "id": "kitchen",
+                          "label": "Kitchen",
+                          "r": [
+                            1.4,
+                            3.0
+                          ],
+                          "deg": [
+                            280,
+                            315
+                          ]
+                        },
+                        {
+                          "id": "entry",
+                          "label": "Entry",
+                          "r": [
+                            2.6,
+                            4.0
+                          ],
+                          "deg": [
+                            320,
+                            350
+                          ]
+                        }
+                      ],
+                      "initial": {
+                        "subject": null,
+                        "status": "SCANNING"
+                      }
+                    },
+                    {
+                      "id": "zl",
+                      "type": "leds",
+                      "title": "Zone occupancy",
+                      "leds": [
+                        {
+                          "id": "entry",
+                          "label": "ENTRY"
+                        },
+                        {
+                          "id": "desk",
+                          "label": "DESK"
+                        },
+                        {
+                          "id": "bed",
+                          "label": "BED"
+                        }
+                      ],
+                      "initial": {
+                        "entry": "off",
+                        "desk": "off",
+                        "bed": "off"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "NET": "#38E1FF",
+                        "DEV": "#FFB454",
+                        "HUB": "#4ADE80"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "iris->aria",
+                      "lane": "DEV",
+                      "text": "Track acquired at the doorway — Entry occupied",
+                      "panels": {
+                        "rm": {
+                          "subject": {
+                            "r": 3.6,
+                            "deg": 330
+                          },
+                          "status": "TRACKING"
+                        },
+                        "zl": {
+                          "entry": "on"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "entry → occupied"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "aria->chorus",
+                        "aria->atrium",
+                        "chorus->motif"
+                      ],
+                      "lane": "NET",
+                      "text": "Zone edge to Chorus (ledger via Motif), mirrored to Atrium on the LAN",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "PUB evt/room/zone"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "iris",
+                        "aria"
+                      ],
+                      "lane": "DEV",
+                      "text": "Across to the desk — Entry clears, Desk occupies",
+                      "panels": {
+                        "rm": {
+                          "subject": {
+                            "r": 1.8,
+                            "deg": 215
+                          }
+                        },
+                        "zl": {
+                          "entry": "off",
+                          "desk": "on"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "entry→clear · desk→occ"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "aria->atrium",
+                        "aria->chorus"
+                      ],
+                      "lane": "NET",
+                      "text": "Both edges ride out to cloud and hub"
+                    },
+                    {
+                      "edge": "atrium->lamp",
+                      "lane": "HUB",
+                      "text": "Atrium matches the routine — lamp on over Thread, no cloud",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "HUB",
+                              "text": "routine: desk lamp on"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "motif->overture",
+                        "overture->phone"
+                      ],
+                      "lane": "NET",
+                      "text": "Open app streams the timeline via Overture"
+                    },
+                    {
+                      "nodes": [
+                        "iris"
+                      ],
+                      "lane": "DEV",
+                      "text": "The resident sits still reading; Iris MW's micro-motion sensing keeps Desk occupied where a PIR would have timed out to vacant",
+                      "panels": {
+                        "rm": {
+                          "status": "MICRO-MOTION"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "still occupied (breathing)"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Fall & Escalation",
+            "sections": [
+              {
+                "heading": "A fall, a check-in, a phone tree",
+                "accent": "red",
+                "text": [
+                  "The machine never calls first — a 60-second human check-in sits between detection and the escalation ladder, and vitals ride the case the whole way."
+                ],
+                "bullets": [
+                  "**Iris MW**'s posture estimator sees the track's height collapse from 1.7 m to 0.4 m by the shower and flags a fall hypothesis to **Aria MCU**.",
+                  "Aria MCU runs a *30-second* on-device confirmation window — sudden height drop and no recovery motion.",
+                  "Confirmation holds; Aria MCU publishes `evt/room/safety` (fall, confidence 0.93, zone Shower) to **Chorus** at QoS 1.",
+                  "Chorus delivers to **Motif**, which forwards safety events straight to **Vigil**; Vigil opens a case.",
+                  "Vigil starts the human check-in: **Encore** pushes `Are you OK? — respond within 60 s` to the resident's phone while **Atrium** speaks the same prompt in the room.",
+                  "No response arrives, and Iris MW still reports a prone target with breathing micro-motion, which Aria attaches to the case as live telemetry.",
+                  "The check-in window expires; Vigil dials the first emergency contact with zone, time, and vitals summary.",
+                  "No answer within 90 s; Vigil dials the second contact, who accepts and confirms they are heading over.",
+                  "Vigil marks the case *engaged* and streams live occupancy to that contact's app until Iris MW reports an upright, moving track again.",
+                  "Aria reports recovery; Vigil closes the case and writes the full timeline — hypothesis to closure — to the ledger."
+                ],
+                "contract": {
+                  "title": "On the wire: fall alert (MQTT QoS 1)",
+                  "source": "https://github.com/auralis/presence/blob/main/docs/wire.md#safety-event",
+                  "fields": [
+                    {
+                      "k": "type",
+                      "v": "\"fall\"",
+                      "g": "safety event class (fall / inactivity)"
+                    },
+                    {
+                      "k": "zone",
+                      "v": "\"shower\"",
+                      "g": "where the track collapsed"
+                    },
+                    {
+                      "k": "conf",
+                      "v": "0.93",
+                      "g": "fall-classifier confidence after the 30 s window",
+                      "hot": true
+                    },
+                    {
+                      "k": "height_m",
+                      "v": "0.4",
+                      "g": "track height after collapse (from 1.7)",
+                      "hot": true
+                    },
+                    {
+                      "k": "window_s",
+                      "v": "30",
+                      "g": "on-device confirmation window that was applied"
+                    },
+                    {
+                      "k": "micro_motion",
+                      "v": "true",
+                      "g": "breathing detected — rides along as vitals context"
+                    },
+                    {
+                      "k": "seq / ts",
+                      "v": "8140 / unix ms",
+                      "g": "ordering + original event time"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "groups": {
+                    "sensor": {
+                      "title": "Presence sensor"
+                    }
+                  },
+                  "nodes": {
+                    "iris": {
+                      "title": "Iris MW",
+                      "sub": "posture · breath",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "sensor",
+                      "link": "https://github.com/auralis/presence/blob/main/fw/iris/tracker.c#L74"
+                    },
+                    "aria": {
+                      "title": "Aria MCU",
+                      "sub": "30 s confirm",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "sensor",
+                      "link": "https://github.com/auralis/presence/blob/main/fw/aria/zones.c#L112"
+                    },
+                    "chorus": {
+                      "title": "Chorus",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "motif": {
+                      "title": "Motif",
+                      "sub": "safety fan-out",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "vigil": {
+                      "title": "Vigil",
+                      "sub": "case ladder",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/auralis/cloud/blob/main/services/vigil/case.go#L58"
+                    },
+                    "encore": {
+                      "title": "Encore",
+                      "sub": "push gateway",
+                      "icon": "server",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Resident Phone",
+                      "sub": "check-in prompt",
+                      "icon": "phone",
+                      "tint": "dev"
+                    },
+                    "c1": {
+                      "title": "First Contact",
+                      "sub": "tier 1",
+                      "icon": "phone",
+                      "tint": "cmd"
+                    },
+                    "c2": {
+                      "title": "Second Contact",
+                      "sub": "tier 2",
+                      "icon": "phone",
+                      "tint": "cmd"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "iris",
+                        "aria"
+                      ],
+                      "chorus",
+                      "motif",
+                      "vigil"
+                    ],
+                    [
+                      "encore",
+                      "phone",
+                      "c1",
+                      "c2"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "iris",
+                      "to": "aria",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "aria",
+                      "to": "chorus",
+                      "kind": "mqtt",
+                      "label": "PUB fall QoS1"
+                    },
+                    {
+                      "from": "chorus",
+                      "to": "motif",
+                      "kind": "mqtt",
+                      "label": "deliver"
+                    },
+                    {
+                      "from": "motif",
+                      "to": "vigil",
+                      "kind": "int",
+                      "label": "safety event"
+                    },
+                    {
+                      "from": "vigil",
+                      "to": "encore",
+                      "kind": "int",
+                      "label": "check-in"
+                    },
+                    {
+                      "from": "encore",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push: OK?"
+                    },
+                    {
+                      "from": "vigil",
+                      "to": "c1",
+                      "kind": "tel",
+                      "label": "call tier 1"
+                    },
+                    {
+                      "from": "vigil",
+                      "to": "c2",
+                      "kind": "tel",
+                      "label": "call tier 2"
+                    },
+                    {
+                      "from": "c2",
+                      "to": "vigil",
+                      "kind": "tel",
+                      "ret": true,
+                      "label": "ack case"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "rb",
+                      "type": "radar",
+                      "title": "Iris MW — bathroom",
+                      "sensor": {
+                        "x": 160,
+                        "y": 90
+                      },
+                      "spread": 360,
+                      "range": 3.2,
+                      "scale": {
+                        "pxPerUnit": 24,
+                        "unit": "m"
+                      },
+                      "rings": [
+                        1,
+                        2,
+                        3
+                      ],
+                      "zones": [
+                        {
+                          "id": "shower",
+                          "label": "Shower",
+                          "r": [
+                            1.2,
+                            2.4
+                          ],
+                          "deg": [
+                            200,
+                            240
+                          ]
+                        },
+                        {
+                          "id": "vanity",
+                          "label": "Vanity",
+                          "r": [
+                            1.0,
+                            2.0
+                          ],
+                          "deg": [
+                            300,
+                            340
+                          ]
+                        }
+                      ],
+                      "initial": {
+                        "subject": {
+                          "r": 1.7,
+                          "deg": 220
+                        },
+                        "status": "TRACKING"
+                      }
+                    },
+                    {
+                      "id": "vs",
+                      "type": "state",
+                      "title": "Vigil — case ladder",
+                      "states": [
+                        "NO CASE",
+                        "CHECK-IN",
+                        "TIER 1",
+                        "ENGAGED",
+                        "CLOSED"
+                      ],
+                      "colors": {
+                        "NO CASE": "#55627A",
+                        "CHECK-IN": "#FFB454",
+                        "TIER 1": "#FF6B5E",
+                        "ENGAGED": "#38E1FF",
+                        "CLOSED": "#4ADE80"
+                      },
+                      "initial": {
+                        "state": "NO CASE"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "NET": "#38E1FF",
+                        "DEV": "#FFB454"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "iris->aria",
+                      "lane": "DEV",
+                      "text": "Track height collapses by the shower — fall hypothesis",
+                      "panels": {
+                        "rb": {
+                          "subject": {
+                            "r": 1.8,
+                            "deg": 220
+                          },
+                          "status": "HEIGHT DROP"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "posture 1.7 → 0.4 m"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "aria->chorus",
+                      "lane": "NET",
+                      "text": "30 s window holds, no recovery motion — safety/fall publishes at QoS 1",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "PUB fall conf 0.93"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "chorus->motif",
+                        "motif->vigil"
+                      ],
+                      "lane": "NET",
+                      "text": "Motif hands it to Vigil — case opened",
+                      "panels": {
+                        "vs": {
+                          "state": "CHECK-IN"
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "vigil->encore",
+                        "encore->phone"
+                      ],
+                      "lane": "NET",
+                      "text": "Check-in: phone push + Atrium speaks in the room, 60 s clock",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "check-in window 60 s"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "iris"
+                      ],
+                      "lane": "DEV",
+                      "text": "No response — radar still shows a prone, breathing target",
+                      "panels": {
+                        "rb": {
+                          "status": "PRONE · BREATHING"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "micro-motion present"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "vigil->c1",
+                      "lane": "TEL",
+                      "text": "Window expires — Vigil calls the first contact",
+                      "panels": {
+                        "vs": {
+                          "state": "TIER 1"
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "vigil->c2",
+                        "c2->vigil"
+                      ],
+                      "lane": "TEL",
+                      "text": "No answer in 90 s — second contact accepts, en route",
+                      "panels": {
+                        "vs": {
+                          "state": "ENGAGED"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "tier 2 ack — en route"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "iris"
+                      ],
+                      "lane": "DEV",
+                      "text": "Upright track returns — case closed with full timeline",
+                      "panels": {
+                        "rb": {
+                          "subject": {
+                            "r": 1.6,
+                            "deg": 235
+                          },
+                          "status": "UPRIGHT"
+                        },
+                        "vs": {
+                          "state": "CLOSED"
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Sleep",
+            "sections": [
+              {
+                "heading": "The night, measured",
+                "accent": "violet",
+                "text": [
+                  "The same radar that tracks walking drops to 2 Hz and reads breathing — one sensor, two sampling modes, one morning summary."
+                ],
+                "bullets": [
+                  "At **23:10** the track settles into zone Bed; Aria MCU switches Iris MW into 2 Hz breath-sensing mode.",
+                  "Aria MCU publishes `sleep/session-start`; Chorus delivers it to **Tempo**, which opens the night's record.",
+                  "Overnight, Aria batches respiration-rate and restlessness samples to Tempo *every 10 minutes*.",
+                  "A restless spell at **04:12** is folded into the record as a wake event.",
+                  "At **07:40** the track leaves Bed; Aria publishes `session-end`, Tempo finalizes the record, and **Encore** delivers the morning summary.",
+                  "Separately, Tempo's inactivity watcher scores each daytime hour's zone activity against the resident's rolling baseline.",
+                  "By **12:00** no Kitchen occupancy has been seen on a day the baseline expects it; Tempo raises an inactivity flag to **Vigil**.",
+                  "Vigil runs the same ladder as a fall, but starts at the gentle end — an app check-in, then contacts — because inactivity is a slow signal."
+                ],
+                "diagram": {
+                  "groups": {
+                    "sensor": {
+                      "title": "Presence sensor"
+                    }
+                  },
+                  "nodes": {
+                    "iris": {
+                      "title": "Iris MW",
+                      "sub": "breath · 2 Hz",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "sensor",
+                      "link": "https://github.com/auralis/presence/blob/main/fw/iris/tracker.c#L74"
+                    },
+                    "aria": {
+                      "title": "Aria MCU",
+                      "sub": "batching",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "sensor",
+                      "link": "https://github.com/auralis/presence/blob/main/fw/aria/zones.c#L112"
+                    },
+                    "chorus": {
+                      "title": "Chorus",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "tempo": {
+                      "title": "Tempo",
+                      "sub": "sleep records",
+                      "icon": "cloud",
+                      "tint": "data"
+                    },
+                    "encore": {
+                      "title": "Encore",
+                      "sub": "push gateway",
+                      "icon": "server",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Resident Phone",
+                      "sub": "morning brief",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "iris",
+                        "aria"
+                      ],
+                      "chorus"
+                    ],
+                    [
+                      "tempo",
+                      "encore",
+                      "phone"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "iris",
+                      "to": "aria",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "aria",
+                      "to": "chorus",
+                      "kind": "mqtt",
+                      "label": "PUB sleep"
+                    },
+                    {
+                      "from": "chorus",
+                      "to": "tempo",
+                      "kind": "mqtt",
+                      "label": "deliver"
+                    },
+                    {
+                      "from": "tempo",
+                      "to": "encore",
+                      "kind": "int",
+                      "label": "morning brief"
+                    },
+                    {
+                      "from": "encore",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push: summary"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "md",
+                      "type": "state",
+                      "title": "Iris MW — sampling mode",
+                      "states": [
+                        "TRACK 20 Hz",
+                        "BREATH 2 Hz"
+                      ],
+                      "colors": {
+                        "TRACK 20 Hz": "#38E1FF",
+                        "BREATH 2 Hz": "#A78BFA"
+                      },
+                      "initial": {
+                        "state": "TRACK 20 Hz"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "NET": "#38E1FF",
+                        "DEV": "#FFB454"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "iris"
+                      ],
+                      "lane": "DEV",
+                      "text": "23:10 — track settles into Bed; Iris drops to breath mode",
+                      "panels": {
+                        "md": {
+                          "state": "BREATH 2 Hz"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "bed occupied · mode=breath"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "aria->chorus",
+                        "chorus->tempo"
+                      ],
+                      "lane": "NET",
+                      "text": "session-start opens the night's record at Tempo",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "sleep session start"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "iris->aria",
+                        "aria->chorus",
+                        "chorus->tempo"
+                      ],
+                      "lane": "DEV",
+                      "text": "Respiration + restlessness batch up every 10 min to Tempo"
+                    },
+                    {
+                      "nodes": [
+                        "iris"
+                      ],
+                      "lane": "DEV",
+                      "text": "04:12 — restless spell folded in as a wake event",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "restless 04:12"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "chorus->tempo",
+                        "aria->chorus"
+                      ],
+                      "lane": "NET",
+                      "packets": [
+                        {
+                          "edge": "aria->chorus"
+                        },
+                        {
+                          "edge": "chorus->tempo",
+                          "delay": 0.45
+                        }
+                      ],
+                      "text": "07:40 — Bed clears; session-end finalizes the record",
+                      "panels": {
+                        "md": {
+                          "state": "TRACK 20 Hz"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "session end · 8 h 30 m"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "tempo->encore",
+                        "encore->phone"
+                      ],
+                      "lane": "NET",
+                      "text": "Morning summary lands; the inactivity watcher takes over the day",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "push: sleep summary"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Offline",
+            "sections": [
+              {
+                "heading": "The internet goes away",
+                "accent": "amber",
+                "text": [
+                  "The hub is the failover brain — automations and the safety ladder keep working on the LAN, and the cloud gets an honest, timestamped backfill afterward."
+                ],
+                "bullets": [
+                  "The ISP drops at **20:12**; Aria MCU's Chorus session times out and its cloud link flips to `OFFLINE` while the LAN channel to Atrium stays up.",
+                  "Atrium also loses Chorus and switches to *local-authority mode* — its cached routine set becomes the only automation engine.",
+                  "The resident walks into the kitchen; Aria sends `kitchen → occupied` to Atrium over the LAN and the lights routine fires in **~40 ms**.",
+                  "Aria MCU appends every zone event to its *4-hour* flash store-and-forward buffer.",
+                  "A fall during the outage stays local: **Vigil** is unreachable, so **Atrium** runs the degraded ladder itself — spoken prompt, then siren and strobing lights; *it cannot dial contacts without internet*.",
+                  "Connectivity returns at **21:03**; Aria reconnects to Chorus and drains the buffer oldest-first, each event carrying its original timestamp.",
+                  "Motif reconciles the backfill into the ledger with the span marked `backfilled`; Tempo recomputes the sleep/inactivity windows it overlaps.",
+                  "Vigil reviews the buffered fall case, finds it resolved locally (the resident got up at **20:41**), and files it with a note instead of paging anyone.",
+                  "**Internet drops** — the honest loss is outbound calling: *no contact is dialed until the link returns*, and the app shows `local mode`."
+                ],
+                "contract": {
+                  "title": "On the wire: backfill envelope",
+                  "source": "https://github.com/auralis/presence/blob/main/docs/wire.md#backfill",
+                  "fields": [
+                    {
+                      "k": "backfill",
+                      "v": "true",
+                      "g": "tells Motif this is reconciliation, not live traffic",
+                      "hot": true
+                    },
+                    {
+                      "k": "span",
+                      "v": "[20:12, 21:03]",
+                      "g": "outage window the batch covers",
+                      "hot": true
+                    },
+                    {
+                      "k": "count",
+                      "v": "212",
+                      "g": "events drained from flash (\"wifi-outage\" reason attached)"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "nodes": {
+                    "aria": {
+                      "title": "Aria MCU",
+                      "sub": "4 h flash buffer",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "link": "https://github.com/auralis/presence/blob/main/fw/aria/zones.c#L112"
+                    },
+                    "atrium": {
+                      "title": "Atrium Hub",
+                      "sub": "local authority",
+                      "icon": "router",
+                      "tint": "dev",
+                      "link": "https://github.com/auralis/atrium/blob/main/hub/routines/local.go#L91"
+                    },
+                    "lamp": {
+                      "title": "Kitchen Lights",
+                      "sub": "thread actuator",
+                      "icon": "gear",
+                      "tint": "dev"
+                    },
+                    "chorus": {
+                      "title": "Chorus",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "motif": {
+                      "title": "Motif",
+                      "sub": "reconciliation",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "tempo": {
+                      "title": "Tempo",
+                      "sub": "recompute",
+                      "icon": "cloud",
+                      "tint": "data"
+                    },
+                    "vigil": {
+                      "title": "Vigil",
+                      "sub": "case review",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/auralis/cloud/blob/main/services/vigil/case.go#L58"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "aria",
+                      "atrium",
+                      "lamp"
+                    ],
+                    [
+                      "chorus",
+                      "motif",
+                      [
+                        "tempo",
+                        "vigil"
+                      ]
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "aria",
+                      "to": "atrium",
+                      "kind": "lan",
+                      "label": "zone events"
+                    },
+                    {
+                      "from": "atrium",
+                      "to": "lamp",
+                      "kind": "thread",
+                      "label": "lights on"
+                    },
+                    {
+                      "from": "aria",
+                      "to": "chorus",
+                      "kind": "mqtt",
+                      "label": "drain backfill"
+                    },
+                    {
+                      "from": "chorus",
+                      "to": "motif",
+                      "kind": "mqtt",
+                      "label": "deliver batch"
+                    },
+                    {
+                      "from": "motif",
+                      "to": "tempo",
+                      "kind": "int",
+                      "label": "recompute"
+                    },
+                    {
+                      "from": "motif",
+                      "to": "vigil",
+                      "kind": "int",
+                      "label": "review safety"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "sig",
+                      "type": "signal",
+                      "title": "Links",
+                      "links": [
+                        {
+                          "id": "cloud",
+                          "label": "Chorus cloud",
+                          "transport": "wifi"
+                        },
+                        {
+                          "id": "lan",
+                          "label": "Atrium LAN",
+                          "transport": "wifi"
+                        },
+                        {
+                          "id": "mesh",
+                          "label": "Thread mesh",
+                          "transport": "thread"
+                        }
+                      ],
+                      "initial": {
+                        "cloud": {
+                          "state": "ok"
+                        },
+                        "lan": {
+                          "state": "ok"
+                        },
+                        "mesh": {
+                          "state": "ok"
+                        }
+                      }
+                    },
+                    {
+                      "id": "sf",
+                      "type": "buffer",
+                      "title": "Aria MCU — store-and-forward",
+                      "segments": 12,
+                      "capacity": "4 h",
+                      "initial": {
+                        "head": 0
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "NET": "#38E1FF",
+                        "HUB": "#4ADE80"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "aria"
+                      ],
+                      "lane": "NET",
+                      "text": "20:12 — ISP drops; the Chorus session times out",
+                      "panels": {
+                        "sig": {
+                          "cloud": {
+                            "state": "lost"
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "cloud link lost"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "atrium"
+                      ],
+                      "lane": "HUB",
+                      "text": "Atrium flips to local authority — cached routines only",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "HUB",
+                              "text": "local authority mode"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "aria->atrium",
+                        "atrium->lamp"
+                      ],
+                      "lane": "HUB",
+                      "text": "Kitchen occupied → lights on, LAN-only, ~40 ms",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "HUB",
+                              "text": "routine fired · 40 ms"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "aria"
+                      ],
+                      "lane": "DEV",
+                      "text": "Every zone event also lands in the 4 h flash buffer",
+                      "panels": {
+                        "sf": {
+                          "head": 3,
+                          "mark": [
+                            [
+                              0,
+                              2,
+                              "buffered"
+                            ]
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "aria",
+                        "atrium"
+                      ],
+                      "lane": "HUB",
+                      "text": "A fall in the window stays local: prompt, then siren + strobe — no calls possible",
+                      "panels": {
+                        "sf": {
+                          "head": 5,
+                          "mark": [
+                            [
+                              3,
+                              4,
+                              "protected"
+                            ]
+                          ],
+                          "label": "fall case local"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "HUB",
+                              "text": "no answer → siren"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "aria->chorus",
+                      "lane": "NET",
+                      "text": "21:03 — link back; drain oldest-first, original timestamps",
+                      "panels": {
+                        "sig": {
+                          "cloud": {
+                            "state": "ok"
+                          }
+                        },
+                        "sf": {
+                          "mark": [
+                            [
+                              0,
+                              4,
+                              "uploading"
+                            ]
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "chorus->motif",
+                        "motif->tempo"
+                      ],
+                      "lane": "NET",
+                      "text": "Motif marks the span backfilled; Tempo recomputes its windows",
+                      "panels": {
+                        "sig": {
+                          "cloud": {
+                            "state": "ok"
+                          }
+                        },
+                        "sf": {
+                          "mark": [
+                            [
+                              0,
+                              4,
+                              "uploaded"
+                            ]
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "motif->vigil",
+                      "lane": "NET",
+                      "text": "Vigil reviews the buffered fall — resolved locally at 20:41, filed, nobody paged",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "backfilled case closed"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "view": "step"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Failure modes",
+            "sections": [
+              {
+                "heading": "Failure modes",
+                "accent": "slate",
+                "bullets": [
+                  "**Power fails** — no battery, so the sensor goes dark; **Atrium** raises a lost-sensor alert after *three* missed heartbeats (~90 s), and **Vigil** treats a dark sensor in a care household as a soft check-in trigger, not silence.",
+                  "**Battery low** — not applicable on the sensor (wall power); **Atrium**'s own backup battery keeps the siren ladder alive *~4 h* into a power cut.",
+                  "**Chorus or Motif down** — identical to an outage from the sensor's view: buffer and drain; the LAN path is unaffected.",
+                  "**Vigil down** — **Motif** holds safety events in a dead-letter queue with retry and pages the on-call; **Atrium**'s local ladder is the household backstop.",
+                  "**Track confusion** — two people merging into one track demotes tracker confidence; automations still fire, but safety classification pauses rather than guess."
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

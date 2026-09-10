@@ -1,0 +1,427 @@
+{
+  "page": {
+    "title": "Sentinel — Cellular Off-Grid Solar Camera",
+    "contract": "1",
+    "protocols": {
+      "cell": {"label": "LTE"}
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Overview",
+            "sections": [
+              {
+                "heading": "Sentinel — off-grid, always recording",
+                "accent": "green",
+                "text": [
+                  "Sentinel is farwatch's off-grid camera: solar-charged, cellular-connected, and — unusually for a battery camera — recording **continuously**, 24/7, into a local microSD ring. There is no wifi, hub, or wire; the only paths in and out are an LTE modem and a solar panel, both budgeted resources. The design is two ledgers wrapped around a camera: an **energy ledger** (panel watt-hours in vs recording and radio watt-hours out) and a **data ledger** (a monthly SIM pool spent on thumbnails, clips, and live view). This document covers the daily solar budget, the continuous ring recorder with event indexing, data-cap tier management, and the cloudy-week degradation sequence that ends in preservation mode."
+                ],
+                "bullets": [
+                  {"text": "**Sensor + optics**: 1/1.8\" 4 MP low-light sensor, IR illuminator, 10 m PIR."},
+                  {"text": "**Low-power / high-power split**, the load-bearing design choice:", "sub": [
+                    {"text": "**Ember LP** — always-on RISC-V core: ISP, ~90 mW H.265 continuous encode, ring writer, PIR controller, fuel gauge, energy ledger; alone sustains 24/7."},
+                    {"text": "**Blaze HP** — quad-core AP + 2-TOPS NPU, normally off: wakes for event classification, thumbnail crops, uploads, and live view."}
+                  ]},
+                  {"text": "**Radio**: LTE Cat-4 modem with eSIM, duty-cycled — attaches only during radio windows or on demand; no wifi radio at all."},
+                  {"text": "**Power**: 19,200 mAh (≈71 Wh) Li-ion pack; 5.4 W panel with MPPT; charging locks out below 0 °C via thermistor interlock (the pack still discharges)."},
+                  {"text": "**Storage**: 512 GB microSD ring (~9.5 days at 1.5 Mbps) + 256 MB internal flash for the event index and config."},
+                  {"text": "**Backend services**:", "sub": [
+                    {"text": "**Waystation** — cellular device gateway: sessions, frames, store-and-forward to sleeping cameras."},
+                    {"text": "**Wrangler** — media intake and storage: thumbnails, on-demand clips, CDN edge."},
+                    {"text": "**Tally** — SIM data-pool metering: per-cycle usage, tier directives, command reserve."},
+                    {"text": "**Almanac** — weather and solar forecasting: per-site sun-hour outlooks pushed nightly."},
+                    {"text": "**Homestead** — accounts, app API, mirrored event/timeline index, energy card."},
+                    {"text": "**Signalfire** — push notification delivery (invoked by Wrangler and Homestead)."}
+                  ]}
+                ]
+              }
+            ]
+          },
+          {
+            "label": "The daily solar ledger",
+            "sections": [
+              {
+                "heading": "The daily solar energy budget",
+                "accent": "amber",
+                "bullets": [
+                  "During the 03:00 radio window, Almanac pushes today's solar forecast (2.1 sun-hours, overcast morning) through Waystation to the camera.",
+                  "Ember LP computes expected panel intake: 2.1 h × 5.4 W ≈ 11.3 Wh.",
+                  "Ember LP sums the standing load: continuous encode 6.7 Wh + ring writes 1.2 Wh + radio windows 3.1 Wh + AI wakes 1.4 Wh ≈ 12.4 Wh/day.",
+                  "The ledger lands 1.1 Wh short; with the pack at 64%, Ember LP rules the day \"sustainable with drawdown\" (−0.9%/day) and leaves the plan unchanged.",
+                  "Blaze HP wakes for 20 seconds and reports the ledger verdict through Waystation to Homestead.",
+                  "Homestead stores the ledger; the app's energy card shows intake vs load and the verdict.",
+                  "At the noon checkpoint the sky has cleared; the panel is delivering 5.1 W and Ember LP revises expected intake to 16 Wh.",
+                  "The revised ledger flips the verdict to \"surplus\"; the evening close posts +3.2 Wh with the pack at 66%.",
+                  "Homestead appends the closed ledger to the site's energy history, which Almanac uses to calibrate the next forecast."
+                ],
+                "contract": {
+                  "title": "Daily energy ledger — camera → Homestead (via Waystation, CBOR frame)",
+                  "fields": [
+                    {"k": "day", "v": "2026-09-05", "g": "ledger date (site-local)"},
+                    {"k": "panel_wh", "v": "11.3", "g": "measured + forecast solar intake"},
+                    {"k": "load_wh", "v": "12.4", "g": "recording + ring + radio + AI load"},
+                    {"k": "soc_pct", "v": "64", "g": "pack state of charge at report time"},
+                    {"k": "verdict", "v": "deficit", "g": "surplus / sustainable / deficit", "hot": true},
+                    {"k": "mode", "v": "FULL", "g": "FULL / ECO / EVENT-ONLY / PRESERVATION"},
+                    {"k": "chg_lock", "v": "false", "g": "true when the 0 °C charge interlock is active"}
+                  ]
+                },
+                "diagram": {
+                  "groups": {"cam": {"title": "Sentinel"}},
+                  "nodes": {
+                    "almanac": {"title": "Almanac", "sub": "sun forecasts", "icon": "server", "tint": "cmd",
+                                "link": "https://github.com/farwatch/cloud/blob/main/almanac/outlook.go#L58"},
+                    "waystation": {"title": "Waystation", "sub": "device gateway", "icon": "cloud", "tint": "cmd",
+                                   "link": "https://github.com/farwatch/cloud/blob/main/waystation/session.go#L83"},
+                    "modem": {"title": "LTE modem", "sub": "duty-cycled", "icon": "antenna", "tint": "mqtt", "group": "cam"},
+                    "ember": {"title": "Ember LP", "sub": "energy ledger", "icon": "chip", "tint": "dev", "group": "cam"},
+                    "blaze": {"title": "Blaze HP", "sub": "reporter", "icon": "chip", "tint": "dev", "group": "cam"},
+                    "panel": {"title": "Solar panel", "sub": "5.4 W MPPT", "icon": "gear", "tint": "dev", "group": "cam"},
+                    "homestead": {"title": "Homestead", "sub": "energy card", "icon": "server", "tint": "data",
+                                  "link": "https://github.com/farwatch/cloud/blob/main/homestead/api.go#L212"},
+                    "phone": {"title": "Owner phone", "sub": "farwatch app", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    ["almanac", "waystation", ["panel", "ember", "modem", "blaze"]],
+                    ["homestead", "phone"]
+                  ],
+                  "edges": [
+                    {"from": "almanac", "to": "waystation", "kind": "int", "label": "outlook 2.1 h"},
+                    {"from": "waystation", "to": "modem", "kind": "cell", "label": "03:00 window"},
+                    {"from": "modem", "to": "ember", "kind": "int"},
+                    {"from": "panel", "to": "ember", "kind": "int"},
+                    {"from": "blaze", "to": "modem", "kind": "int"},
+                    {"from": "modem", "to": "waystation", "kind": "cell", "label": "ledger up"},
+                    {"from": "waystation", "to": "homestead", "kind": "int", "label": "store ledger"},
+                    {"from": "homestead", "to": "phone", "kind": "https", "label": "energy card"}
+                  ],
+                  "panels": [
+                    {"id": "soc", "type": "battery", "title": "Pack — 71 Wh", "unit": "%", "low": 25, "crit": 15,
+                     "initial": {"source": "solar", "charge": 64, "trend": "idle", "note": "—"}},
+                    {"id": "pv", "type": "gauge", "title": "Panel input", "unit": "W", "max": 6,
+                     "initial": {"value": 0}},
+                    {"id": "log", "type": "log", "tags": {"SUN": "#F5A97F", "LEDG": "#38E1FF"}}
+                  ],
+                  "steps": [
+                    {"edges": ["almanac->waystation", "waystation->modem", "modem->ember"],
+                     "text": "03:00 window: forecast reaches Ember",
+                     "panels": {"log": {"log": [{"tag": "SUN", "text": "outlook: 2.1 sun-hours"}]}}},
+                    {"nodes": ["ember"], "text": "Expected intake: 2.1 h × 5.4 W ≈ 11.3 Wh",
+                     "panels": {"pv": {"value": 0}, "soc": {"trend": "draining"}}},
+                    {"nodes": ["ember"], "text": "Standing load sums to 12.4 Wh/day",
+                     "panels": {"log": {"log": [{"tag": "LEDG", "text": "load 12.4 Wh vs 11.3 Wh"}]}}},
+                    {"nodes": ["ember"], "text": "Verdict: sustainable with drawdown (−0.9%/day); plan unchanged",
+                     "panels": {"soc": {"note": "−0.9%/day · sustainable"}}},
+                    {"edges": ["blaze->modem", "modem->waystation", "waystation->homestead", "homestead->phone"],
+                     "text": "Blaze wakes 20 s; ledger stored, app energy card updates",
+                     "panels": {"log": {"log": [{"tag": "LEDG", "text": "verdict shown to owner"}]}}},
+                    {"edge": "panel->ember", "text": "Noon: sky clears, panel at 5.1 W",
+                     "panels": {"pv": {"value": 5.1}, "soc": {"trend": "charging"}}},
+                    {"nodes": ["ember"], "text": "Intake revised to 16 Wh — surplus",
+                     "panels": {"soc": {"note": "+3.2 Wh · surplus"}}},
+                    {"edges": ["modem->waystation", "waystation->homestead"],
+                     "text": "Evening close: pack 66%, history appended",
+                     "panels": {"soc": {"charge": 66}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "A ring that never stops",
+            "sections": [
+              {
+                "heading": "Continuous recording into the ring, with event indexing",
+                "accent": "cyan",
+                "bullets": [
+                  "Ember LP encodes 24/7 at 1.5 Mbps into 30-minute segments on the microSD ring.",
+                  "When the card is full, the write head overwrites the oldest *unprotected* segment — the ring is ~9.5 days deep.",
+                  "The PIR trips; Ember LP tags the timestamp and raises a wake interrupt to Blaze HP.",
+                  "Blaze HP boots in 380 ms and classifies the buffered frames: person, 0.88.",
+                  "Blaze HP writes an event marker to the index and flips the two covering segments to *protected*, exempting them from overwrite.",
+                  "Blaze HP crops a thumbnail and sends it through the modem to Waystation.",
+                  "Waystation hands the media to Wrangler; Wrangler stores it and [Signalfire](https://github.com/farwatch/cloud/blob/main/signalfire/push.go#L31) pushes the notification to the owner's phone.",
+                  "The owner scrubs the timeline; the app pulls only the event marker list from Homestead — no video moves.",
+                  "The owner taps play; the clip streams from the ring over LTE, debited against the data pool (Flow 3).",
+                  "Two weeks later the protected pair ages out of retention and returns to the overwritable pool."
+                ],
+                "contract": {
+                  "title": "Event-marker index record — camera → Homestead",
+                  "note": "Mirrors to Homestead whenever the radio allows.",
+                  "fields": [
+                    {"k": "marker_id", "g": "unique id for this event marker"},
+                    {"k": "ts", "g": "event timestamp (site-local)"},
+                    {"k": "class/conf", "v": "person / 0.88", "g": "classification and confidence", "hot": true},
+                    {"k": "segs", "v": "19–20", "g": "protected covering segments"},
+                    {"k": "uplinked", "v": "thumb", "g": "none / thumb / clip"}
+                  ]
+                },
+                "diagram": {
+                  "groups": {"cam": {"title": "Sentinel"}},
+                  "nodes": {
+                    "pir": {"title": "PIR", "sub": "10 m cone", "icon": "gear", "tint": "dev", "group": "cam"},
+                    "ember": {"title": "Ember LP", "sub": "24/7 encoder", "icon": "chip", "tint": "dev", "group": "cam"},
+                    "sd": {"title": "microSD ring", "sub": "512 GB", "icon": "db", "tint": "data", "group": "cam"},
+                    "blaze": {"title": "Blaze HP", "sub": "2-TOPS NPU", "icon": "chip", "tint": "dev", "group": "cam"},
+                    "modem": {"title": "LTE modem", "sub": "on demand", "icon": "antenna", "tint": "mqtt", "group": "cam"},
+                    "waystation": {"title": "Waystation", "sub": "device gateway", "icon": "cloud", "tint": "cmd",
+                                   "link": "https://github.com/farwatch/cloud/blob/main/waystation/session.go#L83"},
+                    "wrangler": {"title": "Wrangler", "sub": "media store", "icon": "server", "tint": "data",
+                                 "link": "https://github.com/farwatch/cloud/blob/main/wrangler/intake.go#L47"},
+                    "homestead": {"title": "Homestead", "sub": "event index", "icon": "server", "tint": "data",
+                                  "link": "https://github.com/farwatch/cloud/blob/main/homestead/api.go#L212"},
+                    "phone": {"title": "Owner phone", "sub": "timeline", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    [["pir", "ember", "sd", "blaze", "modem"], "waystation"],
+                    ["wrangler", "phone"]
+                  ],
+                  "floats": [
+                    {"id": "homestead", "side": "below"}
+                  ],
+                  "edges": [
+                    {"from": "ember", "to": "sd", "kind": "int"},
+                    {"from": "pir", "to": "ember", "kind": "int"},
+                    {"from": "ember", "to": "blaze", "kind": "int"},
+                    {"from": "blaze", "to": "sd", "kind": "int"},
+                    {"from": "blaze", "to": "modem", "kind": "int"},
+                    {"from": "modem", "to": "waystation", "kind": "cell", "label": "upload"},
+                    {"from": "waystation", "to": "wrangler", "kind": "int", "label": "store media"},
+                    {"from": "wrangler", "to": "phone", "kind": "https", "label": "push (S-fire)"},
+                    {"from": "homestead", "to": "phone", "kind": "https", "label": "marker list"},
+                    {"from": "phone", "to": "waystation", "kind": "https", "label": "play clip"},
+                    {"from": "waystation", "to": "modem", "kind": "cell", "label": "pull from ring"}
+                  ],
+                  "panels": [
+                    {"id": "ring", "type": "buffer", "title": "microSD ring", "segments": 24,
+                     "capacity": "512 GB ≈ 9.5 days · 24 cells (compressed — real ring segments are 30 min each, several per cell)",
+                     "initial": {"head": 18, "cells": [
+                       "buffered", "buffered", "buffered", "buffered", "buffered", "buffered", "buffered",
+                       "buffered", "buffered", "buffered", "buffered", "buffered", "buffered", "buffered",
+                       "buffered", "buffered", "buffered", "buffered", "buffered",
+                       "empty", "empty", "empty", "empty", "empty"
+                     ]}},
+                    {"id": "log", "type": "log", "tags": {"PIR": "#F5A97F", "AI": "#38E1FF", "NET": "#C4A7E7"}}
+                  ],
+                  "steps": [
+                    {"edge": "ember->sd", "text": "Continuous 1.5 Mbps encode into the ring",
+                     "panels": {"ring": {"mark": [[19, 23, "buffered"]], "head": 23}}},
+                    {"nodes": ["sd"], "text": "Full card: head overwrites the oldest unprotected segment",
+                     "panels": {"ring": {"head": 0, "mark": [[0, 0, "buffered"]],
+                                         "note": "seg 0 rewritten — oldest unprotected segment reclaimed"}}},
+                    {"edges": ["pir->ember", "ember->blaze"], "text": "PIR trips — Ember LP tags the timestamp, wakes Blaze",
+                     "panels": {"log": {"log": [{"tag": "PIR", "text": "trip — timestamp tagged"}]}}},
+                    {"nodes": ["blaze"], "text": "Blaze boots 380 ms: person 0.88",
+                     "panels": {"log": {"log": [{"tag": "AI", "text": "person 0.88"}]}}},
+                    {"edge": "blaze->sd", "text": "Marker written; covering segs protected",
+                     "panels": {"ring": {"mark": [[19, 20, "protected"]]}}},
+                    {"edges": ["blaze->modem", "modem->waystation"], "text": "Thumbnail out through the modem",
+                     "panels": {"ring": {"mark": [[19, 20, "uploading"]]}}},
+                    {"edges": ["waystation->wrangler", "wrangler->phone"], "text": "Wrangler stores; Signalfire pushes",
+                     "panels": {"ring": {"mark": [[19, 20, "protected"]]},
+                                "log": {"log": [{"tag": "NET", "text": "thumb pushed"}]}}},
+                    {"edge": "homestead->phone",
+                     "text": "Owner scrubs the timeline — the app pulls only the event marker list from Homestead; no video moves",
+                     "panels": {"log": {"log": [{"tag": "NET", "text": "markers only — no video moves"}]}}},
+                    {"edges": ["phone->waystation", "waystation->modem"],
+                     "text": "Owner taps play; the clip streams from the ring over LTE, debited against the data pool (Flow 3)"},
+                    {"nodes": ["sd"], "text": "Two weeks later the protected pair rejoins the pool",
+                     "panels": {"ring": {"mark": [[19, 20, "buffered"]]}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Rationing 3 GB",
+            "sections": [
+              {
+                "heading": "Cellular data-cap management",
+                "accent": "violet",
+                "bullets": [
+                  "The camera's eSIM carries a 3 GB/cycle pool; Tally opens the cycle at 0 MB used.",
+                  "The modem driver meters every upload and live-view minute and reports usage to Tally in the daily ledger ping.",
+                  "At 60% used (day 19), Tally issues a tier-1 directive: live view drops 1080p → 720p, clip uploads switch to on-demand only.",
+                  "Waystation relays the directive as a quota state frame; Ember LP applies it without a reboot.",
+                  "The app shows the quota bar and Tally's projected exhaustion date (day 26 of a 30-day cycle).",
+                  "At 80%, tier 2: notifications carry thumbnails only; full clips stay on the ring, marked \"held\" in the app until the cycle resets or the owner forces a fetch.",
+                  "At 95%, tier 3: event notifications go text-only and live view is disabled.",
+                  "At 100%, Tally seals the pool except a 15 MB command reserve, so settings changes and emergency fetches still reach the camera.",
+                  "The cycle resets on the 1st; Tally clears the tiers, the camera restores 1080p, and held clips remain fetchable on demand rather than auto-uploading as a burst.",
+                  "**Quota sealed**: tier 4 is a data state, not an outage — the 15 MB reserve keeps commands reachable; nothing recorded is lost, only unfetched."
+                ],
+                "contract": {
+                  "title": "Quota state frame — Tally → camera (via Waystation)",
+                  "fields": [
+                    {"k": "cycle_used_mb", "v": "1843", "g": "metered usage this cycle"},
+                    {"k": "cap_mb", "v": "3072", "g": "pool size for this eSIM plan"},
+                    {"k": "tier", "v": "1", "g": "0 = unrestricted … 4 = sealed", "hot": true},
+                    {"k": "caps", "v": "{\"live\":\"720p\",\"clips\":\"on-demand\"}", "g": "active restrictions at this tier"},
+                    {"k": "reserve_mb", "v": "15", "g": "command reserve kept usable at tier 4"},
+                    {"k": "resets_at", "v": "2026-10-01T00:00Z", "g": "next cycle boundary"}
+                  ]
+                },
+                "diagram": {
+                  "groups": {"cam": {"title": "Sentinel"}},
+                  "nodes": {
+                    "ember": {"title": "Ember LP", "sub": "applies tiers", "icon": "chip", "tint": "dev", "group": "cam"},
+                    "modem": {"title": "LTE modem", "sub": "metered", "icon": "antenna", "tint": "mqtt", "group": "cam"},
+                    "waystation": {"title": "Waystation", "sub": "relay", "icon": "cloud", "tint": "cmd",
+                                   "link": "https://github.com/farwatch/cloud/blob/main/waystation/session.go#L83"},
+                    "tally": {"title": "Tally", "sub": "pool meter", "icon": "server", "tint": "data",
+                              "link": "https://github.com/farwatch/cloud/blob/main/tally/meter.go#L129"},
+                    "homestead": {"title": "Homestead", "sub": "quota bar", "icon": "server", "tint": "cmd",
+                                  "link": "https://github.com/farwatch/cloud/blob/main/homestead/api.go#L212"},
+                    "phone": {"title": "Owner phone", "sub": "farwatch app", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    [["modem", "ember"], "waystation", "tally"],
+                    ["homestead", "phone"]
+                  ],
+                  "edges": [
+                    {"from": "modem", "to": "waystation", "kind": "cell", "label": "usage ping"},
+                    {"from": "waystation", "to": "tally", "kind": "int", "label": "meter bytes"},
+                    {"from": "tally", "to": "waystation", "kind": "int", "ret": true, "label": "tier directive"},
+                    {"from": "waystation", "to": "modem", "kind": "cell", "label": "quota frame"},
+                    {"from": "modem", "to": "ember", "kind": "int"},
+                    {"from": "tally", "to": "homestead", "kind": "int", "label": "cycle state"},
+                    {"from": "homestead", "to": "phone", "kind": "https", "label": "quota bar"}
+                  ],
+                  "panels": [
+                    {"id": "used", "type": "gauge", "title": "Cycle data used", "unit": "MB", "max": 3072,
+                     "initial": {"value": 0}},
+                    {"id": "tier", "type": "state", "title": "Quota tier",
+                     "states": ["FULL", "TIER-1", "TIER-2", "TIER-3", "SEALED"],
+                     "colors": {"SEALED": "#F26D78", "FULL": "#4ADE80"},
+                     "initial": {"state": "FULL"}},
+                    {"id": "log", "type": "log", "tags": {"CAP": "#C4A7E7"}}
+                  ],
+                  "steps": [
+                    {"nodes": ["tally"], "text": "Cycle opens: 0 of 3072 MB",
+                     "panels": {"used": {"value": 0}, "tier": {"state": "FULL"}}},
+                    {"edges": ["modem->waystation", "waystation->tally"], "text": "Daily ping reports metered usage",
+                     "panels": {"used": {"value": 1843}}},
+                    {"edge": "tally->waystation", "text": "60% used (day 19): tier-1 directive issued",
+                     "panels": {"tier": {"state": "TIER-1"},
+                                "log": {"log": [{"tag": "CAP", "text": "live 720p, clips on-demand"}]}}},
+                    {"edges": ["waystation->modem", "modem->ember"], "text": "Quota frame applied, no reboot",
+                     "panels": {"log": {"log": [{"tag": "CAP", "text": "caps applied"}]}}},
+                    {"edges": ["tally->homestead", "homestead->phone"], "text": "App shows bar + exhaustion date: day 26 of 30",
+                     "panels": {"log": {"log": [{"tag": "CAP", "text": "projected: day 26 of 30"}]}}},
+                    {"nodes": ["tally"], "text": "80%: thumbnails only, clips held until reset or forced fetch",
+                     "panels": {"used": {"value": 2458}, "tier": {"state": "TIER-2"}}},
+                    {"nodes": ["tally"], "text": "95%: text-only events, no live",
+                     "panels": {"used": {"value": 2918}, "tier": {"state": "TIER-3"}}},
+                    {"nodes": ["tally"], "text": "100%: sealed, 15 MB command reserve keeps commands reachable",
+                     "panels": {"used": {"value": 3072}, "tier": {"state": "SEALED"}}},
+                    {"nodes": ["tally"], "text": "Reset on the 1st: tiers clear, 1080p restored",
+                     "panels": {"used": {"value": 0}, "tier": {"state": "FULL"}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Four dark days",
+            "sections": [
+              {
+                "heading": "Cloudy week: degradation to preservation mode",
+                "accent": "red",
+                "bullets": [
+                  "Day 1 is overcast: intake 4 Wh against a 12 Wh load; the pack falls 64% → 58% and the ledger verdict is \"deficit\".",
+                  "Almanac's 5-day outlook shows three more overcast days, so Ember LP enters ECO: encode drops 1.5 → 0.8 Mbps and the IR illuminator is dimmed.",
+                  "Day 2 the pack falls 58% → 50%; radio windows stretch from hourly to 4-hourly and live view is disabled to keep the modem cold.",
+                  "Homestead posts the mode change and the outlook to the app, so the degradation is explained before anyone notices missing features.",
+                  "Day 3 the pack hits 41%; continuous encoding stops — EVENT-ONLY mode records PIR-gated clips and everything else sleeps.",
+                  "Day 4 the pack hits 28%; the radio drops to one 90-second check-in per day.",
+                  "The pack crosses 15%: PRESERVATION — recording stops entirely; the PIR still logs text-only event markers to internal flash.",
+                  "Ember LP flushes the event index to the card and spends one final 20-second modem burst posting \"entering preservation\" to Homestead.",
+                  "Day 6 the sun returns; the panel charges the sleeping camera and at 30% Ember LP resumes EVENT-ONLY.",
+                  "At 55% the camera returns to FULL continuous recording and posts the recovery ledger; the timeline shows honest gap markers for the dark days."
+                ],
+                "diagram": {
+                  "groups": {"cam": {"title": "Sentinel"}},
+                  "nodes": {
+                    "panel": {"title": "Solar panel", "sub": "overcast", "icon": "gear", "tint": "dev", "group": "cam"},
+                    "ember": {"title": "Ember LP", "sub": "mode ladder", "icon": "chip", "tint": "dev", "group": "cam"},
+                    "blaze": {"title": "Blaze HP", "sub": "mostly asleep", "icon": "chip", "tint": "dev", "group": "cam"},
+                    "modem": {"title": "LTE modem", "sub": "shrinking windows", "icon": "antenna", "tint": "mqtt", "group": "cam"},
+                    "waystation": {"title": "Waystation", "sub": "gateway", "icon": "cloud", "tint": "cmd",
+                                   "link": "https://github.com/farwatch/cloud/blob/main/waystation/session.go#L83"},
+                    "almanac": {"title": "Almanac", "sub": "5-day outlook", "icon": "server", "tint": "cmd",
+                                "link": "https://github.com/farwatch/cloud/blob/main/almanac/outlook.go#L58"},
+                    "homestead": {"title": "Homestead", "sub": "mode + outlook", "icon": "server", "tint": "cmd",
+                                  "link": "https://github.com/farwatch/cloud/blob/main/homestead/api.go#L212"},
+                    "phone": {"title": "Owner phone", "sub": "explained banner", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    ["almanac", "waystation", ["panel", "ember", "blaze", "modem"]],
+                    ["homestead", "phone"]
+                  ],
+                  "edges": [
+                    {"from": "panel", "to": "ember", "kind": "int"},
+                    {"from": "almanac", "to": "waystation", "kind": "int", "label": "3 more dark"},
+                    {"from": "waystation", "to": "modem", "kind": "cell", "label": "outlook"},
+                    {"from": "modem", "to": "waystation", "kind": "cell", "label": "status ping"},
+                    {"from": "waystation", "to": "homestead", "kind": "int", "label": "status"},
+                    {"from": "homestead", "to": "phone", "kind": "https", "label": "mode banner"}
+                  ],
+                  "panels": [
+                    {"id": "soc", "type": "battery", "title": "Pack — 71 Wh", "unit": "%", "low": 25, "crit": 15,
+                     "initial": {"source": "solar", "charge": 64, "trend": "draining", "note": "deficit forecast"}},
+                    {"id": "mode", "type": "state", "title": "Recording mode",
+                     "states": ["FULL", "ECO", "EVENT-ONLY", "PRESERVATION"],
+                     "colors": {"FULL": "#4ADE80", "PRESERVATION": "#F26D78"},
+                     "initial": {"state": "FULL"}},
+                    {"id": "log", "type": "log", "tags": {"PWR": "#F5A97F", "APP": "#4ADE80"}}
+                  ],
+                  "steps": [
+                    {"edge": "panel->ember", "text": "Day 1 overcast: 4 Wh in, 12 Wh out",
+                     "panels": {"soc": {"charge": 58, "trend": "draining", "note": "intake 4 Wh vs 12 Wh load"}}},
+                    {"edges": ["almanac->waystation", "waystation->modem"], "text": "Outlook: three more dark days → ECO",
+                     "panels": {"mode": {"state": "ECO"},
+                                "log": {"log": [{"tag": "PWR", "text": "encode 0.8 Mbps, IR dim"}]}}},
+                    {"text": "Day 2: windows 4-hourly, live view off",
+                     "panels": {"soc": {"charge": 50, "note": ""}}},
+                    {"edges": ["waystation->homestead", "homestead->phone"],
+                     "text": "Homestead posts the mode change and outlook — banner explains ECO before complaints",
+                     "panels": {"log": {"log": [{"tag": "APP", "text": "degradation explained"}]}}},
+                    {"nodes": ["ember"], "text": "Day 3 at 41%: continuous stops — EVENT-ONLY",
+                     "panels": {"soc": {"charge": 41}, "mode": {"state": "EVENT-ONLY"}}},
+                    {"edge": "modem->waystation", "text": "Day 4 at 28%: one 90 s check-in per day",
+                     "panels": {"soc": {"charge": 28, "note": "preserve at 15%"}}},
+                    {"nodes": ["ember"], "text": "15%: PRESERVATION — recording stops",
+                     "panels": {"soc": {"charge": 15}, "mode": {"state": "PRESERVATION"}}},
+                    {"nodes": ["ember", "modem"],
+                     "text": "Index flushed; final 20 s burst posts \"entering preservation\" to Homestead",
+                     "panels": {"log": {"log": [{"tag": "PWR", "text": "entering preservation"}]}}},
+                    {"nodes": ["panel", "ember"], "text": "Day 6: sun returns; 30% resumes EVENT-ONLY",
+                     "panels": {"soc": {"charge": 30, "trend": "charging", "note": "recovering"},
+                                "mode": {"state": "EVENT-ONLY"}}},
+                    {"nodes": ["ember", "modem"], "text": "55%: FULL again; recovery ledger posted, gaps marked honestly",
+                     "panels": {"soc": {"charge": 55}, "mode": {"state": "FULL"}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Failure modes",
+            "sections": [
+              {
+                "heading": "Failure modes",
+                "accent": "slate",
+                "bullets": [
+                  "**Cellular loss / Waystation / Tally down** (identical from the camera's view): recording and indexing continue at the current energy mode; markers queue on-device and mirror on return; the last quota tier is kept rather than assuming an open pool; the app shows last check-in age instead of pretending liveness.",
+                  "**Cold snap**: below 0 °C the charge interlock opens (`chg_lock=true`); the ledger treats intake as zero and the ladder runs on discharge alone.",
+                  "**microSD failure**: the index lives on internal flash so history survives; recording halts and a text-only alert spends the command reserve if needed."
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

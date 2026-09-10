@@ -1,0 +1,1106 @@
+{
+  "page": {
+    "title": "Cumulus Command & OTA Paths",
+    "protocols": {
+      "device": {
+        "label": "device operation",
+        "color": {
+          "aurora": "#F4B860",
+          "daylight": "#A54F00"
+        }
+      },
+      "policy": {
+        "label": "policy transition",
+        "color": {
+          "aurora": "#B9A2FF",
+          "daylight": "#6741C9"
+        }
+      }
+    },
+    "blocks": [
+      {
+        "heading": "System contract and scope",
+        "accent": "cyan",
+        "text": [
+          "Cumulus is the managed IoT control plane. This HLD covers the operator command path and OTA firmware rollouts, which together account for nearly all current production traffic; telemetry ingest is explicitly out of scope.",
+          "Both flows preserve the same state contract: the platform is authoritative for desired state in Registry, while each device is authoritative for its reported state."
+        ],
+        "bullets": [
+          "Every state change passes through the versioned device-shadow Registry",
+          "Cloud-to-device transport is MQTT over TLS on port 8883 through Relay",
+          "Devices accept no inbound connections; they initiate all subscribe and publish activity",
+          "Site-prefixed topics separate cmd, ack, and out-of-scope telemetry traffic per device",
+          "Site 4 examples span a sleepy Thermostat T-100, always-connected Pump P-7, and a Modbus-bridging Edge Gateway",
+          "Document status: Draft 4; owned by platform-core; last updated 2026-08-19"
+        ]
+      },
+      {
+        "tabs": [
+          {
+            "label": "Command path",
+            "sections": [
+              {
+                "heading": "Operator command loop",
+                "accent": "green",
+                "source": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112",
+                "text": [
+                  "An operator changes Pump P-7's target flow rate. Authorization, versioned desired-state persistence, QoS 1 delivery, and the device's reported-state acknowledgment form one closed loop back to the Console.",
+                  "Sentinel verifies both JWT signature and device.write scope before Dispatch sees the request; only site-operator and platform-admin roles receive that scope."
+                ],
+                "bullets": [
+                  "Failed scope checks return 403 at Nimbus and never reach Dispatch",
+                  "Dispatch validates against reported capabilities before writing desired state",
+                  "Stale shadow versions are retryable conflicts surfaced to the Console",
+                  "The command uses QoS 1 with retain off on cmd/site-4/pump-7",
+                  "Relay fans out to Pump P-7 and the Edge Gateway wildcard subscriber; Thermostat T-100 receives nothing",
+                  "Broker PUBACK and the application ack are distinct; only the latter carries new reported state"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "console": {
+                      "title": "Ops Console",
+                      "sub": "command UI",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/web/console/src/commands/panel.tsx#L48"
+                    },
+                    "nimbus": {
+                      "title": "Nimbus API",
+                      "sub": "public gateway",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/nimbus/router.go#L203"
+                    },
+                    "sentinel": {
+                      "title": "Sentinel Auth",
+                      "sub": "JWT + scopes",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/sentinel/verify.go#L77"
+                    },
+                    "dispatch": {
+                      "title": "Dispatch",
+                      "sub": "validate + publish",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    "registryd": {
+                      "title": "Registry",
+                      "sub": "desired document",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    },
+                    "relay": {
+                      "title": "Relay",
+                      "sub": "TLS :8883 / QoS 1",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    "pump": {
+                      "title": "Pump P-7",
+                      "sub": "always connected",
+                      "icon": "pump",
+                      "tint": "dev",
+                      "link": "https://github.com/doorbuzz-cloud/firmware/blob/main/p7/src/command_loop.cpp#L88"
+                    },
+                    "gateway": {
+                      "title": "Edge Gateway",
+                      "sub": "cmd/site-4/#",
+                      "icon": "router",
+                      "tint": "dev",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/edge/gateway/subscriber.go#L52"
+                    },
+                    "acktopic": {
+                      "title": "Ack Topic",
+                      "sub": "ack/site-4/pump-7",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    "registryr": {
+                      "title": "Registry",
+                      "sub": "reported document",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "console",
+                      "nimbus",
+                      "dispatch",
+                      "registryd"
+                    ],
+                    [
+                      "registryr",
+                      "acktopic",
+                      [
+                        "pump",
+                        "gateway"
+                      ],
+                      "relay"
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "sentinel",
+                      "side": "above"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "console",
+                      "to": "nimbus",
+                      "kind": "https",
+                      "label": "POST /commands"
+                    },
+                    {
+                      "from": "nimbus",
+                      "to": "sentinel",
+                      "kind": "int",
+                      "label": "verify JWT + scope"
+                    },
+                    {
+                      "from": "sentinel",
+                      "to": "nimbus",
+                      "kind": "int",
+                      "ret": true,
+                      "label": "authorized"
+                    },
+                    {
+                      "from": "nimbus",
+                      "to": "dispatch",
+                      "kind": "int",
+                      "label": "forward command"
+                    },
+                    {
+                      "from": "dispatch",
+                      "to": "registryd",
+                      "kind": "int",
+                      "label": "write desired vN"
+                    },
+                    {
+                      "from": "dispatch",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "label": "PUBLISH cmd/..."
+                    },
+                    {
+                      "from": "relay",
+                      "to": "pump",
+                      "kind": "mqtt",
+                      "label": "deliver QoS 1"
+                    },
+                    {
+                      "from": "relay",
+                      "to": "gateway",
+                      "kind": "mqtt",
+                      "label": "wildcard copy"
+                    },
+                    {
+                      "from": "pump",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "ret": true,
+                      "label": "PUBACK"
+                    },
+                    {
+                      "from": "pump",
+                      "to": "acktopic",
+                      "kind": "mqtt",
+                      "label": "reported state"
+                    },
+                    {
+                      "from": "acktopic",
+                      "to": "dispatch",
+                      "kind": "mqtt",
+                      "label": "deliver ack"
+                    },
+                    {
+                      "from": "dispatch",
+                      "to": "registryr",
+                      "kind": "int",
+                      "label": "update reported"
+                    },
+                    {
+                      "from": "registryr",
+                      "to": "console",
+                      "kind": "int",
+                      "label": "subscription update"
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "console->nimbus",
+                      "text": "The Console submits the command with the operator's bearer token.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/web/console/src/commands/panel.tsx#L48"
+                    },
+                    {
+                      "edges": [
+                        "nimbus->sentinel",
+                        "sentinel->nimbus"
+                      ],
+                      "text": "Sentinel verifies the JWT signature and device.write scope before routing continues.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/sentinel/verify.go#L77"
+                    },
+                    {
+                      "edge": "nimbus->dispatch",
+                      "text": "Nimbus forwards only the authorized command to Dispatch.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/nimbus/router.go#L203"
+                    },
+                    {
+                      "edge": "dispatch->registryd",
+                      "text": "Dispatch validates capabilities and writes versioned desired state.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    },
+                    {
+                      "edge": "dispatch->relay",
+                      "text": "Dispatch publishes the non-retained command at QoS 1.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edges": [
+                        "relay->pump",
+                        "relay->gateway"
+                      ],
+                      "text": "Relay delivers to Pump P-7 and the site's wildcard debugging tap.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    {
+                      "edge": "pump->relay",
+                      "text": "Pump P-7 confirms broker delivery with PUBACK.",
+                      "link": "https://github.com/doorbuzz-cloud/firmware/blob/main/p7/src/command_loop.cpp#L88"
+                    },
+                    {
+                      "edge": "pump->acktopic",
+                      "text": "After execution, Pump P-7 publishes reported state on its application ack topic.",
+                      "link": "https://github.com/doorbuzz-cloud/firmware/blob/main/p7/src/command_loop.cpp#L88"
+                    },
+                    {
+                      "edge": "acktopic->dispatch",
+                      "text": "Dispatch consumes the application acknowledgment.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edge": "dispatch->registryr",
+                      "text": "Dispatch records the device's new reported state in Registry.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    },
+                    {
+                      "edge": "registryr->console",
+                      "text": "The Console subscription observes the update and closes the operator loop.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/web/console/src/commands/panel.tsx#L48"
+                    }
+                  ]
+                }
+              },
+              {
+                "heading": "Sleepy-device delivery",
+                "accent": "amber",
+                "source": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9",
+                "text": [
+                  "Thermostat T-100 normally sleeps with its radio off. Relay retains its QoS 1 command in a persistent session and delivers it in the next firmware-controlled wake window rather than losing it.",
+                  "This makes sleepy-device commands eventually consistent by design: desired state is already authoritative while reported state remains behind."
+                ],
+                "bullets": [
+                  "Battery-class devices use clean_session=false",
+                  "T-100 currently wakes every 15 minutes",
+                  "The Console shows pending delivery until the application acknowledgment arrives",
+                  "Sleepy devices are excluded from command-latency SLOs",
+                  "Open TODO: document the per-session queue depth at which Relay begins dropping messages"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "dispatch": {
+                      "title": "Dispatch",
+                      "sub": "desired already set",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    "relayq": {
+                      "title": "Relay Queue",
+                      "sub": "persistent session",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    "t100": {
+                      "title": "Thermostat T-100",
+                      "sub": "15-minute wake",
+                      "icon": "thermo",
+                      "tint": "dev",
+                      "link": "https://github.com/doorbuzz-cloud/firmware/blob/main/t100/main/app_mqtt.c#L164"
+                    },
+                    "relayack": {
+                      "title": "Relay Ack",
+                      "sub": "ack/site-4/t100",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    "dispatchack": {
+                      "title": "Dispatch Ack",
+                      "sub": "consume report",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    "registryr": {
+                      "title": "Registry",
+                      "sub": "reported catches up",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    },
+                    "consolepending": {
+                      "title": "Console State",
+                      "sub": "pending to applied",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/web/console/src/commands/panel.tsx#L48"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "dispatch",
+                      "relayq",
+                      "t100"
+                    ],
+                    [
+                      "relayack",
+                      "dispatchack",
+                      "registryr",
+                      "consolepending"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "dispatch",
+                      "to": "relayq",
+                      "kind": "mqtt",
+                      "label": "QoS 1 command"
+                    },
+                    {
+                      "from": "relayq",
+                      "to": "t100",
+                      "kind": "mqtt",
+                      "label": "deliver on wake"
+                    },
+                    {
+                      "from": "t100",
+                      "to": "relayack",
+                      "kind": "mqtt",
+                      "label": "reported state"
+                    },
+                    {
+                      "from": "relayack",
+                      "to": "dispatchack",
+                      "kind": "mqtt",
+                      "label": "deliver ack"
+                    },
+                    {
+                      "from": "dispatchack",
+                      "to": "registryr",
+                      "kind": "int",
+                      "label": "update reported"
+                    },
+                    {
+                      "from": "registryr",
+                      "to": "consolepending",
+                      "kind": "int",
+                      "label": "resolve pending"
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "dispatch->relayq",
+                      "text": "Dispatch publishes after desired state is versioned; the Console shows pending delivery.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edge": "relayq->t100",
+                      "text": "Relay queues the QoS 1 message while the radio sleeps, then delivers it at the next wake window.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    {
+                      "edge": "t100->relayack",
+                      "text": "T-100 executes the command and publishes its reported state.",
+                      "link": "https://github.com/doorbuzz-cloud/firmware/blob/main/t100/main/app_mqtt.c#L164"
+                    },
+                    {
+                      "edge": "relayack->dispatchack",
+                      "text": "Relay returns the application acknowledgment to Dispatch.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    {
+                      "edge": "dispatchack->registryr",
+                      "text": "Dispatch advances the reported shadow document.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    },
+                    {
+                      "edge": "registryr->consolepending",
+                      "text": "The Console replaces pending delivery with the applied state.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/web/console/src/commands/panel.tsx#L48"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "OTA rollout",
+            "sections": [
+              {
+                "heading": "Canary-to-fleet stage gates",
+                "accent": "violet",
+                "source": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112",
+                "text": [
+                  "OTA reuses the command transport, but Dispatch's rollout coordinator drives the flow rather than an operator click. The prose-defined stages are normative even though the HLD contains no sequence diagram for them.",
+                  "A release engineer first registers the image digest, target hardware revision, and minimum battery level in Registry; Dispatch then opens the canary stage."
+                ],
+                "bullets": [
+                  "The pilot canary cohort is Edge Gateway plus one device per hardware class",
+                  "Every canary must report the new version inside the stage window before fleet rollout begins",
+                  "Fleet offers are issued in batches of 50 with a 10-minute soak between batches",
+                  "A failed or silent canary freezes the rollout and pages the release engineer",
+                  "There is no automatic rollback because reverting flashed firmware is itself another rollout"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "engineer": {
+                      "title": "Release Eng",
+                      "sub": "register image",
+                      "icon": "terminal",
+                      "tint": "cmd"
+                    },
+                    "registry": {
+                      "title": "Registry",
+                      "sub": "digest + targeting",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    },
+                    "dispatch": {
+                      "title": "Dispatch",
+                      "sub": "rollout coordinator",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    "relay": {
+                      "title": "Relay",
+                      "sub": "offer transport",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    "canary": {
+                      "title": "Canary Cohort",
+                      "sub": "gateway + 1/class",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/edge/gateway/subscriber.go#L52"
+                    },
+                    "fleet": {
+                      "title": "Fleet Batch",
+                      "sub": "50 devices",
+                      "icon": "package",
+                      "tint": "dev"
+                    },
+                    "soak": {
+                      "title": "Soak Window",
+                      "sub": "10 minutes",
+                      "icon": "gear",
+                      "tint": "cmd"
+                    },
+                    "next": {
+                      "title": "Stage Gate",
+                      "sub": "more devices?",
+                      "icon": "shield",
+                      "tint": "auth"
+                    },
+                    "complete": {
+                      "title": "Rollout Done",
+                      "sub": "fleet reported",
+                      "icon": "server",
+                      "tint": "data"
+                    },
+                    "frozen": {
+                      "title": "Frozen + Paged",
+                      "sub": "manual decision",
+                      "icon": "phone",
+                      "tint": "auth",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "engineer",
+                      "registry",
+                      "dispatch",
+                      "relay",
+                      "canary"
+                    ],
+                    [
+                      "fleet",
+                      "soak",
+                      "next",
+                      "complete"
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "frozen",
+                      "side": "above"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "engineer",
+                      "to": "registry",
+                      "kind": "https",
+                      "label": "register metadata"
+                    },
+                    {
+                      "from": "registry",
+                      "to": "dispatch",
+                      "kind": "int",
+                      "label": "open rollout"
+                    },
+                    {
+                      "from": "dispatch",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "label": "publish offers"
+                    },
+                    {
+                      "from": "relay",
+                      "to": "canary",
+                      "kind": "mqtt",
+                      "label": "canary topics"
+                    },
+                    {
+                      "from": "canary",
+                      "to": "fleet",
+                      "kind": "policy",
+                      "label": "all versions pass"
+                    },
+                    {
+                      "from": "fleet",
+                      "to": "soak",
+                      "kind": "policy",
+                      "label": "batch of 50"
+                    },
+                    {
+                      "from": "soak",
+                      "to": "next",
+                      "kind": "policy",
+                      "label": "wait 10 minutes"
+                    },
+                    {
+                      "from": "next",
+                      "to": "fleet",
+                      "kind": "policy",
+                      "label": "next batch"
+                    },
+                    {
+                      "from": "next",
+                      "to": "complete",
+                      "kind": "policy",
+                      "label": "fleet exhausted"
+                    },
+                    {
+                      "from": "canary",
+                      "to": "frozen",
+                      "kind": "policy",
+                      "label": "failed or silent"
+                    },
+                    {
+                      "from": "fleet",
+                      "to": "frozen",
+                      "kind": "policy",
+                      "label": "stage failure"
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "engineer->registry",
+                      "text": "The release engineer registers digest, hardware target, and minimum battery level.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    },
+                    {
+                      "edge": "registry->dispatch",
+                      "text": "Dispatch opens the rollout in canary stage and selects the policy-defined cohort.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edge": "dispatch->relay",
+                      "text": "Dispatch publishes one QoS 1 update offer per canary command topic.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edge": "relay->canary",
+                      "text": "Relay delivers offers to Edge Gateway and one device from every hardware class.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/edge/gateway/subscriber.go#L52"
+                    },
+                    {
+                      "edge": "canary->fleet",
+                      "text": "Only a complete set of in-window canary version reports opens fleet stage.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edge": "fleet->soak",
+                      "text": "Dispatch offers the update to the next batch of 50 devices.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edge": "soak->next",
+                      "text": "The coordinator holds a 10-minute soak before evaluating the next batch."
+                    },
+                    {
+                      "edge": "next->fleet",
+                      "text": "Passing batches repeat until no eligible devices remain."
+                    },
+                    {
+                      "edge": "next->complete",
+                      "text": "The rollout completes after the final batch reports the new version."
+                    },
+                    {
+                      "edges": [
+                        "canary->frozen",
+                        "fleet->frozen"
+                      ],
+                      "text": "A failed or silent stage freezes progress and pages the release engineer; rollback is manual.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    }
+                  ]
+                }
+              },
+              {
+                "heading": "Per-device OTA install",
+                "accent": "blue",
+                "source": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9",
+                "text": [
+                  "An OTA offer is only control-plane metadata. The selected device retrieves firmware directly from the artifact store over HTTPS; Relay never carries image bytes.",
+                  "After validating the digest, the device flashes, reboots, and publishes its installed version on the normal ack topic so Dispatch can evaluate the stage gate."
+                ],
+                "bullets": [
+                  "Offer delivery and the version report use the existing per-device MQTT command and ack topics",
+                  "The device must verify the registered digest before flashing",
+                  "The broker transports offers and reports, never the firmware binary"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "dispatch": {
+                      "title": "Dispatch",
+                      "sub": "update offer",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    "relay": {
+                      "title": "Relay",
+                      "sub": "MQTT control only",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    "device": {
+                      "title": "Target Device",
+                      "sub": "selected cohort",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "artifact": {
+                      "title": "Artifact Store",
+                      "sub": "firmware image",
+                      "icon": "server",
+                      "tint": "data"
+                    },
+                    "verify": {
+                      "title": "Verify Digest",
+                      "sub": "local check",
+                      "icon": "shield",
+                      "tint": "auth"
+                    },
+                    "flash": {
+                      "title": "Flash Image",
+                      "sub": "device operation",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "reboot": {
+                      "title": "Reboot",
+                      "sub": "new firmware",
+                      "icon": "chip",
+                      "tint": "dev"
+                    },
+                    "acktopic": {
+                      "title": "Version Report",
+                      "sub": "device ack topic",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    "dispatchcheck": {
+                      "title": "Stage Check",
+                      "sub": "Dispatch consumes",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "dispatch",
+                      "relay",
+                      "device",
+                      "artifact"
+                    ],
+                    [
+                      "verify",
+                      "flash",
+                      "reboot",
+                      "acktopic",
+                      "dispatchcheck"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "dispatch",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "label": "QoS 1 offer"
+                    },
+                    {
+                      "from": "relay",
+                      "to": "device",
+                      "kind": "mqtt",
+                      "label": "command topic"
+                    },
+                    {
+                      "from": "device",
+                      "to": "artifact",
+                      "kind": "https",
+                      "label": "GET image"
+                    },
+                    {
+                      "from": "artifact",
+                      "to": "verify",
+                      "kind": "https",
+                      "ret": true,
+                      "label": "image bytes"
+                    },
+                    {
+                      "from": "verify",
+                      "to": "flash",
+                      "kind": "device",
+                      "label": "digest matches"
+                    },
+                    {
+                      "from": "flash",
+                      "to": "reboot",
+                      "kind": "device",
+                      "label": "activate image"
+                    },
+                    {
+                      "from": "reboot",
+                      "to": "acktopic",
+                      "kind": "mqtt",
+                      "label": "publish version"
+                    },
+                    {
+                      "from": "acktopic",
+                      "to": "dispatchcheck",
+                      "kind": "mqtt",
+                      "label": "deliver report"
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "dispatch->relay",
+                      "text": "Dispatch publishes an OTA offer, not image bytes, at QoS 1.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edge": "relay->device",
+                      "text": "Relay delivers the offer through the device's existing command topic.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    {
+                      "edges": [
+                        "device->artifact",
+                        "artifact->verify"
+                      ],
+                      "text": "The device downloads the firmware image directly from the artifact store over HTTPS."
+                    },
+                    {
+                      "edge": "verify->flash",
+                      "text": "The device verifies the registered digest before it writes firmware."
+                    },
+                    {
+                      "edge": "flash->reboot",
+                      "text": "A verified image is flashed and activated by rebooting the device."
+                    },
+                    {
+                      "edge": "reboot->acktopic",
+                      "text": "The rebooted device publishes its installed version on the ack topic."
+                    },
+                    {
+                      "edge": "acktopic->dispatchcheck",
+                      "text": "Dispatch consumes the version report and evaluates whether the stage may advance.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Reliability & ops",
+            "sections": [
+              {
+                "heading": "Failure taxonomy and retry ladder",
+                "accent": "red",
+                "source": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112",
+                "text": [
+                  "Failures are classified where first observed. Only delivery, acknowledgment, and OTA-offer failures enter the shared exponential-backoff ladder.",
+                  "From the operator's perspective delivery and ack timeouts behave identically. Ack timeouts usually indicate firmware failure after successful delivery, but reliably distinguishing the two cases from broker session state remains an open item."
+                ],
+                "bullets": [
+                  "Sentinel auth failures are terminal, never retried, and surface as 401/403",
+                  "Dispatch capability-validation failures are synchronous and include a machine-readable reason",
+                  "Registry version conflicts are caller-retryable; Console refreshes and retries once before showing an error",
+                  "Timeout backoff is 1, 4, then 16 minutes",
+                  "After the third failed OTA attempt, the device is dead-lettered, excluded from remaining stages, and shown with its last error",
+                  "After the third failed operator command attempt, it is marked undeliverable and desired/reported divergence is flagged",
+                  "Edge Gateway's cmd/site-4/# log is the first artifact pulled for delivery disputes"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "timeout": {
+                      "title": "Timeout",
+                      "sub": "delivery / ack / OTA",
+                      "icon": "antenna",
+                      "tint": "mqtt",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    "wait1": {
+                      "title": "Backoff",
+                      "sub": "1 minute",
+                      "icon": "gear",
+                      "tint": "cmd"
+                    },
+                    "retry1": {
+                      "title": "Retry 1",
+                      "sub": "same offer",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    "wait4": {
+                      "title": "Backoff",
+                      "sub": "4 minutes",
+                      "icon": "gear",
+                      "tint": "cmd"
+                    },
+                    "retry2": {
+                      "title": "Retry 2",
+                      "sub": "same offer",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    "wait16": {
+                      "title": "Backoff",
+                      "sub": "16 minutes",
+                      "icon": "gear",
+                      "tint": "cmd"
+                    },
+                    "retry3": {
+                      "title": "Retry 3",
+                      "sub": "final attempt",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    "deadletter": {
+                      "title": "Dead Letter",
+                      "sub": "OTA: exclude",
+                      "icon": "package",
+                      "tint": "data"
+                    },
+                    "undeliverable": {
+                      "title": "Undeliverable",
+                      "sub": "command: diverged",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/registry/shadow.go#L31"
+                    },
+                    "console": {
+                      "title": "Console Alert",
+                      "sub": "last error visible",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/web/console/src/commands/panel.tsx#L48"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "timeout",
+                      "wait1",
+                      "retry1",
+                      "wait4",
+                      "retry2"
+                    ],
+                    [
+                      "wait16",
+                      "retry3",
+                      [
+                        "deadletter",
+                        "undeliverable"
+                      ],
+                      "console"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "timeout",
+                      "to": "wait1",
+                      "kind": "policy",
+                      "label": "schedule +1m"
+                    },
+                    {
+                      "from": "wait1",
+                      "to": "retry1",
+                      "kind": "policy",
+                      "label": "attempt 1"
+                    },
+                    {
+                      "from": "retry1",
+                      "to": "wait4",
+                      "kind": "policy",
+                      "label": "failed again"
+                    },
+                    {
+                      "from": "wait4",
+                      "to": "retry2",
+                      "kind": "policy",
+                      "label": "attempt 2"
+                    },
+                    {
+                      "from": "retry2",
+                      "to": "wait16",
+                      "kind": "policy",
+                      "label": "failed again"
+                    },
+                    {
+                      "from": "wait16",
+                      "to": "retry3",
+                      "kind": "policy",
+                      "label": "attempt 3"
+                    },
+                    {
+                      "from": "retry3",
+                      "to": "deadletter",
+                      "kind": "policy",
+                      "label": "OTA terminal"
+                    },
+                    {
+                      "from": "retry3",
+                      "to": "undeliverable",
+                      "kind": "policy",
+                      "label": "command terminal"
+                    },
+                    {
+                      "from": "deadletter",
+                      "to": "console",
+                      "kind": "int",
+                      "label": "last error"
+                    },
+                    {
+                      "from": "undeliverable",
+                      "to": "console",
+                      "kind": "int",
+                      "label": "flag divergence"
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "timeout->wait1",
+                      "text": "A delivery, acknowledgment, or OTA-offer timeout enters the shared retry policy.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/infra/relay/broker.conf#L9"
+                    },
+                    {
+                      "edge": "wait1->retry1",
+                      "text": "Dispatch retries after one minute.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edge": "retry1->wait4",
+                      "text": "A repeated failure schedules the four-minute backoff."
+                    },
+                    {
+                      "edge": "wait4->retry2",
+                      "text": "Dispatch makes the second retry after four minutes."
+                    },
+                    {
+                      "edge": "retry2->wait16",
+                      "text": "Another failure schedules the final 16-minute backoff."
+                    },
+                    {
+                      "edge": "wait16->retry3",
+                      "text": "Dispatch makes the third and final retry."
+                    },
+                    {
+                      "edges": [
+                        "retry3->deadletter",
+                        "retry3->undeliverable"
+                      ],
+                      "text": "The terminal state depends on whether the failed work was OTA or an operator command.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/services/dispatch/handler.go#L112"
+                    },
+                    {
+                      "edges": [
+                        "deadletter->console",
+                        "undeliverable->console"
+                      ],
+                      "text": "Console exposes the last OTA error or flags desired/reported divergence for commands.",
+                      "link": "https://github.com/doorbuzz-cloud/platform/blob/main/web/console/src/commands/panel.tsx#L48"
+                    }
+                  ]
+                }
+              },
+              {
+                "heading": "Operational commitments",
+                "accent": "slate",
+                "text": [
+                  "The production envelope is defined by observed line-powered-device latency, intentionally overprovisioned broker capacity, short-lived operator credentials, end-to-end tracing, and site-prefixed topics."
+                ],
+                "bullets": [
+                  "Site 4 command-to-PUBACK latency is p50 180 ms and p99 900 ms for line-powered devices",
+                  "Relay supports 10,000 concurrent sessions per node; site 4 currently uses three",
+                  "Cloud services use mutual TLS; devices use per-device X.509 certificates rotated annually",
+                  "Sentinel JWTs expire after 15 minutes and the Console refreshes them silently",
+                  "Every command carries trace_id from Console through acknowledgment",
+                  "Dispatch emits one span for every rollout stage transition",
+                  "The site-prefixed topic layout is multi-site-ready; only the examples are site-4-specific"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

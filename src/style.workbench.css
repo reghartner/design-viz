@@ -1,0 +1,93 @@
+/* style.workbench.css — page chrome + editor UI for the workbench. */
+:root{
+  --bg:#EFF1F4; --ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;
+  --accent:#0B8FA9; --card:#FFFFFF; --codebg:#F4F2EC; --codeink:#3A3E33;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
+    --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
+  --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
+}
+
+body{background:var(--bg); color:var(--ink); font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif;}
+.wrap{max-width:1200px; margin:0 auto; padding:0 22px;}
+header.wrap{padding-top:46px;}
+.eyebrow{font:600 11px/1 'IBM Plex Mono',monospace; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin:0 0 10px;}
+h1{font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(30px,4.5vw,42px); letter-spacing:-.015em; margin:0 0 10px; text-wrap:balance;}
+.lede{color:var(--sub); max-width:72ch; margin:0; font-size:15.5px;}
+.lede b{color:var(--ink);}
+h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
+.mdesc{color:var(--sub); max-width:80ch; margin:6px 0 14px; font-size:14.5px;}
+
+.toolrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:30px 0 12px;}
+.toolrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
+.skbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
+  padding:6px 12px; border-radius:8px; cursor:pointer;}
+.skbtn[aria-pressed="true"]{border-color:var(--accent); color:var(--accent);}
+.skbtn:focus-visible, .rbtn:focus-visible, .cbtn:focus-visible, .tabbtn:focus-visible,
+.mbtn:focus-visible, .tbtn:focus-visible, .schip:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+/* rendered doc preview frame */
+.docview{border:1px solid var(--line); border-radius:16px; padding:26px 26px 30px;}
+.docview.sk-aurora{background:#0B1220; --dtext:#B9C7DD; --dink:#EAF2FF; --dfaint:#7E93B8;}
+.docview.sk-daylight{background:#F4F2EC; --dtext:#4A4F58; --dink:#23272E; --dfaint:#79808B;}
+.doc-title{font-family:'Sora',sans-serif; font-weight:700; font-size:24px; color:var(--dink); margin:0 0 4px;}
+.doc-sub{font:500 11px 'IBM Plex Mono',monospace; color:var(--dfaint); margin:0;}
+
+/* spec editor */
+.specbox{margin-top:14px; border:1px solid var(--line); border-radius:10px; background:var(--card);}
+.specbox summary{cursor:pointer; padding:9px 14px; font:600 12px 'IBM Plex Mono',monospace; color:var(--sub);}
+.specbox summary:hover{color:var(--ink);}
+.specbox[open] summary{border-bottom:1px solid var(--line);}
+.specbox textarea{display:block; width:100%; box-sizing:border-box; height:440px; border:0; resize:vertical;
+  background:var(--codebg); color:var(--codeink); font:12px/1.5 'IBM Plex Mono',monospace; padding:12px 14px; tab-size:2;}
+.specbox textarea:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
+.specrow{display:flex; align-items:flex-start; gap:12px; padding:10px 14px; border-top:1px solid var(--line); flex-wrap:wrap;}
+.rbtn{background:var(--accent); color:#fff; border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
+  padding:7px 16px; border-radius:8px; cursor:pointer;}
+.rbtn:hover{filter:brightness(1.08);}
+.msgs{list-style:none; margin:0; padding:0; font:500 12px 'IBM Plex Mono',monospace; flex:1; min-width:260px;}
+.msgs li{margin:2px 0;}
+.msgs li.e{color:#C0392B;}
+.msgs li.w{color:#B0771A;}
+
+/* contract & schema */
+.schema{margin-top:46px; border:1px solid var(--line); border-radius:14px; background:var(--card); padding:20px 24px;}
+.schema table{border-collapse:collapse; width:100%; margin-top:12px;}
+.schema th{text-align:left; font:600 11px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--sub); padding:6px 14px 6px 0; border-bottom:1px solid var(--line);}
+.schema td{font-size:13.5px; color:var(--sub); padding:8px 14px 8px 0; border-bottom:1px solid var(--line); vertical-align:top;}
+.schema td:first-child{font:600 12.5px 'IBM Plex Mono',monospace; color:var(--ink); white-space:nowrap;}
+.schema code, .mdesc code{font:500 12px 'IBM Plex Mono',monospace; background:var(--codebg); color:var(--codeink);
+  padding:1px 5px; border-radius:4px;}
+.contractbox{position:relative; margin-top:12px;}
+.contractbox pre{background:var(--codebg); color:var(--codeink); border:1px solid var(--line); border-radius:10px;
+  padding:16px 18px; font:12px/1.55 'IBM Plex Mono',monospace; overflow-x:auto; margin:0; white-space:pre;}
+.cbtn{position:absolute; top:10px; right:10px; background:var(--card); border:1px solid var(--line); color:var(--sub);
+  font:600 11px 'IBM Plex Mono',monospace; padding:5px 11px; border-radius:7px; cursor:pointer;}
+.cbtn:hover{color:var(--ink);}
+
+.limits{margin-top:24px; display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.limits > div{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; font-size:13.5px; color:var(--sub);}
+.limits b{color:var(--ink); display:block; margin-bottom:6px; font-size:13px;}
+.limits ul{margin:0; padding-left:18px;}
+.limits li{margin:3px 0;}
+@media (max-width:760px){ .limits{grid-template-columns:1fr;} }
+
+footer.wrap{padding:38px 22px 56px; color:var(--sub); font-size:13px;}
+footer b{color:var(--ink);}
+
+/* skin buttons: one per SKIN_NAMES entry, generated by boot */
+#skinbtns{display:inline-flex; gap:8px; flex-wrap:wrap;}
+
+/* chrome legibility when a body skin class repaints the page ground:
+   retune the chrome tokens to match the skin's light/dark nature (the
+   overlay skins ride the sk-aurora base, hence the two-class rows) */
+body.sk-aurora{--ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;}
+body.sk-daylight{--ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;}
+body.sk-aurora.sk-editorial, body.sk-aurora.sk-pastel{--ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;}

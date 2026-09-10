@@ -1,0 +1,20 @@
+{
+  "page": {
+    "blocks": [
+      {
+        "heading": "Malformed contract card",
+        "contract": {
+          "title": "On the wire",
+          "fields": [
+            {"v": "row without a k"},
+            {"k": "ttl", "link": 42}
+          ]
+        },
+        "diagram": {
+          "nodes": {"a": {"title": "A"}},
+          "rows": [["a"]]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,962 @@
+{
+  "page": {
+    "title": "Chime Doorbell — motion to clip",
+    "skin": "aurora",
+    "protocols": {
+      "rtp": {
+        "label": "RTP video",
+        "color": "#FFB454"
+      }
+    },
+    "lanes": {
+      "NET": {
+        "color": "#38E1FF"
+      },
+      "DEV": {
+        "color": "#FFB454"
+      },
+      "CAM": {
+        "color": "#F471B5"
+      }
+    },
+    "blocks": [
+      {
+        "heading": "Ring the doorbell — end to end",
+        "accent": "cyan",
+        "source": "https://github.com/doorbuzz-cloud/chime/blob/main/docs/hld.md#motion-pipeline",
+        "text": [
+          "The doorbell carries two chips: Sentry LP stays awake on microamps handling WiFi, MQTT, and the PIR motion sensor; Vision HP holds the camera and H.264 encoder and is powered off until Sentry wakes it over an interrupt line.",
+          "One spec drives all three synchronized views: the flow board, the hardware inspector (chip wake states, board LEDs, power draw), and the viewfinder that lights up when the camera starts recording."
+        ],
+        "bullets": [
+          "Motion events ride MQTT through Relay; video never touches the broker",
+          "The high-power chip runs for seconds per visit — the power gauge shows why",
+          "Clips upload to Vault over HTTPS and are linked back to the originating event"
+        ],
+        "contract": {
+          "title": "On the wire: motion event (MQTT)",
+          "source": "https://github.com/doorbuzz-cloud/chime/blob/main/docs/wire.md#motion-event",
+          "fields": [
+            {
+              "k": "type",
+              "v": "\"motion\"",
+              "g": "logical event type; Relay maps it to evt/door/motion"
+            },
+            {
+              "k": "eventId",
+              "v": "0x1A2B3C4D",
+              "g": "ever-increasing dedup key; Pulse drops replays",
+              "hot": true,
+              "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/mqtt.c#L61"
+            },
+            {
+              "k": "ts",
+              "v": "unix ms",
+              "g": "device clock, NTP-disciplined on wake"
+            },
+            {
+              "k": "ttl",
+              "v": "30s",
+              "g": "broker message-expiry; stale motion is dropped",
+              "link": "https://github.com/doorbuzz-cloud/chime/blob/main/services/pulse/handler.go#L88"
+            }
+          ],
+          "note": "The clip uploaded later embeds the same eventId — that is how Vault links footage back to this event."
+        },
+        "diagram": {
+          "view": "step",
+          "groups": {
+            "doorbell": {
+              "title": "Chime doorbell unit"
+            }
+          },
+          "nodes": {
+            "sentry": {
+              "title": "Sentry LP",
+              "sub": "wifi · mqtt · PIR",
+              "icon": "chip",
+              "tint": "dev",
+              "group": "doorbell",
+              "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/main.c#L44"
+            },
+            "vision": {
+              "title": "Vision HP",
+              "sub": "camera · H.264",
+              "icon": "chip",
+              "tint": "dev",
+              "group": "doorbell",
+              "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/vision/pipeline.c#L120"
+            },
+            "relay": {
+              "title": "Relay Broker",
+              "sub": "MQTT · TLS :8883",
+              "icon": "antenna",
+              "tint": "mqtt"
+            },
+            "pulse": {
+              "title": "Pulse Events",
+              "sub": "event service",
+              "icon": "cloud",
+              "tint": "cmd",
+              "link": "https://github.com/doorbuzz-cloud/chime/blob/main/services/pulse/handler.go#L88"
+            },
+            "herald": {
+              "title": "Herald Push",
+              "sub": "push gateway",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "phone": {
+              "title": "Resident Phone",
+              "sub": "companion app",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "beam": {
+              "title": "Beam Media",
+              "sub": "stream relay",
+              "icon": "server",
+              "tint": "data"
+            },
+            "vault": {
+              "title": "Vault Clips",
+              "sub": "clip storage",
+              "icon": "db",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              [
+                "sentry",
+                "vision"
+              ],
+              "relay",
+              "pulse",
+              "herald"
+            ],
+            [
+              "phone",
+              "beam",
+              "vault"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "sentry",
+              "to": "relay",
+              "kind": "mqtt",
+              "label": "PUBLISH evt/door/motion"
+            },
+            {
+              "from": "relay",
+              "to": "pulse",
+              "kind": "mqtt",
+              "label": "deliver event"
+            },
+            {
+              "from": "pulse",
+              "to": "herald",
+              "kind": "int",
+              "label": "notify resident"
+            },
+            {
+              "from": "herald",
+              "to": "phone",
+              "kind": "https",
+              "label": "push: motion at door"
+            },
+            {
+              "from": "phone",
+              "to": "beam",
+              "kind": "https",
+              "label": "tap Live View"
+            },
+            {
+              "from": "beam",
+              "to": "relay",
+              "kind": "mqtt",
+              "label": "PUBLISH cmd/door/stream"
+            },
+            {
+              "from": "relay",
+              "to": "sentry",
+              "kind": "mqtt",
+              "label": "deliver QoS 1"
+            },
+            {
+              "from": "sentry",
+              "to": "vision",
+              "kind": "int",
+              "label": "WAKE_INT"
+            },
+            {
+              "from": "vision",
+              "to": "beam",
+              "kind": "rtp",
+              "label": "H.264 stream"
+            },
+            {
+              "from": "beam",
+              "to": "phone",
+              "kind": "rtp",
+              "label": "live view"
+            },
+            {
+              "from": "vision",
+              "to": "vault",
+              "kind": "https",
+              "label": "upload clip"
+            },
+            {
+              "from": "vault",
+              "to": "pulse",
+              "kind": "int",
+              "ret": true,
+              "label": "clip indexed"
+            }
+          ],
+          "panels": [
+            {
+              "id": "hp",
+              "type": "state",
+              "title": "Vision HP — wake state",
+              "states": [
+                "OFF",
+                "WAKE IRQ",
+                "BOOT",
+                "STREAM",
+                "RECORD",
+                "UPLOAD"
+              ],
+              "colors": {
+                "OFF": "#55627A",
+                "WAKE IRQ": "#FFB454",
+                "BOOT": "#FFB454",
+                "STREAM": "#38E1FF",
+                "RECORD": "#FF6B5E",
+                "UPLOAD": "#A78BFA"
+              },
+              "initial": {
+                "state": "OFF"
+              }
+            },
+            {
+              "id": "leds",
+              "type": "leds",
+              "title": "Sentry LP — board",
+              "leds": [
+                {
+                  "id": "radio",
+                  "label": "RADIO"
+                },
+                {
+                  "id": "pir",
+                  "label": "PIR"
+                },
+                {
+                  "id": "cam",
+                  "label": "CAM PWR"
+                }
+              ],
+              "initial": {
+                "radio": "on",
+                "pir": "off",
+                "cam": "off"
+              }
+            },
+            {
+              "id": "mbx",
+              "type": "queue",
+              "title": "Sentry LP — mailbox",
+              "initial": {
+                "state": "empty"
+              }
+            },
+            {
+              "id": "pw",
+              "type": "gauge",
+              "title": "Power draw",
+              "unit": "mA",
+              "max": 400,
+              "initial": {
+                "value": 2
+              }
+            },
+            {
+              "id": "cam",
+              "type": "screen",
+              "title": "Viewfinder",
+              "scene": "person-at-door-night",
+              "initial": {
+                "mode": "off"
+              }
+            },
+            {
+              "id": "log",
+              "type": "log",
+              "title": "Event log",
+              "tags": {
+                "NET": "#38E1FF",
+                "DEV": "#FFB454",
+                "CAM": "#F471B5"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "nodes": [
+                "sentry"
+              ],
+              "lane": "DEV",
+              "text": "PIR sensor trips — motion at the front door",
+              "panels": {
+                "leds": {
+                  "pir": "tx"
+                },
+                "pw": {
+                  "value": 6
+                },
+                "log": {
+                  "log": [
+                    {
+                      "tag": "DEV",
+                      "text": "PIR IRQ · motion"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "edge": "sentry->relay",
+              "lane": "NET",
+              "text": "Sentry LP publishes the motion event over MQTT",
+              "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/mqtt.c#L61",
+              "panels": {
+                "leds": {
+                  "radio": "tx"
+                },
+                "log": {
+                  "log": [
+                    {
+                      "tag": "NET",
+                      "text": "PUB evt/door/motion"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "edge": "relay->pulse",
+              "lane": "NET",
+              "text": "Relay delivers the event to Pulse",
+              "panels": {
+                "leds": {
+                  "radio": "on",
+                  "pir": "off"
+                }
+              }
+            },
+            {
+              "edge": "pulse->herald",
+              "lane": "NET",
+              "text": "Pulse raises a doorbell alert for the household"
+            },
+            {
+              "edge": "herald->phone",
+              "lane": "NET",
+              "text": "Push notification rings the resident's phone",
+              "panels": {
+                "log": {
+                  "log": [
+                    {
+                      "tag": "NET",
+                      "text": "push delivered"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "edge": "phone->beam",
+              "lane": "NET",
+              "text": "Resident taps Live View — Beam requests a stream"
+            },
+            {
+              "edges": [
+                "beam->relay",
+                "relay->sentry"
+              ],
+              "lane": "NET",
+              "text": "The stream command rides MQTT back down — Sentry LP holds it in its mailbox",
+              "panels": {
+                "leds": {
+                  "radio": "rx"
+                },
+                "mbx": {
+                  "state": "enqueue",
+                  "label": "STREAM cmd",
+                  "from": "Relay · MQTT"
+                },
+                "log": {
+                  "log": [
+                    {
+                      "tag": "NET",
+                      "text": "RECV cmd/door/stream"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "edge": "sentry->vision",
+              "lane": "DEV",
+              "text": "Sentry LP raises WAKE_INT — the command waits while the high-power chip powers on",
+              "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/wake.c#L17",
+              "panels": {
+                "hp": {
+                  "state": "WAKE IRQ"
+                },
+                "leds": {
+                  "cam": "on"
+                },
+                "pw": {
+                  "value": 85
+                },
+                "mbx": {
+                  "state": "held",
+                  "reason": "holding for Vision HP — wake IRQ raised"
+                },
+                "log": {
+                  "log": [
+                    {
+                      "tag": "DEV",
+                      "text": "WAKE_INT asserted"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "nodes": [
+                "vision"
+              ],
+              "lane": "DEV",
+              "text": "Vision HP boots: camera sensor and H.264 encoder — the mailbox still holds the command",
+              "panels": {
+                "hp": {
+                  "state": "BOOT"
+                },
+                "cam": {
+                  "mode": "boot"
+                },
+                "pw": {
+                  "value": 180
+                },
+                "mbx": {
+                  "reason": "holding for Vision HP — booting"
+                }
+              }
+            },
+            {
+              "edges": [
+                "vision->beam",
+                "beam->phone"
+              ],
+              "lane": "CAM",
+              "text": "Vision HP takes the held command and live video streams to the phone",
+              "panels": {
+                "hp": {
+                  "state": "STREAM"
+                },
+                "cam": {
+                  "mode": "live"
+                },
+                "pw": {
+                  "value": 320
+                },
+                "mbx": {
+                  "state": "dequeue",
+                  "to": "→ Vision HP"
+                },
+                "log": {
+                  "log": [
+                    {
+                      "tag": "CAM",
+                      "text": "RTP stream up"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "nodes": [
+                "vision"
+              ],
+              "lane": "CAM",
+              "text": "The doorbell records the visit",
+              "panels": {
+                "hp": {
+                  "state": "RECORD"
+                },
+                "cam": {
+                  "mode": "rec"
+                },
+                "pw": {
+                  "value": 350
+                },
+                "mbx": {
+                  "state": "empty"
+                },
+                "log": {
+                  "log": [
+                    {
+                      "tag": "CAM",
+                      "text": "REC started"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "edges": [
+                "vision->vault",
+                "vault->pulse"
+              ],
+              "lane": "CAM",
+              "text": "Clip uploads to Vault; Pulse links it to the originating event",
+              "panels": {
+                "hp": {
+                  "state": "UPLOAD"
+                },
+                "cam": {
+                  "mode": "save",
+                  "banner": "SAVING CLIP → VAULT"
+                },
+                "pw": {
+                  "value": 120
+                },
+                "log": {
+                  "log": [
+                    {
+                      "tag": "CAM",
+                      "text": "clip 00:14 → vault"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "heading": "Thermal envelope — throttle, shutdown, recover",
+        "accent": "amber",
+        "source": "https://github.com/doorbuzz-cloud/chime/blob/main/docs/hld.md#thermal",
+        "text": [
+          "Vision HP's H.264 encoder can outrun its cooling on a hot afternoon. Firmware throttles the encoder at 75 °C and hard-powers the chip off at 95 °C — but the doorbell never leaves the network, because Sentry LP owns the radio and keeps talking while its big sibling cools.",
+          "The temperature panel tracks the die across every step against the declared warning and shutdown thresholds; the PIR panel shows the visit that started the load."
+        ],
+        "bullets": [
+          "The PIR cone computes tripped vs clear from geometry — the walk-up stays outside sensor range until step 3",
+          "Warning and critical thresholds are declared once on the panel; the engine colors every step from the value alone",
+          "Steps 8–9 are the point: the always-on chip narrates the shutdown while the hot chip is completely off"
+        ],
+        "contract": {
+          "title": "On the wire: thermal event (MQTT)",
+          "source": "https://github.com/doorbuzz-cloud/chime/blob/main/docs/wire.md#thermal-event",
+          "fields": [
+            {
+              "k": "type",
+              "v": "\"thermal_shutdown\"",
+              "g": "published by Sentry LP, not the chip that overheated",
+              "hot": true
+            },
+            {
+              "k": "chip",
+              "v": "\"vision-hp\"",
+              "g": "which core powered down"
+            },
+            {
+              "k": "die_c",
+              "v": "96.2",
+              "g": "last reading before the rail dropped"
+            },
+            {
+              "k": "resume_below_c",
+              "v": "60",
+              "g": "re-arm threshold; Sentry re-wakes the chip under it"
+            }
+          ],
+          "note": "Pulse turns this into the resident-facing \"camera paused to cool down\" push — the device reports its own outage."
+        },
+        "diagram": {
+          "view": "step",
+          "groups": {
+            "doorbell": {
+              "title": "Chime doorbell unit"
+            }
+          },
+          "nodes": {
+            "sentry": {
+              "title": "Sentry LP",
+              "sub": "wifi · mqtt · PIR",
+              "icon": "chip",
+              "tint": "dev",
+              "group": "doorbell"
+            },
+            "vision": {
+              "title": "Vision HP",
+              "sub": "camera · H.264",
+              "icon": "chip",
+              "tint": "dev",
+              "group": "doorbell"
+            },
+            "relay": {
+              "title": "Relay Broker",
+              "sub": "MQTT · TLS :8883",
+              "icon": "antenna",
+              "tint": "mqtt"
+            },
+            "pulse": {
+              "title": "Pulse Events",
+              "sub": "event service",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "phone": {
+              "title": "Resident Phone",
+              "sub": "companion app",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "beam": {
+              "title": "Beam Media",
+              "sub": "stream relay",
+              "icon": "server",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              [
+                "sentry",
+                "vision"
+              ],
+              "relay",
+              "pulse"
+            ],
+            [
+              "phone",
+              "beam"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "sentry",
+              "to": "vision",
+              "kind": "int",
+              "label": "WAKE_INT"
+            },
+            {
+              "from": "sentry",
+              "to": "relay",
+              "kind": "mqtt",
+              "label": "PUBLISH evt/door/thermal"
+            },
+            {
+              "from": "relay",
+              "to": "pulse",
+              "kind": "mqtt",
+              "label": "deliver event"
+            },
+            {
+              "from": "pulse",
+              "to": "phone",
+              "kind": "https",
+              "label": "push: camera paused"
+            },
+            {
+              "from": "vision",
+              "to": "beam",
+              "kind": "rtp",
+              "label": "H.264 stream"
+            },
+            {
+              "from": "beam",
+              "to": "phone",
+              "kind": "rtp",
+              "label": "live view"
+            }
+          ],
+          "panels": [
+            {
+              "id": "los",
+              "type": "pir",
+              "title": "PIR — field of view (plan)",
+              "sensor": {
+                "x": 160,
+                "y": 146
+              },
+              "cone": {
+                "facing": 270,
+                "spread": 66,
+                "range": 130
+              },
+              "path": [
+                [
+                  30,
+                  30
+                ],
+                [
+                  60,
+                  40
+                ],
+                [
+                  135,
+                  70
+                ]
+              ],
+              "initial": {
+                "subject": {
+                  "x": 30,
+                  "y": 30
+                }
+              }
+            },
+            {
+              "id": "die",
+              "type": "thermo",
+              "title": "Vision HP — die temp",
+              "unit": "°C",
+              "min": 20,
+              "max": 110,
+              "warn": 75,
+              "crit": 95,
+              "initial": {
+                "value": 26,
+                "label": "HP CORE OFF"
+              }
+            },
+            {
+              "id": "hp2",
+              "type": "state",
+              "title": "Vision HP — power state",
+              "states": [
+                "OFF",
+                "BOOT",
+                "STREAM",
+                "THROTTLE",
+                "SHUTDOWN",
+                "COOLDOWN"
+              ],
+              "colors": {
+                "OFF": "#55627A",
+                "BOOT": "#FFB454",
+                "STREAM": "#38E1FF",
+                "THROTTLE": "#FFB454",
+                "SHUTDOWN": "#FF6B5E",
+                "COOLDOWN": "#A78BFA"
+              },
+              "initial": {
+                "state": "OFF"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "edge": "sentry->relay",
+              "lane": "NET",
+              "text": "Quiet porch — Vision HP powered down; Sentry LP heartbeats over MQTT"
+            },
+            {
+              "nodes": [
+                "sentry"
+              ],
+              "lane": "DEV",
+              "text": "Someone starts up the walk — still outside the PIR sensor's range",
+              "panels": {
+                "los": {
+                  "subject": {
+                    "x": 60,
+                    "y": 40
+                  }
+                }
+              }
+            },
+            {
+              "edge": "sentry->vision",
+              "lane": "DEV",
+              "text": "PIR trips — Sentry raises WAKE_INT and powers the camera rail",
+              "panels": {
+                "los": {
+                  "subject": {
+                    "x": 135,
+                    "y": 70
+                  },
+                  "banner": "MOTION — WAKE VISION HP"
+                },
+                "hp2": {
+                  "state": "BOOT"
+                },
+                "die": {
+                  "value": 31,
+                  "label": null
+                }
+              }
+            },
+            {
+              "edges": [
+                "vision->beam",
+                "beam->phone"
+              ],
+              "lane": "CAM",
+              "text": "Vision HP streams to the resident — encoder at full bitrate, die warming",
+              "panels": {
+                "hp2": {
+                  "state": "STREAM"
+                },
+                "die": {
+                  "value": 52
+                },
+                "los": {
+                  "banner": ""
+                }
+              }
+            },
+            {
+              "nodes": [
+                "vision"
+              ],
+              "lane": "CAM",
+              "text": "Sustained encode on a hot afternoon — the die keeps climbing",
+              "panels": {
+                "die": {
+                  "value": 68
+                }
+              }
+            },
+            {
+              "nodes": [
+                "vision"
+              ],
+              "lane": "DEV",
+              "text": "75 °C warning line crossed — firmware throttles the encoder and drops bitrate",
+              "panels": {
+                "hp2": {
+                  "state": "THROTTLE"
+                },
+                "die": {
+                  "value": 82
+                }
+              }
+            },
+            {
+              "nodes": [
+                "vision"
+              ],
+              "lane": "DEV",
+              "text": "Cooling loses the race — 95 °C critical: Vision HP powers itself off mid-stream",
+              "panels": {
+                "hp2": {
+                  "state": "SHUTDOWN"
+                },
+                "die": {
+                  "value": 96,
+                  "label": "HP CORE OFF"
+                }
+              }
+            },
+            {
+              "edges": [
+                "relay->pulse",
+                "sentry->relay"
+              ],
+              "lane": "NET",
+              "packets": [
+                {
+                  "edge": "sentry->relay"
+                },
+                {
+                  "edge": "relay->pulse",
+                  "delay": 0.45
+                }
+              ],
+              "text": "The device is still on the network — Sentry LP publishes the thermal event over MQTT",
+              "panels": {
+                "hp2": {
+                  "state": "COOLDOWN"
+                },
+                "die": {
+                  "value": 88
+                },
+                "los": {
+                  "subject": {
+                    "x": 60,
+                    "y": 40
+                  }
+                }
+              }
+            },
+            {
+              "edge": "pulse->phone",
+              "lane": "NET",
+              "text": "Resident gets the push: camera paused to cool down — the visitor has left",
+              "panels": {
+                "die": {
+                  "value": 73
+                },
+                "los": {
+                  "subject": null
+                }
+              }
+            },
+            {
+              "nodes": [
+                "sentry"
+              ],
+              "lane": "DEV",
+              "text": "Sentry LP keeps watch alone — the die falls toward the 60 °C re-arm point",
+              "panels": {
+                "die": {
+                  "value": 63
+                }
+              }
+            },
+            {
+              "edges": [
+                "beam->phone",
+                "sentry->vision",
+                "vision->beam"
+              ],
+              "lane": "CAM",
+              "packets": [
+                {
+                  "edge": "sentry->vision"
+                },
+                {
+                  "edge": "vision->beam",
+                  "delay": 0.45
+                },
+                {
+                  "edge": "beam->phone",
+                  "delay": 0.9
+                }
+              ],
+              "text": "Below re-arm — Sentry wakes Vision HP again and the stream resumes",
+              "panels": {
+                "hp2": {
+                  "state": "STREAM"
+                },
+                "die": {
+                  "value": 57,
+                  "label": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

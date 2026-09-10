@@ -1,0 +1,1879 @@
+{
+  "page": {
+    "title": "Chime Radar — distance-gated alerts, visit paths, early camera wake",
+    "contract": "1",
+    "skin": "aurora",
+    "lanes": {
+      "NET": {
+        "color": "#38E1FF"
+      },
+      "DEV": {
+        "color": "#FFB454"
+      }
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Distance gate",
+            "sections": [
+              {
+                "heading": "Alert only inside 15 feet",
+                "accent": "cyan",
+                "text": [
+                  "Two walk-bys, one alert — the threshold is enforced on-device, so the radio never wakes for the sidewalk."
+                ],
+                "bullets": [
+                  "Scout RD acquires a track at 24 ft and, because that is outside the configured 15 ft alert line, keeps it entirely local — no interrupt, no radio.",
+                  "Scout RD keeps updating the track as the passer-by follows the sidewalk arc at 20–24 ft; Sentry LP and Vision HP stay asleep.",
+                  "The track leaves the field and Scout RD drops it — a non-alert that cost microwatts instead of a push notification.",
+                  "A second visitor turns up the walkway; Scout RD sees range fall through 15 ft and raises `RADAR_INT` to Sentry LP with range and bearing latched in its status registers.",
+                  "Sentry LP wakes its radio and publishes `evt/door/motion` to Relay with trigger `radar`, `range_ft` 14.6, and the threshold in force.",
+                  "Relay delivers the event to Pulse, which dedups on eventId and opens the alert.",
+                  "Pulse asks Herald to notify the household.",
+                  "Herald pushes \"Visitor 14 ft from the door, approaching\" to the resident's phone."
+                ],
+                "contract": {
+                  "title": "On the wire: radar-qualified motion event (MQTT)",
+                  "source": "https://github.com/doorbuzz-cloud/chime/blob/main/docs/wire.md#radar-motion",
+                  "fields": [
+                    {
+                      "k": "type",
+                      "v": "\"motion\"",
+                      "g": "logical event type; Relay routes it to evt/door/motion"
+                    },
+                    {
+                      "k": "eventId",
+                      "v": "0x51C0FFEE",
+                      "g": "dedup key; clip and visit path embed the same id"
+                    },
+                    {
+                      "k": "trigger",
+                      "v": "\"radar\"",
+                      "g": "radar-gated; \"pir\" means Scout RD is offline (fallback mode)"
+                    },
+                    {
+                      "k": "range_ft",
+                      "v": "14.6",
+                      "g": "range at the trigger instant",
+                      "hot": true
+                    },
+                    {
+                      "k": "bearing_deg",
+                      "v": "250",
+                      "g": "bearing in Scout RD's frame at trigger"
+                    },
+                    {
+                      "k": "speed_fps",
+                      "v": "3.1",
+                      "g": "closing speed; positive = inbound"
+                    },
+                    {
+                      "k": "threshold_ft",
+                      "v": "15",
+                      "g": "alert line in force — Sift audits against it",
+                      "hot": true
+                    },
+                    {
+                      "k": "ttl",
+                      "v": "30s",
+                      "g": "broker message-expiry; stale motion dropped"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "view": "step",
+                  "groups": {
+                    "doorbell": {
+                      "title": "Doorbell"
+                    }
+                  },
+                  "nodes": {
+                    "scout": {
+                      "title": "Scout RD",
+                      "sub": "radar · 60 GHz",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/scout/track.c#L88"
+                    },
+                    "sentry": {
+                      "title": "Sentry LP",
+                      "sub": "wifi · mqtt · PIR",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/main.c#L44"
+                    },
+                    "relay": {
+                      "title": "Relay Broker",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "pulse": {
+                      "title": "Pulse Events",
+                      "sub": "event service",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "herald": {
+                      "title": "Herald Push",
+                      "sub": "push gateway",
+                      "icon": "server",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Resident Phone",
+                      "sub": "companion app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "scout",
+                        "sentry"
+                      ],
+                      "relay",
+                      "pulse",
+                      "herald",
+                      "phone"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "scout",
+                      "to": "sentry",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "sentry",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "label": "motion"
+                    },
+                    {
+                      "from": "relay",
+                      "to": "pulse",
+                      "kind": "mqtt",
+                      "label": "dedup"
+                    },
+                    {
+                      "from": "pulse",
+                      "to": "herald",
+                      "kind": "int",
+                      "label": "notify"
+                    },
+                    {
+                      "from": "herald",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "rd",
+                      "type": "radar",
+                      "title": "Scout RD — front yard",
+                      "sensor": {
+                        "x": 160,
+                        "y": 168
+                      },
+                      "facing": 270,
+                      "spread": 150,
+                      "range": 28,
+                      "scale": {
+                        "pxPerUnit": 5.2,
+                        "unit": "ft"
+                      },
+                      "rings": [
+                        5,
+                        10,
+                        15,
+                        20,
+                        25
+                      ],
+                      "threshold": 15,
+                      "initial": {
+                        "subject": null,
+                        "status": "SCANNING"
+                      }
+                    },
+                    {
+                      "id": "leds",
+                      "type": "leds",
+                      "title": "Sentry LP — board",
+                      "leds": [
+                        {
+                          "id": "radar",
+                          "label": "RADAR"
+                        },
+                        {
+                          "id": "radio",
+                          "label": "RADIO"
+                        },
+                        {
+                          "id": "cam",
+                          "label": "CAM PWR"
+                        }
+                      ],
+                      "initial": {
+                        "radar": "on",
+                        "radio": "off",
+                        "cam": "off"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "NET": "#38E1FF",
+                        "DEV": "#FFB454"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "scout"
+                      ],
+                      "lane": "DEV",
+                      "text": "Track acquired at 24 ft, holding 20–24 ft along the sidewalk — only the radar is awake",
+                      "panels": {
+                        "rd": {
+                          "subject": {
+                            "r": 21,
+                            "deg": 260
+                          },
+                          "status": "TRACKING"
+                        },
+                        "leds": {
+                          "radar": "tx"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "track acq 24 ft"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "scout"
+                      ],
+                      "lane": "DEV",
+                      "text": "Track dropped — the alert that never happened",
+                      "panels": {
+                        "rd": {
+                          "subject": null,
+                          "status": "CLEAR"
+                        },
+                        "leds": {
+                          "radar": "on"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "track lost — no alert"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "scout->sentry",
+                      "lane": "DEV",
+                      "text": "A new track turns in and crosses 15 ft — RADAR_INT",
+                      "panels": {
+                        "rd": {
+                          "subject": {
+                            "r": 14.6,
+                            "deg": 250
+                          },
+                          "status": "INSIDE 15 FT"
+                        },
+                        "leds": {
+                          "radar": "tx"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "RADAR_INT r=14.6"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "sentry->relay",
+                      "lane": "NET",
+                      "text": "Sentry LP wakes the radio and publishes the range-stamped event",
+                      "panels": {
+                        "leds": {
+                          "radio": "tx"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "PUB evt/door/motion"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "relay->pulse",
+                        "pulse->herald"
+                      ],
+                      "lane": "NET",
+                      "text": "Relay delivers to Pulse — dedup, and the household alert opens",
+                      "panels": {
+                        "leds": {
+                          "radio": "on"
+                        }
+                      }
+                    },
+                    {
+                      "edge": "herald->phone",
+                      "lane": "NET",
+                      "text": "Push lands: visitor 14 ft out and closing",
+                      "panels": {
+                        "rd": {
+                          "subject": {
+                            "r": 9,
+                            "deg": 250
+                          }
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "push delivered"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Visit path",
+            "sections": [
+              {
+                "heading": "The visit path rides with the alert",
+                "accent": "violet",
+                "text": [
+                  "The radar was already recording the approach before the alert existed — the 30 s ring buffer is a pre-roll for trajectories, not pixels."
+                ],
+                "bullets": [
+                  "From first acquisition Scout RD appends every track fix (ms offset, range, bearing) to its 30-second ring buffer, overwriting the oldest frames.",
+                  "When the alert fires (Flow 1 step 4), Scout RD freezes the pre-trigger fixes as protected so the approach cannot be overwritten while the visit continues.",
+                  "Sentry LP reads the full track — protected pre-roll plus live fixes — from Scout RD over SPI.",
+                  "Sentry LP publishes the batch to Relay on `evt/door/track`, tagged with the same eventId as the motion event.",
+                  "Relay delivers the batch to Pathworks.",
+                  "Pathworks projects the fixes into yard coordinates using the stored mount calibration and assembles the aerial visit path.",
+                  "Pathworks stores the path record in Vault under the eventId, beside where the clip will land.",
+                  "Pathworks tells Pulse the path is ready, and Pulse has Herald update the pending notification with the path thumbnail.",
+                  "The resident opens the alert and scrubs the walk-up; the app fetches path frames from Vault over HTTPS.",
+                  {
+                    "text": "**Pathworks / Registry / Dispatch down** — alerts still fire without the map: Relay retains the track batch and the path assembles late."
+                  }
+                ],
+                "contract": {
+                  "title": "On the wire: track batch (MQTT)",
+                  "source": "https://github.com/doorbuzz-cloud/chime/blob/main/docs/wire.md#track-batch",
+                  "fields": [
+                    {
+                      "k": "eventId",
+                      "v": "0x51C0FFEE",
+                      "g": "joins the path to its alert and clip"
+                    },
+                    {
+                      "k": "t0",
+                      "v": "unix ms",
+                      "g": "wall time of the first fix"
+                    },
+                    {
+                      "k": "cal_rev",
+                      "v": "7",
+                      "g": "mount-calibration revision Pathworks must project with"
+                    },
+                    {
+                      "k": "fixes",
+                      "v": "[[0,24.1,255],…]",
+                      "g": "per fix: [ms offset, range ft, bearing deg]; 43 in this batch",
+                      "hot": true
+                    }
+                  ]
+                },
+                "diagram": {
+                  "view": "step",
+                  "groups": {
+                    "doorbell": {
+                      "title": "Doorbell"
+                    }
+                  },
+                  "nodes": {
+                    "scout": {
+                      "title": "Scout RD",
+                      "sub": "30 s track ring",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/scout/track.c#L88"
+                    },
+                    "sentry": {
+                      "title": "Sentry LP",
+                      "sub": "wifi · mqtt",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/main.c#L44"
+                    },
+                    "relay": {
+                      "title": "Relay Broker",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "pathworks": {
+                      "title": "Pathworks",
+                      "sub": "path assembler",
+                      "icon": "gear",
+                      "tint": "data",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/services/pathworks/assemble.go#L61"
+                    },
+                    "vault": {
+                      "title": "Vault Clips",
+                      "sub": "clips + paths",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "pulse": {
+                      "title": "Pulse Events",
+                      "sub": "event service",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "herald": {
+                      "title": "Herald Push",
+                      "sub": "push gateway",
+                      "icon": "server",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Resident Phone",
+                      "sub": "companion app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "scout",
+                        "sentry"
+                      ],
+                      "relay",
+                      "pathworks"
+                    ],
+                    [
+                      [
+                        "vault",
+                        "pulse"
+                      ],
+                      "herald",
+                      "phone"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "scout",
+                      "to": "sentry",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "sentry",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "label": "PUB evt/track"
+                    },
+                    {
+                      "from": "relay",
+                      "to": "pathworks",
+                      "kind": "mqtt",
+                      "label": "deliver batch"
+                    },
+                    {
+                      "from": "pathworks",
+                      "to": "vault",
+                      "kind": "int",
+                      "label": "store path"
+                    },
+                    {
+                      "from": "pathworks",
+                      "to": "pulse",
+                      "kind": "int",
+                      "label": "path ready"
+                    },
+                    {
+                      "from": "pulse",
+                      "to": "herald",
+                      "kind": "int",
+                      "label": "update alert"
+                    },
+                    {
+                      "from": "herald",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push: path"
+                    },
+                    {
+                      "from": "phone",
+                      "to": "vault",
+                      "kind": "https",
+                      "label": "GET path"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "rd",
+                      "type": "radar",
+                      "title": "Aerial visit path",
+                      "sensor": {
+                        "x": 160,
+                        "y": 168
+                      },
+                      "facing": 270,
+                      "spread": 150,
+                      "range": 28,
+                      "scale": {
+                        "pxPerUnit": 5.2,
+                        "unit": "ft"
+                      },
+                      "rings": [
+                        5,
+                        10,
+                        15,
+                        20,
+                        25
+                      ],
+                      "threshold": 15,
+                      "initial": {
+                        "subject": {
+                          "r": 26,
+                          "deg": 300
+                        },
+                        "status": "TRACKING"
+                      }
+                    },
+                    {
+                      "id": "tbuf",
+                      "type": "buffer",
+                      "title": "Scout RD — track ring",
+                      "segments": 8,
+                      "capacity": "30 s",
+                      "initial": {
+                        "head": 0
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "NET": "#38E1FF",
+                        "DEV": "#FFB454"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "scout"
+                      ],
+                      "lane": "DEV",
+                      "text": "Every radar frame appends a fix to the 30 s ring — oldest overwritten",
+                      "panels": {
+                        "tbuf": {
+                          "head": 4,
+                          "mark": [
+                            [
+                              0,
+                              3,
+                              "buffered"
+                            ]
+                          ]
+                        },
+                        "rd": {
+                          "subject": {
+                            "r": 22,
+                            "deg": 295
+                          },
+                          "status": "TRACKING"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "scout"
+                      ],
+                      "lane": "DEV",
+                      "text": "Alert fires — pre-trigger fixes frozen as protected",
+                      "panels": {
+                        "tbuf": {
+                          "head": 6,
+                          "mark": [
+                            [
+                              0,
+                              5,
+                              "protected"
+                            ]
+                          ]
+                        },
+                        "rd": {
+                          "subject": {
+                            "r": 14,
+                            "deg": 255
+                          },
+                          "status": "INSIDE 15 FT"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "ring frozen @ trigger"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "scout->sentry",
+                      "lane": "DEV",
+                      "text": "Sentry LP reads the full track over SPI",
+                      "panels": {
+                        "tbuf": {
+                          "head": 7,
+                          "mark": [
+                            [
+                              0,
+                              7,
+                              "uploading"
+                            ]
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "sentry->relay",
+                        "relay->pathworks"
+                      ],
+                      "lane": "NET",
+                      "text": "Track batch publishes under the same eventId and reaches Pathworks",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "PUB evt/door/track ×43"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "pathworks->vault",
+                      "lane": "NET",
+                      "text": "Path assembled via mount calibration and stored beside the clip slot",
+                      "panels": {
+                        "tbuf": {
+                          "mark": [
+                            [
+                              0,
+                              7,
+                              "uploaded"
+                            ]
+                          ],
+                          "label": "43 fixes"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "path → vault (0x51C0FFEE)"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "pathworks->pulse",
+                        "pulse->herald",
+                        "herald->phone"
+                      ],
+                      "lane": "NET",
+                      "text": "Pending alert updated with the path thumbnail",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "push updated: map"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "phone->vault",
+                      "lane": "NET",
+                      "text": "Resident scrubs the walk-up frame by frame",
+                      "panels": {
+                        "rd": {
+                          "subject": {
+                            "r": 6,
+                            "deg": 250
+                          },
+                          "status": "AT THE DOOR"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Camera wake",
+            "sections": [
+              {
+                "heading": "Radar wakes the camera early",
+                "accent": "amber",
+                "text": [
+                  "Trajectory buys the camera a 4-second head start — the waterfall shows RECORD landing while the visitor is still 9 ft out."
+                ],
+                "bullets": [
+                  "Scout RD tracks an approach crossing the 15 ft line inbound at 3.1 ft/s and raises `RADAR_INT` to Sentry LP with range and closing speed.",
+                  "Sentry LP computes time-to-door (~4 s) and raises `WAKE_INT` to Vision HP before touching the radio — the camera gets the head start.",
+                  "Vision HP powers its sensor rail and boots the encoder while the visitor is still ~12 ft out.",
+                  "In parallel, Sentry LP publishes `evt/door/motion` to Relay.",
+                  "Relay delivers the event to Pulse, and Pulse pushes the alert through Herald to the phone.",
+                  "Vision HP reaches RECORD about 1.2 s after the radar trip, with the visitor still ~9 ft away — the clip opens on the approach, not on a doorbell press.",
+                  "Vision HP records the visit and uploads the clip to Vault under the shared eventId.",
+                  "Vault tells Pulse the clip is indexed; the event timeline now holds alert, aerial path, and clip.",
+                  {
+                    "text": "**Vision HP thermal shutdown** — unchanged from the Chime thermal HLD: gating and alerts continue while the camera cools; clips are the only loss."
+                  }
+                ],
+                "diagram": {
+                  "view": "step",
+                  "groups": {
+                    "doorbell": {
+                      "title": "Doorbell"
+                    }
+                  },
+                  "nodes": {
+                    "scout": {
+                      "title": "Scout RD",
+                      "sub": "radar · 60 GHz",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/scout/track.c#L88"
+                    },
+                    "sentry": {
+                      "title": "Sentry LP",
+                      "sub": "wifi · mqtt",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/main.c#L44"
+                    },
+                    "vision": {
+                      "title": "Vision HP",
+                      "sub": "camera · H.264",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/vision/pipeline.c#L120"
+                    },
+                    "relay": {
+                      "title": "Relay Broker",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "pulse": {
+                      "title": "Pulse Events",
+                      "sub": "event service",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "herald": {
+                      "title": "Herald Push",
+                      "sub": "push gateway",
+                      "icon": "server",
+                      "tint": "cmd"
+                    },
+                    "phone": {
+                      "title": "Resident Phone",
+                      "sub": "companion app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    },
+                    "vault": {
+                      "title": "Vault Clips",
+                      "sub": "clip storage",
+                      "icon": "db",
+                      "tint": "data"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "scout",
+                        "sentry",
+                        "vision"
+                      ],
+                      "relay",
+                      "pulse",
+                      "herald"
+                    ],
+                    [
+                      "phone",
+                      "vault"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "scout",
+                      "to": "sentry",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "sentry",
+                      "to": "vision",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "sentry",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "label": "PUB evt/motion"
+                    },
+                    {
+                      "from": "relay",
+                      "to": "pulse",
+                      "kind": "mqtt",
+                      "label": "deliver event"
+                    },
+                    {
+                      "from": "pulse",
+                      "to": "herald",
+                      "kind": "int",
+                      "label": "notify"
+                    },
+                    {
+                      "from": "herald",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push: visitor"
+                    },
+                    {
+                      "from": "vision",
+                      "to": "vault",
+                      "kind": "https",
+                      "label": "upload clip"
+                    },
+                    {
+                      "from": "vault",
+                      "to": "pulse",
+                      "kind": "int",
+                      "ret": true,
+                      "label": "clip indexed"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "rdc",
+                      "type": "radar",
+                      "title": "Scout RD — approach",
+                      "sensor": {
+                        "x": 160,
+                        "y": 168
+                      },
+                      "facing": 270,
+                      "spread": 150,
+                      "range": 28,
+                      "scale": {
+                        "pxPerUnit": 5.2,
+                        "unit": "ft"
+                      },
+                      "rings": [
+                        5,
+                        10,
+                        15,
+                        20,
+                        25
+                      ],
+                      "threshold": 15,
+                      "initial": {
+                        "subject": {
+                          "r": 16,
+                          "deg": 249
+                        },
+                        "status": "TRACKING"
+                      }
+                    },
+                    {
+                      "id": "hp",
+                      "type": "state",
+                      "title": "Vision HP — wake state",
+                      "states": [
+                        "OFF",
+                        "WAKE IRQ",
+                        "BOOT",
+                        "RECORD",
+                        "UPLOAD"
+                      ],
+                      "colors": {
+                        "OFF": "#55627A",
+                        "WAKE IRQ": "#FFB454",
+                        "BOOT": "#FFB454",
+                        "RECORD": "#FF6B5E",
+                        "UPLOAD": "#A78BFA"
+                      },
+                      "initial": {
+                        "state": "OFF"
+                      }
+                    },
+                    {
+                      "id": "cam",
+                      "type": "screen",
+                      "title": "Viewfinder",
+                      "scene": "person-at-door-night",
+                      "initial": {
+                        "mode": "off"
+                      }
+                    },
+                    {
+                      "id": "wf",
+                      "type": "waterfall",
+                      "title": "Radar trip → RECORD",
+                      "spans": [
+                        {
+                          "id": "irq",
+                          "label": "RADAR_INT",
+                          "ms": 40
+                        },
+                        {
+                          "id": "boot",
+                          "label": "Vision boot",
+                          "ms": 900
+                        },
+                        {
+                          "id": "enc",
+                          "label": "first frame",
+                          "ms": 260
+                        }
+                      ],
+                      "initial": {
+                        "reveal": 0
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "scout->sentry",
+                      "lane": "DEV",
+                      "text": "Inbound track crosses the line — RADAR_INT carries range + closing speed",
+                      "panels": {
+                        "rdc": {
+                          "subject": {
+                            "r": 14.6,
+                            "deg": 250
+                          },
+                          "status": "INBOUND 3.1 FT/S"
+                        },
+                        "wf": {
+                          "reveal": 1
+                        }
+                      }
+                    },
+                    {
+                      "edge": "sentry->vision",
+                      "lane": "DEV",
+                      "text": "Sentry predicts ~4 s to door and raises WAKE_INT before any radio work",
+                      "panels": {
+                        "hp": {
+                          "state": "WAKE IRQ"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "vision"
+                      ],
+                      "lane": "DEV",
+                      "text": "Vision HP boots while the visitor is 12 ft out",
+                      "panels": {
+                        "hp": {
+                          "state": "BOOT"
+                        },
+                        "cam": {
+                          "mode": "boot"
+                        },
+                        "wf": {
+                          "reveal": 2
+                        },
+                        "rdc": {
+                          "subject": {
+                            "r": 12,
+                            "deg": 251
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "sentry->relay",
+                        "relay->pulse",
+                        "pulse->herald",
+                        "herald->phone"
+                      ],
+                      "lane": "NET",
+                      "text": "Motion event publishes in parallel; the alert fans out to the phone"
+                    },
+                    {
+                      "nodes": [
+                        "vision"
+                      ],
+                      "lane": "DEV",
+                      "text": "RECORD at T+1.2 s — visitor still 9 ft out; the clip opens on the approach",
+                      "panels": {
+                        "hp": {
+                          "state": "RECORD"
+                        },
+                        "cam": {
+                          "mode": "rec"
+                        },
+                        "wf": {
+                          "reveal": 3,
+                          "total": "1.2 s — 9 ft to spare"
+                        },
+                        "rdc": {
+                          "subject": {
+                            "r": 9,
+                            "deg": 252
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "vision->vault",
+                        "vault->pulse"
+                      ],
+                      "lane": "NET",
+                      "text": "Clip uploads and is indexed — timeline complete: alert, aerial path, clip",
+                      "panels": {
+                        "hp": {
+                          "state": "UPLOAD"
+                        },
+                        "cam": {
+                          "mode": "save",
+                          "banner": "SAVING CLIP → VAULT"
+                        },
+                        "rdc": {
+                          "subject": null,
+                          "status": "CLEAR"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Tuning",
+            "sections": [
+              {
+                "heading": "Tuning out the sidewalk",
+                "accent": "green",
+                "text": [
+                  "Dismissals are data — Sift reads visit paths, proposes a tighter arc, and the change rides the platform's [shadow/command path](https://github.com/doorbuzz-cloud/platform/blob/main/docs/cumulus-hld.md#L1) down to a chip register."
+                ],
+                "bullets": [
+                  "Herald delivers three alerts within an hour, each a sidewalk pass that grazed 14–15 ft without ever turning in.",
+                  "The resident dismisses each alert; the app POSTs the dismissals to Nimbus API with the bearer token.",
+                  "Nimbus verifies the token with Sentinel Auth, then forwards each dismissal to Pulse, where it is recorded against the eventId.",
+                  "Pulse forwards the device's dismissal tally to Sift.",
+                  "Sift joins the dismissed events with their Pathworks records and finds every dismissed track stayed outside 12 ft — the sidewalk clips the alert circle.",
+                  "Sift files a suggestion with Pulse (\"tighten the alert line to 11 ft\"), and Herald pushes it to the resident.",
+                  "The resident accepts; the app POSTs the config change to Nimbus, which, after another Sentinel check, hands it to Dispatch.",
+                  "Dispatch writes the new desired state to Registry as a versioned shadow write, then publishes `cmd/door/radar-config` to Relay at QoS 1.",
+                  "Relay parks the command in the doorbell's persistent session and delivers it on Sentry LP's next wake window.",
+                  "Sentry LP writes the new threshold into Scout RD's config registers and acknowledges on `ack/door` with the applied shadow version — the same sidewalk pass now ends as Flow 1 step 3, silently.",
+                  {
+                    "text": "**Pathworks / Registry / Dispatch down** — threshold changes fail as retryable API errors while the device enforces its last-applied config, so gating never stops."
+                  }
+                ],
+                "contract": {
+                  "title": "On the wire: threshold config (MQTT QoS 1)",
+                  "source": "https://github.com/doorbuzz-cloud/chime/blob/main/docs/wire.md#radar-config",
+                  "fields": [
+                    {
+                      "k": "threshold_ft",
+                      "v": "11",
+                      "g": "new alert line, written into Scout RD's registers",
+                      "hot": true
+                    },
+                    {
+                      "k": "shadow_ver",
+                      "v": "19",
+                      "g": "Registry shadow version; stale writes are rejected"
+                    },
+                    {
+                      "k": "source",
+                      "v": "\"sift:sg-284\"",
+                      "g": "which Sift suggestion produced this write (audit trail)"
+                    }
+                  ]
+                },
+                "diagram": {
+                  "view": "step",
+                  "groups": {
+                    "doorbell": {
+                      "title": "Doorbell"
+                    }
+                  },
+                  "nodes": {
+                    "phone": {
+                      "title": "Resident Phone",
+                      "sub": "companion app",
+                      "icon": "phone",
+                      "tint": "dev"
+                    },
+                    "nimbus": {
+                      "title": "Nimbus API",
+                      "sub": "api gateway",
+                      "icon": "server",
+                      "tint": "cmd"
+                    },
+                    "sauth": {
+                      "title": "Sentinel Auth",
+                      "sub": "token service",
+                      "icon": "shield",
+                      "tint": "auth"
+                    },
+                    "pulse": {
+                      "title": "Pulse Events",
+                      "sub": "dismissal ledger",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "sift": {
+                      "title": "Sift",
+                      "sub": "alert tuning",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/services/sift/suggest.go#L42"
+                    },
+                    "herald": {
+                      "title": "Herald Push",
+                      "sub": "push gateway",
+                      "icon": "server",
+                      "tint": "cmd"
+                    },
+                    "dispatch": {
+                      "title": "Dispatch",
+                      "sub": "command service",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    },
+                    "registry": {
+                      "title": "Registry",
+                      "sub": "device shadow",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "relay": {
+                      "title": "Relay Broker",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "sentry": {
+                      "title": "Sentry LP",
+                      "sub": "wifi · mqtt",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/main.c#L44"
+                    },
+                    "scout": {
+                      "title": "Scout RD",
+                      "sub": "config registers",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/scout/track.c#L88"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "phone",
+                      "nimbus",
+                      "pulse",
+                      "sift"
+                    ],
+                    [
+                      "herald",
+                      "dispatch",
+                      "registry",
+                      "relay",
+                      [
+                        "sentry",
+                        "scout"
+                      ]
+                    ]
+                  ],
+                  "floats": [
+                    {
+                      "id": "sauth",
+                      "side": "above"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "from": "phone",
+                      "to": "nimbus",
+                      "kind": "https",
+                      "label": "app POST"
+                    },
+                    {
+                      "from": "nimbus",
+                      "to": "sauth",
+                      "kind": "int",
+                      "label": "verify JWT"
+                    },
+                    {
+                      "from": "nimbus",
+                      "to": "pulse",
+                      "kind": "int",
+                      "label": "record dismiss"
+                    },
+                    {
+                      "from": "pulse",
+                      "to": "sift",
+                      "kind": "int",
+                      "label": "dismiss tally"
+                    },
+                    {
+                      "from": "sift",
+                      "to": "pulse",
+                      "kind": "int",
+                      "label": "suggest 11 ft"
+                    },
+                    {
+                      "from": "pulse",
+                      "to": "herald",
+                      "kind": "int",
+                      "label": "notify"
+                    },
+                    {
+                      "from": "herald",
+                      "to": "phone",
+                      "kind": "https",
+                      "label": "push: tune?"
+                    },
+                    {
+                      "from": "nimbus",
+                      "to": "dispatch",
+                      "kind": "int",
+                      "label": "config write"
+                    },
+                    {
+                      "from": "dispatch",
+                      "to": "registry",
+                      "kind": "int",
+                      "label": "write"
+                    },
+                    {
+                      "from": "dispatch",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "label": "PUB cmd/config"
+                    },
+                    {
+                      "from": "relay",
+                      "to": "sentry",
+                      "kind": "mqtt",
+                      "label": "QoS 1"
+                    },
+                    {
+                      "from": "sentry",
+                      "to": "scout",
+                      "kind": "int"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "rdt",
+                      "type": "radar",
+                      "title": "Alert line — before/after",
+                      "sensor": {
+                        "x": 160,
+                        "y": 168
+                      },
+                      "facing": 270,
+                      "spread": 150,
+                      "range": 28,
+                      "scale": {
+                        "pxPerUnit": 5.2,
+                        "unit": "ft"
+                      },
+                      "rings": [
+                        5,
+                        10,
+                        15,
+                        20,
+                        25
+                      ],
+                      "threshold": 15,
+                      "initial": {
+                        "subject": null,
+                        "status": "SCANNING"
+                      }
+                    },
+                    {
+                      "id": "mbx",
+                      "type": "queue",
+                      "title": "Relay — parked session",
+                      "initial": {
+                        "state": "empty"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "NET": "#38E1FF",
+                        "DEV": "#FFB454"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "phone"
+                      ],
+                      "lane": "NET",
+                      "text": "Third sidewalk graze of the hour — three pushes, three dismissals coming",
+                      "panels": {
+                        "rdt": {
+                          "subject": {
+                            "r": 14.8,
+                            "deg": 285
+                          },
+                          "status": "INSIDE 15 FT"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "alert ×3 this hour"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "phone->nimbus",
+                        "nimbus->sauth"
+                      ],
+                      "lane": "NET",
+                      "text": "Dismissals post to Nimbus; Sentinel verifies the token",
+                      "panels": {
+                        "rdt": {
+                          "subject": null,
+                          "status": "SCANNING"
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "nimbus->pulse",
+                        "pulse->sift"
+                      ],
+                      "lane": "NET",
+                      "text": "Each dismissal recorded; the device's tally reaches Sift"
+                    },
+                    {
+                      "nodes": [
+                        "sift"
+                      ],
+                      "lane": "DEV",
+                      "text": "Sift joins dismissals with visit paths: none closed inside 12 ft",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "3/3 stayed ≥ 12 ft"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "sift->pulse",
+                        "pulse->herald",
+                        "herald->phone"
+                      ],
+                      "lane": "NET",
+                      "text": "Suggestion pushed: tighten the alert line to 11 ft?"
+                    },
+                    {
+                      "edges": [
+                        "nimbus->dispatch",
+                        "dispatch->registry",
+                        "phone->nimbus"
+                      ],
+                      "lane": "NET",
+                      "packets": [
+                        {
+                          "edge": "phone->nimbus"
+                        },
+                        {
+                          "edge": "nimbus->dispatch",
+                          "delay": 0.45
+                        },
+                        {
+                          "edge": "dispatch->registry",
+                          "delay": 0.9
+                        }
+                      ],
+                      "text": "Resident accepts — the write rides Nimbus → Dispatch → Registry",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "shadow v19 desired"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "dispatch->relay",
+                      "lane": "NET",
+                      "text": "Command published QoS 1 — parked for the sleeping doorbell",
+                      "panels": {
+                        "mbx": {
+                          "state": "enqueue",
+                          "label": "radar-config",
+                          "from": "Dispatch · QoS 1"
+                        }
+                      }
+                    },
+                    {
+                      "edges": [
+                        "relay->sentry",
+                        "sentry->scout"
+                      ],
+                      "lane": "NET",
+                      "text": "Wake window: delivered, and Sentry writes Scout's threshold register",
+                      "panels": {
+                        "mbx": {
+                          "state": "dequeue",
+                          "to": "→ Scout RD"
+                        },
+                        "rdt": {
+                          "threshold": 11
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "threshold 15→11 ft"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "scout"
+                      ],
+                      "lane": "DEV",
+                      "text": "The same sidewalk pass now stays outside the line — silence",
+                      "panels": {
+                        "rdt": {
+                          "subject": {
+                            "r": 14.8,
+                            "deg": 285
+                          },
+                          "status": "OUTSIDE — QUIET"
+                        },
+                        "mbx": {
+                          "state": "empty"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Failure modes",
+            "sections": [
+              {
+                "heading": "Wifi drops — gating continues, alerts arrive late",
+                "accent": "blue",
+                "text": [
+                  "**Wifi drops** — Scout RD keeps gating; Sentry LP queues events in flash and Relay's persistent session replays QoS 1 on reconnect. Alerts arrive late, but the visit path still assembles."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "groups": {
+                    "doorbell": {
+                      "title": "Doorbell"
+                    }
+                  },
+                  "nodes": {
+                    "scout": {
+                      "title": "Scout RD",
+                      "sub": "radar · 60 GHz",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/scout/track.c#L88"
+                    },
+                    "sentry": {
+                      "title": "Sentry LP",
+                      "sub": "wifi · mqtt",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "group": "doorbell",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/sentry/main.c#L44"
+                    },
+                    "relay": {
+                      "title": "Relay Broker",
+                      "sub": "MQTT · TLS :8883",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "pulse": {
+                      "title": "Pulse Events",
+                      "sub": "event service",
+                      "icon": "cloud",
+                      "tint": "cmd"
+                    }
+                  },
+                  "rows": [
+                    [
+                      [
+                        "scout",
+                        "sentry"
+                      ],
+                      "relay",
+                      "pulse"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "scout",
+                      "to": "sentry",
+                      "kind": "int"
+                    },
+                    {
+                      "from": "sentry",
+                      "to": "relay",
+                      "kind": "mqtt",
+                      "label": "PUB motion"
+                    },
+                    {
+                      "from": "relay",
+                      "to": "pulse",
+                      "kind": "mqtt",
+                      "label": "deliver"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "net",
+                      "type": "signal",
+                      "title": "Sentry LP — uplink",
+                      "links": [
+                        {
+                          "id": "wifi",
+                          "label": "WiFi",
+                          "transport": "wifi"
+                        }
+                      ],
+                      "initial": {
+                        "wifi": {
+                          "state": "ok",
+                          "bars": 4
+                        }
+                      }
+                    },
+                    {
+                      "id": "flashq",
+                      "type": "queue",
+                      "title": "Sentry LP — flash queue",
+                      "initial": {
+                        "state": "empty"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "NET": "#38E1FF",
+                        "DEV": "#FFB454"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "sentry"
+                      ],
+                      "lane": "NET",
+                      "text": "Wifi drops — Sentry LP's uplink goes down",
+                      "panels": {
+                        "net": {
+                          "wifi": {
+                            "state": "lost",
+                            "bars": 0,
+                            "note": "link down"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "scout->sentry",
+                      "lane": "DEV",
+                      "text": "Scout RD keeps gating locally and still raises RADAR_INT on a trip — the outage never reaches the radar"
+                    },
+                    {
+                      "nodes": [
+                        "sentry"
+                      ],
+                      "lane": "DEV",
+                      "text": "Sentry LP can't publish — it queues the event in flash instead",
+                      "panels": {
+                        "flashq": {
+                          "state": "enqueue",
+                          "label": "evt/door/motion",
+                          "from": "Scout RD · RADAR_INT",
+                          "reason": "wifi down — holding in flash"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "sentry"
+                      ],
+                      "lane": "NET",
+                      "text": "Wifi returns",
+                      "panels": {
+                        "net": {
+                          "wifi": {
+                            "state": "ok",
+                            "bars": 4,
+                            "note": "reconnected"
+                          }
+                        },
+                        "flashq": {
+                          "state": "dequeue",
+                          "to": "→ Relay"
+                        }
+                      }
+                    },
+                    {
+                      "edge": "sentry->relay",
+                      "lane": "NET",
+                      "text": "Sentry LP publishes the queued event — Relay's persistent session carries it through at QoS 1",
+                      "panels": {
+                        "flashq": {
+                          "state": "empty"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "PUB evt/door/motion (delayed)"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "edge": "relay->pulse",
+                      "lane": "NET",
+                      "text": "Relay delivers to Pulse — the alert arrives late, but the visit path still assembles",
+                      "panels": {
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "NET",
+                              "text": "alert late — path assembles"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "heading": "Battery low / radar fault — duty-cycle stretch, then PIR fallback",
+                "accent": "red",
+                "text": [
+                  "**Battery low / radar fault** — below 20% Scout RD stretches its idle duty cycle (10 Hz → 2 Hz, ~0.5 s slower acquisition); below 8% the radar rail latches off and the doorbell degrades to PIR-triggered Chime (`trigger:\"pir\"`, `radar_fault` published)."
+                ],
+                "bullets": [
+                  "Or after repeated Scout RD watchdog resets — the same outcome (radar rail latched off), independent of battery level."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "scout": {
+                      "title": "Scout RD",
+                      "sub": "radar · 60 GHz",
+                      "icon": "chip",
+                      "tint": "dev",
+                      "link": "https://github.com/doorbuzz-cloud/chime/blob/main/fw/scout/track.c#L88"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "scout"
+                    ]
+                  ],
+                  "panels": [
+                    {
+                      "id": "batt",
+                      "type": "battery",
+                      "title": "Doorbell — battery",
+                      "low": 20,
+                      "crit": 8,
+                      "initial": {
+                        "charge": 34,
+                        "source": "cells",
+                        "trend": "idle"
+                      }
+                    },
+                    {
+                      "id": "st",
+                      "type": "state",
+                      "title": "Scout RD — radar mode",
+                      "states": [
+                        "NORMAL",
+                        "DUTY STRETCH",
+                        "PIR FALLBACK"
+                      ],
+                      "colors": {
+                        "NORMAL": "#4ADE80",
+                        "DUTY STRETCH": "#FFB454",
+                        "PIR FALLBACK": "#FF6B5E"
+                      },
+                      "initial": {
+                        "state": "NORMAL"
+                      }
+                    },
+                    {
+                      "id": "log",
+                      "type": "log",
+                      "title": "Event log",
+                      "tags": {
+                        "DEV": "#FFB454"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "nodes": [
+                        "scout"
+                      ],
+                      "lane": "DEV",
+                      "text": "Normal operation — 10 Hz idle / 20 Hz tracking duty cycle"
+                    },
+                    {
+                      "nodes": [
+                        "scout"
+                      ],
+                      "lane": "DEV",
+                      "text": "Below 20% — Scout RD stretches its idle duty cycle (10 Hz → 2 Hz, ~0.5 s slower acquisition)",
+                      "panels": {
+                        "batt": {
+                          "charge": 19,
+                          "trend": "draining"
+                        },
+                        "st": {
+                          "state": "DUTY STRETCH"
+                        }
+                      }
+                    },
+                    {
+                      "nodes": [
+                        "scout"
+                      ],
+                      "lane": "DEV",
+                      "text": "Below 8% — the radar rail latches off; the doorbell degrades to PIR-triggered Chime",
+                      "panels": {
+                        "batt": {
+                          "charge": 7,
+                          "trend": "draining",
+                          "label": "RADAR OFF"
+                        },
+                        "st": {
+                          "state": "PIR FALLBACK"
+                        },
+                        "log": {
+                          "log": [
+                            {
+                              "tag": "DEV",
+                              "text": "trigger: pir · radar_fault published"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+/* style.flowview.css — page chrome for the standalone render target. */
+body{margin:0; font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif; background:#0B1220;}
+body.sk-aurora{background:#0B1220;}
+body.sk-daylight{background:#F4F2EC;}
+.docview{max-width:1240px; margin:0 auto; padding:34px 26px 60px;}
+.docview.sk-aurora{--dtext:#B9C7DD; --dink:#EAF2FF; --dfaint:#7E93B8;}
+.docview.sk-daylight{--dtext:#4A4F58; --dink:#23272E; --dfaint:#79808B;}
+.doc-title{font-family:'Sora',sans-serif; font-weight:700; font-size:26px; color:var(--dink); margin:0 0 4px;}
+.doc-sub{font:500 11px 'IBM Plex Mono',monospace; color:var(--dfaint); margin:0;}
+.errbox{font:500 12px/1.6 'IBM Plex Mono',monospace; color:#FF8B7A; background:#1A0F12;
+  border:1px solid #5A2A22; border-radius:10px; padding:14px 16px; white-space:pre-wrap;}
+.tabbtn:focus-visible, .mbtn:focus-visible, .tbtn:focus-visible, .schip:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}

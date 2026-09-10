@@ -1,0 +1,405 @@
+{
+  "page": {
+    "title": "HaloVista Aegis — cloud, keys, and a human in the loop",
+    "protocols": { "webrtc": { "label": "WebRTC", "color": "#F472B6" } },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "E2EE enrollment — who can read a clip",
+            "sections": [
+              {
+                "heading": "E2EE enrollment — who can read a clip",
+                "accent": "violet",
+                "text": [
+                  "Opt-in end-to-end encryption — *privacy bought at the price of cloud AI*."
+                ],
+                "bullets": [
+                  "**The owner** opens Privacy settings and the app POSTs an E2EE enrollment request, which **Halogate** verifies and forwards to **Keyring**.",
+                  "**Keyring** returns an enrollment challenge to the phone; the app derives the account key from the owner's new passphrase locally — *the passphrase never leaves the phone*.",
+                  "The app registers its public enrollment key with **Keyring**, which stores public keys only.",
+                  "**Keyring** sends an `e2ee_on` command through **Conduit** to the camera's control channel.",
+                  "The **Iris SoC** asks the **HV-SE1** secure element to mint a fresh media key inside the element.",
+                  "The element returns the key wrapped to each enrolled phone's public key, and the camera forwards the wrapped keys through **Conduit** to **Keyring** — *plaintext keys never leave the element*.",
+                  "**Keyring** marks the camera E2EE in **Ledger**, which gates **Lens AI** descriptions, **Chronicle** indexing, and **Watchtower** off for that camera — *cloud AI cannot run on ciphertext*.",
+                  "The camera now encrypts every clip with the media key before upload, so **Vault** stores ciphertext it cannot read.",
+                  "On playback the enrolled phone fetches the ciphertext from **Vault** and decrypts locally — *the only place a clip is ever plaintext off-camera*.",
+                  "**Keyring down** — E2EE cameras keep capturing and encrypting (keys live in the element); only new enrollments fail.",
+                  "**Vault down** — Iris retries from RAM for ~10 minutes, then drops the clip; the notification still goes out marked \"clip unavailable\".",
+                  "**Passphrase lost** — E2EE clips are unrecoverable, by design; Keyring can only reset forward (new media key, old ciphertext stays dark)."
+                ],
+                "contract": {
+                  "title": "On the wire: wrapped-key record (camera → Keyring, Flow 1 step 6)",
+                  "source": "https://github.com/halovista/firmware/blob/main/halo/iris/e2ee_pipeline.c#L204",
+                  "fields": [
+                    { "k": "key_id", "v": "\"mk_02\"", "g": "media-key generation counter" },
+                    { "k": "camera_id", "v": "\"halo-4f22\"", "g": "which camera's element minted it" },
+                    { "k": "wrapped_for", "v": "\"phone_a81\"", "g": "enrolled phone this blob is wrapped to" },
+                    { "k": "alg", "v": "\"X25519+A256GCM\"", "g": "wrap algorithm" },
+                    { "k": "blob", "v": "\"b64:kJ83…\"", "g": "the wrapped key; opaque to Keyring", "hot": true },
+                    { "k": "created", "v": "1757085710", "g": "wrap time; Keyring rejects stale re-wraps" }
+                  ]
+                },
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "phone": { "title": "Owner phone", "sub": "aegis app", "icon": "phone", "tint": "dev" },
+                    "halogate": { "title": "Halogate", "sub": "api gateway", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/halogate/router.go#L118" },
+                    "keyring": { "title": "Keyring", "sub": "wrapped keys only", "icon": "key", "tint": "auth",
+                      "link": "https://github.com/halovista/platform/blob/main/services/keyring/enroll.go#L88" },
+                    "conduit": { "title": "Conduit", "sub": "device broker", "icon": "antenna", "tint": "mqtt",
+                      "link": "https://github.com/halovista/platform/blob/main/services/conduit/broker.go#L64" },
+                    "iris": { "title": "Iris SoC", "sub": "video + tls", "icon": "chip", "tint": "dev", "group": "halocam" },
+                    "se": { "title": "HV-SE1", "sub": "secure element", "icon": "key", "tint": "dev", "group": "halocam" },
+                    "vault": { "title": "Vault", "sub": "clip store", "icon": "db", "tint": "data",
+                      "link": "https://github.com/halovista/platform/blob/main/services/vault/store.go#L92" },
+                    "ledger": { "title": "Ledger", "sub": "entitlements", "icon": "shield", "tint": "auth",
+                      "link": "https://github.com/halovista/platform/blob/main/services/ledger/entitlements.go#L119" }
+                  },
+                  "groups": { "halocam": { "title": "Halo Cam" } },
+                  "rows": [
+                    ["phone", "halogate", "keyring"],
+                    ["conduit", ["iris", "se"], "vault"]
+                  ],
+                  "floats": [ { "id": "ledger", "side": "below" } ],
+                  "edges": [
+                    { "from": "phone", "to": "halogate", "kind": "https", "label": "enrollment request" },
+                    { "from": "halogate", "to": "keyring", "kind": "int", "label": "enroll req" },
+                    { "from": "keyring", "to": "phone", "kind": "https", "ret": true, "label": "challenge" },
+                    { "from": "phone", "to": "keyring", "kind": "https", "label": "phone pubkey" },
+                    { "from": "keyring", "to": "conduit", "kind": "int", "label": "e2ee_on" },
+                    { "from": "conduit", "to": "iris", "kind": "mqtt", "label": "CMD e2ee_on" },
+                    { "from": "iris", "to": "se", "kind": "int", "label": "mint" },
+                    { "from": "se", "to": "iris", "kind": "int", "ret": true, "label": "keys" },
+                    { "from": "iris", "to": "conduit", "kind": "mqtt", "label": "wrapped keys" },
+                    { "from": "conduit", "to": "keyring", "kind": "int", "label": "distribute" },
+                    { "from": "keyring", "to": "ledger", "kind": "int", "label": "mark E2EE" },
+                    { "from": "iris", "to": "vault", "kind": "https", "label": "ciphertext PUT" },
+                    { "from": "vault", "to": "phone", "kind": "https", "label": "cipher clip" }
+                  ],
+                  "panels": [
+                    { "id": "who", "type": "xray", "title": "Who can read the clip",
+                      "layers": [
+                        { "id": "tls", "label": "TLS", "holder": "each hop" },
+                        { "id": "e2ee", "label": "E2EE envelope", "holder": "enrolled phones" }
+                      ] },
+                    { "id": "enr", "type": "state", "title": "E2EE enrollment",
+                      "states": ["OFF", "CHALLENGE", "KEY_WRAP", "E2EE_ON"],
+                      "colors": { "E2EE_ON": "#A78BFA" },
+                      "initial": { "state": "OFF" } },
+                    { "id": "cloudai", "type": "leds", "title": "Cloud AI features",
+                      "leds": [
+                        { "id": "desc", "label": "DESC AI" },
+                        { "id": "search", "label": "AI SEARCH" },
+                        { "id": "guard", "label": "GUARD" }
+                      ],
+                      "initial": { "desc": "on", "search": "on", "guard": "on" } }
+                  ],
+                  "steps": [
+                    { "edges": ["phone->halogate", "halogate->keyring"],
+                      "text": "Owner requests E2EE; Halogate hands it to Keyring",
+                      "panels": { "who": { "hop": "Vault (today)", "layers": [ { "id": "tls", "open": true }, { "id": "e2ee", "open": true } ] } } },
+                    { "edge": "keyring->phone",
+                      "text": "Challenge returned; passphrase never leaves the phone",
+                      "panels": { "enr": { "state": "CHALLENGE" } } },
+                    { "edge": "phone->keyring",
+                      "text": "App registers its public enrollment key" },
+                    { "edges": ["keyring->conduit", "conduit->iris"],
+                      "text": "e2ee_on pushed down the control channel" },
+                    { "edge": "iris->se",
+                      "text": "Secure element mints the media key internally",
+                      "panels": { "enr": { "state": "KEY_WRAP" } } },
+                    { "edges": ["se->iris", "iris->conduit", "conduit->keyring"],
+                      "text": "Wrapped keys travel back for distribution" },
+                    { "edge": "keyring->ledger",
+                      "text": "Ledger gates cloud AI off for this camera",
+                      "panels": { "enr": { "state": "E2EE_ON" }, "cloudai": { "desc": "off", "search": "off", "guard": "off" } } },
+                    { "edge": "iris->vault",
+                      "text": "Clips upload as ciphertext Vault cannot read",
+                      "panels": { "who": { "hop": "Vault", "layers": [ { "id": "tls", "open": true }, { "id": "e2ee", "open": false } ] } } },
+                    { "edge": "vault->phone",
+                      "text": "Only enrolled phones decrypt and play",
+                      "panels": { "who": { "hop": "Owner phone", "layers": [ { "id": "tls", "open": true }, { "id": "e2ee", "open": true } ] } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Ask your history a question",
+            "sections": [
+              {
+                "heading": "Ask your history a question",
+                "accent": "cyan",
+                "text": [ "Natural-language AI history search." ],
+                "bullets": [
+                  "The owner types \"did the dog walker come yesterday?\" and **Halogate** authenticates and routes the question to **Concierge**.",
+                  "**Concierge**'s LLM parses the question into a structured query: range = yesterday, subject = person + dog, cameras = all non-E2EE.",
+                  "**Concierge** sends the structured query to **Chronicle**, which runs it against labels and embeddings.",
+                  "**Chronicle** returns the top matches with descriptions and thumbnails, marking E2EE cameras \"unsearchable\" rather than silently omitting them.",
+                  "**Concierge** composes the answer (\"Yes — 2:14 pm, front yard, 4 minutes\") and returns it through **Halogate** to the phone.",
+                  "The owner taps a result and the app streams the matched clip from **Vault**.",
+                  "**Lens AI down** — plain \"motion detected\" pushes; Chronicle re-indexes from the backlog on recovery, so search has a blind window, not a hole."
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "phone": { "title": "Owner phone", "sub": "search bar", "icon": "phone", "tint": "dev" },
+                    "halogate": { "title": "Halogate", "sub": "api gateway", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/halogate/router.go#L118" },
+                    "concierge": { "title": "Concierge", "sub": "LLM frontend", "icon": "server", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/concierge/parse.go#L57" },
+                    "chronicle": { "title": "Chronicle", "sub": "event index", "icon": "db", "tint": "data",
+                      "link": "https://github.com/halovista/platform/blob/main/services/chronicle/index.go#L77" },
+                    "vault": { "title": "Vault", "sub": "clip store", "icon": "db", "tint": "data",
+                      "link": "https://github.com/halovista/platform/blob/main/services/vault/store.go#L92" }
+                  },
+                  "rows": [
+                    ["phone", "halogate", "concierge"],
+                    ["chronicle", "vault"]
+                  ],
+                  "edges": [
+                    { "from": "phone", "to": "halogate", "kind": "https", "label": "question" },
+                    { "from": "halogate", "to": "concierge", "kind": "int", "label": "route query" },
+                    { "from": "concierge", "to": "chronicle", "kind": "int", "label": "structured q" },
+                    { "from": "chronicle", "to": "concierge", "kind": "int", "ret": true, "label": "top matches" },
+                    { "from": "concierge", "to": "halogate", "kind": "int", "ret": true, "label": "answer" },
+                    { "from": "halogate", "to": "phone", "kind": "https", "ret": true, "label": "answer + refs" },
+                    { "from": "phone", "to": "vault", "kind": "https", "label": "GET clip" }
+                  ],
+                  "panels": [
+                    { "id": "qlog", "type": "log", "title": "Query trace",
+                      "tags": { "API": "#4ADE80", "LLM": "#38E1FF", "IDX": "#A78BFA" } },
+                    { "id": "clip", "type": "screen", "title": "Matched clip",
+                      "scene": "person-at-door-night", "initial": { "mode": "off" } }
+                  ],
+                  "steps": [
+                    { "edges": ["phone->halogate", "halogate->concierge"],
+                      "text": "\"Did the dog walker come yesterday?\"",
+                      "panels": { "qlog": { "log": [ { "tag": "API", "text": "question authenticated and routed" } ] } } },
+                    { "nodes": ["concierge"],
+                      "text": "LLM parses the question into a structured query",
+                      "panels": { "qlog": { "log": [ { "tag": "LLM", "text": "range=yesterday subj=person+dog" } ] } } },
+                    { "edge": "concierge->chronicle",
+                      "text": "Chronicle searches labels + embeddings",
+                      "panels": { "qlog": { "log": [ { "tag": "IDX", "text": "labels + embeddings" } ] } } },
+                    { "edge": "chronicle->concierge",
+                      "text": "Matches return; E2EE cameras marked unsearchable",
+                      "panels": { "qlog": { "log": [ { "tag": "IDX", "text": "E2EE cameras: unsearchable" } ] } } },
+                    { "edges": ["concierge->halogate", "halogate->phone"],
+                      "text": "Concierge composes the answer",
+                      "panels": { "qlog": { "log": [ { "tag": "LLM", "text": "Yes — 2:14 pm, front yard, 4 min" } ] } } },
+                    { "edge": "phone->vault",
+                      "text": "Tapping a result streams the clip",
+                      "panels": { "clip": { "mode": "live" } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Virtual guard — a human takes over",
+            "sections": [
+              {
+                "heading": "Virtual guard — a human takes over",
+                "accent": "amber",
+                "text": [ "The human virtual-guard session." ],
+                "bullets": [
+                  "A person lingers in the driveway after midnight and the camera streams the event to **Conduit**.",
+                  "**Conduit** forwards frames to **Lens AI**, which classifies a person at 0.94 confidence loitering 38 seconds.",
+                  "**Lens AI** posts a guard-eligible alert to **Watchtower**, which confirms the home's Guard entitlement with **Ledger**.",
+                  "**Watchtower** opens incident CB-8841 in **Casebook** and assigns it to the next free agent at **Agent Desk**.",
+                  "**Agent Desk** opens a live WebRTC view of the camera through **Conduit**; the agent sees the scene in under five seconds.",
+                  "The agent triggers the talk-down and **Agent Desk** routes their audio through **Conduit** to the camera speaker.",
+                  "The subject stays, so the agent escalates and **Conduit** relays the siren command; the camera sounds 105 dB.",
+                  "The subject leaves the frame; the agent marks the outcome \"deterred\" and **Agent Desk** writes the resolution to **Casebook**.",
+                  "**Casebook** hands the finished incident to **Clarion**, which pushes the summary and audit link to the owner.",
+                  "**Wifi drops** — no offline buffer by design (thin-camera model): events in the gap are lost, and history shows an honest \"camera offline\" span.",
+                  "**Battery low (Doorbell)** — below 15% Iris wake is rationed to radar hits under 3 m; below 5% Ward logs motion timestamps only.",
+                  "**Watchtower saturated** — incidents past the 60 s claim SLA degrade to a rich notification with a one-tap siren shortcut; the miss is recorded."
+                ],
+                "contract": {
+                  "title": "On the wire: event envelope (camera → Conduit)",
+                  "source": "https://github.com/halovista/firmware/blob/main/halo/iris/envelope.c#L142",
+                  "fields": [
+                    { "k": "event_id", "v": "\"ev_7c31a9\"", "g": "camera-minted id; dedup key everywhere downstream" },
+                    { "k": "camera_id", "v": "\"halo-4f22\"", "g": "device identity from the HV-SE1 cert" },
+                    { "k": "ts", "v": "1757085660", "g": "wall-clock seconds at trigger" },
+                    { "k": "class", "v": "\"person\"", "g": "Ward/Iris local pre-classification hint" },
+                    { "k": "radar_m", "v": "4.2", "g": "radar distance at trigger, meters" },
+                    { "k": "e2ee", "v": "false", "g": "true = payload is ciphertext; Lens AI must skip", "hot": true },
+                    { "k": "media", "v": "\"vault://halo-4f22/ev_7c31a9\"", "g": "clip object reference" }
+                  ]
+                },
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "cam": { "title": "Halo Cam", "sub": "driveway", "icon": "chip", "tint": "dev" },
+                    "conduit": { "title": "Conduit", "sub": "device broker", "icon": "antenna", "tint": "mqtt",
+                      "link": "https://github.com/halovista/platform/blob/main/services/conduit/broker.go#L64" },
+                    "lens": { "title": "Lens AI", "sub": "cloud vision", "icon": "server", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/lensai/classify.go#L201" },
+                    "watchtower": { "title": "Watchtower", "sub": "guard dispatch", "icon": "server", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/watchtower/queue.go#L141" },
+                    "agentdesk": { "title": "Agent Desk", "sub": "live console", "icon": "terminal", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/agentdesk/session.go#L53" },
+                    "casebook": { "title": "Casebook", "sub": "incident store", "icon": "db", "tint": "data",
+                      "link": "https://github.com/halovista/platform/blob/main/services/casebook/incident.go#L36" },
+                    "clarion": { "title": "Clarion", "sub": "notifications", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/clarion/push.go#L44" },
+                    "phone": { "title": "Owner phone", "sub": "aegis app", "icon": "phone", "tint": "dev" }
+                  },
+                  "rows": [
+                    ["cam", "conduit", "lens", "watchtower"],
+                    ["agentdesk", "casebook", "clarion", "phone"]
+                  ],
+                  "edges": [
+                    { "from": "cam", "to": "conduit", "kind": "mqtt", "label": "event stream" },
+                    { "from": "conduit", "to": "lens", "kind": "int", "label": "frames" },
+                    { "from": "lens", "to": "watchtower", "kind": "int", "label": "person flag" },
+                    { "from": "watchtower", "to": "casebook", "kind": "int", "label": "open incident" },
+                    { "from": "watchtower", "to": "agentdesk", "kind": "int", "label": "assign" },
+                    { "from": "agentdesk", "to": "conduit", "kind": "webrtc", "label": "live view" },
+                    { "from": "conduit", "to": "cam", "kind": "webrtc", "label": "talk-down" },
+                    { "from": "agentdesk", "to": "casebook", "kind": "int", "label": "outcome" },
+                    { "from": "casebook", "to": "clarion", "kind": "int", "label": "summary" },
+                    { "from": "clarion", "to": "phone", "kind": "https", "label": "incident push" }
+                  ],
+                  "panels": [
+                    { "id": "inc", "type": "state", "title": "Incident CB-8841",
+                      "states": ["WATCH", "FLAGGED", "QUEUED", "AGENT_LIVE", "TALKDOWN", "SIREN", "RESOLVED"],
+                      "colors": { "SIREN": "#F87171", "RESOLVED": "#4ADE80" },
+                      "initial": { "state": "WATCH" } },
+                    { "id": "aud", "type": "log", "title": "Guard audit trail",
+                      "tags": { "SYS": "#94A3B8", "AI": "#38E1FF", "AGT": "#FBBF24" } }
+                  ],
+                  "steps": [
+                    { "edge": "cam->conduit",
+                      "text": "A person lingers in the driveway after midnight",
+                      "panels": { "inc": { "state": "WATCH" }, "aud": { "log": [ { "tag": "SYS", "text": "motion driveway" } ] } } },
+                    { "edge": "conduit->lens",
+                      "text": "Lens AI classifies: person 0.94, loitering 38 s",
+                      "panels": { "inc": { "state": "FLAGGED" }, "aud": { "log": [ { "tag": "AI", "text": "person 0.94 loiter 38s" } ] } } },
+                    { "edge": "lens->watchtower",
+                      "text": "Guard entitlement confirmed with Ledger",
+                      "panels": { "inc": { "state": "QUEUED" }, "aud": { "log": [ { "tag": "SYS", "text": "guard plan OK (Ledger)" } ] } } },
+                    { "edges": ["watchtower->casebook", "watchtower->agentdesk"],
+                      "text": "Incident CB-8841 opened, agent assigned",
+                      "panels": { "aud": { "log": [ { "tag": "SYS", "text": "incident CB-8841 open" } ] } } },
+                    { "edge": "agentdesk->conduit",
+                      "text": "Agent live in under five seconds",
+                      "panels": { "inc": { "state": "AGENT_LIVE" }, "aud": { "log": [ { "tag": "AGT", "text": "agent watching (audited)" } ] } } },
+                    { "edge": "conduit->cam",
+                      "text": "Talk-down through the camera speaker",
+                      "panels": { "inc": { "state": "TALKDOWN" }, "aud": { "log": [ { "tag": "AGT", "text": "talk-down played" } ] } } },
+                    { "nodes": ["cam"],
+                      "text": "Subject stays — siren, 105 dB",
+                      "panels": { "inc": { "state": "SIREN" }, "aud": { "log": [ { "tag": "AGT", "text": "siren fired" } ] } } },
+                    { "edge": "agentdesk->casebook",
+                      "text": "Subject leaves; outcome recorded: deterred",
+                      "panels": { "inc": { "state": "RESOLVED" }, "aud": { "log": [ { "tag": "AGT", "text": "outcome: deterred" } ] } } },
+                    { "edges": ["casebook->clarion", "clarion->phone"],
+                      "text": "Owner gets the summary and audit link",
+                      "panels": { "aud": { "log": [ { "tag": "SYS", "text": "summary → owner" } ] } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "The day the plan lapses",
+            "sections": [
+              {
+                "heading": "The day the plan lapses",
+                "accent": "red",
+                "text": [ "Subscription-entitlement loss." ],
+                "bullets": [
+                  "The nightly billing run fails to charge the card; **Ledger** moves the account to GRACE and **Clarion** pushes the 14-day deadline to every enrolled phone.",
+                  "On day 14 **Ledger** moves the account to LAPSED and publishes the revocation; **Lens AI** stops analyzing and **Watchtower** delists the home.",
+                  "**Ledger** tells **Conduit**, which commands each camera into unentitled mode.",
+                  "The camera's next clip upload to **Vault** is refused with 403 — *no new cloud recordings*.",
+                  "Live view, motion notifications, and the manual siren keep working — *they never depended on the plan*.",
+                  "**Vault** keeps already-stored clips until normal expiry; nothing new is written, so *the lapse becomes a permanent gap in history*.",
+                  "The owner renews; **Ledger** republishes entitlements through **Conduit** and every gated feature resumes on the next event.",
+                  "**Ledger down** — entitlements cached 24 h at each consumer; safety functions fail open, Guard sessions fail closed."
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "ledger": { "title": "Ledger", "sub": "entitlements", "icon": "shield", "tint": "auth",
+                      "link": "https://github.com/halovista/platform/blob/main/services/ledger/entitlements.go#L119" },
+                    "clarion": { "title": "Clarion", "sub": "notifications", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/clarion/push.go#L44" },
+                    "phone": { "title": "Owner phone", "sub": "aegis app", "icon": "phone", "tint": "dev" },
+                    "halogate": { "title": "Halogate", "sub": "api gateway", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/halovista/platform/blob/main/services/halogate/router.go#L118" },
+                    "conduit": { "title": "Conduit", "sub": "device broker", "icon": "antenna", "tint": "mqtt",
+                      "link": "https://github.com/halovista/platform/blob/main/services/conduit/broker.go#L64" },
+                    "cam": { "title": "Halo Cam", "sub": "front door", "icon": "chip", "tint": "dev" },
+                    "vault": { "title": "Vault", "sub": "clip store", "icon": "db", "tint": "data",
+                      "link": "https://github.com/halovista/platform/blob/main/services/vault/store.go#L92" }
+                  },
+                  "rows": [
+                    ["ledger", "clarion", "phone", "halogate"],
+                    ["conduit", "cam", "vault"]
+                  ],
+                  "edges": [
+                    { "from": "ledger", "to": "clarion", "kind": "int", "label": "grace notice" },
+                    { "from": "clarion", "to": "phone", "kind": "https", "label": "deadline push" },
+                    { "from": "ledger", "to": "conduit", "kind": "int", "label": "revoke feats" },
+                    { "from": "conduit", "to": "cam", "kind": "mqtt", "label": "unentitled" },
+                    { "from": "cam", "to": "vault", "kind": "https", "label": "PUT clip" },
+                    { "from": "vault", "to": "cam", "kind": "https", "ret": true, "label": "403 lapsed" },
+                    { "from": "phone", "to": "halogate", "kind": "https", "label": "renew plan" }
+                  ],
+                  "panels": [
+                    { "id": "acct", "type": "state", "title": "Account state",
+                      "states": ["ACTIVE", "GRACE", "LAPSED", "RESTORED"],
+                      "colors": { "LAPSED": "#F87171", "RESTORED": "#4ADE80" },
+                      "initial": { "state": "ACTIVE" } },
+                    { "id": "gates", "type": "leds", "title": "Feature gates",
+                      "leds": [
+                        { "id": "clips", "label": "CLOUD CLIPS" },
+                        { "id": "descai", "label": "DESC AI" },
+                        { "id": "search", "label": "AI SEARCH" },
+                        { "id": "guard", "label": "GUARD" },
+                        { "id": "live", "label": "LIVE VIEW" },
+                        { "id": "motion", "label": "MOTION" }
+                      ],
+                      "initial": { "clips": "on", "descai": "on", "search": "on", "guard": "on", "live": "on", "motion": "on" } },
+                    { "id": "elog", "type": "log", "title": "Entitlement log",
+                      "tags": { "BILL": "#FBBF24", "DEV": "#38E1FF", "SYS": "#94A3B8" } }
+                  ],
+                  "steps": [
+                    { "edges": ["ledger->clarion", "clarion->phone"],
+                      "text": "Card charge fails — 14-day grace, owner warned",
+                      "panels": { "acct": { "state": "GRACE" }, "elog": { "log": [ { "tag": "BILL", "text": "charge failed, grace 14d" } ] } } },
+                    { "nodes": ["ledger"],
+                      "text": "Day 14: LAPSED — AI stops, guard delists the home",
+                      "panels": { "acct": { "state": "LAPSED" }, "gates": { "descai": "off", "search": "off", "guard": "off" }, "elog": { "log": [ { "tag": "SYS", "text": "revocation published" } ] } } },
+                    { "edges": ["ledger->conduit", "conduit->cam"],
+                      "text": "Cameras commanded into unentitled mode",
+                      "panels": { "gates": { "clips": "off" }, "elog": { "log": [ { "tag": "DEV", "text": "unentitled mode set" } ] } } },
+                    { "edges": ["cam->vault", "vault->cam"],
+                      "text": "Next clip upload refused",
+                      "panels": { "elog": { "log": [ { "tag": "DEV", "text": "PUT clip → 403 lapsed" } ] } } },
+                    { "nodes": ["cam", "phone"],
+                      "text": "Live view, motion pushes, siren still work",
+                      "panels": { "elog": { "log": [ { "tag": "DEV", "text": "live view OK — no plan needed" } ] } } },
+                    { "nodes": ["vault"],
+                      "text": "Stored clips age out; nothing new written",
+                      "panels": { "elog": { "log": [ { "tag": "SYS", "text": "retention timer only" } ] } } },
+                    { "edges": ["phone->halogate", "ledger->conduit"],
+                      "text": "The owner renews through Halogate; Ledger republishes entitlements through Conduit and every gated feature resumes on the next event",
+                      "panels": { "acct": { "state": "RESTORED" }, "gates": { "clips": "on", "descai": "on", "search": "on", "guard": "on" }, "elog": { "log": [ { "tag": "SYS", "text": "gap in history is permanent" } ] } } }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

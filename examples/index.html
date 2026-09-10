@@ -1,0 +1,107 @@
+<title>IoT Visualization Atlas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0;font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif;background:#0B1220;color:#A9C4D9;}
+.wrap{max-width:1080px;margin:0 auto;padding:36px 24px 64px;}
+h1{font:700 26px 'Sora',system-ui,sans-serif;color:#EAF2FF;margin:0 0 6px;}
+.sub{color:#5E7396;font-size:13.5px;margin:0 0 30px;}
+h2{font:600 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#5E7396;margin:34px 0 12px;border-bottom:1px solid #16233C;padding-bottom:6px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+a.card{display:block;background:#0B1220;border:1px solid #25364F;border-radius:12px;padding:16px 18px;text-decoration:none;color:inherit;}
+a.card:hover{border-color:#38E1FF;}
+.t{font:600 15px 'IBM Plex Sans',system-ui,sans-serif;color:#EAF2FF;margin:0 0 4px;}
+.d{font-size:12.5px;color:#93A7C9;margin:0 0 10px;min-height:18px;}
+.chips{display:flex;flex-wrap:wrap;gap:5px;}
+.chip{font:600 9px 'IBM Plex Mono',monospace;letter-spacing:.05em;padding:2px 7px;border-radius:5px;background:#101A2C;border:1px solid #1D2A40;color:#55627A;}
+.chip.w{color:#8AE8FF;border-color:#173648;}
+.shared{display:flex;flex-direction:column;gap:8px;}
+.shared-row{display:grid;grid-template-columns:minmax(150px,240px) 1fr;gap:12px;align-items:start;padding:10px 12px;border:1px solid #1D2A40;border-radius:9px;background:#0D1626;}
+.shared-name{font:600 12px 'IBM Plex Sans',system-ui,sans-serif;color:#EAF2FF;}
+.service-chip{text-decoration:none;display:inline-block;}
+.service-chip:hover{color:#EAF2FF;border-color:#38E1FF;}
+@media(max-width:620px){.shared-row{grid-template-columns:1fr;gap:6px;}}</style>
+<div class="wrap">
+<h1>IoT Visualization Atlas</h1>
+<p class="sub">16 pages · every diagram is generated from one JSON spec against the flowview template · all organizations and products are fictional</p>
+<h2>auralis-presence</h2>
+<div class="grid">
+<a class="card" href="auralis-presence/presence.html"><p class="t">Auralis Presence — mmWave room sensing, fall safety, offline autonomy</p><p class="d">mmWave room sensing, fall check-in escalation, sleep/inactivity monitoring, and offline autonomy over Atrium</p><div class="chips"><span class="chip w">buffer</span><span class="chip w">leds</span><span class="chip w">log</span><span class="chip w">radar</span><span class="chip w">signal</span><span class="chip w">state</span><span class="chip">radar</span><span class="chip">mmwave</span><span class="chip">fall-detection</span><span class="chip">offline</span><span class="chip">mqtt</span></div></a>
+</div>
+<h2>basecraft-keep</h2>
+<div class="grid">
+<a class="card" href="basecraft-keep/keep.html"><p class="t">Keep — Local AI Hub &amp; Camera Fleet</p><p class="d">Local-first hub pairs with Lookout cameras: face recognition on the Facet NPU, cross-camera tracking, storage rotation, and relay-brokered remote viewing.</p><div class="chips"><span class="chip w">gauge</span><span class="chip w">log</span><span class="chip w">orbit</span><span class="chip w">screen</span><span class="chip w">state</span><span class="chip w">tiles</span><span class="chip w">xray</span><span class="chip">security</span><span class="chip">camera</span><span class="chip">edge-ai</span><span class="chip">storage</span><span class="chip">e2ee</span></div></a>
+</div>
+<h2>chime-radar</h2>
+<div class="grid">
+<a class="card" href="chime-radar/chime-radar.html"><p class="t">Chime Radar — distance-gated alerts, visit paths, early camera wake</p><p class="d">Radar-gated doorbell alerts, aerial visit paths, and radar-before-camera wake sequencing</p><div class="chips"><span class="chip w">battery</span><span class="chip w">buffer</span><span class="chip w">leds</span><span class="chip w">log</span><span class="chip w">queue</span><span class="chip w">radar</span><span class="chip w">screen</span><span class="chip w">signal</span><span class="chip w">state</span><span class="chip w">waterfall</span><span class="chip">radar</span><span class="chip">doorbell</span><span class="chip">distance-gating</span><span class="chip">visit-path</span></div></a>
+</div>
+<h2>cumulus</h2>
+<div class="grid">
+<a class="card" href="cumulus/cumulus-flow.html"><p class="t">Cumulus Command &amp; OTA Paths</p><p class="d">Cloud video pipeline page generated from the cumulus design doc</p><div class="chips"><span class="chip">cloud</span><span class="chip">pipeline</span></div></a>
+</div>
+<h2>doorbell</h2>
+<div class="grid">
+<a class="card" href="doorbell/doorbell-from-spec.html"><p class="t">Chime Doorbell — motion to clip</p><p class="d">Two-chip battery doorbell: motion to clip, plus the thermal envelope walkthrough</p><div class="chips"><span class="chip w">gauge</span><span class="chip w">leds</span><span class="chip w">log</span><span class="chip w">pir</span><span class="chip w">queue</span><span class="chip w">screen</span><span class="chip w">state</span><span class="chip w">thermo</span><span class="chip">doorbell</span><span class="chip">dual-chip</span><span class="chip">thermal</span></div></a>
+</div>
+<h2>doorbell-atlas</h2>
+<div class="grid">
+<a class="card" href="doorbell-atlas/atlas.html"><p class="t">Lookout Feature Atlas</p><p class="d">The doorbell feature atlas: six tabs covering the full device click-through</p><div class="chips"><span class="chip w">gauge</span><span class="chip w">leds</span><span class="chip w">log</span><span class="chip w">orbit</span><span class="chip w">screen</span><span class="chip w">state</span><span class="chip w">waterfall</span><span class="chip w">xray</span><span class="chip w">zoneframe</span><span class="chip">doorbell</span><span class="chip">atlas</span></div></a>
+</div>
+<h2>farwatch-sentinel</h2>
+<div class="grid">
+<a class="card" href="farwatch-sentinel/sentinel.html"><p class="t">Sentinel — Cellular Off-Grid Solar Camera</p><p class="d">Sentinel off-grid solar camera: daily energy ledger, continuous ring recording with event indexing, cellular data-cap tiers, and cloudy-week degradation to preservation mode.</p><div class="chips"><span class="chip w">battery</span><span class="chip w">buffer</span><span class="chip w">gauge</span><span class="chip w">log</span><span class="chip w">state</span><span class="chip">solar</span><span class="chip">battery</span><span class="chip">cellular</span><span class="chip">buffer</span><span class="chip">camera</span></div></a>
+</div>
+<h2>gridseye-bastion</h2>
+<div class="grid">
+<a class="card" href="gridseye-bastion/bastion.html"><p class="t">Bastion — PoE Camera Fleet &amp; Stronghold NVR</p><p class="d">Bastion: PoE camera fleet &amp; Stronghold NVR — edge detection, firmware rollout, UPS power domain, LAN-only viewing</p><div class="chips"><span class="chip w">battery</span><span class="chip w">buffer</span><span class="chip w">gauge</span><span class="chip w">log</span><span class="chip w">orbit</span><span class="chip w">queue</span><span class="chip w">screen</span><span class="chip w">signal</span><span class="chip w">state</span><span class="chip w">tiles</span><span class="chip">camera</span><span class="chip">nvr</span><span class="chip">poe</span><span class="chip">firmware</span><span class="chip">ups</span><span class="chip">power</span><span class="chip">lan</span></div></a>
+</div>
+<h2>halovista-aegis</h2>
+<div class="grid">
+<a class="card" href="halovista-aegis/aegis.html"><p class="t">HaloVista Aegis — cloud, keys, and a human in the loop</p><p class="d">HaloVista Aegis: E2EE enrollment, AI history search, virtual guard, and plan lapse</p><div class="chips"><span class="chip w">leds</span><span class="chip w">log</span><span class="chip w">screen</span><span class="chip w">state</span><span class="chip w">xray</span><span class="chip">e2ee</span><span class="chip">ai-search</span><span class="chip">virtual-guard</span><span class="chip">entitlements</span><span class="chip">camera</span></div></a>
+</div>
+<h2>halovista-mirrorline</h2>
+<div class="grid">
+<a class="card" href="halovista-mirrorline/mirrorline.html"><p class="t">Mirrorline — Event-Store Replication</p><p class="d">Mirrorline event-store replication: quorum writes, read-your-writes, primary election, and WAL tail resync</p><div class="chips"><span class="chip w">buffer</span><span class="chip w">gauge</span><span class="chip w">log</span><span class="chip w">orbit</span><span class="chip w">tiles</span><span class="chip w">waterfall</span><span class="chip">database</span><span class="chip">replication</span><span class="chip">quorum</span><span class="chip">election</span></div></a>
+</div>
+<h2>hearthline-failover</h2>
+<div class="grid">
+<a class="card" href="hearthline-failover/failover.html"><p class="t">hearthline Sentry Cloud — cross-region failover</p><p class="d">Cross-region failover for hearthline Sentry Cloud: journal-first replication, region loss reconciliation, fencing, and failback</p><div class="chips"><span class="chip w">buffer</span><span class="chip w">log</span><span class="chip w">orbit</span><span class="chip w">signal</span><span class="chip w">tiles</span><span class="chip">failover</span><span class="chip">cross-region</span><span class="chip">journal</span><span class="chip">fencing</span></div></a>
+</div>
+<h2>hearthline-sentry-panel</h2>
+<div class="grid">
+<a class="card" href="hearthline-sentry-panel/sentry-panel.html"><p class="t">hearthline Sentry Panel — Monitored Alarm</p><p class="d">hearthline&#x27;s monitored alarm panel: broadband-to-cellular failover, walk-test sensor coverage, and the duress disarm&#x27;s silent-upstream incident.</p><div class="chips"><span class="chip w">leds</span><span class="chip w">log</span><span class="chip w">queue</span><span class="chip w">signal</span><span class="chip w">state</span><span class="chip w">tiles</span><span class="chip">alarm</span><span class="chip">monitoring</span><span class="chip">failover</span><span class="chip">duress</span></div></a>
+</div>
+<h2>loomworks-trellis</h2>
+<div class="grid">
+<a class="card" href="loomworks-trellis/trellis.html"><p class="t">loomworks Trellis — Camera-as-Hub</p><p class="d">Camera-as-hub: BR failover, Zigbee-to-Matter bridging, offline automations, and dual-fabric commissioning</p><div class="chips"><span class="chip w">leds</span><span class="chip w">log</span><span class="chip w">orbit</span><span class="chip w">queue</span><span class="chip w">signal</span><span class="chip w">state</span><span class="chip w">tiles</span><span class="chip">thread</span><span class="chip">zigbee</span><span class="chip">matter</span><span class="chip">camera</span><span class="chip">hub</span></div></a>
+</div>
+<h2>nestrel-warden</h2>
+<div class="grid">
+<a class="card" href="nestrel-warden/warden.html"><p class="t">Nestrel Warden — a cloud camera that remembers the outage</p><p class="d">Warden — wired cloud camera that buffers up to an hour offline and back-fills with dedup on reconnect</p><div class="chips"><span class="chip w">buffer</span><span class="chip w">log</span><span class="chip w">screen</span><span class="chip w">signal</span><span class="chip w">state</span><span class="chip">camera</span><span class="chip">offline-buffer</span><span class="chip">firmware-rollout</span><span class="chip">dedup</span></div></a>
+</div>
+<h2>showcase</h2>
+<div class="grid">
+<a class="card" href="showcase/widgets.html"><p class="t">Widget Showcase — every panel type on one page</p><p class="d">Reference gallery: all 19 inspector widgets on one page, each driven by a step-through</p><div class="chips"><span class="chip w">battery</span><span class="chip w">buffer</span><span class="chip w">gauge</span><span class="chip w">inflight</span><span class="chip w">leds</span><span class="chip w">log</span><span class="chip w">orbit</span><span class="chip w">phone</span><span class="chip w">pir</span><span class="chip w">queue</span><span class="chip w">radar</span><span class="chip w">screen</span><span class="chip w">signal</span><span class="chip w">state</span><span class="chip w">thermo</span><span class="chip w">tiles</span><span class="chip w">waterfall</span><span class="chip w">xray</span><span class="chip w">zoneframe</span><span class="chip">reference</span><span class="chip">showcase</span><span class="chip">widgets</span></div></a>
+</div>
+<h2>wrenlight-perch</h2>
+<div class="grid">
+<a class="card" href="wrenlight-perch/perch.html"><p class="t">wrenlight Perch — Two-Year Battery Camera &amp; Loft Module</p><p class="d">wrenlight Perch: battery-day ledger, TwigLink supervision, Loft clip upload, and cold-weather limits</p><div class="chips"><span class="chip w">battery</span><span class="chip w">log</span><span class="chip w">queue</span><span class="chip w">signal</span><span class="chip w">state</span><span class="chip w">waterfall</span><span class="chip">battery</span><span class="chip">twiglink</span><span class="chip">iot-camera</span><span class="chip">supervision</span><span class="chip">cold-weather</span></div></a>
+</div>
+<h2>Shared services</h2>
+<div class="shared">
+<div class="shared-row"><span class="shared-name">Beam Media</span><div class="chips"><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a><a class="chip w service-chip" href="doorbell/doorbell-from-spec.html">Chime Doorbell — motion to clip</a></div></div>
+<div class="shared-row"><span class="shared-name">Chronicle</span><div class="chips"><a class="chip w service-chip" href="halovista-aegis/aegis.html">HaloVista Aegis — cloud, keys, and a human in the loop</a><a class="chip w service-chip" href="halovista-mirrorline/mirrorline.html">Mirrorline — Event-Store Replication</a></div></div>
+<div class="shared-row"><span class="shared-name">Conduit</span><div class="chips"><a class="chip w service-chip" href="halovista-aegis/aegis.html">HaloVista Aegis — cloud, keys, and a human in the loop</a><a class="chip w service-chip" href="halovista-mirrorline/mirrorline.html">Mirrorline — Event-Store Replication</a></div></div>
+<div class="shared-row"><span class="shared-name">Dispatch</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="cumulus/cumulus-flow.html">Cumulus Command &amp; OTA Paths</a></div></div>
+<div class="shared-row"><span class="shared-name">Herald Push</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a><a class="chip w service-chip" href="doorbell/doorbell-from-spec.html">Chime Doorbell — motion to clip</a></div></div>
+<div class="shared-row"><span class="shared-name">Nimbus API</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="cumulus/cumulus-flow.html">Cumulus Command &amp; OTA Paths</a></div></div>
+<div class="shared-row"><span class="shared-name">Pulse Events</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a><a class="chip w service-chip" href="doorbell/doorbell-from-spec.html">Chime Doorbell — motion to clip</a></div></div>
+<div class="shared-row"><span class="shared-name">Registry</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="cumulus/cumulus-flow.html">Cumulus Command &amp; OTA Paths</a><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a></div></div>
+<div class="shared-row"><span class="shared-name">Relay</span><div class="chips"><a class="chip w service-chip" href="cumulus/cumulus-flow.html">Cumulus Command &amp; OTA Paths</a><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a></div></div>
+<div class="shared-row"><span class="shared-name">Relay Broker</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="doorbell/doorbell-from-spec.html">Chime Doorbell — motion to clip</a></div></div>
+<div class="shared-row"><span class="shared-name">Sentinel Auth</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="cumulus/cumulus-flow.html">Cumulus Command &amp; OTA Paths</a><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a></div></div>
+<div class="shared-row"><span class="shared-name">Sentry LP</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a><a class="chip w service-chip" href="doorbell/doorbell-from-spec.html">Chime Doorbell — motion to clip</a></div></div>
+<div class="shared-row"><span class="shared-name">Sentry Panel</span><div class="chips"><a class="chip w service-chip" href="hearthline-failover/failover.html">hearthline Sentry Cloud — cross-region failover</a><a class="chip w service-chip" href="hearthline-sentry-panel/sentry-panel.html">hearthline Sentry Panel — Monitored Alarm</a></div></div>
+<div class="shared-row"><span class="shared-name">Vault Clips</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a><a class="chip w service-chip" href="doorbell/doorbell-from-spec.html">Chime Doorbell — motion to clip</a></div></div>
+<div class="shared-row"><span class="shared-name">Vision HP</span><div class="chips"><a class="chip w service-chip" href="chime-radar/chime-radar.html">Chime Radar — distance-gated alerts, visit paths, early camera wake</a><a class="chip w service-chip" href="doorbell-atlas/atlas.html">Lookout Feature Atlas</a><a class="chip w service-chip" href="doorbell/doorbell-from-spec.html">Chime Doorbell — motion to clip</a></div></div>
+</div>
+</div>

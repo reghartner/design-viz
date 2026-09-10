@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.DS_Store
+.manifest.lock
+.*.page-build-prev.json

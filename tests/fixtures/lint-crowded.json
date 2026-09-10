@@ -1,0 +1,21 @@
+{"page": {
+  "protocols": {"unusedproto": {"label": "never used", "color": "#123456"}},
+  "blocks": [{"heading": "Crowded", "diagram": {
+    "nodes": {"a": {"title": "A"}, "b": {"title": "B"}, "c": {"title": "C"},
+              "d": {"title": "D"}, "e": {"title": "E"}, "f": {"title": "F"},
+              "g": {"title": "G"}, "h": {"title": "H"}, "i": {"title": "I"},
+              "j": {"title": "J"}, "k": {"title": "K"}},
+    "rows": [["a", "b", "c", "d", "e"], ["f", "g", "h", "i", "j"], ["k"]],
+    "edges": [
+      {"from": "a", "to": "b", "kind": "int",
+       "label": "this label is extremely long for such a short hop between neighbors"},
+      {"from": "e", "to": "f", "kind": "int", "label": "wrap"},
+      {"from": "a", "to": "g", "kind": "int"},
+      {"from": "b", "to": "h", "kind": "int"},
+      {"from": "c", "to": "i", "kind": "int"},
+      {"from": "d", "to": "j", "kind": "int"}
+    ],
+    "steps": [
+      {"edge": "a->g", "text": "one"},
+      {"edges": ["a->g", "b->h"], "text": "two shares first edge with one"}
+    ]}}]}}

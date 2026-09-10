@@ -1,0 +1,288 @@
+{
+  "page": {
+    "title": "Widget Showcase — every panel type on one page",
+    "contract": "1",
+    "generatedFrom": {
+      "url": "https://github.com/reghartner/design-viz/blob/main/README.md",
+      "label": "Widget Showcase brief",
+      "version": "v1",
+      "at": "09-07-2026 15:05"
+    },
+    "blocks": [
+      {
+        "heading": "What this page is",
+        "accent": "slate",
+        "text": [
+          "A reference gallery: all 19 inspector widgets, grouped in four tabs, each driven by a small step-through so you can watch every widget update. The device (**Kit-1**) and its cloud (**Bench**) are fictional demo stand-ins — the stories exist only to exercise the widgets."
+        ]
+      },
+      {
+        "tabs": [
+          {
+            "label": "States & telemetry",
+            "sections": [
+              {
+                "heading": "state · leds · gauge · waterfall · log",
+                "accent": "cyan",
+                "text": [
+                  "The everyday five. A `state` machine readout, `leds` indicator dots, a numeric `gauge`, a `waterfall` timing budget, and the appending `log` (which always renders at the bottom of the panel column, fixed height, auto-scrolled)."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "kit": {"title": "Kit-1", "sub": "demo device", "icon": "chip", "tint": "dev"},
+                    "bench": {"title": "Bench", "sub": "demo cloud", "icon": "cloud", "tint": "cmd"}
+                  },
+                  "rows": [["kit", "bench"]],
+                  "edges": [
+                    {"from": "kit", "to": "bench", "kind": "https", "label": "report"},
+                    {"from": "bench", "to": "kit", "kind": "https", "ret": true, "label": "ack"}
+                  ],
+                  "panels": [
+                    {"id": "pw", "type": "state", "title": "state — Kit-1 power",
+                     "states": ["SLEEP", "BOOT", "RUN"],
+                     "colors": {"RUN": "#4ADE80"},
+                     "initial": {"state": "SLEEP"}},
+                    {"id": "led", "type": "leds", "title": "leds — front panel",
+                     "leds": [{"id": "pwr", "label": "PWR"}, {"id": "net", "label": "NET"}, {"id": "act", "label": "ACT"}],
+                     "initial": {"pwr": "off", "net": "off", "act": "off"}},
+                    {"id": "amp", "type": "gauge", "title": "gauge — supply draw", "unit": "mA", "max": 400,
+                     "initial": {"value": 2}},
+                    {"id": "boot", "type": "waterfall", "title": "waterfall — boot budget",
+                     "spans": [
+                       {"id": "irq", "label": "wake IRQ", "ms": 40},
+                       {"id": "os", "label": "kernel + drivers", "ms": 260},
+                       {"id": "app", "label": "app start", "ms": 180},
+                       {"id": "net", "label": "first report", "ms": 120}
+                     ],
+                     "initial": {"reveal": 0}},
+                    {"id": "lg", "type": "log", "title": "log — event trail",
+                     "tags": {"DEV": "#38E1FF", "NET": "#4ADE80"}}
+                  ],
+                  "steps": [
+                    {"nodes": ["kit"], "text": "Asleep: gauge near zero, every LED dark, no boot spans revealed yet.",
+                     "panels": {"lg": {"log": [{"tag": "DEV", "text": "sleeping @ 2 mA"}]}}},
+                    {"nodes": ["kit"], "text": "Wake IRQ fires — power state BOOT, PWR LED on, draw jumps, first boot span reveals.",
+                     "panels": {"pw": {"state": "BOOT"}, "led": {"pwr": "on"}, "amp": {"value": 180},
+                                "boot": {"reveal": 1}, "lg": {"log": [{"tag": "DEV", "text": "wake IRQ"}]}}},
+                    {"nodes": ["kit"], "text": "Kernel and app come up — two more spans reveal, draw peaks.",
+                     "panels": {"amp": {"value": 340}, "boot": {"reveal": 3},
+                                "lg": {"log": [{"tag": "DEV", "text": "kernel + app up"}]}}},
+                    {"edge": "kit->bench", "text": "First report goes out — RUN, NET LED transmits, last span reveals with the total.",
+                     "panels": {"pw": {"state": "RUN"}, "led": {"net": "tx", "act": "on"},
+                                "boot": {"reveal": 4, "highlight": "net"},
+                                "lg": {"log": [{"tag": "NET", "text": "report sent"}]}}},
+                    {"edge": "bench->kit", "text": "Bench acks; NET LED settles to receive-then-on, draw eases back.",
+                     "panels": {"led": {"net": "on"}, "amp": {"value": 120},
+                                "lg": {"log": [{"tag": "NET", "text": "ack received"}]}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Camera & detection",
+            "sections": [
+              {
+                "heading": "screen · pir · zoneframe · radar",
+                "accent": "violet",
+                "text": [
+                  "The four camera-and-sensing widgets. `pir` and `radar` COMPUTE their outcomes from geometry — the subject positions below are chosen so the trip and the range alert happen exactly where the captions say. `zoneframe` is authored: its zones and verdict banner are stated, not computed."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "cam": {"title": "Kit-1 camera", "sub": "demo optic", "icon": "chip", "tint": "dev"},
+                    "hub": {"title": "Bench hub", "sub": "demo hub", "icon": "router", "tint": "cmd"}
+                  },
+                  "rows": [["cam", "hub"]],
+                  "edges": [
+                    {"from": "cam", "to": "hub", "kind": "int", "label": "detect"}
+                  ],
+                  "panels": [
+                    {"id": "vf", "type": "screen", "title": "screen — viewfinder",
+                     "scene": "person-at-door-night", "initial": {"mode": "off"}},
+                    {"id": "ir", "type": "pir", "title": "pir — IR cone (computed trip)",
+                     "sensor": {"x": 160, "y": 168},
+                     "cone": {"facing": 270, "spread": 80, "range": 140},
+                     "path": [[40, 60], [160, 60], [160, 160]],
+                     "initial": {"subject": {"x": 40, "y": 60}}},
+                    {"id": "zf", "type": "zoneframe", "title": "zoneframe — authored zones",
+                     "zones": [
+                       {"id": "walk", "label": "walkway", "state": "armed",
+                        "points": [[120, 176], [140, 96], [180, 96], [200, 176]]},
+                       {"id": "street", "label": "street", "state": "ignored",
+                        "points": [[8, 8], [312, 8], [312, 56], [8, 56]]}
+                     ]},
+                    {"id": "rr", "type": "radar", "title": "radar — range (computed alert)",
+                     "sensor": {"x": 160, "y": 170}, "facing": 270, "spread": 110,
+                     "scale": {"pxPerUnit": 30, "unit": "m"},
+                     "range": 5, "threshold": 3, "rings": [1, 2, 3, 4, 5],
+                     "zones": [{"id": "porch", "label": "porch", "r": [0.5, 2.0], "deg": [240, 300]}],
+                     "initial": {"subject": {"r": 4.6, "deg": 265}}}
+                  ],
+                  "steps": [
+                    {"nodes": ["cam"], "text": "Idle. Screen off; radar tracks a subject at 4.6 m — outside the 3 m alert line, so CLEAR is computed; the PIR subject is far left of the cone.",
+                     "panels": {}},
+                    {"nodes": ["cam"], "text": "The subject walks in: radar reads 2.6 m — inside 3 m, RANGE ALERT computes on; still outside the PIR cone.",
+                     "panels": {"rr": {"subject": {"r": 2.6, "deg": 265}},
+                                "ir": {"subject": {"x": 160, "y": 96}}}},
+                    {"edge": "cam->hub", "text": "Closer still: the subject enters the IR cone — the trip is COMPUTED, and the camera boots.",
+                     "panels": {"ir": {"subject": {"x": 160, "y": 130}},
+                                "rr": {"subject": {"r": 1.4, "deg": 265}},
+                                "vf": {"mode": "boot"}}},
+                    {"nodes": ["cam"], "text": "Live view; the zoneframe shows the subject inside the armed walkway and the authored ALERT verdict banner.",
+                     "panels": {"vf": {"mode": "live"},
+                                "zf": {"subject": {"x": 160, "y": 140}, "verdict": "alert"}}},
+                    {"nodes": ["cam"], "text": "Recording, then the clip saves — screen shows REC then the save banner.",
+                     "panels": {"vf": {"mode": "save", "banner": "CLIP SAVED — demo"}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Power & storage",
+            "sections": [
+              {
+                "heading": "thermo · battery · buffer · xray",
+                "accent": "amber",
+                "text": [
+                  "`thermo` and `battery` COMPUTE their zones from the declared thresholds (warn 75 / crit 95 °C; low 20 / crit 8 %). `buffer` is a segmented ring whose footer counts are computed from the cells. `xray` shows nested encryption envelopes — who can read the payload at this hop."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "kit": {"title": "Kit-1", "sub": "demo device", "icon": "chip", "tint": "dev"},
+                    "store": {"title": "Bench store", "sub": "demo storage", "icon": "db", "tint": "data"}
+                  },
+                  "rows": [["kit", "store"]],
+                  "edges": [
+                    {"from": "kit", "to": "store", "kind": "tls", "label": "upload"}
+                  ],
+                  "panels": [
+                    {"id": "die", "type": "thermo", "title": "thermo — die temp", "unit": "°C",
+                     "min": 20, "max": 110, "warn": 75, "crit": 95,
+                     "initial": {"value": 34}},
+                    {"id": "bat", "type": "battery", "title": "battery — demo pack",
+                     "low": 20, "crit": 8,
+                     "initial": {"charge": 64, "source": "cells", "trend": "idle"}},
+                    {"id": "ring", "type": "buffer", "title": "buffer — clip ring",
+                     "segments": 8, "capacity": "8 clips",
+                     "initial": {"cells": ["buffered", "buffered", "empty", "empty", "empty", "empty", "empty", "empty"], "head": 2, "note": "2 clips held"}},
+                    {"id": "env", "type": "xray", "title": "xray — who can read it",
+                     "layers": [
+                       {"id": "tls", "label": "TLS 1.3", "holder": "each hop"},
+                       {"id": "e2e", "label": "demo envelope", "holder": "owner only"}
+                     ]}
+                  ],
+                  "steps": [
+                    {"nodes": ["kit"], "text": "Baseline: 34 °C computes NOMINAL, 64 % computes NOMINAL, two clips buffered.",
+                     "panels": {}},
+                    {"nodes": ["kit"], "text": "Heavy encode: 81 °C crosses warn 75 — WARNING computes; the pack drains to 18 %, at/below low 20 — LOW computes.",
+                     "panels": {"die": {"value": 81}, "bat": {"charge": 18, "trend": "draining"},
+                                "ring": {"mark": [[2, 3, "buffered"]], "head": 4, "note": "4 clips held"}}},
+                    {"edge": "kit->store", "text": "Upload starts inside both envelopes: at Bench store the TLS layer is open but the demo envelope stays sealed — payload unreadable there.",
+                     "panels": {"env": {"hop": "Bench store", "layers": [{"id": "tls", "open": true}, {"id": "e2e", "open": false}]},
+                                "ring": {"mark": [[0, 1, "uploading"]], "note": "uploading oldest"}}},
+                    {"nodes": ["kit"], "text": "Uploads ack; cells flip to uploaded, temperature eases, charger connects.",
+                     "panels": {"ring": {"mark": [[0, 1, "uploaded"]], "note": "2 uploaded · 2 held"},
+                                "die": {"value": 62}, "bat": {"charge": 22, "trend": "charging", "source": "wired"}}},
+                    {"nodes": ["kit"], "text": "At the owner's phone every layer opens — readable, the whole point of the envelope.",
+                     "panels": {"env": {"hop": "Owner phone", "layers": [{"id": "tls", "open": true}, {"id": "e2e", "open": true}]}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Links & fleet",
+            "sections": [
+              {
+                "heading": "signal · orbit · queue · tiles · inflight · phone",
+                "accent": "green",
+                "text": [
+                  "`signal` tracks named links, `orbit` is a connection lifecycle, `queue` shows one held message, `tiles` is a fleet grid, `inflight` puts concurrent operations on one shared step axis, and `phone` accumulates resident push notifications."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "kit": {"title": "Kit-1", "sub": "demo device", "icon": "chip", "tint": "dev"},
+                    "broker": {"title": "Bench broker", "sub": "demo broker", "icon": "antenna", "tint": "mqtt"},
+                    "phone": {"title": "Owner phone", "sub": "demo app", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [["kit", "broker", "phone"]],
+                  "edges": [
+                    {"from": "kit", "to": "broker", "kind": "mqtt", "label": "PUB demo"},
+                    {"from": "broker", "to": "phone", "kind": "ws", "label": "push"}
+                  ],
+                  "panels": [
+                    {"id": "net", "type": "signal", "title": "signal — links",
+                     "links": [
+                       {"id": "wifi", "label": "Wi-Fi", "transport": "wifi"},
+                       {"id": "ble", "label": "Setup BLE", "transport": "ble"}
+                     ],
+                     "initial": {"wifi": {"state": "ok", "bars": 4, "note": "-52 dBm"}, "ble": {"state": "ok", "bars": 1, "note": "idle"}}},
+                    {"id": "conn", "type": "orbit", "title": "orbit — session ring",
+                     "states": ["OFFLINE", "CONNECTING", "SESSION", "BACKOFF"],
+                     "colors": {"SESSION": "#4ADE80", "BACKOFF": "#FFB454"},
+                     "initial": {"state": "SESSION", "via": "resumed"}},
+                    {"id": "mbx", "type": "queue", "title": "queue — broker mailbox",
+                     "initial": {"state": "empty"}},
+                    {"id": "fleet", "type": "tiles", "title": "tiles — demo fleet",
+                     "tiles": [
+                       {"id": "k1", "label": "Kit-1"}, {"id": "k2", "label": "Kit-2"}, {"id": "k3", "label": "Kit-3"}
+                     ],
+                     "states": ["ONLINE", "OFFLINE", "UPDATING"],
+                     "colors": {"ONLINE": "#4ADE80", "UPDATING": "#A78BFA", "OFFLINE": "#F87171"},
+                     "initial": {"k1": {"state": "ONLINE", "sub": "fw 1.0"}, "k2": {"state": "ONLINE", "sub": "fw 1.0"}, "k3": {"state": "OFFLINE", "sub": "unplugged"}}},
+                    {"id": "ops", "type": "inflight", "title": "inflight — concurrent work",
+                     "lanes": [
+                       {"id": "plan", "label": "plan upload"},
+                       {"id": "ack", "label": "device ack"}
+                     ]},
+                    {"id": "resident", "type": "phone", "title": "phone — resident alerts",
+                     "initial": {"clock": "9:41"}}
+                  ],
+                  "steps": [
+                    {"nodes": ["kit"], "text": "Steady state: Wi-Fi strong; plan upload seq 4182 starts and remains in flight.",
+                     "panels": {"ops": {"start": [{"lane": "plan", "label": "seq 4182"}]}}},
+                    {"nodes": ["kit"], "tone": {"kit": "alert"}, "text": "Wi-Fi degrades then drops — the session ring falls to BACKOFF and Kit-1 turns alert.",
+                     "panels": {"net": {"wifi": {"state": "lost", "bars": 0, "note": "AP rebooting"}},
+                                "conn": {"state": "BACKOFF", "via": "keepalive missed"},
+                                "ops": {"start": [{"lane": "ack", "label": "ack wait"}]},
+                                "resident": {"notify": {"app": "Homestead", "title": "Kit-1 offline", "text": "Connection lost; commands will wait."}}}},
+                    {"nodes": ["broker"], "text": "A command for Kit-1 arrives meanwhile and parks in the broker mailbox.",
+                     "panels": {"mbx": {"state": "enqueue", "label": "PING cmd", "from": "Bench · demo", "reason": "Kit-1 offline — holding"},
+                                "ops": {"mark": [{"lane": "plan", "state": "retry"}]}}},
+                    {"nodes": ["broker"], "text": "Still held while the device is away; the fleet grid marks Kit-1 offline.",
+                     "panels": {"mbx": {"state": "held", "reason": "waiting for session"},
+                                "fleet": {"k1": {"state": "OFFLINE", "sub": "backoff"}},
+                                "ops": {"end": ["ack"]},
+                                "resident": {"notify": [
+                                  {"app": "Homestead", "title": "Command queued", "text": "PING will deliver after Kit-1 reconnects."},
+                                  {"app": "Homestead", "title": "Kit-3 needs attention", "text": "The demo unit remains unplugged."},
+                                  {"app": "Homestead", "title": "Session retrying", "text": "Bench is waiting for a new connection."}
+                                ]}}},
+                    {"edge": "kit->broker", "tone": {"kit": null}, "text": "Wi-Fi returns; Kit-1 clears back to its base appearance, the session reconnects, and the held command dequeues.",
+                     "panels": {"net": {"wifi": {"state": "ok", "bars": 3, "note": "-61 dBm"}},
+                                "conn": {"state": "SESSION", "via": "reconnected"},
+                                "mbx": {"state": "dequeue", "to": "→ Kit-1"},
+                                "ops": {"end": ["plan"]},
+                                "fleet": {"k1": {"state": "ONLINE", "sub": "fw 1.0"}}}},
+                    {"edge": "broker->phone", "text": "The app hears about it over the WebSocket push; Kit-2 begins an update to show the third tile state.",
+                     "panels": {"mbx": {"state": "empty"},
+                                "ops": {"start": [{"lane": "ack", "label": "push receipt"}]},
+                                "fleet": {"k2": {"state": "UPDATING", "sub": "fw 1.0 → 1.1"}}}},
+                    {"nodes": ["phone"], "text": "The resident opens Homestead and dismisses the accumulated notification stack.",
+                     "panels": {"resident": {"clear": true}}}
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

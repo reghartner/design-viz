@@ -1,0 +1,379 @@
+{
+  "page": {
+    "title": "loomworks Trellis — Camera-as-Hub",
+    "contract": "1",
+    "protocols": {
+      "thread": {"label": "Thread", "color": "#7BD88F"},
+      "zigbee": {"label": "Zigbee", "color": "#FFCB6B"},
+      "ble": {"label": "BLE", "color": "#82AAFF"},
+      "lan": {"label": "Matter / LAN", "color": "#38E1FF"}
+    },
+    "blocks": [
+      {
+        "heading": "Trellis: the camera that is also the hub",
+        "accent": "slate",
+        "text": [
+          "Trellis is loomworks' outdoor camera that is also the home's hub: one device carries a 4 MP camera with on-device AI, an embedded Zigbee coordinator, a Matter controller, and a Thread border router.",
+          "Video, recognition, and automations execute locally, so a full internet outage costs only remote viewing and push notifications — rules keep firing, clips keep landing on the microSD, and bridged Zigbee devices keep their Matter identities.",
+          "The companion Bobbin smart plug doubles as a second Thread border router, so a Trellis reboot does not orphan the mesh.",
+          "The loomworks cloud is deliberately thin: rendezvous, rule sync, OTA, and optional clip archive — never in the automation path."
+        ]
+      },
+      {
+        "tabs": [
+          {
+            "label": "Border-router failover",
+            "sections": [
+              {
+                "heading": "Border-router failover",
+                "accent": "cyan",
+                "text": [
+                  "Trellis reboots for a scheduled firmware apply. Bobbin — the companion smart plug and secondary Thread border router — keeps the mesh alive through the gap, and no automation misses a beat."
+                ],
+                "bullets": [
+                  "**Warp** offers Trellis a firmware image, and Trellis schedules the apply-and-reboot.",
+                  "Trellis reboots; its Thread border-router and mesh-leader roles vanish from the network.",
+                  "**Bobbin** detects the leader timeout, wins the election, and becomes the active mesh leader.",
+                  "Bobbin activates its border-router function, advertising the off-mesh prefix and re-registering the home's services on the LAN.",
+                  "The sleepy door sensor wakes for its scheduled poll, and the poll to its vanished parent fails.",
+                  "The sensor runs an attach scan and re-parents to Bobbin, and its queued open event flows through Bobbin to the third-party controller — the automation fires unbroken.",
+                  "The controller notifies the partner app, which never noticed the hub reboot.",
+                  "Trellis finishes booting, rejoins the mesh as a router, and takes the secondary border-router role — *Thread happily runs both BRs at once*.",
+                  {
+                    "text": "**Related failure modes** (§6):",
+                    "sub": [
+                      "**No second border router**: sleepy Thread devices sit orphaned through a Trellis reboot and their events wait for re-attach; Bobbin exists precisely to close this.",
+                      "**Trellis power loss (wifi variant)**: the whole hub is down; Bobbin keeps Thread routing alive, but Zigbee devices lose their coordinator and events during the gap are lost — the honest tradeoff of hub-in-camera; the PoE variant on a powered switch avoids it."
+                    ]
+                  }
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "warp": {"title": "Warp", "sub": "OTA service", "icon": "cloud", "tint": "cmd"},
+                    "tr": {"title": "Trellis", "sub": "BR-1 (leader)", "icon": "chip", "tint": "dev"},
+                    "bob": {"title": "Bobbin", "sub": "BR-2 (standby)", "icon": "router", "tint": "dev",
+                            "link": "https://github.com/loomworks/trellis-fw/blob/main/bobbin/br_secondary.c#L41"},
+                    "sen": {"title": "Door sensor", "sub": "sleepy Thread", "icon": "chip", "tint": "dev"},
+                    "ctl": {"title": "Partner controller", "sub": "3rd-party fabric", "icon": "server", "tint": "cmd"},
+                    "app": {"title": "Partner app", "sub": "phone", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    ["warp", "tr", "bob", "ctl", "app"]
+                  ],
+                  "floats": [
+                    {"id": "sen", "side": "below"}
+                  ],
+                  "edges": [
+                    {"from": "warp", "to": "tr", "kind": "https", "label": "OTA"},
+                    {"from": "sen", "to": "tr", "kind": "thread", "label": "poll (fails)"},
+                    {"from": "bob", "to": "ctl", "kind": "lan"},
+                    {"from": "sen", "to": "bob", "kind": "thread", "label": "re-attach + evt"},
+                    {"from": "ctl", "to": "app", "kind": "https", "label": "notify"},
+                    {"from": "tr", "to": "bob", "kind": "thread", "label": "BR-2"}
+                  ],
+                  "panels": [
+                    {"id": "br", "type": "signal", "title": "Border routers",
+                     "links": [
+                       {"id": "br1", "label": "Trellis BR", "transport": "thread"},
+                       {"id": "br2", "label": "Bobbin BR", "transport": "thread"}
+                     ],
+                     "initial": {"br1": {"state": "ok"}, "br2": {"state": "lost"}}},
+                    {"id": "orb", "type": "orbit", "title": "Sensor parent",
+                     "states": ["TRELLIS", "ORPHAN", "BOBBIN"],
+                     "colors": {"ORPHAN": "#EF4444", "BOBBIN": "#4ADE80"},
+                     "initial": {"state": "TRELLIS"}},
+                    {"id": "tst", "type": "state", "title": "Trellis",
+                     "states": ["ONLINE", "REBOOTING", "REJOINED"],
+                     "colors": {"REBOOTING": "#FFCB6B", "REJOINED": "#4ADE80"},
+                     "initial": {"state": "ONLINE"}}
+                  ],
+                  "steps": [
+                    {"edge": "warp->tr", "text": "Warp offers the image; reboot scheduled"},
+                    {"nodes": ["tr"], "text": "Trellis reboots — BR and leader roles vanish",
+                     "panels": {"tst": {"state": "REBOOTING"}, "br": {"br1": {"state": "lost"}}}},
+                    {"nodes": ["bob"], "text": "Bobbin wins the election, activates its BR",
+                     "panels": {"br": {"br2": {"state": "ok"}}}},
+                    {"edge": "bob->ctl", "text": "Bobbin re-advertises prefix + services on the LAN"},
+                    {"edge": "sen->tr", "text": "Sleepy sensor wakes; poll to the old parent fails",
+                     "panels": {"orb": {"state": "ORPHAN", "via": "poll timeout"}}},
+                    {"edges": ["sen->bob", "bob->ctl"], "text": "Re-parents to Bobbin; queued event flows on unbroken",
+                     "panels": {"orb": {"state": "BOBBIN", "via": "attach scan"}}},
+                    {"edge": "ctl->app", "text": "Partner app notified — reboot invisible to the user"},
+                    {"edge": "tr->bob", "text": "Trellis rejoins as secondary BR; two BRs now serve",
+                     "panels": {"tst": {"state": "REJOINED"}, "br": {"br1": {"state": "ok"}}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Zigbee bridge",
+            "sections": [
+              {
+                "heading": "One sensor, two stacks: crossing the bridge",
+                "accent": "green",
+                "text": [
+                  "The bridge maps W-12's IEEE address to its stable bridged Matter endpoint 12, labeled \"Back Window\" — the same identity every fabric sees."
+                ],
+                "bullets": [
+                  "**Zigbee window sensor W-12** reports open: an IAS Zone status change to the **Weft-R** coordinator.",
+                  "Weft-R forwards the frame to the bridge process on **[Loom-V8](https://github.com/loomworks/trellis-fw/blob/main/vision/pipeline.c#L212)**.",
+                  "The bridge maps W-12's IEEE address to its stable bridged Matter endpoint `12`, labeled \"Back Window\" — the same identity every fabric sees.",
+                  "A Matter subscription report (`BooleanState` cluster) goes out on the LAN to every subscribed controller on the fabric.",
+                  "The partner ecosystem's controller receives the report, and its app shows \"Back Window — Open\" under exactly that name.",
+                  "The local rule engine consumes the same event internally as just another subscriber.",
+                  "The Zigbee frame's battery and link-quality figures surface as bridged `PowerSource` attributes, so health crosses the bridge along with identity.",
+                  {
+                    "text": "**Related failure modes** (§6):",
+                    "sub": [
+                      "**Zigbee interference**: Weft-R runs channel agility and broadcasts a rejoin; bridged endpoints keep their numbers across the move.",
+                      "**Sensor battery low**: bridged PowerSource carries the level; Heddle nags the owner."
+                    ]
+                  }
+                ],
+                "contract": {
+                  "title": "Bridged Matter report (Trellis bridge → subscribed controllers, LAN)",
+                  "source": "https://github.com/loomworks/trellis-fw/blob/main/bridge/report.c#L167",
+                  "fields": [
+                    {"k": "node_id", "v": "0x00124B77", "g": "the Trellis bridge node on the fabric"},
+                    {"k": "endpoint", "v": "12", "g": "stable per bridged device — the identity that crosses", "hot": true},
+                    {"k": "cluster", "v": "0x0045", "g": "BooleanState (contact)"},
+                    {"k": "state_value", "v": "false", "g": "contact open"},
+                    {"k": "label", "v": "\"Back Window\"", "g": "bridged node label — the same in every app"},
+                    {"k": "data_version", "v": "881", "g": "subscription consistency counter"}
+                  ]
+                },
+                "diagram": {
+                  "view": "step",
+                  "groups": {"trellis": {"title": "Trellis (Loom-V8 + Weft-R)"}},
+                  "nodes": {
+                    "w12": {"title": "Sensor W-12", "sub": "zigbee contact", "icon": "chip", "tint": "dev"},
+                    "weft": {"title": "Weft-R", "sub": "zigbee coord", "icon": "chip", "tint": "dev", "group": "trellis",
+                             "link": "https://github.com/loomworks/weft-radio/blob/main/src/dual_stack.c#L94"},
+                    "brg": {"title": "Bridge", "sub": "zigbee↔matter", "icon": "gear", "tint": "cmd", "group": "trellis"},
+                    "rule": {"title": "Rule engine", "sub": "local subscriber", "icon": "gear", "tint": "cmd", "group": "trellis"},
+                    "ctl": {"title": "Partner controller", "sub": "fabric subscriber", "icon": "server", "tint": "cmd"},
+                    "papp": {"title": "Partner app", "sub": "phone", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    ["w12", ["weft", "brg", "rule"], "ctl", "papp"]
+                  ],
+                  "edges": [
+                    {"from": "w12", "to": "weft", "kind": "zigbee", "label": "IAS zone alarm"},
+                    {"from": "weft", "to": "brg", "kind": "int"},
+                    {"from": "brg", "to": "ctl", "kind": "lan", "label": "report ep 12"},
+                    {"from": "ctl", "to": "papp", "kind": "https", "label": "Back Window open"},
+                    {"from": "brg", "to": "rule", "kind": "int"}
+                  ],
+                  "panels": [
+                    {"id": "led", "type": "leds", "title": "Radio activity",
+                     "leds": [{"id": "zrx", "label": "ZIGBEE RX"}, {"id": "ltx", "label": "LAN TX"}],
+                     "initial": {"zrx": "off", "ltx": "off"}},
+                    {"id": "rlog", "type": "log", "title": "Bridge log",
+                     "tags": {"ZIG": "#FFCB6B", "BRG": "#C792EA", "MTR": "#38E1FF"}}
+                  ],
+                  "steps": [
+                    {"edge": "w12->weft", "text": "W-12 reports open to the Weft-R coordinator",
+                     "panels": {"led": {"zrx": "rx"}, "rlog": {"log": [{"tag": "ZIG", "text": "0x4A21 IAS alarm1 batt 87%"}]}}},
+                    {"edge": "weft->brg", "text": "Frame handed to the bridge on Loom-V8"},
+                    {"nodes": ["brg"], "text": "Mapped to stable endpoint 12 — \"Back Window\"",
+                     "panels": {"rlog": {"log": [{"tag": "BRG", "text": "ieee …A1:B2:77 → ep 12 Back Window"}]}}},
+                    {"edge": "brg->ctl", "text": "Matter subscription report fans out on the LAN",
+                     "panels": {"led": {"ltx": "tx"}, "rlog": {"log": [{"tag": "MTR", "text": "report 0x0045 false dv=881"}]}}},
+                    {"edge": "ctl->papp", "text": "Partner app shows the same name — identity preserved"},
+                    {"edge": "brg->rule", "text": "Rule engine consumes the same event locally",
+                     "panels": {"rlog": {"log": [{"tag": "BRG", "text": "rule engine: no rule matched"}]}}}
+                  ]
+                }
+              },
+              {
+                "heading": "On the wire: the Zigbee frame Weft-R receives",
+                "accent": "green",
+                "text": [
+                  "Before any bridging happens, the raw Zigbee frame W-12 sends to Weft-R already carries the battery and link-quality figures that end up on the Matter side as PowerSource attributes."
+                ],
+                "contract": {
+                  "title": "Zigbee sensor frame (W-12 → Weft-R coordinator)",
+                  "source": "https://github.com/loomworks/weft-radio/blob/main/src/ias_zone.c#L52",
+                  "fields": [
+                    {"k": "short_addr", "v": "0x4A21", "g": "network address this session"},
+                    {"k": "ieee", "v": "00:15:8D:00:04:A1:B2:77", "g": "stable identity the bridge maps to endpoint 12", "hot": true},
+                    {"k": "cluster", "v": "0x0500", "g": "IAS Zone"},
+                    {"k": "zone_status", "v": "0x0001", "g": "alarm1 set — contact open"},
+                    {"k": "battery_pct", "v": "87", "g": "surfaced as a bridged PowerSource attribute"},
+                    {"k": "lqi", "v": "188", "g": "link quality, kept for mesh health"}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Internet outage",
+            "sections": [
+              {
+                "heading": "Internet outage: the house keeps working",
+                "accent": "amber",
+                "text": [
+                  "The ISP modem dies mid-evening. Everything that matters locally — inference, rules, locks, lights, recording — keeps running; only remote view and push notifications wait for the tunnel to come back."
+                ],
+                "bullets": [
+                  "The ISP modem dies; Trellis's WAN probe fails and the **Lattice** tunnel drops, but *the LAN, Thread, and Zigbee networks stay up*.",
+                  "At `23:10` the camera path detects a person on the driveway — inference on the NPU, nothing leaving the device.",
+                  "The rule engine matches rule `R-18` (\"person on driveway at night → lock + light\"), synced earlier from **[Pattern](https://github.com/loomworks/lattice-cloud/blob/main/pattern/compile.go#L78)** and executed entirely locally.",
+                  "Trellis sends a Matter `LockDoor` command over Thread to the front-door lock, and the lock confirms.",
+                  "Trellis sends a Zigbee `on` command to the porch light, and the light acks.",
+                  "The clip lands on the microSD and the push notification is queued in the outbox, because no uplink exists.",
+                  "The WAN returns *40 minutes later*, and Trellis re-establishes the Lattice tunnel.",
+                  "The queued notification flushes through **Heddle** to the owner's phone; the clip stays local unless the owner enabled the **Spool** archive.",
+                  {
+                    "text": "**Related failure modes** (§6):",
+                    "sub": [
+                      "**Internet outage**: automations, bridging, and microSD recording continue; remote view and pushes queue; **Spool** uploads defer until the tunnel returns.",
+                      "**microSD failure**: recording falls back to a RAM pre-roll plus immediate **Spool** upload for subscribers; the app raises a storage-health alert.",
+                      "**Lattice down**: remote access is lost; the app on the same LAN reaches Trellis directly via mDNS, and automations are untouched."
+                    ]
+                  }
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "wan": {"title": "ISP modem", "sub": "broadband (dead)", "icon": "router", "tint": "dev"},
+                    "lat": {"title": "Lattice", "sub": "rendezvous", "icon": "cloud", "tint": "cmd",
+                            "link": "https://github.com/loomworks/lattice-cloud/blob/main/lattice/tunnel.go#L133"},
+                    "tr": {"title": "Trellis", "sub": "camera + rules", "icon": "chip", "tint": "dev"},
+                    "lock": {"title": "Front lock", "sub": "thread, matter", "icon": "key", "tint": "dev"},
+                    "light": {"title": "Porch light", "sub": "zigbee", "icon": "gear", "tint": "dev"},
+                    "hed": {"title": "Heddle", "sub": "push relay", "icon": "server", "tint": "cmd"},
+                    "ph": {"title": "Owner phone", "sub": "loomworks app", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    ["tr", "wan", "lat"],
+                    [["lock", "light", "hed"], "ph"]
+                  ],
+                  "edges": [
+                    {"from": "tr", "to": "wan", "kind": "https", "label": "WAN probe"},
+                    {"from": "wan", "to": "lat", "kind": "https", "label": "tunnel"},
+                    {"from": "tr", "to": "lock", "kind": "thread", "label": "LockDoor"},
+                    {"from": "lock", "to": "tr", "kind": "thread", "ret": true, "label": "locked"},
+                    {"from": "tr", "to": "light", "kind": "zigbee", "label": "on"},
+                    {"from": "tr", "to": "hed", "kind": "https", "label": "queued push"},
+                    {"from": "hed", "to": "ph", "kind": "https", "label": "notify"}
+                  ],
+                  "panels": [
+                    {"id": "links", "type": "signal", "title": "Links",
+                     "links": [
+                       {"id": "wan", "label": "WAN", "transport": "wifi"},
+                       {"id": "thr", "label": "Thread", "transport": "thread"}
+                     ],
+                     "initial": {"wan": {"state": "ok"}, "thr": {"state": "ok"}}},
+                    {"id": "outb", "type": "queue", "title": "Notification outbox", "initial": {"state": "empty"}},
+                    {"id": "llog", "type": "log", "title": "Rule engine",
+                     "tags": {"RULE": "#C792EA", "ACT": "#4ADE80"}}
+                  ],
+                  "steps": [
+                    {"edge": "tr->wan", "text": "WAN probe fails; Lattice tunnel drops",
+                     "panels": {"links": {"wan": {"state": "lost"}}}},
+                    {"nodes": ["tr"], "text": "23:10 — person detected on the driveway, on-NPU"},
+                    {"nodes": ["tr"], "text": "Rule R-18 matches: person at night → lock + light",
+                     "panels": {"llog": {"log": [{"tag": "RULE", "text": "R-18 matched — local exec"}]}}},
+                    {"edges": ["tr->lock", "lock->tr"], "text": "LockDoor over Thread; lock confirms",
+                     "panels": {"llog": {"log": [{"tag": "ACT", "text": "front lock: LOCKED"}]}}},
+                    {"edge": "tr->light", "text": "Porch light on over Zigbee",
+                     "panels": {"llog": {"log": [{"tag": "ACT", "text": "porch light: ON"}]}}},
+                    {"nodes": ["tr"], "text": "Clip to microSD; push queued — no uplink",
+                     "panels": {"outb": {"state": "enqueue", "label": "push: person 23:10", "from": "rule engine", "reason": "WAN down"}}},
+                    {"edge": "wan->lat", "text": "WAN restores; tunnel re-established",
+                     "panels": {"links": {"wan": {"state": "ok"}}, "outb": {"state": "held", "reason": "flushing outbox"}}},
+                    {"edges": ["tr->hed", "hed->ph"], "text": "Queued push flushes through Heddle",
+                     "panels": {"outb": {"state": "dequeue", "to": "→ Heddle"}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Two fabrics",
+            "sections": [
+              {
+                "heading": "Two fabrics, one sensor",
+                "accent": "violet",
+                "text": [
+                  "The owner commissions a new Thread contact sensor onto the loomworks fabric, then opens a second commissioning window so a partner ecosystem's controller can join too — without a factory reset, and without either admin displacing the other."
+                ],
+                "bullets": [
+                  "The owner scans the new Thread contact sensor's QR code in the loomworks app, which hands the setup payload to Trellis.",
+                  "Trellis finds the device over BLE and runs PASE with the setup passcode.",
+                  "Trellis checks the device-attestation certificate against **Graft**'s mirror of the certification ledger.",
+                  "Trellis writes operational credentials plus the Thread network key; the sensor joins the mesh, *drops BLE*, and a CASE session puts it on the loomworks fabric.",
+                  "The owner picks \"Add to another ecosystem,\" and the app asks Trellis to open a commissioning window — a one-time passcode, the device advertising again.",
+                  "The partner ecosystem's controller commissions over the open window: its own PASE and its own credentials for fabric 2, over the existing network, *no factory reset*.",
+                  "The sensor stores two independent fabric credential sets, and both controllers hold their own CASE subscriptions.",
+                  "A window-open event now reports to both fabrics at once, each under the identity that fabric assigned.",
+                  "*The argument*: multi-admin is additive — the fabric tiles fill in one at a time, and neither controller displaces the other."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "lapp": {"title": "loomworks app", "sub": "commissioner UI", "icon": "phone", "tint": "dev"},
+                    "tr": {"title": "Trellis", "sub": "matter controller", "icon": "chip", "tint": "dev"},
+                    "dev": {"title": "Contact sensor", "sub": "new thread device", "icon": "chip", "tint": "dev"},
+                    "grf": {"title": "Graft", "sub": "attestation mirror", "icon": "cloud", "tint": "auth"},
+                    "pctl": {"title": "Partner controller", "sub": "fabric 2", "icon": "server", "tint": "cmd"},
+                    "papp": {"title": "Partner app", "sub": "phone", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    ["lapp", "tr", "dev"],
+                    ["papp", "pctl"]
+                  ],
+                  "floats": [
+                    {"id": "grf", "side": "above"}
+                  ],
+                  "edges": [
+                    {"from": "lapp", "to": "tr", "kind": "lan", "label": "setup payload"},
+                    {"from": "tr", "to": "dev", "kind": "ble", "label": "PASE + creds"},
+                    {"from": "tr", "to": "grf", "kind": "https", "label": "attestation"},
+                    {"from": "grf", "to": "tr", "kind": "https", "ret": true, "label": "cert ok"},
+                    {"from": "dev", "to": "tr", "kind": "thread", "label": "CASE fabric 1"},
+                    {"from": "papp", "to": "pctl", "kind": "https", "label": "add device"},
+                    {"from": "pctl", "to": "dev", "kind": "lan", "label": "PASE #2 + creds"},
+                    {"from": "dev", "to": "pctl", "kind": "lan", "label": "CASE fabric 2"}
+                  ],
+                  "panels": [
+                    {"id": "cst", "type": "state", "title": "Commissioning",
+                     "states": ["ADVERTISING", "PASE", "ATTESTED", "FABRIC 1", "WINDOW OPEN", "FABRIC 1+2"],
+                     "colors": {"FABRIC 1+2": "#4ADE80"},
+                     "initial": {"state": "ADVERTISING"}},
+                    {"id": "fab", "type": "tiles", "title": "Fabric membership",
+                     "tiles": [
+                       {"id": "f1", "label": "loomworks fabric", "sub": "Trellis controller"},
+                       {"id": "f2", "label": "partner fabric", "sub": "3rd-party controller"}
+                     ],
+                     "initial": {"f1": {"state": "none"}, "f2": {"state": "none"}}}
+                  ],
+                  "steps": [
+                    {"edge": "lapp->tr", "text": "QR scanned; setup payload handed to Trellis",
+                     "panels": {"cst": {"state": "ADVERTISING"}}},
+                    {"edge": "tr->dev", "text": "BLE session, PASE with the setup passcode",
+                     "panels": {"cst": {"state": "PASE"}}},
+                    {"edges": ["tr->grf", "grf->tr"], "text": "Attestation cert checked against Graft's mirror",
+                     "panels": {"cst": {"state": "ATTESTED"}}},
+                    {"nodes": ["dev"], "text": "Creds + Thread key written; sensor joins the mesh",
+                     "panels": {"cst": {"state": "FABRIC 1"}, "fab": {"f1": {"state": "joined"}}}},
+                    {"nodes": ["lapp", "tr"], "text": "Owner opens a commissioning window — new passcode",
+                     "panels": {"cst": {"state": "WINDOW OPEN"}}},
+                    {"edges": ["papp->pctl", "pctl->dev"], "text": "Partner controller commissions over the window",
+                     "panels": {"fab": {"f2": {"state": "joining"}}}},
+                    {"edge": "dev->pctl", "text": "Fabric-2 creds stored; second CASE session up",
+                     "panels": {"cst": {"state": "FABRIC 1+2"}, "fab": {"f2": {"state": "joined"}}}},
+                    {"edges": ["dev->tr", "dev->pctl"], "text": "One open event reports to both fabrics at once"}
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

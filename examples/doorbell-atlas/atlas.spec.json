@@ -1,0 +1,609 @@
+{
+  "page": {
+    "title": "Lookout Feature Atlas",
+    "protocols": {
+      "ble": { "label": "BLE", "color": { "aurora": "#4C8DFF", "daylight": "#1D4ED8" } },
+      "rtp": { "label": "media stream", "color": { "aurora": "#FFB454", "daylight": "#B45309" } },
+      "power": { "label": "power", "color": { "aurora": "#FDE047", "daylight": "#A16207" } },
+      "frame": { "label": "image data", "color": { "aurora": "#2DD4BF", "daylight": "#0F766E" } },
+      "device": { "label": "on-device", "color": { "aurora": "#94A3B8", "daylight": "#475569" } }
+    },
+    "lanes": {
+      "NET": { "label": "NET", "color": "#38E1FF" },
+      "DEV": { "label": "DEV", "color": "#4ADE80" },
+      "CAM": { "label": "CAM", "color": "#FFB454" }
+    },
+    "blocks": [
+      {
+        "heading": "One doorbell, two brains",
+        "accent": "cyan",
+        "text": [
+          "Lookout is a battery video doorbell built on the Cumulus IoT platform. Inside are two chips with opposite jobs: Sentry LP stays awake on 4 mW to hold WiFi, MQTT, and the motion sensor, while Vision HP — camera, encoder, neural nets — stays off until Sentry raises its interrupt line.",
+          "Every diagram below is generated from one JSON spec and offers the same two views: ambient (everything animating) and a guided step-through. Tabs order the story from the doorbell's hero moment to what happens to your footage."
+        ],
+        "bullets": [
+          "Sentry LP: always-on WiFi + MQTT session, PIR motion input, 4 mW idle",
+          "Vision HP: camera, H.264 encoder, person/package classifier — normally powered off",
+          "Cloud: Relay broker (MQTT/TLS), Pulse events, Herald push, Beam media, Vault clip store",
+          "Line colors are protocols, and they draw the same in every diagram on this page"
+        ]
+      },
+      {
+        "tabs": [
+          {
+            "label": "The Doorbell Moment",
+            "sections": [
+              {
+                "heading": "Button press to phone ring in 640 ms",
+                "accent": "green",
+                "source": "https://github.com/doorbuzz-hw/firmware/blob/main/sentry/button_isr.c#L42",
+                "text": [
+                  "The hero path. A visitor presses the ring; the always-on Sentry chip publishes one small MQTT event, and the cloud turns it into a push that rings the owner's phone well inside a second.",
+                  "No video is involved yet — the ring event is control-plane only, which is why it fits the latency budget even on a congested home network."
+                ],
+                "bullets": [
+                  "End-to-end budget: 640 ms p95 from circuit close to phone ring",
+                  "Sentry wakes from idle in 11 ms; the MQTT session is already open, so there is no connect cost",
+                  "The event is 210 bytes; QoS 1 with retain off",
+                  "Video starts only if the owner answers — see the next tab"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "press": { "title": "Ring Button", "sub": "GPIO, debounced", "icon": "key", "tint": "dev" },
+                    "sentry": { "title": "Sentry LP", "sub": "always-on chip", "icon": "chip", "tint": "dev", "link": "https://github.com/doorbuzz-hw/firmware/blob/main/sentry/button_isr.c#L42" },
+                    "relay": { "title": "Relay", "sub": "MQTT · TLS :8883", "icon": "antenna", "tint": "mqtt" },
+                    "pulse": { "title": "Pulse Events", "sub": "event router", "icon": "server", "tint": "cmd" },
+                    "herald": { "title": "Herald Push", "sub": "notification svc", "icon": "cloud", "tint": "cmd" },
+                    "pns": { "title": "OS Push Network", "sub": "platform delivery", "icon": "cloud", "tint": "data" },
+                    "phone": { "title": "Owner's Phone", "sub": "rings + preview", "icon": "phone", "tint": "dev" }
+                  },
+                  "rows": [
+                    ["press", "sentry", "relay", "pulse"],
+                    ["herald", "pns", "phone"]
+                  ],
+                  "edges": [
+                    { "from": "press", "to": "sentry", "kind": "device", "label": "button IRQ" },
+                    { "from": "sentry", "to": "relay", "kind": "mqtt", "label": "evt/door/press · QoS 1" },
+                    { "from": "relay", "to": "pulse", "kind": "mqtt", "label": "deliver event" },
+                    { "from": "pulse", "to": "herald", "kind": "int", "label": "route: push" },
+                    { "from": "herald", "to": "pns", "kind": "https", "label": "push payload" },
+                    { "from": "pns", "to": "phone", "kind": "https", "label": "wake + ring" }
+                  ],
+                  "panels": [
+                    {
+                      "id": "lat", "type": "waterfall", "title": "Latency budget — 640 ms p95",
+                      "initial": { "reveal": 0 },
+                      "spans": [
+                        { "id": "irq", "label": "IRQ + Sentry wake", "ms": 70 },
+                        { "id": "pub", "label": "MQTT publish", "ms": 40 },
+                        { "id": "route", "label": "Relay dequeue", "ms": 40 },
+                        { "id": "decide", "label": "Pulse routing", "ms": 60 },
+                        { "id": "push", "label": "Herald + OS push", "ms": 210 },
+                        { "id": "ring", "label": "Phone wake + ring", "ms": 220 }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    { "edge": "press->sentry", "lane": "DEV", "text": "The button closes the circuit; Sentry LP wakes from 4 mW idle in 11 ms.", "panels": { "lat": { "reveal": 1, "highlight": "irq" } } },
+                    { "edge": "sentry->relay", "lane": "NET", "text": "Sentry publishes the press event over its already-open MQTT session (t+70 ms).", "panels": { "lat": { "reveal": 2, "highlight": "pub" } } },
+                    { "edge": "relay->pulse", "lane": "NET", "text": "Relay hands the event to Pulse for routing (t+110 ms).", "panels": { "lat": { "reveal": 3, "highlight": "route" } } },
+                    { "edge": "pulse->herald", "lane": "NET", "text": "Pulse chooses push delivery — the owner's phone is reachable (t+150 ms).", "panels": { "lat": { "reveal": 4, "highlight": "decide" } } },
+                    { "edge": "herald->pns", "lane": "NET", "text": "Herald formats the platform push and hands it to the OS push network (t+210 ms).", "panels": { "lat": { "reveal": 5, "highlight": "push" } } },
+                    { "edge": "pns->phone", "lane": "NET", "text": "The phone rings 640 ms after the press — the full p95 budget.", "panels": { "lat": { "reveal": 6, "highlight": "ring", "total": "640 ms p95" } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Answer & Talk",
+            "sections": [
+              {
+                "heading": "When someone approaches — the whole device story",
+                "accent": "green",
+                "source": "https://github.com/doorbuzz-hw/docs/blob/main/hld.md#motion-pipeline",
+                "text": [
+                  "The whole visit in one guided flow: motion trips the PIR, the event rides MQTT to the owner's phone, live view wakes the high-power chip, and the clip lands in Vault — every step synchronized across the flow board, the hardware inspector (wake state, board LEDs, power draw, event log), and the viewfinder.",
+                  "Watch the viewfinder from step 9 on: dark standby, boot static, the live night scene, then the blinking REC timecode and the clip-save banner."
+                ],
+                "bullets": [
+                  "Motion events ride MQTT through Relay; video never touches the broker",
+                  "Vision HP runs for seconds per visit — the power gauge peaks at 350 mA while recording",
+                  "Clips upload to Vault over HTTPS and are linked back to the originating event",
+                  "Zones and privacy masks gate this pipeline — see Smart Motion & Privacy"
+                ],
+                "diagram": {
+                  "view": "step",
+                  "groups": {
+                    "doorbell": { "title": "Lookout doorbell unit" }
+                  },
+                  "nodes": {
+                    "sentry": { "title": "Sentry LP", "sub": "wifi · mqtt · PIR", "icon": "chip", "tint": "dev", "group": "doorbell", "link": "https://github.com/doorbuzz-hw/firmware/blob/main/sentry/main.c#L44" },
+                    "vision": { "title": "Vision HP", "sub": "camera · H.264", "icon": "chip", "tint": "dev", "group": "doorbell", "link": "https://github.com/doorbuzz-hw/firmware/blob/main/vision/pipeline.c#L120" },
+                    "relay": { "title": "Relay", "sub": "MQTT · TLS :8883", "icon": "antenna", "tint": "mqtt" },
+                    "pulse": { "title": "Pulse Events", "sub": "event router", "icon": "server", "tint": "cmd", "link": "https://github.com/doorbuzz-hw/cloud/blob/main/pulse/handler.go#L88" },
+                    "herald": { "title": "Herald Push", "sub": "notification svc", "icon": "cloud", "tint": "cmd" },
+                    "phone": { "title": "Owner's Phone", "sub": "companion app", "icon": "phone", "tint": "dev" },
+                    "beam": { "title": "Beam Media", "sub": "stream relay", "icon": "server", "tint": "data" },
+                    "vault": { "title": "Vault Clips", "sub": "clip storage", "icon": "db", "tint": "data" }
+                  },
+                  "rows": [
+                    [["sentry", "vision"], "relay", "pulse", "herald"],
+                    ["phone", "beam", "vault"]
+                  ],
+                  "edges": [
+                    { "from": "sentry", "to": "relay", "kind": "mqtt", "label": "evt/door/motion" },
+                    { "from": "relay", "to": "pulse", "kind": "mqtt", "label": "deliver event" },
+                    { "from": "pulse", "to": "herald", "kind": "int", "label": "notify owner" },
+                    { "from": "herald", "to": "phone", "kind": "https", "label": "push: motion at door" },
+                    { "from": "phone", "to": "beam", "kind": "https", "label": "tap Live View" },
+                    { "from": "beam", "to": "relay", "kind": "mqtt", "label": "PUBLISH cmd/door/stream" },
+                    { "from": "relay", "to": "sentry", "kind": "mqtt", "label": "deliver QoS 1" },
+                    { "from": "sentry", "to": "vision", "kind": "device", "label": "IRQ" },
+                    { "from": "vision", "to": "beam", "kind": "rtp", "label": "H.264 stream" },
+                    { "from": "beam", "to": "phone", "kind": "rtp", "label": "live view" },
+                    { "from": "vision", "to": "vault", "kind": "https", "label": "upload clip" },
+                    { "from": "vault", "to": "pulse", "kind": "int", "ret": true, "label": "clip indexed" }
+                  ],
+                  "panels": [
+                    { "id": "hp", "type": "state", "title": "Vision HP — wake state",
+                      "states": ["OFF", "WAKE IRQ", "BOOT", "STREAM", "RECORD", "UPLOAD"],
+                      "colors": { "OFF": "#55627A", "WAKE IRQ": "#FFB454", "BOOT": "#FFB454", "STREAM": "#38E1FF", "RECORD": "#FF6B5E", "UPLOAD": "#A78BFA" },
+                      "initial": { "state": "OFF" } },
+                    { "id": "leds", "type": "leds", "title": "Sentry LP — board",
+                      "leds": [{ "id": "radio", "label": "RADIO" }, { "id": "pir", "label": "PIR" }, { "id": "cam", "label": "CAM PWR" }],
+                      "initial": { "radio": "on", "pir": "off", "cam": "off" } },
+                    { "id": "pw", "type": "gauge", "title": "Power draw", "unit": "mA", "max": 400,
+                      "initial": { "value": 2 } },
+                    { "id": "cam", "type": "screen", "title": "Viewfinder", "scene": "person-at-door-night",
+                      "initial": { "mode": "off" } },
+                    { "id": "log", "type": "log", "title": "Event log",
+                      "tags": { "NET": "#38E1FF", "DEV": "#4ADE80", "CAM": "#FFB454" } }
+                  ],
+                  "steps": [
+                    { "nodes": ["sentry"], "lane": "DEV",
+                      "text": "PIR sensor trips — motion at the front door.",
+                      "panels": { "leds": { "pir": "tx" }, "pw": { "value": 6 }, "log": { "log": [{ "tag": "DEV", "text": "PIR IRQ · motion" }] } } },
+                    { "edge": "sentry->relay", "lane": "NET",
+                      "text": "Sentry LP publishes the motion event over MQTT.",
+                      "link": "https://github.com/doorbuzz-hw/firmware/blob/main/sentry/mqtt.c#L61",
+                      "panels": { "leds": { "radio": "tx" }, "log": { "log": [{ "tag": "NET", "text": "PUB evt/door/motion" }] } } },
+                    { "edge": "relay->pulse", "lane": "NET",
+                      "text": "Relay delivers the event to Pulse.",
+                      "panels": { "leds": { "radio": "on", "pir": "off" } } },
+                    { "edge": "pulse->herald", "lane": "NET",
+                      "text": "Pulse raises a doorbell alert for the household." },
+                    { "edge": "herald->phone", "lane": "NET",
+                      "text": "Push notification rings the owner's phone.",
+                      "panels": { "log": { "log": [{ "tag": "NET", "text": "push delivered" }] } } },
+                    { "edge": "phone->beam", "lane": "NET",
+                      "text": "Owner taps Live View — Beam requests a stream." },
+                    { "edges": ["beam->relay", "relay->sentry"], "lane": "NET",
+                      "text": "The stream command rides MQTT back down to the doorbell.",
+                      "panels": { "leds": { "radio": "rx" }, "log": { "log": [{ "tag": "NET", "text": "RECV cmd/door/stream" }] } } },
+                    { "edge": "sentry->vision", "lane": "DEV",
+                      "text": "Sentry LP raises WAKE_INT — the high-power chip powers on.",
+                      "link": "https://github.com/doorbuzz-hw/firmware/blob/main/sentry/wake.c#L17",
+                      "panels": { "hp": { "state": "WAKE IRQ" }, "leds": { "cam": "on" }, "pw": { "value": 85 }, "log": { "log": [{ "tag": "DEV", "text": "WAKE_INT asserted" }] } } },
+                    { "nodes": ["vision"], "lane": "DEV",
+                      "text": "Vision HP boots: camera sensor and H.264 encoder.",
+                      "panels": { "hp": { "state": "BOOT" }, "cam": { "mode": "boot" }, "pw": { "value": 180 } } },
+                    { "edges": ["vision->beam", "beam->phone"], "lane": "CAM",
+                      "text": "Live video streams to the phone — someone is at the door.",
+                      "panels": { "hp": { "state": "STREAM" }, "cam": { "mode": "live" }, "pw": { "value": 320 }, "log": { "log": [{ "tag": "CAM", "text": "RTP stream up" }] } } },
+                    { "nodes": ["vision"], "lane": "CAM",
+                      "text": "The doorbell records the visit.",
+                      "panels": { "hp": { "state": "RECORD" }, "cam": { "mode": "rec" }, "pw": { "value": 350 }, "log": { "log": [{ "tag": "CAM", "text": "REC started" }] } } },
+                    { "edges": ["vision->vault", "vault->pulse"], "lane": "CAM",
+                      "text": "Clip uploads to Vault; Pulse links it to the originating event.",
+                      "panels": { "hp": { "state": "UPLOAD" }, "cam": { "mode": "save", "banner": "SAVING CLIP → VAULT" }, "pw": { "value": 120 }, "log": { "log": [{ "tag": "CAM", "text": "clip 00:14 → vault" }] } } }
+                  ]
+                }
+              },
+              {
+                "heading": "Live view and full-duplex talk",
+                "accent": "blue",
+                "text": [
+                  "Answering the ring opens live view: the cloud wakes Vision HP over the same MQTT session, and encrypted video plus doorstep audio stream to the phone through Beam, the media relay. The full wake-to-record sequence — hardware inspector and viewfinder included — is the guided flow above; this board focuses on the audio paths.",
+                  "Holding Talk adds the reverse audio path. Both directions run at once — echo cancellation happens on Vision, next to the microphone, so the visitor never hears themselves."
+                ],
+                "bullets": [
+                  "Vision HP cold-boots its camera pipeline in 480 ms",
+                  "Media is end-to-end encrypted; Beam relays without decoding",
+                  "Talk is full duplex — not walkie-talkie push-to-talk",
+                  "If nobody answers in 20 s, Vision records a clip instead (see Your Data's Journey)"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "phone": { "title": "Owner's Phone", "sub": "live view UI", "icon": "phone", "tint": "dev" },
+                    "beam": { "title": "Beam Media", "sub": "stream relay", "icon": "server", "tint": "cmd" },
+                    "relay": { "title": "Relay", "sub": "MQTT · TLS :8883", "icon": "antenna", "tint": "mqtt" },
+                    "sentry": { "title": "Sentry LP", "sub": "always-on chip", "icon": "chip", "tint": "dev" },
+                    "vision": { "title": "Vision HP", "sub": "camera + encoder", "icon": "chip", "tint": "dev", "link": "https://github.com/doorbuzz-hw/firmware/blob/main/vision/stream_task.c#L96" }
+                  },
+                  "rows": [
+                    ["phone", "beam", "relay", "sentry"],
+                    ["vision"]
+                  ],
+                  "edges": [
+                    { "from": "phone", "to": "beam", "kind": "https", "label": "open live view" },
+                    { "from": "beam", "to": "relay", "kind": "int", "label": "wake request" },
+                    { "from": "relay", "to": "sentry", "kind": "mqtt", "label": "cmd/door/stream" },
+                    { "from": "sentry", "to": "vision", "kind": "device", "label": "WAKE_INT" },
+                    { "from": "vision", "to": "beam", "kind": "rtp", "label": "video + door audio" },
+                    { "from": "beam", "to": "phone", "kind": "rtp", "label": "stream down" },
+                    { "from": "phone", "to": "vision", "kind": "rtp", "ret": true, "label": "talk audio up" }
+                  ],
+                  "steps": [
+                    { "edge": "phone->beam", "lane": "NET", "text": "Owner taps Live View; Beam authenticates and wakes the doorbell — the wake chain runs step by step in the flow above." },
+                    { "edges": ["vision->beam", "beam->phone"], "lane": "CAM", "text": "Encrypted video and doorstep audio stream to the phone; Vision cold-boots its camera pipeline in 480 ms." },
+                    { "edge": "phone->vision", "lane": "CAM", "text": "Owner holds Talk — the phone mic streams up; echo cancellation runs on Vision, next to the doorstep microphone." },
+                    { "edges": ["beam->phone", "vision->beam", "phone->vision"], "lane": "CAM", "text": "Full duplex: both directions live at once — a conversation, not walkie-talkie." }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Smart Motion & Privacy",
+            "sections": [
+              {
+                "heading": "Detection that respects the mask",
+                "accent": "violet",
+                "text": [
+                  "Motion detection is a pipeline, and privacy is enforced at its first stage. The PIR sensor wakes Sentry on a heat change; Vision grabs one low-resolution analysis frame; zones are applied on the sensor before anything else sees pixels.",
+                  "A person in an armed zone becomes an alert. Motion in a masked zone is dropped on-device — those pixels are cropped out before the frame reaches the classifier, so they never exist off the sensor."
+                ],
+                "bullets": [
+                  "Privacy masks are applied on-sensor: masked pixels never leave the device",
+                  "The classifier distinguishes person / package / vehicle / animal",
+                  "Analysis frames are 320×240 luma-only — full video starts only for real events",
+                  "Zone edits in the app take effect on the next wake, no reboot"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "pir": { "title": "PIR Sensor", "sub": "passive infrared", "icon": "thermo", "tint": "dev" },
+                    "sentry": { "title": "Sentry LP", "sub": "wake logic", "icon": "chip", "tint": "dev" },
+                    "vision": { "title": "Vision HP", "sub": "frame + classifier", "icon": "chip", "tint": "dev" },
+                    "zones": { "title": "Zone Policy", "sub": "masks + armed areas", "icon": "shield", "tint": "auth" },
+                    "pulse": { "title": "Pulse Events", "sub": "event decision", "icon": "server", "tint": "cmd" },
+                    "phone": { "title": "Owner's Phone", "sub": "rich alert", "icon": "phone", "tint": "dev" }
+                  },
+                  "rows": [
+                    ["pir", "sentry", "vision", "zones"],
+                    ["pulse", "phone"]
+                  ],
+                  "edges": [
+                    { "from": "pir", "to": "sentry", "kind": "device", "label": "heat-delta IRQ" },
+                    { "from": "sentry", "to": "vision", "kind": "device", "label": "wake + frame request" },
+                    { "from": "vision", "to": "zones", "kind": "frame", "label": "low-res luma frame" },
+                    { "from": "zones", "to": "pulse", "kind": "int", "label": "verdict: person, armed" },
+                    { "from": "pulse", "to": "phone", "kind": "https", "label": "alert + snapshot" }
+                  ],
+                  "panels": [
+                    {
+                      "id": "yard", "type": "zoneframe", "title": "Zones on the frame",
+                      "initial": { "subject": { "x": 18, "y": 166 } },
+                      "zones": [
+                        { "id": "walk", "label": "walkway", "state": "armed", "points": [[128, 150], [148, 98], [176, 98], [198, 150]] },
+                        { "id": "street", "label": "street", "state": "ignored", "points": [[2, 154], [318, 154], [318, 178], [2, 178]] },
+                        { "id": "window", "label": "neighbor window", "state": "masked", "points": [[246, 32], [310, 32], [310, 88], [246, 88]] }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    { "edge": "pir->sentry", "lane": "DEV", "text": "The PIR sees a warm shape move; Sentry wakes. No pixels involved yet.", "panels": { "yard": { "subject": { "x": 60, "y": 162 } } } },
+                    { "edge": "sentry->vision", "lane": "CAM", "text": "Sentry wakes Vision for a single 320×240 analysis frame.", "panels": { "yard": { "subject": { "x": 150, "y": 140 } } } },
+                    { "edge": "vision->zones", "lane": "CAM", "text": "Masks are cropped on-sensor first — masked pixels never leave the device — then the classifier runs.", "panels": { "yard": { "subject": { "x": 158, "y": 124 }, "verdict": "never-captured" } } },
+                    { "edge": "zones->pulse", "lane": "NET", "text": "Person inside an armed zone → event. Masked-zone motion is dropped silently, with no record.", "panels": { "yard": { "subject": { "x": 162, "y": 116 }, "verdict": "alert" } } },
+                    { "edge": "pulse->phone", "lane": "NET", "text": "The owner gets a rich alert with a mask-respecting snapshot.", "panels": { "yard": { "subject": { "x": 164, "y": 112 } } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Day-One Setup",
+            "sections": [
+              {
+                "heading": "From box to claimed in seven steps",
+                "accent": "cyan",
+                "source": "https://github.com/doorbuzz-hw/firmware/blob/main/provisioning/ble_pair.c#L118",
+                "text": [
+                  "Provisioning runs over BLE only long enough to hand the doorbell its WiFi credentials, encrypted under a key derived from the QR code in the box. After that the doorbell is a normal Cumulus device: it enrolls a per-device certificate, binds to the owner's account, and opens its permanent MQTT session.",
+                  "This board opens in the guided view because setup is the flow where step order is the whole story."
+                ],
+                "bullets": [
+                  "BLE never carries video or network traffic — pairing and credentials only",
+                  "WiFi credentials cross encrypted under the QR-derived key, not plaintext",
+                  "Each device gets its own X.509 certificate at enrollment; there are no shared secrets",
+                  "Total time on a normal network: under 90 seconds"
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "phone": { "title": "Owner's Phone", "sub": "setup app", "icon": "phone", "tint": "dev" },
+                    "doorbell": { "title": "Lookout Doorbell", "sub": "Sentry LP", "icon": "chip", "tint": "dev", "link": "https://github.com/doorbuzz-hw/firmware/blob/main/provisioning/ble_pair.c#L118" },
+                    "router": { "title": "Home WiFi", "sub": "WPA2 join", "icon": "router", "tint": "data" },
+                    "sentinel": { "title": "Sentinel Auth", "sub": "cert enrollment", "icon": "shield", "tint": "auth" },
+                    "registry": { "title": "Registry", "sub": "account binding", "icon": "db", "tint": "data" },
+                    "relay": { "title": "Relay", "sub": "MQTT · TLS :8883", "icon": "antenna", "tint": "mqtt" }
+                  },
+                  "rows": [
+                    ["phone", "doorbell", "router"],
+                    ["sentinel", "registry", "relay"]
+                  ],
+                  "edges": [
+                    { "from": "phone", "to": "doorbell", "kind": "ble", "label": "pair · QR-derived key" },
+                    { "from": "doorbell", "to": "router", "kind": "int", "label": "join WLAN" },
+                    { "from": "doorbell", "to": "sentinel", "kind": "https", "label": "enroll: per-device cert" },
+                    { "from": "sentinel", "to": "registry", "kind": "int", "label": "bind to account" },
+                    { "from": "registry", "to": "relay", "kind": "int", "label": "authorize session" },
+                    { "from": "relay", "to": "doorbell", "kind": "mqtt", "label": "first connect" }
+                  ],
+                  "steps": [
+                    { "edge": "phone->doorbell", "lane": "NET", "text": "The app finds the doorbell over BLE and pairs with the key from the box QR code — BLE never carries video or WiFi traffic." },
+                    { "edge": "phone->doorbell", "lane": "NET", "text": "WiFi credentials cross the BLE link encrypted under the QR-derived key." },
+                    { "edge": "doorbell->router", "lane": "NET", "text": "The doorbell joins the home network and shuts BLE down." },
+                    { "edge": "doorbell->sentinel", "lane": "NET", "text": "It enrolls with Sentinel: CSR up, per-device X.509 certificate back." },
+                    { "edge": "sentinel->registry", "lane": "NET", "text": "The certificate binds this exact hardware to the owner's account." },
+                    { "edge": "registry->relay", "lane": "NET", "text": "Registry authorizes the device's MQTT session with Relay." },
+                    { "edge": "relay->doorbell", "lane": "DEV", "text": "First connect succeeds — the ring LED goes solid. Claimed, in under 90 seconds." }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Power to Last a Year",
+            "sections": [
+              {
+                "heading": "Where the milliwatts go",
+                "accent": "amber",
+                "text": [
+                  "Battery life is a budget, and the two-chip design is the budget's whole trick: Sentry LP holds the network for 4 mW while Vision HP — thirty times hungrier per second — only exists during events.",
+                  "This board shows the flows with real numbers. A dedicated power-flow visualization (animated source-to-load bands) is planned; the topology and the arithmetic are already accurate here."
+                ],
+                "bullets": [
+                  "Battery: 6700 mAh ≈ 24.8 Wh usable; deep-discharge cutoff at 5%",
+                  "Baseline: Sentry 4 mW around the clock ≈ 96 mWh/day",
+                  "Each 30 s event costs ≈ 27 mWh (Vision boot + encode + radio burst)",
+                  "Ten events/day with zero sun ≈ 34 days to empty; 4 h of decent sun/day ≈ indefinite",
+                  "Cold weather derates the pack: at −10 °C plan on roughly 60% of rated capacity"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "sun": { "title": "Solar Panel", "sub": "0.5 W peak", "icon": "cloud", "tint": "data" },
+                    "pmic": { "title": "PMIC", "sub": "charge controller", "icon": "gear", "tint": "cmd" },
+                    "batt": { "title": "Battery", "sub": "6700 mAh", "icon": "db", "tint": "dev" },
+                    "sentry": { "title": "Sentry LP", "sub": "4 mW idle", "icon": "chip", "tint": "dev" },
+                    "radio": { "title": "WiFi Radio", "sub": "180 mW tx bursts", "icon": "antenna", "tint": "mqtt" },
+                    "vision": { "title": "Vision HP", "sub": "3.2 W streaming", "icon": "chip", "tint": "dev" }
+                  },
+                  "rows": [
+                    ["sun", "pmic", "batt"],
+                    ["sentry", "radio", "vision"]
+                  ],
+                  "edges": [
+                    { "from": "sun", "to": "pmic", "kind": "power", "label": "harvest ≤500 mW" },
+                    { "from": "pmic", "to": "batt", "kind": "power", "label": "charge current" },
+                    { "from": "batt", "to": "sentry", "kind": "power", "label": "always-on · 4 mW" },
+                    { "from": "batt", "to": "radio", "kind": "power", "label": "tx bursts · 180 mW" },
+                    { "from": "batt", "to": "vision", "kind": "power", "label": "events · 3.2 W" }
+                  ],
+                  "steps": [
+                    { "edge": "sun->pmic", "lane": "DEV", "text": "Four hours of decent sun harvests about 1.6 Wh — a normal day's spend." },
+                    { "edge": "pmic->batt", "lane": "DEV", "text": "The PMIC tops up the 6700 mAh pack and cuts off at 5% to protect it." },
+                    { "edge": "batt->sentry", "lane": "DEV", "text": "Sentry LP sips 4 mW around the clock — 96 mWh a day just to stay reachable." },
+                    { "edge": "batt->radio", "lane": "DEV", "text": "The radio wakes only to publish; duty cycling keeps transmit under 40 mWh/day." },
+                    { "edge": "batt->vision", "lane": "DEV", "text": "Vision HP is the spender: each 30 s event ≈ 27 mWh. Ten events a day with no sun ≈ 34 days to empty." }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Your Data's Journey",
+            "sections": [
+              {
+                "heading": "From lens to vault",
+                "accent": "red",
+                "source": "https://github.com/doorbuzz-hw/cloud/blob/main/vault/retention.go#L57",
+                "text": [
+                  "When nobody answers, Vision records. The clip starts before the press — a ring buffer holds the last four seconds continuously, so the moment that caused the event is always in the file.",
+                  "Clips are encrypted on the device before upload. Vault stores them, renders a preview for the app timeline, and starts the retention clock."
+                ],
+                "bullets": [
+                  "Pre-roll: 4 s ring buffer means the clip includes the walk-up, not just the aftermath",
+                  "Retention tiers: Free 24 h · Plus 60 days · Local-only mode keeps clips on the doorbell's flash",
+                  "Deleting a clip cascades: store, previews, and timeline entries go together",
+                  "Every clip carries a tamper-evident hash logged at upload time"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "vision": { "title": "Vision HP", "sub": "encode + pre-roll", "icon": "chip", "tint": "dev" },
+                    "enc": { "title": "Clip Sealer", "sub": "AES per-clip key", "icon": "key", "tint": "auth" },
+                    "vault": { "title": "Vault Clips", "sub": "cloud store", "icon": "package", "tint": "data", "link": "https://github.com/doorbuzz-hw/cloud/blob/main/vault/retention.go#L57" },
+                    "thumb": { "title": "Thumbnailer", "sub": "preview render", "icon": "server", "tint": "cmd" },
+                    "phone": { "title": "Owner's Phone", "sub": "timeline", "icon": "phone", "tint": "dev" }
+                  },
+                  "rows": [
+                    ["vision", "enc", "vault"],
+                    ["thumb", "phone"]
+                  ],
+                  "edges": [
+                    { "from": "vision", "to": "enc", "kind": "device", "label": "raw clip + pre-roll" },
+                    { "from": "enc", "to": "vault", "kind": "https", "label": "sealed upload" },
+                    { "from": "vault", "to": "thumb", "kind": "int", "label": "generate preview" },
+                    { "from": "thumb", "to": "phone", "kind": "https", "label": "notify + thumbnail" }
+                  ],
+                  "steps": [
+                    { "edge": "vision->enc", "lane": "DEV", "text": "The clip includes 4 s of pre-roll from the ring buffer — the moment before the press." },
+                    { "edge": "enc->vault", "lane": "NET", "text": "Sealed on-device before it leaves; Vault stores by clip id and logs a tamper-evident hash." },
+                    { "edge": "vault->thumb", "lane": "NET", "text": "Vault triggers a preview render for the app timeline." },
+                    { "edge": "thumb->phone", "lane": "NET", "text": "The timeline updates and the retention countdown starts — 24 h Free, 60 days Plus." }
+                  ]
+                }
+              },
+              {
+                "heading": "Who can watch",
+                "accent": "slate",
+                "text": [
+                  "In end-to-end-encrypted mode the clip is sealed with a key that only the owner's paired phones hold. Vault stores ciphertext it cannot open.",
+                  "That guarantee has visible costs, and stating them is the point of this diagram: no cloud previews, no shared users, no web viewer on E2EE clips. Six people usually leave this argument with six models of who can decrypt what — the picture is the fix."
+                ],
+                "bullets": [
+                  "E2EE key lives in the phones' secure enclaves; the cloud never sees it",
+                  "Trade-offs in E2EE mode: no thumbnails, no shared users, no web viewer",
+                  "Standard mode instead encrypts at rest with Vault-held keys — previews and sharing work"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "vision": { "title": "Vision HP", "sub": "records the clip", "icon": "chip", "tint": "dev" },
+                    "enc": { "title": "E2EE Sealer", "sub": "user-held key", "icon": "key", "tint": "auth" },
+                    "vault": { "title": "Vault Clips", "sub": "stores ciphertext", "icon": "package", "tint": "data" },
+                    "phone": { "title": "Owner's Phone", "sub": "only holder of the key", "icon": "phone", "tint": "dev" }
+                  },
+                  "rows": [
+                    ["vision", "enc"],
+                    ["vault", "phone"]
+                  ],
+                  "edges": [
+                    { "from": "vision", "to": "enc", "kind": "device", "label": "seal with user key" },
+                    { "from": "enc", "to": "vault", "kind": "https", "label": "ciphertext only" },
+                    { "from": "vault", "to": "phone", "kind": "https", "label": "sealed clip on request" }
+                  ],
+                  "panels": [
+                    {
+                      "id": "who", "type": "xray", "title": "Who can open what",
+                      "initial": { "hop": "Vision HP", "layers": [{ "id": "tls", "open": true }, { "id": "e2ee", "open": true }, { "id": "clip", "open": true }] },
+                      "layers": [
+                        { "id": "tls", "label": "TLS 1.3 transport", "holder": "each hop's session" },
+                        { "id": "e2ee", "label": "E2EE clip envelope", "holder": "owner's phones only" },
+                        { "id": "clip", "label": "H.264 clip", "holder": "" }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    { "edge": "vision->enc", "lane": "DEV", "text": "The clip is sealed with a key only the owner's paired phones hold.", "panels": { "who": { "hop": "Vision HP", "layers": [{ "id": "tls", "open": true }, { "id": "e2ee", "open": true }, { "id": "clip", "open": true }] } } },
+                    { "edge": "enc->vault", "lane": "NET", "text": "Vault stores ciphertext it cannot open — so no thumbnails and no cloud previews exist.", "panels": { "who": { "hop": "Vault Clips", "layers": [{ "id": "tls", "open": true }, { "id": "e2ee", "open": false }, { "id": "clip", "open": false }] } } },
+                    { "edge": "vault->phone", "lane": "NET", "text": "Only the paired phone decrypts. Trade-off, stated plainly: no shared users, no web viewer on E2EE clips.", "panels": { "who": { "hop": "Owner's Phone", "layers": [{ "id": "tls", "open": true }, { "id": "e2ee", "open": true }, { "id": "clip", "open": true }] } } }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Offline & Recovery",
+            "sections": [
+              {
+                "heading": "When the WiFi drops",
+                "accent": "slate",
+                "text": [
+                  "A doorbell that goes dumb without the cloud is a bad doorbell. When the home network disappears, everything that lives on the device keeps working: the button still rings the chime over its own 915 MHz link, motion still wakes Vision, and clips record to the doorbell's flash ring — 72 hours deep.",
+                  "What dies is exactly the cloud half: push notifications, live view, and Vault uploads queue up or fail fast. The connectivity dial on the right tracks the state machine through the outage."
+                ],
+                "bullets": [
+                  "Still works offline: button → chime (915 MHz, no WiFi involved), motion wake, zone enforcement, local recording to a 72 h flash ring",
+                  "Dead offline: push alerts, live view, clip upload, setting changes",
+                  "Sentry probes for the network with exponential backoff to protect the battery",
+                  "Nothing recorded offline is lost — see the reconnect flow below"
+                ],
+                "diagram": {
+                  "view": "ambient",
+                  "nodes": {
+                    "press": { "title": "Ring Button", "sub": "GPIO, debounced", "icon": "key", "tint": "dev" },
+                    "sentry": { "title": "Sentry LP", "sub": "offline logic", "icon": "chip", "tint": "dev" },
+                    "chime": { "title": "Indoor Chime", "sub": "915 MHz link", "icon": "antenna", "tint": "dev" },
+                    "vision": { "title": "Vision HP", "sub": "records locally", "icon": "chip", "tint": "dev" },
+                    "flash": { "title": "Flash Ring", "sub": "72 h local store", "icon": "db", "tint": "data" }
+                  },
+                  "rows": [
+                    ["press", "sentry", "chime"],
+                    ["vision", "flash"]
+                  ],
+                  "edges": [
+                    { "from": "press", "to": "sentry", "kind": "device", "label": "button IRQ" },
+                    { "from": "sentry", "to": "chime", "kind": "device", "label": "ring · 915 MHz" },
+                    { "from": "sentry", "to": "vision", "kind": "device", "label": "WAKE_INT" },
+                    { "from": "vision", "to": "flash", "kind": "device", "label": "record to ring" }
+                  ],
+                  "panels": [
+                    {
+                      "id": "conn", "type": "orbit", "title": "Connectivity",
+                      "states": ["ONLINE", "DEGRADED", "OFFLINE", "RECOVERING"],
+                      "colors": { "ONLINE": "#4ADE80", "DEGRADED": "#FFB454", "OFFLINE": "#F87171", "RECOVERING": "#38E1FF" },
+                      "initial": { "state": "ONLINE" }
+                    }
+                  ],
+                  "steps": [
+                    { "nodes": ["sentry"], "lane": "NET", "text": "The router dies. Three missed beacons and Sentry declares the network gone.", "panels": { "conn": { "state": "DEGRADED", "via": "beacon loss ×3" } } },
+                    { "nodes": ["sentry"], "lane": "NET", "text": "Reconnect probes back off exponentially — battery is not spent fighting a dead router.", "panels": { "conn": { "state": "OFFLINE", "via": "probe timeout" } } },
+                    { "edges": ["press->sentry", "sentry->chime"], "lane": "DEV", "text": "A visitor presses the ring. The chime still sounds — the 915 MHz link never touched WiFi." },
+                    { "edges": ["sentry->vision", "vision->flash"], "lane": "DEV", "text": "Motion still wakes Vision; the clip lands in the 72-hour flash ring instead of the cloud." }
+                  ]
+                }
+              },
+              {
+                "heading": "Reconnect and catch-up",
+                "accent": "green",
+                "text": [
+                  "When the network returns, recovery is ordered: rejoin the WLAN, resume the MQTT session, replay what each side missed. Relay's persistent session delivers the commands that queued while the doorbell was dark, and the flash ring backfills its offline clips to Vault.",
+                  "The owner's timeline heals itself — offline clips appear with their original timestamps, not the upload time."
+                ],
+                "bullets": [
+                  "MQTT session resume, not reconnect: subscriptions and queued QoS 1 commands survive",
+                  "Backfill is oldest-first and bandwidth-capped so live traffic wins",
+                  "Clips carry capture timestamps; the timeline sorts by when things happened"
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "sentry": { "title": "Sentry LP", "sub": "rejoin logic", "icon": "chip", "tint": "dev" },
+                    "router": { "title": "Home WiFi", "sub": "back online", "icon": "router", "tint": "data" },
+                    "relay": { "title": "Relay", "sub": "persistent session", "icon": "antenna", "tint": "mqtt" },
+                    "flash": { "title": "Flash Ring", "sub": "offline clips", "icon": "db", "tint": "data" },
+                    "vault": { "title": "Vault Clips", "sub": "backfill target", "icon": "package", "tint": "data" },
+                    "phone": { "title": "Owner's Phone", "sub": "timeline heals", "icon": "phone", "tint": "dev" }
+                  },
+                  "rows": [
+                    ["sentry", "router", "relay"],
+                    ["flash", "vault", "phone"]
+                  ],
+                  "edges": [
+                    { "from": "sentry", "to": "router", "kind": "int", "label": "WLAN rejoin" },
+                    { "from": "sentry", "to": "relay", "kind": "mqtt", "label": "session resume" },
+                    { "from": "relay", "to": "sentry", "kind": "mqtt", "ret": true, "label": "queued cmd replay" },
+                    { "from": "flash", "to": "vault", "kind": "https", "label": "backfill clips" },
+                    { "from": "vault", "to": "phone", "kind": "https", "label": "timeline update" }
+                  ],
+                  "panels": [
+                    {
+                      "id": "conn2", "type": "orbit", "title": "Connectivity",
+                      "states": ["ONLINE", "DEGRADED", "OFFLINE", "RECOVERING"],
+                      "colors": { "ONLINE": "#4ADE80", "DEGRADED": "#FFB454", "OFFLINE": "#F87171", "RECOVERING": "#38E1FF" },
+                      "initial": { "state": "OFFLINE" }
+                    }
+                  ],
+                  "steps": [
+                    { "edge": "sentry->router", "lane": "NET", "text": "A probe finally answers — Sentry rejoins the WLAN.", "panels": { "conn2": { "state": "RECOVERING", "via": "WLAN up" } } },
+                    { "edge": "sentry->relay", "lane": "NET", "text": "The MQTT session resumes; subscriptions survived on Relay's side." },
+                    { "edge": "relay->sentry", "lane": "NET", "text": "Relay replays the QoS 1 commands that queued during the outage." },
+                    { "edge": "flash->vault", "lane": "NET", "text": "The flash ring backfills offline clips to Vault, oldest first, bandwidth-capped.", "panels": { "conn2": { "state": "RECOVERING", "via": "backfill" } } },
+                    { "edge": "vault->phone", "lane": "NET", "text": "The timeline heals with original capture timestamps. Fully back.", "panels": { "conn2": { "state": "ONLINE", "via": "caught up" } } }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

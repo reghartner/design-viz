@@ -1,0 +1,599 @@
+<title>Flowline Mockups</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#EFF1F4; --ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;
+    --accent:#0B8FA9; --card:#FFFFFF;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
+      --accent:#43C8E0; --card:#151A21;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
+    --accent:#43C8E0; --card:#151A21;
+  }
+
+  body{background:var(--bg); color:var(--ink); font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif;}
+  .wrap{max-width:1200px; margin:0 auto; padding:0 22px;}
+  header.wrap{padding-top:46px;}
+  .eyebrow{font:600 11px/1 'IBM Plex Mono',monospace; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin:0 0 10px;}
+  h1{font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(30px,4.5vw,42px); letter-spacing:-.015em; margin:0 0 10px; text-wrap:balance;}
+  .lede{color:var(--sub); max-width:68ch; margin:0; font-size:15.5px;}
+  .caps{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px;}
+  .cap{font:500 11px/1 'IBM Plex Mono',monospace; border:1px solid var(--line); background:var(--card); color:var(--sub); padding:6px 10px; border-radius:999px;}
+
+  .mock{margin:46px 0 0;}
+  .mhead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;}
+  .mnum{font:700 12px 'IBM Plex Mono',monospace; color:var(--accent);}
+  h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
+  .mtag{font:500 11px 'IBM Plex Mono',monospace; color:var(--sub);}
+  .pick{font:700 10px 'IBM Plex Mono',monospace; color:#0B1220; background:#43C8E0; padding:3px 8px; border-radius:999px; letter-spacing:.08em;}
+  .mdesc{color:var(--sub); max-width:80ch; margin:6px 0 14px; font-size:14.5px;}
+  .notes{list-style:none; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:0; margin:12px 0 0;}
+  .notes li{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 13px; font-size:13px; color:var(--sub);}
+  .notes b{color:var(--ink); font-weight:600;}
+  @media (max-width:760px){ .notes{grid-template-columns:1fr;} }
+
+  .board{border:1px solid var(--line); border-radius:14px; overflow-x:auto;}
+  .board svg.flow{display:block; min-width:980px; width:100%; height:auto;}
+
+  /* ---------- shared SVG parts ---------- */
+  .edge{fill:none; stroke-width:2.2; stroke-linecap:round;}
+  .halo{fill:none; stroke-width:9; stroke-linecap:round; opacity:.13;}
+  .lbl{font:500 10.5px 'IBM Plex Mono',monospace;}
+  .lbl.dim{opacity:.65;}
+  .coin text{font:700 10px 'IBM Plex Mono',monospace;}
+  .t1{font:600 12.5px 'IBM Plex Sans',sans-serif;}
+  .t2{font:500 9.5px 'IBM Plex Mono',monospace;}
+  .icbg{fill:currentColor; opacity:.13;}
+  .cpkt{visibility:hidden;}
+  @keyframes dash16{to{stroke-dashoffset:-16;}}
+  @keyframes dash20{to{stroke-dashoffset:-20;}}
+
+  /* ---------- 04 Combined: aurora skin + protocol legend + mode toggle ---------- */
+  .p-comb .edge.https{stroke:#38E1FF; stroke-dasharray:9 7; animation:dash16 .9s linear infinite;}
+  .p-comb .edge.int{stroke:#A78BFA; stroke-dasharray:9 7; animation:dash16 .9s linear infinite;}
+  .p-comb .edge.mqtt{stroke:#F471B5; stroke-dasharray:9 7; animation:dash16 .9s linear infinite;}
+  .p-comb .edge.ret{stroke-dasharray:4 6; animation:dash20 1.7s linear infinite; stroke-width:1.9;}
+  .p-comb .halo.https{stroke:#38E1FF;}
+  .p-comb .halo.int{stroke:#A78BFA;}
+  .p-comb .halo.mqtt{stroke:#F471B5;}
+  .p-comb .pkt{fill:#8FEFFF; filter:drop-shadow(0 0 6px rgba(56,225,255,.95));}
+  .p-comb .pk-int{fill:#CDBCFF; filter:drop-shadow(0 0 6px rgba(167,139,250,.95));}
+  .p-comb .pk-mqtt{fill:#FFA3D3; filter:drop-shadow(0 0 6px rgba(244,113,181,.95));}
+  .p-comb .card{fill:#101A2C; stroke:#25364F; stroke-width:1.2;}
+  .p-comb .node:hover .card{stroke:#3E9FC4;}
+  .p-comb .t1{fill:#EAF2FF;}
+  .p-comb .t2{fill:#7E93B8;}
+  .p-comb .lbl{fill:#93A7C9;}
+  .p-comb .coin circle{fill:#0C1526; stroke:#63D9F5; stroke-width:1.4;}
+  .p-comb .coin text{fill:#8AE8FF;}
+  .p-comb .tint-cmd{color:#38E1FF;}
+  .p-comb .tint-auth{color:#FFB454;}
+  .p-comb .tint-data{color:#A78BFA;}
+  .p-comb .tint-mqtt{color:#F471B5;}
+  .p-comb .tint-dev{color:#4ADE80;}
+  /* step mode: dim everything except the lit step; kind colors stay */
+  .p-comb.stepmode .edge{animation:none;}
+  .p-comb.stepmode .edge:not(.lit){opacity:.15;}
+  .p-comb.stepmode .edge.lit{opacity:1; animation:dash16 .8s linear infinite;}
+  .p-comb.stepmode .halo{opacity:.04;}
+  .p-comb.stepmode .pkt.loopdot{display:none;}
+  .p-comb.stepmode .node:not(.lit){opacity:.35;}
+  .p-comb.stepmode .node.lit .card{stroke:#3E9FC4;}
+  .p-comb.stepmode .lbl{opacity:.25;}
+  .p-comb.stepmode .coin:not(.lit){opacity:.3;}
+  .p-comb.stepmode .coin.lit circle{stroke:#8AE8FF;}
+
+  .lg{position:sticky; left:0; display:flex; flex-wrap:wrap; gap:16px; align-items:center;
+    padding:10px 14px; background:#0B1220; border-bottom:1px dashed #25364F;}
+  .lg .li{display:flex; gap:7px; align-items:center; font:500 11px 'IBM Plex Mono',monospace; color:#93A7C9;}
+  .lg .li svg{display:block; width:40px; height:10px;}
+  .mtoggle{margin-left:auto; display:flex; gap:6px;}
+  .mbtn{background:#101A2C; border:1px solid #25364F; color:#7E93B8; font:600 11px 'IBM Plex Mono',monospace;
+    padding:5px 10px; border-radius:7px; cursor:pointer;}
+  .mbtn[aria-pressed="true"]{border-color:#38E1FF; color:#8AE8FF; background:#0C2230;}
+  .mbtn:focus-visible{outline:2px solid #38E1FF; outline-offset:2px;}
+  #bar-d{display:none; border-radius:12px; border-top:1px solid #2A343F; margin-top:8px;}
+  #bar-d.on{display:flex;}
+
+  /* ---------- 01 Aurora (dark, committed) ---------- */
+  .p-aurora .edge.cmd{stroke:#38E1FF; stroke-dasharray:9 7; animation:dash16 .9s linear infinite;}
+  .p-aurora .edge.auth{stroke:#FFB454; stroke-dasharray:4 6; animation:dash20 1.7s linear infinite;}
+  .p-aurora .edge.ack{stroke:#4ADE80; stroke-dasharray:4 6; animation:dash20 1.7s linear infinite;}
+  .p-aurora .halo{stroke:#38E1FF;}
+  .p-aurora .pkt{fill:#8FEFFF; filter:drop-shadow(0 0 6px rgba(56,225,255,.95));}
+  .p-aurora .pk-ack{fill:#8CF2B0; filter:drop-shadow(0 0 6px rgba(74,222,128,.95));}
+  .p-aurora .card{fill:#101A2C; stroke:#25364F; stroke-width:1.2;}
+  .p-aurora .node:hover .card{stroke:#3E9FC4;}
+  .p-aurora .t1{fill:#EAF2FF;}
+  .p-aurora .t2{fill:#7E93B8;}
+  .p-aurora .lbl{fill:#93A7C9;}
+  .p-aurora .coin circle{fill:#0C1526; stroke:#63D9F5; stroke-width:1.4;}
+  .p-aurora .coin text{fill:#8AE8FF;}
+  .p-aurora .tint-cmd{color:#38E1FF;}
+  .p-aurora .tint-auth{color:#FFB454;}
+  .p-aurora .tint-data{color:#A78BFA;}
+  .p-aurora .tint-mqtt{color:#F471B5;}
+  .p-aurora .tint-dev{color:#4ADE80;}
+
+  /* ---------- 02 Daylight (light, committed) ---------- */
+  .p-daylight .edge.cmd{stroke:#4956C9; stroke-width:2; stroke-dasharray:8 8; animation:dash16 2.1s linear infinite;}
+  .p-daylight .edge.auth{stroke:#B0771A; stroke-width:2; stroke-dasharray:3 7; animation:dash20 3.4s linear infinite;}
+  .p-daylight .edge.ack{stroke:#0E9382; stroke-width:2; stroke-dasharray:3 7; animation:dash20 3.4s linear infinite;}
+  .p-daylight .pkt{fill:#4956C9;}
+  .p-daylight .pk-ack{fill:#0E9382;}
+  .p-daylight .card{fill:#FFFFFF; stroke:#E0DCD1; stroke-width:1.2; filter:drop-shadow(0 1px 2px rgba(40,36,22,.10));}
+  .p-daylight .t1{fill:#23272E;}
+  .p-daylight .t2{fill:#79808B;}
+  .p-daylight .lbl{fill:#6B6F7A;}
+  .p-daylight .coin circle{fill:#4956C9;}
+  .p-daylight .coin text{fill:#FFFFFF;}
+  .p-daylight .tint-cmd{color:#4956C9;}
+  .p-daylight .tint-auth{color:#B0771A;}
+  .p-daylight .tint-data{color:#7C5CC4;}
+  .p-daylight .tint-mqtt{color:#C2417E;}
+  .p-daylight .tint-dev{color:#0E9382;}
+
+  /* ---------- 03 Playhead (dark terminal, committed) ---------- */
+  .p-playhead{border-radius:14px 14px 0 0; border-bottom:0;}
+  .p-playhead .edge{stroke:#333D49; stroke-width:1.9;}
+  .p-playhead .edge.auth, .p-playhead .edge.ack{stroke-dasharray:4 6;}
+  .p-playhead .edge.lit{stroke:#7EE787; stroke-width:2.4; stroke-dasharray:9 7; animation:dash16 .8s linear infinite;}
+  .p-playhead .pkt{fill:#B7F7C8; filter:drop-shadow(0 0 5px rgba(126,231,135,.9));}
+  .p-playhead .card{fill:#10151B; stroke:#232B35; stroke-width:1.2;}
+  .p-playhead .node{color:#4E5967;}
+  .p-playhead .t1{fill:#8792A0;}
+  .p-playhead .t2{fill:#55606C;}
+  .p-playhead .lbl{fill:#5A6673;}
+  .p-playhead .node.lit{color:#7EE787;}
+  .p-playhead .node.lit .card{stroke:#3FBE6B;}
+  .p-playhead .node.lit .t1{fill:#DFF7E6;}
+  .p-playhead .node.lit .t2{fill:#7FA98B;}
+  .p-playhead .coin circle{fill:#10151B; stroke:#333D49; stroke-width:1.3;}
+  .p-playhead .coin text{fill:#6E7B8A;}
+  .p-playhead .coin.lit circle{fill:#0F2417; stroke:#7EE787;}
+  .p-playhead .coin.lit text{fill:#7EE787;}
+
+  .termbar{border:1px solid var(--line); border-top:1px dashed #232B35; border-radius:0 0 14px 14px;
+    background:#0C1014; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .tbtn{background:#141A21; border:1px solid #2A343F; color:#9FB0BF; font:600 12px 'IBM Plex Mono',monospace;
+    padding:5px 11px; border-radius:7px; cursor:pointer;}
+  .tbtn:hover{border-color:#3FBE6B; color:#B7F7C8;}
+  .tbtn:focus-visible, .schip:focus-visible{outline:2px solid #7EE787; outline-offset:2px;}
+  .schips{display:flex; gap:5px;}
+  .schip{background:#141A21; border:1px solid #2A343F; color:#6E7B8A; font:700 11px 'IBM Plex Mono',monospace;
+    width:26px; height:26px; border-radius:7px; cursor:pointer; padding:0;}
+  .schip[aria-current="true"]{border-color:#7EE787; color:#7EE787; background:#0F2417;}
+  .stepline{font:500 12px 'IBM Plex Mono',monospace; color:#A9D9B4; min-width:200px; flex:1;}
+  .stepline b{color:#7EE787; font-weight:700; margin-right:8px;}
+  #bar-d .tbtn:hover{border-color:#38E1FF; color:#8AE8FF;}
+  #bar-d .schip[aria-current="true"]{border-color:#38E1FF; color:#8AE8FF; background:#0C2230;}
+  #bar-d .stepline{color:#9CC8DC;}
+  #bar-d .stepline b{color:#8AE8FF;}
+
+  footer.wrap{padding:38px 22px 56px; color:var(--sub); font-size:13px; max-width:1200px;}
+  footer b{color:var(--ink);}
+
+  @media (prefers-reduced-motion: reduce){
+    .edge, .halo{animation:none !important;}
+    .pkt{display:none;}
+  }
+</style>
+
+<svg aria-hidden="true" style="position:absolute; width:0; height:0; overflow:hidden">
+  <defs>
+    <symbol id="i-term" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><polyline points="7 9.5 10 12 7 14.5"/><line x1="12.5" y1="15" x2="16.5" y2="15"/></g></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 17h10a3.6 3.6 0 0 0 .5-7.16A5.2 5.2 0 0 0 7 8.7 3.7 3.7 0 0 0 6.5 17Z"/></g></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 2.8v5.1c0 4.4-2.9 7.4-7 9.1-4.1-1.7-7-4.7-7-9.1V5.8Z"/><polyline points="9 11.6 11.4 14 15.4 9.6"/></g></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><line x1="12" y1="3.6" x2="12" y2="6.2"/><line x1="12" y1="17.8" x2="12" y2="20.4"/><line x1="3.6" y1="12" x2="6.2" y2="12"/><line x1="17.8" y1="12" x2="20.4" y2="12"/><line x1="6.1" y1="6.1" x2="7.9" y2="7.9"/><line x1="16.1" y1="16.1" x2="17.9" y2="17.9"/><line x1="17.9" y1="6.1" x2="16.1" y2="7.9"/><line x1="6.1" y1="17.9" x2="7.9" y2="16.1"/></g></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8V6"/><path d="M5 12c0 1.55 3.13 2.8 7 2.8s7-1.25 7-2.8"/></g></symbol>
+    <symbol id="i-ant" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="10" r="2"/><line x1="12" y1="12.4" x2="12" y2="20"/><path d="M8.6 13.4a4.8 4.8 0 0 1 0-6.8"/><path d="M15.4 6.6a4.8 4.8 0 0 1 0 6.8"/><path d="M6.2 15.8a8.2 8.2 0 0 1 0-11.6"/><path d="M17.8 4.2a8.2 8.2 0 0 1 0 11.6"/></g></symbol>
+    <symbol id="i-thermo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10.3 14.6V5.7a1.7 1.7 0 0 1 3.4 0v8.9"/><circle cx="12" cy="17" r="3"/></g></symbol>
+    <symbol id="i-pump" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6.8"/><path d="M9.8 9.2 15.6 12l-5.8 2.8Z"/></g></symbol>
+    <symbol id="i-router" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="13" width="17" height="7" rx="2"/><line x1="8" y1="13" x2="6.5" y2="6.5"/><line x1="16" y1="13" x2="17.5" y2="6.5"/><circle cx="7.5" cy="16.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="11" cy="16.5" r="0.9" fill="currentColor" stroke="none"/></g></symbol>
+  </defs>
+</svg>
+
+<header class="wrap">
+  <p class="eyebrow">Technical docs · visual direction</p>
+  <h1>Flowline Mockups</h1>
+  <p class="lede">Treatments of one diagram system, drawn on the same scenario: an operator
+  command travels from a cloud backend to IoT devices over MQTT, and the acknowledgment travels back.
+  Every mockup exercises the full feature set, so you are comparing looks, not content.
+  Mockup 04 is the current pick: the dark skin, fully visible by default, with a step-mode toggle
+  and a legend that keys every line style to its protocol.</p>
+  <div class="caps">
+    <span class="cap">two-row serpentine</span>
+    <span class="cap">auth branch</span>
+    <span class="cap">3-way fan-out</span>
+    <span class="cap">service icons</span>
+    <span class="cap">labeled edges</span>
+    <span class="cap">numbered steps</span>
+    <span class="cap">return path</span>
+    <span class="cap">protocol legend</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="mock">
+    <div class="mhead"><span class="mnum">04</span><h2>Aurora Combined</h2><span class="mtag">ambient by default · step mode on demand</span><span class="pick">CURRENT PICK</span></div>
+    <p class="mdesc">The dark skin with everything visible and animating by default. The STEP button
+    dims the board to one lit step at a time with a caption bar and controls; AMBIENT returns to the
+    full view. Line style is keyed to protocol, not to position in the drawing: every MQTT edge is the
+    same pink dash, every HTTPS edge the same cyan, every internal service call the same violet.
+    A response or acknowledgment draws as a fine dash in its protocol's color. The legend and the
+    edges read from the same style table, so they cannot drift apart.</p>
+    <div class="board p-comb" id="wrap-d">
+      <div class="lg">
+        <span class="li"><svg viewBox="0 0 40 10" aria-hidden="true"><line x1="1" y1="5" x2="31" y2="5" stroke="#38E1FF" stroke-width="2.2" stroke-dasharray="9 7" stroke-linecap="round"/><path d="M31 1.5 39 5 31 8.5z" fill="#38E1FF"/></svg>HTTPS</span>
+        <span class="li"><svg viewBox="0 0 40 10" aria-hidden="true"><line x1="1" y1="5" x2="31" y2="5" stroke="#A78BFA" stroke-width="2.2" stroke-dasharray="9 7" stroke-linecap="round"/><path d="M31 1.5 39 5 31 8.5z" fill="#A78BFA"/></svg>service call</span>
+        <span class="li"><svg viewBox="0 0 40 10" aria-hidden="true"><line x1="1" y1="5" x2="31" y2="5" stroke="#F471B5" stroke-width="2.2" stroke-dasharray="9 7" stroke-linecap="round"/><path d="M31 1.5 39 5 31 8.5z" fill="#F471B5"/></svg>MQTT</span>
+        <span class="li"><svg viewBox="0 0 40 10" aria-hidden="true"><line x1="1" y1="5" x2="31" y2="5" stroke="#93A7C9" stroke-width="1.9" stroke-dasharray="4 6" stroke-linecap="round"/><path d="M31 1.5 39 5 31 8.5z" fill="#93A7C9"/></svg>response / ack (fine dash, protocol color)</span>
+        <span class="mtoggle">
+          <button class="mbtn" id="md-amb" aria-pressed="true">AMBIENT</button>
+          <button class="mbtn" id="md-step" aria-pressed="false">STEP</button>
+        </span>
+      </div>
+      <div id="board-d"></div>
+    </div>
+    <div class="termbar" id="bar-d">
+      <button class="tbtn" id="btn-prev-d" aria-label="Previous step">&#8249;</button>
+      <button class="tbtn" id="btn-play-d" aria-label="Pause">&#10074;&#10074;</button>
+      <button class="tbtn" id="btn-next-d" aria-label="Next step">&#8250;</button>
+      <div class="schips" id="chips-d"></div>
+      <div class="stepline"><b id="step-n-d">STEP 1/7</b><span id="step-text-d"></span></div>
+    </div>
+    <ul class="notes">
+      <li><b>Default state:</b> the full diagram, ambient motion — mockup 01's behavior, nothing hidden.</li>
+      <li><b>Step mode:</b> mockup 03's guided walkthrough, but keeping each edge's protocol color instead of recoloring to green.</li>
+      <li><b>Legend:</b> one style table drives edges, packets, and legend swatches — any MQTT line draws the same, everywhere.</li>
+    </ul>
+  </section>
+
+  <section class="mock">
+    <div class="mhead"><span class="mnum">01</span><h2>Aurora</h2><span class="mtag">ambient live traffic</span></div>
+    <p class="mdesc">Dark ground, glowing paths, packets always in motion. Reads as a running system —
+    the motion tells you flow direction before you read a single label. Colors here are keyed to path
+    role (command / auth / ack) rather than protocol; mockup 04 above replaces that with the protocol
+    legend.</p>
+    <div class="board p-aurora" id="board-a"></div>
+    <ul class="notes">
+      <li><b>Where it fits:</b> dark-themed docs, architecture overview pages, anything meant to impress on first open.</li>
+      <li><b>Motion:</b> marching dashes on every path plus glowing packet dots (SMIL <code>animateMotion</code>), running continuously.</li>
+      <li><b>Cost:</b> pure CSS + SVG, zero JavaScript. Heaviest visual, calmest to maintain.</li>
+    </ul>
+  </section>
+
+  <section class="mock">
+    <div class="mhead"><span class="mnum">02</span><h2>Daylight</h2><span class="mtag">print-friendly documentation</span></div>
+    <p class="mdesc">Calm paper ground and one color per path role: indigo command path, amber auth
+    branch, teal acknowledgment. Slow dash drift and a few sparse packets — enough motion to show
+    direction, not enough to fight the prose beside it. Prints legibly.</p>
+    <div class="board p-daylight" id="board-b"></div>
+    <ul class="notes">
+      <li><b>Where it fits:</b> inline next to reference prose, runbooks, PDFs, printed handouts.</li>
+      <li><b>Motion:</b> slow dash drift on the command path, four staggered packet dots. Quietest of the three.</li>
+      <li><b>Cost:</b> pure CSS + SVG, zero JavaScript. Path-role colors double as a legend.</li>
+    </ul>
+  </section>
+
+  <section class="mock">
+    <div class="mhead"><span class="mnum">03</span><h2>Playhead</h2><span class="mtag">self-narrating walkthrough</span></div>
+    <p class="mdesc">The diagram narrates itself. One step is lit at a time — its edges, nodes, and
+    step number turn green, a packet runs the edge once, and the caption bar states what is happening.
+    Auto-advances every three seconds; the reader can pause, step, or jump. Strongest for onboarding
+    and incident-runbook docs where reading order matters.</p>
+    <div class="board p-playhead" id="board-c"></div>
+    <div class="termbar">
+      <button class="tbtn" id="btn-prev" aria-label="Previous step">&#8249;</button>
+      <button class="tbtn" id="btn-play" aria-label="Pause">&#10074;&#10074;</button>
+      <button class="tbtn" id="btn-next" aria-label="Next step">&#8250;</button>
+      <div class="schips" id="chips"></div>
+      <div class="stepline"><b id="step-n">STEP 1/7</b><span id="step-text"></span></div>
+    </div>
+    <ul class="notes">
+      <li><b>Where it fits:</b> onboarding guides, protocol walkthroughs, runbooks — anywhere the sequence is the lesson.</li>
+      <li><b>Motion:</b> one lit step at a time; a single packet runs the active edge, then freezes at the arrowhead.</li>
+      <li><b>Cost:</b> same SVG as the others plus ~40 lines of JavaScript for the stepper.</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <b>Build notes.</b> All four boards are generated from one shared geometry (nodes, edges, labels,
+  step coins) — only the CSS skin, the edge-kind table, and the packet schedule differ per mockup.
+  Motion is CSS stroke-dash animation plus SMIL packets; no libraries. The reduced-motion preference
+  disables packets, dash motion, and autoplay.
+</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  var NODES = [
+    {id:'console',  x:30,  y:113, w:150, h:54, icon:'i-term',   tint:'cmd',  title:'Ops Console',      sub:'operator UI'},
+    {id:'api',      x:275, y:113, w:150, h:54, icon:'i-cloud',  tint:'cmd',  title:'Nimbus API',       sub:'api gateway'},
+    {id:'dispatch', x:545, y:113, w:150, h:54, icon:'i-gear',   tint:'cmd',  title:'Dispatch',         sub:'command svc'},
+    {id:'registry', x:805, y:113, w:150, h:54, icon:'i-db',     tint:'data', title:'Registry',         sub:'device shadows'},
+    {id:'sentinel', x:410, y:24,  w:150, h:44, icon:'i-shield', tint:'auth', title:'Sentinel Auth',    sub:'tokens'},
+    {id:'broker',   x:795, y:403, w:150, h:54, icon:'i-ant',    tint:'mqtt', title:'Relay Broker',     sub:'MQTT &#183; TLS :8883'},
+    {id:'d1',       x:235, y:303, w:170, h:54, icon:'i-thermo', tint:'dev',  title:'Thermostat T-100', sub:'cmd/site-4/hvac-2'},
+    {id:'d2',       x:235, y:403, w:170, h:54, icon:'i-pump',   tint:'dev',  title:'Pump P-7',         sub:'cmd/site-4/pump-7'},
+    {id:'d3',       x:235, y:503, w:170, h:54, icon:'i-router', tint:'dev',  title:'Edge Gateway',     sub:'cmd/site-4/#'}
+  ];
+
+  var EDGES = [
+    {id:'e1',  cls:'cmd',  d:'M 180 140 L 275 140'},
+    {id:'e2',  cls:'auth', d:'M 358 113 C 372 86 388 64 410 52'},
+    {id:'e2r', cls:'auth', d:'M 525 68 C 552 80 572 94 596 111'},
+    {id:'e3',  cls:'cmd',  d:'M 425 140 L 545 140'},
+    {id:'e4',  cls:'cmd',  d:'M 695 140 L 805 140'},
+    {id:'e5',  cls:'cmd',  d:'M 955 140 C 1075 140 1120 200 1120 285 C 1120 370 1060 430 945 430'},
+    {id:'f1',  cls:'cmd',  d:'M 795 422 C 690 415 540 340 405 330'},
+    {id:'f2',  cls:'cmd',  d:'M 795 430 L 405 430'},
+    {id:'f3',  cls:'cmd',  d:'M 795 438 C 690 445 540 520 405 530'},
+    {id:'a1',  cls:'ack',  d:'M 405 450 C 560 472 700 464 795 446'},
+    {id:'a2',  cls:'ack',  d:'M 868 403 C 858 295 700 235 634 169'}
+  ];
+
+  /* Same geometry, protocol-keyed kinds: line style follows the protocol, not the drawing position. */
+  var KIND2 = {e1:'https', e2:'int', e2r:'int ret', e3:'int', e4:'int', e5:'mqtt',
+               f1:'mqtt', f2:'mqtt', f3:'mqtt', a1:'mqtt ret', a2:'mqtt ret'};
+  var EDGES2 = [];
+  (function(){
+    for (var i = 0; i < EDGES.length; i++){
+      EDGES2.push({id:EDGES[i].id, cls:KIND2[EDGES[i].id], d:EDGES[i].d});
+    }
+  })();
+
+  var LABELS = [
+    {x:227,  y:126, t:'POST /commands'},
+    {x:368,  y:66,  t:'verify JWT', a:'end'},
+    {x:610,  y:95,  t:'scope ok', a:'start'},
+    {x:485,  y:126, t:'authorized'},
+    {x:750,  y:126, t:'shadow lookup'},
+    {x:1092, y:296, t:'PUBLISH cmd/site-4/pump-7', a:'end'},
+    {x:1092, y:312, t:'QoS 1 &#183; retain off', a:'end', dim:true},
+    {x:598,  y:449, t:'SUBSCRIBE cmd/site-4/#'},
+    {x:430,  y:478, t:'PUBACK &#183; QoS 1', a:'start'},
+    {x:762,  y:248, t:'ack/site-4/pump-7', a:'start'}
+  ];
+
+  var COINS = [
+    {n:1, x:227,  y:140}, {n:2, x:381, y:77},  {n:3, x:485, y:140},
+    {n:4, x:750,  y:140}, {n:5, x:1120, y:285}, {n:6, x:640, y:430},
+    {n:7, x:836,  y:330}
+  ];
+
+  function marker(p, kind, color){
+    return '<marker id="' + p + '-m-' + kind + '" viewBox="0 0 10 10" refX="7.5" refY="5" ' +
+      'markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">' +
+      '<path d="M0 0L10 5L0 10z" fill="' + color + '"/></marker>';
+  }
+
+  function buildPanel(p, o){
+    var edges = o.edges || EDGES;
+    var kindOf = {}, i;
+    for (i = 0; i < edges.length; i++) kindOf[edges[i].id] = edges[i].cls.split(' ')[0];
+
+    var s = '<svg class="flow" viewBox="0 0 1180 620" role="img" aria-label="' + o.aria + '" xmlns="http://www.w3.org/2000/svg">';
+    s += '<defs>';
+    for (i = 0; i < o.markers.length; i++) s += marker(p, o.markers[i][0], o.markers[i][1]);
+    if (o.grid){
+      s += '<pattern id="' + p + '-g" width="26" height="26" patternUnits="userSpaceOnUse">' +
+           '<circle cx="1.3" cy="1.3" r="1.3" fill="' + o.grid + '"/></pattern>';
+    }
+    s += '</defs>';
+    s += '<rect width="1180" height="620" fill="' + o.bg + '"/>';
+    if (o.grid) s += '<rect width="1180" height="620" fill="url(#' + p + '-g)"/>';
+
+    var e, l, c, n;
+    if (o.halos){
+      for (i = 0; i < edges.length; i++){
+        e = edges[i];
+        if (o.halos === 'all' || e.cls === o.halos){
+          s += '<path class="halo ' + kindOf[e.id] + '" d="' + e.d + '"/>';
+        }
+      }
+    }
+    for (i = 0; i < edges.length; i++){
+      e = edges[i];
+      s += '<path id="' + p + '-' + e.id + '" class="edge ' + e.cls + '" d="' + e.d +
+           '" marker-end="url(#' + p + '-m-' + kindOf[e.id] + ')"/>';
+    }
+    for (i = 0; i < LABELS.length; i++){
+      l = LABELS[i];
+      s += '<text class="lbl' + (l.dim ? ' dim' : '') + '" x="' + l.x + '" y="' + l.y +
+           '" text-anchor="' + (l.a || 'middle') + '">' + l.t + '</text>';
+    }
+    for (i = 0; i < COINS.length; i++){
+      c = COINS[i];
+      s += '<g class="coin" id="' + p + '-coin-' + c.n + '"><circle cx="' + c.x + '" cy="' + c.y +
+           '" r="10"/><text x="' + c.x + '" y="' + (c.y + 3.5) + '" text-anchor="middle">' + c.n + '</text></g>';
+    }
+    for (i = 0; i < NODES.length; i++){
+      n = NODES[i];
+      var small = n.h === 44;
+      s += '<g class="node tint-' + n.tint + '" id="' + p + '-n-' + n.id + '" transform="translate(' + n.x + ' ' + n.y + ')">' +
+           '<rect class="card" width="' + n.w + '" height="' + n.h + '" rx="12"/>' +
+           '<rect class="icbg" x="12" y="' + (small ? 9 : 14) + '" width="26" height="26" rx="8"/>' +
+           '<use href="#' + n.icon + '" x="17" y="' + (small ? 14 : 19) + '" width="16" height="16"/>' +
+           '<text class="t1" x="46" y="' + (small ? 22 : 25) + '">' + n.title + '</text>' +
+           '<text class="t2" x="46" y="' + (small ? 36 : 41) + '">' + n.sub + '</text></g>';
+    }
+    var pk;
+    if (o.pkts){
+      for (i = 0; i < o.pkts.length; i++){
+        pk = o.pkts[i];
+        s += '<circle class="pkt loopdot pk-' + kindOf[pk[0]] + '" r="' + (o.pr || 4) + '">' +
+             '<animateMotion dur="' + pk[1] + 's" begin="' + pk[2] + 's" repeatCount="indefinite">' +
+             '<mpath href="#' + p + '-' + pk[0] + '"/></animateMotion></circle>';
+      }
+    }
+    if (o.mpkts){
+      for (i = 0; i < o.mpkts.length; i++){
+        pk = o.mpkts[i];
+        s += '<circle class="pkt cpkt pk-' + kindOf[pk[0]] + '" r="4.2">' +
+             '<animateMotion id="' + p + '-am-' + pk[0] + '" dur="' + pk[1] + 's" begin="indefinite" fill="freeze">' +
+             '<mpath href="#' + p + '-' + pk[0] + '"/></animateMotion></circle>';
+      }
+    }
+    s += '</svg>';
+    return s;
+  }
+
+  var LOOPDOTS = [['e1',2.4,-0.3],['e3',2.4,-1.1],['e4',2.2,-1.8],['e5',2.8,-0.6],
+                  ['f1',1.9,-0.2],['f2',1.9,-0.85],['f3',1.9,-1.4],['a1',2.4,-1.0],['a2',2.6,-2.0]];
+  var STEPDOTS = [['e1',0.9],['e3',0.9],['e4',0.9],['e5',1.5],['f1',1.1],['f2',1.1],['f3',1.1],['a1',1.1],['a2',1.3]];
+
+  document.getElementById('board-d').innerHTML = buildPanel('d', {
+    aria:'Aurora Combined: command flow from cloud services to IoT devices, dark skin, line styles keyed to protocol, with an ambient and a step mode',
+    bg:'#0B1220', grid:'#16233C', halos:'all', pr:4,
+    edges:EDGES2,
+    markers:[['https','#38E1FF'],['int','#A78BFA'],['mqtt','#F471B5']],
+    pkts:LOOPDOTS, mpkts:STEPDOTS
+  });
+
+  document.getElementById('board-a').innerHTML = buildPanel('a', {
+    aria:'Aurora treatment: command flow from cloud services to IoT devices over MQTT, dark with glowing animated paths',
+    bg:'#0B1220', grid:'#16233C', halos:'cmd', pr:4,
+    markers:[['cmd','#38E1FF'],['auth','#FFB454'],['ack','#4ADE80']],
+    pkts:LOOPDOTS
+  });
+
+  document.getElementById('board-b').innerHTML = buildPanel('b', {
+    aria:'Daylight treatment: the same command flow on a light paper ground with calm dash motion',
+    bg:'#FBFAF6', grid:'', halos:false, pr:3.4,
+    markers:[['cmd','#4956C9'],['auth','#B0771A'],['ack','#0E9382']],
+    pkts:[['e1',3.2,-0.4],['e3',3.2,-1.6],['e4',3.2,-2.6],['e5',3.8,-1.0],['f2',3.0,-0.5]]
+  });
+
+  document.getElementById('board-c').innerHTML = buildPanel('c', {
+    aria:'Playhead treatment: the same command flow as a step-by-step walkthrough, one step lit at a time',
+    bg:'#0C1014', grid:'#151B22', halos:false,
+    markers:[['cmd','#4A5563'],['auth','#4A5563'],['ack','#4A5563']],
+    mpkts:STEPDOTS
+  });
+
+  /* ---------- stepper (shared by Playhead and Aurora Combined) ---------- */
+  var STEPS = [
+    {edges:['e1'],            nodes:['console','api'],           dots:['e1'],
+     text:'Operator sends the command — POST /commands'},
+    {edges:['e2','e2r'],      nodes:['api','sentinel'],          dots:[],
+     text:'Nimbus API verifies the token with Sentinel Auth'},
+    {edges:['e3'],            nodes:['api','dispatch'],          dots:['e3'],
+     text:'Authorized command handed to Dispatch'},
+    {edges:['e4'],            nodes:['dispatch','registry'],     dots:['e4'],
+     text:'Dispatch writes desired state to the device shadow Registry'},
+    {edges:['e5'],            nodes:['registry','broker'],       dots:['e5'],
+     text:'PUBLISH cmd/site-4/pump-7 (QoS 1) to the Relay broker'},
+    {edges:['f1','f2','f3'],  nodes:['broker','d1','d2','d3'],   dots:['f1','f2','f3'],
+     text:'Relay fans out to every subscriber on cmd/site-4/#'},
+    {edges:['a1','a2'],       nodes:['d2','broker','dispatch'],  dots:['a1','a2'],
+     text:'Pump P-7 acknowledges — PUBACK, then ack/site-4/pump-7 back to Dispatch'}
+  ];
+
+  var RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function el(id){ return document.getElementById(id); }
+
+  function makeStepper(cfg){
+    var cur = 0, timer = null;
+    var board = el(cfg.board), chipsBox = el(cfg.chips);
+    var stepN = el(cfg.stepN), stepText = el(cfg.stepText);
+    var btnPlay = el(cfg.btnPlay);
+
+    var k;
+    for (k = 0; k < STEPS.length; k++){
+      (function(idx){
+        var b = document.createElement('button');
+        b.className = 'schip';
+        b.textContent = idx + 1;
+        b.setAttribute('aria-label', 'Go to step ' + (idx + 1));
+        b.addEventListener('click', function(){ api.stopAuto(); api.setStep(idx); });
+        chipsBox.appendChild(b);
+      })(k);
+    }
+
+    var api = {
+      clear: function(){
+        var lit = board.querySelectorAll('.lit'), j;
+        for (j = 0; j < lit.length; j++) lit[j].classList.remove('lit');
+        var dots = board.querySelectorAll('.cpkt');
+        for (j = 0; j < dots.length; j++) dots[j].style.visibility = 'hidden';
+      },
+      setStep: function(i){
+        cur = ((i % 7) + 7) % 7;
+        api.clear();
+        var s = STEPS[cur], j;
+        for (j = 0; j < s.edges.length; j++) el(cfg.p + '-' + s.edges[j]).classList.add('lit');
+        for (j = 0; j < s.nodes.length; j++) el(cfg.p + '-n-' + s.nodes[j]).classList.add('lit');
+        el(cfg.p + '-coin-' + (cur + 1)).classList.add('lit');
+        if (!RM){
+          for (j = 0; j < s.dots.length; j++){
+            var am = el(cfg.p + '-am-' + s.dots[j]);
+            if (am){
+              am.parentNode.style.visibility = 'visible';
+              am.beginElement();
+            }
+          }
+        }
+        var chips = chipsBox.children;
+        for (j = 0; j < chips.length; j++){
+          chips[j].setAttribute('aria-current', j === cur ? 'true' : 'false');
+        }
+        stepN.textContent = 'STEP ' + (cur + 1) + '/7';
+        stepText.textContent = s.text;
+      },
+      startAuto: function(){
+        if (timer) return;
+        timer = window.setInterval(function(){ api.setStep(cur + 1); }, 3000);
+        btnPlay.innerHTML = '&#10074;&#10074;';
+        btnPlay.setAttribute('aria-label', 'Pause');
+      },
+      stopAuto: function(){
+        if (timer){ window.clearInterval(timer); timer = null; }
+        btnPlay.innerHTML = '&#9654;';
+        btnPlay.setAttribute('aria-label', 'Play');
+      },
+      cur: function(){ return cur; }
+    };
+
+    btnPlay.addEventListener('click', function(){ if (timer) api.stopAuto(); else api.startAuto(); });
+    el(cfg.btnPrev).addEventListener('click', function(){ api.stopAuto(); api.setStep(api.cur() - 1); });
+    el(cfg.btnNext).addEventListener('click', function(){ api.stopAuto(); api.setStep(api.cur() + 1); });
+    return api;
+  }
+
+  var stC = makeStepper({p:'c', board:'board-c', chips:'chips', stepN:'step-n', stepText:'step-text',
+                         btnPlay:'btn-play', btnPrev:'btn-prev', btnNext:'btn-next'});
+  stC.setStep(0);
+  if (!RM) stC.startAuto(); else stC.stopAuto();
+
+  var stD = makeStepper({p:'d', board:'board-d', chips:'chips-d', stepN:'step-n-d', stepText:'step-text-d',
+                         btnPlay:'btn-play-d', btnPrev:'btn-prev-d', btnNext:'btn-next-d'});
+
+  /* mode toggle for Aurora Combined: ambient (default, everything visible) vs step */
+  var wrapD = el('wrap-d'), barD = el('bar-d');
+  function setMode(step){
+    wrapD.classList.toggle('stepmode', step);
+    barD.classList.toggle('on', step);
+    el('md-step').setAttribute('aria-pressed', step ? 'true' : 'false');
+    el('md-amb').setAttribute('aria-pressed', step ? 'false' : 'true');
+    if (step){
+      stD.setStep(0);
+      if (!RM) stD.startAuto(); else stD.stopAuto();
+    } else {
+      stD.stopAuto();
+      stD.clear();
+    }
+  }
+  el('md-step').addEventListener('click', function(){ setMode(true); });
+  el('md-amb').addEventListener('click', function(){ setMode(false); });
+})();
+</script>

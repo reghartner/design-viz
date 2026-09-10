@@ -1,0 +1,4 @@
+{"page": {"blocks": [{"heading": "Bad edge", "diagram": {
+  "nodes": {"a": {"title": "A"}},
+  "rows": [["a"]],
+  "edges": [{"from": "a", "to": "ghost"}]}}]}}

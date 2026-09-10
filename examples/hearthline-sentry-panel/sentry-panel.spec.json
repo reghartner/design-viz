@@ -1,0 +1,357 @@
+{
+  "page": {
+    "title": "hearthline Sentry Panel — Monitored Alarm",
+    "contract": "1",
+    "protocols": {
+      "subghz": {"label": "sub-GHz 915", "color": "#C792EA"},
+      "cell": {"label": "LTE Cat-M1", "color": "#F78C6C"}
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Alarm path",
+            "sections": [
+              {
+                "heading": "Alarm path: broadband first, cellular mid-incident",
+                "accent": "red",
+                "text": [
+                  "Battery sensors talk to a mains-powered base station over a proprietary sub-GHz radio; the base station runs the certified alarm state machine locally and signals the monitoring center over broadband first, failing over to a built-in cellular modem under active supervision — mid-incident if necessary, with sequence numbers preserved so the monitoring side never double-books or loses an event."
+                ],
+                "bullets": [
+                  "**Glassbreak sensor GB-2** hears a break and sends a sub-GHz alarm frame to **Ember-M0**.",
+                  "**Ember-M0** latches ALARM in the state machine, fires the siren, and hands the event to **Hearth-A53**.",
+                  "**Hearth-A53** sends signal `seq 4181` (alarm, zone 3) to **Hearthgate** over broadband TLS, and Hearthgate acks it within 2 seconds.",
+                  "Hearthgate appends the event to **Register** and forwards it to **Overwatch**, which opens incident `INC-7731`.",
+                  "Hearth-A53 sends `seq 4182` (siren-on) into a broadband link that has just died, so no ack returns.",
+                  "The 15-second ack supervision timer expires, so Hearth-A53 powers the LTE modem and opens a TLS session to Hearthgate over the cellular APN.",
+                  "Hearth-A53 retransmits `seq 4182` and continues with `seq 4183` on the cellular path, and Hearthgate dedupes on `(account, seq)` so nothing double-books.",
+                  "Overwatch assigns the incident to an agent, and the monitoring-center acknowledgment travels back to the panel over the same cellular session.",
+                  "Ember-M0 marks the incident center-acknowledged, the keypad shows `MONITORING NOTIFIED`, and Hearth-A53 keeps probing broadband for fail-back.",
+                  "*Failure mode — broadband drops*: the 15-second ack supervision above triggers cellular failover mid-incident; sequence numbering (the `(account, seq)` dedupe) makes the switch invisible to Register.",
+                  "*Failure mode — both uplinks down*: the siren and latched alarm state still work locally; events queue in Ember-M0 flash with their seq numbers and flush in order on restore, and Hearthgate gap detection reconciles against Register."
+                ],
+                "contract": {
+                  "title": "On the wire: sensor frame (sub-GHz 915 MHz)",
+                  "source": "https://github.com/hearthline/panel-fw/blob/main/ember/subghz_frame.h#L23",
+                  "fields": [
+                    {"k": "sensor_id", "v": "0x3F82A1", "g": "factory id, enrolled against the account in Roster"},
+                    {"k": "type", "v": "\"glassbreak\"", "g": "sensor class", "hot": true},
+                    {"k": "state", "v": "\"alarm\"", "g": "`alarm` / `restore` / `supervisory` / `tamper`", "hot": true},
+                    {"k": "counter", "v": "0x00B4", "g": "rolling code; Ember-M0 rejects replays"},
+                    {"k": "batt_mv", "v": "2810", "g": "cell voltage; below 2600 flags low battery"},
+                    {"k": "rssi", "v": "-71", "g": "received strength, logged for placement advice"}
+                  ]
+                },
+                "diagram": {
+                  "groups": {"panel": {"title": "Sentry Panel"}},
+                  "nodes": {
+                    "gb": {"title": "Glassbreak GB-2", "sub": "zone 3", "icon": "chip", "tint": "dev"},
+                    "lp": {"title": "Ember-M0", "sub": "alarm core", "icon": "chip", "tint": "dev", "group": "panel",
+                           "link": "https://github.com/hearthline/panel-fw/blob/main/ember/state_machine.c#L88"},
+                    "hp": {"title": "Hearth-A53", "sub": "comms + LTE", "icon": "antenna", "tint": "dev", "group": "panel",
+                           "link": "https://github.com/hearthline/panel-fw/blob/main/hearth/uplink_super.c#L141"},
+                    "isp": {"title": "Home ISP", "sub": "broadband", "icon": "router", "tint": "dev"},
+                    "apn": {"title": "Cellular APN", "sub": "LTE Cat-M1", "icon": "antenna", "tint": "mqtt"},
+                    "gh": {"title": "Hearthgate", "sub": "signaling ingest", "icon": "cloud", "tint": "cmd",
+                           "link": "https://github.com/hearthline/monitor-core/blob/main/hearthgate/ingest.go#L204"},
+                    "ldg": {"title": "Register", "sub": "event journal", "icon": "db", "tint": "data"},
+                    "vg": {"title": "Overwatch", "sub": "incident routing", "icon": "server", "tint": "cmd",
+                           "link": "https://github.com/hearthline/monitor-core/blob/main/overwatch/incident.go#L96"},
+                    "ac": {"title": "Agent console", "sub": "Guardline", "icon": "terminal", "tint": "cmd"}
+                  },
+                  "rows": [
+                    ["gb", ["lp", "hp"]],
+                    [["isp", "apn"], "gh", ["ldg", "vg"], "ac"]
+                  ],
+                  "edges": [
+                    {"from": "gb", "to": "lp", "kind": "subghz", "label": "alarm frame"},
+                    {"from": "lp", "to": "hp", "kind": "int"},
+                    {"from": "hp", "to": "isp", "kind": "https", "label": "seq via bb"},
+                    {"from": "isp", "to": "gh", "kind": "https", "label": "TLS signaling"},
+                    {"from": "hp", "to": "apn", "kind": "cell", "label": "seq retx"},
+                    {"from": "apn", "to": "gh", "kind": "cell", "label": "TLS signaling"},
+                    {"from": "gh", "to": "apn", "kind": "cell", "ret": true, "label": "center ack"},
+                    {"from": "apn", "to": "hp", "kind": "cell", "ret": true, "label": "center ack"},
+                    {"from": "gh", "to": "ldg", "kind": "int", "label": "append"},
+                    {"from": "gh", "to": "vg", "kind": "int", "label": "open incident"},
+                    {"from": "vg", "to": "ac", "kind": "int", "label": "assign INC-7731"}
+                  ],
+                  "panels": [
+                    {"id": "st", "type": "state", "title": "Ember-M0 — alarm state",
+                     "states": ["ARMED_AWAY", "ALARM", "ACKED"],
+                     "colors": {"ALARM": "#EF4444", "ACKED": "#4ADE80"},
+                     "initial": {"state": "ARMED_AWAY"}},
+                    {"id": "up", "type": "signal", "title": "Uplinks",
+                     "links": [
+                       {"id": "bb", "label": "Broadband", "transport": "wifi"},
+                       {"id": "cell", "label": "Cellular", "transport": "cellular"}
+                     ],
+                     "initial": {"bb": {"state": "ok"}, "cell": {"state": "lost"}}},
+                    {"id": "ob", "type": "queue", "title": "Panel outbox", "initial": {"state": "empty"}}
+                  ],
+                  "steps": [
+                    {"edge": "gb->lp", "text": "Glassbreak alarm frame reaches Ember-M0"},
+                    {"edge": "lp->hp", "text": "ALARM latched, siren on, event handed to the A53",
+                     "panels": {"st": {"state": "ALARM"}}},
+                    {"edges": ["hp->isp", "isp->gh"], "text": "Seq 4181 travels the broadband path; acked in 2 s"},
+                    {"edges": ["gh->ldg", "gh->vg"], "text": "Hearthgate appends to Register; Overwatch opens INC-7731"},
+                    {"nodes": ["hp", "isp"], "text": "Seq 4182 sent into a dead broadband link — no ack",
+                     "panels": {"up": {"bb": {"state": "lost"}},
+                                "ob": {"state": "enqueue", "label": "seq 4182", "from": "Ember-M0 outbox"}}},
+                    {"nodes": ["hp"], "text": "15 s supervision expires; LTE modem powers up",
+                     "panels": {"up": {"cell": {"state": "retrying"}},
+                                "ob": {"state": "held", "reason": "waiting for an uplink"}}},
+                    {"edges": ["hp->apn", "apn->gh"], "text": "Seq 4182 retransmitted (+4183) over cellular",
+                     "panels": {"up": {"cell": {"state": "ok"}},
+                                "ob": {"state": "dequeue", "to": "→ Hearthgate (cell)"}}},
+                    {"edge": "vg->ac", "text": "Hearthgate dedupes on (acct, seq); Overwatch assigns an agent",
+                     "panels": {"ob": {"state": "empty"}}},
+                    {"edges": ["gh->apn", "apn->hp"], "text": "Center ack returns over cellular; keypad: MONITORING NOTIFIED",
+                     "panels": {"st": {"state": "ACKED"}}}
+                  ]
+                }
+              },
+              {
+                "heading": "Wire contract: signaling event",
+                "accent": "pink",
+                "text": [
+                  "The panel→Hearthgate envelope shown above carries every signal in this flow (`seq 4181`, `4182`, `4183`). The sample values below are `seq 4182`'s retransmission over the cellular path — `event: siren_on`, `path: cell`."
+                ],
+                "contract": {
+                  "title": "On the wire: signaling event (TLS over broadband or cellular)",
+                  "source": "https://github.com/hearthline/monitor-core/blob/main/hearthgate/envelope.go#L61",
+                  "fields": [
+                    {"k": "acct", "v": "\"HL-55021\"", "g": "account id"},
+                    {"k": "seq", "v": "4182", "g": "per-panel monotonic; drives dedupe and gap detection", "hot": true},
+                    {"k": "event", "v": "\"siren_on\"", "g": "`alarm` / `siren_on` / `pending_entry` / `disarm` / `test_*`"},
+                    {"k": "zone", "v": "3", "g": "zone number from the Roster config"},
+                    {"k": "path", "v": "\"cell\"", "g": "`bb` or `cell` — which uplink carried this copy", "hot": true},
+                    {"k": "flags", "v": "{\"duress\":1}", "g": "duress bit rides inside the signed body only"},
+                    {"k": "hmac", "v": "9f31…", "g": "panel key over the whole envelope"}
+                  ],
+                  "note": "This same envelope carries the duress board's `disarm` event with `flags.duress=1` set."
+                }
+              }
+            ]
+          },
+          {
+            "label": "Camera verification",
+            "sections": [
+              {
+                "heading": "Camera-verified dispatch",
+                "accent": "violet",
+                "text": [
+                  "Monitored plans add camera verification: an agent reviews the attached clip, attempts a talk-down through the camera's speaker, and only then decides on dispatch."
+                ],
+                "bullets": [
+                  "On the ALARM latch, **Hearth-A53** asks **Sentry Cam** to record, and the camera uploads a 30-second clip to **Clipline** over wifi.",
+                  "Clipline attaches the clip to `INC-7731` and tells **Overwatch** the incident is camera-verification eligible.",
+                  "Overwatch pops the incident on a **Guardline** agent console with the clip queued first.",
+                  "The agent reviews the clip and confirms a person inside the premises perimeter.",
+                  "The agent opens a talk-down: Guardline relays live agent audio to the camera's speaker while the camera streams live video back.",
+                  "The subject does not leave, so the agent marks the incident \"verified intruder\" and requests dispatch from Overwatch.",
+                  "Overwatch hands the dispatch request and clip reference to **Summons**, which forwards it to the regional emergency-services gateway — verified video raises response priority.",
+                  "**Beacon** pushes the owner the full timeline: alarm, clip, talk-down attempted, dispatch requested."
+                ]
+              }
+            ]
+          },
+          {
+            "label": "Walk test",
+            "sections": [
+              {
+                "heading": "Walk test: every sensor exercised",
+                "accent": "amber",
+                "text": [
+                  "The owner walk-tests the whole sensor inventory from the app, with dispatch suppressed for the duration and a signed record kept at the end."
+                ],
+                "bullets": [
+                  "The owner starts a walk test in the app; the request lands on **Roster**, which commands the panel into TEST mode.",
+                  "**Ember-M0** enters TEST: sensors report normally, the siren stays quiet, and every signal is tagged test-mode; **Overwatch** marks the account \"test in progress — suppress dispatch.\"",
+                  "The owner trips each sensor in turn, and each sub-GHz frame reaches Ember-M0, which chirps the keypad and marks that sensor tested.",
+                  "**Hearth-A53** streams per-sensor results to Roster, which updates the walk-test inventory: front entry PASS, hall motion PASS.",
+                  "The basement entry sensor never reports; after two attempts Roster shows it FAIL (last supervisory 3 days ago, battery critical).",
+                  "The owner swaps the sensor battery and trips it again, and the arriving frame flips basement entry to PASS.",
+                  "The owner ends the test at the keypad, and Ember-M0 verifies every enrolled sensor was exercised before leaving TEST.",
+                  "Hearth-A53 sends the test-complete report to Hearthgate, which tells Overwatch to lift dispatch suppression.",
+                  "Roster stores the signed walk-test record and the panel returns to DISARMED/READY — fully armed-capable.",
+                  "*Failure mode — sensor battery low*: supervisory frames carry `batt_mv`; Roster schedules a keypad chirp and app nag; a sensor silent past 3 supervisory windows is flagged unsupervised.",
+                  "*Failure mode — walk test abandoned*: TEST auto-expires after 60 minutes and suppression lifts even if the app session died; the keypad exit above is explicit, expiry is the backstop."
+                ],
+                "diagram": {
+                  "nodes": {
+                    "ph": {"title": "Owner phone", "sub": "hearthline app", "icon": "phone", "tint": "dev"},
+                    "rs": {"title": "Roster", "sub": "device registry", "icon": "db", "tint": "data"},
+                    "pnl": {"title": "Sentry Panel", "sub": "TEST mode", "icon": "chip", "tint": "dev"},
+                    "snsE": {"title": "Front Entry", "icon": "chip", "tint": "dev"},
+                    "snsM": {"title": "Hall Motion", "icon": "chip", "tint": "dev"},
+                    "snsB": {"title": "Basement Entry", "icon": "chip", "tint": "dev"},
+                    "gh": {"title": "Hearthgate", "sub": "signaling ingest", "icon": "cloud", "tint": "cmd",
+                           "link": "https://github.com/hearthline/monitor-core/blob/main/hearthgate/ingest.go#L204"},
+                    "vg": {"title": "Overwatch", "sub": "dispatch suppress", "icon": "server", "tint": "cmd",
+                           "link": "https://github.com/hearthline/monitor-core/blob/main/overwatch/incident.go#L96"}
+                  },
+                  "rows": [
+                    ["ph", "rs"],
+                    [["snsE", "snsM", "snsB"], "pnl", "gh", "vg"]
+                  ],
+                  "edges": [
+                    {"from": "ph", "to": "rs", "kind": "https", "label": "start walk test"},
+                    {"from": "rs", "to": "pnl", "kind": "https", "label": "enter TEST"},
+                    {"from": "rs", "to": "vg", "kind": "int", "label": "suppress dispatch"},
+                    {"from": "snsE", "to": "pnl", "kind": "subghz", "label": "test trip"},
+                    {"from": "snsM", "to": "pnl", "kind": "subghz", "label": "test trip"},
+                    {"from": "snsB", "to": "pnl", "kind": "subghz", "label": "late trip"},
+                    {"from": "pnl", "to": "rs", "kind": "https", "label": "per-sensor results"},
+                    {"from": "pnl", "to": "gh", "kind": "https", "label": "test-complete"},
+                    {"from": "gh", "to": "vg", "kind": "int", "label": "lift suppression"}
+                  ],
+                  "panels": [
+                    {"id": "inv", "type": "tiles", "title": "Walk-test inventory",
+                     "tiles": [
+                       {"id": "front", "label": "Front Entry"},
+                       {"id": "motion", "label": "Hall Motion"},
+                       {"id": "basement", "label": "Basement Entry"}
+                     ],
+                     "initial": {"front": {"state": "untested"}, "motion": {"state": "untested"}, "basement": {"state": "untested"}}},
+                    {"id": "pst", "type": "state", "title": "Panel mode",
+                     "states": ["DISARMED", "TEST", "READY"],
+                     "colors": {"TEST": "#FFCB6B", "READY": "#4ADE80"},
+                     "initial": {"state": "DISARMED"}}
+                  ],
+                  "steps": [
+                    {"edge": "ph->rs", "text": "Owner starts the walk test in the app"},
+                    {"edges": ["rs->pnl", "rs->vg"], "text": "Roster commands TEST; Overwatch suppresses dispatch",
+                     "panels": {"pst": {"state": "TEST"}}},
+                    {"edge": "snsE->pnl", "text": "Front entry tripped — frame chirps the keypad",
+                     "panels": {"inv": {"front": {"state": "pass"}}}},
+                    {"edge": "snsM->pnl", "text": "Hall motion tripped",
+                     "panels": {"inv": {"motion": {"state": "pass"}}}},
+                    {"edge": "pnl->rs", "text": "Results stream to Roster; basement entry stays silent",
+                     "panels": {"inv": {"basement": {"state": "fail"}}}},
+                    {"edge": "snsB->pnl", "text": "Battery swapped; basement re-trip arrives",
+                     "panels": {"inv": {"basement": {"state": "pass"}}}},
+                    {"nodes": ["pnl"], "text": "Owner ends the test at the keypad; panel verifies coverage",
+                     "panels": {"pst": {"state": "TEST"}}},
+                    {"edge": "pnl->gh", "text": "Test-complete report signaled",
+                     "panels": {"pst": {"state": "TEST"}}},
+                    {"edge": "gh->vg", "text": "Suppression lifted; signed record stored — armed-capable",
+                     "panels": {"pst": {"state": "READY"}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Duress",
+            "sections": [
+              {
+                "heading": "Duress disarm: identical locally, silent upstream",
+                "accent": "slate",
+                "text": [
+                  "The keypad supports a duress code that looks exactly like a normal disarm at the premises while silently opening a priority incident upstream."
+                ],
+                "bullets": [
+                  "The front door opens while armed-away; the entry sensor's frame reaches Ember-M0, which starts the 30-second entry delay and beeps the keypad.",
+                  "Hearth-A53 sends a pending-entry event to Hearthgate so the monitoring side has context if the delay expires.",
+                  "The user keys a 4-digit code, and the keypad sends it to Ember-M0 in a rolling-code envelope.",
+                  "Normal path: the code matches the owner's code, Ember-M0 disarms and cancels the delay, and Overwatch closes the pending entry silently on the disarm event.",
+                  "Duress path: the code matches the owner's duress code, and locally everything is identical — the keypad shows DISARMED, no siren, entry delay cancelled.",
+                  "The disarm event Hearth-A53 sends carries `flags.duress=1` inside the signed envelope, invisible at the premises.",
+                  "Overwatch opens a silent duress incident and routes it to an agent flagged NO PREMISES CONTACT — no callback, no siren, no talk-down.",
+                  "Beacon suppresses the normal owner push, because an attacker watching the owner's phone must see nothing unusual.",
+                  "The agent follows the duress protocol and requests priority dispatch through Summons while the panel continues to look disarmed.",
+                  "**[Countersign](https://github.com/hearthline/monitor-core/blob/main/countersign/codes.go#L57)** owns the keypad code policy behind this — auth, panel client certificates, agent SSO, and *per-account duress codes* — which is why the duress code can look exactly like a normal disarm at the premises.",
+                  "*The argument*: `pst` (Ember-M0's local state) and `kd` (what the keypad shows) end **identically** on both paths — only `mlog` (the monitoring side) diverges."
+                ],
+                "diagram": {
+                  "groups": {"panel": {"title": "Sentry Panel"}},
+                  "nodes": {
+                    "door": {"title": "Entry sensor", "icon": "chip", "tint": "dev"},
+                    "kp": {"title": "Keypad", "sub": "code entry", "icon": "terminal", "tint": "dev"},
+                    "lp": {"title": "Ember-M0", "sub": "alarm core", "icon": "chip", "tint": "dev", "group": "panel",
+                           "link": "https://github.com/hearthline/panel-fw/blob/main/ember/state_machine.c#L88"},
+                    "hp": {"title": "Hearth-A53", "sub": "comms + LTE", "icon": "antenna", "tint": "dev", "group": "panel",
+                           "link": "https://github.com/hearthline/panel-fw/blob/main/hearth/uplink_super.c#L141"},
+                    "gh": {"title": "Hearthgate", "sub": "signaling ingest", "icon": "cloud", "tint": "cmd",
+                           "link": "https://github.com/hearthline/monitor-core/blob/main/hearthgate/ingest.go#L204"},
+                    "vg": {"title": "Overwatch", "sub": "silent incident", "icon": "server", "tint": "cmd",
+                           "link": "https://github.com/hearthline/monitor-core/blob/main/overwatch/incident.go#L96"},
+                    "ac": {"title": "Agent console", "sub": "NO CONTACT", "icon": "terminal", "tint": "auth"},
+                    "sm": {"title": "Summons", "sub": "dispatch bridge", "icon": "cloud", "tint": "cmd"}
+                  },
+                  "rows": [
+                    ["door", "kp", ["lp", "hp"]],
+                    ["gh", "vg", ["ac", "sm"]]
+                  ],
+                  "edges": [
+                    {"from": "door", "to": "lp", "kind": "subghz", "label": "entry open"},
+                    {"from": "lp", "to": "kp", "kind": "subghz", "label": "entry-delay beep"},
+                    {"from": "kp", "to": "lp", "kind": "subghz", "label": "code (rolling)"},
+                    {"from": "lp", "to": "hp", "kind": "int"},
+                    {"from": "hp", "to": "gh", "kind": "https", "label": "flags.duress=1"},
+                    {"from": "gh", "to": "vg", "kind": "int", "label": "silent incident"},
+                    {"from": "vg", "to": "ac", "kind": "int", "label": "NO CONTACT"},
+                    {"from": "ac", "to": "vg", "kind": "int", "label": "dispatch req"},
+                    {"from": "vg", "to": "sm", "kind": "int", "label": "priority dispatch"}
+                  ],
+                  "panels": [
+                    {"id": "kd", "type": "leds", "title": "Keypad — what the user sees",
+                     "leds": [
+                       {"id": "armed", "label": "ARMED"},
+                       {"id": "delay", "label": "ENTRY DELAY"},
+                       {"id": "disarmed", "label": "DISARMED"}
+                     ],
+                     "initial": {"armed": "on", "delay": "off", "disarmed": "off"}},
+                    {"id": "pst", "type": "state", "title": "Ember-M0 — local state",
+                     "states": ["ARMED_AWAY", "ENTRY_DELAY", "DISARMED"],
+                     "colors": {"DISARMED": "#4ADE80"},
+                     "initial": {"state": "ARMED_AWAY"}},
+                    {"id": "mlog", "type": "log", "title": "Monitoring side",
+                     "tags": {"NET": "#F78C6C", "SYS": "#38E1FF"}}
+                  ],
+                  "steps": [
+                    {"edge": "door->lp", "text": "Door opens armed-away; 30 s entry delay starts",
+                     "panels": {"pst": {"state": "ENTRY_DELAY"}, "kd": {"armed": "off", "delay": "on"}}},
+                    {"edge": "lp->kp", "text": "Keypad beeps the countdown"},
+                    {"edge": "hp->gh", "text": "Pending-entry event gives monitoring context",
+                     "panels": {"mlog": {"log": [{"tag": "SYS", "text": "pending entry"}]}}},
+                    {"edge": "kp->lp", "text": "User keys the duress code"},
+                    {"nodes": ["lp", "kp"], "text": "Locally identical: DISARMED shown, no siren",
+                     "panels": {"pst": {"state": "DISARMED"}, "kd": {"delay": "off", "disarmed": "on"}}},
+                    {"edges": ["lp->hp", "hp->gh"], "text": "Disarm event carries the duress bit in the signed body",
+                     "panels": {"mlog": {"log": [{"tag": "NET", "text": "disarm flags.duress=1"}]}}},
+                    {"edges": ["gh->vg", "vg->ac"], "text": "Overwatch opens a silent incident: NO PREMISES CONTACT",
+                     "panels": {"mlog": {"log": [{"tag": "SYS", "text": "silent duress incident"}]}}},
+                    {"nodes": ["vg"], "text": "Owner push suppressed by duress policy",
+                     "panels": {"mlog": {"log": [{"tag": "SYS", "text": "Beacon: push suppressed"}]}}},
+                    {"edges": ["ac->vg", "vg->sm"], "text": "Agent requests priority dispatch; panel still looks disarmed",
+                     "panels": {"mlog": {"log": [{"tag": "SYS", "text": "priority dispatch requested"}]}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Failure modes",
+            "sections": [
+              {
+                "heading": "Failure modes: power, region, and load",
+                "accent": "cyan",
+                "text": [
+                  "Failure modes that don't interrupt any of the three boards above but shape how the panel behaves under power loss, backend region loss, and monitoring-center load."
+                ],
+                "bullets": [
+                  "**Power fails**: 24 h on the backup pack; Hearth-A53 sheds wifi and camera liaison while Ember-M0 keeps the state machine, sub-GHz, and on-demand LTE alive; the keypad announces \"on backup power.\"",
+                  "**Hearthgate region down**: panels retry the alternate region endpoint (DNS-steered).",
+                  "**Agent overload**: Overwatch queues incidents against SLA clocks; alarm events are never dropped, but camera verification degrades to the unverified dispatch policy."
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,365 @@
+{
+  "page": {
+    "title": "Nestrel Warden — a cloud camera that remembers the outage",
+    "protocols": {
+      "wifi": {"label": "Wi-Fi radio", "color": "#60A5FA"}
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "An event becomes a sentence",
+            "sections": [
+              {
+                "heading": "An event becomes a sentence",
+                "accent": "green",
+                "text": [
+                  "Classification runs on-device; everything else — history, LLM-written notification descriptions, search — lives in the Nestrel cloud."
+                ],
+                "bullets": [
+                  "**Kestrel SoC (NR-V2)** — dual Cortex-A35 + vision DSP; on-device person/vehicle/animal/package classifier, H.264 encode, TLS. Wired and always on: **no low-power/high-power split** — one SoC does everything.",
+                  "**Flash** — 8 GB eMMC: dual firmware slots (A/B) plus a reserved 512 MB event-buffer partition good for ~60 minutes of classified event clips, managed as a ring of 12 segments.",
+                  "**Sensors** — 1/2.8\" 2K HDR sensor; 6 IR LEDs with mechanical IR-cut; mic + speaker; status LED; enclosure temperature sensor.",
+                  "**Radios** — dual-band 802.11ac wifi (no ethernet); BLE 5 for setup only.",
+                  "**Power** — 24 V wall adapter; a supercapacitor rides through sub-second dips, anything longer is a real outage and a marked gap.",
+                  "Warden's classifier detects a person with a package in the porch zone and finalizes a 24-second event clip in RAM.",
+                  "Warden posts the event envelope to Skybridge, which forwards it to Timeline to slot event_uid `ev-8f31` into the camera's timeline.",
+                  "Warden streams the clip chunks to Inlet, which assembles, verifies, and writes the object to Coldstore.",
+                  "Inlet hands key frames and the classifier labels to Scribe.",
+                  "Scribe's LLM writes the caption (\"A courier leaves a box at the front door\") and posts it to Timeline against `ev-8f31`.",
+                  "Timeline emits a notify record to Courier, which pushes the described notification to the household's phones.",
+                  "**Scribe down** — notifications fall back to plain labels (\"Person, package\"); captions are back-filled onto the timeline on recovery."
+                ],
+                "diagram": {
+                  "nodes": {
+                    "cam": {"title": "Warden", "sub": "porch camera", "icon": "chip", "tint": "dev"},
+                    "skybridge": {"title": "Skybridge", "sub": "device gateway", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/skybridge/session.go#L86"},
+                    "inlet": {"title": "Inlet", "sub": "media ingest", "icon": "server", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/inlet/ingest.go#L131"},
+                    "coldstore": {"title": "Coldstore", "sub": "object store", "icon": "db", "tint": "data",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/coldstore/objects.go#L58"},
+                    "scribe": {"title": "Scribe", "sub": "LLM captioner", "icon": "server", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/scribe/describe.go#L49"},
+                    "timeline": {"title": "Timeline", "sub": "event index", "icon": "db", "tint": "data",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/timeline/reconcile.go#L133"},
+                    "courier": {"title": "Courier", "sub": "notifications", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/courier/push.go#L72"},
+                    "phone": {"title": "Household", "sub": "nestrel app", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    ["cam", "skybridge", "inlet", "coldstore"],
+                    ["scribe", "timeline", "courier", "phone"]
+                  ],
+                  "edges": [
+                    {"from": "cam", "to": "skybridge", "kind": "https", "label": "event envelope"},
+                    {"from": "skybridge", "to": "timeline", "kind": "int", "label": "index ev_uid"},
+                    {"from": "cam", "to": "inlet", "kind": "https", "label": "clip chunks"},
+                    {"from": "inlet", "to": "coldstore", "kind": "int", "label": "write object"},
+                    {"from": "inlet", "to": "scribe", "kind": "int", "label": "key frames"},
+                    {"from": "scribe", "to": "timeline", "kind": "int", "label": "caption"},
+                    {"from": "timeline", "to": "courier", "kind": "int", "label": "notify rec"},
+                    {"from": "courier", "to": "phone", "kind": "https", "label": "rich push"}
+                  ],
+                  "panels": [
+                    {"id": "vf", "type": "screen", "title": "Warden viewfinder", "scene": "package-drop", "initial": {"mode": "live"}},
+                    {"id": "plog", "type": "log", "title": "Event pipeline", "tags": {"DEV": "#38E1FF", "NET": "#4ADE80", "LLM": "#A78BFA"}}
+                  ],
+                  "steps": [
+                    {"nodes": ["cam"], "text": "Warden's classifier detects a person with a package in the porch zone and finalizes a 24-second clip in RAM.",
+                      "panels": {"vf": {"mode": "rec"}, "plog": {"log": [{"tag": "DEV", "text": "person+package porch"}]}}},
+                    {"edges": ["cam->skybridge", "skybridge->timeline"], "text": "Envelope posted; Timeline slots ev-8f31",
+                      "panels": {"plog": {"log": [{"tag": "NET", "text": "ev-8f31 indexed"}]}}},
+                    {"edges": ["cam->inlet", "inlet->coldstore"], "text": "Clip chunks assembled and sealed into Coldstore",
+                      "panels": {"vf": {"mode": "save", "banner": "CLIP 24 s UPLOADED"}}},
+                    {"edge": "inlet->scribe", "text": "Scribe reads key frames + labels"},
+                    {"edge": "scribe->timeline", "text": "LLM caption attached to the event",
+                      "panels": {"plog": {"log": [{"tag": "LLM", "text": "A courier leaves a box at the front door"}]}}},
+                    {"edges": ["timeline->courier", "courier->phone"], "text": "Described push reaches the household"}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "One hour in the dark",
+            "sections": [
+              {
+                "heading": "One hour in the dark",
+                "accent": "amber",
+                "text": [
+                  "Warden's defining trait is that it does not go blind when the wifi does: up to one hour of classified events buffers to a reserved flash partition."
+                ],
+                "bullets": [
+                  "The router reboots and Warden's association drops; the connection manager marks the wifi link and cloud session LOST and switches the recorder's output to the flash buffer.",
+                  "Warden probes for the access point on a 5 s / 15 s / 60 s backoff while sensing and classification continue unaffected.",
+                  "Motion fires and the recorder writes event `ev-4361` to flash segment 1 with its wall-clock timestamp and monotonic counter.",
+                  "Two more events land in segments 2–3; the write head advances and the buffer reports 41 minutes of capacity left.",
+                  "At 58 minutes offline the ring is full and the recorder overwrites the oldest unprotected segment — oldest events are lost first, newest are kept.",
+                  "Skybridge misses three heartbeats and tells Vitals, which has Courier push an \"offline since 18:02\" alert to the household.",
+                  "*Flash segments are counted 1–12 in this story (segment 1 = the buffer's first write); the buffer widget's cells below are 0-indexed internally, so segment 1 = cell 0, segment 2 = cell 1, and so on.*",
+                  "**Wifi drops** — the whole point: classification and recording continue, events buffer to flash for ~60 minutes, oldest-first overwrite after that; a longer outage loses the oldest excess, never the most recent events.",
+                  "**Power fails** — wired, no battery: the camera goes dark and the timeline shows a hard gap; the supercap only guarantees the in-flight flash write completes, so the buffer is never corrupted mid-segment.",
+                  "**Flash wear** — buffer segments failing verification are retired, shrinking capacity; Vitals raises an advisory below 30 minutes."
+                ],
+                "diagram": {
+                  "groups": {"warden": {"title": "Warden camera"}},
+                  "nodes": {
+                    "conn": {"title": "Conn manager", "sub": "wifi + tls", "icon": "antenna", "tint": "dev", "group": "warden"},
+                    "rec": {"title": "Recorder", "sub": "classify + write", "icon": "gear", "tint": "dev", "group": "warden"},
+                    "flash": {"title": "Flash buffer", "sub": "512 MB / 60 min", "icon": "db", "tint": "dev", "group": "warden"},
+                    "ap": {"title": "Access point", "sub": "household wifi", "icon": "router", "tint": "dev"},
+                    "skybridge": {"title": "Skybridge", "sub": "device gateway", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/skybridge/session.go#L86"},
+                    "vitals": {"title": "Vitals", "sub": "fleet health", "icon": "db", "tint": "data",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/vitals/health.go#L94"},
+                    "courier": {"title": "Courier", "sub": "notifications", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/courier/push.go#L72"},
+                    "phone": {"title": "Household", "sub": "nestrel app", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    [["conn", "rec", "flash"], "ap", "skybridge"],
+                    ["vitals", "courier", "phone"]
+                  ],
+                  "edges": [
+                    {"from": "conn", "to": "ap", "kind": "wifi", "label": "probe"},
+                    {"from": "rec", "to": "flash", "kind": "int", "label": "evt"},
+                    {"from": "skybridge", "to": "vitals", "kind": "int", "label": "3 beats missed"},
+                    {"from": "vitals", "to": "courier", "kind": "int", "label": "cam offline"},
+                    {"from": "courier", "to": "phone", "kind": "https", "label": "offline alert"}
+                  ],
+                  "panels": [
+                    {"id": "sig", "type": "signal", "title": "Uplinks",
+                      "links": [
+                        {"id": "wifi", "label": "Wi-Fi", "transport": "wifi"},
+                        {"id": "cloud", "label": "Cloud session", "transport": "wifi"}
+                      ],
+                      "initial": {"wifi": {"state": "ok"}, "cloud": {"state": "ok"}}},
+                    {"id": "buf", "type": "buffer", "title": "Flash event buffer", "capacity": "60 min", "segments": 12,
+                      "initial": {"head": 0, "cells": []}},
+                    {"id": "blog", "type": "log", "title": "Device log", "tags": {"DEV": "#38E1FF", "NET": "#4ADE80"}}
+                  ],
+                  "steps": [
+                    {"nodes": ["ap", "conn", "rec"], "text": "The router reboots and Warden's association drops — the connection manager marks the wifi link and cloud session LOST and switches the recorder's output to the flash buffer.",
+                      "panels": {"sig": {"wifi": {"state": "lost"}, "cloud": {"state": "lost"}}, "blog": {"log": [{"tag": "DEV", "text": "deauth 18:02 — buffer armed"}]}}},
+                    {"edge": "conn->ap", "text": "Probing on 5/15/60 s backoff; sensing unaffected",
+                      "panels": {"sig": {"wifi": {"state": "retrying"}}}},
+                    {"edge": "rec->flash", "text": "ev-4361 written to segment 1",
+                      "panels": {"buf": {"mark": [[0, 0, "buffered"]], "head": 1, "note": "ev-4361 buffered"}}},
+                    {"nodes": ["flash"], "text": "Two more events; 41 min of capacity left",
+                      "panels": {"buf": {"mark": [[1, 2, "buffered"]], "head": 3, "note": "Two more events — 41 min left"}}},
+                    {"nodes": ["flash"], "text": "Ring full at 58 min — oldest overwritten first",
+                      "panels": {"buf": {"mark": [[3, 11, "buffered"], [0, 0, "buffered"]], "head": 1, "note": "ring wrapped — ev-4361 (seg 1) overwritten"},
+                        "blog": {"log": [{"tag": "DEV", "text": "ring wrap — oldest lost"}]}}},
+                    {"edges": ["skybridge->vitals", "vitals->courier", "courier->phone"], "text": "Cloud notices: offline alert to the household",
+                      "panels": {"blog": {"log": [{"tag": "NET", "text": "offline since 18:02 pushed"}]}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Back-fill without doubles",
+            "sections": [
+              {
+                "heading": "Back-fill without doubles",
+                "accent": "blue",
+                "text": [
+                  "An independent incident from Flow 2 — a shorter (47-minute) outage at the same site that never fills the ring, shown to teach the dedup path.",
+                  "The buffer back-fills after reconnect, with dedup and timeline reconciliation, so the household sees one honest timeline and one summary notification instead of a burst of stale alerts."
+                ],
+                "bullets": [
+                  "The access point returns; Warden reassociates and resumes its TLS session, and Skybridge resyncs the clock and returns the last event_uid it has acked.",
+                  "Warden sends Timeline a back-fill manifest listing four buffered events with timestamps, durations, and clip hashes.",
+                  "Timeline dedups the manifest against its index and returns the upload list — `ev-4410` was uploaded just before the drop but never acked, so it is marked duplicate and skipped.",
+                  "Warden uploads the three missing clips oldest-first to Inlet at background priority so live traffic always wins.",
+                  "Inlet writes each clip to Coldstore and acks each event_uid, and Warden flips each acked flash segment to reclaimable.",
+                  "Timeline splices the back-filled events in at their recorded timestamps and badges the outage window \"recovered offline\".",
+                  "Timeline sends the batch to Scribe, which captions all three in one call, and attaches the captions without re-notifying per event.",
+                  "Courier pushes a single summary — \"Warden was offline 47 min; 3 events recovered\" — instead of three stale alerts.",
+                  "**Inlet down** — the same flash buffer absorbs it: unacked events stay buffered and the back-fill flow runs on recovery, so a cloud ingest outage looks like a wifi outage to the camera.",
+                  "**Timeline down** — acks stop, so segments stay protected until acked: no data loss, just delayed dedup and splice."
+                ],
+                "contract": {
+                  "title": "On the wire: back-fill manifest (Warden → Timeline)",
+                  "source": "https://github.com/nestrel/firmware/blob/main/warden/buffer/flashring.c#L77",
+                  "fields": [
+                    {"k": "cam_id", "v": "\"warden-7f9\"", "g": "device identity"},
+                    {"k": "outage_start", "v": "1757088120", "g": "when the uplink dropped"},
+                    {"k": "outage_end", "v": "1757090940", "g": "when the TLS session resumed"},
+                    {"k": "clock_skew_ms", "v": "1840", "g": "correction Skybridge applied; Timeline shifts timestamps"},
+                    {"k": "events", "v": "[{\"uid\":\"ev-4410\",\"ts\":1757088180,\"dur_s\":19,\"sha256\":\"9c41…\"},…]", "g": "one entry per buffered event; uid is the dedup key", "hot": true},
+                    {"k": "dropped", "v": "0", "g": "events lost to ring overwrite during the outage"}
+                  ],
+                  "note": "Sent in Flow 3 step 2, right after the access point returns."
+                },
+                "diagram": {
+                  "groups": {"warden": {"title": "Warden camera"}},
+                  "nodes": {
+                    "conn": {"title": "Conn manager", "sub": "wifi + tls", "icon": "antenna", "tint": "dev", "group": "warden"},
+                    "flash": {"title": "Flash buffer", "sub": "4 events held", "icon": "db", "tint": "dev", "group": "warden"},
+                    "skybridge": {"title": "Skybridge", "sub": "device gateway", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/skybridge/session.go#L86"},
+                    "timeline": {"title": "Timeline", "sub": "dedup + splice", "icon": "db", "tint": "data",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/timeline/reconcile.go#L133"},
+                    "inlet": {"title": "Inlet", "sub": "media ingest", "icon": "server", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/inlet/ingest.go#L131"},
+                    "coldstore": {"title": "Coldstore", "sub": "object store", "icon": "db", "tint": "data",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/coldstore/objects.go#L58"},
+                    "scribe": {"title": "Scribe", "sub": "LLM captioner", "icon": "server", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/scribe/describe.go#L49"},
+                    "courier": {"title": "Courier", "sub": "notifications", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/courier/push.go#L72"},
+                    "phone": {"title": "Household", "sub": "nestrel app", "icon": "phone", "tint": "dev"}
+                  },
+                  "rows": [
+                    [["conn", "flash"], "skybridge", "timeline"],
+                    ["inlet", "coldstore", "scribe"]
+                  ],
+                  "floats": [
+                    {"id": "courier", "side": "below"},
+                    {"id": "phone", "side": "below"}
+                  ],
+                  "edges": [
+                    {"from": "conn", "to": "skybridge", "kind": "https", "label": "TLS resume"},
+                    {"from": "skybridge", "to": "conn", "kind": "https", "ret": true, "label": "clock+last uid"},
+                    {"from": "conn", "to": "timeline", "kind": "https", "label": "manifest 4 ev"},
+                    {"from": "timeline", "to": "conn", "kind": "https", "ret": true, "label": "upload list 3"},
+                    {"from": "conn", "to": "inlet", "kind": "https", "label": "clips bg-prio"},
+                    {"from": "inlet", "to": "coldstore", "kind": "int", "label": "write object"},
+                    {"from": "inlet", "to": "conn", "kind": "https", "ret": true, "label": "ack ev_uid"},
+                    {"from": "timeline", "to": "scribe", "kind": "int", "label": "batch describe"},
+                    {"from": "scribe", "to": "timeline", "kind": "int", "ret": true, "label": "3 captions"},
+                    {"from": "timeline", "to": "courier", "kind": "int", "label": "1 summary"},
+                    {"from": "courier", "to": "phone", "kind": "https", "label": "summary push"}
+                  ],
+                  "panels": [
+                    {"id": "sig", "type": "signal", "title": "Uplinks",
+                      "links": [
+                        {"id": "wifi", "label": "Wi-Fi", "transport": "wifi"},
+                        {"id": "cloud", "label": "Cloud session", "transport": "wifi"}
+                      ],
+                      "initial": {"wifi": {"state": "lost"}, "cloud": {"state": "lost"}}},
+                    {"id": "buf", "type": "buffer", "title": "Flash event buffer", "capacity": "60 min", "segments": 12,
+                      "initial": {"head": 4, "cells": ["buffered", "buffered", "buffered", "buffered"]}},
+                    {"id": "rlog", "type": "log", "title": "Reconciliation", "tags": {"NET": "#4ADE80", "IDX": "#FBBF24", "LLM": "#A78BFA"}}
+                  ],
+                  "steps": [
+                    {"edges": ["conn->skybridge", "skybridge->conn"], "text": "AP back — TLS resumed, clock resynced",
+                      "panels": {"sig": {"wifi": {"state": "ok"}, "cloud": {"state": "ok"}}, "rlog": {"log": [{"tag": "NET", "text": "skew +1.8 s corrected"}]}}},
+                    {"edge": "conn->timeline", "text": "Manifest of 4 buffered events sent",
+                      "panels": {"rlog": {"log": [{"tag": "NET", "text": "manifest: 4 buffered events"}]}}},
+                    {"edge": "timeline->conn", "text": "Dedup: ev-4410 already indexed — skipped",
+                      "panels": {"rlog": {"log": [{"tag": "IDX", "text": "ev-4410 duplicate — skip"}]}, "buf": {"mark": [[0, 0, "uploaded"]], "note": "ev-4410 duplicate — reclaimable"}}},
+                    {"edge": "conn->inlet", "text": "Oldest-first upload at background priority",
+                      "panels": {"buf": {"mark": [[1, 1, "uploading"]], "note": "uploading oldest missing clip"}}},
+                    {"edges": ["inlet->coldstore", "inlet->conn"], "text": "Each ack flips a segment reclaimable",
+                      "panels": {"buf": {"mark": [[1, 1, "uploaded"], [2, 2, "uploading"]], "note": "one clip acked — uploading next"}}},
+                    {"nodes": ["timeline"], "text": "Events spliced at recorded timestamps; gap badged",
+                      "panels": {"rlog": {"log": [{"tag": "IDX", "text": "47 min gap badged"}]}, "buf": {"mark": [[2, 2, "uploaded"], [3, 3, "uploaded"]], "note": "remaining clips acked"}}},
+                    {"edges": ["timeline->scribe", "scribe->timeline"], "text": "Batch captions — no per-event re-notify",
+                      "panels": {"rlog": {"log": [{"tag": "LLM", "text": "3 captions attached"}]}}},
+                    {"edges": ["timeline->courier", "courier->phone"], "text": "One summary push: offline 47 min, 3 recovered",
+                      "panels": {"rlog": {"log": [{"tag": "NET", "text": "summary sent — not 3 alerts"}]}}}
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Overnight wave, with a parachute",
+            "sections": [
+              {
+                "heading": "Overnight wave, with a parachute",
+                "accent": "violet",
+                "text": [
+                  "The staged overnight firmware rollout ships with health-checked automatic rollback."
+                ],
+                "bullets": [
+                  "A release engineer promotes firmware 4.2.0 in Foundry, which opens wave 3 (5% of the fleet) for the overnight window.",
+                  "Foundry queries Vitals for each wave-3 camera's health and skips any that is offline, mid-event, or running hot.",
+                  "Foundry publishes the update offer to Skybridge, which delivers it to Warden's control channel at 02:10 local.",
+                  "Warden confirms it is idle — no live view, no buffered backlog — and downloads the signed image from Foundry's artifact store.",
+                  "Warden verifies the signature and digest against its secure-boot keys, writes the image to slot B marked boot-once, and reboots — recording pauses about 40 seconds.",
+                  "The new firmware starts its health check: camera pipeline up, buffer partition mounted, TLS session established within 120 seconds.",
+                  "The 4.2.0 wifi driver fails to associate inside the window, so the boot watchdog reboots the camera into slot A automatically — no cloud round-trip needed.",
+                  "Slot A (4.1.7) comes back, reconnects, and reports the rollback with failure code `WIFI_ASSOC_TIMEOUT` to Vitals.",
+                  "Vitals feeds wave statistics to Foundry, which holds wave 3 when rollbacks cross 1% and pages the release engineer.",
+                  "**Firmware update fails** — slot B never becomes default until the health check passes; boot-once plus the watchdog guarantees an unattended return to slot A."
+                ],
+                "contract": {
+                  "title": "On the wire: update offer (Foundry → Warden via Skybridge)",
+                  "source": "https://github.com/nestrel/firmware/blob/main/warden/ota/slots.c#L164",
+                  "fields": [
+                    {"k": "release_id", "v": "\"rel-420-w3\"", "g": "release + wave identity for telemetry"},
+                    {"k": "version", "v": "\"4.2.0\"", "g": "target firmware version"},
+                    {"k": "image_url", "v": "\"https://fw.nestrel.io/warden/4.2.0.img\"", "g": "artifact-store download"},
+                    {"k": "sha256", "v": "\"e07b…\"", "g": "image digest, checked before flashing"},
+                    {"k": "sig", "v": "\"b64:MEUC…\"", "g": "release signature, checked against secure-boot keys", "hot": true},
+                    {"k": "window", "v": "\"01:00-05:00\"", "g": "local install window; offer expires outside it"},
+                    {"k": "health_timeout_s", "v": "120", "g": "how long the post-boot health check may take", "hot": true}
+                  ],
+                  "note": "Sent in Flow 4 step 3, when the offer lands on Warden's control channel at 02:10 local."
+                },
+                "diagram": {
+                  "nodes": {
+                    "eng": {"title": "Release eng", "sub": "foundry console", "icon": "terminal", "tint": "cmd"},
+                    "foundry": {"title": "Foundry", "sub": "wave coordinator", "icon": "server", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/foundry/waves.go#L212"},
+                    "artifacts": {"title": "Artifact store", "sub": "signed images", "icon": "db", "tint": "data"},
+                    "vitals": {"title": "Vitals", "sub": "fleet health", "icon": "db", "tint": "data",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/vitals/health.go#L94"},
+                    "skybridge": {"title": "Skybridge", "sub": "device gateway", "icon": "cloud", "tint": "cmd",
+                      "link": "https://github.com/nestrel/cloud/blob/main/services/skybridge/session.go#L86"},
+                    "warden": {"title": "Warden", "sub": "slot A 4.1.7", "icon": "chip", "tint": "dev"}
+                  },
+                  "rows": [
+                    ["eng", "foundry", "artifacts"],
+                    ["vitals", "skybridge", "warden"]
+                  ],
+                  "edges": [
+                    {"from": "eng", "to": "foundry", "kind": "https", "label": "promote 4.2.0"},
+                    {"from": "foundry", "to": "vitals", "kind": "int", "label": "health query"},
+                    {"from": "foundry", "to": "skybridge", "kind": "int", "label": "wave 3 offers"},
+                    {"from": "skybridge", "to": "warden", "kind": "mqtt", "label": "UPDATE offer"},
+                    {"from": "warden", "to": "artifacts", "kind": "https", "label": "GET image"},
+                    {"from": "warden", "to": "skybridge", "kind": "mqtt", "label": "rollback evt"},
+                    {"from": "skybridge", "to": "vitals", "kind": "int", "label": "record fail"},
+                    {"from": "vitals", "to": "foundry", "kind": "int", "label": "wave stats"},
+                    {"from": "foundry", "to": "eng", "kind": "https", "label": "page on-call"}
+                  ],
+                  "panels": [
+                    {"id": "slot", "type": "state", "title": "Firmware slots",
+                      "states": ["RUN_A", "OFFERED", "DOWNLOAD", "FLASH_B", "HEALTH", "ROLLBACK"],
+                      "colors": {"ROLLBACK": "#F87171", "RUN_A": "#4ADE80"},
+                      "initial": {"state": "RUN_A"}},
+                    {"id": "flog", "type": "log", "title": "OTA log", "tags": {"SYS": "#94A3B8", "OTA": "#FBBF24"}}
+                  ],
+                  "steps": [
+                    {"edge": "eng->foundry", "text": "4.2.0 promoted; wave 3 opens overnight",
+                      "panels": {"flog": {"log": [{"tag": "SYS", "text": "wave 3 = 5% of fleet"}]}}},
+                    {"edge": "foundry->vitals", "text": "Foundry queries Vitals and skips any wave-3 camera that is offline, mid-event, or running hot"},
+                    {"edges": ["foundry->skybridge", "skybridge->warden"], "text": "Offer lands at 02:10 local",
+                      "panels": {"slot": {"state": "OFFERED"}}},
+                    {"edge": "warden->artifacts", "text": "Idle check passes; download begins",
+                      "panels": {"slot": {"state": "DOWNLOAD"}}},
+                    {"nodes": ["warden"], "text": "Verified, slot B flashed boot-once, reboot ~40 s",
+                      "panels": {"slot": {"state": "FLASH_B"}, "flog": {"log": [{"tag": "OTA", "text": "sig OK · slot B boot-once"}]}}},
+                    {"nodes": ["warden"], "text": "4.2.0 boots and the health check starts: camera pipeline up, buffer partition mounted, TLS session must establish within 120 seconds",
+                      "panels": {"slot": {"state": "HEALTH"}, "flog": {"log": [{"tag": "OTA", "text": "pipeline OK · flash OK · TLS pending"}]}}},
+                    {"nodes": ["warden"], "text": "Wifi assoc times out inside the window — the boot watchdog reboots Warden into slot A automatically, no cloud round-trip needed",
+                      "panels": {"slot": {"state": "ROLLBACK"}, "flog": {"log": [{"tag": "OTA", "text": "WIFI_ASSOC_TIMEOUT 120 s"}]}}},
+                    {"edges": ["warden->skybridge", "skybridge->vitals"], "text": "Slot A boots and reports the rollback",
+                      "panels": {"slot": {"state": "RUN_A"}, "flog": {"log": [{"tag": "OTA", "text": "back on 4.1.7 — safe"}]}}},
+                    {"edges": ["vitals->foundry", "foundry->eng"], "text": "Rollbacks cross 1% — wave held, on-call paged",
+                      "panels": {"flog": {"log": [{"tag": "SYS", "text": "wave 3 held — rollbacks crossed 1%"}]}}}
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

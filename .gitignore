@@ -3,3 +3,8 @@ __pycache__/
 .DS_Store
 .manifest.lock
 .*.page-build-prev.json
+
+# Local-only agent guidance: CLAUDE.md and the ENTIRE docs/agents/ tree are
+# local-only by design and never committed
+/CLAUDE.md
+/docs/agents/

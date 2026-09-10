@@ -65,6 +65,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | `template/flowview.html` | The render target (GENERATED — edit `src/`). Self-contained single file: layout engine, six skins, protocol-keyed legend, tabs, step player, containment groups, synchronized inspector panels (state machine, LEDs, gauge, log, camera screen), permalink affordances. Reads its spec from an embedded JSON block. |
 | `tools/inject.py` | The injection step: `inject.py <spec.json> <template.html> <out.html>`. Validates the JSON, refuses unescaped `</script`, sets the page title from `page.title`, and discovers derived sibling links when the conventional output root already has `crossref.json`. |
 | `tools/build_index.py` | Generates a root's `index.html` and `crossref.json` from `manifest.json` plus every named spec. The index groups pages by family and lists exact-title services shared by 2+ pages; the JSON catalog supplies derived per-page backlinks. |
+| `tools/mermaid2spec.py` | Converts a mermaid `sequenceDiagram` (bare, or the first ```mermaid fence in markdown) into a deliberately bland skeleton spec: `python3 tools/mermaid2spec.py <input.(md\|mmd)> [-o out.json] [--title "..."]`. Enriching icons, tints, protocols, and prose stays the authoring LLM's job; unsupported mermaid constructs fail loud. |
 | `contract/authoring-contract.md` | The complete authoring contract. Self-sufficient: hand this file plus a source document to any LLM and it can emit a valid spec with zero other context. |
 | `cookbook/` | Task-shaped recipes for authoring agents: one file per common request (temperature thresholds, battery drain, motion-detection geometry, wake-up mailbox, persistent-connection-while-awake, LP-chip MQTT relay, egress routing) plus `adjustments.md`, a phrase-to-knob table for visual feedback ("move that up and to the right"). Every ```json fence in it is a complete spec kept lint-clean by `tests/test_cookbook.py`. |
 | `workbench/flowspec.html` | Interactive workbench: the same engine plus an editable JSON panel with a Render button, schema reference, and known-limits notes. For hand-tuning specs. |
@@ -96,12 +97,16 @@ inside this repo. The page name comes from either `<name>.spec.json` or plain
 Pass an explicit `<family>/<slug>` after the spec when a nested library is
 wanted; that established mode still writes `<root>/<family>/<slug>.html` and
 `<slug>.spec.json`. An explicit bare `<slug>` plus `--root` selects a different
-flat output name.
+flat output name. Both `<spec.json>` and `--root` may be given relative to
+*your own* working directory — the tool anchors them to the directory you run
+it from, and a symlinked spec or root keeps its alias name in the outputs and
+the manifest family.
 `python3 <VIZ>/tools/build_index.py --root <OUT> --title "..."` adds a
 browsing index over everything in OUT plus an `OUT/crossref.json` service
 catalog. Selective widget documentation comes
 from `python3 <VIZ>/tools/widget_doc.py <types…>` so an agent loads only the
-contract sections its document needs.
+contract sections its document needs (`--list` prints the valid type names;
+`--contract-card` prepends the shared message-contract-card section).
 
 ## Authoring workflow for an agent (the core loop)
 
@@ -147,7 +152,9 @@ edit it. To change a page:
    With no slug and no `--root`, `<name>.html` and `manifest.json` are updated
    in the spec's own directory; no redundant spec copy or subdirectory is
    created. It validates first and refuses on problems, printing each one with
-   the JSON field path and what to fix. `PAGE_BUILD OK` means the HTML and the
+   the JSON field path and what to fix — validator *warnings* also stop the
+   build (`cookbook/adjustments.md` maps the common ones to spec knobs);
+   `--allow-warnings` builds through them. `PAGE_BUILD OK` means the HTML and the
    manifest are updated. Descriptions/tags are kept from last time unless you
    pass `--desc` / `--tags` again. This repo's existing `examples/` library
    deliberately remains nested, so rebuild those pages with their explicit
@@ -273,7 +280,9 @@ CONFLUENCE_EMAIL=reader@example.test CONFLUENCE_TOKEN=example-api-token \
 
 The default comparison uses the two newest versions. Agents should read the
 diff output instead of loading both full documents; unchanged regions are
-intentionally omitted.
+intentionally omitted. `--context N` widens the unchanged lines shown around
+each change (default 3), and `--raw` diffs the storage XHTML verbatim instead
+of the readable text extraction.
 
 **No-credential file mode.** When another tool already fetched the two
 versions — typically a Confluence MCP server available to the agent — save
@@ -323,6 +332,10 @@ python3 tools/confluence_patch.py --file widget-page.json \
   --out widget-page-patched.xhtml --find-file old.xhtml \
   --replace-file new.xhtml --dry-run
 ```
+
+`--restore <version>` (live mode only, no find/replace) republishes that
+historical version's body as a new version — the undo for a bad patch; every
+live patch also prints the exact restore command for its own undo.
 
 ## Exporting a GIF
 
@@ -380,7 +393,7 @@ features you get for free” in `contract/authoring-contract.md`.
 Running the test suites locally (same invocations CI uses):
 
 ```
-python3 -m unittest discover -s tests
+python3 -m unittest discover -s tests -v
 node --test tests/*.test.js
 ```
 

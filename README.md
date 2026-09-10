@@ -33,6 +33,18 @@ Everything here — content and tooling — came out of an agent-driven loop:
    (`docs/hlds/`) against those feature sets. Every company, service, and product name in
    them is invented. Each draft went through human and agent review passes for realism and
    internal contradictions.
+
+   One concrete example of how that grounding works: the doorbell page
+   (`examples/doorbell/`, expanded in `examples/doorbell-atlas/`) is a composite of two
+   real designs, built only from public information. Its hardware architecture — a
+   low-power chip that stays connected on microamps handling Wi-Fi, MQTT, and the PIR
+   sensor, waking a separate camera/encoder chip over an interrupt line for seconds per
+   visit — follows Blink's publicly documented dual-chip battery design. Its cloud
+   architecture — motion events over an MQTT broker, video never touching the broker,
+   clips uploaded over HTTPS and linked back to the originating event — follows Ring's
+   event-versus-media split. The radar-presence sibling (`examples/chime-radar/`)
+   corresponds to the 24 GHz radar in Ring's Battery Doorbell Pro. No affiliation with
+   either company; everything named in the documents is fictional.
 3. **Widgets.** Agents built the inspector widgets needed to visualize those features —
    nineteen of them, from state machines and gauges to a ring buffer, a radar sweep, and a
    phone notification stack.

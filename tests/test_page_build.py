@@ -56,6 +56,22 @@ class PageBuildTest(unittest.TestCase):
         self.assertEqual(entry["spec"], "temp.spec.json")
         self.assertEqual(entry["family"], self.tmp.name)
 
+    def test_relative_spec_and_root_resolve_against_caller_cwd_not_repo(self):
+        # The validate/inject subprocesses run with cwd=ROOT; a spec or
+        # --root given relative to the caller's directory must still
+        # resolve there (the documented consuming-project flow) and must
+        # write nothing inside this repo.
+        r = subprocess.run(
+            ["python3", str(TOOL), "temp.spec.json", "--root", "out"],
+            capture_output=True, text=True, cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((self.tmp / "out" / "temp.html").is_file())
+        self.assertTrue((self.tmp / "out" / "manifest.json").is_file())
+        self.assertFalse((ROOT / "out").exists(),
+                         "relative --root must not resolve inside the repo")
+        entry = json.loads((self.tmp / "out" / "manifest.json").read_text())["pages"][0]
+        self.assertEqual(entry["family"], "out")
+
     def test_no_slug_accepts_plain_json_name(self):
         plain = self.tmp / "drip-commander.json"
         plain.write_text(clean_spec_text())

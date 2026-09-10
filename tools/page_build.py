@@ -148,6 +148,12 @@ def main() -> int:
     spec_path = pathlib.Path(a.spec)
     if not spec_path.is_file():
         fail(f"spec not found: {spec_path}")
+    # Resolve inputs to absolute paths up front: the validate and inject
+    # subprocesses below run with cwd=ROOT, so a spec or --root given
+    # relative to the caller's directory would otherwise resolve inside
+    # this repo (or not at all) once handed to them.
+    spec_path = spec_path.resolve()
+    root_dir = pathlib.Path(a.root).resolve() if a.root is not None else None
     if a.dest is not None:
         dest_parts = pathlib.PurePosixPath(a.dest).parts
         if (pathlib.PurePosixPath(a.dest).is_absolute()
@@ -158,7 +164,7 @@ def main() -> int:
     snapshot_path = None
     if a.dest is None:
         slug = flat_stem(spec_path)
-        output_root = pathlib.Path(a.root) if a.root is not None else spec_path.parent
+        output_root = root_dir if root_dir is not None else spec_path.parent
         dest_dir = output_root
         html_rel = f"{slug}.html"
         spec_rel = spec_path.name
@@ -169,7 +175,7 @@ def main() -> int:
         if not match:
             fail(f'dest must be "<family>/<slug>" in kebab-case, got: {a.dest}')
         family, slug = match.group(1), match.group(2)
-        output_root = pathlib.Path(a.root) if a.root is not None else ROOT / "examples"
+        output_root = root_dir if root_dir is not None else ROOT / "examples"
         dest_dir = output_root / family
         html_rel = f"{family}/{slug}.html"
         spec_rel = f"{family}/{slug}.spec.json"
@@ -180,7 +186,7 @@ def main() -> int:
         if not KEBAB.fullmatch(a.dest):
             fail(f"flat slug must be kebab-case with no path traversal, got: {a.dest}")
         slug = a.dest
-        output_root = pathlib.Path(a.root)
+        output_root = root_dir
         dest_dir = output_root
         html_rel = f"{slug}.html"
         spec_rel = f"{slug}.spec.json"

@@ -3,8 +3,8 @@
 
 Usage:
   python3 tools/export_gif.py <built-page.html> [--section <n>]
-      [--width 1280] [--delay-ms 1600] [--out <path.gif | directory>]
-      [--chrome <path>]
+      [--width 1280] [--delay-ms 1600] [--margin 16]
+      [--out <path.gif | directory>] [--chrome <path>]
 
 Output lands HERE by default: beside the page, named after it — with the
 section reference appended when --section picked one, so exporting several
@@ -12,9 +12,12 @@ sections never overwrites. --out takes an exact .gif path, or a directory
 (existing, or marked by a trailing slash) to receive the derived name.
 
 Chrome/Chromium captures one PNG for every canonical heading-slug step deep
-link. Pillow is used when available; a bundled PNG reader, fixed-palette
-quantizer, and simple GIF LZW stream keep the command functional on a bare
-Python 3 installation.
+link, clipped to the section's diagram: the board with its legend, the
+widget panels, and the step bar, plus a --margin background border. Heading,
+prose, and everything after the diagram stay out of frame; a diagram taller
+than the viewport is captured in full. Pillow is used when available; a
+bundled PNG reader, fixed-palette quantizer, and simple GIF LZW stream keep
+the command functional on a bare Python 3 installation.
 """
 
 from __future__ import annotations
@@ -344,14 +347,69 @@ def find_chrome(explicit: str | None = None) -> str | None:
     return None
 
 
+def clip_expression(section_reference: str, margin: int) -> str:
+    """JS that returns the diagram clip rect for a section, in page coordinates.
+
+    The rect is the union of the section's ``.boardgrid`` (board, legend, and
+    widget panels) and its visible ``.termbar`` (step readout and transport
+    buttons — a sibling of the grid on panel-less sections), expanded by
+    ``margin`` CSS pixels on every side and clamped to the document. Returns
+    null when the section or its diagram is missing.
+    """
+    return (
+        "(function(){"
+        "var sec = document.getElementById('section-' + %s);"
+        "if (!sec) return null;"
+        "var pad = %d, parts = [];"
+        "var grid = sec.querySelector('.boardgrid');"
+        "if (grid) parts.push(grid);"
+        "var bar = sec.querySelector('.termbar');"
+        "if (bar && !bar.hidden) parts.push(bar);"
+        "var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;"
+        "parts.forEach(function(el){"
+        "var r = el.getBoundingClientRect();"
+        "if (r.width <= 0 || r.height <= 0) return;"
+        "left = Math.min(left, r.left); top = Math.min(top, r.top);"
+        "right = Math.max(right, r.right); bottom = Math.max(bottom, r.bottom);"
+        "});"
+        "if (left === Infinity) return null;"
+        # The margin above the grid may overlap the heading/prose block's
+        # bottom edge; keep the clip below everything in the section that
+        # sits above the diagram.
+        "var introBottom = -Infinity;"
+        "Array.prototype.forEach.call(sec.children, function(child){"
+        "if (parts.indexOf(child) >= 0) return;"
+        "var r = child.getBoundingClientRect();"
+        "if (r.height <= 0 || r.bottom > top + 1) return;"
+        "introBottom = Math.max(introBottom, r.bottom);"
+        "});"
+        "var doc = document.documentElement;"
+        "var x0 = Math.max(0, Math.floor(left + window.scrollX) - pad);"
+        "var y0 = Math.max(0, Math.floor(top + window.scrollY) - pad);"
+        "if (introBottom > -Infinity)"
+        "y0 = Math.max(y0, Math.ceil(introBottom + window.scrollY) + 1);"
+        "var x1 = Math.min(doc.scrollWidth, Math.ceil(right + window.scrollX) + pad);"
+        "var y1 = Math.min(doc.scrollHeight, Math.ceil(bottom + window.scrollY) + pad);"
+        "return {x: x0, y: y0, width: x1 - x0, height: y1 - y0};"
+        "})()"
+    ) % (json.dumps(str(section_reference)), margin)
+
+
 def capture_frames(
     page_path: pathlib.Path,
     fragments: Iterable[str],
     chrome: str,
     width: int,
     output_dir: pathlib.Path,
+    section_reference: str | None = None,
+    margin: int = 16,
 ) -> list[pathlib.Path]:
-    """Capture one 16:9 viewport PNG for each deep-link fragment."""
+    """Capture one PNG per deep-link fragment.
+
+    With ``section_reference`` the screenshot is clipped to that section's
+    diagram (board, legend, widget panels, step bar) plus ``margin`` pixels,
+    even where the diagram extends below the viewport; without it the whole
+    16:9 viewport is captured (legacy behavior)."""
     height = max(1, round(width * 9 / 16))
     screenshots: list[pathlib.Path] = []
     base_url = page_path.resolve().as_uri()
@@ -398,6 +456,16 @@ def capture_frames(
                     })
                     devtools.command("Page.navigate", {"url": base_url + fragment})
                     _wait_for_rendered_page(devtools, process, 20)
+                    # Web fonts load with display=swap and reflow the page when
+                    # they land; measuring the clip before that shift captures
+                    # the wrong region, so wait for the font set to settle.
+                    devtools.command("Runtime.evaluate", {
+                        "expression": (
+                            "document.fonts && document.fonts.ready ? "
+                            "document.fonts.ready.then(function(){return true;}) : true"
+                        ),
+                        "awaitPromise": True,
+                    })
                     # Two animation frames ensure the instant deep-link scroll and
                     # the resulting compositor update are both visible to capture.
                     devtools.command("Runtime.evaluate", {
@@ -407,10 +475,29 @@ def capture_frames(
                         ),
                         "awaitPromise": True,
                     })
-                    result = devtools.command("Page.captureScreenshot", {
+                    capture_params: dict[str, Any] = {
                         "format": "png",
                         "fromSurface": True,
-                    })
+                    }
+                    if section_reference is not None:
+                        clip_result = devtools.command("Runtime.evaluate", {
+                            "expression": clip_expression(section_reference, margin),
+                            "returnByValue": True,
+                        })
+                        clip = clip_result.get("result", {}).get("value")
+                        if (not isinstance(clip, dict)
+                                or clip.get("width", 0) <= 0
+                                or clip.get("height", 0) <= 0):
+                            raise RuntimeError(
+                                "could not measure the diagram of section "
+                                f"'{section_reference}' for clipping")
+                        capture_params["clip"] = {
+                            "x": clip["x"], "y": clip["y"],
+                            "width": clip["width"], "height": clip["height"],
+                            "scale": 1,
+                        }
+                        capture_params["captureBeyondViewport"] = True
+                    result = devtools.command("Page.captureScreenshot", capture_params)
                     data = base64.b64decode(result.get("data", ""), validate=True)
                     if not data.startswith(PNG_SIGNATURE):
                         raise RuntimeError("Chrome returned a non-PNG screenshot")
@@ -848,6 +935,35 @@ def gif_frame_count(data: bytes) -> int:
     raise ValueError("GIF trailer is missing")
 
 
+def pad_rgb_frame(
+    rgb: bytes,
+    width: int,
+    height: int,
+    target_width: int,
+    target_height: int,
+) -> bytes:
+    """Grow an RGB frame to the target size, anchored top-left.
+
+    Clipped step frames can differ by a few pixels when a widget panel's
+    content changes height between steps; padding to the common maximum keeps
+    the diagram's own pixels in place. The fill color is the frame's top-left
+    pixel, which the surrounding margin guarantees is page background."""
+    if target_width < width or target_height < height:
+        raise ValueError("padding cannot shrink a frame")
+    if len(rgb) != width * height * 3:
+        raise ValueError("RGB frame does not match its stated dimensions")
+    if (target_width, target_height) == (width, height):
+        return rgb
+    fill = rgb[0:3] if rgb else b"\xff\xff\xff"
+    row_pad = fill * (target_width - width)
+    out = bytearray()
+    for y in range(height):
+        out.extend(rgb[y * width * 3:(y + 1) * width * 3])
+        out.extend(row_pad)
+    out.extend(fill * (target_width * (target_height - height)))
+    return bytes(out)
+
+
 def write_animated_gif(
     screenshots: list[pathlib.Path],
     out_path: pathlib.Path,
@@ -866,9 +982,14 @@ def write_animated_gif(
                 images.append(source.convert("RGB"))
         if not images:
             raise ValueError("no screenshots to encode")
-        width, height = images[0].size
-        if any(image.size != (width, height) for image in images):
-            raise ValueError("Chrome screenshots do not have identical dimensions")
+        width = max(image.size[0] for image in images)
+        height = max(image.size[1] for image in images)
+        for index, image in enumerate(images):
+            if image.size == (width, height):
+                continue
+            canvas = Image.new("RGB", (width, height), image.getpixel((0, 0)))
+            canvas.paste(image, (0, 0))
+            images[index] = canvas
         images[0].save(
             out_path,
             format="GIF",
@@ -884,11 +1005,12 @@ def write_animated_gif(
     decoded = [decode_png(path.read_bytes()) for path in screenshots]
     if not decoded:
         raise ValueError("no screenshots to encode")
-    width, height = decoded[0][:2]
-    if any(item[:2] != (width, height) for item in decoded):
-        raise ValueError("Chrome screenshots do not have identical dimensions")
+    width = max(item[0] for item in decoded)
+    height = max(item[1] for item in decoded)
     out_path.write_bytes(encode_gif(
-        (item[2] for item in decoded), width, height, delay_ms=delay_ms))
+        (pad_rgb_frame(item[2], item[0], item[1], width, height)
+         for item in decoded),
+        width, height, delay_ms=delay_ms))
     return "bundled", width, height
 
 
@@ -921,6 +1043,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="1-based rendered section number (default: first step-through)")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--delay-ms", type=int, default=1600)
+    parser.add_argument("--margin", type=int, default=16,
+                        help="background margin around the clipped diagram, px (default 16)")
     parser.add_argument("--out", metavar="path.gif")
     parser.add_argument("--chrome", metavar="path")
     args = parser.parse_args(argv)
@@ -935,6 +1059,8 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--width must be between 320 and 4096")
         if args.delay_ms <= 0:
             raise ValueError("--delay-ms must be positive")
+        if args.margin < 0 or args.margin > 200:
+            raise ValueError("--margin must be between 0 and 200")
         chrome = find_chrome(args.chrome)
         if chrome is None:
             if args.chrome:
@@ -957,7 +1083,9 @@ def main(argv: list[str] | None = None) -> int:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="design-viz-gif-") as temp:
             screenshots = capture_frames(
-                page_path, fragments, chrome, args.width, pathlib.Path(temp))
+                page_path, fragments, chrome, args.width, pathlib.Path(temp),
+                section_reference=str(target.section_reference),
+                margin=args.margin)
             encoder, width, height = write_animated_gif(
                 screenshots, out_path, args.delay_ms)
         reference_note = (

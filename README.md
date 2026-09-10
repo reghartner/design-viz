@@ -334,6 +334,7 @@ python3 tools/export_gif.py built-page.html
 python3 tools/export_gif.py built-page.html --section 2 --width 1280 \
     --delay-ms 1600 --out walkthrough.gif
 python3 tools/export_gif.py built-page.html --section 2 --out gifs/
+python3 tools/export_gif.py built-page.html --skin daylight --dim-alpha 0.35
 python3 tools/export_gif.py built-page.html --chrome /path/to/chrome
 ```
 
@@ -352,7 +353,13 @@ Section headings, prose, and whatever follows the diagram stay out of frame,
 and a diagram taller than the viewport is captured in full. `--width` still
 sets the layout viewport width the page renders at, and `--scale` (default 2)
 renders each CSS pixel as that many device pixels, so text in the GIF stays
-sharp without changing the layout. It uses Pillow when installed and otherwise
+sharp without changing the layout. `--skin <name>` renders with that theme
+instead of the page's own default — the name is validated against the page's
+skin list (`window.dvSkins`), so an unknown token fails with the valid names.
+`--dim-alpha <0..1>` overrides the step-mode non-highlighted opacity with one
+uniform value; it sets the page's `--dv-dim` CSS variable, which every dimmed
+step-mode element (edges, labels, nodes, coins) reads in place of its
+per-element default. It uses Pillow when installed and otherwise
 falls back to its bundled PNG reader and pure-Python GIF encoder, so the page
 itself remains zero-dependency and the exporter works with bare Python 3.
 Duplicate step ids or ids that collide with a positional fallback make the

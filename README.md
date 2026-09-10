@@ -22,6 +22,27 @@ design doc (prose / permalinks / mermaid)
 Feedback loop: meeting feedback goes back to the agent as plain English, the agent edits the
 JSON, re-inject, republish. The spec is data, so revisions diff cleanly in git.
 
+## How this was built
+
+Everything here — content and tooling — came out of an agent-driven loop:
+
+1. **Research fanout.** AI agents gathered the IoT device offerings of 27 companies
+   (`docs/research/iot-device-catalog.md`), focusing on dual-chip devices that maintain an
+   active internet connection, with industry-standard solutions as the baseline.
+2. **Fictional HLDs.** Agents drafted twelve fake high-level design documents
+   (`docs/hlds/`) against those feature sets. Every company, service, and product name in
+   them is invented. Each draft went through human and agent review passes for realism and
+   internal contradictions.
+3. **Widgets.** Agents built the inspector widgets needed to visualize those features —
+   nineteen of them, from state machines and gauges to a ring buffer, a radar sweep, and a
+   phone notification stack.
+4. **Generator + contract.** The page generator was built around a strict authoring
+   contract (`contract/authoring-contract.md`) and a written agent runbook
+   (`.claude/skills/hld-to-page/SKILL.md`) for turning an HLD into a page.
+5. **Authoring fanout.** Agents of all capability levels then attempted to follow the
+   runbook and build pages from the fake HLDs (`examples/`), reporting every hiccup. Those
+   reports fed back into the contract, the cookbook recipes, and the skill definition.
+
 ## Layout
 
 | path | what it is |

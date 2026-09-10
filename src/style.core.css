@@ -928,7 +928,7 @@
   .screenbox .walker{transform:translateX(160px);}
   .odot.cur{animation:none !important;}
   .wfrow, .wfbar, .odot, .pchip{transition:none !important;animation:none !important;}
-  .dv-step-tween .edge, .dv-step-tween .node, .dv-step-tween .coin,
+  .dv-step-tween .edge, .dv-step-tween .lbl, .dv-step-tween .node, .dv-step-tween .coin,
   .dv-step-tween .node .card, .dv-step-tween .coin circle,
   .dv-step-tween .node .t1, .node.tone-pulse .card,
   .stepline.dv-caption-old, .stepline.dv-caption-new{transition:none !important;animation:none !important;}

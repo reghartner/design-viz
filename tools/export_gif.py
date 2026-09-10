@@ -3,7 +3,7 @@
 
 Usage:
   python3 tools/export_gif.py <built-page.html> [--section <n>]
-      [--width 1280] [--delay-ms 1600] [--margin 16]
+      [--width 1280] [--delay-ms 1600] [--margin 16] [--scale 2]
       [--out <path.gif | directory>] [--chrome <path>]
 
 Output lands HERE by default: beside the page, named after it — with the
@@ -13,7 +13,9 @@ sections never overwrites. --out takes an exact .gif path, or a directory
 
 Chrome/Chromium captures one PNG for every canonical heading-slug step deep
 link, clipped to the section's diagram: the board with its legend, the
-widget panels, and the step bar, plus a --margin background border. Heading,
+widget panels, and the step bar, plus a --margin background border. --scale
+renders each CSS pixel as that many device pixels (default 2), so text
+stays sharp; layout is unchanged. Heading,
 prose, and everything after the diagram stay out of frame; a diagram taller
 than the viewport is captured in full. Pillow is used when available; a
 bundled PNG reader, fixed-palette quantizer, and simple GIF LZW stream keep
@@ -403,13 +405,16 @@ def capture_frames(
     output_dir: pathlib.Path,
     section_reference: str | None = None,
     margin: int = 16,
+    scale: int = 1,
 ) -> list[pathlib.Path]:
     """Capture one PNG per deep-link fragment.
 
     With ``section_reference`` the screenshot is clipped to that section's
     diagram (board, legend, widget panels, step bar) plus ``margin`` pixels,
     even where the diagram extends below the viewport; without it the whole
-    16:9 viewport is captured (legacy behavior)."""
+    16:9 viewport is captured (legacy behavior). ``scale`` renders each CSS
+    pixel as that many device pixels (the layout is unchanged; the output
+    image is ``scale`` times larger in each direction)."""
     height = max(1, round(width * 9 / 16))
     screenshots: list[pathlib.Path] = []
     base_url = page_path.resolve().as_uri()
@@ -448,10 +453,14 @@ def capture_frames(
                 with _DevToolsSocket(endpoint) as devtools:
                     devtools.command("Page.enable")
                     devtools.command("Runtime.enable")
+                    # The clipped path applies scale through the capture clip;
+                    # the legacy full-viewport path (whose clip would name page
+                    # coordinates, losing the scrolled view) scales the device
+                    # instead.
                     devtools.command("Emulation.setDeviceMetricsOverride", {
                         "width": width,
                         "height": height,
-                        "deviceScaleFactor": 1,
+                        "deviceScaleFactor": 1 if section_reference is not None else scale,
                         "mobile": False,
                     })
                     devtools.command("Page.navigate", {"url": base_url + fragment})
@@ -494,7 +503,7 @@ def capture_frames(
                         capture_params["clip"] = {
                             "x": clip["x"], "y": clip["y"],
                             "width": clip["width"], "height": clip["height"],
-                            "scale": 1,
+                            "scale": scale,
                         }
                         capture_params["captureBeyondViewport"] = True
                     result = devtools.command("Page.captureScreenshot", capture_params)
@@ -1045,6 +1054,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--delay-ms", type=int, default=1600)
     parser.add_argument("--margin", type=int, default=16,
                         help="background margin around the clipped diagram, px (default 16)")
+    parser.add_argument("--scale", type=int, default=2,
+                        help="device pixels per CSS pixel in the output "
+                             "(default 2; 1 restores the previous size)")
     parser.add_argument("--out", metavar="path.gif")
     parser.add_argument("--chrome", metavar="path")
     args = parser.parse_args(argv)
@@ -1061,6 +1073,8 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--delay-ms must be positive")
         if args.margin < 0 or args.margin > 200:
             raise ValueError("--margin must be between 0 and 200")
+        if args.scale < 1 or args.scale > 4:
+            raise ValueError("--scale must be between 1 and 4")
         chrome = find_chrome(args.chrome)
         if chrome is None:
             if args.chrome:
@@ -1085,7 +1099,7 @@ def main(argv: list[str] | None = None) -> int:
             screenshots = capture_frames(
                 page_path, fragments, chrome, args.width, pathlib.Path(temp),
                 section_reference=str(target.section_reference),
-                margin=args.margin)
+                margin=args.margin, scale=args.scale)
             encoder, width, height = write_animated_gif(
                 screenshots, out_path, args.delay_ms)
         reference_note = (

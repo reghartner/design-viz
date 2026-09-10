@@ -252,6 +252,28 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertTrue(encoded.startswith(b"GIF8"))
             self.assertEqual(export_gif.gif_frame_count(encoded), len(fragments))
 
+    def test_scale_doubles_pixel_dimensions_without_changing_layout(self):
+        page = ROOT / "examples" / "basecraft-keep" / "keep.html"
+        spec = export_gif.read_embedded_spec(page)
+        target = export_gif.choose_target(spec)
+        fragment = [target.fragments[0]]
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            (temp_path / "s1").mkdir()
+            (temp_path / "s2").mkdir()
+            base = export_gif.capture_frames(
+                page, fragment, CHROME, 1280, temp_path / "s1",
+                section_reference=str(target.section_reference), scale=1)
+            doubled = export_gif.capture_frames(
+                page, fragment, CHROME, 1280, temp_path / "s2",
+                section_reference=str(target.section_reference), scale=2)
+            w1, h1, _ = export_gif.decode_png(base[0].read_bytes())
+            w2, h2, _ = export_gif.decode_png(doubled[0].read_bytes())
+            # The clip is measured in CSS pixels either way; scale multiplies
+            # only the rendered output (allow 1px rounding per edge).
+            self.assertLessEqual(abs(w2 - 2 * w1), 2)
+            self.assertLessEqual(abs(h2 - 2 * h1), 2)
+
     def test_clip_excludes_section_heading_and_covers_board_and_termbar(self):
         page = ROOT / "examples" / "basecraft-keep" / "keep.html"
         spec = export_gif.read_embedded_spec(page)

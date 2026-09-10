@@ -8369,21 +8369,25 @@ function renderPage(view, page, skin, backlinks){
 
 /* A re-render (workbench Render click, skin switch) rebuilds the DOM and so
    resets every tabs block to its first tab. These helpers carry the reader's
-   place across renderPage calls: capture the active tab's canonical
-   reference per tabs block (the unique label slug, or the deep-link
-   positional form when labels collide — the same grammar the URL hash
-   uses), then re-select whatever it resolves to in the new render. Blocks
-   are matched by position; a reference with no match in the new block keeps
-   the render default (first tab). */
+   place across renderPage calls: capture the active tab's label slug plus
+   its position per tabs block, then re-select that label in the new render.
+   Tab identity is the LABEL — the position only disambiguates duplicate
+   labels — so a label that no longer exists keeps the render default
+   (first tab), never a positional stand-in. Blocks are matched by
+   position. */
 function activeTabReferences(ctl){
   if (!ctl || !ctl.tabBlocks || !ctl.tabBlocks.length) return null;
-  return ctl.tabBlocks.map(function(tb){ return tabReference(tb.slugs, tb.active()); });
+  return ctl.tabBlocks.map(function(tb){
+    var idx = tb.active();
+    return {slug: tb.slugs[idx], index: idx};
+  });
 }
 function restoreActiveTabs(ctl, saved){
   if (!ctl || !ctl.tabBlocks || !saved) return;
   ctl.tabBlocks.forEach(function(tb, i){
-    var ref = i < saved.length ? saved[i] : null;
-    var idx = ref != null ? tabIndexOf(ref, tb.slugs, tb.count) : -1;
+    var rec = i < saved.length ? saved[i] : null;
+    if (!rec || rec.slug == null) return;
+    var idx = tb.slugs[rec.index] === rec.slug ? rec.index : tb.slugs.indexOf(rec.slug);
     if (idx > 0) tb.select(idx, false);
   });
 }

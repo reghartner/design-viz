@@ -692,33 +692,49 @@ function tabBlockMock(slugs, active){
   };
 }
 
-test('activeTabReferences captures a canonical reference per tabs block', () => {
+test('activeTabReferences captures slug and position per tabs block', () => {
   const ctl = {tabBlocks: [tabBlockMock(['flow', 'ota', 'guide'], 1), tabBlockMock(['x', 'y'], 0)]};
-  assert.deepStrictEqual(C.activeTabReferences(ctl), ['ota', 'x']);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(C.activeTabReferences(ctl))),
+    [{slug: 'ota', index: 1}, {slug: 'x', index: 0}]);
   assert.strictEqual(C.activeTabReferences(null), null);
   assert.strictEqual(C.activeTabReferences({tabBlocks: []}), null);
 });
 
 test('restoreActiveTabs re-selects a surviving slug without focusing it', () => {
   const tb = tabBlockMock(['flow', 'ota', 'guide'], 0);
-  C.restoreActiveTabs({tabBlocks: [tb]}, ['ota']);
+  C.restoreActiveTabs({tabBlocks: [tb]}, [{slug: 'ota', index: 1}]);
   assert.strictEqual(tb._active, 1);
   assert.deepStrictEqual(tb.selectCalls, [[1, false]]);
+  /* the slug moved: it is found at its new position */
+  const moved = tabBlockMock(['ota', 'flow', 'guide'], 0);
+  C.restoreActiveTabs({tabBlocks: [moved]}, [{slug: 'ota', index: 1}]);
+  assert.strictEqual(moved._active, 0);
+  assert.deepStrictEqual(moved.selectCalls, []); /* index 0 needs no select */
 });
 
 test('restoreActiveTabs keeps the default first tab when the slug is gone', () => {
   const tb = tabBlockMock(['flow', 'guide'], 0);
-  C.restoreActiveTabs({tabBlocks: [tb]}, ['ota']);
+  C.restoreActiveTabs({tabBlocks: [tb]}, [{slug: 'ota', index: 1}]);
   assert.strictEqual(tb._active, 0);
   assert.deepStrictEqual(tb.selectCalls, []);
 });
 
-test('a duplicate tab label round-trips through the positional reference', () => {
-  /* two tabs slugified to the same value: the active later duplicate is
-     captured as the deep-link positional form and restored to itself */
+test('a vanished numeric label never falls back to a positional pick', () => {
+  /* a tab labeled "2" has the unique slug '2'; when that tab is removed the
+     restore must default, not select whatever now sits second */
+  const before = tabBlockMock(['flow', 'ota', '2'], 2);
+  const saved = C.activeTabReferences({tabBlocks: [before]});
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(saved)), [{slug: '2', index: 2}]);
+  const after = tabBlockMock(['flow', 'ota', 'guide'], 0);
+  C.restoreActiveTabs({tabBlocks: [after]}, saved);
+  assert.strictEqual(after._active, 0);
+  assert.deepStrictEqual(after.selectCalls, []);
+});
+
+test('a duplicate tab label is restored to the same occurrence by position', () => {
   const before = tabBlockMock(['same', 'same', 'other'], 1);
   const saved = C.activeTabReferences({tabBlocks: [before]});
-  assert.deepStrictEqual(saved, ['2']);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(saved)), [{slug: 'same', index: 1}]);
   const after = tabBlockMock(['same', 'same', 'other'], 0);
   C.restoreActiveTabs({tabBlocks: [after]}, saved);
   assert.strictEqual(after._active, 1);
@@ -729,7 +745,8 @@ test('restoreActiveTabs matches blocks by position and tolerates count changes',
   const second = tabBlockMock(['c', 'd'], 0);
   /* saved list came from a render with three blocks; block 2 keeps its tab,
      block 1's old slug now only exists in block 2 and must not cross over */
-  C.restoreActiveTabs({tabBlocks: [first, second]}, ['d', 'd', 'gone']);
+  C.restoreActiveTabs({tabBlocks: [first, second]},
+    [{slug: 'd', index: 1}, {slug: 'd', index: 1}, {slug: 'gone', index: 0}]);
   assert.strictEqual(first._active, 0);
   assert.strictEqual(second._active, 1);
   C.restoreActiveTabs({tabBlocks: [first, second]}, null);

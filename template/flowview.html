@@ -5463,9 +5463,16 @@ function edgePath(e, L, adj){
     if (b.float){
       var bBelow = b.cy >= a.cy;
       var sx = a.cx + clamp((b.cx - a.cx) * 0.25, -45, 45), sy = a.cy + (bBelow ? a.h/2 : -a.h/2);
-      var ex = b.cx > a.cx ? b.cx - b.w/2 : b.cx + b.w/2, ey = b.cy + (bBelow ? -b.h/2 : b.h/2);
+      /* Land on the center of the float's facing edge; floatSide (set by
+         resolveEdgeAvoidance when no centered route clears the other cards)
+         falls back to the near corner so the path can skirt the column. */
+      var ex = adj.floatSide ? (b.cx > a.cx ? b.cx - b.w/2 : b.cx + b.w/2) : b.cx;
+      var ey = b.cy + (bBelow ? -b.h/2 : b.h/2);
+      /* centered landing keeps the final control at ex so the approach stays
+         vertical even when an avoidance bow (avX) bends the mid-course */
+      var c2x = adj.floatSide ? ex - (ex-sx)*0.3 + avX : ex;
       return 'M ' + sx + ' ' + sy + ' C ' + (sx + (ex-sx)*0.25 + avX) + ' ' + (sy + (ey-sy)*0.5) + ' ' +
-             (ex - (ex-sx)*0.3 + avX) + ' ' + (ey - (ey-sy)*0.35) + ' ' + ex + ' ' + ey;
+             c2x + ' ' + (ey - (ey-sy)*0.35) + ' ' + ex + ' ' + ey;
     }
     var bAbove = b.cy < a.cy;
     var fx = a.cx + clamp((b.cx - a.cx) * 0.3, -50, 50), fy = a.cy + (bAbove ? -a.h/2 : a.h/2);
@@ -5600,14 +5607,28 @@ function resolveEdgeAvoidance(edges, L, adj){
     var sameRow = !a.float && !b.float && a.row === b.row && Math.abs(a.cx - b.cx) >= 1;
     var cands = sameRow ? AVOID_MY : AVOID_MX;
     var key = sameRow ? 'avoidMy' : 'avoidMx';
-    var bestVal = 0, bestHits = base;
-    for (var ci = 0; ci < cands.length; ci++){
-      adj[ei][key] = cands[ci];
-      var h = countPathRectHits(samplePathD(edgePath(e, L, adj[ei])), rects);
-      if (h < bestHits){ bestHits = h; bestVal = cands[ci]; }
-      if (h === 0) break;
+    function sweep(){
+      var bestVal = 0, best = base;
+      for (var ci = 0; ci < cands.length; ci++){
+        adj[ei][key] = cands[ci];
+        var h = countPathRectHits(samplePathD(edgePath(e, L, adj[ei])), rects);
+        if (h < best){ best = h; bestVal = cands[ci]; }
+        if (h === 0) break;
+      }
+      adj[ei][key] = bestVal;
+      return best;
     }
-    adj[ei][key] = bestVal;
+    var bestHits = sweep();
+    /* center-landed float edge still blocked after every bow: retry the whole
+       candidate ladder with the corner attach, which frees the column */
+    if (bestHits > 0 && b.float){
+      var centerVal = adj[ei][key];
+      adj[ei][key] = 0;
+      adj[ei].floatSide = true;
+      base = countPathRectHits(samplePathD(edgePath(e, L, adj[ei])), rects);
+      /* corner wins only when strictly fewer hits; ties keep the center */
+      if (sweep() >= bestHits){ adj[ei].floatSide = false; adj[ei][key] = centerVal; }
+    }
   });
   return adj;
 }

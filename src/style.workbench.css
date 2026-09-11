@@ -145,10 +145,13 @@ tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
 /* members of the selected step, marked on the board (distinct from the
    selection ring: dashed) */
 g.node.dv-instep .card{stroke:var(--accent); stroke-width:2; stroke-dasharray:5 3;}
-/* an edge's dash pattern IS its protocol styling — the membership marker
-   is an accent glow plus width instead */
-path.edge.dv-instep{stroke-width:3.4; filter:drop-shadow(0 0 3px var(--accent));}
+/* an edge's dash pattern IS its protocol styling, and the terminal skin
+   strips CSS filters — so the edge marker brightens the edge's HALO twin
+   (same geometry, protocol color, no filter) plus a width bump */
+path.edge.dv-instep{stroke-width:3.4;}
+.docview path.halo.dv-instep{display:block; opacity:.5;}
 .stepmode path.edge.dv-instep{opacity:1;}
+.stepmode .docview path.halo.dv-instep{opacity:.5;}
 .pwidget.dv-instep{outline:2px dashed var(--accent); outline-offset:2px;}
 .docview .stepline{cursor:pointer;} /* click selects the current step */
 .rbtn{background:var(--accent); color:var(--accent-ink, #fff); border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;

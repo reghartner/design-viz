@@ -262,8 +262,9 @@ rows for the step's hops, lit nodes, and panel patches — each chip removes
 with one click (hop shapes normalize automatically between `edge`,
 `edges`, and edgeless), clicking a panel chip opens that patch's JSON in a
 mini editor, and the selected step's members carry distinct
-markers on the board (dashed outlines on nodes and panels, an accent glow
-on edges). **ADD TO STEP** turns board clicks into membership
+markers on the board (dashed outlines on nodes and panels; edges brighten
+their halo in the protocol color — no CSS filter, so every skin shows
+it). **ADD TO STEP** turns board clicks into membership
 toggles: while the mode is on, clicking any edge, node, or panel in the
 section adds it to the step (or removes it if already there), each toggle
 is one undo step, and Esc or DONE ends the mode. **Tabs are managed

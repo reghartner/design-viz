@@ -1424,8 +1424,13 @@ function initWorkbenchBuilder(opts){
     });
     builderStepHops(got.st).forEach(function(k){
       if (!(k in keyToIdx)) return;
+      /* mark the edge AND its halo twin — the halo carries the glow in
+         every skin (terminal strips CSS filters, so a filter-based glow
+         cannot be the marker) */
       var el = secEl.querySelector('path.edge[data-dv-edge="' + keyToIdx[k] + '"]');
       if (el) el.classList.add('dv-instep');
+      var halo = secEl.querySelector('path.halo[data-dv-edge="' + keyToIdx[k] + '"]');
+      if (halo) halo.classList.add('dv-instep');
     });
     (Array.isArray(got.st.nodes) ? got.st.nodes : []).forEach(function(id){
       var el = secEl.querySelector('[data-dv-node="' + cssQuote(id) + '"]');

@@ -56,6 +56,14 @@ function fail(msgs){
    canonical form during wiring, which drops the embed/sk keys */
 var embedRequest = embedRequestFromHash(window.location.hash);
 
+/* the embed flag is applied at load; a hash-only navigation (typing or
+   pasting a fragment into an open page) never re-runs boot, so entering
+   or leaving the embedded view via the address bar reloads the page */
+window.addEventListener('hashchange', function(){
+  var next = embedRequestFromHash(window.location.hash);
+  if (JSON.stringify(next) !== JSON.stringify(embedRequest)) window.location.reload();
+});
+
 function applyEmbedMode(ctl){
   /* #embed=<section-ref>[&sk=<skin>]: strip the page down to one
      section's diagram + panels + step controls for iframe hosting.
@@ -100,7 +108,10 @@ function boot(raw){
       } catch (ex){ /* sandboxed iframes may deny history writes */ }
     }
   }
-  deepLinkChannel = wireDeepLinks(ctl, window); /* tabs, every diagram/step, contract cards + rows */
+  var preservedHash = embedRequest ?
+    'embed=' + encodeURIComponent(String(embedRequest.section)) +
+    (embedRequest.skin ? '&sk=' + encodeURIComponent(embedRequest.skin) : '') : null;
+  deepLinkChannel = wireDeepLinks(ctl, window, preservedHash); /* tabs, every diagram/step, contract cards + rows */
   applyEmbedMode(ctl);
   if (pendingLinkBase){
     deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);

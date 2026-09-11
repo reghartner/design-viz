@@ -9784,7 +9784,9 @@ function initWorkbenchBuilder(opts){
     wrap.className = 'fctl fchk';
     var input = document.createElement('input');
     input.type = 'checkbox'; input.checked = !!checked;
-    input.addEventListener('change', function(){ commit(input.checked); });
+    input.addEventListener('change', function(){
+      if (commit(input.checked) === false) input.checked = !input.checked;
+    });
     wrap.appendChild(input);
     return wrap;
   }
@@ -9824,11 +9826,11 @@ function initWorkbenchBuilder(opts){
         return commitCascade(function(raw){ return planRenameNode(src.value, raw, t.section, t.id, v); },
           {after: function(){ t.id = v; renderInspector(); }});
       }, {required: 'a node needs an id'})),
-      frow('title', textControl(val.title, function(v){ commitSimple('title', v == null ? null : JSON.stringify(v)); })),
-      frow('sub', textControl(val.sub, function(v){ commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
-      frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ commitSimple('icon', JSON.stringify(v || 'gear')); })),
-      frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ commitSimple('tint', JSON.stringify(v || 'cmd')); })),
-      frow('link', textControl(val.link, function(v){ commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+      frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); })),
+      frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
+      frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
+      frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
+      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
     ];
   }
   function edgeForm(val, ctx){
@@ -9836,8 +9838,8 @@ function initWorkbenchBuilder(opts){
     var ids = Object.keys((ctx.diagram && ctx.diagram.nodes) || {});
     function endpoint(field){
       return selectControl(ids, val[field], function(v){
-        if (v == null) return;
-        commitCascade(function(raw){
+        if (v == null) return true; /* endpoint kept — nothing to commit */
+        return commitCascade(function(raw){
           return planSetEdgeEndpoint(src.value, raw, t.section, t.index, field, v);
         });
       });
@@ -9845,17 +9847,17 @@ function initWorkbenchBuilder(opts){
     return [
       frow('from', endpoint('from')),
       frow('to', endpoint('to')),
-      frow('kind', selectControl(protocolKinds(ctx.page), val.kind || 'int', function(v){ commitSimple('kind', JSON.stringify(v || 'int')); })),
-      frow('ret (response)', checkboxControl(val.ret, function(on){ commitSimple('ret', on ? 'true' : null); })),
-      frow('label', textControl(val.label, function(v){ commitSimple('label', v == null ? null : JSON.stringify(v)); })),
-      frow('bend', numberControl(val.bend, function(v){ commitSimple('bend', v == null ? null : String(v)); })),
-      frow('labelDx', numberControl(val.labelDx, function(v){ commitSimple('labelDx', v == null ? null : String(v)); })),
-      frow('labelDy', numberControl(val.labelDy, function(v){ commitSimple('labelDy', v == null ? null : String(v)); }))
+      frow('kind', selectControl(protocolKinds(ctx.page), val.kind || 'int', function(v){ return commitSimple('kind', JSON.stringify(v || 'int')); })),
+      frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
+      frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
+      frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
+      frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
+      frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
     ];
   }
   function stepForm(val, ctx){
     var rows = [
-      frow('text', textControl(val.text, function(v){ commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
+      frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
     ];
     if (Array.isArray(val.edges)){
       var note = document.createElement('span');
@@ -9865,14 +9867,14 @@ function initWorkbenchBuilder(opts){
     } else {
       var keys = ((ctx.diagram && ctx.diagram.edges) || []).map(builderEdgeKey);
       rows.push(frow('edge', selectControl(keys, val.edge, function(v){
-        commitSimple('edge', v == null ? null : JSON.stringify(v));
+        return commitSimple('edge', v == null ? null : JSON.stringify(v));
       }, true)));
     }
     var laneNames = Object.keys((ctx.page && ctx.page.lanes) || {});
     rows.push(frow('lane', selectControl(laneNames, val.lane, function(v){
-      commitSimple('lane', v == null ? null : JSON.stringify(v));
+      return commitSimple('lane', v == null ? null : JSON.stringify(v));
     }, true)));
-    rows.push(frow('link', textControl(val.link, function(v){ commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})));
+    rows.push(frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})));
     return rows;
   }
   function panelForm(val, ctx){
@@ -9884,17 +9886,17 @@ function initWorkbenchBuilder(opts){
         return commitCascade(function(raw){ return planRenamePanel(src.value, raw, t.section, t.index, v); },
           {after: function(){ renderInspector(); }});
       }, {required: 'a panel needs an id'})),
-      frow('type', selectControl(PANEL_TYPES, val.type, function(v){ commitSimple('type', v == null ? null : JSON.stringify(v)); })),
-      frow('title', textControl(val.title, function(v){ commitSimple('title', v == null ? null : JSON.stringify(v)); }))
+      frow('type', selectControl(PANEL_TYPES, val.type, function(v){ return commitSimple('type', v == null ? null : JSON.stringify(v)); })),
+      frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
     ];
   }
   function sectionForm(val, ctx){
     ensureAccentDatalist();
     return [
-      frow('heading', textControl(val.heading, function(v){ commitSimple('heading', v == null ? null : JSON.stringify(v)); })),
-      frow('accent', textControl(val.accent, function(v){ commitSimple('accent', v == null ? null : JSON.stringify(v)); },
+      frow('heading', textControl(val.heading, function(v){ return commitSimple('heading', v == null ? null : JSON.stringify(v)); })),
+      frow('accent', textControl(val.accent, function(v){ return commitSimple('accent', v == null ? null : JSON.stringify(v)); },
         {list: 'accent-tokens', placeholder: 'token or #hex'})),
-      frow('source', textControl(val.source, function(v){ commitSimple('source', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+      frow('source', textControl(val.source, function(v){ return commitSimple('source', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
     ];
   }
 

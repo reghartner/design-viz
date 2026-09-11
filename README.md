@@ -273,6 +273,25 @@ form edits its label and highlight, **+ tab** inserts a ready-made
 sibling after it, arrows reorder it, delete removes it (the last tab of
 a block is refused with instructions instead).
 
+## Embedding one diagram in an iframe
+
+Any published page understands `#embed=<section-ref>` in its URL: it
+renders ONLY that section's diagram, panels, and step controls — no page
+title, tabs, prose, or contract card — sized for an iframe (Confluence,
+wikis, dashboards). The ref is the section's heading slug (the same
+vocabulary the deep-link `d=` selector and the `section-<slug>` element
+ids use) or its 1-based rendered number. `&sk=<skin>` picks the skin for
+the embed. A section living inside a tab is revealed automatically.
+
+```html
+<iframe src="https://host/path/page.html#embed=sleepy-device-delivery&sk=daylight"
+        width="100%" height="620" style="border:0"></iframe>
+```
+
+The flag composes with the other hash fields and is read once at load;
+everything else about the page (deep links, skins, the step player) works
+unchanged without it.
+
 ## Validating a spec (the agent loop)
 
 ```

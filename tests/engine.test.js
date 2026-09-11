@@ -25,7 +25,7 @@ function loadCore(overrides = {}){
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
     ' foldPhoneStates, phoneModel, phonePanelHTML, PANEL_TYPES,' +
     ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
-    ' activeTabReferences, restoreActiveTabs,' +
+    ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection,' +
     ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
     ' sectionHasProse, sectionIntroHTML, setProseCollapsed, createProseController, TONE_SET,' +
     ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES};';
@@ -3241,4 +3241,39 @@ test('queue context: validator warns on non-string from/to/reason in initial and
   assert.ok(v.warnings.some(w => w.includes('initial.from: must be a string')), v.warnings.join('; '));
   assert.ok(v.warnings.some(w => w.includes('panels.mbx.reason: must be a string')), v.warnings.join('; '));
   assert.ok(v.warnings.some(w => w.includes('panels.mbx.to: must be a string')), v.warnings.join('; '));
+});
+
+test('embed mode: hash parsing reads embed and sk, tolerating other deep-link fields', () => {
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(C.embedRequestFromHash('#embed=motion-detection'))),
+    {section: 'motion-detection', skin: null});
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(C.embedRequestFromHash('embed=2&sk=daylight&m=step&s=3'))),
+    {section: '2', skin: 'daylight'});
+  assert.strictEqual(C.embedRequestFromHash('#d=motion&m=step'), null);
+  assert.strictEqual(C.embedRequestFromHash(''), null);
+  assert.strictEqual(C.embedRequestFromHash('#embed='), null);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(C.embedRequestFromHash('#embed=a%20b'))),
+    {section: 'a b', skin: null});
+  /* malformed escapes in one pair do not kill the request in another */
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(C.embedRequestFromHash('#sk=%E0%A4%A&embed=ok'))),
+    {section: 'ok', skin: null});
+});
+
+test('embed mode: the target resolves by reference slug or 1-based number', () => {
+  const ctl = {sections: [
+    {number: 1, reference: 'command-delivery'},
+    {number: 2, reference: 'motion-detection'},
+    {number: 3, reference: 3}
+  ]};
+  assert.strictEqual(C.embedTargetSection(ctl, 'motion-detection').number, 2);
+  assert.strictEqual(C.embedTargetSection(ctl, '1').number, 1);
+  assert.strictEqual(C.embedTargetSection(ctl, '3').number, 3); /* heading-less section: numeric ref */
+  assert.strictEqual(C.embedTargetSection(ctl, 'nope'), null);
+  assert.strictEqual(C.embedTargetSection(null, 'x'), null);
+});
+
+test('embed mode: parseHash still ignores the embed and sk keys', () => {
+  const st = C.parseHash('#embed=motion&sk=daylight&m=step&s=2');
+  assert.strictEqual(st.m, 'step');
+  assert.strictEqual(st.s, '2');
+  assert.strictEqual('embed' in st, false);
 });

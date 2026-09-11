@@ -1066,6 +1066,9 @@ function initWorkbenchBuilder(opts){
         if (guide) guide.hidden = true;
         autosaveDraft();
       };
+      reader.onerror = function(){
+        inspectorMessage('could not read "' + f.name + '" — the editor is unchanged');
+      };
       reader.readAsText(f);
       fileInput.value = ''; /* allow re-opening the same file */
     });

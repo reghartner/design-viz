@@ -29,6 +29,7 @@ function loadBuilder(){
     ' specFileName, parseValidationPath, findingLocation,' +
     ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE,' +
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
+    ' PANEL_SETUP_FIELDS, SCENE_TOKENS,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -914,4 +915,30 @@ test('builderStepHops merges the malformed both-keys shape without dropping hops
   const st = JSON.parse(plan.text).page.blocks[0].diagram.steps[0];
   assert.deepStrictEqual(st.edges, ['a->b', 'a->c', 'a->f']);
   assert.ok(!('edge' in st));
+});
+
+/* ================= panel setup field table ================= */
+
+test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known control kinds', () => {
+  assert.deepStrictEqual(Object.keys(B.PANEL_SETUP_FIELDS).sort(), [...V.PANEL_TYPES].sort());
+  const kinds = new Set(['text', 'num', 'csv', 'scene', 'json', 'jsonArr']);
+  for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
+    assert.ok(fields.length >= 1, type);
+    for (const [key, kind] of fields){
+      assert.ok(typeof key === 'string' && key.length, type + '.' + key);
+      assert.ok(kinds.has(kind), type + '.' + key + ' kind ' + kind);
+    }
+    /* initial — THE setup field — is exposed for every type */
+    assert.ok(fields.some(f => f[0] === 'initial'), type + ' exposes initial');
+  }
+});
+
+test('every key the palette starter templates carry has a setup control', () => {
+  for (const [type, tpl] of Object.entries(B.PANEL_TEMPLATES)){
+    const declared = new Set((B.PANEL_SETUP_FIELDS[type] || []).map(f => f[0]));
+    for (const key of Object.keys(tpl)){
+      if (key === 'title') continue; /* title has its own fixed row */
+      assert.ok(declared.has(key), type + ' template key "' + key + '" lacks a setup control');
+    }
+  }
 });

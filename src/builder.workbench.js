@@ -1077,6 +1077,40 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
   });
 }
 
+/* ---------------- panel setup fields ----------------
+   One row of typed controls per setup field of each widget type.
+   Kinds: text | num | csv (comma-separated string list) | scene (token
+   select) | json (an object, edited as JSON) | jsonArr (an array,
+   edited as JSON). Structural fields stay JSON-in-place — their shapes
+   differ too much per widget for typed sub-forms — but every declared
+   field is exposed. tests assert the table covers exactly the engine's
+   PANEL_TYPES and every key the insert palette's starter templates
+   carry. */
+
+var PANEL_SETUP_FIELDS = {
+  state:     [['states', 'csv'], ['initial', 'json']],
+  leds:      [['leds', 'jsonArr'], ['initial', 'json']],
+  gauge:     [['unit', 'text'], ['max', 'num'], ['initial', 'json']],
+  log:       [['tags', 'json'], ['initial', 'json']],
+  screen:    [['scene', 'scene'], ['initial', 'json']],
+  waterfall: [['spans', 'jsonArr'], ['initial', 'json']],
+  orbit:     [['states', 'csv'], ['initial', 'json']],
+  zoneframe: [['zones', 'jsonArr'], ['initial', 'json']],
+  xray:      [['layers', 'jsonArr'], ['initial', 'json']],
+  queue:     [['initial', 'json']],
+  pir:       [['cone', 'json'], ['sensor', 'json'], ['path', 'jsonArr'], ['initial', 'json']],
+  thermo:    [['min', 'num'], ['max', 'num'], ['warn', 'num'], ['crit', 'num'], ['initial', 'json']],
+  battery:   [['low', 'num'], ['crit', 'num'], ['initial', 'json']],
+  buffer:    [['segments', 'num'], ['initial', 'json']],
+  radar:     [['sensor', 'json'], ['spread', 'num'], ['range', 'num'], ['initial', 'json']],
+  signal:    [['links', 'jsonArr'], ['initial', 'json']],
+  tiles:     [['tiles', 'jsonArr'], ['initial', 'json']],
+  inflight:  [['lanes', 'jsonArr'], ['initial', 'json']],
+  phone:     [['initial', 'json']]
+};
+
+var SCENE_TOKENS = ['person-at-door-night', 'package-drop', 'static-noise'];
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -1740,18 +1774,57 @@ function initWorkbenchBuilder(opts){
     });
     return rows;
   }
+  function jsonFieldControl(key, value, wantArray){
+    return textControl(value === undefined ? '' : JSON.stringify(value), function(v){
+      if (v == null) return commitSimple(key, null);
+      var parsed;
+      try { parsed = JSON.parse(v); }
+      catch (ex){ formError(key + ': not valid JSON (' + ex.message + ')'); return false; }
+      if (wantArray && !Array.isArray(parsed)){
+        formError(key + ' is a JSON array — [ ... ]'); return false;
+      }
+      if (!wantArray && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))){
+        formError(key + ' is a JSON object — { ... }'); return false;
+      }
+      return commitSimple(key, JSON.stringify(parsed));
+    }, {textarea: true});
+  }
+  function panelSetupRows(val){
+    var fields = PANEL_SETUP_FIELDS[val.type] || [['initial', 'json']];
+    return fields.map(function(f){
+      var key = f[0], kind = f[1], cur = val[key];
+      if (kind === 'text')
+        return frow(key, textControl(cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }));
+      if (kind === 'num')
+        return frow(key, numberControl(cur, function(v){ return commitSimple(key, v == null ? null : String(v)); }));
+      if (kind === 'scene')
+        return frow(key, selectControl(SCENE_TOKENS, cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }, true));
+      if (kind === 'csv')
+        return frow(key, textControl(Array.isArray(cur) ? cur.join(', ') : cur, function(v){
+          if (v == null) return commitSimple(key, null);
+          var list = v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+          return commitSimple(key, list.length ? JSON.stringify(list) : null);
+        }, {placeholder: 'A, B, C'}));
+      return frow(key, jsonFieldControl(key, cur, kind === 'jsonArr'));
+    });
+  }
   function panelForm(val, ctx){
     var t = currentTarget;
-    return [
+    var rows = [
       frow('id', textControl(val.id, function(v){
         if (v == null){ formError('a panel needs an id'); return false; }
         if (v === val.id){ formError(''); return true; }
         return commitCascade(function(raw){ return planRenamePanel(src.value, raw, t.section, t.index, v); },
           {after: function(){ renderInspector(); }});
       }, {required: 'a panel needs an id'})),
-      frow('type', selectControl(PANEL_TYPES, val.type, function(v){ return commitSimple('type', v == null ? null : JSON.stringify(v)); })),
+      frow('type', selectControl(PANEL_TYPES, val.type, function(v){
+        var ok = commitSimple('type', v == null ? null : JSON.stringify(v));
+        if (ok) renderInspector(); /* the setup rows follow the type */
+        return ok;
+      })),
       frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
     ];
+    return rows.concat(panelSetupRows(val));
   }
   function sectionForm(val, ctx){
     ensureAccentDatalist();

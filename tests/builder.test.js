@@ -903,3 +903,15 @@ test('planStepSetPanelPatch replaces a patch and rejects non-object JSON', () =>
   assert.match(B.planStepSetPanelPatch(RICH_TEXT, RICH, 0, 0, 'q', '[1]').error, /JSON object/);
   assert.match(B.planStepSetPanelPatch(RICH_TEXT, RICH, 0, 0, 'g', '{}').error, /not in this step/);
 });
+
+test('builderStepHops merges the malformed both-keys shape without dropping hops', () => {
+  assert.deepStrictEqual(plain(B.builderStepHops({edge: 'a->b', edges: ['c->d', 'a->b']})),
+    ['a->b', 'c->d']);
+  /* a toggle on such a step keeps every listed hop */
+  const spec = JSON.parse(JSON.stringify(RICH));
+  spec.page.blocks[0].diagram.steps[0] = {edge: 'a->b', edges: ['a->c'], text: 's1'};
+  const plan = B.planStepToggleHop(JSON.stringify(spec, null, 2), spec, 0, 0, 'a->f');
+  const st = JSON.parse(plan.text).page.blocks[0].diagram.steps[0];
+  assert.deepStrictEqual(st.edges, ['a->b', 'a->c', 'a->f']);
+  assert.ok(!('edge' in st));
+});

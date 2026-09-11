@@ -982,10 +982,15 @@ function planMoveTab(text, raw, blockIdx, tabIdx, delta){
    edge: "a->b", two or more store edges: [...]. */
 
 function builderStepHops(st){
+  /* tolerate the malformed both-keys shape: merge edge and edges so a
+     later toggle's rebuild cannot silently drop listed hops */
   if (!st) return [];
-  if (typeof st.edge === 'string') return [st.edge];
-  if (Array.isArray(st.edges)) return st.edges.filter(function(k){ return typeof k === 'string'; });
-  return [];
+  var out = [];
+  if (typeof st.edge === 'string') out.push(st.edge);
+  if (Array.isArray(st.edges)) st.edges.forEach(function(k){
+    if (typeof k === 'string' && out.indexOf(k) < 0) out.push(k);
+  });
+  return out;
 }
 
 function builderStepAt(raw, sectionIdx, stepIdx){

@@ -150,7 +150,9 @@ tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
 /* members of the selected step, marked on the board (distinct from the
    selection ring: dashed) */
 g.node.dv-instep .card{stroke:var(--accent); stroke-width:2; stroke-dasharray:5 3;}
-path.edge.dv-instep{stroke-width:3;}
+/* an edge's dash pattern IS its protocol styling — the membership marker
+   is an accent glow plus width instead */
+path.edge.dv-instep{stroke-width:3.4; filter:drop-shadow(0 0 3px var(--accent));}
 .stepmode path.edge.dv-instep{opacity:1;}
 .pwidget.dv-instep{outline:2px dashed var(--accent); outline-offset:2px;}
 .docview .stepline{cursor:pointer;} /* click selects the current step */
@@ -9953,10 +9955,15 @@ function planMoveTab(text, raw, blockIdx, tabIdx, delta){
    edge: "a->b", two or more store edges: [...]. */
 
 function builderStepHops(st){
+  /* tolerate the malformed both-keys shape: merge edge and edges so a
+     later toggle's rebuild cannot silently drop listed hops */
   if (!st) return [];
-  if (typeof st.edge === 'string') return [st.edge];
-  if (Array.isArray(st.edges)) return st.edges.filter(function(k){ return typeof k === 'string'; });
-  return [];
+  var out = [];
+  if (typeof st.edge === 'string') out.push(st.edge);
+  if (Array.isArray(st.edges)) st.edges.forEach(function(k){
+    if (typeof k === 'string' && out.indexOf(k) < 0) out.push(k);
+  });
+  return out;
 }
 
 function builderStepAt(raw, sectionIdx, stepIdx){

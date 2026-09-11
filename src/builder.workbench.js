@@ -2109,6 +2109,18 @@ function initWorkbenchBuilder(opts){
     addToStepStatus();
   }
   document.addEventListener('click', addModeBlocker, true);
+  document.addEventListener('keydown', function(ev){
+    /* the tab bar switches tabs on Arrow/Home/End — pause that too
+       while the mode is armed (capture phase beats the engine's
+       tab-bar listener) */
+    if (!addToStep) return;
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(ev.key) < 0) return;
+    if (!(ev.target.closest && ev.target.closest('.tabbtn'))) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    formError('finish ADD TO STEP first (DONE or Esc) — tab switching is paused while the mode is armed');
+    addToStepStatus();
+  }, true);
   function cancelAddToStep(message){
     if (!addToStep) return;
     addToStep = null;

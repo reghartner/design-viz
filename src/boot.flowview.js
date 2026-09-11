@@ -52,6 +52,31 @@ function fail(msgs){
   view.appendChild(pre);
 }
 
+/* captured BEFORE boot: the deep-link channel rewrites the hash to its
+   canonical form during wiring, which drops the embed/sk keys */
+var embedRequest = embedRequestFromHash(window.location.hash);
+
+function applyEmbedMode(ctl){
+  /* #embed=<section-ref>[&sk=<skin>]: strip the page down to one
+     section's diagram + panels + step controls for iframe hosting.
+     Read once at load; composes with the other hash fields. */
+  var req = embedRequest;
+  if (!req) return;
+  var target = embedTargetSection(ctl, req.section);
+  if (!target){
+    if (window.console) console.warn('flowspec: #embed section "' + req.section + '" not found');
+    return;
+  }
+  if (req.skin && SKIN_NAMES.indexOf(req.skin) >= 0) window.dvSetSkin(req.skin);
+  if (target.tabBlock != null && target.tab != null){
+    var tb = ctl.tabBlocks[target.tabBlock - 1];
+    /* activate=false: reveal the tab without rewriting the hash */
+    if (tb) tb.select(target.tab, false, false);
+  }
+  document.body.classList.add('dv-embed');
+  target.sectionEl.classList.add('dv-embed-target');
+}
+
 function boot(raw){
   var page = normalize(raw);
   var v = validate(page);
@@ -61,7 +86,22 @@ function boot(raw){
   var bootSkin = resolveSkin(readCookieText(), page.skin);
   applySkinClasses(document.body, view, bootSkin);
   var ctl = renderPage(view, page, bootSkin, backlinkData);
+  if (embedRequest){
+    /* compose with the step deep-link fields: m=/s= without an explicit
+       d= selector must address the EMBEDDED diagram, not the page's
+       default one — inject the embed ref as the selector before the
+       deep-link channel reads the hash */
+    var st = parseHash(window.location.hash);
+    if (st.d == null && (st.m != null || st.s != null)){
+      try {
+        history.replaceState(null, '',
+          '#' + window.location.hash.replace(/^#/, '') +
+          '&d=' + encodeURIComponent(embedRequest.section));
+      } catch (ex){ /* sandboxed iframes may deny history writes */ }
+    }
+  }
   deepLinkChannel = wireDeepLinks(ctl, window); /* tabs, every diagram/step, contract cards + rows */
+  applyEmbedMode(ctl);
   if (pendingLinkBase){
     deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);
     pendingLinkBase = null;

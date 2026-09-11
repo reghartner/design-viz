@@ -3319,6 +3319,35 @@ function restoreActiveTabs(ctl, saved){
   });
 }
 
+/* ---------------- URL embed mode ----------------
+   #embed=<section-ref>[&sk=<skin>] on a published page shows ONLY that
+   section's diagram + panels + step controls — for hosting a single
+   diagram in an iframe (Confluence). The ref is a unique heading slug
+   or the 1-based rendered section number, same vocabulary as the d=
+   deep-link selector. Parsing is pure (tested); boot.flowview.js
+   applies it. Unknown hash keys are ignored by parseHash, so embed
+   composes with the existing deep-link fields (m=, s=, d=, ...). */
+function embedRequestFromHash(hashText){
+  var out = null, skin = null;
+  String(hashText || '').replace(/^#/, '').split('&').forEach(function(part){
+    var i = part.indexOf('=');
+    if (i <= 0) return;
+    var k = part.slice(0, i), v;
+    try { v = decodeURIComponent(part.slice(i + 1)); }
+    catch (ex){ return; }
+    if (k === 'embed' && v) out = v;
+    else if (k === 'sk' && v) skin = v;
+  });
+  return out ? {section: out, skin: skin} : null;
+}
+function embedTargetSection(ctl, ref){
+  var target = null;
+  ((ctl && ctl.sections) || []).forEach(function(rec){
+    if (!target && (rec.reference === ref || String(rec.number) === ref)) target = rec;
+  });
+  return target;
+}
+
 /* ---------------- deep links: hash <-> complete viewer state -------------
    Legacy: numeric d/c section selectors and #t=<tab>&m/s for the first
    stepper in that tab. Canonical d/c selectors use unique heading slugs (or

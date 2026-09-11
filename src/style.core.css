@@ -3808,3 +3808,22 @@ body.sk-blueprint .sk-daylight .stepmode .node.lit.tone-dim .card{
   .node.tone-ok .t1,.node.tone-dim .t1{fill:#111111 !important;}
   .node.tone-pulse .card{animation:none !important;}
 }
+
+/* ---------- URL embed mode (#embed=<section-ref>) ----------
+   One section's diagram + panels + step controls, nothing else — for
+   hosting a single diagram in an iframe. The !important overrides beat
+   every skin's section-box treatment. */
+body.dv-embed{margin:0 !important;}
+body.dv-embed header, body.dv-embed footer,
+body.dv-embed .doc-title, body.dv-embed .doc-sub,
+body.dv-embed .generated-from, body.dv-embed .presentbtn,
+body.dv-embed .tabbar,
+body.dv-embed .doc-sec:not(.dv-embed-target),
+body.dv-embed .dv-embed-target .sec-eyebrow,
+body.dv-embed .dv-embed-target .sec-heading-row,
+body.dv-embed .dv-embed-target .sec-prose,
+body.dv-embed .dv-embed-target .ctcard,
+body.dv-embed .dv-embed-target .printsteps{display:none !important;}
+body.dv-embed .docview{max-width:none !important; padding:10px !important; border:0 !important; margin:0 !important;}
+body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transparent !important;
+  box-shadow:none !important; padding:0 !important; margin:0 !important; max-width:none !important;}

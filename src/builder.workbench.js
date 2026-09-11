@@ -1049,10 +1049,15 @@ function initWorkbenchBuilder(opts){
     mirror.style.tabSize = cs.tabSize;
     mirror.style.padding = cs.padding;
     mirror.style.border = '0';
-    /* trailing token keeps a final empty line from collapsing */
-    mirror.textContent = src.value.slice(0, start) + '​';
+    /* a marker span's offsetTop is the selection line's TOP edge in the
+       textarea's scroll space (offsetHeight would add the marker line's
+       own height and the bottom padding) */
+    mirror.appendChild(document.createTextNode(src.value.slice(0, start)));
+    var marker = document.createElement('span');
+    marker.textContent = '​';
+    mirror.appendChild(marker);
     document.body.appendChild(mirror);
-    var y = mirror.offsetHeight;
+    var y = marker.offsetTop;
     mirror.remove();
     src.scrollTop = Math.max(0, y - src.clientHeight * 0.35);
   }

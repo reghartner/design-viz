@@ -132,6 +132,7 @@ g.coin.dv-sel circle{stroke:var(--accent); stroke-width:2.5;}
 section.doc-sec.dv-sel{outline:2px solid var(--accent); outline-offset:3px;}
 p.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
 tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
+.tabbtn.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
 .rbtn{background:var(--accent); color:var(--accent-ink, #fff); border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
   padding:7px 16px; border-radius:8px; cursor:pointer;}
 .rbtn:hover{filter:brightness(1.08);}
@@ -9130,7 +9131,9 @@ function specValueAt(raw, path){
 }
 function builderTargetPath(raw, target){
   /* target: {section:<zero-based ordinal>, kind, id?, index?} → path array
-     into the raw editor JSON, or null. */
+     into the raw editor JSON, or null. Tabs address by block index
+     instead of section ordinal. */
+  if (target.kind === 'tab') return builderTabPath(raw, target.block, target.tab);
   var rec = specSectionPaths(raw)[target.section];
   if (!rec) return null;
   if (target.kind === 'section') return rec.section;
@@ -9858,6 +9861,70 @@ function findingLocation(text, raw, message){
   return {start: loc.start, end: loc.end, exact: exact};
 }
 
+/* ---------------- tab management ----------------
+   Tabs are addressed by BLOCK index (the position in the page's
+   blocks/sections list — the same index the engine bakes into each tab
+   button's id "tab-<block>-<tab>") plus the tab index inside that
+   block's tabs list. */
+
+function builderTabPath(raw, blockIdx, tabIdx){
+  var base, page;
+  if (raw && raw.page){ page = raw.page; base = ['page']; }
+  else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
+  else return null;
+  var key = page.blocks ? 'blocks' : 'sections';
+  var block = (page[key] || [])[blockIdx];
+  if (!block || !Array.isArray(block.tabs) || !block.tabs[tabIdx]) return null;
+  return base.concat([key, blockIdx, 'tabs', tabIdx]);
+}
+
+var BUILDER_TAB_TEMPLATE = [
+  '{',
+  '  "label": "New tab",',
+  '  "sections": [' + BUILDER_SECTION_TEMPLATE.split('\n').join('\n  ') + ']',
+  '}'
+].join('\n');
+
+function planAddTab(text, raw, blockIdx, afterIdx){
+  /* insert a renderable tab (one starter section) directly after the
+     tab the operator is looking at */
+  var path = builderTabPath(raw, blockIdx, afterIdx);
+  if (!path) return {error: 'tab not found — reselect and try again'};
+  var tabsPath = path.slice(0, -1);
+  var r = jsonInsertArrayItemAfter(text, tabsPath, afterIdx, BUILDER_TAB_TEMPLATE);
+  if (!r) return {error: 'could not edit the tabs list in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'tab',
+          block: blockIdx, index: afterIdx + 1};
+}
+
+function planDeleteTab(text, raw, blockIdx, tabIdx){
+  var path = builderTabPath(raw, blockIdx, tabIdx);
+  if (!path) return {error: 'tab not found — reselect and try again'};
+  var tabsPath = path.slice(0, -1);
+  var tabs = specValueAt(raw, tabsPath);
+  if (Array.isArray(tabs) && tabs.length === 1)
+    return {error: 'this is the block\u2019s last tab — delete its sections instead, or remove the whole tabs block in the JSON'};
+  var r = jsonRemoveMember(text, tabsPath, tabIdx);
+  if (!r) return {error: 'could not edit the tabs list in the editor text'};
+  return r;
+}
+
+function planMoveTab(text, raw, blockIdx, tabIdx, delta){
+  var path = builderTabPath(raw, blockIdx, tabIdx);
+  if (!path) return {error: 'tab not found — reselect and try again'};
+  var tabsPath = path.slice(0, -1);
+  var tabs = specValueAt(raw, tabsPath);
+  var to = tabIdx + delta;
+  if (to < 0 || to >= tabs.length) return {error: 'already at that end'};
+  var r = builderRewrite(text, raw, tabsPath, function(copy){
+    var item = copy.splice(tabIdx, 1)[0];
+    copy.splice(to, 0, item);
+  });
+  if (r.error) return r;
+  r.kind = 'tab'; r.block = blockIdx; r.index = to;
+  return r;
+}
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -9935,6 +10002,15 @@ var BUILDER_GUIDES = {
       ['delta', 'added | removed | changed badge'],
       ['link', 'permalink URL — arrow beside the name'],
       ['revealAt, hideAt', 'zero-based step indexes binding the row to the diagram click-through']
+    ]
+  },
+  tab: {
+    title: 'Tab — one labeled group of sections',
+    how: 'Clicking a tab shows it AND selects it here. Edit the label and Render; + tab adds a sibling after this one; the arrows reorder; delete removes the tab and every section inside it.',
+    fields: [
+      ['label', 'the tab button text — tab identity for deep links and re-renders'],
+      ['highlight', 'true, an accent token, or "#RRGGBB" — emphasizes the tab button'],
+      ['sections', 'the sections this tab shows']
     ]
   },
   section: {
@@ -10150,6 +10226,7 @@ function initWorkbenchBuilder(opts){
   }
   function findTargetEl(t){
     if (!t) return null;
+    if (t.kind === 'tab') return document.getElementById('tab-' + t.block + '-' + t.tab);
     var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
     if (!secEl) return null;
     if (t.kind === 'section') return secEl;
@@ -10455,7 +10532,34 @@ function initWorkbenchBuilder(opts){
     ];
   }
 
+  function tabForm(val, ctx){
+    var t = currentTarget;
+    return [
+      frow('label', textControl(val.label, function(v){
+        if (v == null){ formError('a tab needs a label'); return false; }
+        /* capture BEFORE the commit whether this tab is the shown one —
+           only then may the rename re-activate it (the engine restores
+           the active tab by LABEL slug, so renaming the shown tab makes
+           the re-render fall back to the first tab; a tab that was not
+           shown must stay not shown) */
+        var before = findTargetEl(t);
+        var wasActive = !!(before && before.getAttribute('aria-selected') === 'true');
+        var ok = commitSimple('label', JSON.stringify(v));
+        if (ok && wasActive){
+          var btn = findTargetEl(t);
+          if (btn && btn.getAttribute('aria-selected') !== 'true') btn.click();
+        }
+        return ok;
+      }, {required: 'a tab needs a label'})),
+      frow('highlight', textControl(val.highlight === true ? 'true' : val.highlight, function(v){
+        if (v == null) return commitSimple('highlight', null);
+        return commitSimple('highlight', v === 'true' ? 'true' : JSON.stringify(v));
+      }, {list: 'accent-tokens', placeholder: 'true, token, or #hex'}))
+    ];
+  }
+
   function deletePlanFor(t, raw){
+    if (t.kind === 'tab') return planDeleteTab(src.value, raw, t.block, t.tab);
     if (t.kind === 'node') return planDeleteNode(src.value, raw, t.section, t.id);
     if (t.kind === 'edge') return planDeleteEdge(src.value, raw, t.section, t.index);
     if (t.kind === 'step') return planDeleteStep(src.value, raw, t.section, t.index);
@@ -10523,6 +10627,7 @@ function initWorkbenchBuilder(opts){
       };
       var form = document.createElement('div');
       form.className = 'iform';
+      if (t.kind === 'tab') ensureAccentDatalist();
       var rows =
         t.kind === 'node' ? nodeForm(val, ctx) :
         t.kind === 'edge' ? edgeForm(val, ctx) :
@@ -10530,7 +10635,8 @@ function initWorkbenchBuilder(opts){
         t.kind === 'panel' ? panelForm(val, ctx) :
         t.kind === 'bullet' ? bulletForm(val, ctx) :
         t.kind === 'para' ? paraForm(val, ctx) :
-        t.kind === 'crow' ? crowForm(val, ctx) : sectionForm(val, ctx);
+        t.kind === 'crow' ? crowForm(val, ctx) :
+        t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);
       rows.forEach(function(r){ form.appendChild(r); });
       guide.appendChild(form);
 
@@ -10553,6 +10659,23 @@ function initWorkbenchBuilder(opts){
               insertSection = plan.index;
               renderInspector();
             }});
+        }));
+      }
+      if (t.kind === 'tab'){
+        acts.appendChild(actionButton('+ tab', function(){
+          commitCascade(function(raw){ return planAddTab(src.value, raw, t.block, t.tab); },
+            {after: function(plan){
+              currentTarget = {kind: 'tab', block: plan.block, tab: plan.index};
+              renderInspector();
+            }});
+        }));
+        acts.appendChild(actionButton('← earlier', function(){
+          commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, -1); },
+            {after: function(plan){ t.tab = plan.index; renderInspector(); }});
+        }));
+        acts.appendChild(actionButton('→ later', function(){
+          commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, 1); },
+            {after: function(plan){ t.tab = plan.index; renderInspector(); }});
         }));
       }
       if (t.kind === 'step'){
@@ -10599,6 +10722,15 @@ function initWorkbenchBuilder(opts){
   /* ================= selection ================= */
 
   function targetFromEvent(ev){
+    /* tab buttons both switch the panel (engine) and select the tab
+       here; the copy chip beside a tab is NOT a .tabbtn and still falls
+       through to the interactive skip below */
+    var tabBtn = ev.target.closest && ev.target.closest('.tabbtn');
+    if (tabBtn){
+      var m = /^tab-(\d+)-(\d+)$/.exec(tabBtn.id || '');
+      if (m) return {kind: 'tab', block: parseInt(m[1], 10), tab: parseInt(m[2], 10), el: tabBtn};
+      return null;
+    }
     if (ev.target.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
     var secEl = ev.target.closest('.doc-sec');
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
@@ -10630,8 +10762,9 @@ function initWorkbenchBuilder(opts){
   function selectTarget(target, focusEditor){
     setSelected(target.el);
     currentTarget = {section: target.section, kind: target.kind,
-                     id: target.id, index: target.index};
-    insertSection = target.section;
+                     id: target.id, index: target.index,
+                     block: target.block, tab: target.tab};
+    if (target.kind !== 'tab') insertSection = target.section;
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
     renderInspector();

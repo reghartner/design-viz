@@ -28,6 +28,7 @@ function loadBuilder(){
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
     ' specFileName, parseValidationPath, findingLocation,' +
     ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE,' +
+    ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -830,4 +831,75 @@ test('planMoveTab reorders within the block and clamps the ends', () => {
   assert.strictEqual(plan.index, 1);
   assert.match(B.planMoveTab(TEXT, SPEC, 1, 0, -1).error, /end/);
   assert.match(B.planMoveTab(TEXT, SPEC, 1, 1, 1).error, /end/);
+});
+
+/* ================= step contract editing ================= */
+
+test('builderStepHops reads edge, edges, and edgeless shapes', () => {
+  assert.deepStrictEqual(plain(B.builderStepHops({edge: 'a->b'})), ['a->b']);
+  assert.deepStrictEqual(plain(B.builderStepHops({edges: ['a->b', 'c->d']})), ['a->b', 'c->d']);
+  assert.deepStrictEqual(plain(B.builderStepHops({text: 'only'})), []);
+  assert.deepStrictEqual(plain(B.builderStepHops(null)), []);
+});
+
+test('planStepToggleHop adds, removes, and normalizes edge/edges shapes', () => {
+  /* RICH steps[0] = {edge:'a->b', ...}; add a->c -> edges pair */
+  const add = B.planStepToggleHop(RICH_TEXT, RICH, 0, 0, 'a->c');
+  assert.ok(!add.error, add.error);
+  assert.ok(add.added);
+  const st1 = JSON.parse(add.text).page.blocks[0].diagram.steps[0];
+  assert.ok(!('edge' in st1));
+  assert.deepStrictEqual(st1.edges, ['a->b', 'a->c']);
+
+  /* remove one of a pair -> back to single edge string */
+  const back = B.planStepToggleHop(add.text, JSON.parse(add.text), 0, 0, 'a->c');
+  const st2 = JSON.parse(back.text).page.blocks[0].diagram.steps[0];
+  assert.strictEqual(st2.edge, 'a->b');
+  assert.ok(!('edges' in st2));
+
+  /* remove the last hop -> edgeless step, keys gone */
+  const gone = B.planStepToggleHop(back.text, JSON.parse(back.text), 0, 0, 'a->b');
+  const st3 = JSON.parse(gone.text).page.blocks[0].diagram.steps[0];
+  assert.ok(!('edge' in st3) && !('edges' in st3));
+  assert.strictEqual(st3.text, 's1'); /* caption survives */
+
+  assert.match(B.planStepToggleHop(RICH_TEXT, RICH, 0, 0, 'zz->qq').error, /no edge/);
+});
+
+test('planStepToggleNode adds and removes lit nodes, dropping the empty list', () => {
+  const add = B.planStepToggleNode(RICH_TEXT, RICH, 0, 0, 'c');
+  assert.deepStrictEqual(JSON.parse(add.text).page.blocks[0].diagram.steps[0].nodes, ['c']);
+  const off = B.planStepToggleNode(add.text, JSON.parse(add.text), 0, 0, 'c');
+  assert.ok(!('nodes' in JSON.parse(off.text).page.blocks[0].diagram.steps[0]));
+  /* RICH steps[1] already lights f */
+  const rm = B.planStepToggleNode(RICH_TEXT, RICH, 0, 1, 'f');
+  assert.ok(!rm.added);
+  assert.ok(!('nodes' in JSON.parse(rm.text).page.blocks[0].diagram.steps[1]));
+  assert.match(B.planStepToggleNode(RICH_TEXT, RICH, 0, 0, 'zz').error, /no node/);
+});
+
+test('planStepTogglePanel adds an empty patch, removes an existing one, and stays validator-clean', () => {
+  /* add the gauge panel to step 0 (only q is patched there) */
+  const add = B.planStepTogglePanel(RICH_TEXT, RICH, 0, 0, 'g');
+  const st = JSON.parse(add.text).page.blocks[0].diagram.steps[0];
+  assert.deepStrictEqual(st.panels.g, {});
+  assert.deepStrictEqual(Object.keys(st.panels), ['q', 'g']);
+  const v = V.validate(V.normalize(plain(JSON.parse(add.text))));
+  assert.deepStrictEqual(plain(v.errors), []);
+  assert.deepStrictEqual(plain(v.warnings), []);
+
+  /* remove the only patch of step 2 (none) / remove q from step 0 */
+  const rm = B.planStepTogglePanel(RICH_TEXT, RICH, 0, 0, 'q');
+  assert.ok(!('panels' in JSON.parse(rm.text).page.blocks[0].diagram.steps[0]));
+  assert.match(B.planStepTogglePanel(RICH_TEXT, RICH, 0, 0, 'zz').error, /no panel/);
+});
+
+test('planStepSetPanelPatch replaces a patch and rejects non-object JSON', () => {
+  const r = B.planStepSetPanelPatch(RICH_TEXT, RICH, 0, 0, 'q', '{"state": "held", "reason": "waiting"}');
+  assert.ok(!r.error, r.error);
+  const st = JSON.parse(r.text).page.blocks[0].diagram.steps[0];
+  assert.deepStrictEqual(st.panels.q, {state: 'held', reason: 'waiting'});
+  assert.match(B.planStepSetPanelPatch(RICH_TEXT, RICH, 0, 0, 'q', 'not json').error, /not valid JSON/);
+  assert.match(B.planStepSetPanelPatch(RICH_TEXT, RICH, 0, 0, 'q', '[1]').error, /JSON object/);
+  assert.match(B.planStepSetPanelPatch(RICH_TEXT, RICH, 0, 0, 'g', '{}').error, /not in this step/);
 });

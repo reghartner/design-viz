@@ -975,6 +975,103 @@ function planMoveTab(text, raw, blockIdx, tabIdx, delta){
   return r;
 }
 
+/* ---------------- step contract editing ----------------
+   A step's membership: hops (edge / edges), lit nodes (nodes), and
+   panel patches (panels). Toggles normalize the hop shape: zero hops
+   removes the key (edgeless steps are legal), one hop stores
+   edge: "a->b", two or more store edges: [...]. */
+
+function builderStepHops(st){
+  if (!st) return [];
+  if (typeof st.edge === 'string') return [st.edge];
+  if (Array.isArray(st.edges)) return st.edges.filter(function(k){ return typeof k === 'string'; });
+  return [];
+}
+
+function builderStepAt(raw, sectionIdx, stepIdx){
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return null;
+  var d = specValueAt(raw, rec.diagram);
+  if (!d || !Array.isArray(d.steps) || !d.steps[stepIdx]) return null;
+  return {rec: rec, d: d, st: d.steps[stepIdx],
+          path: rec.diagram.concat(['steps', stepIdx])};
+}
+
+function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
+  var got = builderStepAt(raw, sectionIdx, stepIdx);
+  if (!got) return {error: 'step not found — reselect and try again'};
+  var hops = builderStepHops(got.st);
+  var has = hops.indexOf(key) >= 0;
+  if (!has){
+    var known = (got.d.edges || []).some(function(e){ return e && builderEdgeKey(e) === key; });
+    if (!known) return {error: 'no edge "' + key + '" in this diagram'};
+  }
+  var next = has ? hops.filter(function(k){ return k !== key; }) : hops.concat([key]);
+  var r = builderRewrite(text, raw, got.path, function(st){
+    delete st.edge; delete st.edges;
+    if (next.length === 1) st.edge = next[0];
+    else if (next.length > 1) st.edges = next;
+  });
+  if (r.error) return r;
+  r.added = !has;
+  return r;
+}
+
+function planStepToggleNode(text, raw, sectionIdx, stepIdx, nodeId){
+  var got = builderStepAt(raw, sectionIdx, stepIdx);
+  if (!got) return {error: 'step not found — reselect and try again'};
+  var list = Array.isArray(got.st.nodes) ? got.st.nodes : [];
+  var has = list.indexOf(nodeId) >= 0;
+  if (!has && !(got.d.nodes && Object.prototype.hasOwnProperty.call(got.d.nodes, nodeId)))
+    return {error: 'no node "' + nodeId + '" in this diagram'};
+  var r = builderRewrite(text, raw, got.path, function(st){
+    var next = (Array.isArray(st.nodes) ? st.nodes : []).filter(function(n){ return n !== nodeId; });
+    if (!has) next.push(nodeId);
+    if (next.length) st.nodes = next; else delete st.nodes;
+  });
+  if (r.error) return r;
+  r.added = !has;
+  return r;
+}
+
+function planStepTogglePanel(text, raw, sectionIdx, stepIdx, panelId){
+  var got = builderStepAt(raw, sectionIdx, stepIdx);
+  if (!got) return {error: 'step not found — reselect and try again'};
+  var has = !!(got.st.panels && Object.prototype.hasOwnProperty.call(got.st.panels, panelId));
+  if (!has && !(got.d.panels || []).some(function(p){ return p && p.id === panelId; }))
+    return {error: 'no panel "' + panelId + '" in this diagram'};
+  var r = builderRewrite(text, raw, got.path, function(st){
+    if (has){
+      delete st.panels[panelId];
+      if (!Object.keys(st.panels).length) delete st.panels;
+    } else {
+      if (!st.panels) st.panels = {};
+      st.panels[panelId] = {};
+    }
+  });
+  if (r.error) return r;
+  r.added = !has;
+  return r;
+}
+
+function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchText){
+  /* replace one panel patch with operator-supplied JSON (an object) */
+  var got = builderStepAt(raw, sectionIdx, stepIdx);
+  if (!got) return {error: 'step not found — reselect and try again'};
+  var patch;
+  try { patch = JSON.parse(patchText); }
+  catch (ex){ return {error: 'the patch is not valid JSON (' + ex.message + ')'}; }
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch))
+    return {error: 'a panel patch is a JSON object'};
+  if (!(got.st.panels && Object.prototype.hasOwnProperty.call(got.st.panels, panelId)))
+    return {error: 'panel "' + panelId + '" is not in this step'};
+  return builderRewrite(text, raw, got.path.concat(['panels', panelId]), function(copy, _unused){
+    /* builderRewrite mutates a copy in place; replace all fields */
+    Object.keys(copy).forEach(function(k){ delete copy[k]; });
+    Object.keys(patch).forEach(function(k){ copy[k] = patch[k]; });
+  });
+}
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -1173,6 +1270,7 @@ function initWorkbenchBuilder(opts){
     updateHistoryButtons();
     render();
     setSelected(null); currentTarget = null;
+    clearStepMarkers();
     inspectorMessage(message);
     autosaveDraft();
   }
@@ -1299,6 +1397,44 @@ function initWorkbenchBuilder(opts){
   }
   function rehighlight(){ setSelected(findTargetEl(currentTarget)); }
 
+  /* ---- board markers for the selected step's members ---- */
+  function clearStepMarkers(){
+    Array.prototype.forEach.call(view.querySelectorAll('.dv-instep'), function(el){
+      el.classList.remove('dv-instep');
+    });
+  }
+  function applyStepMarkers(){
+    clearStepMarkers();
+    var t = currentTarget;
+    if (!t || t.kind !== 'step') return;
+    var parsed = parseEditor();
+    if (parsed.error) return;
+    var got = builderStepAt(parsed.raw, t.section, t.index);
+    var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
+    if (!got || !secEl) return;
+    var keyToIdx = Object.create(null);
+    (got.d.edges || []).forEach(function(e, i){
+      var k = builderEdgeKey(e);
+      if (!(k in keyToIdx)) keyToIdx[k] = i;
+    });
+    builderStepHops(got.st).forEach(function(k){
+      if (!(k in keyToIdx)) return;
+      var el = secEl.querySelector('path.edge[data-dv-edge="' + keyToIdx[k] + '"]');
+      if (el) el.classList.add('dv-instep');
+    });
+    (Array.isArray(got.st.nodes) ? got.st.nodes : []).forEach(function(id){
+      var el = secEl.querySelector('[data-dv-node="' + cssQuote(id) + '"]');
+      if (el) el.classList.add('dv-instep');
+    });
+    Object.keys(got.st.panels || {}).forEach(function(pid){
+      var idx = -1;
+      (got.d.panels || []).forEach(function(pn, i){ if (idx < 0 && pn && pn.id === pid) idx = i; });
+      if (idx < 0) return;
+      var el = secEl.querySelector('[data-dv-panel="' + idx + '"]');
+      if (el) el.classList.add('dv-instep');
+    });
+  }
+
   /* ================= inspector: forms that write the JSON ================= */
 
   function inspectorMessage(text){
@@ -1327,6 +1463,7 @@ function initWorkbenchBuilder(opts){
     autosaveDraft();
     if (opt && opt.after) opt.after(plan);
     rehighlight();
+    applyStepMarkers();
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
     if (plan.start != null) scrollTextareaTo(plan.start);
@@ -1506,26 +1643,75 @@ function initWorkbenchBuilder(opts){
       frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
     ];
   }
+  var openPatchPanel = null; /* panel id whose patch editor is open in the step form */
+  function chipRow(labelText, items, emptyText, onRemove, onBody){
+    var box = document.createElement('span');
+    box.className = 'fctl mchips';
+    if (!items.length){
+      var none = document.createElement('span');
+      none.className = 'fnote';
+      none.textContent = emptyText;
+      box.appendChild(none);
+    }
+    items.forEach(function(it){
+      var chip = document.createElement('span');
+      chip.className = 'mchip' + (it.open ? ' open' : '');
+      var lab = document.createElement('button');
+      lab.type = 'button'; lab.className = 'mlab';
+      lab.textContent = it.label;
+      if (onBody) lab.addEventListener('click', function(){ onBody(it.key); });
+      else lab.tabIndex = -1;
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'mx';
+      x.textContent = '\u00d7'; x.title = 'remove from this step';
+      x.setAttribute('aria-label', 'remove ' + it.label + ' from this step');
+      x.addEventListener('click', function(){ onRemove(it.key); });
+      chip.appendChild(lab); chip.appendChild(x);
+      box.appendChild(chip);
+    });
+    return frow(labelText, box);
+  }
   function stepForm(val, ctx){
+    var t = currentTarget;
+    function toggled(planFn){
+      return function(key){
+        commitCascade(function(raw){ return planFn(src.value, raw, t.section, t.index, key); },
+          {after: function(){ renderInspector(); }});
+      };
+    }
     var rows = [
       frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
     ];
-    if (Array.isArray(val.edges)){
-      var note = document.createElement('span');
-      note.className = 'fctl fnote';
-      note.textContent = 'multi-hop step (' + val.edges.join(', ') + ') — edit the edges list in the JSON';
-      rows.push(frow('edges', note));
-    } else {
-      var keys = ((ctx.diagram && ctx.diagram.edges) || []).map(builderEdgeKey);
-      rows.push(frow('edge', selectControl(keys, val.edge, function(v){
-        return commitSimple('edge', v == null ? null : JSON.stringify(v));
-      }, true)));
-    }
     var laneNames = Object.keys((ctx.page && ctx.page.lanes) || {});
     rows.push(frow('lane', selectControl(laneNames, val.lane, function(v){
       return commitSimple('lane', v == null ? null : JSON.stringify(v));
     }, true)));
     rows.push(frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})));
+
+    /* ---- the step's contract: hops, lit nodes, panel patches ---- */
+    rows.push(chipRow('hops',
+      builderStepHops(val).map(function(k){ return {key: k, label: k}; }),
+      'none — edgeless step', toggled(planStepToggleHop)));
+    rows.push(chipRow('nodes',
+      (Array.isArray(val.nodes) ? val.nodes : []).map(function(n){ return {key: n, label: n}; }),
+      'none', toggled(planStepToggleNode)));
+    var pids = Object.keys(val.panels || {});
+    rows.push(chipRow('panels',
+      pids.map(function(pid){ return {key: pid, label: pid, open: pid === openPatchPanel}; }),
+      'none', toggled(planStepTogglePanel),
+      function(pid){ /* chip body toggles that patch's JSON editor */
+        openPatchPanel = openPatchPanel === pid ? null : pid;
+        renderInspector();
+      }));
+    if (openPatchPanel && pids.indexOf(openPatchPanel) >= 0){
+      var pid = openPatchPanel;
+      rows.push(frow('patch ' + pid, textControl(JSON.stringify(val.panels[pid]), function(v){
+        if (v == null){ formError('a patch is a JSON object — remove the panel chip instead'); return false; }
+        return commitCascade(function(raw){
+          return planStepSetPanelPatch(src.value, raw, t.section, t.index, pid, v);
+        }, {after: function(){ renderInspector(); }});
+      }, {textarea: true})));
+    }
     return rows;
   }
   function panelForm(val, ctx){
@@ -1737,6 +1923,16 @@ function initWorkbenchBuilder(opts){
         }));
       }
       if (t.kind === 'step'){
+        var adding = !!(addToStep && addToStep.section === t.section && addToStep.step === t.index);
+        acts.appendChild(actionButton(adding ? 'DONE adding (Esc)' : 'ADD TO STEP', function(){
+          if (addToStep){ cancelAddToStep(null); return; }
+          if (connect) cancelConnect(null);
+          addToStep = {section: t.section, step: t.index};
+          addToStepStatus();
+          renderInspector();
+        }));
+      }
+      if (t.kind === 'step'){
         acts.appendChild(actionButton('↑ earlier', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
             {after: function(plan){ t.index = plan.index; renderInspector(); }});
@@ -1852,10 +2048,63 @@ function initWorkbenchBuilder(opts){
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
     renderInspector();
+    applyStepMarkers();
     if (focusEditor === false) return;
     var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
     var loc = path ? jsonLocate(src.value, path) : null;
     if (loc) selectRange(loc);
+  }
+
+  /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
+  var addToStep = null; /* {section, step} while active */
+  var addModeSurvive = false; /* set around this mode's own re-renders */
+  function addToStepStatus(){
+    if (targetLabel && addToStep)
+      targetLabel.textContent = 'add to step ' + (addToStep.step + 1) +
+        ': click edges, nodes, panels to toggle — Esc or DONE ends';
+  }
+  function cancelAddToStep(message){
+    if (!addToStep) return;
+    addToStep = null;
+    var parsed = parseEditor();
+    updateTargetLabel(parsed.error ? null : parsed.raw);
+    if (message) inspectorMessage(message);
+    else renderInspector(); /* refresh the button label */
+  }
+  function handleAddToStepClick(target){
+    if (!target || ['edge', 'node', 'panel'].indexOf(target.kind) < 0){
+      inspectorMessage('add to step: click an edge, node, or panel (Esc or DONE ends)');
+      addToStepStatus();
+      return;
+    }
+    if (target.section !== addToStep.section){
+      inspectorMessage('that element is in a different section — still adding to step ' + (addToStep.step + 1));
+      addToStepStatus();
+      return;
+    }
+    var parsed = parseEditor();
+    if (parsed.error){ cancelAddToStep(parsed.error); return; }
+    var mode = addToStep;
+    var plan = null;
+    if (target.kind === 'node'){
+      plan = planStepToggleNode(src.value, parsed.raw, mode.section, mode.step, target.id);
+    } else if (target.kind === 'edge'){
+      var rec = specSectionPaths(parsed.raw)[mode.section];
+      var edges = rec ? (specValueAt(parsed.raw, rec.diagram) || {}).edges : null;
+      var e = Array.isArray(edges) ? edges[target.index] : null;
+      if (!e){ inspectorMessage('edge not found — the render and the editor may be out of sync'); return; }
+      plan = planStepToggleHop(src.value, parsed.raw, mode.section, mode.step, builderEdgeKey(e));
+    } else {
+      var rec2 = specSectionPaths(parsed.raw)[mode.section];
+      var panels = rec2 ? (specValueAt(parsed.raw, rec2.diagram) || {}).panels : null;
+      var pn = Array.isArray(panels) ? panels[target.index] : null;
+      if (!pn || !pn.id){ inspectorMessage('panel not found — the render and the editor may be out of sync'); return; }
+      plan = planStepTogglePanel(src.value, parsed.raw, mode.section, mode.step, pn.id);
+    }
+    addModeSurvive = true;
+    var ok = applyPlan(plan, {after: function(){ renderInspector(); }});
+    if (!ok){ addModeSurvive = false; return; }
+    addToStepStatus(); /* applyPlan resets the target label */
   }
 
   /* ---- connect mode: draw an edge by clicking its two nodes ---- */
@@ -1870,6 +2119,7 @@ function initWorkbenchBuilder(opts){
     if (message) inspectorMessage(message);
   }
   function startConnect(){
+    if (addToStep) cancelAddToStep(null);
     if (connect){ cancelConnect('connect cancelled'); return; }
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
@@ -1982,6 +2232,10 @@ function initWorkbenchBuilder(opts){
   view.addEventListener('click', function(ev){
     if (suppressClick){ suppressClick = false; return; }
     var target = targetFromEvent(ev);
+    if (addToStep){
+      handleAddToStepClick(target);
+      return;
+    }
     if (connect){
       handleConnectClick(target);
       return;
@@ -1996,12 +2250,17 @@ function initWorkbenchBuilder(opts){
      stale arming is cancelled. */
   new MutationObserver(function(){
     if (connect) cancelConnect('connect cancelled — the page re-rendered');
+    if (addToStep && !addModeSurvive)
+      cancelAddToStep('add-to-step ended — the page re-rendered');
+    addModeSurvive = false;
+    setTimeout(applyStepMarkers, 0); /* markers live in the rebuilt DOM */
   }).observe(view, {childList: true});
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
       if (palette && !palette.hidden){ closePalette(); return; }
+      if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }
       if (currentTarget){
         currentTarget = null;

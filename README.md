@@ -256,7 +256,16 @@ the message names a field the text does not carry). **Steps are selectable
 everywhere**: besides the numbered coins, every chip in the click-through
 bar selects its step (and jumps playback there), and clicking the caption
 line selects the step being shown — so steps that share a first hop or
-have no edge at all are reachable too. **Tabs are managed
+have no edge at all are reachable too. **The step form
+edits the whole step contract**: the caption, lane, and link sit above chip
+rows for the step's hops, lit nodes, and panel patches — each chip removes
+with one click (hop shapes normalize automatically between `edge`,
+`edges`, and edgeless), clicking a panel chip opens that patch's JSON in a
+mini editor, and the selected step's members are marked with dashed
+outlines on the board. **ADD TO STEP** turns board clicks into membership
+toggles: while the mode is on, clicking any edge, node, or panel in the
+section adds it to the step (or removes it if already there), each toggle
+is one undo step, and Esc or DONE ends the mode. **Tabs are managed
 in place**: clicking a tab button switches to it AND selects it — the
 form edits its label and highlight, **+ tab** inserts a ready-made
 sibling after it, arrows reorder it, delete removes it (the last tab of

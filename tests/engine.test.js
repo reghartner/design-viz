@@ -2767,7 +2767,7 @@ test('fragment reveals: pure HTML builders attach metadata to object bullets and
   const bullets = C.bulletsHTML([{text: 'later', revealAt: 1, hideAt: 3}]);
   assert.ok(bullets.includes('<li data-dv-fragment="" data-dv-reveal-at="1" data-dv-hide-at="3">later</li>'), bullets);
   const card = C.contractCardHTML({fields: [{k: 'ttl', revealAt: 2}]});
-  assert.ok(card.includes('<tr class="ctrow" data-dv-fragment="" data-dv-reveal-at="2">'), card);
+  assert.ok(card.includes('<tr class="ctrow" data-dv-crow="0" data-dv-fragment="" data-dv-reveal-at="2">'), card);
 });
 
 test('fragment reveals: validator covers bad indices, empty intervals, range, and sections without steps', () => {

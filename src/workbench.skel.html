@@ -21,9 +21,12 @@
   drive <b>synchronized inspector panels</b>: device state machines, indicator LEDs, gauges, event
   logs, and a camera-screen widget. The spec is data only, written primarily by an agent reading an
   HLD or code. Default skin is <b>Aurora</b>; <b>Daylight</b> proves skins are swappable CSS.
-  Everything below the toolbar renders from the JSON in the editor. <b>Click any node, edge,
-  label, coin, panel, or section</b> in the render to jump to its definition in the editor,
-  with a field guide; the INSERT buttons splice ready-made pieces into the spec.</p>
+  Everything below the toolbar renders from the JSON in the editor. <b>Click anything</b> in the
+  render — node, edge, label, coin, panel, paragraph, bullet, contract row, section — to jump to
+  its definition and edit it in an inspector form: field controls, id renames that rewrite every
+  reference, deletes that prune references, duplication, step reordering, undo. <b>+ edge</b>
+  draws a hop by clicking source then target; <b>dragging an edge label</b> commits its
+  labelDx/labelDy nudge. Esc clears; Delete removes the selection.</p>
 </header>
 
 <main>
@@ -43,10 +46,11 @@
       <div class="buildrow">
         <span class="lab">INSERT</span>
         <button class="bbtn" id="add-node">+ node</button>
-        <button class="bbtn" id="add-edge">+ edge</button>
+        <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
         <button class="bbtn" id="add-step">+ step</button>
         <button class="bbtn" id="add-panel">+ panel</button>
         <button class="bbtn" id="add-section">+ section</button>
+        <button class="bbtn" id="undo-builder" disabled>undo</button>
         <span class="btarget" id="btarget"></span>
       </div>
       <div class="guide" id="guide" hidden></div>

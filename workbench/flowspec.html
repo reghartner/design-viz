@@ -41,7 +41,7 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
      offset, the summary bar, the insert row, and the render row — and grows
      by the guide panel's 200px cap while guidance is showing */
   .workwrap .specbox textarea{height:calc(100vh - 252px);}
-  .workwrap .specbox:has(.guide:not([hidden])) textarea{height:calc(100vh - 452px);}
+  .workwrap .specbox:has(.guide:not([hidden])) textarea{height:max(200px, calc(100vh - 592px));}
   .workwrap .msgs{max-height:120px; overflow-y:auto;}
 }
 
@@ -79,7 +79,7 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .btarget{font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); margin-left:auto;}
 .guide{border-bottom:1px solid var(--line); padding:10px 14px; font-size:12.5px; line-height:1.5; color:var(--sub);
-  max-height:200px; overflow-y:auto;}
+  max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}
 .guide .gpath{display:block; margin:2px 0 6px; font:600 11px 'IBM Plex Mono',monospace; color:var(--accent); word-break:break-all;}
 .guide .gerr{color:#B0771A; margin:4px 0;}
@@ -88,15 +88,37 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .guide li code{font:600 11px 'IBM Plex Mono',monospace; background:var(--codebg); color:var(--codeink); padding:0 4px; border-radius:4px;}
 .guide .gtokens{margin-top:6px; font:500 11px 'IBM Plex Mono',monospace;}
 
+/* inspector: per-element edit form written through to the spec JSON */
+.iform{margin-top:8px; display:grid; gap:5px;}
+.frow{display:flex; align-items:center; gap:8px;}
+.flab{flex:0 0 88px; font:600 11px 'IBM Plex Mono',monospace; color:var(--sub); text-align:right;}
+.fctl{flex:1; min-width:0; background:var(--codebg); color:var(--codeink); border:1px solid var(--line);
+  border-radius:6px; font:12px/1.4 'IBM Plex Mono',monospace; padding:4px 8px; box-sizing:border-box;}
+textarea.fctl{resize:vertical; min-height:44px;}
+.fctl:focus-visible{outline:2px solid var(--accent); outline-offset:-1px;}
+.fnum{flex:0 1 90px;}
+.fchk{border:0; background:none; padding:0;}
+.fnote{border:0; background:none; font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); padding:0;}
+.iacts{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+.bdanger{color:#C0392B; border-color:#C0392B55;}
+.bdanger:hover{color:#C0392B; border-color:#C0392B;}
+.ihelp{margin-top:10px;}
+.ihelp summary{cursor:pointer; font:600 11px 'IBM Plex Mono',monospace; color:var(--sub);}
+.ihelp[open] summary{margin-bottom:4px;}
+
 /* builder: selection highlight on the rendered page (svg + widget cards) */
-.docview .node, .docview .edge, .docview .halo, .docview .lbl, .docview .coin,
-.docview .pwidget{cursor:pointer;}
+.docview .node, .docview .edge, .docview .halo, .docview .coin,
+.docview .pwidget, .docview .sec-text[data-dv-para],
+.docview .sec-bullets li[data-dv-bullet], .docview .ctrow{cursor:pointer;}
+.docview text.lbl{cursor:grab;} /* drag nudges labelDx/labelDy; click selects */
 g.node.dv-sel .card{stroke:var(--accent); stroke-width:2.5;}
 path.edge.dv-sel{stroke-width:3.4;}
 text.lbl.dv-sel{fill:var(--accent);}
 g.coin.dv-sel circle{stroke:var(--accent); stroke-width:2.5;}
 .pwidget.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
 section.doc-sec.dv-sel{outline:2px solid var(--accent); outline-offset:3px;}
+p.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
+tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
 .rbtn{background:var(--accent); color:#fff; border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
   padding:7px 16px; border-radius:8px; cursor:pointer;}
 .rbtn:hover{filter:brightness(1.08);}
@@ -3983,9 +4005,12 @@ body.sk-blueprint .sk-daylight .stepmode .node.lit.tone-dim .card{
   drive <b>synchronized inspector panels</b>: device state machines, indicator LEDs, gauges, event
   logs, and a camera-screen widget. The spec is data only, written primarily by an agent reading an
   HLD or code. Default skin is <b>Aurora</b>; <b>Daylight</b> proves skins are swappable CSS.
-  Everything below the toolbar renders from the JSON in the editor. <b>Click any node, edge,
-  label, coin, panel, or section</b> in the render to jump to its definition in the editor,
-  with a field guide; the INSERT buttons splice ready-made pieces into the spec.</p>
+  Everything below the toolbar renders from the JSON in the editor. <b>Click anything</b> in the
+  render — node, edge, label, coin, panel, paragraph, bullet, contract row, section — to jump to
+  its definition and edit it in an inspector form: field controls, id renames that rewrite every
+  reference, deletes that prune references, duplication, step reordering, undo. <b>+ edge</b>
+  draws a hop by clicking source then target; <b>dragging an edge label</b> commits its
+  labelDx/labelDy nudge. Esc clears; Delete removes the selection.</p>
 </header>
 
 <main>
@@ -4005,10 +4030,11 @@ body.sk-blueprint .sk-daylight .stepmode .node.lit.tone-dim .card{
       <div class="buildrow">
         <span class="lab">INSERT</span>
         <button class="bbtn" id="add-node">+ node</button>
-        <button class="bbtn" id="add-edge">+ edge</button>
+        <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
         <button class="bbtn" id="add-step">+ step</button>
         <button class="bbtn" id="add-panel">+ panel</button>
         <button class="bbtn" id="add-section">+ section</button>
+        <button class="bbtn" id="undo-builder" disabled>undo</button>
         <span class="btarget" id="btarget"></span>
       </div>
       <div class="guide" id="guide" hidden></div>
@@ -6982,16 +7008,20 @@ function generatedFromHTML(source){
    {text, sub:[...items], revealAt?, hideAt?} whose sub-list renders as an indented child <ul>.
    Recursive so the source doc's nested bullet structure carries over. Pure
    string builder (no DOM) so node tests cover it. */
-function bulletsHTML(items){
+function bulletsHTML(items, markTop){
+  /* markTop: tag top-level items with their spec index (workbench
+     click-to-definition); sub-lists stay unmarked so a click inside one
+     resolves to its top-level parent */
   if (!Array.isArray(items) || !items.length) return '';
   var h = '<ul class="sec-bullets">';
-  items.forEach(function(b){
+  items.forEach(function(b, i){
+    var mark = markTop ? ' data-dv-bullet="' + i + '"' : '';
     if (b && typeof b === 'object' && !Array.isArray(b)){
-      h += '<li' + fragmentAttrs(b) + '>' + inlineMarkup(b.text != null ? String(b.text) : '');
+      h += '<li' + mark + fragmentAttrs(b) + '>' + inlineMarkup(b.text != null ? String(b.text) : '');
       if (Array.isArray(b.sub) && b.sub.length) h += bulletsHTML(b.sub);
       h += '</li>';
     } else {
-      h += '<li>' + inlineMarkup(String(b)) + '</li>';
+      h += '<li' + mark + '>' + inlineMarkup(String(b)) + '</li>';
     }
   });
   return h + '</ul>';
@@ -7022,7 +7052,7 @@ function contractCardHTML(contract, sectionReference){
   }
   var rows = Array.isArray(contract.fields) ? contract.fields : [];
   var body = '', renderedRow = 0;
-  rows.forEach(function(f){
+  rows.forEach(function(f, fi){
     if (!f || typeof f !== 'object' || !f.k) return;
     renderedRow++;
     var link = (f.link && typeof f.link === 'string') ?
@@ -7032,6 +7062,7 @@ function contractCardHTML(contract, sectionReference){
     var badge = delta ? ' <span class="ctdelta" aria-label="' + delta + ' field">' + delta + '</span>' : '';
     body += '<tr class="ctrow' + (f.hot === true ? ' hot' : '') +
             (delta ? ' delta-' + delta : '') + '"' +
+            ' data-dv-crow="' + fi + '"' + /* spec index — malformed rows are skipped, so the rendered position can lag it */
             (addressed ? ' id="contract-' + sectionAddress + '-row-' + renderedRow +
              '" tabindex="-1" aria-label="Contract field ' + esc(f.k) + '"' : '') +
             fragmentAttrs(f) + '>' +
@@ -8093,8 +8124,8 @@ function sectionIntroHTML(sec, gi, sectionReference){
       (defaultCollapsed ? ' hidden' : '') + '>';
     var texts = typeof sec.text === 'string' ? [sec.text] :
                 (Array.isArray(sec.text) ? sec.text : []);
-    texts.forEach(function(t){ h += '<p class="sec-text">' + inlineMarkup(t) + '</p>'; });
-    if (Array.isArray(sec.bullets) && sec.bullets.length) h += bulletsHTML(sec.bullets);
+    texts.forEach(function(t, ti){ h += '<p class="sec-text" data-dv-para="' + ti + '">' + inlineMarkup(t) + '</p>'; });
+    if (Array.isArray(sec.bullets) && sec.bullets.length) h += bulletsHTML(sec.bullets, true);
     h += '</div>';
   }
   return {html:h, hasProse:hasProse, defaultCollapsed:defaultCollapsed,
@@ -9054,6 +9085,13 @@ function builderTargetPath(raw, target){
   if (target.kind === 'edge') return d.concat(['edges', target.index]);
   if (target.kind === 'step') return d.concat(['steps', target.index]);
   if (target.kind === 'panel') return d.concat(['panels', target.index]);
+  if (target.kind === 'bullet') return rec.section.concat(['bullets', target.index]);
+  if (target.kind === 'para'){
+    var sec = specValueAt(raw, rec.section);
+    if (sec && typeof sec.text === 'string') return rec.section.concat(['text']);
+    return rec.section.concat(['text', target.index]);
+  }
+  if (target.kind === 'crow') return rec.section.concat(['contract', 'fields', target.index]);
   return null;
 }
 function builderPathString(path){
@@ -9165,7 +9203,7 @@ function planAddStep(text, raw, sectionIdx){
 function planAddPanel(text, raw, sectionIdx){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
-  var taken = {};
+  var taken = Object.create(null);
   (got.d.panels || []).forEach(function(p){ if (p && p.id) taken[p.id] = true; });
   var id = builderUniqueKey(taken, 'panel');
   var item = '{"id": ' + JSON.stringify(id) +
@@ -9205,6 +9243,425 @@ function planAddSection(text, raw){
   if (!r) return {error: 'could not edit the ' + key + ' list in the editor text'};
   return {text: r.text, start: r.start, end: r.end, kind: 'section',
           index: specSectionPaths(raw).length};
+}
+
+/* ---------------- field edits, renames, deletes, reorders ----------------
+   Two edit strategies. Single-field edits are SURGICAL: replace, insert, or
+   remove one member's text and leave the rest of the document byte-for-byte
+   untouched. Edits that must stay consistent across several diagram keys
+   (renaming a node id, deleting a node, retargeting an edge) REWRITE one
+   value — usually the section's diagram object — from a mutated copy,
+   serialized with two-space indents and re-indented to the container
+   depth. */
+
+function jsonReplaceValue(text, path, valueText){
+  /* Replace the value at path; multi-line valueText is re-indented to the
+     member's line indent. Returns {text, start, end} or null. */
+  var loc = jsonLocate(text, path);
+  if (!loc) return null;
+  var ls = text.lastIndexOf('\n', loc.keyStart) + 1;
+  var indent = (text.slice(ls, loc.keyStart).match(/^[ \t]*/) || [''])[0];
+  var adj = valueText.split('\n').join('\n' + indent);
+  return {text: text.slice(0, loc.start) + adj + text.slice(loc.end),
+          start: loc.start, end: loc.start + adj.length};
+}
+function jsonRemoveMember(text, containerPath, key){
+  /* Remove one member (and the comma that binds it) from the object or
+     array at containerPath. Returns {text} or null when absent. */
+  var loc = containerPath.length ? jsonLocate(text, containerPath) : {start: jsonSkipWS(text, 0)};
+  var cont = loc ? jsonContainer(text, loc.start) : null;
+  if (!cont) return null;
+  var idx = -1;
+  for (var m = 0; m < cont.members.length; m++){
+    if (cont.members[m].key === key){ idx = m; break; }
+  }
+  if (idx < 0) return null;
+  var mem = cont.members[idx], from, to;
+  if (cont.members.length === 1){ from = cont.open + 1; to = cont.close; }
+  else if (idx === cont.members.length - 1){ from = cont.members[idx - 1].valEnd; to = mem.valEnd; }
+  else { from = mem.keyStart; to = cont.members[idx + 1].keyStart; }
+  return {text: text.slice(0, from) + text.slice(to)};
+}
+function jsonSetField(text, objPath, key, valueTextOrNull){
+  /* Set (replace or insert) one field of the object at objPath; null value
+     removes the field. Returns {text, start?, end?} or null. */
+  var exists = jsonLocate(text, objPath.concat([key]));
+  if (valueTextOrNull == null){
+    if (!exists) return {text: text};
+    return jsonRemoveMember(text, objPath, key);
+  }
+  if (exists) return jsonReplaceValue(text, objPath.concat([key]), valueTextOrNull);
+  return jsonInsertMember(text, objPath, key, valueTextOrNull);
+}
+
+function builderClone(v){ return JSON.parse(JSON.stringify(v)); }
+function builderRewrite(text, raw, path, mutate){
+  /* Rewrite the value at path from a mutated deep copy. mutate(copy) edits
+     in place and may return {error}. */
+  var cur = specValueAt(raw, path);
+  if (cur == null || typeof cur !== 'object')
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var copy = builderClone(cur);
+  var out = mutate(copy);
+  if (out && out.error) return out;
+  var r = jsonReplaceValue(text, path, JSON.stringify(copy, null, 2));
+  if (!r) return {error: 'could not rewrite the editor text'};
+  return r;
+}
+
+function planSetField(text, raw, targetPath, key, valueTextOrNull){
+  /* Surgical single-field edit on the object at targetPath. */
+  if (!jsonLocate(text, targetPath))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var r = jsonSetField(text, targetPath, key, valueTextOrNull);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+
+function builderEdgeKey(e){ return ((e && e.from) || '') + '->' + ((e && e.to) || ''); }
+function builderRetargetStepKeys(steps, oldKey, newKey){
+  /* Point every step reference at newKey; null newKey removes the
+     reference (a step may legally end up edgeless). */
+  (steps || []).forEach(function(st){
+    if (!st) return;
+    if (st.edge === oldKey){
+      if (newKey) st.edge = newKey; else delete st.edge;
+    }
+    if (Array.isArray(st.edges)){
+      st.edges = st.edges.map(function(k){ return k === oldKey ? newKey : k; })
+                         .filter(function(k){ return typeof k === 'string'; });
+      if (!st.edges.length) delete st.edges;
+    }
+  });
+}
+
+var BUILDER_ID_RE = /^[A-Za-z0-9_-]+$/;
+
+function planSetEdgeEndpoint(text, raw, sectionIdx, edgeIdx, field, nodeId){
+  /* Change an edge's from/to and retarget every step reference to the
+     edge's old "from->to" key. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var e = (got.d.edges || [])[edgeIdx];
+  if (!e) return {error: 'edge not found — reselect and try again'};
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, nodeId))
+    return {error: 'unknown node id "' + nodeId + '"'};
+  var oldKey = builderEdgeKey(e);
+  return builderRewrite(text, raw, got.path, function(d){
+    d.edges[edgeIdx][field] = nodeId;
+    builderRetargetStepKeys(d.steps, oldKey, builderEdgeKey(d.edges[edgeIdx]));
+  });
+}
+
+function planRenameNode(text, raw, sectionIdx, oldId, newId){
+  /* Rename a node id everywhere it is referenced: the nodes map, rows and
+     stacks, floats, edge endpoints, step node lists, and the step
+     "from->to" keys of every edge whose endpoint changed. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!BUILDER_ID_RE.test(newId || ''))
+    return {error: 'node ids use letters, digits, _ and - only'};
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, oldId))
+    return {error: 'node "' + oldId + '" not found'};
+  if (newId === oldId) return {error: 'same id'};
+  if (Object.prototype.hasOwnProperty.call(got.d.nodes, newId))
+    return {error: 'id "' + newId + '" is already taken'};
+  return builderRewrite(text, raw, got.path, function(d){
+    /* null-prototype map: a plain {} would route an id like "__proto__"
+       through the prototype setter and silently drop the node */
+    var nodes = Object.create(null);
+    Object.keys(d.nodes).forEach(function(k){ nodes[k === oldId ? newId : k] = d.nodes[k]; });
+    d.nodes = nodes;
+    d.rows = (d.rows || []).map(function(row){
+      return row.map(function(slot){
+        if (Array.isArray(slot)) return slot.map(function(s){ return s === oldId ? newId : s; });
+        return slot === oldId ? newId : slot;
+      });
+    });
+    (Array.isArray(d.floats) ? d.floats : []).forEach(function(f){
+      if (f && f.id === oldId) f.id = newId;
+    });
+    var renamedKeys = [];
+    (d.edges || []).forEach(function(e){
+      if (!e) return;
+      var was = builderEdgeKey(e), hit = false;
+      if (e.from === oldId){ e.from = newId; hit = true; }
+      if (e.to === oldId){ e.to = newId; hit = true; }
+      if (hit) renamedKeys.push([was, builderEdgeKey(e)]);
+    });
+    (d.steps || []).forEach(function(st){
+      if (st && Array.isArray(st.nodes))
+        st.nodes = st.nodes.map(function(n){ return n === oldId ? newId : n; });
+    });
+    renamedKeys.forEach(function(pair){ builderRetargetStepKeys(d.steps, pair[0], pair[1]); });
+  });
+}
+
+function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
+  /* Rename a panel id and move every step patch keyed by it. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var p = (got.d.panels || [])[panelIdx];
+  if (!p) return {error: 'panel not found — reselect and try again'};
+  if (!BUILDER_ID_RE.test(newId || ''))
+    return {error: 'panel ids use letters, digits, _ and - only'};
+  var oldId = p.id;
+  if (newId === oldId) return {error: 'same id'};
+  if ((got.d.panels || []).some(function(q){ return q && q.id === newId; }))
+    return {error: 'id "' + newId + '" is already taken'};
+  return builderRewrite(text, raw, got.path, function(d){
+    d.panels[panelIdx].id = newId;
+    (d.steps || []).forEach(function(st){
+      if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, oldId)){
+        var patches = Object.create(null); /* "__proto__" — see planRenameNode */
+        Object.keys(st.panels).forEach(function(k){ patches[k === oldId ? newId : k] = st.panels[k]; });
+        st.panels = patches;
+      }
+    });
+  });
+}
+
+function planDeleteNode(text, raw, sectionIdx, id){
+  /* Remove a node plus its row/float placement and every edge touching it;
+     step references to the removed edges and the node are pruned (a step
+     may legally stay as caption-only). */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
+    return {error: 'node "' + id + '" not found'};
+  return builderRewrite(text, raw, got.path, function(d){
+    delete d.nodes[id];
+    d.rows = (d.rows || []).map(function(row){
+      return row.map(function(slot){
+        return Array.isArray(slot) ? slot.filter(function(s){ return s !== id; }) : slot;
+      }).filter(function(slot){
+        return Array.isArray(slot) ? slot.length > 0 : slot !== id;
+      });
+    }).filter(function(row){ return row.length > 0; });
+    if (Array.isArray(d.floats)){
+      d.floats = d.floats.filter(function(f){ return !(f && f.id === id); });
+      if (!d.floats.length) delete d.floats;
+    }
+    var removedKeys = [];
+    if (Array.isArray(d.edges)){
+      d.edges = d.edges.filter(function(e){
+        var hit = e && (e.from === id || e.to === id);
+        if (hit) removedKeys.push(builderEdgeKey(e));
+        return !hit;
+      });
+    }
+    var surviving = {};
+    (d.edges || []).forEach(function(e){ if (e) surviving[builderEdgeKey(e)] = true; });
+    removedKeys.forEach(function(k){
+      if (!surviving[k]) builderRetargetStepKeys(d.steps, k, null);
+    });
+    (d.steps || []).forEach(function(st){
+      if (st && Array.isArray(st.nodes)){
+        st.nodes = st.nodes.filter(function(n){ return n !== id; });
+        if (!st.nodes.length) delete st.nodes;
+      }
+    });
+  });
+}
+
+function planDeleteEdge(text, raw, sectionIdx, edgeIdx){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var e = (got.d.edges || [])[edgeIdx];
+  if (!e) return {error: 'edge not found — reselect and try again'};
+  var key = builderEdgeKey(e);
+  return builderRewrite(text, raw, got.path, function(d){
+    d.edges.splice(edgeIdx, 1);
+    var stillThere = d.edges.some(function(o){ return o && builderEdgeKey(o) === key; });
+    if (!stillThere) builderRetargetStepKeys(d.steps, key, null);
+  });
+}
+
+function planDeletePanel(text, raw, sectionIdx, panelIdx){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var p = (got.d.panels || [])[panelIdx];
+  if (!p) return {error: 'panel not found — reselect and try again'};
+  var id = p.id;
+  return builderRewrite(text, raw, got.path, function(d){
+    d.panels.splice(panelIdx, 1);
+    if (!d.panels.length) delete d.panels;
+    (d.steps || []).forEach(function(st){
+      if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, id)){
+        delete st.panels[id];
+        if (!Object.keys(st.panels).length) delete st.panels;
+      }
+    });
+  });
+}
+
+function planDeleteStep(text, raw, sectionIdx, stepIdx){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!Array.isArray(got.d.steps) || !got.d.steps[stepIdx])
+    return {error: 'step not found — reselect and try again'};
+  return builderRewrite(text, raw, got.path.concat(['steps']), function(steps){
+    steps.splice(stepIdx, 1);
+  });
+}
+
+function planMoveStep(text, raw, sectionIdx, stepIdx, delta){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var steps = got.d.steps;
+  var to = stepIdx + delta;
+  if (!Array.isArray(steps) || !steps[stepIdx]) return {error: 'step not found'};
+  if (to < 0 || to >= steps.length) return {error: 'already at that end'};
+  var r = builderRewrite(text, raw, got.path.concat(['steps']), function(copy){
+    var item = copy.splice(stepIdx, 1)[0];
+    copy.splice(to, 0, item);
+  });
+  if (r.error) return r;
+  r.index = to;
+  return r;
+}
+
+function planDeleteSection(text, raw, sectionIdx){
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'no such section'};
+  if (!rec.section.length)
+    return {error: 'this spec is one bare diagram — clear the editor instead of deleting'};
+  var parentPath = rec.section.slice(0, -1);
+  var key = rec.section[rec.section.length - 1];
+  var r = jsonRemoveMember(text, parentPath, key);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+
+/* ---------------- pass 3: direct-manipulation planners ---------------- */
+
+function jsonInsertArrayItemAfter(text, arrPath, afterIdx, itemText){
+  /* Insert itemText into the array at arrPath directly AFTER member
+     afterIdx (jsonInsertMember only appends at the end). */
+  var loc = arrPath.length ? jsonLocate(text, arrPath) : {start: jsonSkipWS(text, 0)};
+  var cont = loc ? jsonContainer(text, loc.start) : null;
+  if (!cont || cont.isObj) return null;
+  var anchor = cont.members[afterIdx];
+  if (!anchor) return null;
+  var ls = text.lastIndexOf('\n', anchor.keyStart) + 1;
+  var indent = (text.slice(ls, anchor.keyStart).match(/^[ \t]*/) || [''])[0];
+  var adjVal = itemText.split('\n').join('\n' + indent);
+  var prefix = ',\n' + indent;
+  var insertAt = anchor.valEnd;
+  var start = insertAt + prefix.length;
+  return {text: text.slice(0, insertAt) + prefix + adjVal + text.slice(insertAt),
+          start: start, end: start + adjVal.length};
+}
+
+function planReplaceValue(text, raw, path, valueText){
+  /* Replace one whole value (a bullet string, a paragraph) in place. */
+  if (!jsonLocate(text, path))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var r = jsonReplaceValue(text, path, valueText);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+function planSetFields(text, raw, targetPath, pairs){
+  /* Several surgical field edits on one object under a single undo step
+     (the label drag commits labelDx and labelDy together). */
+  if (!jsonLocate(text, targetPath))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var out = text;
+  for (var i = 0; i < pairs.length; i++){
+    var r = jsonSetField(out, targetPath, pairs[i][0], pairs[i][1]);
+    if (!r) return {error: 'could not edit the editor text'};
+    out = r.text;
+  }
+  return {text: out};
+}
+function planDeleteListItem(text, raw, containerPath, index){
+  /* Remove one entry from a plain list (bullets, text paragraphs,
+     contract fields). */
+  if (!jsonLocate(text, containerPath))
+    return {error: 'list not found in the editor text'};
+  var r = jsonRemoveMember(text, containerPath, index);
+  if (!r) return {error: 'no such entry'};
+  return r;
+}
+
+function planAddEdgeBetween(text, raw, sectionIdx, fromId, toId){
+  /* Connect mode: the operator clicked the exact source and target. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var nodes = got.d.nodes || {};
+  if (!Object.prototype.hasOwnProperty.call(nodes, fromId))
+    return {error: 'unknown node id "' + fromId + '"'};
+  if (!Object.prototype.hasOwnProperty.call(nodes, toId))
+    return {error: 'unknown node id "' + toId + '"'};
+  if (fromId === toId) return {error: 'source and target are the same node'};
+  var key = fromId + '->' + toId;
+  if ((got.d.edges || []).some(function(e){ return e && builderEdgeKey(e) === key; }))
+    return {error: 'edge "' + key + '" already exists \u2014 click it to edit'};
+  var item = '{"from": ' + JSON.stringify(fromId) + ', "to": ' + JSON.stringify(toId) +
+             ', "kind": "int", "label": "describe the hop"}';
+  var r = jsonInsertListItemOrCreate(text, got.path, 'edges', item);
+  if (!r) return {error: 'could not edit edges in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'edge',
+          index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
+}
+
+function planDuplicateNode(text, raw, sectionIdx, id){
+  /* Copy a node definition under a fresh id and place the copy right
+     beside the original (same row slot, same stack, or floats list). */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var d = got.d;
+  if (!d.nodes || !Object.prototype.hasOwnProperty.call(d.nodes, id))
+    return {error: 'node "' + id + '" not found'};
+  var newId = builderUniqueKey(d.nodes, id);
+  var placed = null;
+  (d.rows || []).forEach(function(row, r){
+    if (placed) return;
+    row.forEach(function(slot, s){
+      if (placed) return;
+      if (slot === id) placed = {path: got.path.concat(['rows', r]), after: s};
+      else if (Array.isArray(slot)){
+        var k = slot.indexOf(id);
+        if (k >= 0) placed = {path: got.path.concat(['rows', r, s]), after: k};
+      }
+    });
+  });
+  var out;
+  if (placed){
+    out = jsonInsertArrayItemAfter(text, placed.path, placed.after, JSON.stringify(newId));
+    if (!out) return {error: 'could not edit rows in the editor text'};
+  } else {
+    var floats = d.floats || [];
+    var fi = -1;
+    floats.forEach(function(f, i){ if (fi < 0 && f && f.id === id) fi = i; });
+    if (fi < 0) return {error: 'node "' + id + '" has no row or float placement to copy'};
+    /* clone the WHOLE float entry (side plus any nudge fields), fresh id,
+       placed directly after the original like the row cases */
+    var entry = builderClone(floats[fi]);
+    entry.id = newId;
+    out = jsonInsertArrayItemAfter(text, got.path.concat(['floats']), fi, JSON.stringify(entry));
+    if (!out) return {error: 'could not edit floats in the editor text'};
+  }
+  var def = jsonInsertMember(out.text, got.path.concat(['nodes']), newId,
+    JSON.stringify(builderClone(d.nodes[id])));
+  if (!def) return {error: 'could not edit nodes in the editor text'};
+  return {text: def.text, start: def.start, end: def.end, kind: 'node', id: newId};
+}
+
+function planDuplicateSection(text, raw, sectionIdx){
+  /* Deep-copy a section directly after the original; the copy renders as
+     the next section ordinal (render order is depth-first list order). */
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'no such section'};
+  if (!rec.section.length)
+    return {error: 'this spec is one bare diagram \u2014 wrap it as {"page": {"blocks": [ ... ]}} first'};
+  var clone = builderClone(specValueAt(raw, rec.section));
+  if (clone && typeof clone.heading === 'string') clone.heading += ' (copy)';
+  var parentPath = rec.section.slice(0, -1);
+  var idx = rec.section[rec.section.length - 1];
+  var r = jsonInsertArrayItemAfter(text, parentPath, idx, JSON.stringify(clone, null, 2));
+  if (!r) return {error: 'could not edit the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'section', index: sectionIdx + 1};
 }
 
 /* ---------------- per-element authoring guidance ---------------- */
@@ -9257,6 +9714,35 @@ var BUILDER_GUIDES = {
       ['initial', 'widget state before step 1']
     ]
   },
+  bullet: {
+    title: 'Bullet — one list point',
+    how: 'Edit the text and Render. A bullet is a plain string, or an object when it needs nesting or step reveals.',
+    fields: [
+      ['text', 'the point itself (object form)'],
+      ['sub', 'nested child bullets (object form)'],
+      ['revealAt, hideAt', 'zero-based step indexes binding the bullet to the diagram click-through']
+    ]
+  },
+  para: {
+    title: 'Paragraph — section prose',
+    how: 'Edit the text and Render. section.text is one string or a list of paragraph strings.',
+    fields: [
+      ['text', 'plain prose; `code` spans render in monospace']
+    ]
+  },
+  crow: {
+    title: 'Contract field — one "on the wire" row',
+    how: 'Edit the row and Render. Rows without a k key are skipped by the renderer.',
+    fields: [
+      ['k', 'field name (required)'],
+      ['v', 'sample value'],
+      ['g', 'gloss — what the field means'],
+      ['hot', 'true highlights the row'],
+      ['delta', 'added | removed | changed badge'],
+      ['link', 'permalink URL — arrow beside the name'],
+      ['revealAt, hideAt', 'zero-based step indexes binding the row to the diagram click-through']
+    ]
+  },
   section: {
     title: 'Section — one accent-colored box',
     how: 'Edit the selected JSON, then click Render. Everything inside is optional; a section is prose, an optional contract card, and an optional diagram.',
@@ -9278,9 +9764,12 @@ function initWorkbenchBuilder(opts){
   var view = opts.view, src = opts.src, render = opts.render;
   var guide = document.getElementById('guide');
   var targetLabel = document.getElementById('btarget');
+  var undoBtn = document.getElementById('undo-builder');
   var specbox = document.querySelector('.specbox');
   var selectedEl = null;
-  var insertSection = 0; /* zero-based ordinal of the section inserts target */
+  var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
+  var insertSection = 0;    /* zero-based ordinal of the section inserts target */
+  var undoStack = [];
 
   function parseEditor(){
     try { return {raw: JSON.parse(src.value)}; }
@@ -9310,28 +9799,458 @@ function initWorkbenchBuilder(opts){
     targetLabel.textContent = 'into section ' + (insertSection + 1) + name +
       ' — click a section to retarget';
   }
-  function renderGuide(kind, pathStr, note){
+
+  /* ---- undo: one snapshot of the editor text per builder action ---- */
+  function pushUndo(){
+    undoStack.push(src.value);
+    if (undoStack.length > 30) undoStack.shift();
+    if (undoBtn) undoBtn.disabled = false;
+  }
+  function doUndo(){
+    if (!undoStack.length) return;
+    src.value = undoStack.pop();
+    if (undoBtn) undoBtn.disabled = !undoStack.length;
+    render();
+    setSelected(null); currentTarget = null;
+    inspectorMessage('undid the last builder action — board re-rendered');
+  }
+  if (undoBtn) undoBtn.addEventListener('click', doUndo);
+
+  /* ---- board highlight by stable identity, re-applied after renders ---- */
+  function cssQuote(s){
+    /* node ids come from the spec and may hold quotes/backslashes */
+    if (window.CSS && CSS.escape) return CSS.escape(String(s));
+    return String(s).replace(/[^A-Za-z0-9_-]/g, '\\$&');
+  }
+  function findTargetEl(t){
+    if (!t) return null;
+    var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
+    if (!secEl) return null;
+    if (t.kind === 'section') return secEl;
+    var sel = t.kind === 'node' ? '[data-dv-node="' + cssQuote(t.id) + '"]' :
+              t.kind === 'edge' ? 'path.edge[data-dv-edge="' + t.index + '"]' :
+              t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
+              t.kind === 'bullet' ? '[data-dv-bullet="' + t.index + '"]' :
+              t.kind === 'para' ? '[data-dv-para="' + t.index + '"]' :
+              t.kind === 'crow' ? '[data-dv-crow="' + t.index + '"]' :
+                                  '[data-dv-panel="' + t.index + '"]';
+    try { return secEl.querySelector(sel); } catch (ex){ return null; }
+  }
+  function rehighlight(){ setSelected(findTargetEl(currentTarget)); }
+
+  /* ================= inspector: forms that write the JSON ================= */
+
+  function inspectorMessage(text){
     if (!guide) return;
     guide.hidden = false;
     guide.innerHTML = '';
-    var g = BUILDER_GUIDES[kind];
-    if (!g) return;
-    var b = document.createElement('b');
-    b.textContent = g.title;
-    guide.appendChild(b);
-    if (pathStr){
-      var p = document.createElement('span');
-      p.className = 'gpath'; p.textContent = pathStr;
-      guide.appendChild(p);
+    var n = document.createElement('div');
+    n.className = 'gerr'; n.textContent = text;
+    guide.appendChild(n);
+  }
+  function formError(text){
+    var slot = guide && guide.querySelector('.ierr');
+    if (!slot){ inspectorMessage(text); return; }
+    slot.textContent = text || '';
+    slot.hidden = !text;
+  }
+
+  /* apply a plan produced by a pure planner; keeps form focus (no textarea
+     focus steal), re-renders, re-applies the board highlight */
+  function applyPlan(plan, opt){
+    if (!plan || plan.error){ formError(plan ? plan.error : 'edit failed'); return false; }
+    formError('');
+    pushUndo();
+    src.value = plan.text;
+    render();
+    if (opt && opt.after) opt.after(plan);
+    rehighlight();
+    var parsed = parseEditor();
+    if (!parsed.error) updateTargetLabel(parsed.raw);
+    if (plan.start != null) scrollTextareaTo(plan.start);
+    return true;
+  }
+  function commitSimple(key, valueTextOrNull){
+    var parsed = parseEditor();
+    if (parsed.error){ formError(parsed.error); return false; }
+    var path = builderTargetPath(parsed.raw, currentTarget);
+    if (!path){ formError('element not found — click Render, then reselect'); return false; }
+    return applyPlan(planSetField(src.value, parsed.raw, path, key, valueTextOrNull));
+  }
+  function commitCascade(planFor, opt){
+    var parsed = parseEditor();
+    if (parsed.error){ formError(parsed.error); return false; }
+    return applyPlan(planFor(parsed.raw), opt);
+  }
+  function commitValue(valueText){
+    /* replace the selected element's WHOLE value (bullet string, paragraph) */
+    var parsed = parseEditor();
+    if (parsed.error){ formError(parsed.error); return false; }
+    var path = builderTargetPath(parsed.raw, currentTarget);
+    if (!path){ formError('element not found — click Render, then reselect'); return false; }
+    return applyPlan(planReplaceValue(src.value, parsed.raw, path, valueText));
+  }
+
+  /* ---- form controls ---- */
+  function frow(labelText, control){
+    var row = document.createElement('label');
+    row.className = 'frow';
+    var lab = document.createElement('span');
+    lab.className = 'flab'; lab.textContent = labelText;
+    row.appendChild(lab); row.appendChild(control);
+    return row;
+  }
+  function commitOnChange(input, getCommitValue, commit){
+    /* a commit returning false (validation or plan error) resets the
+       remembered value so re-entering ANY value — the original included —
+       fires again instead of being swallowed as "unchanged" */
+    var last = input.value;
+    var fire = function(){
+      if (input.value === last) return;
+      last = input.value;
+      var ok = commit(getCommitValue ? getCommitValue(input.value) : input.value);
+      if (ok === false) last = null;
+    };
+    input.addEventListener('change', fire);
+    input.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter' && input.tagName !== 'TEXTAREA'){ ev.preventDefault(); fire(); }
+    });
+  }
+  function textControl(value, commit, opts){
+    var input = document.createElement(opts && opts.textarea ? 'textarea' : 'input');
+    if (!opts || !opts.textarea) input.type = 'text';
+    input.className = 'fctl';
+    if (opts && opts.placeholder) input.placeholder = opts.placeholder;
+    if (opts && opts.list) input.setAttribute('list', opts.list);
+    input.value = value == null ? '' : String(value);
+    /* empty commits as removal unless the field is required */
+    commitOnChange(input, null, function(v){
+      var trimmed = v.trim();
+      if (!trimmed && opts && opts.required){ formError(opts.required); return false; }
+      return commit(trimmed === '' ? null : trimmed);
+    });
+    return input;
+  }
+  function numberControl(value, commit){
+    var input = document.createElement('input');
+    input.type = 'text'; input.className = 'fctl fnum';
+    input.value = value == null ? '' : String(value);
+    commitOnChange(input, null, function(v){
+      var trimmed = v.trim();
+      if (trimmed === '') return commit(null);
+      var num = Number(trimmed);
+      if (!isFinite(num)){ formError('"' + trimmed + '" is not a number'); return false; }
+      return commit(num);
+    });
+    return input;
+  }
+  function selectControl(options, current, commit, allowEmpty){
+    var sel = document.createElement('select');
+    sel.className = 'fctl';
+    if (allowEmpty){
+      var none = document.createElement('option');
+      none.value = ''; none.textContent = '(none)';
+      sel.appendChild(none);
     }
-    if (note){
-      var n = document.createElement('div');
-      n.className = 'gerr'; n.textContent = note;
-      guide.appendChild(n);
+    var seen = false;
+    options.forEach(function(o){
+      var op = document.createElement('option');
+      op.value = o; op.textContent = o;
+      if (o === current) seen = true;
+      sel.appendChild(op);
+    });
+    if (current != null && current !== '' && !seen){
+      var extra = document.createElement('option');
+      extra.value = current; extra.textContent = current + ' (unknown)';
+      sel.appendChild(extra);
     }
+    sel.value = current == null ? '' : String(current);
+    commitOnChange(sel, null, function(v){ return commit(v === '' ? null : v); });
+    return sel;
+  }
+  function checkboxControl(checked, commit){
+    var wrap = document.createElement('span');
+    wrap.className = 'fctl fchk';
+    var input = document.createElement('input');
+    input.type = 'checkbox'; input.checked = !!checked;
+    input.addEventListener('change', function(){
+      if (commit(input.checked) === false) input.checked = !input.checked;
+    });
+    wrap.appendChild(input);
+    return wrap;
+  }
+  function actionButton(label, onClick, cls){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'bbtn ' + (cls || '');
+    b.textContent = label;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function ensureAccentDatalist(){
+    if (document.getElementById('accent-tokens')) return;
+    var dl = document.createElement('datalist');
+    dl.id = 'accent-tokens';
+    Object.keys(ACCENTS).forEach(function(name){
+      var op = document.createElement('option');
+      op.value = name; dl.appendChild(op);
+    });
+    document.body.appendChild(dl);
+  }
+
+  function protocolKinds(page){
+    var kinds = ['https', 'int', 'mqtt'];
+    Object.keys((page && page.protocols) || {}).forEach(function(k){
+      if (kinds.indexOf(k) < 0) kinds.push(k);
+    });
+    return kinds;
+  }
+
+  /* ---- per-kind form builders; each returns an array of DOM rows ---- */
+  function nodeForm(val, ctx){
+    var t = currentTarget;
+    return [
+      frow('id', textControl(t.id, function(v){
+        if (v == null){ formError('a node needs an id'); return false; }
+        if (v === t.id){ formError(''); return true; }
+        return commitCascade(function(raw){ return planRenameNode(src.value, raw, t.section, t.id, v); },
+          {after: function(){ t.id = v; renderInspector(); }});
+      }, {required: 'a node needs an id'})),
+      frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); })),
+      frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
+      frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
+      frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
+      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+    ];
+  }
+  function edgeForm(val, ctx){
+    var t = currentTarget;
+    var ids = Object.keys((ctx.diagram && ctx.diagram.nodes) || {});
+    function endpoint(field){
+      return selectControl(ids, val[field], function(v){
+        if (v == null) return true; /* endpoint kept — nothing to commit */
+        return commitCascade(function(raw){
+          return planSetEdgeEndpoint(src.value, raw, t.section, t.index, field, v);
+        });
+      });
+    }
+    return [
+      frow('from', endpoint('from')),
+      frow('to', endpoint('to')),
+      frow('kind', selectControl(protocolKinds(ctx.page), val.kind || 'int', function(v){ return commitSimple('kind', JSON.stringify(v || 'int')); })),
+      frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
+      frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
+      frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
+      frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
+      frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
+    ];
+  }
+  function stepForm(val, ctx){
+    var rows = [
+      frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
+    ];
+    if (Array.isArray(val.edges)){
+      var note = document.createElement('span');
+      note.className = 'fctl fnote';
+      note.textContent = 'multi-hop step (' + val.edges.join(', ') + ') — edit the edges list in the JSON';
+      rows.push(frow('edges', note));
+    } else {
+      var keys = ((ctx.diagram && ctx.diagram.edges) || []).map(builderEdgeKey);
+      rows.push(frow('edge', selectControl(keys, val.edge, function(v){
+        return commitSimple('edge', v == null ? null : JSON.stringify(v));
+      }, true)));
+    }
+    var laneNames = Object.keys((ctx.page && ctx.page.lanes) || {});
+    rows.push(frow('lane', selectControl(laneNames, val.lane, function(v){
+      return commitSimple('lane', v == null ? null : JSON.stringify(v));
+    }, true)));
+    rows.push(frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})));
+    return rows;
+  }
+  function panelForm(val, ctx){
+    var t = currentTarget;
+    return [
+      frow('id', textControl(val.id, function(v){
+        if (v == null){ formError('a panel needs an id'); return false; }
+        if (v === val.id){ formError(''); return true; }
+        return commitCascade(function(raw){ return planRenamePanel(src.value, raw, t.section, t.index, v); },
+          {after: function(){ renderInspector(); }});
+      }, {required: 'a panel needs an id'})),
+      frow('type', selectControl(PANEL_TYPES, val.type, function(v){ return commitSimple('type', v == null ? null : JSON.stringify(v)); })),
+      frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
+    ];
+  }
+  function sectionForm(val, ctx){
+    ensureAccentDatalist();
+    return [
+      frow('heading', textControl(val.heading, function(v){ return commitSimple('heading', v == null ? null : JSON.stringify(v)); })),
+      frow('accent', textControl(val.accent, function(v){ return commitSimple('accent', v == null ? null : JSON.stringify(v)); },
+        {list: 'accent-tokens', placeholder: 'token or #hex'})),
+      frow('source', textControl(val.source, function(v){ return commitSimple('source', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+    ];
+  }
+
+  function bulletForm(val, ctx){
+    var isObj = val != null && typeof val === 'object';
+    var rows = [
+      frow('text', textControl(isObj ? val.text : val, function(v){
+        var s = JSON.stringify(v == null ? '' : v);
+        return isObj ? commitSimple('text', s) : commitValue(s);
+      }, {textarea: true}))
+    ];
+    if (isObj && Array.isArray(val.sub) && val.sub.length){
+      var note = document.createElement('span');
+      note.className = 'fctl fnote';
+      note.textContent = val.sub.length + ' nested sub-bullet' + (val.sub.length > 1 ? 's' : '') + ' — edit them in the JSON';
+      rows.push(frow('sub', note));
+    }
+    return rows;
+  }
+  function paraForm(val, ctx){
+    return [
+      frow('text', textControl(val, function(v){
+        return commitValue(JSON.stringify(v == null ? '' : v));
+      }, {textarea: true}))
+    ];
+  }
+  function crowForm(val, ctx){
+    return [
+      frow('k', textControl(val.k, function(v){
+        if (v == null){ formError('a contract row needs k — the field name'); return false; }
+        return commitSimple('k', JSON.stringify(v));
+      }, {required: 'a contract row needs k — the field name'})),
+      frow('v', textControl(val.v, function(v){ return commitSimple('v', v == null ? null : JSON.stringify(v)); })),
+      frow('g', textControl(val.g, function(v){ return commitSimple('g', v == null ? null : JSON.stringify(v)); })),
+      frow('hot', checkboxControl(val.hot, function(on){ return commitSimple('hot', on ? 'true' : null); })),
+      frow('delta', selectControl(['added', 'removed', 'changed'], val.delta, function(v){
+        return commitSimple('delta', v == null ? null : JSON.stringify(v));
+      }, true)),
+      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+    ];
+  }
+
+  function deletePlanFor(t, raw){
+    if (t.kind === 'node') return planDeleteNode(src.value, raw, t.section, t.id);
+    if (t.kind === 'edge') return planDeleteEdge(src.value, raw, t.section, t.index);
+    if (t.kind === 'step') return planDeleteStep(src.value, raw, t.section, t.index);
+    if (t.kind === 'panel') return planDeletePanel(src.value, raw, t.section, t.index);
+    var rec = specSectionPaths(raw)[t.section];
+    if (!rec) return {error: 'no such section'};
+    if (t.kind === 'bullet') return planDeleteListItem(src.value, raw, rec.section.concat(['bullets']), t.index);
+    if (t.kind === 'para'){
+      var sec = specValueAt(raw, rec.section);
+      if (sec && typeof sec.text === 'string') return planSetField(src.value, raw, rec.section, 'text', null);
+      return planDeleteListItem(src.value, raw, rec.section.concat(['text']), t.index);
+    }
+    if (t.kind === 'crow') return planDeleteListItem(src.value, raw, rec.section.concat(['contract', 'fields']), t.index);
+    return planDeleteSection(src.value, raw, t.section);
+  }
+
+  function deleteCurrent(){
+    var t = currentTarget;
+    if (!t) return;
+    commitCascade(function(raw){ return deletePlanFor(t, raw); },
+      {after: function(){
+        currentTarget = null; setSelected(null);
+        if (t.kind === 'section') insertSection = 0;
+        inspectorMessage(t.kind + ' deleted — undo restores it');
+      }});
+  }
+
+  function renderInspector(){
+    if (!guide || !currentTarget) return;
+    var t = currentTarget;
+    guide.hidden = false;
+    guide.innerHTML = '';
+    var g = BUILDER_GUIDES[t.kind] || {title: t.kind, how: '', fields: []};
+
+    var head = document.createElement('b');
+    head.textContent = g.title;
+    guide.appendChild(head);
+
+    var parsed = parseEditor();
+    var path = parsed.error ? null : builderTargetPath(parsed.raw, t);
+    var loc = path ? jsonLocate(src.value, path) : null;
+
+    var p = document.createElement('span');
+    p.className = 'gpath';
+    p.textContent = path ? builderPathString(path) : '';
+    guide.appendChild(p);
+
+    var err = document.createElement('div');
+    err.className = 'gerr ierr'; err.hidden = true;
+    guide.appendChild(err);
+
+    if (parsed.error){
+      formError(parsed.error + ' — fix it to edit this element');
+    } else if (!loc){
+      formError('definition not found in the editor text — the render and the editor may be out of sync (click Render)');
+    } else if (t.kind === 'section' && path.length === 0){
+      formError('bare diagram — wrap it as {"page": {"blocks": [ ... ]}} to edit heading and accent');
+    } else {
+      var val = specValueAt(parsed.raw, path);
+      if (val == null) val = {};
+      var rec = specSectionPaths(parsed.raw)[t.section];
+      var ctx = {
+        page: normalize(parsed.raw) || {},
+        diagram: rec ? specValueAt(parsed.raw, rec.diagram) : null
+      };
+      var form = document.createElement('div');
+      form.className = 'iform';
+      var rows =
+        t.kind === 'node' ? nodeForm(val, ctx) :
+        t.kind === 'edge' ? edgeForm(val, ctx) :
+        t.kind === 'step' ? stepForm(val, ctx) :
+        t.kind === 'panel' ? panelForm(val, ctx) :
+        t.kind === 'bullet' ? bulletForm(val, ctx) :
+        t.kind === 'para' ? paraForm(val, ctx) :
+        t.kind === 'crow' ? crowForm(val, ctx) : sectionForm(val, ctx);
+      rows.forEach(function(r){ form.appendChild(r); });
+      guide.appendChild(form);
+
+      var acts = document.createElement('div');
+      acts.className = 'iacts';
+      if (t.kind === 'node'){
+        acts.appendChild(actionButton('duplicate', function(){
+          commitCascade(function(raw){ return planDuplicateNode(src.value, raw, t.section, t.id); },
+            {after: function(plan){
+              currentTarget = {section: t.section, kind: 'node', id: plan.id};
+              renderInspector();
+            }});
+        }));
+      }
+      if (t.kind === 'section'){
+        acts.appendChild(actionButton('duplicate', function(){
+          commitCascade(function(raw){ return planDuplicateSection(src.value, raw, t.section); },
+            {after: function(plan){
+              currentTarget = {section: plan.index, kind: 'section'};
+              insertSection = plan.index;
+              renderInspector();
+            }});
+        }));
+      }
+      if (t.kind === 'step'){
+        acts.appendChild(actionButton('↑ earlier', function(){
+          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
+            {after: function(plan){ t.index = plan.index; renderInspector(); }});
+        }));
+        acts.appendChild(actionButton('↓ later', function(){
+          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1); },
+            {after: function(plan){ t.index = plan.index; renderInspector(); }});
+        }));
+      }
+      acts.appendChild(actionButton('delete ' + t.kind, deleteCurrent, 'bdanger'));
+      guide.appendChild(acts);
+    }
+
+    /* the pass-1 field guidance, tucked under a details fold */
+    var help = document.createElement('details');
+    help.className = 'ihelp';
+    var sum = document.createElement('summary');
+    sum.textContent = 'field help';
+    help.appendChild(sum);
     var how = document.createElement('div');
     how.textContent = g.how;
-    guide.appendChild(how);
+    help.appendChild(how);
     var ul = document.createElement('ul');
     g.fields.forEach(function(f){
       var li = document.createElement('li');
@@ -9341,13 +10260,16 @@ function initWorkbenchBuilder(opts){
       li.appendChild(document.createTextNode(' — ' + f[1]));
       ul.appendChild(li);
     });
-    guide.appendChild(ul);
+    help.appendChild(ul);
     if (g.tokens){
-      var t = document.createElement('div');
-      t.className = 'gtokens'; t.textContent = g.tokens;
-      guide.appendChild(t);
+      var tok = document.createElement('div');
+      tok.className = 'gtokens'; tok.textContent = g.tokens;
+      help.appendChild(tok);
     }
+    guide.appendChild(help);
   }
+
+  /* ================= selection ================= */
 
   function targetFromEvent(ev){
     if (ev.target.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
@@ -9355,7 +10277,7 @@ function initWorkbenchBuilder(opts){
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
     var gi = parseInt(secEl.getAttribute('data-dv-section'), 10);
     if (isNaN(gi)) return null;
-    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel]');
+    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-para], [data-dv-crow]');
     if (el && secEl.contains(el)){
       if (el.hasAttribute('data-dv-node'))
         return {section: gi, kind: 'node', id: el.getAttribute('data-dv-node'), el: el};
@@ -9363,6 +10285,12 @@ function initWorkbenchBuilder(opts){
         return {section: gi, kind: 'step', index: parseInt(el.getAttribute('data-dv-step'), 10), el: el};
       if (el.hasAttribute('data-dv-panel'))
         return {section: gi, kind: 'panel', index: parseInt(el.getAttribute('data-dv-panel'), 10), el: el};
+      if (el.hasAttribute('data-dv-bullet'))
+        return {section: gi, kind: 'bullet', index: parseInt(el.getAttribute('data-dv-bullet'), 10), el: el};
+      if (el.hasAttribute('data-dv-para'))
+        return {section: gi, kind: 'para', index: parseInt(el.getAttribute('data-dv-para'), 10), el: el};
+      if (el.hasAttribute('data-dv-crow'))
+        return {section: gi, kind: 'crow', index: parseInt(el.getAttribute('data-dv-crow'), 10), el: el};
       /* halo and label clicks resolve to the same edge — highlight the
          visible edge path (the halo has no selected style of its own) */
       var edgeIdx = parseInt(el.getAttribute('data-dv-edge'), 10);
@@ -9372,79 +10300,203 @@ function initWorkbenchBuilder(opts){
     return {section: gi, kind: 'section', el: secEl};
   }
 
-  function selectTarget(target){
+  function selectTarget(target, focusEditor){
     setSelected(target.el);
+    currentTarget = {section: target.section, kind: target.kind,
+                     id: target.id, index: target.index};
     insertSection = target.section;
     var parsed = parseEditor();
-    if (parsed.error){
-      renderGuide(target.kind, null, parsed.error + ' — fix it to jump to the definition');
-      updateTargetLabel(null);
-      return;
-    }
-    updateTargetLabel(parsed.raw);
-    var path = builderTargetPath(parsed.raw, target);
+    if (!parsed.error) updateTargetLabel(parsed.raw);
+    renderInspector();
+    if (focusEditor === false) return;
+    var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
     var loc = path ? jsonLocate(src.value, path) : null;
-    if (!loc){
-      renderGuide(target.kind, path ? builderPathString(path) : null,
-        'definition not found in the editor text — the render and the editor may be out of sync (click Render)');
-      return;
-    }
-    renderGuide(target.kind, builderPathString(path), null);
-    selectRange(loc);
+    if (loc) selectRange(loc);
   }
 
+  /* ---- connect mode: draw an edge by clicking its two nodes ---- */
+  var connect = null; /* null | {stage:1} | {stage:2, section, fromId} */
+  function connectStatus(text){
+    if (targetLabel) targetLabel.textContent = text;
+  }
+  function cancelConnect(message){
+    connect = null;
+    var parsed = parseEditor();
+    updateTargetLabel(parsed.error ? null : parsed.raw);
+    if (message) inspectorMessage(message);
+  }
+  function startConnect(){
+    if (connect){ cancelConnect('connect cancelled'); return; }
+    var parsed = parseEditor();
+    if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
+    if (!specSectionPaths(parsed.raw).length){ inspectorMessage('no sections found in the editor text'); return; }
+    connect = {stage: 1};
+    connectStatus('connect: click the SOURCE node (Esc cancels)');
+  }
+  function handleConnectClick(target){
+    if (!target || target.kind !== 'node'){
+      cancelConnect('connect cancelled — that was not a node');
+      return;
+    }
+    if (connect.stage === 1){
+      connect = {stage: 2, section: target.section, fromId: target.id};
+      setSelected(target.el);
+      connectStatus('connect: ' + target.id + ' → click the TARGET node');
+      return;
+    }
+    if (target.section !== connect.section){
+      cancelConnect('connect cancelled — the two nodes are in different sections');
+      return;
+    }
+    var fromId = connect.fromId;
+    insertSection = target.section;
+    var parsed = parseEditor();
+    if (parsed.error){ cancelConnect(parsed.error); return; }
+    var plan = planAddEdgeBetween(src.value, parsed.raw, target.section, fromId, target.id);
+    if (plan.error){ cancelConnect(plan.error); return; }
+    pushUndo();
+    src.value = plan.text;
+    render();
+    cancelConnect(null);
+    var el = findTargetEl({section: target.section, kind: 'edge', index: plan.index});
+    selectTarget({section: target.section, kind: 'edge', index: plan.index, el: el}, false);
+    selectRange(plan);
+  }
+
+  /* ---- drag an edge label to set its labelDx/labelDy nudges ---- */
+  var drag = null, suppressClick = false;
+  function svgPointAt(svg, inv, clientX, clientY){
+    var pt = svg.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    return pt.matrixTransform(inv);
+  }
+  view.addEventListener('mousedown', function(ev){
+    if (ev.button !== 0 || connect) return;
+    if (!ev.target.closest) return;
+    var lbl = ev.target.closest('text.lbl[data-dv-edge]');
+    if (!lbl) return;
+    var svg = lbl.ownerSVGElement;
+    if (!svg || !svg.getScreenCTM) return;
+    var ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    var inv, start;
+    try {
+      inv = ctm.inverse();
+      start = svgPointAt(svg, inv, ev.clientX, ev.clientY);
+    } catch (ex){ return; } /* non-invertible CTM: no drag, plain click still works */
+    if (!isFinite(start.x) || !isFinite(start.y)) return;
+    drag = {lbl: lbl, svg: svg, inv: inv, x0: start.x, y0: start.y, dx: 0, dy: 0, moved: false};
+    ev.preventDefault(); /* no text selection while dragging */
+  });
+  window.addEventListener('mousemove', function(ev){
+    if (!drag) return;
+    var pt = svgPointAt(drag.svg, drag.inv, ev.clientX, ev.clientY);
+    drag.dx = pt.x - drag.x0;
+    drag.dy = pt.y - drag.y0;
+    if (drag.dx * drag.dx + drag.dy * drag.dy > 9) drag.moved = true; /* > 3 viewBox units, straight-line */
+    if (drag.moved) drag.lbl.setAttribute('transform', 'translate(' + drag.dx + ' ' + drag.dy + ')');
+  });
+  window.addEventListener('mouseup', function(){
+    if (!drag) return;
+    var d = drag;
+    drag = null;
+    if (!d.moved){ d.lbl.removeAttribute('transform'); return; }
+    suppressClick = true; /* the click after a real drag is not a selection */
+    /* that click fires (if at all) before timeouts run — self-clear so a
+       drag released off-target cannot swallow the NEXT genuine click */
+    setTimeout(function(){ suppressClick = false; }, 0);
+    d.lbl.removeAttribute('transform');
+    var secEl = d.lbl.closest('.doc-sec');
+    var gi = secEl ? parseInt(secEl.getAttribute('data-dv-section'), 10) : NaN;
+    var idx = parseInt(d.lbl.getAttribute('data-dv-edge'), 10);
+    if (isNaN(gi) || isNaN(idx)) return;
+    var parsed = parseEditor();
+    if (parsed.error){ inspectorMessage(parsed.error); return; }
+    var target = {section: gi, kind: 'edge', index: idx};
+    var path = builderTargetPath(parsed.raw, target);
+    var e = path ? specValueAt(parsed.raw, path) : null;
+    if (!e){ inspectorMessage('edge not found in the editor text — the render and the editor may be out of sync'); return; }
+    var newDx = Math.round((typeof e.labelDx === 'number' ? e.labelDx : 0) + d.dx);
+    var newDy = Math.round((typeof e.labelDy === 'number' ? e.labelDy : 0) + d.dy);
+    if (!isFinite(newDx) || !isFinite(newDy)) return; /* never write NaN into the spec */
+    var plan = planSetFields(src.value, parsed.raw, path, [
+      ['labelDx', newDx === 0 ? null : String(newDx)],
+      ['labelDy', newDy === 0 ? null : String(newDy)]
+    ]);
+    if (plan.error){ inspectorMessage(plan.error); return; }
+    pushUndo();
+    src.value = plan.text;
+    render();
+    currentTarget = target;
+    insertSection = gi;
+    rehighlight();
+    renderInspector();
+  });
+
   view.addEventListener('click', function(ev){
+    if (suppressClick){ suppressClick = false; return; }
     var target = targetFromEvent(ev);
+    if (connect){
+      handleConnectClick(target);
+      return;
+    }
     if (target) selectTarget(target);
   });
 
-  /* insert buttons: splice a ready-made snippet into the editor text,
-     re-render, then select the new element both on the board and in the
-     editor */
-  function reselectInserted(plan){
-    var target = null;
-    if (plan.kind === 'section'){
-      var secEl = view.querySelector('.doc-sec[data-dv-section="' + plan.index + '"]');
-      if (secEl) target = {section: plan.index, kind: 'section', el: secEl};
-    } else {
-      var secHost = view.querySelector('.doc-sec[data-dv-section="' + insertSection + '"]');
-      if (secHost){
-        var sel = plan.kind === 'node' ? '[data-dv-node="' + plan.id + '"]' :
-                  plan.kind === 'edge' ? 'path.edge[data-dv-edge="' + plan.index + '"]' :
-                  plan.kind === 'step' ? '[data-dv-step="' + plan.index + '"]' :
-                  '[data-dv-panel="' + plan.index + '"]';
-        var el = secHost.querySelector(sel);
-        if (el) target = {section: insertSection, kind: plan.kind, id: plan.id,
-                          index: plan.index, el: el};
+  /* a re-render outside the connect flow (Render button, skin switch)
+     rebuilds the DOM and can renumber sections — a stale armed connect
+     must not wire an edge from the old render. Builder-driven renders
+     clear the state synchronously before this observer runs, so only
+     stale arming is cancelled. */
+  new MutationObserver(function(){
+    if (connect) cancelConnect('connect cancelled — the page re-rendered');
+  }).observe(view, {childList: true});
+
+  /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape'){
+      if (connect){ cancelConnect('connect cancelled'); return; }
+      if (currentTarget){
+        currentTarget = null;
+        setSelected(null);
+        if (guide) guide.hidden = true;
       }
+      return;
     }
-    setSelected(target && target.el);
-  }
+    if (ev.key === 'Delete' || ev.key === 'Backspace'){
+      var ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' ||
+                 ae.tagName === 'BUTTON' || ae.isContentEditable)) return;
+      if (!currentTarget) return;
+      ev.preventDefault();
+      deleteCurrent();
+    }
+  });
+
+  /* ================= insert buttons ================= */
+
   function runInsert(kind, planFn){
     var parsed = parseEditor();
-    if (parsed.error){
-      renderGuide(kind, null, parsed.error + ' — fix it before inserting');
-      return;
-    }
+    if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
     if (kind !== 'section' && !specSectionPaths(parsed.raw).length){
-      renderGuide(kind, null, 'no sections found in the editor text');
-      return;
+      inspectorMessage('no sections found in the editor text'); return;
     }
     var plan = kind === 'section' ? planAddSection(src.value, parsed.raw)
                                   : planFn(src.value, parsed.raw, insertSection);
-    if (plan.error){
-      renderGuide(kind, null, plan.error);
-      return;
-    }
+    if (plan.error){ inspectorMessage(plan.error); return; }
+    pushUndo();
     src.value = plan.text;
     render();
     if (plan.kind === 'section') insertSection = plan.index;
-    reselectInserted(plan);
-    renderGuide(plan.kind, null, null);
+    var identity = {section: plan.kind === 'section' ? plan.index : insertSection,
+                    kind: plan.kind, id: plan.id, index: plan.index};
+    var el = findTargetEl(identity);
+    selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
+                  index: identity.index, el: el}, false);
     selectRange(plan);
   }
   var addButtons = {
-    'add-node': ['node', planAddNode], 'add-edge': ['edge', planAddEdge],
+    'add-node': ['node', planAddNode],
     'add-step': ['step', planAddStep], 'add-panel': ['panel', planAddPanel],
     'add-section': ['section', planAddSection]
   };
@@ -9454,6 +10506,9 @@ function initWorkbenchBuilder(opts){
       runInsert(addButtons[id][0], addButtons[id][1]);
     });
   });
+  /* + edge draws by clicking source then target (Esc cancels) */
+  var edgeBtn = document.getElementById('add-edge');
+  if (edgeBtn) edgeBtn.addEventListener('click', startConnect);
 
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);

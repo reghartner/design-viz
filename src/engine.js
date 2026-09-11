@@ -1847,16 +1847,20 @@ function generatedFromHTML(source){
    {text, sub:[...items], revealAt?, hideAt?} whose sub-list renders as an indented child <ul>.
    Recursive so the source doc's nested bullet structure carries over. Pure
    string builder (no DOM) so node tests cover it. */
-function bulletsHTML(items){
+function bulletsHTML(items, markTop){
+  /* markTop: tag top-level items with their spec index (workbench
+     click-to-definition); sub-lists stay unmarked so a click inside one
+     resolves to its top-level parent */
   if (!Array.isArray(items) || !items.length) return '';
   var h = '<ul class="sec-bullets">';
-  items.forEach(function(b){
+  items.forEach(function(b, i){
+    var mark = markTop ? ' data-dv-bullet="' + i + '"' : '';
     if (b && typeof b === 'object' && !Array.isArray(b)){
-      h += '<li' + fragmentAttrs(b) + '>' + inlineMarkup(b.text != null ? String(b.text) : '');
+      h += '<li' + mark + fragmentAttrs(b) + '>' + inlineMarkup(b.text != null ? String(b.text) : '');
       if (Array.isArray(b.sub) && b.sub.length) h += bulletsHTML(b.sub);
       h += '</li>';
     } else {
-      h += '<li>' + inlineMarkup(String(b)) + '</li>';
+      h += '<li' + mark + '>' + inlineMarkup(String(b)) + '</li>';
     }
   });
   return h + '</ul>';
@@ -1887,7 +1891,7 @@ function contractCardHTML(contract, sectionReference){
   }
   var rows = Array.isArray(contract.fields) ? contract.fields : [];
   var body = '', renderedRow = 0;
-  rows.forEach(function(f){
+  rows.forEach(function(f, fi){
     if (!f || typeof f !== 'object' || !f.k) return;
     renderedRow++;
     var link = (f.link && typeof f.link === 'string') ?
@@ -1897,6 +1901,7 @@ function contractCardHTML(contract, sectionReference){
     var badge = delta ? ' <span class="ctdelta" aria-label="' + delta + ' field">' + delta + '</span>' : '';
     body += '<tr class="ctrow' + (f.hot === true ? ' hot' : '') +
             (delta ? ' delta-' + delta : '') + '"' +
+            ' data-dv-crow="' + fi + '"' + /* spec index — malformed rows are skipped, so the rendered position can lag it */
             (addressed ? ' id="contract-' + sectionAddress + '-row-' + renderedRow +
              '" tabindex="-1" aria-label="Contract field ' + esc(f.k) + '"' : '') +
             fragmentAttrs(f) + '>' +
@@ -2958,8 +2963,8 @@ function sectionIntroHTML(sec, gi, sectionReference){
       (defaultCollapsed ? ' hidden' : '') + '>';
     var texts = typeof sec.text === 'string' ? [sec.text] :
                 (Array.isArray(sec.text) ? sec.text : []);
-    texts.forEach(function(t){ h += '<p class="sec-text">' + inlineMarkup(t) + '</p>'; });
-    if (Array.isArray(sec.bullets) && sec.bullets.length) h += bulletsHTML(sec.bullets);
+    texts.forEach(function(t, ti){ h += '<p class="sec-text" data-dv-para="' + ti + '">' + inlineMarkup(t) + '</p>'; });
+    if (Array.isArray(sec.bullets) && sec.bullets.length) h += bulletsHTML(sec.bullets, true);
     h += '</div>';
   }
   return {html:h, hasProse:hasProse, defaultCollapsed:defaultCollapsed,

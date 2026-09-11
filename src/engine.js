@@ -3400,6 +3400,9 @@ function fallbackCopy(win, text, button){
    urlFn is called at click time so the copied URL reflects current state. */
 function bindCopyControl(win, button, urlFn){
   if (!button) return;
+  /* restore the button's OWN glyph after feedback — chips carry
+     different icons (link, embed frame) */
+  var restIcon = button.innerHTML;
   button.addEventListener('click', function(){
     var text = urlFn();
     removeManualCopyField(button);
@@ -3428,7 +3431,7 @@ function bindCopyControl(win, button, urlFn){
       announce(message || '');
       if (button._dvFeedback) win.clearTimeout(button._dvFeedback);
       button._dvFeedback = ms ?
-        win.setTimeout(function(){ show(COPY_ICON, null, 0); }, ms) : null;
+        win.setTimeout(function(){ show(restIcon, null, 0); }, ms) : null;
     }
     function done(){ if (button._dvCopyGen === gen) show(COPY_OK_ICON, 'ok', 1200, 'Link copied'); }
     function failed(){ if (button._dvCopyGen === gen) show(COPY_FAIL_ICON, 'err', 2400, 'Copy failed'); }

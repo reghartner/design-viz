@@ -836,6 +836,79 @@ function specFileName(raw){
   return (slug || 'flowspec') + '.spec.json';
 }
 
+/* ---------------- clickable validation findings ----------------
+   Validator and lint messages open with a field path relative to the
+   normalized PAGE object ("blocks[0].tabs[1].sections[0].diagram.
+   edges[3].kind: ..."). These helpers turn that prefix back into a
+   character range of the RAW editor text so a click on the message
+   selects the offending JSON — falling back to the nearest existing
+   parent when the exact leaf is not in the text. */
+
+function parseValidationPath(message){
+  /* leading "ERROR " / "warn " labels are tolerated; returns the path
+     segment array or null when the message carries no field path */
+  var m = /^(?:ERROR\s+|warn\s+)?([A-Za-z_][A-Za-z0-9_$-]*(?:\[\d+\]|\.[A-Za-z0-9_$-]+)*)\s*:/.exec(message || '');
+  if (!m) return null;
+  var out = [];
+  var re = /([A-Za-z0-9_$-]+)|\[(\d+)\]/g, seg;
+  while ((seg = re.exec(m[1]))){
+    if (seg[1] != null) out.push(seg[1]);
+    else out.push(parseInt(seg[2], 10));
+  }
+  return out.length ? out : null;
+}
+function findingLocation(text, raw, message){
+  /* character range for a validation message. The validator addresses
+     the normalized PAGE object; a leading "page" token names that same
+     object. Remaining tokens are resolved GREEDILY against the parsed
+     raw JSON — at each object level the longest dot-join of remaining
+     string tokens that names a real member wins, so author ids that
+     contain dots still resolve. Unresolvable tails retreat to the
+     nearest existing parent (exact: false). */
+  var tokens = parseValidationPath(message);
+  if (!tokens) return null;
+  if (tokens[0] === 'page') tokens = tokens.slice(1);
+  var base, node;
+  if (raw && raw.page){ base = ['page']; node = raw.page; }
+  else if (raw && (raw.blocks || raw.sections)){ base = []; node = raw; }
+  else if (raw && raw.nodes && raw.rows){
+    /* normalize() wrapped the bare diagram as sections[0].diagram */
+    if (tokens.length >= 2 && tokens[0] === 'sections' && tokens[1] === 0){
+      tokens = tokens.slice(2);
+      if (tokens[0] === 'diagram') tokens = tokens.slice(1);
+    } else if (tokens.length){
+      return null; /* the message names page furniture a bare diagram lacks */
+    }
+    base = []; node = raw;
+  } else return null;
+  var path = base.slice();
+  var i = 0;
+  while (i < tokens.length && node != null && typeof node === 'object'){
+    if (Array.isArray(node)){
+      if (typeof tokens[i] !== 'number') break;
+      path.push(tokens[i]);
+      node = node[tokens[i]];
+      i++;
+    } else {
+      var key = null, j;
+      for (j = tokens.length; j > i; j--){
+        var joined = tokens.slice(i, j).map(String).join('.');
+        if (Object.prototype.hasOwnProperty.call(node, joined)){ key = joined; break; }
+      }
+      if (key == null) break;
+      path.push(key);
+      node = node[key];
+      i = j;
+    }
+  }
+  var exact = i === tokens.length;
+  var loc = jsonLocate(text, path);
+  while (!loc && path.length){ path.pop(); loc = jsonLocate(text, path); exact = false; }
+  if (!loc) loc = jsonLocate(text, []);
+  if (!loc) return null;
+  return {start: loc.start, end: loc.end, exact: exact};
+}
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -929,6 +1002,11 @@ var BUILDER_GUIDES = {
     ]
   }
 };
+
+/* assigned by initWorkbenchBuilder; boot's message list calls it when a
+   finding is clicked (boot renders messages before the builder starts,
+   so the indirection is checked at click time) */
+var BUILDER_JUMP_TO_FINDING = null;
 
 /* ---------------- DOM wiring (workbench only) ---------------- */
 
@@ -1838,6 +1916,15 @@ function initWorkbenchBuilder(opts){
     if (palette && !palette.hidden &&
         !(ev.target.closest && ev.target.closest('#palette, #add-node, #add-panel'))) closePalette();
   });
+
+  BUILDER_JUMP_TO_FINDING = function(message){
+    var parsed = parseEditor();
+    if (parsed.error) return;
+    var loc = findingLocation(src.value, parsed.raw, message);
+    if (!loc) return;
+    selectRange(loc);
+    if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent');
+  };
 
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);

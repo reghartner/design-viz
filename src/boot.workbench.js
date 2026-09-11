@@ -326,12 +326,19 @@ function setSkinButtons(skin){
 }
 function showMsgs(v){
   msgs.innerHTML = '';
-  v.errors.forEach(function(m){
-    var li = document.createElement('li'); li.className = 'e'; li.textContent = 'ERROR ' + m; msgs.appendChild(li);
-  });
-  v.warnings.forEach(function(m){
-    var li = document.createElement('li'); li.className = 'w'; li.textContent = 'warn ' + m; msgs.appendChild(li);
-  });
+  function add(cls, label, m){
+    var li = document.createElement('li');
+    li.className = cls;
+    li.textContent = label + m;
+    /* clicking a finding selects the offending JSON in the editor
+       (BUILDER_JUMP_TO_FINDING is assigned once the builder starts) */
+    li.addEventListener('click', function(){
+      if (BUILDER_JUMP_TO_FINDING) BUILDER_JUMP_TO_FINDING(m);
+    });
+    msgs.appendChild(li);
+  }
+  v.errors.forEach(function(m){ add('e', 'ERROR ', m); });
+  v.warnings.forEach(function(m){ add('w', 'warn ', m); });
 }
 
 function go(fromText){

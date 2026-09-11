@@ -10795,6 +10795,8 @@ function initWorkbenchBuilder(opts){
 
   view.addEventListener('click', function(ev){
     if (suppressClick){ suppressClick = false; return; }
+    if (ev.target.closest && ev.target.closest('.tabbtn'))
+      setTimeout(injectZoomControls, 0); /* newly shown boards can now measure */
     var target = targetFromEvent(ev);
     if (connect){
       handleConnectClick(target);
@@ -10814,16 +10816,20 @@ function initWorkbenchBuilder(opts){
     var svg = canvas && canvas.querySelector('svg');
     if (!svg) return;
     var scale = boardZoom[gi] || 1;
-    if (scale === 1){
-      svg.style.width = '';
-      svg.style.minWidth = '';
-      canvas.classList.remove('dv-zoomed');
-    } else {
-      svg.style.width = (scale * 100) + '%';
-      /* the core sheet gives board svgs a min-width; it would clamp
-         every zoom-out scale to that floor */
-      svg.style.minWidth = '0';
-      canvas.classList.add('dv-zoomed');
+    /* measure the STOCK 100% width first (inline styles cleared), then
+       scale in absolute pixels — percentage widths track the canvas, so
+       on canvases narrower than the core sheet's min-width floor a
+       percentage "zoom in" could actually shrink the svg */
+    svg.style.width = '';
+    svg.style.minWidth = '';
+    canvas.classList.remove('dv-zoomed');
+    if (scale !== 1){
+      var base = svg.getBoundingClientRect().width;
+      if (base > 0){ /* a board in a hidden tab measures 0 — leave stock */
+        svg.style.minWidth = '0';
+        svg.style.width = (base * scale) + 'px';
+        canvas.classList.add('dv-zoomed');
+      }
     }
     var lvl = secEl.querySelector('.zoomctl .zlvl');
     if (lvl) lvl.textContent = Math.round(scale * 100) + '%';

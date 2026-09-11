@@ -590,6 +590,23 @@ body.sk-aurora.sk-blueprint{
 
 /* waterfall widget: latency spans on one shared scale */
 .wfall{display:flex; flex-direction:column; gap:5px;}
+/* timeline widget: wall-clock axis, cadence beats, events, now cursor.
+   Colors ride the per-skin docview text vars so every skin reads. */
+.tlsvg{width:100%; display:block;}
+.tlaxis{stroke:var(--dfaint); stroke-width:1.6; opacity:.6;}
+.tltickline{stroke:var(--dfaint); stroke-width:1; opacity:.45;}
+.tltick{font:8.5px 'IBM Plex Mono',monospace; fill:var(--dfaint);}
+.tlbeat{fill:none; stroke:var(--dfaint); stroke-width:1.4;}
+.tlbeat.past{fill:var(--dtext); stroke:var(--dtext);}
+.tlelapsed{fill:var(--dfaint); opacity:.16;}
+.tlev.tl-ok{fill:#34D399;}
+.tlev.tl-alert{fill:#F87171;}
+.tlev.tl-info{fill:var(--dtext);}
+.tlevlab{font:8.5px 'IBM Plex Mono',monospace; fill:var(--dtext);}
+.tlnow{stroke:var(--dink); stroke-width:1.6;}
+.tlnowhead{fill:var(--dink);}
+.tlmeta{margin-top:4px; font:500 10px 'IBM Plex Mono',monospace; color:var(--dfaint);}
+
 .wfrow{display:flex; align-items:center; gap:8px; opacity:.3; transition:opacity .3s ease;}
 .wfrow.on{opacity:1;}
 .wflabel{font:500 10.5px 'IBM Plex Mono',monospace; width:128px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -4179,7 +4196,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
       <tr><td>diagram.rows</td><td><code>[[slot, ...], ...]</code></td><td>Flow-ordered slots per row. A slot is a node id, or an <b>array of ids = a stack</b> (fan-out targets in one column). Even rows lay left&#8594;right, odd rows right&#8594;left — the serpentine. The wrap edge between rows is detected automatically.</td></tr>
       <tr><td>diagram.floats</td><td><code>[{id, side:"above"}]</code></td><td>Branch nodes off the main flow (auth, signing). X position computed from the edges that touch them.</td></tr>
       <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> of the hop (default <code>int</code>). Zero-based reveal indices draw the edge only for the selected step interval. <code>bend</code>/<code>labelDx</code>/<code>labelDy</code> are optional manual nudges.</td></tr>
-      <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Nineteen types are documented in <code>contract/authoring-contract.md</code>, including <code>inflight</code> for overlapping operations and <code>phone</code> for an accumulating push-notification stack.</td></tr>
+      <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Twenty types are documented in <code>contract/authoring-contract.md</code>, including <code>inflight</code> for overlapping operations and <code>phone</code> for an accumulating push-notification stack.</td></tr>
       <tr><td>diagram.steps</td><td><code>[{edge | edges, nodes?, panels?, lane?, text, link?}]</code></td><td>Ordered narrative. <code>edge:"from-&gt;to"</code> or <code>edges:[...]</code> for hops that happen together — their packets fire in order, staggered. A step may be <b>edgeless</b>: light <code>nodes:[...]</code> directly and/or patch panels. <code>panels</code> carries SPARSE per-panel patches; the engine folds them into complete per-step state so any jump is consistent (<code>log</code> appends; <code>enterOnce</code> applies only at its own step). Drives the numbered coins, the ambient packet schedule, AND the click-through.</td></tr>
       <tr><td>icons</td><td colspan="2"><code>terminal cloud shield gear db antenna thermo pump router package key server chip phone</code></td></tr>
       <tr><td>tints</td><td colspan="2"><code>cmd auth data mqtt dev</code></td></tr>
@@ -4248,11 +4265,59 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','signal','tiles','inflight','phone'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','signal','tiles','inflight','phone','timeline'];
 var SCENE_NAMES = ['person-at-door-night','package-drop','static-noise'];
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
 var BUFFER_STATES = ['empty','buffered','protected','uploading','uploaded','dropped'];
+/* wall-clock durations for the timeline widget: "2h", "90m", "1h30m",
+   "45s", "1h 30m", or a bare number (minutes) -> seconds; null on junk.
+   Shared by the validator, the fold, and the engine model. */
+function parseClock(text){
+  if (typeof text === 'number' && isFinite(text) && text >= 0) return text * 60;
+  if (typeof text !== 'string') return null;
+  var s = text.trim().toLowerCase();
+  if (!s) return null;
+  if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s) * 60;
+  var m, total = 0, any = false;
+  var re = /(\d+(?:\.\d+)?)\s*(h|m|s)/g;
+  while ((m = re.exec(s))){ any = true; total += parseFloat(m[1]) * (m[2] === 'h' ? 3600 : m[2] === 'm' ? 60 : 1); }
+  if (!any) return null;
+  if (s.replace(/(\d+(?:\.\d+)?)\s*(h|m|s)/g, '').replace(/\s/g, '') !== '') return null;
+  return total;
+}
+function formatClock(seconds){
+  /* 5400 -> "1h30m", 3600 -> "1h", 90 -> "1m30s", 45 -> "45s", 0 -> "0" */
+  var h = Math.floor(seconds / 3600);
+  var rem = seconds - h * 3600;
+  var mn = Math.floor(rem / 60);
+  var sc = Math.round(rem - mn * 60);
+  var out = '';
+  if (h) out += h + 'h';
+  if (mn) out += mn + 'm';
+  if (sc && !h) out += sc + 's';
+  return out || '0';
+}
+var TIMELINE_EVENT_KINDS = ['ok', 'alert', 'info'];
+function timelineEventWarnings(list, path, warnings){
+  (Array.isArray(list) ? list : []).forEach(function(e, i){
+    var EP = path + '[' + i + ']';
+    if (!e || typeof e !== 'object'){ warnings.push(EP + ': needs {at, label?, kind?} — skipped'); return; }
+    if (parseClock(e.at) == null)
+      warnings.push(EP + '.at: unreadable time "' + e.at + '" (use "1h30m" / "45m" / "90s") — skipped');
+    if (e.kind != null && TIMELINE_EVENT_KINDS.indexOf(e.kind) < 0)
+      warnings.push(EP + '.kind: unknown kind "' + e.kind + '" — using "info" (valid: ' + TIMELINE_EVENT_KINDS.join(' ') + ')');
+  });
+}
+function timelinePatchWarnings(obj, path, warnings){
+  if (!obj || typeof obj !== 'object') return;
+  if (obj.now != null && parseClock(obj.now) == null)
+    warnings.push(path + '.now: unreadable time "' + obj.now + '" (use "1h30m" / "45m" / "90s") — cursor unchanged');
+  if (obj.events != null && !Array.isArray(obj.events))
+    warnings.push(path + '.events: expected an array of {at, label?, kind?} — ignored');
+  else timelineEventWarnings(obj.events, path + '.events', warnings);
+}
+
 /* shared by bufferModel and the fold compactor */
 function bufferSegCount(decl){
   return (decl && typeof decl.segments === 'number' && isFinite(decl.segments))
@@ -4685,6 +4750,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var radarPanels = {};
   var inflightPanels = {};
   var phonePanels = {};
+  var timelinePanels = {};
   (d.panels || []).forEach(function(p, pi){
     var PP = DP + '.panels[' + pi + ']';
     if (!p || typeof p !== 'object'){ errors.push(PP + ': must be an object {id, type, ...}'); return; }
@@ -4722,6 +4788,19 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (p.type === 'phone'){
       phonePanels[p.id] = true;
       phonePatchWarnings(p.initial, PP + '.initial', warnings);
+    }
+    if (p.type === 'timeline'){
+      timelinePanels[p.id] = true;
+      if (p.span == null)
+        warnings.push(PP + '.span: timeline needs a span ("6h", "90m") — using 1h');
+      else if (parseClock(p.span) == null || parseClock(p.span) <= 0)
+        warnings.push(PP + '.span: unreadable span "' + p.span + '" (use "6h" / "90m") — using 1h');
+      if (p.cadence != null){
+        if (typeof p.cadence !== 'object' || parseClock(p.cadence.every) == null || parseClock(p.cadence.every) <= 0)
+          warnings.push(PP + '.cadence: expected {every:"30m", label?} with a readable interval — no periodic beats drawn');
+      }
+      timelineEventWarnings(p.events, PP + '.events', warnings);
+      timelinePatchWarnings(p.initial, PP + '.initial', warnings);
     }
     if (PANEL_TYPES.indexOf(p.type) < 0)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PANEL_TYPES.join(' ') + ')');
@@ -4931,6 +5010,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
           inflightPanels[pid], warnings);
       } else if (phonePanels[pid] && patch[pid]){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
+      } else if (timelinePanels[pid] && patch[pid]){
+        timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       }
     });
     if (st && st.lane && !lanes[st.lane])
@@ -5127,6 +5208,12 @@ function foldPanelStates(d){
     Object.keys(p.initial || {}).forEach(function(k){ carried[k] = p.initial[k]; });
     var logAcc = [];
     if (Array.isArray(carried.log)){ logAcc = carried.log.slice(); delete carried.log; }
+    /* timeline events accumulate across steps like log lines */
+    var eventAcc = null;
+    if (p.type === 'timeline'){
+      eventAcc = Array.isArray(carried.events) ? carried.events.slice() : [];
+      delete carried.events;
+    }
     var states = [];
     steps.forEach(function(st){
       var patchAll = stepPanelPatch(st) || {};
@@ -5141,6 +5228,11 @@ function foldPanelStates(d){
         if (k === 'log'){
           var lines = Array.isArray(patch.log) ? patch.log : [patch.log];
           logAcc = logAcc.concat(lines);
+          return;
+        }
+        if (k === 'events' && eventAcc !== null){
+          var evs = Array.isArray(patch.events) ? patch.events : [patch.events];
+          eventAcc = eventAcc.concat(evs);
           return;
         }
         if (k === 'mark'){
@@ -5163,6 +5255,7 @@ function foldPanelStates(d){
       var snap = {};
       Object.keys(carried).forEach(function(k){ snap[k] = carried[k]; });
       if (once) Object.keys(once).forEach(function(k){ snap[k] = once[k]; });
+      if (eventAcc !== null) snap.events = eventAcc.slice();
       snap.log = logAcc.slice();
       states.push(snap);
     });
@@ -6883,6 +6976,53 @@ function bufferModel(panel, state){
 /* inflight widget: operations/messages as bars on one shared step axis.
    foldInflightStates (validator.js) supplies complete history snapshots;
    this pure model vets that snapshot for the HTML renderer. */
+/* timeline: wall-clock axis over a declared span with periodic cadence
+   beats and event dots; steps sweep a `now` cursor and append events.
+   Pure model (node-testable, no DOM). */
+function timelineModel(panel, state){
+  panel = panel || {}; state = state || {};
+  var span = parseClock(panel.span);
+  if (span == null || span <= 0) span = 3600;
+  /* tick unit: coarsest table entry giving at most 8 intervals */
+  var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
+  var unit = units[units.length - 1];
+  for (var i = 0; i < units.length; i++){
+    if (span / units[i] <= 8){ unit = units[i]; break; }
+  }
+  var ticks = [];
+  for (var ts = 0; ts <= span + 1e-6; ts += unit)
+    ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
+  var every = panel.cadence ? parseClock(panel.cadence.every) : null;
+  var beats = [];
+  if (every != null && every > 0){
+    for (var b = every; b <= span + 1e-6 && beats.length < 200; b += every)
+      beats.push({s: b, pct: b / span * 100});
+  }
+  function norm(list){
+    var out = [];
+    (Array.isArray(list) ? list : []).forEach(function(e){
+      if (!e) return;
+      var at = parseClock(e.at);
+      if (at == null) return;
+      var s = Math.min(Math.max(at, 0), span);
+      out.push({s: s, pct: s / span * 100,
+                label: e.label != null ? String(e.label) : '',
+                kind: ['ok', 'alert', 'info'].indexOf(e.kind) >= 0 ? e.kind : 'info'});
+    });
+    return out;
+  }
+  var events = norm(panel.events).concat(norm(state.events));
+  var nowS = parseClock(state.now);
+  var now = null;
+  if (nowS != null){
+    var c = Math.min(Math.max(nowS, 0), span);
+    now = {s: c, pct: c / span * 100, label: formatClock(c)};
+  }
+  return {span: span, spanLabel: formatClock(span), unit: unit, ticks: ticks,
+          beats: beats, every: every, events: events, now: now,
+          cadenceLabel: panel.cadence && panel.cadence.label != null ? String(panel.cadence.label) : ''};
+}
+
 function inflightModel(panel, state, stepCount, currentStep){
   panel = panel || {}; state = state || {};
   var seen = {};
@@ -7403,6 +7543,41 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (mode === 'boot') h += SCENES['static-noise'];
     else if (mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
     h += scrOvl + '</div>';
+  } else if (type === 'timeline'){
+    var tlm = timelineModel(panel, state);
+    function tlx(pct){ return (6 + pct / 100 * 308).toFixed(1); }
+    h += '<svg class="tlsvg" viewBox="0 0 320 64" role="img" aria-label="timeline">';
+    if (tlm.now)
+      h += '<rect class="tlelapsed" x="6" y="36" width="' + (tlm.now.pct / 100 * 308).toFixed(1) + '" height="8" rx="2"/>';
+    h += '<line class="tlaxis" x1="6" y1="40" x2="314" y2="40"/>';
+    tlm.ticks.forEach(function(tk){
+      var x = tlx(tk.pct);
+      h += '<line class="tltickline" x1="' + x + '" y1="36" x2="' + x + '" y2="44"/>' +
+           '<text class="tltick" x="' + x + '" y="56" text-anchor="middle">' + esc(tk.label) + '</text>';
+    });
+    tlm.beats.forEach(function(bt){
+      var past = tlm.now && bt.s <= tlm.now.s + 1e-6;
+      h += '<circle class="tlbeat' + (past ? ' past' : '') + '" cx="' + tlx(bt.pct) + '" cy="40" r="2.6"/>';
+    });
+    tlm.events.forEach(function(ev){
+      var x = tlx(ev.pct);
+      h += '<circle class="tlev tl-' + ev.kind + '" cx="' + x + '" cy="26" r="4"><title>' +
+           esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
+      if (ev.label)
+        h += '<text class="tlevlab" x="' + Math.min(Math.max(parseFloat(x), 16), 304) + '" y="15" text-anchor="middle">' + esc(ev.label) + '</text>';
+    });
+    if (tlm.now){
+      var nx = tlx(tlm.now.pct);
+      h += '<line class="tlnow" x1="' + nx + '" y1="18" x2="' + nx + '" y2="46"/>' +
+           '<circle class="tlnowhead" cx="' + nx + '" cy="18" r="3"/>';
+    }
+    h += '</svg>';
+    var tlmeta = [];
+    if (tlm.every != null && tlm.every > 0)
+      tlmeta.push((tlm.cadenceLabel || 'beat') + ' every ' + formatClock(tlm.every));
+    if (tlm.now) tlmeta.push('now ' + tlm.now.label);
+    tlmeta.push('span ' + tlm.spanLabel);
+    h += '<div class="tlmeta">' + esc(tlmeta.join(' · ')) + '</div>';
   } else if (type === 'waterfall'){
     var wm = waterfallModel(panel.spans, state);
     var wfPrev = host._wfRevealed || null;
@@ -9749,7 +9924,9 @@ var PANEL_TEMPLATES = {
   signal:    {title: 'Links', links: [{id: 'up', label: 'uplink', transport: 'wifi'}]},
   tiles:     {title: 'Fleet', tiles: [{id: 't1', label: 'UNIT 1'}, {id: 't2', label: 'UNIT 2'}]},
   inflight:  {title: 'In flight', lanes: [{id: 'op', label: 'operation'}]},
-  phone:     {title: 'Phone', initial: {clock: '9:41'}}
+  phone:     {title: 'Phone', initial: {clock: '9:41'}},
+  timeline:  {title: 'Heartbeat', span: '6h', cadence: {every: '30m', label: 'heartbeat'},
+              initial: {now: '0m'}}
 };
 
 /* ---------------- pass 3: direct-manipulation planners ---------------- */
@@ -10163,7 +10340,8 @@ var PANEL_SETUP_FIELDS = {
   signal:    [['links', 'jsonArr'], ['initial', 'json']],
   tiles:     [['tiles', 'jsonArr'], ['states', 'csv'], ['colors', 'json'], ['initial', 'json']],
   inflight:  [['lanes', 'jsonArr'], ['initial', 'json']],
-  phone:     [['initial', 'json']]
+  phone:     [['initial', 'json']],
+  timeline:  [['span', 'text'], ['cadence', 'json'], ['events', 'jsonArr'], ['initial', 'json']]
 };
 
 var SCENE_TOKENS = ['person-at-door-night', 'package-drop', 'static-noise'];
@@ -10213,7 +10391,7 @@ var BUILDER_GUIDES = {
     how: 'Edit the selected JSON, then click Render. Steps patch the panel by id; patches are sparse and folded, so jumping to any step is consistent.',
     fields: [
       ['id', 'the handle steps patch: "panels": {"<id>": {...}}'],
-      ['type', 'widget kind: state leds gauge log screen queue inflight phone … (full list in the authoring contract)'],
+      ['type', 'widget kind: state leds gauge log screen queue inflight phone timeline … (full list in the authoring contract)'],
       ['title', 'card title above the widget'],
       ['initial', 'widget state before step 1']
     ]
@@ -11808,6 +11986,10 @@ var CONTRACT = [
   '      {"id":"<pid>", "type":"inflight", "title":"...",',
   '       "lanes":[{"id":"a","label":"plan upload"}]} // patch {"start":[{"lane":"a","label":"seq 4182"}],',
   '                                     //        "end":["a"], "mark":[{"lane":"a","state":"ok|retry|failed"}]}',
+  '      {"id":"<pid>", "type":"timeline", "title":"...", "span":"6h",',
+  '       "cadence":{"every":"30m","label":"heartbeat"}, "initial":{"now":"0m"}}',
+  '                                     // wall-clock axis; steps patch {"now":"2h"} and',
+  '                                     // {"events":[{"at":"1h30m","label":"...","kind":"ok|alert|info"}]} (append)',
   '      {"id":"<pid>", "type":"phone", "title":"...", "initial":{"clock":"9:41"}}',
   '                                     // patch {"notify":{"app":"Homestead","title":"...","text":"..."}}',
   '                                     // or {"notify":[...]} (accumulates newest first); {"clear":true} dismisses all',

@@ -942,3 +942,14 @@ test('every key the palette starter templates carry has a setup control', () => 
     }
   }
 });
+
+test('the timeline palette starter renders a validator-clean heartbeat setup', () => {
+  const plan = B.planAddPanel(TEXT, SPEC, 0, 'timeline');
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.strictEqual(d.panels[0].type, 'timeline');
+  assert.strictEqual(d.panels[0].span, '6h');
+  assert.deepStrictEqual(d.panels[0].cadence, {every: '30m', label: 'heartbeat'});
+  const v = V.validate(V.normalize(plain(JSON.parse(plan.text))));
+  assert.deepStrictEqual(plain(v.errors), []);
+  assert.deepStrictEqual(plain(v.warnings), []);
+});

@@ -1622,6 +1622,53 @@ function bufferModel(panel, state){
 /* inflight widget: operations/messages as bars on one shared step axis.
    foldInflightStates (validator.js) supplies complete history snapshots;
    this pure model vets that snapshot for the HTML renderer. */
+/* timeline: wall-clock axis over a declared span with periodic cadence
+   beats and event dots; steps sweep a `now` cursor and append events.
+   Pure model (node-testable, no DOM). */
+function timelineModel(panel, state){
+  panel = panel || {}; state = state || {};
+  var span = parseClock(panel.span);
+  if (span == null || span <= 0) span = 3600;
+  /* tick unit: coarsest table entry giving at most 8 intervals */
+  var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
+  var unit = units[units.length - 1];
+  for (var i = 0; i < units.length; i++){
+    if (span / units[i] <= 8){ unit = units[i]; break; }
+  }
+  var ticks = [];
+  for (var ts = 0; ts <= span + 1e-6; ts += unit)
+    ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
+  var every = panel.cadence ? parseClock(panel.cadence.every) : null;
+  var beats = [];
+  if (every != null && every > 0){
+    for (var b = every; b <= span + 1e-6 && beats.length < 200; b += every)
+      beats.push({s: b, pct: b / span * 100});
+  }
+  function norm(list){
+    var out = [];
+    (Array.isArray(list) ? list : []).forEach(function(e){
+      if (!e) return;
+      var at = parseClock(e.at);
+      if (at == null) return;
+      var s = Math.min(Math.max(at, 0), span);
+      out.push({s: s, pct: s / span * 100,
+                label: e.label != null ? String(e.label) : '',
+                kind: ['ok', 'alert', 'info'].indexOf(e.kind) >= 0 ? e.kind : 'info'});
+    });
+    return out;
+  }
+  var events = norm(panel.events).concat(norm(state.events));
+  var nowS = parseClock(state.now);
+  var now = null;
+  if (nowS != null){
+    var c = Math.min(Math.max(nowS, 0), span);
+    now = {s: c, pct: c / span * 100, label: formatClock(c)};
+  }
+  return {span: span, spanLabel: formatClock(span), unit: unit, ticks: ticks,
+          beats: beats, every: every, events: events, now: now,
+          cadenceLabel: panel.cadence && panel.cadence.label != null ? String(panel.cadence.label) : ''};
+}
+
 function inflightModel(panel, state, stepCount, currentStep){
   panel = panel || {}; state = state || {};
   var seen = {};
@@ -2142,6 +2189,41 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (mode === 'boot') h += SCENES['static-noise'];
     else if (mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
     h += scrOvl + '</div>';
+  } else if (type === 'timeline'){
+    var tlm = timelineModel(panel, state);
+    function tlx(pct){ return (6 + pct / 100 * 308).toFixed(1); }
+    h += '<svg class="tlsvg" viewBox="0 0 320 64" role="img" aria-label="timeline">';
+    if (tlm.now)
+      h += '<rect class="tlelapsed" x="6" y="36" width="' + (tlm.now.pct / 100 * 308).toFixed(1) + '" height="8" rx="2"/>';
+    h += '<line class="tlaxis" x1="6" y1="40" x2="314" y2="40"/>';
+    tlm.ticks.forEach(function(tk){
+      var x = tlx(tk.pct);
+      h += '<line class="tltickline" x1="' + x + '" y1="36" x2="' + x + '" y2="44"/>' +
+           '<text class="tltick" x="' + x + '" y="56" text-anchor="middle">' + esc(tk.label) + '</text>';
+    });
+    tlm.beats.forEach(function(bt){
+      var past = tlm.now && bt.s <= tlm.now.s + 1e-6;
+      h += '<circle class="tlbeat' + (past ? ' past' : '') + '" cx="' + tlx(bt.pct) + '" cy="40" r="2.6"/>';
+    });
+    tlm.events.forEach(function(ev){
+      var x = tlx(ev.pct);
+      h += '<circle class="tlev tl-' + ev.kind + '" cx="' + x + '" cy="26" r="4"><title>' +
+           esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
+      if (ev.label)
+        h += '<text class="tlevlab" x="' + Math.min(Math.max(parseFloat(x), 16), 304) + '" y="15" text-anchor="middle">' + esc(ev.label) + '</text>';
+    });
+    if (tlm.now){
+      var nx = tlx(tlm.now.pct);
+      h += '<line class="tlnow" x1="' + nx + '" y1="18" x2="' + nx + '" y2="46"/>' +
+           '<circle class="tlnowhead" cx="' + nx + '" cy="18" r="3"/>';
+    }
+    h += '</svg>';
+    var tlmeta = [];
+    if (tlm.every != null && tlm.every > 0)
+      tlmeta.push((tlm.cadenceLabel || 'beat') + ' every ' + formatClock(tlm.every));
+    if (tlm.now) tlmeta.push('now ' + tlm.now.label);
+    tlmeta.push('span ' + tlm.spanLabel);
+    h += '<div class="tlmeta">' + esc(tlmeta.join(' · ')) + '</div>';
   } else if (type === 'waterfall'){
     var wm = waterfallModel(panel.spans, state);
     var wfPrev = host._wfRevealed || null;

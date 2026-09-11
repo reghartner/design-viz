@@ -25,7 +25,7 @@ function loadCore(overrides = {}){
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
     ' foldPhoneStates, phoneModel, phonePanelHTML, PANEL_TYPES,' +
     ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
-    ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection,' +
+    ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection, parseClock, formatClock, timelineModel,' +
     ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
     ' sectionHasProse, sectionIntroHTML, setProseCollapsed, createProseController, TONE_SET,' +
     ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES};';
@@ -3310,4 +3310,102 @@ test('copy control: a chip with a different glyph gets ITS glyph back after feed
     timeouts.forEach(fn => fn());
     assert.strictEqual(button.innerHTML, '<svg data-glyph="embed"></svg>');
   });
+});
+
+test('timeline: parseClock reads every documented duration form and rejects junk', () => {
+  assert.strictEqual(C.parseClock('2h'), 7200);
+  assert.strictEqual(C.parseClock('1h30m'), 5400);
+  assert.strictEqual(C.parseClock('1h 30m'), 5400);
+  assert.strictEqual(C.parseClock('90m'), 5400);
+  assert.strictEqual(C.parseClock('45s'), 45);
+  assert.strictEqual(C.parseClock(90), 5400);      /* bare number = minutes */
+  assert.strictEqual(C.parseClock('90'), 5400);
+  assert.strictEqual(C.parseClock('soon'), null);
+  assert.strictEqual(C.parseClock('1h30x'), null);
+  assert.strictEqual(C.parseClock(''), null);
+  assert.strictEqual(C.parseClock(null), null);
+  assert.strictEqual(C.formatClock(5400), '1h30m');
+  assert.strictEqual(C.formatClock(3600), '1h');
+  assert.strictEqual(C.formatClock(90), '1m30s');
+  assert.strictEqual(C.formatClock(45), '45s');
+  assert.strictEqual(C.formatClock(0), '0');
+});
+
+test('timeline model: ticks fit the span, beats follow the cadence, now clamps', () => {
+  const m = C.timelineModel(
+    {span: '6h', cadence: {every: '30m', label: 'heartbeat'},
+     events: [{at: '1h30m', label: 'missed', kind: 'alert'}]},
+    {now: '2h', events: [{at: '2h', kind: 'ok'}]});
+  assert.strictEqual(m.span, 21600);
+  assert.strictEqual(m.unit, 3600);              /* 6 hour ticks <= 8 */
+  assert.strictEqual(m.ticks.length, 7);         /* 0h .. 6h */
+  assert.strictEqual(m.ticks[1].label, '1h');
+  assert.strictEqual(m.beats.length, 12);        /* every 30m over 6h */
+  assert.strictEqual(m.events.length, 2);        /* declared + state, merged */
+  assert.strictEqual(m.events[0].kind, 'alert');
+  assert.strictEqual(m.now.label, '2h');
+  /* clamp + defaults */
+  const c = C.timelineModel({span: '1h'}, {now: '90m'});
+  assert.strictEqual(c.now.s, 3600);
+  assert.strictEqual(c.beats.length, 0);
+  const d = C.timelineModel({}, {});
+  assert.strictEqual(d.span, 3600);              /* junk span -> 1h default */
+  assert.strictEqual(d.now, null);
+  /* junk events skipped, unknown kind -> info */
+  const e = C.timelineModel({span: '1h', events: [{at: 'zzz'}, {at: '10m', kind: 'wild'}]}, {});
+  assert.strictEqual(e.events.length, 1);
+  assert.strictEqual(e.events[0].kind, 'info');
+});
+
+test('timeline fold: now replaces per step, events append like log lines', () => {
+  const folded = C.foldPanelStates({
+    panels: [{id: 'hb', type: 'timeline', span: '3h',
+              initial: {now: '0m', events: [{at: '5m', kind: 'ok'}]}}],
+    steps: [
+      {panels: {hb: {now: '1h'}}},
+      {panels: {hb: {now: '2h', events: [{at: '1h30m', label: 'missed', kind: 'alert'}]}}},
+      {panels: {hb: {now: '3h'}}}
+    ]
+  });
+  const states = folded.hb;
+  assert.strictEqual(states[0].now, '1h');
+  assert.strictEqual(JSON.parse(JSON.stringify(states[0].events)).length, 1);
+  assert.strictEqual(states[1].now, '2h');
+  assert.strictEqual(states[1].events.length, 2);   /* appended */
+  assert.strictEqual(states[2].events.length, 2);   /* carried forward */
+  assert.strictEqual(states[2].now, '3h');
+});
+
+test('timeline renderer: markup carries axis, beats, events, and the now cursor', () => {
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'hb', type: 'timeline', span: '2h',
+    cadence: {every: '30m', label: 'heartbeat'}},
+    {now: '1h', events: [{at: '30m', label: 'ok', kind: 'ok'}]}, 'aurora', [], 0, false);
+  const h = host.innerHTML;
+  assert.ok(h.includes('tlaxis'), 'axis');
+  assert.strictEqual((h.match(/tlbeat/g) || []).length, 4, 'four cadence beats over 2h');
+  assert.ok(h.includes('tlbeat past'), 'passed beats fill');
+  assert.ok(h.includes('tl-ok'), 'event kind class');
+  assert.ok(h.includes('tlnow'), 'now cursor');
+  assert.ok(h.includes('heartbeat every 30m'), 'meta line');
+  assert.ok(h.includes('now 1h'), 'meta now');
+});
+
+test('timeline validator: bad span/cadence/event/patch fields warn with paths', () => {
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']],
+    edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'hb', type: 'timeline', span: 'whenever',
+              cadence: {every: 'sometimes'},
+              events: [{at: 'later'}, {at: '5m', kind: 'odd'}]}],
+    steps: [{edge: 'a->b', panels: {hb: {now: 'nope', events: 'not-a-list'}}}]
+  }}]}));
+  const w = JSON.parse(JSON.stringify(v.warnings)).join('\n');
+  assert.match(w, /span: unreadable span "whenever"/);
+  assert.match(w, /cadence: expected \{every/);
+  assert.match(w, /events\[0\]\.at: unreadable time/);
+  assert.match(w, /events\[1\]\.kind: unknown kind "odd"/);
+  assert.match(w, /now: unreadable time "nope"/);
+  assert.match(w, /events: expected an array/);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(v.errors)), []);
 });

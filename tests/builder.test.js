@@ -921,7 +921,7 @@ test('builderStepHops merges the malformed both-keys shape without dropping hops
 
 test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known control kinds', () => {
   assert.deepStrictEqual(Object.keys(B.PANEL_SETUP_FIELDS).sort(), [...V.PANEL_TYPES].sort());
-  const kinds = new Set(['text', 'num', 'csv', 'scene', 'json', 'jsonArr']);
+  const kinds = new Set(['text', 'num', 'csv', 'scene', 'json', 'jsonArr', 'jsonAny']);
   for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
     assert.ok(fields.length >= 1, type);
     for (const [key, kind] of fields){

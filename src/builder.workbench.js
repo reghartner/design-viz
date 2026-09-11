@@ -1088,23 +1088,25 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
    carry. */
 
 var PANEL_SETUP_FIELDS = {
-  state:     [['states', 'csv'], ['initial', 'json']],
+  state:     [['states', 'csv'], ['colors', 'json'], ['initial', 'json']],
   leds:      [['leds', 'jsonArr'], ['initial', 'json']],
   gauge:     [['unit', 'text'], ['max', 'num'], ['initial', 'json']],
   log:       [['tags', 'json'], ['initial', 'json']],
   screen:    [['scene', 'scene'], ['initial', 'json']],
   waterfall: [['spans', 'jsonArr'], ['initial', 'json']],
-  orbit:     [['states', 'csv'], ['initial', 'json']],
+  orbit:     [['states', 'csv'], ['colors', 'json'], ['initial', 'json']],
   zoneframe: [['zones', 'jsonArr'], ['initial', 'json']],
   xray:      [['layers', 'jsonArr'], ['initial', 'json']],
   queue:     [['initial', 'json']],
   pir:       [['cone', 'json'], ['sensor', 'json'], ['path', 'jsonArr'], ['initial', 'json']],
-  thermo:    [['min', 'num'], ['max', 'num'], ['warn', 'num'], ['crit', 'num'], ['initial', 'json']],
+  thermo:    [['unit', 'text'], ['min', 'num'], ['max', 'num'], ['warn', 'num'], ['crit', 'num'], ['initial', 'json']],
   battery:   [['low', 'num'], ['crit', 'num'], ['initial', 'json']],
-  buffer:    [['segments', 'num'], ['initial', 'json']],
-  radar:     [['sensor', 'json'], ['spread', 'num'], ['range', 'num'], ['initial', 'json']],
+  buffer:    [['segments', 'num'], ['capacity', 'text'], ['initial', 'json']],
+  radar:     [['sensor', 'json'], ['facing', 'num'], ['spread', 'num'], ['range', 'num'],
+              ['threshold', 'num'], ['rings', 'jsonAny'], ['scale', 'json'],
+              ['zones', 'jsonArr'], ['initial', 'json']],
   signal:    [['links', 'jsonArr'], ['initial', 'json']],
-  tiles:     [['tiles', 'jsonArr'], ['initial', 'json']],
+  tiles:     [['tiles', 'jsonArr'], ['states', 'csv'], ['colors', 'json'], ['initial', 'json']],
   inflight:  [['lanes', 'jsonArr'], ['initial', 'json']],
   phone:     [['initial', 'json']]
 };
@@ -1774,16 +1776,18 @@ function initWorkbenchBuilder(opts){
     });
     return rows;
   }
-  function jsonFieldControl(key, value, wantArray){
+  function jsonFieldControl(key, value, kind){
+    /* kind: 'json' (object) | 'jsonArr' (array) | 'jsonAny' (any JSON —
+       radar rings takes a count OR a radii array) */
     return textControl(value === undefined ? '' : JSON.stringify(value), function(v){
       if (v == null) return commitSimple(key, null);
       var parsed;
       try { parsed = JSON.parse(v); }
       catch (ex){ formError(key + ': not valid JSON (' + ex.message + ')'); return false; }
-      if (wantArray && !Array.isArray(parsed)){
+      if (kind === 'jsonArr' && !Array.isArray(parsed)){
         formError(key + ' is a JSON array — [ ... ]'); return false;
       }
-      if (!wantArray && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))){
+      if (kind === 'json' && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))){
         formError(key + ' is a JSON object — { ... }'); return false;
       }
       return commitSimple(key, JSON.stringify(parsed));
@@ -1799,13 +1803,20 @@ function initWorkbenchBuilder(opts){
         return frow(key, numberControl(cur, function(v){ return commitSimple(key, v == null ? null : String(v)); }));
       if (kind === 'scene')
         return frow(key, selectControl(SCENE_TOKENS, cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }, true));
-      if (kind === 'csv')
+      if (kind === 'csv'){
+        /* comma-separated entry is lossy for labels that CONTAIN commas —
+           such lists fall back to JSON editing instead of being rewritten */
+        var hasComma = Array.isArray(cur) && cur.some(function(s){
+          return typeof s === 'string' && s.indexOf(',') >= 0;
+        });
+        if (hasComma) return frow(key, jsonFieldControl(key, cur, 'jsonArr'));
         return frow(key, textControl(Array.isArray(cur) ? cur.join(', ') : cur, function(v){
           if (v == null) return commitSimple(key, null);
           var list = v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
           return commitSimple(key, list.length ? JSON.stringify(list) : null);
         }, {placeholder: 'A, B, C'}));
-      return frow(key, jsonFieldControl(key, cur, kind === 'jsonArr'));
+      }
+      return frow(key, jsonFieldControl(key, cur, kind));
     });
   }
   function panelForm(val, ctx){

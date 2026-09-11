@@ -3980,6 +3980,8 @@ function formatClock(seconds){
   var rem = seconds - h * 3600;
   var mn = Math.floor(rem / 60);
   var sc = Math.round(rem - mn * 60);
+  if (sc === 60){ sc = 0; mn += 1; } /* 59.6s must not read "60s" */
+  if (mn === 60){ mn = 0; h += 1; }
   var out = '';
   if (h) out += h + 'h';
   if (mn) out += mn + 'm';
@@ -3987,6 +3989,9 @@ function formatClock(seconds){
   return out || '0';
 }
 var TIMELINE_EVENT_KINDS = ['ok', 'alert', 'info'];
+/* beat dots stop being drawable well before this; beyond it the renderer
+   omits the dots and says so in the meta line, and the validator warns */
+var TIMELINE_MAX_BEATS = 120;
 function timelineEventWarnings(list, path, warnings){
   (Array.isArray(list) ? list : []).forEach(function(e, i){
     var EP = path + '[' + i + ']';
@@ -4486,6 +4491,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       if (p.cadence != null){
         if (typeof p.cadence !== 'object' || parseClock(p.cadence.every) == null || parseClock(p.cadence.every) <= 0)
           warnings.push(PP + '.cadence: expected {every:"30m", label?} with a readable interval — no periodic beats drawn');
+        else {
+          var tlSpanS = parseClock(p.span);
+          if (tlSpanS != null && tlSpanS > 0 &&
+              Math.floor(tlSpanS / parseClock(p.cadence.every)) > TIMELINE_MAX_BEATS)
+            warnings.push(PP + '.cadence: ' + Math.floor(tlSpanS / parseClock(p.cadence.every)) +
+              ' beats over this span cannot be drawn individually (max ' + TIMELINE_MAX_BEATS +
+              ') — the axis renders without beat dots and the meta line reports the count');
+        }
       }
       timelineEventWarnings(p.events, PP + '.events', warnings);
       timelinePatchWarnings(p.initial, PP + '.initial', warnings);
@@ -4923,6 +4936,12 @@ function foldPanelStates(d){
           eventAcc = eventAcc.concat(evs);
           return;
         }
+        if (k === 'now' && eventAcc !== null){
+          /* the validator promises "cursor unchanged" for unreadable
+             times — honor it instead of wiping the carried cursor */
+          if (parseClock(patch.now) != null) carried.now = patch.now;
+          return;
+        }
         if (k === 'mark'){
           /* buffer range-paints accumulate across steps (replayed in order
              at render), so any step jump repaints the full history. Long
@@ -4950,6 +4969,7 @@ function foldPanelStates(d){
     if (!steps.length){
       var only = {};
       Object.keys(carried).forEach(function(k){ only[k] = carried[k]; });
+      if (eventAcc !== null) only.events = eventAcc.slice();
       only.log = logAcc.slice();
       states.push(only);
     }
@@ -6681,10 +6701,17 @@ function timelineModel(panel, state){
   for (var ts = 0; ts <= span + 1e-6; ts += unit)
     ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
   var every = panel.cadence ? parseClock(panel.cadence.every) : null;
-  var beats = [];
+  var beats = [], beatsOmitted = 0;
   if (every != null && every > 0){
-    for (var b = every; b <= span + 1e-6 && beats.length < 200; b += every)
-      beats.push({s: b, pct: b / span * 100});
+    var beatCount = Math.floor(span / every + 1e-6);
+    if (beatCount > TIMELINE_MAX_BEATS){
+      /* sub-pixel soup — draw none, report the count instead of
+         silently truncating the cadence */
+      beatsOmitted = beatCount;
+    } else {
+      for (var b = every; b <= span + 1e-6; b += every)
+        beats.push({s: b, pct: b / span * 100});
+    }
   }
   function norm(list){
     var out = [];
@@ -6707,7 +6734,7 @@ function timelineModel(panel, state){
     now = {s: c, pct: c / span * 100, label: formatClock(c)};
   }
   return {span: span, spanLabel: formatClock(span), unit: unit, ticks: ticks,
-          beats: beats, every: every, events: events, now: now,
+          beats: beats, beatsOmitted: beatsOmitted, every: every, events: events, now: now,
           cadenceLabel: panel.cadence && panel.cadence.label != null ? String(panel.cadence.label) : ''};
 }
 
@@ -7261,8 +7288,11 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     }
     h += '</svg>';
     var tlmeta = [];
-    if (tlm.every != null && tlm.every > 0)
-      tlmeta.push((tlm.cadenceLabel || 'beat') + ' every ' + formatClock(tlm.every));
+    if (tlm.every != null && tlm.every > 0){
+      var cad = (tlm.cadenceLabel || 'beat') + ' every ' + formatClock(tlm.every);
+      if (tlm.beatsOmitted) cad += ' (' + tlm.beatsOmitted + ' beats — too dense to draw)';
+      tlmeta.push(cad);
+    }
     if (tlm.now) tlmeta.push('now ' + tlm.now.label);
     tlmeta.push('span ' + tlm.spanLabel);
     h += '<div class="tlmeta">' + esc(tlmeta.join(' · ')) + '</div>';

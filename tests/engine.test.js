@@ -3409,3 +3409,44 @@ test('timeline validator: bad span/cadence/event/patch fields warn with paths', 
   assert.match(w, /events: expected an array/);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(v.errors)), []);
 });
+
+test('timeline regressions: seeded events survive step-less specs, junk now keeps the cursor, dense cadences report instead of truncating', () => {
+  /* M1: no steps — initial.events must reach the only snapshot */
+  const still = C.foldPanelStates({
+    panels: [{id: 'hb', type: 'timeline', span: '2h',
+              initial: {now: '30m', events: [{at: '15m', kind: 'ok'}]}}],
+    steps: []
+  });
+  assert.strictEqual(still.hb.length, 1);
+  assert.strictEqual(JSON.parse(JSON.stringify(still.hb[0].events)).length, 1);
+  assert.strictEqual(still.hb[0].now, '30m');
+
+  /* M2: an unreadable now patch leaves the carried cursor unchanged */
+  const kept = C.foldPanelStates({
+    panels: [{id: 'hb', type: 'timeline', span: '2h', initial: {now: '30m'}}],
+    steps: [{panels: {hb: {now: 'garbage'}}}, {panels: {hb: {now: '1h'}}}]
+  });
+  assert.strictEqual(kept.hb[0].now, '30m');
+  assert.strictEqual(kept.hb[1].now, '1h');
+
+  /* M3: 48h at 1m = 2880 beats — none drawn, count reported */
+  const dense = C.timelineModel({span: '48h', cadence: {every: '1m'}}, {});
+  assert.strictEqual(dense.beats.length, 0);
+  assert.strictEqual(dense.beatsOmitted, 2880);
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'hb', type: 'timeline', span: '48h',
+    cadence: {every: '1m', label: 'tick'}}, {}, 'aurora', [], 0, false);
+  assert.ok(host.innerHTML.includes('2880 beats — too dense to draw'));
+  /* and the validator warns at declaration time */
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'hb', type: 'timeline', span: '48h', cadence: {every: '1m'}}],
+    steps: [{edge: 'a->b'}]
+  }}]}));
+  assert.match(JSON.parse(JSON.stringify(v.warnings)).join('\n'),
+    /2880 beats over this span cannot be drawn individually/);
+
+  /* MINOR: rounding must carry, never print 60s */
+  assert.strictEqual(C.formatClock(59.6), '1m');
+  assert.strictEqual(C.formatClock(3599.7), '1h');
+});

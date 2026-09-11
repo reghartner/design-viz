@@ -1639,10 +1639,17 @@ function timelineModel(panel, state){
   for (var ts = 0; ts <= span + 1e-6; ts += unit)
     ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
   var every = panel.cadence ? parseClock(panel.cadence.every) : null;
-  var beats = [];
+  var beats = [], beatsOmitted = 0;
   if (every != null && every > 0){
-    for (var b = every; b <= span + 1e-6 && beats.length < 200; b += every)
-      beats.push({s: b, pct: b / span * 100});
+    var beatCount = Math.floor(span / every + 1e-6);
+    if (beatCount > TIMELINE_MAX_BEATS){
+      /* sub-pixel soup — draw none, report the count instead of
+         silently truncating the cadence */
+      beatsOmitted = beatCount;
+    } else {
+      for (var b = every; b <= span + 1e-6; b += every)
+        beats.push({s: b, pct: b / span * 100});
+    }
   }
   function norm(list){
     var out = [];
@@ -1665,7 +1672,7 @@ function timelineModel(panel, state){
     now = {s: c, pct: c / span * 100, label: formatClock(c)};
   }
   return {span: span, spanLabel: formatClock(span), unit: unit, ticks: ticks,
-          beats: beats, every: every, events: events, now: now,
+          beats: beats, beatsOmitted: beatsOmitted, every: every, events: events, now: now,
           cadenceLabel: panel.cadence && panel.cadence.label != null ? String(panel.cadence.label) : ''};
 }
 
@@ -2219,8 +2226,11 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     }
     h += '</svg>';
     var tlmeta = [];
-    if (tlm.every != null && tlm.every > 0)
-      tlmeta.push((tlm.cadenceLabel || 'beat') + ' every ' + formatClock(tlm.every));
+    if (tlm.every != null && tlm.every > 0){
+      var cad = (tlm.cadenceLabel || 'beat') + ' every ' + formatClock(tlm.every);
+      if (tlm.beatsOmitted) cad += ' (' + tlm.beatsOmitted + ' beats — too dense to draw)';
+      tlmeta.push(cad);
+    }
     if (tlm.now) tlmeta.push('now ' + tlm.now.label);
     tlmeta.push('span ' + tlm.spanLabel);
     h += '<div class="tlmeta">' + esc(tlmeta.join(' · ')) + '</div>';

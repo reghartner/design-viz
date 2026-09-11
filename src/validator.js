@@ -37,6 +37,8 @@ function formatClock(seconds){
   var rem = seconds - h * 3600;
   var mn = Math.floor(rem / 60);
   var sc = Math.round(rem - mn * 60);
+  if (sc === 60){ sc = 0; mn += 1; } /* 59.6s must not read "60s" */
+  if (mn === 60){ mn = 0; h += 1; }
   var out = '';
   if (h) out += h + 'h';
   if (mn) out += mn + 'm';
@@ -44,6 +46,9 @@ function formatClock(seconds){
   return out || '0';
 }
 var TIMELINE_EVENT_KINDS = ['ok', 'alert', 'info'];
+/* beat dots stop being drawable well before this; beyond it the renderer
+   omits the dots and says so in the meta line, and the validator warns */
+var TIMELINE_MAX_BEATS = 120;
 function timelineEventWarnings(list, path, warnings){
   (Array.isArray(list) ? list : []).forEach(function(e, i){
     var EP = path + '[' + i + ']';
@@ -543,6 +548,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       if (p.cadence != null){
         if (typeof p.cadence !== 'object' || parseClock(p.cadence.every) == null || parseClock(p.cadence.every) <= 0)
           warnings.push(PP + '.cadence: expected {every:"30m", label?} with a readable interval — no periodic beats drawn');
+        else {
+          var tlSpanS = parseClock(p.span);
+          if (tlSpanS != null && tlSpanS > 0 &&
+              Math.floor(tlSpanS / parseClock(p.cadence.every)) > TIMELINE_MAX_BEATS)
+            warnings.push(PP + '.cadence: ' + Math.floor(tlSpanS / parseClock(p.cadence.every)) +
+              ' beats over this span cannot be drawn individually (max ' + TIMELINE_MAX_BEATS +
+              ') — the axis renders without beat dots and the meta line reports the count');
+        }
       }
       timelineEventWarnings(p.events, PP + '.events', warnings);
       timelinePatchWarnings(p.initial, PP + '.initial', warnings);
@@ -980,6 +993,12 @@ function foldPanelStates(d){
           eventAcc = eventAcc.concat(evs);
           return;
         }
+        if (k === 'now' && eventAcc !== null){
+          /* the validator promises "cursor unchanged" for unreadable
+             times — honor it instead of wiping the carried cursor */
+          if (parseClock(patch.now) != null) carried.now = patch.now;
+          return;
+        }
         if (k === 'mark'){
           /* buffer range-paints accumulate across steps (replayed in order
              at render), so any step jump repaints the full history. Long
@@ -1007,6 +1026,7 @@ function foldPanelStates(d){
     if (!steps.length){
       var only = {};
       Object.keys(carried).forEach(function(k){ only[k] = carried[k]; });
+      if (eventAcc !== null) only.events = eventAcc.slice();
       only.log = logAcc.slice();
       states.push(only);
     }

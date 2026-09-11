@@ -10533,10 +10533,19 @@ function initWorkbenchBuilder(opts){
   }
 
   function tabForm(val, ctx){
+    var t = currentTarget;
     return [
       frow('label', textControl(val.label, function(v){
         if (v == null){ formError('a tab needs a label'); return false; }
-        return commitSimple('label', JSON.stringify(v));
+        var ok = commitSimple('label', JSON.stringify(v));
+        if (ok){
+          /* the engine restores the active tab by LABEL slug, so
+             renaming the active tab makes the re-render fall back to
+             the first tab — re-activate the renamed one */
+          var btn = findTargetEl(t);
+          if (btn && btn.getAttribute('aria-selected') !== 'true') btn.click();
+        }
+        return ok;
       }, {required: 'a tab needs a label'})),
       frow('highlight', textControl(val.highlight === true ? 'true' : val.highlight, function(v){
         if (v == null) return commitSimple('highlight', null);

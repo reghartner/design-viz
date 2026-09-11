@@ -241,7 +241,15 @@ bullets, and contract-card rows each open their own edit form with delete;
 nodes and sections also get a **duplicate** button (the node copy lands
 beside the original — same row, stack, or float). Keyboard: **Esc** clears
 the selection or cancels connect mode; **Delete** removes the selected
-element (only when focus is not in a form field or the editor).
+element (only when focus is not in a form field or the editor). The editing
+loop is durable: **open…** loads a `.spec.json` from disk (undoable),
+**save** downloads the editor text as `<page-title-slug>.spec.json` (even
+when it does not parse — unfinished work is still work), every edit
+auto-saves a draft to browser storage, and after a reload a bar offers to
+**restore** or **discard** the unsaved draft (restore is one undo step).
+**undo** has a matching **redo** (a new action clears the redo line; hand
+edits in the editor are not snapshotted, but undo stashes the current text
+on the redo side first, so nothing is discarded).
 
 ## Validating a spec (the agent loop)
 

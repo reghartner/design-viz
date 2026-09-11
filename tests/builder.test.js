@@ -26,6 +26,7 @@ function loadBuilder(){
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
+    ' specFileName,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -698,4 +699,15 @@ test('planAddNode presets carry icon, tint, title, and an icon-named id', () => 
   /* no preset: unchanged default behavior */
   const plain1 = B.planAddNode(TEXT, SPEC, 0);
   assert.ok(JSON.parse(plain1.text).page.blocks[0].diagram.nodes.node1);
+});
+
+/* ================= pass 5: durability ================= */
+
+test('specFileName slugs the page title and falls back cleanly', () => {
+  assert.strictEqual(B.specFileName({page: {title: 'Cumulus IoT — device messaging'}}),
+    'cumulus-iot-device-messaging.spec.json');
+  assert.strictEqual(B.specFileName({title: 'No wrapper'}), 'no-wrapper.spec.json');
+  assert.strictEqual(B.specFileName({page: {title: '***'}}), 'flowspec.spec.json');
+  assert.strictEqual(B.specFileName(null), 'flowspec.spec.json');
+  assert.strictEqual(B.specFileName({nodes: {}, rows: []}), 'flowspec.spec.json');
 });

@@ -826,6 +826,16 @@ function planDuplicateSection(text, raw, sectionIdx){
   return {text: r.text, start: r.start, end: r.end, kind: 'section', index: sectionIdx + 1};
 }
 
+/* ---------------- durability: filenames ---------------- */
+
+function specFileName(raw){
+  /* download name for the save button: page-title slug + .spec.json */
+  var page = raw && raw.page ? raw.page : raw;
+  var title = page && typeof page.title === 'string' ? page.title : '';
+  var slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return (slug || 'flowspec') + '.spec.json';
+}
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -962,21 +972,119 @@ function initWorkbenchBuilder(opts){
       ' — click a section to retarget';
   }
 
-  /* ---- undo: one snapshot of the editor text per builder action ---- */
+  /* ---- undo/redo: one snapshot of the editor text per builder action.
+     Hand edits in the textarea are not snapshotted, but undo pushes the
+     CURRENT text onto the redo stack first, so nothing is discarded. ---- */
+  var redoBtn = document.getElementById('redo-builder');
+  var redoStack = [];
+  function updateHistoryButtons(){
+    if (undoBtn) undoBtn.disabled = !undoStack.length;
+    if (redoBtn) redoBtn.disabled = !redoStack.length;
+  }
   function pushUndo(){
     undoStack.push(src.value);
     if (undoStack.length > 30) undoStack.shift();
-    if (undoBtn) undoBtn.disabled = false;
+    redoStack.length = 0; /* a new action invalidates the redo line */
+    updateHistoryButtons();
   }
-  function doUndo(){
-    if (!undoStack.length) return;
-    src.value = undoStack.pop();
-    if (undoBtn) undoBtn.disabled = !undoStack.length;
+  function historyStep(fromStack, toStack, message){
+    if (!fromStack.length) return;
+    toStack.push(src.value);
+    src.value = fromStack.pop();
+    updateHistoryButtons();
     render();
     setSelected(null); currentTarget = null;
-    inspectorMessage('undid the last builder action — board re-rendered');
+    inspectorMessage(message);
+    autosaveDraft();
   }
+  function doUndo(){ historyStep(undoStack, redoStack, 'undid the last builder action — board re-rendered'); }
+  function doRedo(){ historyStep(redoStack, undoStack, 'redid the builder action — board re-rendered'); }
   if (undoBtn) undoBtn.addEventListener('click', doUndo);
+  if (redoBtn) redoBtn.addEventListener('click', doRedo);
+
+  /* ---- draft autosave + recovery offer ---- */
+  var DRAFT_KEY = 'dv-workbench-draft';
+  function autosaveDraft(){
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({text: src.value, at: Date.now()})); }
+    catch (ex){ /* storage unavailable: the feature degrades to nothing */ }
+  }
+  function readDraft(){
+    try {
+      var d = JSON.parse(localStorage.getItem(DRAFT_KEY));
+      return d && typeof d.text === 'string' ? d : null;
+    } catch (ex){ return null; }
+  }
+  function clearDraft(){
+    try { localStorage.removeItem(DRAFT_KEY); } catch (ex){}
+  }
+  var draftTimer = null;
+  src.addEventListener('input', function(){
+    if (draftTimer) clearTimeout(draftTimer);
+    draftTimer = setTimeout(autosaveDraft, 800);
+  });
+  (function offerDraft(){
+    var bar = document.getElementById('draftbar');
+    var draft = readDraft(); /* captured once — later autosaves cannot swap it */
+    if (!bar || !draft || draft.text === src.value) return;
+    bar.innerHTML = '';
+    var label = document.createElement('span');
+    label.textContent = 'unsaved draft from ' + new Date(draft.at || 0).toLocaleString() + ' —';
+    var restore = document.createElement('button');
+    restore.type = 'button'; restore.className = 'bbtn'; restore.textContent = 'restore';
+    restore.addEventListener('click', function(){
+      pushUndo(); /* restoring is one undoable action */
+      src.value = draft.text;
+      render();
+      bar.hidden = true;
+      autosaveDraft();
+    });
+    var discard = document.createElement('button');
+    discard.type = 'button'; discard.className = 'bbtn'; discard.textContent = 'discard';
+    discard.addEventListener('click', function(){
+      clearDraft();
+      bar.hidden = true;
+    });
+    bar.appendChild(label); bar.appendChild(restore); bar.appendChild(discard);
+    bar.hidden = false;
+  })();
+
+  /* ---- open a .spec.json / save the editor to disk ---- */
+  var fileInput = document.getElementById('file-input');
+  var openBtn = document.getElementById('file-open');
+  var saveBtn = document.getElementById('file-save');
+  if (openBtn && fileInput){
+    openBtn.addEventListener('click', function(){ fileInput.click(); });
+    fileInput.addEventListener('change', function(){
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function(){
+        pushUndo(); /* opening replaces the editor — undoable */
+        src.value = String(reader.result);
+        render(); /* parse/validation errors surface in the message list */
+        setSelected(null); currentTarget = null;
+        if (guide) guide.hidden = true;
+        autosaveDraft();
+      };
+      reader.readAsText(f);
+      fileInput.value = ''; /* allow re-opening the same file */
+    });
+  }
+  if (saveBtn){
+    saveBtn.addEventListener('click', function(){
+      /* saves the editor text as-is — un-renderable work is still work */
+      var parsed = parseEditor();
+      var name = specFileName(parsed.error ? null : parsed.raw);
+      var blob = new Blob([src.value], {type: 'application/json'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    });
+  }
 
   /* ---- board highlight by stable identity, re-applied after renders ---- */
   function cssQuote(s){
@@ -1025,6 +1133,7 @@ function initWorkbenchBuilder(opts){
     pushUndo();
     src.value = plan.text;
     render();
+    autosaveDraft();
     if (opt && opt.after) opt.after(plan);
     rehighlight();
     var parsed = parseEditor();
@@ -1519,6 +1628,7 @@ function initWorkbenchBuilder(opts){
     pushUndo();
     src.value = plan.text;
     render();
+    autosaveDraft();
     cancelConnect(null);
     var el = findTargetEl({section: target.section, kind: 'edge', index: plan.index});
     selectTarget({section: target.section, kind: 'edge', index: plan.index, el: el}, false);
@@ -1589,6 +1699,7 @@ function initWorkbenchBuilder(opts){
     pushUndo();
     src.value = plan.text;
     render();
+    autosaveDraft();
     currentTarget = target;
     insertSection = gi;
     rehighlight();
@@ -1650,6 +1761,7 @@ function initWorkbenchBuilder(opts){
     pushUndo();
     src.value = plan.text;
     render();
+    autosaveDraft();
     if (plan.kind === 'section') insertSection = plan.index;
     var identity = {section: plan.kind === 'section' ? plan.index : insertSection,
                     kind: plan.kind, id: plan.id, index: plan.index};

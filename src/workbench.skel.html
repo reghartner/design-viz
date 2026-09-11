@@ -51,13 +51,18 @@
         <button class="bbtn" id="add-panel">+ panel</button>
         <button class="bbtn" id="add-section">+ section</button>
         <button class="bbtn" id="undo-builder" disabled>undo</button>
+        <button class="bbtn" id="redo-builder" disabled>redo</button>
         <span class="btarget" id="btarget"></span>
       </div>
+      <div class="draftbar" id="draftbar" hidden></div>
       <div class="palette" id="palette" hidden></div>
       <div class="guide" id="guide" hidden></div>
       <textarea id="src" spellcheck="false" aria-label="Page spec JSON source"></textarea>
       <div class="specrow">
         <button class="rbtn" id="go">Render</button>
+        <button class="bbtn" id="file-open">open&#8230;</button>
+        <button class="bbtn" id="file-save">save</button>
+        <input type="file" id="file-input" accept=".json,application/json" hidden>
         <ul class="msgs" id="msgs"></ul>
       </div>
     </details>

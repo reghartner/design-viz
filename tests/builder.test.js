@@ -615,3 +615,23 @@ test('planDuplicateSection deep-copies right after the original and renames the 
   const bare = {nodes: {a: {}}, rows: [['a']]};
   assert.match(B.planDuplicateSection(JSON.stringify(bare), bare, 0).error, /bare diagram/);
 });
+
+test('planDuplicateNode clones a float entry wholesale and places it after the original', () => {
+  /* extra placement fields on the float entry must survive the copy
+     (Codex pass-3 cycle-1 MAJOR: the copy was rebuilt from id+side only
+     and appended at the end) */
+  const spec = JSON.parse(JSON.stringify(RICH));
+  spec.page.blocks[0].diagram.floats = [
+    {id: 'f', side: 'above', dx: 18},
+    {id: 'g2', side: 'above'}
+  ];
+  spec.page.blocks[0].diagram.nodes.g2 = {title: 'G2'};
+  const plan = B.planDuplicateNode(JSON.stringify(spec, null, 2), spec, 0, 'f');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(d.floats, [
+    {id: 'f', side: 'above', dx: 18},
+    {id: 'f1', side: 'above', dx: 18},
+    {id: 'g2', side: 'above'}
+  ]);
+});

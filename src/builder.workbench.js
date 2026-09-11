@@ -736,10 +736,15 @@ function planDuplicateNode(text, raw, sectionIdx, id){
     out = jsonInsertArrayItemAfter(text, placed.path, placed.after, JSON.stringify(newId));
     if (!out) return {error: 'could not edit rows in the editor text'};
   } else {
-    var float = (d.floats || []).filter(function(f){ return f && f.id === id; })[0];
-    if (!float) return {error: 'node "' + id + '" has no row or float placement to copy'};
-    out = jsonInsertListItemOrCreate(text, got.path, 'floats',
-      '{"id": ' + JSON.stringify(newId) + ', "side": ' + JSON.stringify(float.side || 'above') + '}');
+    var floats = d.floats || [];
+    var fi = -1;
+    floats.forEach(function(f, i){ if (fi < 0 && f && f.id === id) fi = i; });
+    if (fi < 0) return {error: 'node "' + id + '" has no row or float placement to copy'};
+    /* clone the WHOLE float entry (side plus any nudge fields), fresh id,
+       placed directly after the original like the row cases */
+    var entry = builderClone(floats[fi]);
+    entry.id = newId;
+    out = jsonInsertArrayItemAfter(text, got.path.concat(['floats']), fi, JSON.stringify(entry));
     if (!out) return {error: 'could not edit floats in the editor text'};
   }
   var def = jsonInsertMember(out.text, got.path.concat(['nodes']), newId,
@@ -1479,8 +1484,12 @@ function initWorkbenchBuilder(opts){
     if (!svg || !svg.getScreenCTM) return;
     var ctm = svg.getScreenCTM();
     if (!ctm) return;
-    var inv = ctm.inverse();
-    var start = svgPointAt(svg, inv, ev.clientX, ev.clientY);
+    var inv, start;
+    try {
+      inv = ctm.inverse();
+      start = svgPointAt(svg, inv, ev.clientX, ev.clientY);
+    } catch (ex){ return; } /* non-invertible CTM: no drag, plain click still works */
+    if (!isFinite(start.x) || !isFinite(start.y)) return;
     drag = {lbl: lbl, svg: svg, inv: inv, x0: start.x, y0: start.y, dx: 0, dy: 0, moved: false};
     ev.preventDefault(); /* no text selection while dragging */
   });
@@ -1489,7 +1498,7 @@ function initWorkbenchBuilder(opts){
     var pt = svgPointAt(drag.svg, drag.inv, ev.clientX, ev.clientY);
     drag.dx = pt.x - drag.x0;
     drag.dy = pt.y - drag.y0;
-    if (Math.abs(drag.dx) + Math.abs(drag.dy) > 2) drag.moved = true;
+    if (drag.dx * drag.dx + drag.dy * drag.dy > 9) drag.moved = true; /* > 3 viewBox units, straight-line */
     if (drag.moved) drag.lbl.setAttribute('transform', 'translate(' + drag.dx + ' ' + drag.dy + ')');
   });
   window.addEventListener('mouseup', function(){
@@ -1514,6 +1523,7 @@ function initWorkbenchBuilder(opts){
     if (!e){ inspectorMessage('edge not found in the editor text — the render and the editor may be out of sync'); return; }
     var newDx = Math.round((typeof e.labelDx === 'number' ? e.labelDx : 0) + d.dx);
     var newDy = Math.round((typeof e.labelDy === 'number' ? e.labelDy : 0) + d.dy);
+    if (!isFinite(newDx) || !isFinite(newDy)) return; /* never write NaN into the spec */
     var plan = planSetFields(src.value, parsed.raw, path, [
       ['labelDx', newDx === 0 ? null : String(newDx)],
       ['labelDy', newDy === 0 ? null : String(newDy)]
@@ -1537,6 +1547,15 @@ function initWorkbenchBuilder(opts){
     }
     if (target) selectTarget(target);
   });
+
+  /* a re-render outside the connect flow (Render button, skin switch)
+     rebuilds the DOM and can renumber sections — a stale armed connect
+     must not wire an edge from the old render. Builder-driven renders
+     clear the state synchronously before this observer runs, so only
+     stale arming is cancelled. */
+  new MutationObserver(function(){
+    if (connect) cancelConnect('connect cancelled — the page re-rendered');
+  }).observe(view, {childList: true});
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){

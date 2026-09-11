@@ -10537,11 +10537,15 @@ function initWorkbenchBuilder(opts){
     return [
       frow('label', textControl(val.label, function(v){
         if (v == null){ formError('a tab needs a label'); return false; }
+        /* capture BEFORE the commit whether this tab is the shown one —
+           only then may the rename re-activate it (the engine restores
+           the active tab by LABEL slug, so renaming the shown tab makes
+           the re-render fall back to the first tab; a tab that was not
+           shown must stay not shown) */
+        var before = findTargetEl(t);
+        var wasActive = !!(before && before.getAttribute('aria-selected') === 'true');
         var ok = commitSimple('label', JSON.stringify(v));
-        if (ok){
-          /* the engine restores the active tab by LABEL slug, so
-             renaming the active tab makes the re-render fall back to
-             the first tab — re-activate the renamed one */
+        if (ok && wasActive){
           var btn = findTargetEl(t);
           if (btn && btn.getAttribute('aria-selected') !== 'true') btn.click();
         }

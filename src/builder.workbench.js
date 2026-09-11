@@ -909,6 +909,23 @@ function findingLocation(text, raw, message){
   return {start: loc.start, end: loc.end, exact: exact};
 }
 
+/* ---------------- board zoom ---------------- */
+
+var BUILDER_ZOOM_STEPS = [0.5, 0.67, 0.8, 1, 1.25, 1.6, 2, 2.5, 3];
+
+function builderZoomStep(current, direction){
+  /* next zoom scale: direction +1 / -1 walks the step table from the
+     nearest entry; 0 resets to 1. Clamped at the table ends. */
+  if (direction === 0) return 1;
+  var idx = 0, best = Infinity;
+  for (var i = 0; i < BUILDER_ZOOM_STEPS.length; i++){
+    var d = Math.abs(BUILDER_ZOOM_STEPS[i] - current);
+    if (d < best){ best = d; idx = i; }
+  }
+  idx = Math.min(BUILDER_ZOOM_STEPS.length - 1, Math.max(0, idx + direction));
+  return BUILDER_ZOOM_STEPS[idx];
+}
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -1823,13 +1840,74 @@ function initWorkbenchBuilder(opts){
     if (target) selectTarget(target);
   });
 
+  /* ---- board zoom: - / percent (click resets) / + on every diagram.
+     The scale multiplies the svg's width inside .boardcanvas (layout
+     stays computed; scrollbars pan); state is keyed by section ordinal
+     and reapplied after every re-render. ---- */
+  var boardZoom = {}; /* section ordinal -> scale */
+  function applyBoardZoom(secEl){
+    var gi = secEl.getAttribute('data-dv-section');
+    var canvas = secEl.querySelector('.boardcanvas');
+    var svg = canvas && canvas.querySelector('svg');
+    if (!svg) return;
+    var scale = boardZoom[gi] || 1;
+    if (scale === 1){
+      svg.style.width = '';
+      canvas.classList.remove('dv-zoomed');
+    } else {
+      svg.style.width = (scale * 100) + '%';
+      canvas.classList.add('dv-zoomed');
+    }
+    var lvl = secEl.querySelector('.zoomctl .zlvl');
+    if (lvl) lvl.textContent = Math.round(scale * 100) + '%';
+  }
+  function bumpBoardZoom(secEl, direction){
+    var gi = secEl.getAttribute('data-dv-section');
+    boardZoom[gi] = builderZoomStep(boardZoom[gi] || 1, direction);
+    applyBoardZoom(secEl);
+  }
+  function injectZoomControls(){
+    var secs = view.querySelectorAll('.doc-sec[data-dv-section]');
+    Array.prototype.forEach.call(secs, function(secEl){
+      var boardDiv = secEl.querySelector('.board');
+      if (!boardDiv || !secEl.querySelector('.boardcanvas svg')) return;
+      if (!boardDiv.querySelector('.zoomctl')){
+        var ctl = document.createElement('div');
+        ctl.className = 'zoomctl';
+        function zbtn(label, dir, title){
+          var b = document.createElement('button');
+          b.type = 'button'; b.className = 'zbtn';
+          b.textContent = label; b.title = title;
+          b.addEventListener('click', function(){ bumpBoardZoom(secEl, dir); });
+          return b;
+        }
+        ctl.appendChild(zbtn('−', -1, 'zoom out'));
+        var lvl = document.createElement('button');
+        lvl.type = 'button'; lvl.className = 'zbtn zlvl'; lvl.textContent = '100%';
+        lvl.title = 'reset zoom';
+        lvl.addEventListener('click', function(){ bumpBoardZoom(secEl, 0); });
+        ctl.appendChild(lvl);
+        ctl.appendChild(zbtn('+', 1, 'zoom in'));
+        boardDiv.appendChild(ctl);
+      }
+      applyBoardZoom(secEl);
+    });
+  }
+  injectZoomControls();
+
   /* a re-render outside the connect flow (Render button, skin switch)
      rebuilds the DOM and can renumber sections — a stale armed connect
      must not wire an edge from the old render. Builder-driven renders
      clear the state synchronously before this observer runs, so only
-     stale arming is cancelled. */
+     stale arming is cancelled. The same signal re-injects the zoom
+     controls and reapplies each board's zoom. */
+  var rerenderQueued = false;
   new MutationObserver(function(){
     if (connect) cancelConnect('connect cancelled — the page re-rendered');
+    if (!rerenderQueued){
+      rerenderQueued = true;
+      setTimeout(function(){ rerenderQueued = false; injectZoomControls(); }, 0);
+    }
   }).observe(view, {childList: true});
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */

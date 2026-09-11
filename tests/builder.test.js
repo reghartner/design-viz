@@ -26,7 +26,7 @@ function loadBuilder(){
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
-    ' specFileName, parseValidationPath, findingLocation,' +
+    ' specFileName, parseValidationPath, findingLocation, builderZoomStep, BUILDER_ZOOM_STEPS,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -781,4 +781,15 @@ test('findingLocation selects the exact field and falls back to the nearest pare
   assert.deepStrictEqual(JSON.parse(bareText.slice(b.start, b.end)), {title: 'A'});
 
   assert.strictEqual(B.findingLocation(TEXT, SPEC, 'JSON parse: nope'), null);
+});
+
+test('builderZoomStep walks the step table, clamps at the ends, and resets on 0', () => {
+  assert.strictEqual(B.builderZoomStep(1, 1), 1.25);
+  assert.strictEqual(B.builderZoomStep(1.25, 1), 1.6);
+  assert.strictEqual(B.builderZoomStep(1, -1), 0.8);
+  assert.strictEqual(B.builderZoomStep(3, 1), 3);        /* top clamp */
+  assert.strictEqual(B.builderZoomStep(0.5, -1), 0.5);   /* bottom clamp */
+  assert.strictEqual(B.builderZoomStep(2.5, 0), 1);      /* reset */
+  assert.strictEqual(B.builderZoomStep(1.1, 1), 1.25);   /* nearest entry first */
+  assert.strictEqual(B.BUILDER_ZOOM_STEPS.indexOf(1) >= 0, true);
 });

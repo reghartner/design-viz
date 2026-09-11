@@ -252,7 +252,10 @@ edits in the editor are not snapshotted, but undo stashes the current text
 on the redo side first, so nothing is discarded). **Validation findings
 are clickable**: every error/warning in the message list selects the
 offending JSON field in the editor (or its nearest existing parent when
-the message names a field the text does not carry).
+the message names a field the text does not carry). Every diagram gets
+**zoom controls** (bottom-right of the board): − / + step the scale
+(50%–300%), the percent button resets, the board scrolls to pan while
+zoomed, and the zoom level survives re-renders.
 
 ## Validating a spec (the agent loop)
 

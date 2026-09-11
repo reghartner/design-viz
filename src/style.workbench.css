@@ -114,6 +114,20 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .ihelp summary{cursor:pointer; font:600 11px 'IBM Plex Mono',monospace; color:var(--sub);}
 .ihelp[open] summary{margin-bottom:4px;}
 
+/* board zoom: overlay controls bottom-right of each board; the canvas
+   scrolls to pan while zoomed. The board is the positioning context so
+   the controls stay put while the canvas scrolls. */
+.docview .board{position:relative;}
+.boardcanvas.dv-zoomed{overflow:auto; max-height:78vh;}
+.zoomctl{position:absolute; right:8px; bottom:8px; z-index:3; display:flex; align-items:center; gap:2px;
+  background:color-mix(in srgb, var(--card) 82%, transparent); border:1px solid var(--line);
+  border-radius:8px; padding:2px 4px; backdrop-filter:blur(2px);}
+.zbtn{background:none; border:0; color:var(--sub); font:700 13px 'IBM Plex Mono',monospace;
+  cursor:pointer; padding:2px 6px; border-radius:5px;}
+.zbtn:hover{color:var(--ink); background:color-mix(in srgb, var(--line) 40%, transparent);}
+.zbtn:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+.zlvl{font:600 10.5px 'IBM Plex Mono',monospace; min-width:40px; text-align:center;}
+
 /* builder: selection highlight on the rendered page (svg + widget cards) */
 .docview .node, .docview .edge, .docview .halo, .docview .coin,
 .docview .pwidget, .docview .sec-text[data-dv-para],

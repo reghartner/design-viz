@@ -485,3 +485,20 @@ test('every pass-2 planner output still parses and leaves unrelated blocks intac
     assert.strictEqual(out.page.blocks[0].heading, 'Rich');
   }
 });
+
+test('renames to hostile ids like __proto__ keep the entry as a real own property', () => {
+  /* a plain {} rebuild would route "__proto__" through the prototype
+     setter and silently drop the node (Codex cycle-1 MAJOR) */
+  const plan = B.planRenameNode(RICH_TEXT, RICH, 0, 'a', '__proto__');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.ok(Object.prototype.hasOwnProperty.call(d.nodes, '__proto__'));
+  assert.strictEqual(Object.keys(d.nodes).length, 4);
+  assert.strictEqual(d.steps[0].edge, '__proto__->b');
+
+  const panelPlan = B.planRenamePanel(RICH_TEXT, RICH, 0, 0, '__proto__');
+  assert.ok(!panelPlan.error, panelPlan.error);
+  const pd = JSON.parse(panelPlan.text).page.blocks[0].diagram;
+  assert.strictEqual(pd.panels[0].id, '__proto__');
+  assert.ok(Object.prototype.hasOwnProperty.call(pd.steps[0].panels, '__proto__'));
+});

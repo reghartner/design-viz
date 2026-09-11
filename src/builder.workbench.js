@@ -301,7 +301,7 @@ function planAddStep(text, raw, sectionIdx){
 function planAddPanel(text, raw, sectionIdx){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
-  var taken = {};
+  var taken = Object.create(null);
   (got.d.panels || []).forEach(function(p){ if (p && p.id) taken[p.id] = true; });
   var id = builderUniqueKey(taken, 'panel');
   var item = '{"id": ' + JSON.stringify(id) +
@@ -465,7 +465,9 @@ function planRenameNode(text, raw, sectionIdx, oldId, newId){
   if (Object.prototype.hasOwnProperty.call(got.d.nodes, newId))
     return {error: 'id "' + newId + '" is already taken'};
   return builderRewrite(text, raw, got.path, function(d){
-    var nodes = {};
+    /* null-prototype map: a plain {} would route an id like "__proto__"
+       through the prototype setter and silently drop the node */
+    var nodes = Object.create(null);
     Object.keys(d.nodes).forEach(function(k){ nodes[k === oldId ? newId : k] = d.nodes[k]; });
     d.nodes = nodes;
     d.rows = (d.rows || []).map(function(row){
@@ -509,7 +511,7 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
     d.panels[panelIdx].id = newId;
     (d.steps || []).forEach(function(st){
       if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, oldId)){
-        var patches = {};
+        var patches = Object.create(null); /* "__proto__" — see planRenameNode */
         Object.keys(st.panels).forEach(function(k){ patches[k === oldId ? newId : k] = st.panels[k]; });
         st.panels = patches;
       }
@@ -753,16 +755,21 @@ function initWorkbenchBuilder(opts){
   if (undoBtn) undoBtn.addEventListener('click', doUndo);
 
   /* ---- board highlight by stable identity, re-applied after renders ---- */
+  function cssQuote(s){
+    /* node ids come from the spec and may hold quotes/backslashes */
+    if (window.CSS && CSS.escape) return CSS.escape(String(s));
+    return String(s).replace(/[^A-Za-z0-9_-]/g, '\\$&');
+  }
   function findTargetEl(t){
     if (!t) return null;
     var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
     if (!secEl) return null;
     if (t.kind === 'section') return secEl;
-    var sel = t.kind === 'node' ? '[data-dv-node="' + t.id + '"]' :
+    var sel = t.kind === 'node' ? '[data-dv-node="' + cssQuote(t.id) + '"]' :
               t.kind === 'edge' ? 'path.edge[data-dv-edge="' + t.index + '"]' :
               t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
                                   '[data-dv-panel="' + t.index + '"]';
-    return secEl.querySelector(sel);
+    try { return secEl.querySelector(sel); } catch (ex){ return null; }
   }
   function rehighlight(){ setSelected(findTargetEl(currentTarget)); }
 
@@ -800,15 +807,15 @@ function initWorkbenchBuilder(opts){
   }
   function commitSimple(key, valueTextOrNull){
     var parsed = parseEditor();
-    if (parsed.error){ formError(parsed.error); return; }
+    if (parsed.error){ formError(parsed.error); return false; }
     var path = builderTargetPath(parsed.raw, currentTarget);
-    if (!path){ formError('element not found — click Render, then reselect'); return; }
-    applyPlan(planSetField(src.value, parsed.raw, path, key, valueTextOrNull));
+    if (!path){ formError('element not found — click Render, then reselect'); return false; }
+    return applyPlan(planSetField(src.value, parsed.raw, path, key, valueTextOrNull));
   }
   function commitCascade(planFor, opt){
     var parsed = parseEditor();
-    if (parsed.error){ formError(parsed.error); return; }
-    applyPlan(planFor(parsed.raw), opt);
+    if (parsed.error){ formError(parsed.error); return false; }
+    return applyPlan(planFor(parsed.raw), opt);
   }
 
   /* ---- form controls ---- */
@@ -821,11 +828,15 @@ function initWorkbenchBuilder(opts){
     return row;
   }
   function commitOnChange(input, getCommitValue, commit){
+    /* a commit returning false (validation or plan error) resets the
+       remembered value so re-entering ANY value — the original included —
+       fires again instead of being swallowed as "unchanged" */
     var last = input.value;
     var fire = function(){
       if (input.value === last) return;
       last = input.value;
-      commit(getCommitValue ? getCommitValue(input.value) : input.value);
+      var ok = commit(getCommitValue ? getCommitValue(input.value) : input.value);
+      if (ok === false) last = null;
     };
     input.addEventListener('change', fire);
     input.addEventListener('keydown', function(ev){
@@ -842,8 +853,8 @@ function initWorkbenchBuilder(opts){
     /* empty commits as removal unless the field is required */
     commitOnChange(input, null, function(v){
       var trimmed = v.trim();
-      if (!trimmed && opts && opts.required){ formError(opts.required); return; }
-      commit(trimmed === '' ? null : trimmed);
+      if (!trimmed && opts && opts.required){ formError(opts.required); return false; }
+      return commit(trimmed === '' ? null : trimmed);
     });
     return input;
   }
@@ -853,10 +864,10 @@ function initWorkbenchBuilder(opts){
     input.value = value == null ? '' : String(value);
     commitOnChange(input, null, function(v){
       var trimmed = v.trim();
-      if (trimmed === ''){ commit(null); return; }
+      if (trimmed === '') return commit(null);
       var num = Number(trimmed);
-      if (!isFinite(num)){ formError('"' + trimmed + '" is not a number'); return; }
-      commit(num);
+      if (!isFinite(num)){ formError('"' + trimmed + '" is not a number'); return false; }
+      return commit(num);
     });
     return input;
   }
@@ -881,7 +892,7 @@ function initWorkbenchBuilder(opts){
       sel.appendChild(extra);
     }
     sel.value = current == null ? '' : String(current);
-    commitOnChange(sel, null, function(v){ commit(v === '' ? null : v); });
+    commitOnChange(sel, null, function(v){ return commit(v === '' ? null : v); });
     return sel;
   }
   function checkboxControl(checked, commit){
@@ -924,8 +935,9 @@ function initWorkbenchBuilder(opts){
     var t = currentTarget;
     return [
       frow('id', textControl(t.id, function(v){
-        if (v == null){ formError('a node needs an id'); return; }
-        commitCascade(function(raw){ return planRenameNode(src.value, raw, t.section, t.id, v); },
+        if (v == null){ formError('a node needs an id'); return false; }
+        if (v === t.id){ formError(''); return true; }
+        return commitCascade(function(raw){ return planRenameNode(src.value, raw, t.section, t.id, v); },
           {after: function(){ t.id = v; renderInspector(); }});
       }, {required: 'a node needs an id'})),
       frow('title', textControl(val.title, function(v){ commitSimple('title', v == null ? null : JSON.stringify(v)); })),
@@ -983,8 +995,9 @@ function initWorkbenchBuilder(opts){
     var t = currentTarget;
     return [
       frow('id', textControl(val.id, function(v){
-        if (v == null){ formError('a panel needs an id'); return; }
-        commitCascade(function(raw){ return planRenamePanel(src.value, raw, t.section, t.index, v); },
+        if (v == null){ formError('a panel needs an id'); return false; }
+        if (v === val.id){ formError(''); return true; }
+        return commitCascade(function(raw){ return planRenamePanel(src.value, raw, t.section, t.index, v); },
           {after: function(){ renderInspector(); }});
       }, {required: 'a panel needs an id'})),
       frow('type', selectControl(PANEL_TYPES, val.type, function(v){ commitSimple('type', v == null ? null : JSON.stringify(v)); })),

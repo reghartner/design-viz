@@ -21,7 +21,9 @@
   drive <b>synchronized inspector panels</b>: device state machines, indicator LEDs, gauges, event
   logs, and a camera-screen widget. The spec is data only, written primarily by an agent reading an
   HLD or code. Default skin is <b>Aurora</b>; <b>Daylight</b> proves skins are swappable CSS.
-  Everything below the toolbar renders from the JSON in the editor.</p>
+  Everything below the toolbar renders from the JSON in the editor. <b>Click any node, edge,
+  label, coin, panel, or section</b> in the render to jump to its definition in the editor,
+  with a field guide; the INSERT buttons splice ready-made pieces into the spec.</p>
 </header>
 
 <main>
@@ -38,6 +40,16 @@
 
     <details class="specbox" open>
       <summary>page spec JSON — edit &amp; re-render</summary>
+      <div class="buildrow">
+        <span class="lab">INSERT</span>
+        <button class="bbtn" id="add-node">+ node</button>
+        <button class="bbtn" id="add-edge">+ edge</button>
+        <button class="bbtn" id="add-step">+ step</button>
+        <button class="bbtn" id="add-panel">+ panel</button>
+        <button class="bbtn" id="add-section">+ section</button>
+        <span class="btarget" id="btarget"></span>
+      </div>
+      <div class="guide" id="guide" hidden></div>
       <textarea id="src" spellcheck="false" aria-label="Page spec JSON source"></textarea>
       <div class="specrow">
         <button class="rbtn" id="go">Render</button>

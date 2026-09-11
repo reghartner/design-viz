@@ -361,3 +361,7 @@ document.getElementById('go').addEventListener('click', function(){ go(true); })
 
 src.value = JSON.stringify(DEMO, null, 2);
 go(false);
+
+/* builder: click any rendered node/edge/label/coin/panel/section to jump to
+   its definition in the editor; INSERT buttons splice ready-made snippets */
+initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }});

@@ -3522,3 +3522,30 @@ test('timeline density warning judges the CLAMPED span the model draws', () => {
   assert.match(w, /clamped to 7d/);
   assert.strictEqual(C.timelineModel({span: '720h', cadence: {every: '3h'}}, {}).beats.length, 56);
 });
+
+test('timeline labels: close events stagger to a second row, a third collision drops to hover-only', () => {
+  const m = C.timelineModel(
+    {span: '4h', cadence: {every: '1h'},
+     events: [{at: '1h12m', label: 'motion', kind: 'info'},
+              {at: '1h14m', label: 'clip up', kind: 'ok'},
+              {at: '1h15m', label: 'third here', kind: 'info'},
+              {at: '1h50m', label: 'late', kind: 'ok'}]},
+    {now: '1h20m'});
+  const d = JSON.parse(JSON.stringify(m.detail.events));
+  assert.strictEqual(d[0].labelRow, 0, 'first label on the near row');
+  assert.strictEqual(d[1].labelRow, 1, 'overlapping neighbor staggers up');
+  assert.strictEqual(d[2].labelRow, null, 'third collision keeps only the hover title');
+  assert.strictEqual(d[3].labelRow, 0, 'a distant label returns to the near row');
+  /* renderer: staggered baselines present, dropped label absent */
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'tl', type: 'timeline', span: '4h',
+    cadence: {every: '1h'},
+    events: [{at: '1h12m', label: 'motion', kind: 'info'},
+             {at: '1h14m', label: 'clip up', kind: 'ok'},
+             {at: '1h15m', label: 'third here', kind: 'info'}]},
+    {now: '1h20m'}, 'aurora', [], 0, false);
+  const h = host.innerHTML;
+  assert.ok(h.includes('y="43"') && h.includes('y="32"'), 'two label baselines');
+  assert.ok(!h.includes('>third here<'), 'collided label not drawn');
+  assert.ok(h.includes('third here'), 'its hover title remains');
+});

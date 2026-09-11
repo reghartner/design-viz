@@ -7013,6 +7013,24 @@ function bufferModel(panel, state){
 /* timeline: wall-clock axis over a declared span with periodic cadence
    beats and event dots; steps sweep a `now` cursor and append events.
    Pure model (node-testable, no DOM). */
+function timelineLabelRows(events){
+  /* deterministic label collision layout: labels go on row 0, overflow
+     to row 1, and drop to hover-title-only (labelRow null) when both
+     rows are occupied at that x. Widths are estimated from the 8.5px
+     mono glyphs; x positions mirror the renderer's clamp. */
+  var charW = 5.1;
+  var ends = [-Infinity, -Infinity];
+  events.forEach(function(e){
+    if (!e.label){ e.labelRow = null; return; }
+    var x = Math.min(Math.max(6 + e.pct / 100 * 308, 16), 304);
+    var half = Math.min(e.label.length * charW / 2, 60);
+    var xs = x - half, xe = x + half;
+    if (xs >= ends[0] + 4){ e.labelRow = 0; ends[0] = xe; }
+    else if (xs >= ends[1] + 4){ e.labelRow = 1; ends[1] = xe; }
+    else e.labelRow = null;
+  });
+  return events;
+}
 function timelineModel(panel, state){
   panel = panel || {}; state = state || {};
   var span = parseClock(panel.span);
@@ -7055,6 +7073,8 @@ function timelineModel(panel, state){
     return out;
   }
   var events = norm(panel.events).concat(norm(state.events));
+  events.sort(function(a, b){ return a.s - b.s; });
+  timelineLabelRows(events);
   var nowS = parseClock(state.now);
   var now = null;
   if (nowS != null){
@@ -7077,6 +7097,7 @@ function timelineModel(panel, state){
         if (e.s >= dStart - 1e-6 && e.s <= dEnd + 1e-6)
           dEvents.push({s: e.s, pct: (e.s - dStart) / dLen * 100, label: e.label, kind: e.kind});
       });
+      timelineLabelRows(dEvents);
       var dUnits = [1, 5, 10, 30, 60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200];
       var dUnit = dUnits[dUnits.length - 1];
       for (var di = 0; di < dUnits.length; di++){
@@ -7664,8 +7685,9 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
         var x = tlx(ev.pct);
         h += '<circle class="tlev tl-' + ev.kind + '" cx="' + x + '" cy="54" r="4"><title>' +
              esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
-        if (ev.label)
-          h += '<text class="tlevlab" x="' + Math.min(Math.max(parseFloat(x), 16), 304) + '" y="43" text-anchor="middle">' + esc(ev.label) + '</text>';
+        if (ev.label && ev.labelRow != null)
+          h += '<text class="tlevlab" x="' + Math.min(Math.max(parseFloat(x), 16), 304) +
+               '" y="' + (ev.labelRow === 0 ? 43 : 32) + '" text-anchor="middle">' + esc(ev.label) + '</text>';
       });
       var dnx = tlx(dm.nowPct);
       h += '<line class="tlnow" x1="' + dnx + '" y1="47" x2="' + dnx + '" y2="74"/>' +
@@ -7689,8 +7711,9 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
         var x = tlx(ev.pct);
         h += '<circle class="tlev tl-' + ev.kind + '" cx="' + x + '" cy="26" r="4"><title>' +
              esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
-        if (ev.label)
-          h += '<text class="tlevlab" x="' + Math.min(Math.max(parseFloat(x), 16), 304) + '" y="15" text-anchor="middle">' + esc(ev.label) + '</text>';
+        if (ev.label && ev.labelRow != null)
+          h += '<text class="tlevlab" x="' + Math.min(Math.max(parseFloat(x), 16), 304) +
+               '" y="' + (ev.labelRow === 0 ? 15 : 6) + '" text-anchor="middle">' + esc(ev.label) + '</text>';
       });
       if (tlm.now){
         var nx = tlx(tlm.now.pct);

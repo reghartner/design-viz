@@ -1038,7 +1038,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   s += '<g>';
   (d.edges || []).forEach(function(e, i){
     var k = protos[e.kind] ? e.kind : 'int';
-    s += '<path class="halo dv-protocol-stroke"' + fragmentAttrs(e) +
+    s += '<path class="halo dv-protocol-stroke" data-dv-edge="' + i + '"' + fragmentAttrs(e) +
          ' style="' + protocolColorStyle(protos, k) + '" stroke="' +
          kindColor(protos, k, skinBase(skin)) + '" d="' + edgePath(e, L, ADJ[i]) + '"/>';
   });
@@ -1047,6 +1047,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     var k = protos[e.kind] ? e.kind : 'int';
     edgeIds[e.from + '->' + e.to] = {domId:id, e:e, kind:k, idx:i};
     s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + '"' +
+         ' data-dv-edge="' + i + '"' +
          fragmentAttrs(e) + ' style="' + protocolColorStyle(protos, k) +
          '" stroke="' + kindColor(protos, k, skinBase(skin)) +
          '" stroke-dasharray="' + (e.ret ? DASH_RET : DASH_MAIN) + '" d="' + edgePath(e, L, ADJ[i]) +
@@ -1066,7 +1067,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
     var hasNodeLink = n.link && typeof n.link === 'string';
     var backlinkX = p.w - (hasNodeLink ? 38 : 15);
-    s += '<g class="node tint-' + tint + '" id="' + prefix + '-n-' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
+    s += '<g class="node tint-' + tint + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
          '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
@@ -1112,6 +1113,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       var g = document.createElementNS(SVGNS, 'g');
       g.setAttribute('class', 'coin');
       g.setAttribute('id', prefix + '-coin-' + stepN);
+      g.setAttribute('data-dv-step', String(stepN - 1));
       markFragmentElement(g, e);
       var c = document.createElementNS(SVGNS, 'circle');
       c.setAttribute('cx', mid.x); c.setAttribute('cy', mid.y); c.setAttribute('r', 10);
@@ -1128,6 +1130,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       var lt = document.createElementNS(SVGNS, 'text');
       lt.setAttribute('class', 'lbl'); lt.setAttribute('x', lx); lt.setAttribute('y', ly);
       lt.setAttribute('text-anchor', anchor);
+      lt.setAttribute('data-dv-edge', String(info.idx));
       lt.textContent = e.label;
       markFragmentElement(lt, e);
       svg.appendChild(lt);
@@ -2676,6 +2679,8 @@ function buildPanels(asideEl, d, skin){
     if (!p || !p.id) return;
     var card = document.createElement('div');
     card.className = 'pwidget pt-' + (PANEL_TYPES.indexOf(p.type) >= 0 ? p.type : 'unknown');
+    /* spec index, not render order — log panels are reordered to the end */
+    card.setAttribute('data-dv-panel', String((d.panels || []).indexOf(p)));
     if (p.title){
       var t = document.createElement('div');
       t.className = 'ptitle'; t.textContent = p.title;
@@ -3016,6 +3021,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var box = document.createElement('section');
   box.className = 'doc-sec';
   box.id = 'section-' + sectionReference;
+  box.setAttribute('data-dv-section', String(gi));
   box.style.setProperty('--acc', acc);
   var intro = sectionIntroHTML(sec, gi, sectionReference);
   var inner = intro.html;

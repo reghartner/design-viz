@@ -17,7 +17,11 @@ BACKLINK_RE = re.compile(
     r'^(<script type="application/json" id="flowbacklinks">)\n(.*?)\n(</script>)',
     re.S | re.M,
 )
-ENGINE_CHUNK_RE = re.compile(r"/\* ---- src/validator\.js ---- \*/(.*?)/\* ---- src/boot\.", re.S)
+# The shared chunk is validator.js + engine.js; the workbench additionally
+# bundles builder.workbench.js after the engine, so the chunk ends at the
+# first page-specific fragment marker (builder.* or boot.*).
+ENGINE_CHUNK_RE = re.compile(
+    r"/\* ---- src/validator\.js ---- \*/(.*?)/\* ---- src/(?:builder|boot)\.", re.S)
 
 
 class BuildTests(unittest.TestCase):

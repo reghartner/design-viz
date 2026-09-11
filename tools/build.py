@@ -4,7 +4,8 @@
   template/flowview.html   = flowview.skel.html  + core/flowview CSS + icons
                              + demo spec + (validator.js, engine.js, boot.flowview.js)
   workbench/flowspec.html  = workbench.skel.html + core/workbench CSS + icons
-                             + (validator.js, engine.js, boot.workbench.js)
+                             + (validator.js, engine.js, builder.workbench.js,
+                                boot.workbench.js)
 
 Deterministic: same src -> byte-identical output. Run from anywhere.
 """
@@ -56,7 +57,7 @@ def main() -> int:
         "STYLE_PAGE": read("style.workbench.css").rstrip(),
         "STYLE_CORE": core_css,
         "ICONS": icons,
-        "JS": js_bundle("validator.js", "engine.js", "boot.workbench.js"),
+        "JS": js_bundle("validator.js", "engine.js", "builder.workbench.js", "boot.workbench.js"),
     })
     (ROOT / "workbench" / "flowspec.html").write_text(workbench)
 

@@ -68,7 +68,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | `tools/mermaid2spec.py` | Converts a mermaid `sequenceDiagram` (bare, or the first ```mermaid fence in markdown) into a deliberately bland skeleton spec: `python3 tools/mermaid2spec.py <input.(md\|mmd)> [-o out.json] [--title "..."]`. Enriching icons, tints, protocols, and prose stays the authoring LLM's job; unsupported mermaid constructs fail loud. |
 | `contract/authoring-contract.md` | The complete authoring contract. Self-sufficient: hand this file plus a source document to any LLM and it can emit a valid spec with zero other context. |
 | `cookbook/` | Task-shaped recipes for authoring agents: one file per common request (temperature thresholds, battery drain, motion-detection geometry, wake-up mailbox, persistent-connection-while-awake, LP-chip MQTT relay, egress routing) plus `adjustments.md`, a phrase-to-knob table for visual feedback ("move that up and to the right"). Every ```json fence in it is a complete spec kept lint-clean by `tests/test_cookbook.py`. |
-| `workbench/flowspec.html` | Interactive workbench: the same engine plus an editable JSON panel with a Render button, schema reference, and known-limits notes. For hand-tuning specs. |
+| `workbench/flowspec.html` | Interactive workbench: the same engine plus an editable JSON panel with a Render button, click-to-definition selection with per-element field guides, snippet INSERT buttons, schema reference, and known-limits notes. For hand-tuning specs. |
 | `examples/cumulus/` | End-to-end proof. `cumulus-hld.md` is a realistic fixture design doc (mermaid + prose-only flow + facts buried in paragraphs). `cumulus-page.spec.json` was generated from it by GPT-5.6 given only the contract; `cumulus-page.spec.v2.json` applied three plain-English "meeting feedback" items. `cumulus-flow.html` is the rendered v2 output. |
 | `mockups/` | The hand-built design explorations that defined the target: `flowline-mockups.html` (four visual treatments; mockup 04 "Aurora Combined" is the chosen direction), `device-lens.html` (click-through with a device-internals inspector), `doorbell-northstar.html` (the northstar: three synchronized panels — flow board, two-chip hardware view with wake states, camera viewfinder that visibly starts recording). |
 
@@ -213,7 +213,13 @@ field or agent-authored cross-reference data is required.
 
 For rapid trial-and-error, `workbench/flowspec.html` is the same engine with
 an editable JSON panel and a Render button: paste your spec, tweak, render,
-and copy the result back into the `.spec.json` when it looks right.
+and copy the result back into the `.spec.json` when it looks right. Clicking
+a rendered node, edge, edge label, step coin, panel widget, or section box
+selects that element's JSON in the editor and shows a field guide for it
+(selection maps the last render onto the current editor text — re-render
+after reordering edits to keep the two aligned). The INSERT buttons splice a
+ready-made node, edge, step, panel, or section into the spec and re-render;
+inserts target the section you last clicked.
 
 ## Validating a spec (the agent loop)
 

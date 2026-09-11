@@ -19,6 +19,10 @@ function loadBuilder(){
     ' specSectionPaths, specValueAt, builderTargetPath, builderPathString,' +
     ' builderUniqueKey, builderFlatRowIds,' +
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
+    ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
+    ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
+    ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
+    ' planMoveStep, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -280,5 +284,204 @@ test('every insert result and every guide entry stays render-ready', () => {
   for (const kind of ['node', 'edge', 'step', 'panel', 'section']){
     const g = B.BUILDER_GUIDES[kind];
     assert.ok(g.title && g.how && g.fields.length >= 4, kind + ' guide is filled in');
+  }
+});
+
+/* ================= pass 2: field edits, renames, deletes, reorders ======= */
+
+/* a richer section for the cascade tests: stack rows, a float, a group of
+   edges sharing a node, multi-edge steps, panel patches */
+const RICH = {
+  page: {
+    blocks: [
+      {heading: 'Rich',
+       diagram: {
+         nodes: {a: {title: 'A'}, b: {title: 'B'}, c: {title: 'C'}, f: {title: 'F'}},
+         rows: [['a', ['b', 'c']]],
+         floats: [{id: 'f', side: 'above'}],
+         edges: [
+           {from: 'a', to: 'b', kind: 'int', label: 'one'},
+           {from: 'a', to: 'c', kind: 'mqtt'},
+           {from: 'b', to: 'a', kind: 'int', ret: true},
+           {from: 'a', to: 'f', kind: 'int'}
+         ],
+         panels: [{id: 'q', type: 'queue', initial: {state: 'empty'}},
+                  {id: 'g', type: 'gauge', unit: 'mA', max: 10, initial: {value: 1}}],
+         steps: [
+           {edge: 'a->b', text: 's1', panels: {q: {state: 'enqueue', label: 'm'}}},
+           {edges: ['a->c', 'b->a'], text: 's2', nodes: ['f'],
+            panels: {q: {state: 'empty'}, g: {value: 5}}},
+           {edge: 'a->f', text: 's3'}
+         ]
+       }}
+    ]
+  }
+};
+const RICH_TEXT = JSON.stringify(RICH, null, 2);
+
+test('jsonReplaceValue swaps a value in place and re-indents multi-line output', () => {
+  const r = B.jsonReplaceValue(TEXT, ['page', 'title'], '"Renamed"');
+  assert.strictEqual(JSON.parse(r.text).page.title, 'Renamed');
+  assert.strictEqual(r.text.slice(r.start, r.end), '"Renamed"');
+  const multi = B.jsonReplaceValue(TEXT, ['page', 'blocks', 0, 'diagram', 'edges'],
+    '[\n  {"from": "b", "to": "a"}\n]');
+  assert.deepStrictEqual(JSON.parse(multi.text).page.blocks[0].diagram.edges, [{from: 'b', to: 'a'}]);
+  assert.strictEqual(B.jsonReplaceValue(TEXT, ['page', 'nope'], '1'), null);
+});
+
+test('jsonRemoveMember removes first, middle, last, and only members cleanly', () => {
+  const obj = '{"a": 1, "b": 2, "c": 3}';
+  assert.deepStrictEqual(JSON.parse(B.jsonRemoveMember(obj, [], 'a').text), {b: 2, c: 3});
+  assert.deepStrictEqual(JSON.parse(B.jsonRemoveMember(obj, [], 'b').text), {a: 1, c: 3});
+  assert.deepStrictEqual(JSON.parse(B.jsonRemoveMember(obj, [], 'c').text), {a: 1, b: 2});
+  assert.deepStrictEqual(JSON.parse(B.jsonRemoveMember('{"only": 1}', [], 'only').text), {});
+  const arr = '{"xs": [10, 20, 30]}';
+  assert.deepStrictEqual(JSON.parse(B.jsonRemoveMember(arr, ['xs'], 1).text).xs, [10, 30]);
+  assert.deepStrictEqual(JSON.parse(B.jsonRemoveMember(arr, ['xs'], 2).text).xs, [10, 20]);
+  assert.strictEqual(B.jsonRemoveMember(obj, [], 'zz'), null);
+});
+
+test('jsonSetField replaces, inserts, and removes one field surgically', () => {
+  const nodePath = ['page', 'blocks', 0, 'diagram', 'nodes', 'a'];
+  const rep = B.jsonSetField(TEXT, nodePath, 'title', '"A2"');
+  assert.strictEqual(JSON.parse(rep.text).page.blocks[0].diagram.nodes.a.title, 'A2');
+  const ins = B.jsonSetField(TEXT, nodePath, 'icon', '"db"');
+  assert.strictEqual(JSON.parse(ins.text).page.blocks[0].diagram.nodes.a.icon, 'db');
+  const rem = B.jsonSetField(TEXT, nodePath, 'title', null);
+  assert.deepStrictEqual(plain(JSON.parse(rem.text).page.blocks[0].diagram.nodes.a), {});
+  const noop = B.jsonSetField(TEXT, nodePath, 'ghost', null);
+  assert.strictEqual(noop.text, TEXT);
+  /* the rest of the document is untouched by a surgical edit */
+  assert.ok(rep.text.includes('"Second tab"'));
+});
+
+test('planSetEdgeEndpoint retargets the edge AND every step reference to its old key', () => {
+  const plan = B.planSetEdgeEndpoint(RICH_TEXT, RICH, 0, 0, 'to', 'c');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.strictEqual(d.edges[0].to, 'c');
+  assert.strictEqual(d.steps[0].edge, 'a->c'); /* was a->b */
+  assert.deepStrictEqual(d.steps[1].edges, ['a->c', 'b->a']); /* untouched */
+  assert.match(B.planSetEdgeEndpoint(RICH_TEXT, RICH, 0, 0, 'to', 'zz').error, /unknown node/);
+  assert.match(B.planSetEdgeEndpoint(RICH_TEXT, RICH, 0, 9, 'to', 'c').error, /not found/);
+});
+
+test('planRenameNode rewrites the map key, rows, floats, edges, steps, and step edge keys', () => {
+  const plan = B.planRenameNode(RICH_TEXT, RICH, 0, 'a', 'hub');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.ok(d.nodes.hub && !d.nodes.a);
+  assert.deepStrictEqual(d.rows, [['hub', ['b', 'c']]]);
+  assert.deepStrictEqual(d.edges.map(e => e.from + '->' + e.to),
+    ['hub->b', 'hub->c', 'b->hub', 'hub->f']);
+  assert.strictEqual(d.steps[0].edge, 'hub->b');
+  assert.deepStrictEqual(d.steps[1].edges, ['hub->c', 'b->hub']);
+  assert.strictEqual(d.steps[2].edge, 'hub->f');
+  /* keeps map order: hub replaces a in place */
+  assert.deepStrictEqual(Object.keys(d.nodes), ['hub', 'b', 'c', 'f']);
+
+  const float = B.planRenameNode(RICH_TEXT, RICH, 0, 'f', 'sig');
+  const fd = JSON.parse(float.text).page.blocks[0].diagram;
+  assert.strictEqual(fd.floats[0].id, 'sig');
+  assert.strictEqual(fd.steps[1].nodes[0], 'sig');
+
+  assert.match(B.planRenameNode(RICH_TEXT, RICH, 0, 'a', 'b').error, /taken/);
+  assert.match(B.planRenameNode(RICH_TEXT, RICH, 0, 'a', 'no spaces').error, /letters/);
+  assert.match(B.planRenameNode(RICH_TEXT, RICH, 0, 'zz', 'ok').error, /not found/);
+});
+
+test('planRenamePanel moves every step patch to the new id', () => {
+  const plan = B.planRenamePanel(RICH_TEXT, RICH, 0, 0, 'queue1');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.strictEqual(d.panels[0].id, 'queue1');
+  assert.deepStrictEqual(Object.keys(d.steps[0].panels), ['queue1']);
+  assert.deepStrictEqual(Object.keys(d.steps[1].panels), ['queue1', 'g']);
+  assert.match(B.planRenamePanel(RICH_TEXT, RICH, 0, 0, 'g').error, /taken/);
+});
+
+test('planDeleteNode removes placement and touching edges, pruning steps to legal shapes', () => {
+  const plan = B.planDeleteNode(RICH_TEXT, RICH, 0, 'a');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.ok(!d.nodes.a);
+  assert.deepStrictEqual(d.rows, [[['b', 'c']]]); /* plain slot removed, stack kept */
+  assert.deepStrictEqual(d.edges, []); /* every edge touched a */
+  /* steps survive as captions; edge references are gone, node light kept */
+  assert.ok(!('edge' in d.steps[0]) && !('edges' in d.steps[0]));
+  assert.deepStrictEqual(d.steps[1].nodes, ['f']);
+  assert.strictEqual(d.steps.length, 3);
+
+  /* deleting a stack member shrinks the stack; deleting the float drops floats */
+  const b = JSON.parse(B.planDeleteNode(RICH_TEXT, RICH, 0, 'b').text).page.blocks[0].diagram;
+  assert.deepStrictEqual(b.rows, [['a', ['c']]]);
+  const f = JSON.parse(B.planDeleteNode(RICH_TEXT, RICH, 0, 'f').text).page.blocks[0].diagram;
+  assert.ok(!('floats' in f));
+  assert.ok(!('nodes' in f.steps[1]));
+});
+
+test('planDeleteEdge splices the edge and prunes step references unless a duplicate key survives', () => {
+  const plan = B.planDeleteEdge(RICH_TEXT, RICH, 0, 0); /* a->b */
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.strictEqual(d.edges.length, 3);
+  assert.ok(!('edge' in d.steps[0]));
+
+  /* with a duplicate a->b present, deleting one keeps the step reference */
+  const dup = JSON.parse(JSON.stringify(RICH));
+  dup.page.blocks[0].diagram.edges.push({from: 'a', to: 'b', kind: 'https'});
+  const dupPlan = B.planDeleteEdge(JSON.stringify(dup, null, 2), dup, 0, 0);
+  const dd = JSON.parse(dupPlan.text).page.blocks[0].diagram;
+  assert.strictEqual(dd.steps[0].edge, 'a->b');
+});
+
+test('planDeletePanel removes the widget and its step patches', () => {
+  const plan = B.planDeletePanel(RICH_TEXT, RICH, 0, 0);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(d.panels.map(p => p.id), ['g']);
+  assert.ok(!('panels' in d.steps[0]));
+  assert.deepStrictEqual(Object.keys(d.steps[1].panels), ['g']);
+});
+
+test('planDeleteStep and planMoveStep splice and reorder only the steps array', () => {
+  const del = B.planDeleteStep(RICH_TEXT, RICH, 0, 1);
+  const dd = JSON.parse(del.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(dd.steps.map(s => s.text), ['s1', 's3']);
+  assert.strictEqual(dd.edges.length, 4); /* untouched */
+
+  const mv = B.planMoveStep(RICH_TEXT, RICH, 0, 0, 1);
+  assert.strictEqual(mv.index, 1);
+  const md = JSON.parse(mv.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(md.steps.map(s => s.text), ['s2', 's1', 's3']);
+  assert.match(B.planMoveStep(RICH_TEXT, RICH, 0, 0, -1).error, /end/);
+  assert.match(B.planMoveStep(RICH_TEXT, RICH, 0, 2, 1).error, /end/);
+});
+
+test('planDeleteSection removes the whole section member and refuses the bare diagram', () => {
+  const plan = B.planDeleteSection(TEXT, SPEC, 1); /* first tab section */
+  const out = JSON.parse(plan.text);
+  assert.deepStrictEqual(out.page.blocks[1].tabs[0].sections, []);
+  assert.strictEqual(out.page.blocks[0].heading, 'Plain');
+  const top = B.planDeleteSection(TEXT, SPEC, 0);
+  assert.strictEqual(JSON.parse(top.text).page.blocks.length, 1);
+  const bare = {nodes: {a: {}}, rows: [['a']]};
+  assert.match(B.planDeleteSection(JSON.stringify(bare), bare, 0).error, /bare diagram/);
+});
+
+test('every pass-2 planner output still parses and leaves unrelated blocks intact', () => {
+  const plans = [
+    B.planSetEdgeEndpoint(RICH_TEXT, RICH, 0, 1, 'from', 'b'),
+    B.planRenameNode(RICH_TEXT, RICH, 0, 'b', 'beta'),
+    B.planRenamePanel(RICH_TEXT, RICH, 0, 1, 'meter'),
+    B.planDeleteNode(RICH_TEXT, RICH, 0, 'c'),
+    B.planDeleteEdge(RICH_TEXT, RICH, 0, 2),
+    B.planDeletePanel(RICH_TEXT, RICH, 0, 1),
+    B.planDeleteStep(RICH_TEXT, RICH, 0, 0),
+    B.planMoveStep(RICH_TEXT, RICH, 0, 2, -1),
+    B.planSetField(RICH_TEXT, RICH, ['page', 'blocks', 0], 'accent', '"violet"')
+  ];
+  for (const plan of plans){
+    assert.ok(!plan.error, plan.error);
+    const out = JSON.parse(plan.text);
+    assert.strictEqual(out.page.blocks[0].heading, 'Rich');
   }
 });

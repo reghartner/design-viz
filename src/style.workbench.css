@@ -36,7 +36,7 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
      offset, the summary bar, the insert row, and the render row — and grows
      by the guide panel's 200px cap while guidance is showing */
   .workwrap .specbox textarea{height:calc(100vh - 252px);}
-  .workwrap .specbox:has(.guide:not([hidden])) textarea{height:calc(100vh - 452px);}
+  .workwrap .specbox:has(.guide:not([hidden])) textarea{height:max(200px, calc(100vh - 592px));}
   .workwrap .msgs{max-height:120px; overflow-y:auto;}
 }
 
@@ -74,7 +74,7 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .btarget{font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); margin-left:auto;}
 .guide{border-bottom:1px solid var(--line); padding:10px 14px; font-size:12.5px; line-height:1.5; color:var(--sub);
-  max-height:200px; overflow-y:auto;}
+  max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}
 .guide .gpath{display:block; margin:2px 0 6px; font:600 11px 'IBM Plex Mono',monospace; color:var(--accent); word-break:break-all;}
 .guide .gerr{color:#B0771A; margin:4px 0;}
@@ -82,6 +82,24 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .guide li{margin:2px 0;}
 .guide li code{font:600 11px 'IBM Plex Mono',monospace; background:var(--codebg); color:var(--codeink); padding:0 4px; border-radius:4px;}
 .guide .gtokens{margin-top:6px; font:500 11px 'IBM Plex Mono',monospace;}
+
+/* inspector: per-element edit form written through to the spec JSON */
+.iform{margin-top:8px; display:grid; gap:5px;}
+.frow{display:flex; align-items:center; gap:8px;}
+.flab{flex:0 0 88px; font:600 11px 'IBM Plex Mono',monospace; color:var(--sub); text-align:right;}
+.fctl{flex:1; min-width:0; background:var(--codebg); color:var(--codeink); border:1px solid var(--line);
+  border-radius:6px; font:12px/1.4 'IBM Plex Mono',monospace; padding:4px 8px; box-sizing:border-box;}
+textarea.fctl{resize:vertical; min-height:44px;}
+.fctl:focus-visible{outline:2px solid var(--accent); outline-offset:-1px;}
+.fnum{flex:0 1 90px;}
+.fchk{border:0; background:none; padding:0;}
+.fnote{border:0; background:none; font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); padding:0;}
+.iacts{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+.bdanger{color:#C0392B; border-color:#C0392B55;}
+.bdanger:hover{color:#C0392B; border-color:#C0392B;}
+.ihelp{margin-top:10px;}
+.ihelp summary{cursor:pointer; font:600 11px 'IBM Plex Mono',monospace; color:var(--sub);}
+.ihelp[open] summary{margin-bottom:4px;}
 
 /* builder: selection highlight on the rendered page (svg + widget cards) */
 .docview .node, .docview .edge, .docview .halo, .docview .lbl, .docview .coin,

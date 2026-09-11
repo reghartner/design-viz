@@ -343,6 +343,292 @@ function planAddSection(text, raw){
           index: specSectionPaths(raw).length};
 }
 
+/* ---------------- field edits, renames, deletes, reorders ----------------
+   Two edit strategies. Single-field edits are SURGICAL: replace, insert, or
+   remove one member's text and leave the rest of the document byte-for-byte
+   untouched. Edits that must stay consistent across several diagram keys
+   (renaming a node id, deleting a node, retargeting an edge) REWRITE one
+   value — usually the section's diagram object — from a mutated copy,
+   serialized with two-space indents and re-indented to the container
+   depth. */
+
+function jsonReplaceValue(text, path, valueText){
+  /* Replace the value at path; multi-line valueText is re-indented to the
+     member's line indent. Returns {text, start, end} or null. */
+  var loc = jsonLocate(text, path);
+  if (!loc) return null;
+  var ls = text.lastIndexOf('\n', loc.keyStart) + 1;
+  var indent = (text.slice(ls, loc.keyStart).match(/^[ \t]*/) || [''])[0];
+  var adj = valueText.split('\n').join('\n' + indent);
+  return {text: text.slice(0, loc.start) + adj + text.slice(loc.end),
+          start: loc.start, end: loc.start + adj.length};
+}
+function jsonRemoveMember(text, containerPath, key){
+  /* Remove one member (and the comma that binds it) from the object or
+     array at containerPath. Returns {text} or null when absent. */
+  var loc = containerPath.length ? jsonLocate(text, containerPath) : {start: jsonSkipWS(text, 0)};
+  var cont = loc ? jsonContainer(text, loc.start) : null;
+  if (!cont) return null;
+  var idx = -1;
+  for (var m = 0; m < cont.members.length; m++){
+    if (cont.members[m].key === key){ idx = m; break; }
+  }
+  if (idx < 0) return null;
+  var mem = cont.members[idx], from, to;
+  if (cont.members.length === 1){ from = cont.open + 1; to = cont.close; }
+  else if (idx === cont.members.length - 1){ from = cont.members[idx - 1].valEnd; to = mem.valEnd; }
+  else { from = mem.keyStart; to = cont.members[idx + 1].keyStart; }
+  return {text: text.slice(0, from) + text.slice(to)};
+}
+function jsonSetField(text, objPath, key, valueTextOrNull){
+  /* Set (replace or insert) one field of the object at objPath; null value
+     removes the field. Returns {text, start?, end?} or null. */
+  var exists = jsonLocate(text, objPath.concat([key]));
+  if (valueTextOrNull == null){
+    if (!exists) return {text: text};
+    return jsonRemoveMember(text, objPath, key);
+  }
+  if (exists) return jsonReplaceValue(text, objPath.concat([key]), valueTextOrNull);
+  return jsonInsertMember(text, objPath, key, valueTextOrNull);
+}
+
+function builderClone(v){ return JSON.parse(JSON.stringify(v)); }
+function builderRewrite(text, raw, path, mutate){
+  /* Rewrite the value at path from a mutated deep copy. mutate(copy) edits
+     in place and may return {error}. */
+  var cur = specValueAt(raw, path);
+  if (cur == null || typeof cur !== 'object')
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var copy = builderClone(cur);
+  var out = mutate(copy);
+  if (out && out.error) return out;
+  var r = jsonReplaceValue(text, path, JSON.stringify(copy, null, 2));
+  if (!r) return {error: 'could not rewrite the editor text'};
+  return r;
+}
+
+function planSetField(text, raw, targetPath, key, valueTextOrNull){
+  /* Surgical single-field edit on the object at targetPath. */
+  if (!jsonLocate(text, targetPath))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var r = jsonSetField(text, targetPath, key, valueTextOrNull);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+
+function builderEdgeKey(e){ return ((e && e.from) || '') + '->' + ((e && e.to) || ''); }
+function builderRetargetStepKeys(steps, oldKey, newKey){
+  /* Point every step reference at newKey; null newKey removes the
+     reference (a step may legally end up edgeless). */
+  (steps || []).forEach(function(st){
+    if (!st) return;
+    if (st.edge === oldKey){
+      if (newKey) st.edge = newKey; else delete st.edge;
+    }
+    if (Array.isArray(st.edges)){
+      st.edges = st.edges.map(function(k){ return k === oldKey ? newKey : k; })
+                         .filter(function(k){ return typeof k === 'string'; });
+      if (!st.edges.length) delete st.edges;
+    }
+  });
+}
+
+var BUILDER_ID_RE = /^[A-Za-z0-9_-]+$/;
+
+function planSetEdgeEndpoint(text, raw, sectionIdx, edgeIdx, field, nodeId){
+  /* Change an edge's from/to and retarget every step reference to the
+     edge's old "from->to" key. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var e = (got.d.edges || [])[edgeIdx];
+  if (!e) return {error: 'edge not found — reselect and try again'};
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, nodeId))
+    return {error: 'unknown node id "' + nodeId + '"'};
+  var oldKey = builderEdgeKey(e);
+  return builderRewrite(text, raw, got.path, function(d){
+    d.edges[edgeIdx][field] = nodeId;
+    builderRetargetStepKeys(d.steps, oldKey, builderEdgeKey(d.edges[edgeIdx]));
+  });
+}
+
+function planRenameNode(text, raw, sectionIdx, oldId, newId){
+  /* Rename a node id everywhere it is referenced: the nodes map, rows and
+     stacks, floats, edge endpoints, step node lists, and the step
+     "from->to" keys of every edge whose endpoint changed. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!BUILDER_ID_RE.test(newId || ''))
+    return {error: 'node ids use letters, digits, _ and - only'};
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, oldId))
+    return {error: 'node "' + oldId + '" not found'};
+  if (newId === oldId) return {error: 'same id'};
+  if (Object.prototype.hasOwnProperty.call(got.d.nodes, newId))
+    return {error: 'id "' + newId + '" is already taken'};
+  return builderRewrite(text, raw, got.path, function(d){
+    var nodes = {};
+    Object.keys(d.nodes).forEach(function(k){ nodes[k === oldId ? newId : k] = d.nodes[k]; });
+    d.nodes = nodes;
+    d.rows = (d.rows || []).map(function(row){
+      return row.map(function(slot){
+        if (Array.isArray(slot)) return slot.map(function(s){ return s === oldId ? newId : s; });
+        return slot === oldId ? newId : slot;
+      });
+    });
+    (Array.isArray(d.floats) ? d.floats : []).forEach(function(f){
+      if (f && f.id === oldId) f.id = newId;
+    });
+    var renamedKeys = [];
+    (d.edges || []).forEach(function(e){
+      if (!e) return;
+      var was = builderEdgeKey(e), hit = false;
+      if (e.from === oldId){ e.from = newId; hit = true; }
+      if (e.to === oldId){ e.to = newId; hit = true; }
+      if (hit) renamedKeys.push([was, builderEdgeKey(e)]);
+    });
+    (d.steps || []).forEach(function(st){
+      if (st && Array.isArray(st.nodes))
+        st.nodes = st.nodes.map(function(n){ return n === oldId ? newId : n; });
+    });
+    renamedKeys.forEach(function(pair){ builderRetargetStepKeys(d.steps, pair[0], pair[1]); });
+  });
+}
+
+function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
+  /* Rename a panel id and move every step patch keyed by it. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var p = (got.d.panels || [])[panelIdx];
+  if (!p) return {error: 'panel not found — reselect and try again'};
+  if (!BUILDER_ID_RE.test(newId || ''))
+    return {error: 'panel ids use letters, digits, _ and - only'};
+  var oldId = p.id;
+  if (newId === oldId) return {error: 'same id'};
+  if ((got.d.panels || []).some(function(q){ return q && q.id === newId; }))
+    return {error: 'id "' + newId + '" is already taken'};
+  return builderRewrite(text, raw, got.path, function(d){
+    d.panels[panelIdx].id = newId;
+    (d.steps || []).forEach(function(st){
+      if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, oldId)){
+        var patches = {};
+        Object.keys(st.panels).forEach(function(k){ patches[k === oldId ? newId : k] = st.panels[k]; });
+        st.panels = patches;
+      }
+    });
+  });
+}
+
+function planDeleteNode(text, raw, sectionIdx, id){
+  /* Remove a node plus its row/float placement and every edge touching it;
+     step references to the removed edges and the node are pruned (a step
+     may legally stay as caption-only). */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
+    return {error: 'node "' + id + '" not found'};
+  return builderRewrite(text, raw, got.path, function(d){
+    delete d.nodes[id];
+    d.rows = (d.rows || []).map(function(row){
+      return row.map(function(slot){
+        return Array.isArray(slot) ? slot.filter(function(s){ return s !== id; }) : slot;
+      }).filter(function(slot){
+        return Array.isArray(slot) ? slot.length > 0 : slot !== id;
+      });
+    }).filter(function(row){ return row.length > 0; });
+    if (Array.isArray(d.floats)){
+      d.floats = d.floats.filter(function(f){ return !(f && f.id === id); });
+      if (!d.floats.length) delete d.floats;
+    }
+    var removedKeys = [];
+    if (Array.isArray(d.edges)){
+      d.edges = d.edges.filter(function(e){
+        var hit = e && (e.from === id || e.to === id);
+        if (hit) removedKeys.push(builderEdgeKey(e));
+        return !hit;
+      });
+    }
+    var surviving = {};
+    (d.edges || []).forEach(function(e){ if (e) surviving[builderEdgeKey(e)] = true; });
+    removedKeys.forEach(function(k){
+      if (!surviving[k]) builderRetargetStepKeys(d.steps, k, null);
+    });
+    (d.steps || []).forEach(function(st){
+      if (st && Array.isArray(st.nodes)){
+        st.nodes = st.nodes.filter(function(n){ return n !== id; });
+        if (!st.nodes.length) delete st.nodes;
+      }
+    });
+  });
+}
+
+function planDeleteEdge(text, raw, sectionIdx, edgeIdx){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var e = (got.d.edges || [])[edgeIdx];
+  if (!e) return {error: 'edge not found — reselect and try again'};
+  var key = builderEdgeKey(e);
+  return builderRewrite(text, raw, got.path, function(d){
+    d.edges.splice(edgeIdx, 1);
+    var stillThere = d.edges.some(function(o){ return o && builderEdgeKey(o) === key; });
+    if (!stillThere) builderRetargetStepKeys(d.steps, key, null);
+  });
+}
+
+function planDeletePanel(text, raw, sectionIdx, panelIdx){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var p = (got.d.panels || [])[panelIdx];
+  if (!p) return {error: 'panel not found — reselect and try again'};
+  var id = p.id;
+  return builderRewrite(text, raw, got.path, function(d){
+    d.panels.splice(panelIdx, 1);
+    if (!d.panels.length) delete d.panels;
+    (d.steps || []).forEach(function(st){
+      if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, id)){
+        delete st.panels[id];
+        if (!Object.keys(st.panels).length) delete st.panels;
+      }
+    });
+  });
+}
+
+function planDeleteStep(text, raw, sectionIdx, stepIdx){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!Array.isArray(got.d.steps) || !got.d.steps[stepIdx])
+    return {error: 'step not found — reselect and try again'};
+  return builderRewrite(text, raw, got.path.concat(['steps']), function(steps){
+    steps.splice(stepIdx, 1);
+  });
+}
+
+function planMoveStep(text, raw, sectionIdx, stepIdx, delta){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var steps = got.d.steps;
+  var to = stepIdx + delta;
+  if (!Array.isArray(steps) || !steps[stepIdx]) return {error: 'step not found'};
+  if (to < 0 || to >= steps.length) return {error: 'already at that end'};
+  var r = builderRewrite(text, raw, got.path.concat(['steps']), function(copy){
+    var item = copy.splice(stepIdx, 1)[0];
+    copy.splice(to, 0, item);
+  });
+  if (r.error) return r;
+  r.index = to;
+  return r;
+}
+
+function planDeleteSection(text, raw, sectionIdx){
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'no such section'};
+  if (!rec.section.length)
+    return {error: 'this spec is one bare diagram — clear the editor instead of deleting'};
+  var parentPath = rec.section.slice(0, -1);
+  var key = rec.section[rec.section.length - 1];
+  var r = jsonRemoveMember(text, parentPath, key);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -414,9 +700,12 @@ function initWorkbenchBuilder(opts){
   var view = opts.view, src = opts.src, render = opts.render;
   var guide = document.getElementById('guide');
   var targetLabel = document.getElementById('btarget');
+  var undoBtn = document.getElementById('undo-builder');
   var specbox = document.querySelector('.specbox');
   var selectedEl = null;
-  var insertSection = 0; /* zero-based ordinal of the section inserts target */
+  var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
+  var insertSection = 0;    /* zero-based ordinal of the section inserts target */
+  var undoStack = [];
 
   function parseEditor(){
     try { return {raw: JSON.parse(src.value)}; }
@@ -446,28 +735,359 @@ function initWorkbenchBuilder(opts){
     targetLabel.textContent = 'into section ' + (insertSection + 1) + name +
       ' — click a section to retarget';
   }
-  function renderGuide(kind, pathStr, note){
+
+  /* ---- undo: one snapshot of the editor text per builder action ---- */
+  function pushUndo(){
+    undoStack.push(src.value);
+    if (undoStack.length > 30) undoStack.shift();
+    if (undoBtn) undoBtn.disabled = false;
+  }
+  function doUndo(){
+    if (!undoStack.length) return;
+    src.value = undoStack.pop();
+    if (undoBtn) undoBtn.disabled = !undoStack.length;
+    render();
+    setSelected(null); currentTarget = null;
+    inspectorMessage('undid the last builder action — board re-rendered');
+  }
+  if (undoBtn) undoBtn.addEventListener('click', doUndo);
+
+  /* ---- board highlight by stable identity, re-applied after renders ---- */
+  function findTargetEl(t){
+    if (!t) return null;
+    var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
+    if (!secEl) return null;
+    if (t.kind === 'section') return secEl;
+    var sel = t.kind === 'node' ? '[data-dv-node="' + t.id + '"]' :
+              t.kind === 'edge' ? 'path.edge[data-dv-edge="' + t.index + '"]' :
+              t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
+                                  '[data-dv-panel="' + t.index + '"]';
+    return secEl.querySelector(sel);
+  }
+  function rehighlight(){ setSelected(findTargetEl(currentTarget)); }
+
+  /* ================= inspector: forms that write the JSON ================= */
+
+  function inspectorMessage(text){
     if (!guide) return;
     guide.hidden = false;
     guide.innerHTML = '';
-    var g = BUILDER_GUIDES[kind];
-    if (!g) return;
-    var b = document.createElement('b');
-    b.textContent = g.title;
-    guide.appendChild(b);
-    if (pathStr){
-      var p = document.createElement('span');
-      p.className = 'gpath'; p.textContent = pathStr;
-      guide.appendChild(p);
+    var n = document.createElement('div');
+    n.className = 'gerr'; n.textContent = text;
+    guide.appendChild(n);
+  }
+  function formError(text){
+    var slot = guide && guide.querySelector('.ierr');
+    if (!slot){ inspectorMessage(text); return; }
+    slot.textContent = text || '';
+    slot.hidden = !text;
+  }
+
+  /* apply a plan produced by a pure planner; keeps form focus (no textarea
+     focus steal), re-renders, re-applies the board highlight */
+  function applyPlan(plan, opt){
+    if (!plan || plan.error){ formError(plan ? plan.error : 'edit failed'); return false; }
+    formError('');
+    pushUndo();
+    src.value = plan.text;
+    render();
+    if (opt && opt.after) opt.after(plan);
+    rehighlight();
+    var parsed = parseEditor();
+    if (!parsed.error) updateTargetLabel(parsed.raw);
+    if (plan.start != null) scrollTextareaTo(plan.start);
+    return true;
+  }
+  function commitSimple(key, valueTextOrNull){
+    var parsed = parseEditor();
+    if (parsed.error){ formError(parsed.error); return; }
+    var path = builderTargetPath(parsed.raw, currentTarget);
+    if (!path){ formError('element not found — click Render, then reselect'); return; }
+    applyPlan(planSetField(src.value, parsed.raw, path, key, valueTextOrNull));
+  }
+  function commitCascade(planFor, opt){
+    var parsed = parseEditor();
+    if (parsed.error){ formError(parsed.error); return; }
+    applyPlan(planFor(parsed.raw), opt);
+  }
+
+  /* ---- form controls ---- */
+  function frow(labelText, control){
+    var row = document.createElement('label');
+    row.className = 'frow';
+    var lab = document.createElement('span');
+    lab.className = 'flab'; lab.textContent = labelText;
+    row.appendChild(lab); row.appendChild(control);
+    return row;
+  }
+  function commitOnChange(input, getCommitValue, commit){
+    var last = input.value;
+    var fire = function(){
+      if (input.value === last) return;
+      last = input.value;
+      commit(getCommitValue ? getCommitValue(input.value) : input.value);
+    };
+    input.addEventListener('change', fire);
+    input.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter' && input.tagName !== 'TEXTAREA'){ ev.preventDefault(); fire(); }
+    });
+  }
+  function textControl(value, commit, opts){
+    var input = document.createElement(opts && opts.textarea ? 'textarea' : 'input');
+    if (!opts || !opts.textarea) input.type = 'text';
+    input.className = 'fctl';
+    if (opts && opts.placeholder) input.placeholder = opts.placeholder;
+    if (opts && opts.list) input.setAttribute('list', opts.list);
+    input.value = value == null ? '' : String(value);
+    /* empty commits as removal unless the field is required */
+    commitOnChange(input, null, function(v){
+      var trimmed = v.trim();
+      if (!trimmed && opts && opts.required){ formError(opts.required); return; }
+      commit(trimmed === '' ? null : trimmed);
+    });
+    return input;
+  }
+  function numberControl(value, commit){
+    var input = document.createElement('input');
+    input.type = 'text'; input.className = 'fctl fnum';
+    input.value = value == null ? '' : String(value);
+    commitOnChange(input, null, function(v){
+      var trimmed = v.trim();
+      if (trimmed === ''){ commit(null); return; }
+      var num = Number(trimmed);
+      if (!isFinite(num)){ formError('"' + trimmed + '" is not a number'); return; }
+      commit(num);
+    });
+    return input;
+  }
+  function selectControl(options, current, commit, allowEmpty){
+    var sel = document.createElement('select');
+    sel.className = 'fctl';
+    if (allowEmpty){
+      var none = document.createElement('option');
+      none.value = ''; none.textContent = '(none)';
+      sel.appendChild(none);
     }
-    if (note){
-      var n = document.createElement('div');
-      n.className = 'gerr'; n.textContent = note;
-      guide.appendChild(n);
+    var seen = false;
+    options.forEach(function(o){
+      var op = document.createElement('option');
+      op.value = o; op.textContent = o;
+      if (o === current) seen = true;
+      sel.appendChild(op);
+    });
+    if (current != null && current !== '' && !seen){
+      var extra = document.createElement('option');
+      extra.value = current; extra.textContent = current + ' (unknown)';
+      sel.appendChild(extra);
     }
+    sel.value = current == null ? '' : String(current);
+    commitOnChange(sel, null, function(v){ commit(v === '' ? null : v); });
+    return sel;
+  }
+  function checkboxControl(checked, commit){
+    var wrap = document.createElement('span');
+    wrap.className = 'fctl fchk';
+    var input = document.createElement('input');
+    input.type = 'checkbox'; input.checked = !!checked;
+    input.addEventListener('change', function(){ commit(input.checked); });
+    wrap.appendChild(input);
+    return wrap;
+  }
+  function actionButton(label, onClick, cls){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'bbtn ' + (cls || '');
+    b.textContent = label;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function ensureAccentDatalist(){
+    if (document.getElementById('accent-tokens')) return;
+    var dl = document.createElement('datalist');
+    dl.id = 'accent-tokens';
+    Object.keys(ACCENTS).forEach(function(name){
+      var op = document.createElement('option');
+      op.value = name; dl.appendChild(op);
+    });
+    document.body.appendChild(dl);
+  }
+
+  function protocolKinds(page){
+    var kinds = ['https', 'int', 'mqtt'];
+    Object.keys((page && page.protocols) || {}).forEach(function(k){
+      if (kinds.indexOf(k) < 0) kinds.push(k);
+    });
+    return kinds;
+  }
+
+  /* ---- per-kind form builders; each returns an array of DOM rows ---- */
+  function nodeForm(val, ctx){
+    var t = currentTarget;
+    return [
+      frow('id', textControl(t.id, function(v){
+        if (v == null){ formError('a node needs an id'); return; }
+        commitCascade(function(raw){ return planRenameNode(src.value, raw, t.section, t.id, v); },
+          {after: function(){ t.id = v; renderInspector(); }});
+      }, {required: 'a node needs an id'})),
+      frow('title', textControl(val.title, function(v){ commitSimple('title', v == null ? null : JSON.stringify(v)); })),
+      frow('sub', textControl(val.sub, function(v){ commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
+      frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ commitSimple('icon', JSON.stringify(v || 'gear')); })),
+      frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ commitSimple('tint', JSON.stringify(v || 'cmd')); })),
+      frow('link', textControl(val.link, function(v){ commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+    ];
+  }
+  function edgeForm(val, ctx){
+    var t = currentTarget;
+    var ids = Object.keys((ctx.diagram && ctx.diagram.nodes) || {});
+    function endpoint(field){
+      return selectControl(ids, val[field], function(v){
+        if (v == null) return;
+        commitCascade(function(raw){
+          return planSetEdgeEndpoint(src.value, raw, t.section, t.index, field, v);
+        });
+      });
+    }
+    return [
+      frow('from', endpoint('from')),
+      frow('to', endpoint('to')),
+      frow('kind', selectControl(protocolKinds(ctx.page), val.kind || 'int', function(v){ commitSimple('kind', JSON.stringify(v || 'int')); })),
+      frow('ret (response)', checkboxControl(val.ret, function(on){ commitSimple('ret', on ? 'true' : null); })),
+      frow('label', textControl(val.label, function(v){ commitSimple('label', v == null ? null : JSON.stringify(v)); })),
+      frow('bend', numberControl(val.bend, function(v){ commitSimple('bend', v == null ? null : String(v)); })),
+      frow('labelDx', numberControl(val.labelDx, function(v){ commitSimple('labelDx', v == null ? null : String(v)); })),
+      frow('labelDy', numberControl(val.labelDy, function(v){ commitSimple('labelDy', v == null ? null : String(v)); }))
+    ];
+  }
+  function stepForm(val, ctx){
+    var rows = [
+      frow('text', textControl(val.text, function(v){ commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
+    ];
+    if (Array.isArray(val.edges)){
+      var note = document.createElement('span');
+      note.className = 'fctl fnote';
+      note.textContent = 'multi-hop step (' + val.edges.join(', ') + ') — edit the edges list in the JSON';
+      rows.push(frow('edges', note));
+    } else {
+      var keys = ((ctx.diagram && ctx.diagram.edges) || []).map(builderEdgeKey);
+      rows.push(frow('edge', selectControl(keys, val.edge, function(v){
+        commitSimple('edge', v == null ? null : JSON.stringify(v));
+      }, true)));
+    }
+    var laneNames = Object.keys((ctx.page && ctx.page.lanes) || {});
+    rows.push(frow('lane', selectControl(laneNames, val.lane, function(v){
+      commitSimple('lane', v == null ? null : JSON.stringify(v));
+    }, true)));
+    rows.push(frow('link', textControl(val.link, function(v){ commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})));
+    return rows;
+  }
+  function panelForm(val, ctx){
+    var t = currentTarget;
+    return [
+      frow('id', textControl(val.id, function(v){
+        if (v == null){ formError('a panel needs an id'); return; }
+        commitCascade(function(raw){ return planRenamePanel(src.value, raw, t.section, t.index, v); },
+          {after: function(){ renderInspector(); }});
+      }, {required: 'a panel needs an id'})),
+      frow('type', selectControl(PANEL_TYPES, val.type, function(v){ commitSimple('type', v == null ? null : JSON.stringify(v)); })),
+      frow('title', textControl(val.title, function(v){ commitSimple('title', v == null ? null : JSON.stringify(v)); }))
+    ];
+  }
+  function sectionForm(val, ctx){
+    ensureAccentDatalist();
+    return [
+      frow('heading', textControl(val.heading, function(v){ commitSimple('heading', v == null ? null : JSON.stringify(v)); })),
+      frow('accent', textControl(val.accent, function(v){ commitSimple('accent', v == null ? null : JSON.stringify(v)); },
+        {list: 'accent-tokens', placeholder: 'token or #hex'})),
+      frow('source', textControl(val.source, function(v){ commitSimple('source', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+    ];
+  }
+
+  function deletePlanFor(t, raw){
+    if (t.kind === 'node') return planDeleteNode(src.value, raw, t.section, t.id);
+    if (t.kind === 'edge') return planDeleteEdge(src.value, raw, t.section, t.index);
+    if (t.kind === 'step') return planDeleteStep(src.value, raw, t.section, t.index);
+    if (t.kind === 'panel') return planDeletePanel(src.value, raw, t.section, t.index);
+    return planDeleteSection(src.value, raw, t.section);
+  }
+
+  function renderInspector(){
+    if (!guide || !currentTarget) return;
+    var t = currentTarget;
+    guide.hidden = false;
+    guide.innerHTML = '';
+    var g = BUILDER_GUIDES[t.kind] || {title: t.kind, how: '', fields: []};
+
+    var head = document.createElement('b');
+    head.textContent = g.title;
+    guide.appendChild(head);
+
+    var parsed = parseEditor();
+    var path = parsed.error ? null : builderTargetPath(parsed.raw, t);
+    var loc = path ? jsonLocate(src.value, path) : null;
+
+    var p = document.createElement('span');
+    p.className = 'gpath';
+    p.textContent = path ? builderPathString(path) : '';
+    guide.appendChild(p);
+
+    var err = document.createElement('div');
+    err.className = 'gerr ierr'; err.hidden = true;
+    guide.appendChild(err);
+
+    if (parsed.error){
+      formError(parsed.error + ' — fix it to edit this element');
+    } else if (!loc){
+      formError('definition not found in the editor text — the render and the editor may be out of sync (click Render)');
+    } else if (t.kind === 'section' && path.length === 0){
+      formError('bare diagram — wrap it as {"page": {"blocks": [ ... ]}} to edit heading and accent');
+    } else {
+      var val = specValueAt(parsed.raw, path) || {};
+      var rec = specSectionPaths(parsed.raw)[t.section];
+      var ctx = {
+        page: normalize(parsed.raw) || {},
+        diagram: rec ? specValueAt(parsed.raw, rec.diagram) : null
+      };
+      var form = document.createElement('div');
+      form.className = 'iform';
+      var rows =
+        t.kind === 'node' ? nodeForm(val, ctx) :
+        t.kind === 'edge' ? edgeForm(val, ctx) :
+        t.kind === 'step' ? stepForm(val, ctx) :
+        t.kind === 'panel' ? panelForm(val, ctx) : sectionForm(val, ctx);
+      rows.forEach(function(r){ form.appendChild(r); });
+      guide.appendChild(form);
+
+      var acts = document.createElement('div');
+      acts.className = 'iacts';
+      if (t.kind === 'step'){
+        acts.appendChild(actionButton('↑ earlier', function(){
+          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
+            {after: function(plan){ t.index = plan.index; renderInspector(); }});
+        }));
+        acts.appendChild(actionButton('↓ later', function(){
+          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1); },
+            {after: function(plan){ t.index = plan.index; renderInspector(); }});
+        }));
+      }
+      acts.appendChild(actionButton('delete ' + t.kind, function(){
+        commitCascade(function(raw){ return deletePlanFor(t, raw); },
+          {after: function(){
+            currentTarget = null; setSelected(null);
+            if (t.kind === 'section') insertSection = 0;
+            inspectorMessage(t.kind + ' deleted — undo restores it');
+          }});
+      }, 'bdanger'));
+      guide.appendChild(acts);
+    }
+
+    /* the pass-1 field guidance, tucked under a details fold */
+    var help = document.createElement('details');
+    help.className = 'ihelp';
+    var sum = document.createElement('summary');
+    sum.textContent = 'field help';
+    help.appendChild(sum);
     var how = document.createElement('div');
     how.textContent = g.how;
-    guide.appendChild(how);
+    help.appendChild(how);
     var ul = document.createElement('ul');
     g.fields.forEach(function(f){
       var li = document.createElement('li');
@@ -477,13 +1097,16 @@ function initWorkbenchBuilder(opts){
       li.appendChild(document.createTextNode(' — ' + f[1]));
       ul.appendChild(li);
     });
-    guide.appendChild(ul);
+    help.appendChild(ul);
     if (g.tokens){
-      var t = document.createElement('div');
-      t.className = 'gtokens'; t.textContent = g.tokens;
-      guide.appendChild(t);
+      var tok = document.createElement('div');
+      tok.className = 'gtokens'; tok.textContent = g.tokens;
+      help.appendChild(tok);
     }
+    guide.appendChild(help);
   }
+
+  /* ================= selection ================= */
 
   function targetFromEvent(ev){
     if (ev.target.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
@@ -508,25 +1131,18 @@ function initWorkbenchBuilder(opts){
     return {section: gi, kind: 'section', el: secEl};
   }
 
-  function selectTarget(target){
+  function selectTarget(target, focusEditor){
     setSelected(target.el);
+    currentTarget = {section: target.section, kind: target.kind,
+                     id: target.id, index: target.index};
     insertSection = target.section;
     var parsed = parseEditor();
-    if (parsed.error){
-      renderGuide(target.kind, null, parsed.error + ' — fix it to jump to the definition');
-      updateTargetLabel(null);
-      return;
-    }
-    updateTargetLabel(parsed.raw);
-    var path = builderTargetPath(parsed.raw, target);
+    if (!parsed.error) updateTargetLabel(parsed.raw);
+    renderInspector();
+    if (focusEditor === false) return;
+    var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
     var loc = path ? jsonLocate(src.value, path) : null;
-    if (!loc){
-      renderGuide(target.kind, path ? builderPathString(path) : null,
-        'definition not found in the editor text — the render and the editor may be out of sync (click Render)');
-      return;
-    }
-    renderGuide(target.kind, builderPathString(path), null);
-    selectRange(loc);
+    if (loc) selectRange(loc);
   }
 
   view.addEventListener('click', function(ev){
@@ -534,49 +1150,26 @@ function initWorkbenchBuilder(opts){
     if (target) selectTarget(target);
   });
 
-  /* insert buttons: splice a ready-made snippet into the editor text,
-     re-render, then select the new element both on the board and in the
-     editor */
-  function reselectInserted(plan){
-    var target = null;
-    if (plan.kind === 'section'){
-      var secEl = view.querySelector('.doc-sec[data-dv-section="' + plan.index + '"]');
-      if (secEl) target = {section: plan.index, kind: 'section', el: secEl};
-    } else {
-      var secHost = view.querySelector('.doc-sec[data-dv-section="' + insertSection + '"]');
-      if (secHost){
-        var sel = plan.kind === 'node' ? '[data-dv-node="' + plan.id + '"]' :
-                  plan.kind === 'edge' ? 'path.edge[data-dv-edge="' + plan.index + '"]' :
-                  plan.kind === 'step' ? '[data-dv-step="' + plan.index + '"]' :
-                  '[data-dv-panel="' + plan.index + '"]';
-        var el = secHost.querySelector(sel);
-        if (el) target = {section: insertSection, kind: plan.kind, id: plan.id,
-                          index: plan.index, el: el};
-      }
-    }
-    setSelected(target && target.el);
-  }
+  /* ================= insert buttons ================= */
+
   function runInsert(kind, planFn){
     var parsed = parseEditor();
-    if (parsed.error){
-      renderGuide(kind, null, parsed.error + ' — fix it before inserting');
-      return;
-    }
+    if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
     if (kind !== 'section' && !specSectionPaths(parsed.raw).length){
-      renderGuide(kind, null, 'no sections found in the editor text');
-      return;
+      inspectorMessage('no sections found in the editor text'); return;
     }
     var plan = kind === 'section' ? planAddSection(src.value, parsed.raw)
                                   : planFn(src.value, parsed.raw, insertSection);
-    if (plan.error){
-      renderGuide(kind, null, plan.error);
-      return;
-    }
+    if (plan.error){ inspectorMessage(plan.error); return; }
+    pushUndo();
     src.value = plan.text;
     render();
     if (plan.kind === 'section') insertSection = plan.index;
-    reselectInserted(plan);
-    renderGuide(plan.kind, null, null);
+    var identity = {section: plan.kind === 'section' ? plan.index : insertSection,
+                    kind: plan.kind, id: plan.id, index: plan.index};
+    var el = findTargetEl(identity);
+    selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
+                  index: identity.index, el: el}, false);
     selectRange(plan);
   }
   var addButtons = {

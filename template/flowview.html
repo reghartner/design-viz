@@ -8396,7 +8396,12 @@ function bindCopyControl(win, button, urlFn){
   });
 }
 
-function wireDeepLinks(ctl, win){
+function wireDeepLinks(ctl, win, preservedHash){
+  /* preservedHash (optional): raw "k=v&k=v" text kept at the FRONT of
+     every hash this channel writes and of every copied link — the embed
+     mode passes "embed=<ref>[&sk=<skin>]" so reloads and links keep the
+     embedded view. parseHash ignores the keys, so state handling is
+     unaffected. */
   var suppress = false;
   var linkBase = null;
   var linkBasePath = null;
@@ -8552,6 +8557,11 @@ function wireDeepLinks(ctl, win){
                        diagramSection:null, cardSection:null, row:null};
     }
   }
+  function withPreserved(h){
+    if (!preservedHash) return h;
+    var rest = String(h || '').replace(/^#/, '');
+    return '#' + preservedHash + (rest ? '&' + rest : '');
+  }
   function write(){
     if (suppress) return;
     syncChangedTarget();
@@ -8559,7 +8569,7 @@ function wireDeepLinks(ctl, win){
     var h = currentHash();
     try {
       win.history.replaceState(null, '',
-        h || win.location.pathname + win.location.search);
+        withPreserved(h) || win.location.pathname + win.location.search);
       /* Fragments may contain heading slugs derived from a company document.
          Do not disclose them to an arbitrary embedder: mirroring stays off
          until a valid link-base handshake identifies the host, then targets
@@ -8635,7 +8645,7 @@ function wireDeepLinks(ctl, win){
     if (linkBase !== null) return composeLinkURL(linkBase, hash);
     var href = String(win.location.href || '');
     var base = href ? href.split('#')[0] : (win.location.pathname + win.location.search);
-    return base + hash;
+    return base + withPreserved(hash);
   }
   function bindCopy(button, hashFn){
     bindCopyControl(win, button, function(){ return fullURL(hashFn()); });
@@ -8785,9 +8795,19 @@ function fail(msgs){
   view.appendChild(pre);
 }
 
-/* captured BEFORE boot: the deep-link channel rewrites the hash to its
-   canonical form during wiring, which drops the embed/sk keys */
+/* captured BEFORE boot: the deep-link channel canonicalizes the hash
+   during wiring — it preserves the embed/sk keys only because boot
+   passes them as the preserved prefix, so the request must be read
+   before that first rewrite */
 var embedRequest = embedRequestFromHash(window.location.hash);
+
+/* the embed flag is applied at load; a hash-only navigation (typing or
+   pasting a fragment into an open page) never re-runs boot, so entering
+   or leaving the embedded view via the address bar reloads the page */
+window.addEventListener('hashchange', function(){
+  var next = embedRequestFromHash(window.location.hash);
+  if (JSON.stringify(next) !== JSON.stringify(embedRequest)) window.location.reload();
+});
 
 function applyEmbedMode(ctl){
   /* #embed=<section-ref>[&sk=<skin>]: strip the page down to one
@@ -8833,7 +8853,10 @@ function boot(raw){
       } catch (ex){ /* sandboxed iframes may deny history writes */ }
     }
   }
-  deepLinkChannel = wireDeepLinks(ctl, window); /* tabs, every diagram/step, contract cards + rows */
+  var preservedHash = embedRequest ?
+    'embed=' + encodeURIComponent(String(embedRequest.section)) +
+    (embedRequest.skin ? '&sk=' + encodeURIComponent(embedRequest.skin) : '') : null;
+  deepLinkChannel = wireDeepLinks(ctl, window, preservedHash); /* tabs, every diagram/step, contract cards + rows */
   applyEmbedMode(ctl);
   if (pendingLinkBase){
     deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);

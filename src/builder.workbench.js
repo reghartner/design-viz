@@ -1487,6 +1487,7 @@ function initWorkbenchBuilder(opts){
     if (!plan || plan.error){ formError(plan ? plan.error : 'edit failed'); return false; }
     formError('');
     pushUndo();
+    if (addToStep) addModeSurvive = true; /* builder-internal render — keep the mode */
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -1673,7 +1674,6 @@ function initWorkbenchBuilder(opts){
       frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
     ];
   }
-  var openPatchPanel = null; /* panel id whose patch editor is open in the step form */
   function chipRow(labelText, items, emptyText, onRemove, onBody){
     var box = document.createElement('span');
     box.className = 'fctl mchips';
@@ -1727,21 +1727,17 @@ function initWorkbenchBuilder(opts){
       'none', toggled(planStepToggleNode)));
     var pids = Object.keys(val.panels || {});
     rows.push(chipRow('panels',
-      pids.map(function(pid){ return {key: pid, label: pid, open: pid === openPatchPanel}; }),
-      'none', toggled(planStepTogglePanel),
-      function(pid){ /* chip body toggles that patch's JSON editor */
-        openPatchPanel = openPatchPanel === pid ? null : pid;
-        renderInspector();
-      }));
-    if (openPatchPanel && pids.indexOf(openPatchPanel) >= 0){
-      var pid = openPatchPanel;
+      pids.map(function(pid){ return {key: pid, label: pid}; }),
+      'none', toggled(planStepTogglePanel)));
+    /* every patch gets its own editor, open by default */
+    pids.forEach(function(pid){
       rows.push(frow('patch ' + pid, textControl(JSON.stringify(val.panels[pid]), function(v){
         if (v == null){ formError('a patch is a JSON object — remove the panel chip instead'); return false; }
         return commitCascade(function(raw){
           return planStepSetPanelPatch(src.value, raw, t.section, t.index, pid, v);
         }, {after: function(){ renderInspector(); }});
       }, {textarea: true})));
-    }
+    });
     return rows;
   }
   function panelForm(val, ctx){
@@ -1952,9 +1948,10 @@ function initWorkbenchBuilder(opts){
             {after: function(plan){ t.tab = plan.index; renderInspector(); }});
         }));
       }
+      var armedHere = !!(addToStep && t.kind === 'step' &&
+                         addToStep.section === t.section && addToStep.step === t.index);
       if (t.kind === 'step'){
-        var adding = !!(addToStep && addToStep.section === t.section && addToStep.step === t.index);
-        acts.appendChild(actionButton(adding ? 'DONE adding (Esc)' : 'ADD TO STEP', function(){
+        acts.appendChild(actionButton(armedHere ? 'DONE adding (Esc)' : 'ADD TO STEP', function(){
           if (addToStep){ cancelAddToStep(null); return; }
           if (connect) cancelConnect(null);
           addToStep = {section: t.section, step: t.index};
@@ -1962,7 +1959,7 @@ function initWorkbenchBuilder(opts){
           renderInspector();
         }));
       }
-      if (t.kind === 'step'){
+      if (t.kind === 'step' && !armedHere){
         acts.appendChild(actionButton('↑ earlier', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
             {after: function(plan){ t.index = plan.index; renderInspector(); }});
@@ -1972,7 +1969,8 @@ function initWorkbenchBuilder(opts){
             {after: function(plan){ t.index = plan.index; renderInspector(); }});
         }));
       }
-      acts.appendChild(actionButton('delete ' + t.kind, deleteCurrent, 'bdanger'));
+      if (!armedHere)
+        acts.appendChild(actionButton('delete ' + t.kind, deleteCurrent, 'bdanger'));
       guide.appendChild(acts);
     }
 
@@ -2094,6 +2092,35 @@ function initWorkbenchBuilder(opts){
       targetLabel.textContent = 'add to step ' + (addToStep.step + 1) +
         ': click edges, nodes, panels to toggle — Esc or DONE ends';
   }
+  var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
+    '#undo-builder, #redo-builder, #file-open, #file-save, #draftbar .bbtn, ' +
+    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn';
+  function addModeBlocker(ev){
+    /* while ADD TO STEP is armed, controls that would change the shown
+       step, re-render from outside the mode, or leave the page state
+       behind the mode's back are paused — capture phase, so the
+       engine's own listeners never fire */
+    if (!addToStep) return;
+    var el = ev.target.closest && ev.target.closest(ADD_MODE_BLOCKED);
+    if (!el) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    formError('finish ADD TO STEP first (DONE or Esc) — this control is paused while the mode is armed');
+    addToStepStatus();
+  }
+  document.addEventListener('click', addModeBlocker, true);
+  document.addEventListener('keydown', function(ev){
+    /* the tab bar switches tabs on Arrow/Home/End — pause that too
+       while the mode is armed (capture phase beats the engine's
+       tab-bar listener) */
+    if (!addToStep) return;
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(ev.key) < 0) return;
+    if (!(ev.target.closest && ev.target.closest('.tabbtn'))) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    formError('finish ADD TO STEP first (DONE or Esc) — tab switching is paused while the mode is armed');
+    addToStepStatus();
+  }, true);
   function cancelAddToStep(message){
     if (!addToStep) return;
     addToStep = null;
@@ -2134,9 +2161,8 @@ function initWorkbenchBuilder(opts){
       if (!pn || !pn.id){ formError('panel not found — the render and the editor may be out of sync'); return; }
       plan = planStepTogglePanel(src.value, parsed.raw, mode.section, mode.step, pn.id);
     }
-    addModeSurvive = true;
     var ok = applyPlan(plan, {after: function(){ renderInspector(); }});
-    if (!ok){ addModeSurvive = false; return; }
+    if (!ok) return;
     addToStepStatus(); /* applyPlan resets the target label */
   }
 
@@ -2311,6 +2337,10 @@ function initWorkbenchBuilder(opts){
                  ae.tagName === 'BUTTON' || ae.isContentEditable)) return;
       if (!currentTarget) return;
       ev.preventDefault();
+      if (addToStep){
+        formError('finish ADD TO STEP first (DONE or Esc) — delete is paused while the mode is armed');
+        return;
+      }
       deleteCurrent();
     }
   });

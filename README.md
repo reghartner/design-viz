@@ -249,7 +249,10 @@ auto-saves a draft to browser storage, and after a reload a bar offers to
 **restore** or **discard** the unsaved draft (restore is one undo step).
 **undo** has a matching **redo** (a new action clears the redo line; hand
 edits in the editor are not snapshotted, but undo stashes the current text
-on the redo side first, so nothing is discarded).
+on the redo side first, so nothing is discarded). **Validation findings
+are clickable**: every error/warning in the message list selects the
+offending JSON field in the editor (or its nearest existing parent when
+the message names a field the text does not carry).
 
 ## Validating a spec (the agent loop)
 

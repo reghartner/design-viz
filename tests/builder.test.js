@@ -26,7 +26,7 @@ function loadBuilder(){
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
-    ' specFileName,' +
+    ' specFileName, parseValidationPath, validationRawPath, findingLocation,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -710,4 +710,52 @@ test('specFileName slugs the page title and falls back cleanly', () => {
   assert.strictEqual(B.specFileName({page: {title: '***'}}), 'flowspec.spec.json');
   assert.strictEqual(B.specFileName(null), 'flowspec.spec.json');
   assert.strictEqual(B.specFileName({nodes: {}, rows: []}), 'flowspec.spec.json');
+});
+
+/* ================= pass 6: clickable validation findings ================= */
+
+test('parseValidationPath reads validator field paths and rejects pathless prose', () => {
+  assert.deepStrictEqual(plain(B.parseValidationPath(
+    'blocks[0].tabs[1].sections[0].diagram.edges[3].kind: unknown kind "x"')),
+    ['blocks', 0, 'tabs', 1, 'sections', 0, 'diagram', 'edges', 3, 'kind']);
+  assert.deepStrictEqual(plain(B.parseValidationPath('warn sections[2].heading: too long')),
+    ['sections', 2, 'heading']);
+  assert.deepStrictEqual(plain(B.parseValidationPath('ERROR page: must be an object')), ['page']);
+  assert.deepStrictEqual(plain(B.parseValidationPath('blocks[0].diagram.nodes.d2.icon: bad')),
+    ['blocks', 0, 'diagram', 'nodes', 'd2', 'icon']);
+  assert.strictEqual(B.parseValidationPath('JSON parse: Unexpected token'), null);
+  assert.strictEqual(B.parseValidationPath('no colon here'), null);
+});
+
+test('validationRawPath maps page paths onto wrapped, alias, and bare-diagram shapes', () => {
+  assert.deepStrictEqual(plain(B.validationRawPath({page: {blocks: []}}, ['blocks', 0, 'heading'])),
+    ['page', 'blocks', 0, 'heading']);
+  assert.deepStrictEqual(plain(B.validationRawPath({sections: []}, ['sections', 1])), ['sections', 1]);
+  const bare = {nodes: {a: {}}, rows: [['a']]};
+  assert.deepStrictEqual(plain(B.validationRawPath(bare, ['sections', 0, 'diagram', 'nodes', 'a'])),
+    ['nodes', 'a']);
+  assert.strictEqual(B.validationRawPath(bare, ['title']), null);
+  assert.strictEqual(B.validationRawPath(null, ['blocks', 0]), null);
+});
+
+test('findingLocation selects the exact field and falls back to the nearest parent', () => {
+  const exact = B.findingLocation(TEXT, SPEC,
+    'blocks[0].diagram.edges[0].kind: unknown kind "x"');
+  assert.ok(exact.exact);
+  assert.strictEqual(JSON.parse(TEXT.slice(exact.start, exact.end)), 'int');
+
+  /* leaf absent in the text (validator warns about a default) -> parent */
+  const parent = B.findingLocation(TEXT, SPEC,
+    'blocks[0].diagram.edges[0].bend: must be a number');
+  assert.ok(!parent.exact);
+  assert.deepStrictEqual(JSON.parse(TEXT.slice(parent.start, parent.end)),
+    SPEC.page.blocks[0].diagram.edges[0]);
+
+  const bare = {nodes: {a: {title: 'A'}}, rows: [['a']]};
+  const bareText = JSON.stringify(bare, null, 2);
+  const b = B.findingLocation(bareText, bare, 'sections[0].diagram.nodes.a.icon: unknown icon');
+  assert.ok(!b.exact); /* icon absent -> node object */
+  assert.deepStrictEqual(JSON.parse(bareText.slice(b.start, b.end)), {title: 'A'});
+
+  assert.strictEqual(B.findingLocation(TEXT, SPEC, 'JSON parse: nope'), null);
 });

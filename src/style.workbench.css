@@ -131,7 +131,8 @@ tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
   padding:7px 16px; border-radius:8px; cursor:pointer;}
 .rbtn:hover{filter:brightness(1.08);}
 .msgs{list-style:none; margin:0; padding:0; font:500 12px 'IBM Plex Mono',monospace; flex:1; min-width:260px;}
-.msgs li{margin:2px 0;}
+.msgs li{margin:2px 0; cursor:pointer;}
+.msgs li:hover{text-decoration:underline;}
 .msgs li.e{color:#C0392B;}
 .msgs li.w{color:#B0771A;}
 

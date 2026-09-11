@@ -836,6 +836,56 @@ function specFileName(raw){
   return (slug || 'flowspec') + '.spec.json';
 }
 
+/* ---------------- clickable validation findings ----------------
+   Validator and lint messages open with a field path relative to the
+   normalized PAGE object ("blocks[0].tabs[1].sections[0].diagram.
+   edges[3].kind: ..."). These helpers turn that prefix back into a
+   character range of the RAW editor text so a click on the message
+   selects the offending JSON — falling back to the nearest existing
+   parent when the exact leaf is not in the text. */
+
+function parseValidationPath(message){
+  /* leading "ERROR " / "warn " labels are tolerated; returns the path
+     segment array or null when the message carries no field path */
+  var m = /^(?:ERROR\s+|warn\s+)?([A-Za-z_][A-Za-z0-9_$-]*(?:\[\d+\]|\.[A-Za-z0-9_$-]+)*)\s*:/.exec(message || '');
+  if (!m) return null;
+  var out = [];
+  var re = /([A-Za-z0-9_$-]+)|\[(\d+)\]/g, seg;
+  while ((seg = re.exec(m[1]))){
+    if (seg[1] != null) out.push(seg[1]);
+    else out.push(parseInt(seg[2], 10));
+  }
+  return out.length ? out : null;
+}
+function validationRawPath(raw, pagePath){
+  /* map a normalized-page path onto the raw editor JSON shape */
+  if (raw && raw.page) return ['page'].concat(pagePath);
+  if (raw && (raw.blocks || raw.sections)) return pagePath.slice();
+  if (raw && raw.nodes && raw.rows){
+    /* normalize() wrapped the bare diagram as sections[0].diagram */
+    if (pagePath.length >= 2 && pagePath[0] === 'sections' && pagePath[1] === 0){
+      var rest = pagePath.slice(2);
+      if (rest[0] === 'diagram') rest = rest.slice(1);
+      return rest;
+    }
+    return null;
+  }
+  return null;
+}
+function findingLocation(text, raw, message){
+  /* character range for a validation message, retreating to the nearest
+     existing parent; null when nothing along the path is locatable */
+  var pagePath = parseValidationPath(message);
+  if (!pagePath) return null;
+  var path = validationRawPath(raw, pagePath);
+  if (!path) return null;
+  for (var end = path.length; end > 0; end--){
+    var loc = jsonLocate(text, path.slice(0, end));
+    if (loc) return {start: loc.start, end: loc.end, exact: end === path.length};
+  }
+  return null;
+}
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -929,6 +979,11 @@ var BUILDER_GUIDES = {
     ]
   }
 };
+
+/* assigned by initWorkbenchBuilder; boot's message list calls it when a
+   finding is clicked (boot renders messages before the builder starts,
+   so the indirection is checked at click time) */
+var BUILDER_JUMP_TO_FINDING = null;
 
 /* ---------------- DOM wiring (workbench only) ---------------- */
 
@@ -1838,6 +1893,15 @@ function initWorkbenchBuilder(opts){
     if (palette && !palette.hidden &&
         !(ev.target.closest && ev.target.closest('#palette, #add-node, #add-panel'))) closePalette();
   });
+
+  BUILDER_JUMP_TO_FINDING = function(message){
+    var parsed = parseEditor();
+    if (parsed.error) return;
+    var loc = findingLocation(src.value, parsed.raw, message);
+    if (!loc) return;
+    selectRange(loc);
+    if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent');
+  };
 
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);

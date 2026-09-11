@@ -1031,9 +1031,35 @@ function initWorkbenchBuilder(opts){
     if (selectedEl) selectedEl.classList.add('dv-sel');
   }
   function scrollTextareaTo(start){
-    var line = src.value.slice(0, start).split('\n').length - 1;
-    var lh = parseFloat(getComputedStyle(src).lineHeight) || 18;
-    src.scrollTop = Math.max(0, line * lh - src.clientHeight * 0.35);
+    /* newline counting under-measures because long JSON lines soft-wrap
+       in the textarea; mirror the text up to the selection in an
+       offscreen block with the textarea's metrics and measure real
+       pixels */
+    var cs = getComputedStyle(src);
+    var mirror = document.createElement('div');
+    mirror.style.position = 'absolute';
+    mirror.style.visibility = 'hidden';
+    mirror.style.left = '-9999px';
+    mirror.style.whiteSpace = 'pre-wrap';
+    mirror.style.overflowWrap = 'break-word';
+    mirror.style.boxSizing = 'border-box';
+    mirror.style.width = src.clientWidth + 'px'; /* content+padding, no scrollbar */
+    mirror.style.font = cs.font;
+    mirror.style.letterSpacing = cs.letterSpacing;
+    mirror.style.tabSize = cs.tabSize;
+    mirror.style.padding = cs.padding;
+    mirror.style.border = '0';
+    /* a marker span's offsetTop is the selection line's TOP edge in the
+       textarea's scroll space (offsetHeight would add the marker line's
+       own height and the bottom padding) */
+    mirror.appendChild(document.createTextNode(src.value.slice(0, start)));
+    var marker = document.createElement('span');
+    marker.textContent = '​';
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    var y = marker.offsetTop;
+    mirror.remove();
+    src.scrollTop = Math.max(0, y - src.clientHeight * 0.35);
   }
   function selectRange(loc){
     if (specbox && !specbox.open) specbox.open = true;

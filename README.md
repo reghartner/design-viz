@@ -229,16 +229,27 @@ later** reorder buttons. Every builder action pushes an **undo** snapshot
 render onto the current editor text — re-render after hand-reordering
 edits to keep the two aligned. The INSERT buttons splice a ready-made node,
 step, panel, or section into the spec and re-render; inserts target the
-section you last clicked. **+ edge draws by clicking**: press it, click the
-source node, click the target node (Esc cancels; a duplicate `from->to`
-pair is refused). **Dragging an edge label** commits the movement as
+section you last clicked. **+ node and + panel open a picker**: one preset
+per icon type (Console, API, Auth, Store, Broker, Sensor, …, each with its
+usual tint) and one working starter per panel widget type (all 19 — every
+template validates with zero errors and zero warnings). **+ edge draws by
+clicking**: press it, click the source node, click the target node (Esc
+cancels; a duplicate `from->to` pair is refused). **Dragging an edge label** commits the movement as
 `labelDx`/`labelDy` nudges — the hand-tuning chore for crowded corridors —
 while a plain click still selects. Prose is selectable too: paragraphs,
 bullets, and contract-card rows each open their own edit form with delete;
 nodes and sections also get a **duplicate** button (the node copy lands
 beside the original — same row, stack, or float). Keyboard: **Esc** clears
 the selection or cancels connect mode; **Delete** removes the selected
-element (only when focus is not in a form field or the editor).
+element (only when focus is not in a form field or the editor). The editing
+loop is durable: **open…** loads a `.spec.json` from disk (undoable),
+**save** downloads the editor text as `<page-title-slug>.spec.json` (even
+when it does not parse — unfinished work is still work), every edit
+auto-saves a draft to browser storage, and after a reload a bar offers to
+**restore** or **discard** the unsaved draft (restore is one undo step).
+**undo** has a matching **redo** (a new action clears the redo line; hand
+edits in the editor are not snapshotted, but undo stashes the current text
+on the redo side first, so nothing is discarded).
 
 ## Validating a spec (the agent loop)
 

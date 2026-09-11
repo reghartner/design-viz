@@ -233,17 +233,23 @@ function builderDiagram(text, raw, sectionIdx){
   return {path: rec.diagram, d: specValueAt(raw, rec.diagram)};
 }
 
-function planAddNode(text, raw, sectionIdx){
+function planAddNode(text, raw, sectionIdx, preset){
+  /* preset (optional): {icon, tint, title} from NODE_PRESETS — the id stem
+     follows the icon so the spec reads well (db1, antenna1, ...) */
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   var d = got.d;
   if (!Array.isArray(d.rows) || !d.rows.length)
     return {error: 'this diagram has no rows — a node needs a row slot to render'};
-  var id = builderUniqueKey(d.nodes || {}, 'node');
+  var icon = preset && preset.icon ? preset.icon : 'gear';
+  var tint = preset && preset.tint ? preset.tint : 'cmd';
+  var title = preset && preset.title ? preset.title : 'New node';
+  var id = builderUniqueKey(d.nodes || {}, preset && preset.icon ? preset.icon : 'node');
   var r1 = jsonInsertMember(text, got.path.concat(['rows', d.rows.length - 1]), null, JSON.stringify(id));
   if (!r1) return {error: 'could not edit rows in the editor text'};
   var r2 = jsonInsertMember(r1.text, got.path.concat(['nodes']), id,
-    '{"title": "New node", "sub": "what it does", "icon": "gear", "tint": "cmd"}');
+    '{"title": ' + JSON.stringify(title) + ', "sub": "what it does", "icon": ' +
+    JSON.stringify(icon) + ', "tint": ' + JSON.stringify(tint) + '}');
   if (!r2) return {error: 'could not edit nodes in the editor text'};
   return {text: r2.text, start: r2.start, end: r2.end, kind: 'node', id: id};
 }
@@ -305,15 +311,18 @@ function planAddStep(text, raw, sectionIdx){
   return {text: r.text, start: r.start, end: r.end, kind: 'step',
           index: (got.d.steps || []).length};
 }
-function planAddPanel(text, raw, sectionIdx){
+function planAddPanel(text, raw, sectionIdx, type){
+  /* type (optional): a PANEL_TEMPLATES key; default queue */
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
+  var tplKey = type && PANEL_TEMPLATES[type] ? type : 'queue';
   var taken = Object.create(null);
   (got.d.panels || []).forEach(function(p){ if (p && p.id) taken[p.id] = true; });
-  var id = builderUniqueKey(taken, 'panel');
-  var item = '{"id": ' + JSON.stringify(id) +
-             ', "type": "queue", "title": "New panel", "initial": {"state": "empty"}}';
-  var r = jsonInsertListItemOrCreate(text, got.path, 'panels', item);
+  var id = builderUniqueKey(taken, tplKey);
+  var tpl = builderClone(PANEL_TEMPLATES[tplKey]);
+  var entry = {id: id, type: tplKey};
+  Object.keys(tpl).forEach(function(k){ entry[k] = tpl[k]; });
+  var r = jsonInsertListItemOrCreate(text, got.path, 'panels', JSON.stringify(entry, null, 2));
   if (!r) return {error: 'could not edit panels in the editor text'};
   return {text: r.text, start: r.start, end: r.end, kind: 'panel',
           index: (got.d.panels || []).length};
@@ -638,6 +647,54 @@ function planDeleteSection(text, raw, sectionIdx){
   return r;
 }
 
+/* ---------------- pass 4: insert palettes ----------------
+   One node preset per icon (with the tint that icon usually carries) and
+   one working starter template per panel widget type. The templates must
+   validate with zero errors AND zero warnings — tests/builder.test.js
+   runs the real validator over every one. */
+
+var NODE_PRESETS = [
+  {icon: 'terminal', tint: 'cmd',  title: 'Console'},
+  {icon: 'cloud',    tint: 'cmd',  title: 'API'},
+  {icon: 'shield',   tint: 'auth', title: 'Auth'},
+  {icon: 'gear',     tint: 'cmd',  title: 'Service'},
+  {icon: 'db',       tint: 'data', title: 'Store'},
+  {icon: 'antenna',  tint: 'mqtt', title: 'Broker'},
+  {icon: 'thermo',   tint: 'dev',  title: 'Sensor'},
+  {icon: 'pump',     tint: 'dev',  title: 'Actuator'},
+  {icon: 'router',   tint: 'dev',  title: 'Gateway'},
+  {icon: 'package',  tint: 'data', title: 'Artifact'},
+  {icon: 'key',      tint: 'auth', title: 'Signer'},
+  {icon: 'server',   tint: 'cmd',  title: 'Server'},
+  {icon: 'chip',     tint: 'dev',  title: 'MCU'},
+  {icon: 'phone',    tint: 'dev',  title: 'Phone'}
+];
+
+var PANEL_TEMPLATES = {
+  state:     {title: 'Device state', states: ['OFF', 'BOOT', 'LIVE'], initial: {state: 'OFF'}},
+  leds:      {title: 'Indicators', leds: [{id: 'power', label: 'PWR'}, {id: 'radio', label: 'RADIO'}],
+              initial: {power: 'on'}},
+  gauge:     {title: 'Draw', unit: 'mA', max: 400, initial: {value: 12}},
+  log:       {title: 'Event log', tags: {NET: '#38E1FF'}, initial: {log: [{tag: 'NET', text: 'panel added'}]}},
+  screen:    {title: 'Camera', scene: 'static-noise', initial: {mode: 'off'}},
+  waterfall: {title: 'Latency budget', spans: [{id: 'net', label: 'network', ms: 40},
+              {id: 'work', label: 'processing', ms: 120}]},
+  orbit:     {title: 'Lifecycle', states: ['IDLE', 'ACTIVE', 'DONE'], initial: {state: 'IDLE'}},
+  zoneframe: {title: 'Zones', zones: [{id: 'porch', points: [[20, 40], [150, 40], [150, 160], [20, 160]]}]},
+  xray:      {title: 'Layers', layers: [{id: 'case', label: 'Case', holder: true},
+              {id: 'board', label: 'Board'}]},
+  queue:     {title: 'Queue', initial: {state: 'empty'}},
+  pir:       {title: 'Motion cone'},
+  thermo:    {title: 'Temperature', min: 0, max: 100, warn: 60, crit: 85, initial: {value: 21}},
+  battery:   {title: 'Battery', low: 30, crit: 10, initial: {charge: 80}},
+  buffer:    {title: 'Buffer', initial: {}},
+  radar:     {title: 'Radar'},
+  signal:    {title: 'Links', links: [{id: 'up', label: 'uplink', transport: 'wifi'}]},
+  tiles:     {title: 'Fleet', tiles: [{id: 't1', label: 'UNIT 1'}, {id: 't2', label: 'UNIT 2'}]},
+  inflight:  {title: 'In flight', lanes: [{id: 'op', label: 'operation'}]},
+  phone:     {title: 'Phone', initial: {clock: '9:41'}}
+};
+
 /* ---------------- pass 3: direct-manipulation planners ---------------- */
 
 function jsonInsertArrayItemAfter(text, arrPath, afterIdx, itemText){
@@ -767,6 +824,16 @@ function planDuplicateSection(text, raw, sectionIdx){
   var r = jsonInsertArrayItemAfter(text, parentPath, idx, JSON.stringify(clone, null, 2));
   if (!r) return {error: 'could not edit the editor text'};
   return {text: r.text, start: r.start, end: r.end, kind: 'section', index: sectionIdx + 1};
+}
+
+/* ---------------- durability: filenames ---------------- */
+
+function specFileName(raw){
+  /* download name for the save button: page-title slug + .spec.json */
+  var page = raw && raw.page ? raw.page : raw;
+  var title = page && typeof page.title === 'string' ? page.title : '';
+  var slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return (slug || 'flowspec') + '.spec.json';
 }
 
 /* ---------------- per-element authoring guidance ---------------- */
@@ -905,21 +972,122 @@ function initWorkbenchBuilder(opts){
       ' — click a section to retarget';
   }
 
-  /* ---- undo: one snapshot of the editor text per builder action ---- */
+  /* ---- undo/redo: one snapshot of the editor text per builder action.
+     Hand edits in the textarea are not snapshotted, but undo pushes the
+     CURRENT text onto the redo stack first, so nothing is discarded. ---- */
+  var redoBtn = document.getElementById('redo-builder');
+  var redoStack = [];
+  function updateHistoryButtons(){
+    if (undoBtn) undoBtn.disabled = !undoStack.length;
+    if (redoBtn) redoBtn.disabled = !redoStack.length;
+  }
   function pushUndo(){
     undoStack.push(src.value);
     if (undoStack.length > 30) undoStack.shift();
-    if (undoBtn) undoBtn.disabled = false;
+    redoStack.length = 0; /* a new action invalidates the redo line */
+    updateHistoryButtons();
   }
-  function doUndo(){
-    if (!undoStack.length) return;
-    src.value = undoStack.pop();
-    if (undoBtn) undoBtn.disabled = !undoStack.length;
+  function historyStep(fromStack, toStack, message){
+    if (!fromStack.length) return;
+    toStack.push(src.value);
+    src.value = fromStack.pop();
+    updateHistoryButtons();
     render();
     setSelected(null); currentTarget = null;
-    inspectorMessage('undid the last builder action — board re-rendered');
+    inspectorMessage(message);
+    autosaveDraft();
   }
+  function doUndo(){ historyStep(undoStack, redoStack, 'undid the last builder action — board re-rendered'); }
+  function doRedo(){ historyStep(redoStack, undoStack, 'redid the builder action — board re-rendered'); }
   if (undoBtn) undoBtn.addEventListener('click', doUndo);
+  if (redoBtn) redoBtn.addEventListener('click', doRedo);
+
+  /* ---- draft autosave + recovery offer ---- */
+  var DRAFT_KEY = 'dv-workbench-draft';
+  function autosaveDraft(){
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({text: src.value, at: Date.now()})); }
+    catch (ex){ /* storage unavailable: the feature degrades to nothing */ }
+  }
+  function readDraft(){
+    try {
+      var d = JSON.parse(localStorage.getItem(DRAFT_KEY));
+      return d && typeof d.text === 'string' ? d : null;
+    } catch (ex){ return null; }
+  }
+  function clearDraft(){
+    try { localStorage.removeItem(DRAFT_KEY); } catch (ex){}
+  }
+  var draftTimer = null;
+  src.addEventListener('input', function(){
+    if (draftTimer) clearTimeout(draftTimer);
+    draftTimer = setTimeout(autosaveDraft, 800);
+  });
+  (function offerDraft(){
+    var bar = document.getElementById('draftbar');
+    var draft = readDraft(); /* captured once — later autosaves cannot swap it */
+    if (!bar || !draft || draft.text === src.value) return;
+    bar.innerHTML = '';
+    var label = document.createElement('span');
+    label.textContent = 'unsaved draft from ' + new Date(draft.at || 0).toLocaleString() + ' —';
+    var restore = document.createElement('button');
+    restore.type = 'button'; restore.className = 'bbtn'; restore.textContent = 'restore';
+    restore.addEventListener('click', function(){
+      pushUndo(); /* restoring is one undoable action */
+      src.value = draft.text;
+      render();
+      bar.hidden = true;
+      autosaveDraft();
+    });
+    var discard = document.createElement('button');
+    discard.type = 'button'; discard.className = 'bbtn'; discard.textContent = 'discard';
+    discard.addEventListener('click', function(){
+      clearDraft();
+      bar.hidden = true;
+    });
+    bar.appendChild(label); bar.appendChild(restore); bar.appendChild(discard);
+    bar.hidden = false;
+  })();
+
+  /* ---- open a .spec.json / save the editor to disk ---- */
+  var fileInput = document.getElementById('file-input');
+  var openBtn = document.getElementById('file-open');
+  var saveBtn = document.getElementById('file-save');
+  if (openBtn && fileInput){
+    openBtn.addEventListener('click', function(){ fileInput.click(); });
+    fileInput.addEventListener('change', function(){
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function(){
+        pushUndo(); /* opening replaces the editor — undoable */
+        src.value = String(reader.result);
+        render(); /* parse/validation errors surface in the message list */
+        setSelected(null); currentTarget = null;
+        if (guide) guide.hidden = true;
+        autosaveDraft();
+      };
+      reader.onerror = function(){
+        inspectorMessage('could not read "' + f.name + '" — the editor is unchanged');
+      };
+      reader.readAsText(f);
+      fileInput.value = ''; /* allow re-opening the same file */
+    });
+  }
+  if (saveBtn){
+    saveBtn.addEventListener('click', function(){
+      /* saves the editor text as-is — un-renderable work is still work */
+      var parsed = parseEditor();
+      var name = specFileName(parsed.error ? null : parsed.raw);
+      var blob = new Blob([src.value], {type: 'application/json'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    });
+  }
 
   /* ---- board highlight by stable identity, re-applied after renders ---- */
   function cssQuote(s){
@@ -968,6 +1136,7 @@ function initWorkbenchBuilder(opts){
     pushUndo();
     src.value = plan.text;
     render();
+    autosaveDraft();
     if (opt && opt.after) opt.after(plan);
     rehighlight();
     var parsed = parseEditor();
@@ -1462,6 +1631,7 @@ function initWorkbenchBuilder(opts){
     pushUndo();
     src.value = plan.text;
     render();
+    autosaveDraft();
     cancelConnect(null);
     var el = findTargetEl({section: target.section, kind: 'edge', index: plan.index});
     selectTarget({section: target.section, kind: 'edge', index: plan.index, el: el}, false);
@@ -1532,6 +1702,7 @@ function initWorkbenchBuilder(opts){
     pushUndo();
     src.value = plan.text;
     render();
+    autosaveDraft();
     currentTarget = target;
     insertSection = gi;
     rehighlight();
@@ -1560,6 +1731,7 @@ function initWorkbenchBuilder(opts){
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
+      if (palette && !palette.hidden){ closePalette(); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }
       if (currentTarget){
         currentTarget = null;
@@ -1592,6 +1764,7 @@ function initWorkbenchBuilder(opts){
     pushUndo();
     src.value = plan.text;
     render();
+    autosaveDraft();
     if (plan.kind === 'section') insertSection = plan.index;
     var identity = {section: plan.kind === 'section' ? plan.index : insertSection,
                     kind: plan.kind, id: plan.id, index: plan.index};
@@ -1601,8 +1774,7 @@ function initWorkbenchBuilder(opts){
     selectRange(plan);
   }
   var addButtons = {
-    'add-node': ['node', planAddNode],
-    'add-step': ['step', planAddStep], 'add-panel': ['panel', planAddPanel],
+    'add-step': ['step', planAddStep],
     'add-section': ['section', planAddSection]
   };
   Object.keys(addButtons).forEach(function(id){
@@ -1614,6 +1786,58 @@ function initWorkbenchBuilder(opts){
   /* + edge draws by clicking source then target (Esc cancels) */
   var edgeBtn = document.getElementById('add-edge');
   if (edgeBtn) edgeBtn.addEventListener('click', startConnect);
+
+  /* ---- insert palettes: + node picks a preset, + panel picks a type ---- */
+  var palette = document.getElementById('palette');
+  function closePalette(){
+    if (palette && !palette.hidden){ palette.hidden = true; palette.innerHTML = ''; }
+  }
+  function paletteButton(iconToken, labelText, run){
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'pbtn';
+    if (iconToken){
+      /* iconToken comes from our own preset table, never from the spec */
+      var ns = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', '0 0 16 16');
+      svg.setAttribute('aria-hidden', 'true');
+      var use = document.createElementNS(ns, 'use');
+      use.setAttribute('href', '#i-' + iconToken);
+      svg.appendChild(use);
+      b.appendChild(svg);
+    }
+    b.appendChild(document.createTextNode(labelText));
+    b.addEventListener('click', function(){ closePalette(); run(); });
+    return b;
+  }
+  function openPalette(kind){
+    if (!palette) return;
+    if (!palette.hidden && palette.getAttribute('data-kind') === kind){ closePalette(); return; }
+    palette.setAttribute('data-kind', kind);
+    palette.innerHTML = '';
+    if (kind === 'node'){
+      NODE_PRESETS.forEach(function(pr){
+        palette.appendChild(paletteButton(pr.icon, pr.title, function(){
+          runInsert('node', function(text, raw, si){ return planAddNode(text, raw, si, pr); });
+        }));
+      });
+    } else {
+      Object.keys(PANEL_TEMPLATES).forEach(function(type){
+        palette.appendChild(paletteButton(null, type, function(){
+          runInsert('panel', function(text, raw, si){ return planAddPanel(text, raw, si, type); });
+        }));
+      });
+    }
+    palette.hidden = false;
+  }
+  var nodeBtn = document.getElementById('add-node');
+  if (nodeBtn) nodeBtn.addEventListener('click', function(){ openPalette('node'); });
+  var panelBtn = document.getElementById('add-panel');
+  if (panelBtn) panelBtn.addEventListener('click', function(){ openPalette('panel'); });
+  document.addEventListener('click', function(ev){
+    if (palette && !palette.hidden &&
+        !(ev.target.closest && ev.target.closest('#palette, #add-node, #add-panel'))) closePalette();
+  });
 
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);

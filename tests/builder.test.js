@@ -25,6 +25,8 @@ function loadBuilder(){
     ' planMoveStep, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
+    ' NODE_PRESETS, PANEL_TEMPLATES,' +
+    ' specFileName,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -234,14 +236,18 @@ test('planAddStep falls back to the first edge when every edge is used', () => {
 test('planAddPanel creates the panels list on demand and avoids taken ids', () => {
   const plan = B.planAddPanel(TEXT, SPEC, 0); /* section 0 has no panels list */
   const d = JSON.parse(plan.text).page.blocks[0].diagram;
-  assert.deepStrictEqual(d.panels[0], {id: 'panel1', type: 'queue', title: 'New panel', initial: {state: 'empty'}});
+  assert.deepStrictEqual(d.panels[0], {id: 'queue1', type: 'queue', title: 'Queue', initial: {state: 'empty'}});
   assert.strictEqual(plan.index, 0);
 
   const tabPlan = B.planAddPanel(TEXT, SPEC, 1); /* section 1 already has panel "p" */
   const td = JSON.parse(tabPlan.text).page.blocks[1].tabs[0].sections[0].diagram;
   assert.strictEqual(td.panels.length, 2);
-  assert.strictEqual(td.panels[1].id, 'panel1');
+  assert.strictEqual(td.panels[1].id, 'queue1');
   assert.strictEqual(tabPlan.index, 1);
+
+  /* id stem follows the type; a taken stem counts up */
+  const g = B.planAddPanel(TEXT, SPEC, 0, 'gauge');
+  assert.strictEqual(JSON.parse(g.text).page.blocks[0].diagram.panels[0].id, 'gauge1');
 });
 
 test('planAddSection appends a complete renderable section and handles every page shape', () => {
@@ -634,4 +640,74 @@ test('planDuplicateNode clones a float entry wholesale and places it after the o
     {id: 'f1', side: 'above', dx: 18},
     {id: 'g2', side: 'above'}
   ]);
+});
+
+/* ================= pass 4: insert palettes ================= */
+
+function loadValidator(){
+  const code =
+    fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
+    ';__exports = {validate, normalize, ICON_SET, TINT_SET, PANEL_TYPES};';
+  const sandbox = {console};
+  vm.runInNewContext(code, sandbox);
+  return sandbox.__exports;
+}
+const V = loadValidator();
+
+test('node presets cover distinct icons with legal icon and tint tokens', () => {
+  const icons = B.NODE_PRESETS.map(p => p.icon);
+  assert.strictEqual(new Set(icons).size, icons.length);
+  for (const preset of B.NODE_PRESETS){
+    assert.ok(V.ICON_SET.includes(preset.icon), preset.icon);
+    assert.ok(V.TINT_SET.includes(preset.tint), preset.tint);
+    assert.ok(preset.title && typeof preset.title === 'string');
+  }
+});
+
+test('panel templates exist for every engine panel type and no extras', () => {
+  assert.deepStrictEqual(Object.keys(B.PANEL_TEMPLATES).sort(), [...V.PANEL_TYPES].sort());
+});
+
+test('every panel template validates with zero errors AND zero warnings', () => {
+  for (const type of Object.keys(B.PANEL_TEMPLATES)){
+    const spec = JSON.parse(JSON.stringify(SPEC));
+    const plan = B.planAddPanel(JSON.stringify(spec, null, 2), spec, 0, type);
+    assert.ok(!plan.error, type + ': ' + plan.error);
+    const out = JSON.parse(plan.text);
+    const added = out.page.blocks[0].diagram.panels[0];
+    assert.strictEqual(added.type, type);
+    assert.strictEqual(added.id, type + '1');
+    const v = V.validate(V.normalize(plain(out)));
+    assert.deepStrictEqual(plain(v.errors), [], type + ' errors');
+    assert.deepStrictEqual(plain(v.warnings), [], type + ' warnings: ' + JSON.stringify(v.warnings));
+  }
+});
+
+test('planAddNode presets carry icon, tint, title, and an icon-named id', () => {
+  const preset = B.NODE_PRESETS.find(p => p.icon === 'db');
+  const plan = B.planAddNode(TEXT, SPEC, 0, plain(preset));
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(d.nodes.db1, {title: 'Store', sub: 'what it does', icon: 'db', tint: 'data'});
+  assert.deepStrictEqual(d.rows[0], ['a', 'b', 'db1']);
+  /* every preset yields a validator-clean insert */
+  for (const pr of B.NODE_PRESETS){
+    const pl = B.planAddNode(TEXT, SPEC, 0, plain(pr));
+    const v = V.validate(V.normalize(plain(JSON.parse(pl.text))));
+    assert.deepStrictEqual(plain(v.errors), [], pr.icon);
+    assert.deepStrictEqual(plain(v.warnings), [], pr.icon + ': ' + JSON.stringify(v.warnings));
+  }
+  /* no preset: unchanged default behavior */
+  const plain1 = B.planAddNode(TEXT, SPEC, 0);
+  assert.ok(JSON.parse(plain1.text).page.blocks[0].diagram.nodes.node1);
+});
+
+/* ================= pass 5: durability ================= */
+
+test('specFileName slugs the page title and falls back cleanly', () => {
+  assert.strictEqual(B.specFileName({page: {title: 'Cumulus IoT — device messaging'}}),
+    'cumulus-iot-device-messaging.spec.json');
+  assert.strictEqual(B.specFileName({title: 'No wrapper'}), 'no-wrapper.spec.json');
+  assert.strictEqual(B.specFileName({page: {title: '***'}}), 'flowspec.spec.json');
+  assert.strictEqual(B.specFileName(null), 'flowspec.spec.json');
+  assert.strictEqual(B.specFileName({nodes: {}, rows: []}), 'flowspec.spec.json');
 });

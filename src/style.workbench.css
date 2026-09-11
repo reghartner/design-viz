@@ -73,6 +73,19 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .bbtn:hover{color:var(--ink); border-color:var(--accent);}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .btarget{font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); margin-left:auto;}
+/* draft-recovery offer */
+.draftbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px;
+  border-bottom:1px solid var(--line); font:500 12px 'IBM Plex Mono',monospace; color:#B0771A;}
+
+/* insert palette: node presets / panel widget types */
+.palette{display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px; border-bottom:1px solid var(--line);
+  max-height:180px; overflow-y:auto;}
+.pbtn{display:inline-flex; align-items:center; gap:6px; background:var(--codebg); border:1px solid var(--line);
+  color:var(--codeink); font:600 11px 'IBM Plex Mono',monospace; padding:5px 9px; border-radius:7px; cursor:pointer;}
+.pbtn:hover{border-color:var(--accent); color:var(--ink);}
+.pbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+.pbtn svg{width:14px; height:14px;}
+
 .guide{border-bottom:1px solid var(--line); padding:10px 14px; font-size:12.5px; line-height:1.5; color:var(--sub);
   max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}

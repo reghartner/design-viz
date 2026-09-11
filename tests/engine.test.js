@@ -3549,3 +3549,26 @@ test('timeline labels: close events stagger to a second row, a third collision d
   assert.ok(!h.includes('>third here<'), 'collided label not drawn');
   assert.ok(h.includes('third here'), 'its hover title remains');
 });
+
+test('timeline labels: the drawn text matches the measured text — long labels truncate', () => {
+  const m = C.timelineModel(
+    {span: '2h', cadence: {every: '1h'},
+     events: [{at: '20m', label: 'a very long label that keeps going on', kind: 'info'},
+              {at: '40m', label: 'neighbor', kind: 'ok'}]},
+    {now: '30m'});
+  const evs = JSON.parse(JSON.stringify(m.detail.events));
+  assert.strictEqual(evs[0].labelText, 'a very long label tha…');
+  assert.strictEqual(evs[0].labelText.length, 22);
+  /* the truncated (not the full) width drives collision: the neighbor
+     at 40m clears row 0's real occupied end and stays measurable */
+  assert.strictEqual(typeof evs[1].labelRow, 'number');
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'tl', type: 'timeline', span: '2h',
+    cadence: {every: '1h'},
+    events: [{at: '20m', label: 'a very long label that keeps going on', kind: 'info'}]},
+    {now: '30m'}, 'aurora', [], 0, false);
+  const h = host.innerHTML;
+  assert.ok(h.includes('a very long label tha…</text>'), 'truncated text drawn');
+  assert.ok(h.includes('a very long label that keeps going on</title>'), 'full text in the hover title');
+  assert.ok(!h.includes('keeps going on</text>'), 'full text never drawn as a label');
+});

@@ -2874,7 +2874,7 @@ test('copy control: success swaps to the check glyph, restores, and ignores stal
   };
   const classes = new Set();
   const button = {
-    innerHTML: '', parentNode: null, nextSibling: null, listeners: {},
+    innerHTML: C.COPY_ICON, parentNode: null, nextSibling: null, listeners: {},
     classList: {
       add(c){ classes.add(c); },
       remove(...cs){ cs.forEach(c => classes.delete(c)); },
@@ -2939,7 +2939,7 @@ test('copy control: clipboard denial falls back, and a dead fallback shows the c
   };
   const classes = new Set();
   const button = {
-    innerHTML: '', parentNode: holder, nextSibling: null, listeners: {},
+    innerHTML: C.COPY_ICON, parentNode: holder, nextSibling: null, listeners: {},
     classList: {
       add(c){ classes.add(c); },
       remove(...cs){ cs.forEach(c => classes.delete(c)); },
@@ -3276,4 +3276,38 @@ test('embed mode: parseHash still ignores the embed and sk keys', () => {
   assert.strictEqual(st.m, 'step');
   assert.strictEqual(st.s, '2');
   assert.strictEqual('embed' in st, false);
+});
+
+test('embed-link chip: diagram sections get it, prose-only sections do not', () => {
+  const withDiagram = C.sectionIntroHTML({heading: 'Motion', diagram: {nodes: {}, rows: []}}, 1, 'motion');
+  assert.ok(withDiagram.html.includes('embedcopy'), withDiagram.html);
+  assert.ok(withDiagram.html.includes('Copy embed link'), 'title present');
+  const proseOnly = C.sectionIntroHTML({heading: 'Notes', text: ['x']}, 2, 'notes');
+  assert.strictEqual(proseOnly.html.includes('embedcopy'), false);
+  /* heading-less diagram sections carry it on the eyebrow row */
+  const headless = C.sectionIntroHTML({diagram: {nodes: {}, rows: []}}, 0, 1);
+  assert.ok(headless.html.includes('embedcopy'));
+});
+
+test('copy control: a chip with a different glyph gets ITS glyph back after feedback', () => {
+  /* the embed chip carries a frame glyph — feedback must not swap it
+     for the link glyph (regression: restore was hard-coded) */
+  const timeouts = [];
+  const win = {
+    setTimeout(fn, ms){ timeouts.push(fn); return timeouts.length; },
+    clearTimeout(){},
+    navigator: {clipboard: {writeText(){ return Promise.resolve(); }}}
+  };
+  const button = {
+    innerHTML: '<svg data-glyph="embed"></svg>', parentNode: null, nextSibling: null, listeners: {},
+    classList: {add(){}, remove(){}},
+    addEventListener(type, fn){ this.listeners[type] = fn; }
+  };
+  C.bindCopyControl(win, button, () => 'x#embed=y');
+  button.listeners.click();
+  return Promise.resolve().then(() => {
+    assert.strictEqual(button.innerHTML, C.COPY_OK_ICON);
+    timeouts.forEach(fn => fn());
+    assert.strictEqual(button.innerHTML, '<svg data-glyph="embed"></svg>');
+  });
 });

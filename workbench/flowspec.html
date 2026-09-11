@@ -9363,7 +9363,11 @@ function initWorkbenchBuilder(opts){
         return {section: gi, kind: 'step', index: parseInt(el.getAttribute('data-dv-step'), 10), el: el};
       if (el.hasAttribute('data-dv-panel'))
         return {section: gi, kind: 'panel', index: parseInt(el.getAttribute('data-dv-panel'), 10), el: el};
-      return {section: gi, kind: 'edge', index: parseInt(el.getAttribute('data-dv-edge'), 10), el: el};
+      /* halo and label clicks resolve to the same edge — highlight the
+         visible edge path (the halo has no selected style of its own) */
+      var edgeIdx = parseInt(el.getAttribute('data-dv-edge'), 10);
+      var edgeEl = secEl.querySelector('path.edge[data-dv-edge="' + edgeIdx + '"]') || el;
+      return {section: gi, kind: 'edge', index: edgeIdx, el: edgeEl};
     }
     return {section: gi, kind: 'section', el: secEl};
   }

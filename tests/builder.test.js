@@ -27,6 +27,7 @@ function loadBuilder(){
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
     ' specFileName, parseValidationPath, findingLocation,' +
+    ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -781,4 +782,52 @@ test('findingLocation selects the exact field and falls back to the nearest pare
   assert.deepStrictEqual(JSON.parse(bareText.slice(b.start, b.end)), {title: 'A'});
 
   assert.strictEqual(B.findingLocation(TEXT, SPEC, 'JSON parse: nope'), null);
+});
+
+/* ================= tab management ================= */
+
+test('builderTabPath addresses tabs by block index across page shapes', () => {
+  assert.deepStrictEqual(plain(B.builderTabPath(SPEC, 1, 1)),
+    ['page', 'blocks', 1, 'tabs', 1]);
+  assert.strictEqual(B.builderTabPath(SPEC, 0, 0), null); /* plain section block */
+  assert.strictEqual(B.builderTabPath(SPEC, 1, 9), null);
+  const alias = {sections: [{tabs: [{label: 'A', sections: []}]}]};
+  assert.deepStrictEqual(plain(B.builderTabPath(alias, 0, 0)), ['sections', 0, 'tabs', 0]);
+  assert.strictEqual(B.builderTabPath({nodes: {}, rows: []}, 0, 0), null);
+});
+
+test('the tab template is valid JSON holding one renderable section', () => {
+  const tab = JSON.parse(B.BUILDER_TAB_TEMPLATE);
+  assert.strictEqual(tab.label, 'New tab');
+  assert.strictEqual(tab.sections.length, 1);
+  assert.ok(tab.sections[0].diagram.nodes.svc1);
+});
+
+test('planAddTab inserts a validator-clean tab directly after the current one', () => {
+  const plan = B.planAddTab(TEXT, SPEC, 1, 0);
+  assert.ok(!plan.error, plan.error);
+  const tabs = JSON.parse(plan.text).page.blocks[1].tabs;
+  assert.deepStrictEqual(tabs.map(x => x.label), ['One', 'New tab', 'Two']);
+  assert.strictEqual(plan.index, 1);
+  const v = V.validate(V.normalize(plain(JSON.parse(plan.text))));
+  assert.deepStrictEqual(plain(v.errors), []);
+  assert.deepStrictEqual(plain(v.warnings), []);
+  assert.match(B.planAddTab(TEXT, SPEC, 0, 0).error, /not found/);
+});
+
+test('planDeleteTab removes a tab but refuses the last one in its block', () => {
+  const plan = B.planDeleteTab(TEXT, SPEC, 1, 0);
+  const tabs = JSON.parse(plan.text).page.blocks[1].tabs;
+  assert.deepStrictEqual(tabs.map(x => x.label), ['Two']);
+  const one = {page: {blocks: [{tabs: [{label: 'Only', sections: []}]}]}};
+  assert.match(B.planDeleteTab(JSON.stringify(one), one, 0, 0).error, /last tab/);
+});
+
+test('planMoveTab reorders within the block and clamps the ends', () => {
+  const plan = B.planMoveTab(TEXT, SPEC, 1, 0, 1);
+  const tabs = JSON.parse(plan.text).page.blocks[1].tabs;
+  assert.deepStrictEqual(tabs.map(x => x.label), ['Two', 'One']);
+  assert.strictEqual(plan.index, 1);
+  assert.match(B.planMoveTab(TEXT, SPEC, 1, 0, -1).error, /end/);
+  assert.match(B.planMoveTab(TEXT, SPEC, 1, 1, 1).error, /end/);
 });

@@ -3468,3 +3468,17 @@ test('timeline bounds: overflowing durations parse to null; absurd spans clamp a
   assert.match(JSON.parse(JSON.stringify(v.warnings)).join('\n'),
     /span: longer than the drawable maximum \(7d\) — clamped to 7d/);
 });
+
+test('timeline density warning judges the CLAMPED span the model draws', () => {
+  /* 30d at 3h: unclamped 240 beats would warn, but the model clamps to
+     7d = 56 beats and draws them — no warning is correct */
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'hb', type: 'timeline', span: '720h', cadence: {every: '3h'}}],
+    steps: [{edge: 'a->b'}]
+  }}]}));
+  const w = JSON.parse(JSON.stringify(v.warnings)).join('\n');
+  assert.ok(!/cannot be drawn individually/.test(w), w);
+  assert.match(w, /clamped to 7d/);
+  assert.strictEqual(C.timelineModel({span: '720h', cadence: {every: '3h'}}, {}).beats.length, 56);
+});

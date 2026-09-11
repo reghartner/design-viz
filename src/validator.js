@@ -557,7 +557,11 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         if (typeof p.cadence !== 'object' || parseClock(p.cadence.every) == null || parseClock(p.cadence.every) <= 0)
           warnings.push(PP + '.cadence: expected {every:"30m", label?} with a readable interval — no periodic beats drawn');
         else {
+          /* density is judged on the span the model actually DRAWS —
+             the clamped one — or a legally long span would warn about
+             beats the render happily shows */
           var tlSpanS = parseClock(p.span);
+          if (tlSpanS != null) tlSpanS = Math.min(tlSpanS, TIMELINE_MAX_SPAN);
           if (tlSpanS != null && tlSpanS > 0 &&
               Math.floor(tlSpanS / parseClock(p.cadence.every)) > TIMELINE_MAX_BEATS)
             warnings.push(PP + '.cadence: ' + Math.floor(tlSpanS / parseClock(p.cadence.every)) +

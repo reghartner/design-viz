@@ -3376,19 +3376,59 @@ test('timeline fold: now replaces per step, events append like log lines', () =>
   assert.strictEqual(states[2].now, '3h');
 });
 
-test('timeline renderer: markup carries axis, beats, events, and the now cursor', () => {
+test('timeline renderer: overview strip plus the magnified current interval', () => {
   const host = {innerHTML: '', querySelector: () => null};
   C.renderPanelBody(host, {id: 'hb', type: 'timeline', span: '2h',
     cadence: {every: '30m', label: 'heartbeat'}},
     {now: '1h', events: [{at: '30m', label: 'ok', kind: 'ok'}]}, 'aurora', [], 0, false);
   const h = host.innerHTML;
   assert.ok(h.includes('tlaxis'), 'axis');
-  assert.strictEqual((h.match(/tlbeat/g) || []).length, 4, 'four cadence beats over 2h');
+  /* 4 overview cadence beats + the 2 detail end beats */
+  assert.strictEqual((h.match(/tlbeat/g) || []).length, 6);
   assert.ok(h.includes('tlbeat past'), 'passed beats fill');
+  assert.ok(h.includes('tlband'), 'interval band on the overview');
+  assert.ok(h.includes('tlzoom'), 'zoom connectors');
   assert.ok(h.includes('tl-ok'), 'event kind class');
   assert.ok(h.includes('tlnow'), 'now cursor');
   assert.ok(h.includes('heartbeat every 30m'), 'meta line');
+  assert.ok(h.includes('window 1h–1h30m'), 'window meta: now sits on the 1h beat');
   assert.ok(h.includes('now 1h'), 'meta now');
+  /* no cadence -> the single-axis fallback, no detail markup */
+  const flat = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(flat, {id: 'hb', type: 'timeline', span: '2h'},
+    {now: '1h'}, 'aurora', [], 0, false);
+  assert.ok(!flat.innerHTML.includes('tlband'));
+  assert.ok(flat.innerHTML.includes('tltick'), 'fallback keeps tick labels');
+});
+
+test('timeline detail window: events BETWEEN long-running beats spread out magnified', () => {
+  const m = C.timelineModel(
+    {span: '4h', cadence: {every: '1h', label: 'heartbeat'},
+     events: [{at: '1h5m', label: 'motion', kind: 'info'},
+              {at: '1h40m', label: 'clip up', kind: 'ok'},
+              {at: '2h30m', kind: 'ok'}]},
+    {now: '1h20m'});
+  const d = JSON.parse(JSON.stringify(m.detail));
+  assert.strictEqual(d.start, 3600);
+  assert.strictEqual(d.end, 7200);
+  assert.strictEqual(d.startLabel, '1h');
+  assert.strictEqual(d.endLabel, '2h');
+  /* only the two between-beat events, repositioned inside the window */
+  assert.strictEqual(d.events.length, 2);
+  assert.ok(Math.abs(d.events[0].pct - (5 / 60) * 100) < 0.01, 'motion at 5m into the hour');
+  assert.ok(Math.abs(d.events[1].pct - (40 / 60) * 100) < 0.01, 'clip at 40m into the hour');
+  assert.ok(Math.abs(d.nowPct - (20 / 60) * 100) < 0.01);
+  assert.strictEqual(d.startPast, true);
+  assert.strictEqual(d.endPast, false);
+  assert.ok(d.ticks.length >= 3 && d.ticks.length <= 8, 'interior minor ticks');
+  /* no cadence or no now -> no detail */
+  assert.strictEqual(C.timelineModel({span: '4h'}, {now: '1h'}).detail, null);
+  assert.strictEqual(C.timelineModel({span: '4h', cadence: {every: '1h'}}, {}).detail, null);
+  /* now past the last full interval clamps the window to the tail */
+  const tail = JSON.parse(JSON.stringify(C.timelineModel(
+    {span: '4h', cadence: {every: '1h'}}, {now: '4h'}).detail));
+  assert.strictEqual(tail.start, 3 * 3600);
+  assert.strictEqual(tail.end, 4 * 3600);
 });
 
 test('timeline validator: bad span/cadence/event/patch fields warn with paths', () => {

@@ -367,6 +367,8 @@
 .tlevlab{font:8.5px 'IBM Plex Mono',monospace; fill:var(--dtext);}
 .tlnow{stroke:var(--dink); stroke-width:1.6;}
 .tlnowhead{fill:var(--dink);}
+.tlband{fill:var(--dtext); opacity:.09;}
+.tlzoom{stroke:var(--dfaint); stroke-width:1; stroke-dasharray:2 3; opacity:.55;}
 .tlmeta{margin-top:4px; font:500 10px 'IBM Plex Mono',monospace; color:var(--dfaint);}
 
 .wfrow{display:flex; align-items:center; gap:8px; opacity:.3; transition:opacity .3s ease;}

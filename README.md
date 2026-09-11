@@ -229,9 +229,12 @@ later** reorder buttons. Every builder action pushes an **undo** snapshot
 render onto the current editor text — re-render after hand-reordering
 edits to keep the two aligned. The INSERT buttons splice a ready-made node,
 step, panel, or section into the spec and re-render; inserts target the
-section you last clicked. **+ edge draws by clicking**: press it, click the
-source node, click the target node (Esc cancels; a duplicate `from->to`
-pair is refused). **Dragging an edge label** commits the movement as
+section you last clicked. **+ node and + panel open a picker**: one preset
+per icon type (Console, API, Auth, Store, Broker, Sensor, …, each with its
+usual tint) and one working starter per panel widget type (all 19 — every
+template validates with zero errors and zero warnings). **+ edge draws by
+clicking**: press it, click the source node, click the target node (Esc
+cancels; a duplicate `from->to` pair is refused). **Dragging an edge label** commits the movement as
 `labelDx`/`labelDy` nudges — the hand-tuning chore for crowded corridors —
 while a plain click still selects. Prose is selectable too: paragraphs,
 bullets, and contract-card rows each open their own edit form with delete;

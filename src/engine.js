@@ -1875,6 +1875,9 @@ function bulletsHTML(items, markTop){
 var COPY_ICON = '<svg class="copyglyph" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.6 9.4l2.8-2.8"/><path d="M8.3 4.6l1.4-1.4a2.55 2.55 0 0 1 3.6 3.6l-1.4 1.4"/><path d="M7.7 11.4l-1.4 1.4a2.55 2.55 0 0 1-3.6-3.6l1.4-1.4"/></svg>';
 var COPY_OK_ICON = '<svg class="copyglyph" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 8.6l3.1 3.1 6.5-7.4"/></svg>';
 var COPY_FAIL_ICON = '<svg class="copyglyph" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>';
+/* embed-link chip: a small frame glyph — copies the #embed= URL that
+   shows just this section's diagram (for iframes / direct links) */
+var EMBED_ICON = '<svg class="copyglyph" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.6"/><path d="M5.4 8h5.2M8.6 6l2 2-2 2"/></svg>';
 
 function contractCardHTML(contract, sectionReference){
   if (!contract || typeof contract !== 'object' || Array.isArray(contract)) return '';
@@ -2948,15 +2951,19 @@ function sectionIntroHTML(sec, gi, sectionReference){
   var sectionLabel = sec.heading || ('section ' + (gi + 1));
   var srcChip = (sec.source && typeof sec.source === 'string') ?
     ' <a class="srcchip" href="' + esc(sec.source) + '" target="_blank" rel="noopener">source &#8599;</a>' : '';
+  var embedChip = sec.diagram ?
+    ' <button type="button" class="copychip embedcopy" title="Copy embed link (this diagram only, no page chrome)"' +
+    ' aria-label="Copy embed link for ' + esc(sectionLabel) + ' — the diagram alone, without the page">' +
+    EMBED_ICON + '</button>' : '';
   var toggle = hasProse ? proseToggleHTML(sectionReference, sectionLabel, defaultCollapsed) : '';
   var h = '';
   if (sec.heading){
     h += '<p class="sec-eyebrow">section ' + (gi + 1) + '</p>';
-    h += '<div class="sec-heading-row"><h3 class="sec-h">' + esc(sec.heading) + srcChip +
+    h += '<div class="sec-heading-row"><h3 class="sec-h">' + esc(sec.heading) + srcChip + embedChip +
       '</h3>' + toggle + '</div>';
   } else {
     h += '<div class="sec-heading-row sec-heading-row-eyebrow"><p class="sec-eyebrow">section ' +
-      (gi + 1) + srcChip + '</p>' + toggle + '</div>';
+      (gi + 1) + srcChip + embedChip + '</p>' + toggle + '</div>';
   }
   if (hasProse){
     h += '<div class="sec-prose" id="section-' + esc(sectionReference) + '-prose"' +
@@ -3681,6 +3688,17 @@ function wireDeepLinks(ctl, win){
   function bindCopy(button, hashFn){
     bindCopyControl(win, button, function(){ return fullURL(hashFn()); });
   }
+  /* embed-link chips copy the page's OWN address (search kept for the
+     ?spec= mode, hash replaced) — NOT the registered host link base:
+     the #embed fragment only works on the raw page an iframe points
+     at, never on a wrapping host page. */
+  ctl.sections.forEach(function(sec){
+    var embedBtn = sec.sectionEl && sec.sectionEl.querySelector ?
+      sec.sectionEl.querySelector('.embedcopy') : null;
+    if (embedBtn) bindCopyControl(win, embedBtn, function(){
+      return win.location.href.split('#')[0] + '#embed=' + encodeURIComponent(String(sec.reference));
+    });
+  });
   var initial = ctl.activeTarget || {kind:'page'};
   if (initial.kind === 'diagram') fragmentState.diagramSection = initial.section;
   else if (initial.kind === 'tab'){

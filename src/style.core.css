@@ -3823,7 +3823,8 @@ body.dv-embed .dv-embed-target .sec-eyebrow,
 body.dv-embed .dv-embed-target .sec-heading-row,
 body.dv-embed .dv-embed-target .sec-prose,
 body.dv-embed .dv-embed-target .ctcard,
-body.dv-embed .dv-embed-target .printsteps{display:none !important;}
+body.dv-embed .dv-embed-target .printsteps,
+body.dv-embed .embedcopy{display:none !important;}
 body.dv-embed .docview{max-width:none !important; padding:10px !important; border:0 !important; margin:0 !important;}
 body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transparent !important;
   box-shadow:none !important; padding:0 !important; margin:0 !important; max-width:none !important;}

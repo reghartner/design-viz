@@ -3277,3 +3277,14 @@ test('embed mode: parseHash still ignores the embed and sk keys', () => {
   assert.strictEqual(st.s, '2');
   assert.strictEqual('embed' in st, false);
 });
+
+test('embed-link chip: diagram sections get it, prose-only sections do not', () => {
+  const withDiagram = C.sectionIntroHTML({heading: 'Motion', diagram: {nodes: {}, rows: []}}, 1, 'motion');
+  assert.ok(withDiagram.html.includes('embedcopy'), withDiagram.html);
+  assert.ok(withDiagram.html.includes('Copy embed link'), 'title present');
+  const proseOnly = C.sectionIntroHTML({heading: 'Notes', text: ['x']}, 2, 'notes');
+  assert.strictEqual(proseOnly.html.includes('embedcopy'), false);
+  /* heading-less diagram sections carry it on the eyebrow row */
+  const headless = C.sectionIntroHTML({diagram: {nodes: {}, rows: []}}, 0, 1);
+  assert.ok(headless.html.includes('embedcopy'));
+});

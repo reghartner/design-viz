@@ -86,6 +86,20 @@ function boot(raw){
   var bootSkin = resolveSkin(readCookieText(), page.skin);
   applySkinClasses(document.body, view, bootSkin);
   var ctl = renderPage(view, page, bootSkin, backlinkData);
+  if (embedRequest){
+    /* compose with the step deep-link fields: m=/s= without an explicit
+       d= selector must address the EMBEDDED diagram, not the page's
+       default one — inject the embed ref as the selector before the
+       deep-link channel reads the hash */
+    var st = parseHash(window.location.hash);
+    if (st.d == null && (st.m != null || st.s != null)){
+      try {
+        history.replaceState(null, '',
+          '#' + window.location.hash.replace(/^#/, '') +
+          '&d=' + encodeURIComponent(embedRequest.section));
+      } catch (ex){ /* sandboxed iframes may deny history writes */ }
+    }
+  }
   deepLinkChannel = wireDeepLinks(ctl, window); /* tabs, every diagram/step, contract cards + rows */
   applyEmbedMode(ctl);
   if (pendingLinkBase){

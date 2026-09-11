@@ -252,7 +252,11 @@ edits in the editor are not snapshotted, but undo stashes the current text
 on the redo side first, so nothing is discarded). **Validation findings
 are clickable**: every error/warning in the message list selects the
 offending JSON field in the editor (or its nearest existing parent when
-the message names a field the text does not carry). **Tabs are managed
+the message names a field the text does not carry). **Steps are selectable
+everywhere**: besides the numbered coins, every chip in the click-through
+bar selects its step (and jumps playback there), and clicking the caption
+line selects the step being shown — so steps that share a first hop or
+have no edge at all are reachable too. **Tabs are managed
 in place**: clicking a tab button switches to it AND selects it — the
 form edits its label and highlight, **+ tab** inserts a ready-made
 sibling after it, arrows reorder it, delete removes it (the last tab of

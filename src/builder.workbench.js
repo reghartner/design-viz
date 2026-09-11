@@ -1280,6 +1280,14 @@ function initWorkbenchBuilder(opts){
     var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
     if (!secEl) return null;
     if (t.kind === 'section') return secEl;
+    if (t.kind === 'step'){
+      /* prefer the numbered coin; steps sharing a first hop (or
+         edgeless steps) have no coin — fall back to their chip */
+      var coin = secEl.querySelector('[data-dv-step="' + t.index + '"]');
+      if (coin) return coin;
+      var chipsBox = secEl.querySelector('.schips');
+      return (chipsBox && chipsBox.children[t.index]) || null;
+    }
     var sel = t.kind === 'node' ? '[data-dv-node="' + cssQuote(t.id) + '"]' :
               t.kind === 'edge' ? 'path.edge[data-dv-edge="' + t.index + '"]' :
               t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
@@ -1781,7 +1789,33 @@ function initWorkbenchBuilder(opts){
       if (m) return {kind: 'tab', block: parseInt(m[1], 10), tab: parseInt(m[2], 10), el: tabBtn};
       return null;
     }
+    /* step chips in the click-through bar both jump playback (engine)
+       and select the step here; the chip's position IS the step index */
+    var chip = ev.target.closest && ev.target.closest('.schip');
+    if (chip){
+      var chipSec = chip.closest('.doc-sec');
+      if (!chipSec || !chipSec.hasAttribute('data-dv-section')) return null;
+      var chipIdx = Array.prototype.indexOf.call(chip.parentNode.children, chip);
+      if (chipIdx < 0) return null;
+      return {section: parseInt(chipSec.getAttribute('data-dv-section'), 10),
+              kind: 'step', index: chipIdx, el: chip};
+    }
     if (ev.target.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
+    /* the caption line selects the CURRENT step (links and the copy
+       chip inside it were already skipped above) */
+    var line = ev.target.closest && ev.target.closest('.stepline');
+    if (line){
+      var lineSec = line.closest('.doc-sec');
+      var chipsBox = lineSec && lineSec.querySelector('.schips');
+      if (!lineSec || !chipsBox || !lineSec.hasAttribute('data-dv-section')) return null;
+      var cur = -1;
+      Array.prototype.forEach.call(chipsBox.children, function(c, i){
+        if (cur < 0 && c.getAttribute('aria-current') === 'true') cur = i;
+      });
+      if (cur < 0) return null;
+      return {section: parseInt(lineSec.getAttribute('data-dv-section'), 10),
+              kind: 'step', index: cur, el: chipsBox.children[cur]};
+    }
     var secEl = ev.target.closest('.doc-sec');
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
     var gi = parseInt(secEl.getAttribute('data-dv-section'), 10);

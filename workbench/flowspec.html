@@ -10816,9 +10816,13 @@ function initWorkbenchBuilder(opts){
     var scale = boardZoom[gi] || 1;
     if (scale === 1){
       svg.style.width = '';
+      svg.style.minWidth = '';
       canvas.classList.remove('dv-zoomed');
     } else {
       svg.style.width = (scale * 100) + '%';
+      /* the core sheet gives board svgs a min-width; it would clamp
+         every zoom-out scale to that floor */
+      svg.style.minWidth = '0';
       canvas.classList.add('dv-zoomed');
     }
     var lvl = secEl.querySelector('.zoomctl .zlvl');

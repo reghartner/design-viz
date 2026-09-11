@@ -23,6 +23,8 @@ function loadBuilder(){
     ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
     ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
     ' planMoveStep, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
+    ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
+    ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -501,4 +503,115 @@ test('renames to hostile ids like __proto__ keep the entry as a real own propert
   const pd = JSON.parse(panelPlan.text).page.blocks[0].diagram;
   assert.strictEqual(pd.panels[0].id, '__proto__');
   assert.ok(Object.prototype.hasOwnProperty.call(pd.steps[0].panels, '__proto__'));
+});
+
+/* ================= pass 3: direct manipulation ================= */
+
+const PROSE = {
+  page: {
+    blocks: [
+      {heading: 'P', text: ['first paragraph', 'second paragraph'],
+       bullets: ['plain point', {text: 'fancy point', sub: ['child'], revealAt: 1}],
+       contract: {title: 'Wire', fields: [
+         {k: 'topic', v: 'a/b', g: 'where'},
+         {k: 'ttl', v: '30s'}
+       ]},
+       diagram: {nodes: {a: {title: 'A'}, b: {title: 'B'}, c: {title: 'C'}},
+                 rows: [['a', ['b', 'c']]],
+                 edges: [{from: 'a', to: 'b', labelDx: -40}],
+                 steps: [{edge: 'a->b', text: 's1'}]}}
+    ]
+  }
+};
+const PROSE_TEXT = JSON.stringify(PROSE, null, 2);
+
+test('jsonInsertArrayItemAfter splices directly after the anchor member', () => {
+  const text = '{\n  "xs": [\n    10,\n    20\n  ]\n}';
+  const r = B.jsonInsertArrayItemAfter(text, ['xs'], 0, '15');
+  assert.deepStrictEqual(JSON.parse(r.text).xs, [10, 15, 20]);
+  assert.strictEqual(r.text.slice(r.start, r.end), '15');
+  const tail = B.jsonInsertArrayItemAfter(text, ['xs'], 1, '30');
+  assert.deepStrictEqual(JSON.parse(tail.text).xs, [10, 20, 30]);
+  assert.strictEqual(B.jsonInsertArrayItemAfter(text, ['xs'], 5, '1'), null);
+  assert.strictEqual(B.jsonInsertArrayItemAfter('{"o": {}}', ['o'], 0, '1'), null);
+});
+
+test('builderTargetPath maps bullets, paragraphs (string and list), and contract rows', () => {
+  assert.deepStrictEqual(plain(B.builderTargetPath(PROSE, {section: 0, kind: 'bullet', index: 1})),
+    ['page', 'blocks', 0, 'bullets', 1]);
+  assert.deepStrictEqual(plain(B.builderTargetPath(PROSE, {section: 0, kind: 'para', index: 1})),
+    ['page', 'blocks', 0, 'text', 1]);
+  const stringText = {page: {blocks: [{heading: 'S', text: 'one paragraph'}]}};
+  assert.deepStrictEqual(plain(B.builderTargetPath(stringText, {section: 0, kind: 'para', index: 0})),
+    ['page', 'blocks', 0, 'text']);
+  assert.deepStrictEqual(plain(B.builderTargetPath(PROSE, {section: 0, kind: 'crow', index: 1})),
+    ['page', 'blocks', 0, 'contract', 'fields', 1]);
+});
+
+test('planReplaceValue rewrites a bullet string and a paragraph in place', () => {
+  const bulletPath = ['page', 'blocks', 0, 'bullets', 0];
+  const r = B.planReplaceValue(PROSE_TEXT, PROSE, bulletPath, JSON.stringify('sharper point'));
+  assert.strictEqual(JSON.parse(r.text).page.blocks[0].bullets[0], 'sharper point');
+  const miss = B.planReplaceValue(PROSE_TEXT, PROSE, ['page', 'nope'], '1');
+  assert.match(miss.error, /not found/);
+});
+
+test('planSetFields applies several surgical edits in one plan', () => {
+  const edgePath = ['page', 'blocks', 0, 'diagram', 'edges', 0];
+  const r = B.planSetFields(PROSE_TEXT, PROSE, edgePath, [['labelDx', '12'], ['labelDy', '-8']]);
+  const e = JSON.parse(r.text).page.blocks[0].diagram.edges[0];
+  assert.strictEqual(e.labelDx, 12);
+  assert.strictEqual(e.labelDy, -8);
+  const clear = B.planSetFields(PROSE_TEXT, PROSE, edgePath, [['labelDx', null], ['labelDy', null]]);
+  const ec = JSON.parse(clear.text).page.blocks[0].diagram.edges[0];
+  assert.ok(!('labelDx' in ec) && !('labelDy' in ec));
+});
+
+test('planDeleteListItem removes bullets, paragraphs, and contract rows', () => {
+  const noBullet = B.planDeleteListItem(PROSE_TEXT, PROSE, ['page', 'blocks', 0, 'bullets'], 0);
+  assert.strictEqual(JSON.parse(noBullet.text).page.blocks[0].bullets.length, 1);
+  const noRow = B.planDeleteListItem(PROSE_TEXT, PROSE, ['page', 'blocks', 0, 'contract', 'fields'], 1);
+  assert.deepStrictEqual(JSON.parse(noRow.text).page.blocks[0].contract.fields.map(f => f.k), ['topic']);
+  assert.match(B.planDeleteListItem(PROSE_TEXT, PROSE, ['page', 'blocks', 0, 'bullets'], 9).error, /no such/);
+});
+
+test('planAddEdgeBetween wires the exact clicked pair and refuses duplicates and self-loops', () => {
+  const r = B.planAddEdgeBetween(PROSE_TEXT, PROSE, 0, 'c', 'a');
+  assert.ok(!r.error, r.error);
+  const d = JSON.parse(r.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(d.edges[1], {from: 'c', to: 'a', kind: 'int', label: 'describe the hop'});
+  assert.strictEqual(r.index, 1);
+  assert.match(B.planAddEdgeBetween(PROSE_TEXT, PROSE, 0, 'a', 'b').error, /already exists/);
+  assert.match(B.planAddEdgeBetween(PROSE_TEXT, PROSE, 0, 'a', 'a').error, /same node/);
+  assert.match(B.planAddEdgeBetween(PROSE_TEXT, PROSE, 0, 'a', 'zz').error, /unknown node/);
+});
+
+test('planDuplicateNode copies the definition beside the original placement', () => {
+  const plain1 = B.planDuplicateNode(PROSE_TEXT, PROSE, 0, 'a');
+  const d1 = JSON.parse(plain1.text).page.blocks[0].diagram;
+  assert.strictEqual(plain1.id, 'a1');
+  assert.deepStrictEqual(d1.rows[0][0], 'a');
+  assert.strictEqual(d1.rows[0][1], 'a1'); /* right after the original slot */
+  assert.deepStrictEqual(d1.nodes.a1, {title: 'A'});
+
+  const stack = B.planDuplicateNode(PROSE_TEXT, PROSE, 0, 'b');
+  const d2 = JSON.parse(stack.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(d2.rows[0][1], ['b', 'b1', 'c']); /* inside the stack */
+
+  const float = B.planDuplicateNode(JSON.stringify(RICH, null, 2), RICH, 0, 'f');
+  const d3 = JSON.parse(float.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(d3.floats[1], {id: 'f1', side: 'above'});
+  assert.match(B.planDuplicateNode(PROSE_TEXT, PROSE, 0, 'zz').error, /not found/);
+});
+
+test('planDuplicateSection deep-copies right after the original and renames the heading', () => {
+  const r = B.planDuplicateSection(TEXT, SPEC, 1); /* first tab section */
+  const out = JSON.parse(r.text);
+  const secs = out.page.blocks[1].tabs[0].sections;
+  assert.strictEqual(secs.length, 2);
+  assert.strictEqual(secs[1].heading, 'InTab (copy)');
+  assert.deepStrictEqual(secs[1].diagram.nodes, secs[0].diagram.nodes);
+  assert.strictEqual(r.index, 2); /* renders directly after the original ordinal 1 */
+  const bare = {nodes: {a: {}}, rows: [['a']]};
+  assert.match(B.planDuplicateSection(JSON.stringify(bare), bare, 0).error, /bare diagram/);
 });

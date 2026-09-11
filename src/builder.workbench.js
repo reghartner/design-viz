@@ -190,6 +190,13 @@ function builderTargetPath(raw, target){
   if (target.kind === 'edge') return d.concat(['edges', target.index]);
   if (target.kind === 'step') return d.concat(['steps', target.index]);
   if (target.kind === 'panel') return d.concat(['panels', target.index]);
+  if (target.kind === 'bullet') return rec.section.concat(['bullets', target.index]);
+  if (target.kind === 'para'){
+    var sec = specValueAt(raw, rec.section);
+    if (sec && typeof sec.text === 'string') return rec.section.concat(['text']);
+    return rec.section.concat(['text', target.index]);
+  }
+  if (target.kind === 'crow') return rec.section.concat(['contract', 'fields', target.index]);
   return null;
 }
 function builderPathString(path){
@@ -631,6 +638,132 @@ function planDeleteSection(text, raw, sectionIdx){
   return r;
 }
 
+/* ---------------- pass 3: direct-manipulation planners ---------------- */
+
+function jsonInsertArrayItemAfter(text, arrPath, afterIdx, itemText){
+  /* Insert itemText into the array at arrPath directly AFTER member
+     afterIdx (jsonInsertMember only appends at the end). */
+  var loc = arrPath.length ? jsonLocate(text, arrPath) : {start: jsonSkipWS(text, 0)};
+  var cont = loc ? jsonContainer(text, loc.start) : null;
+  if (!cont || cont.isObj) return null;
+  var anchor = cont.members[afterIdx];
+  if (!anchor) return null;
+  var ls = text.lastIndexOf('\n', anchor.keyStart) + 1;
+  var indent = (text.slice(ls, anchor.keyStart).match(/^[ \t]*/) || [''])[0];
+  var adjVal = itemText.split('\n').join('\n' + indent);
+  var prefix = ',\n' + indent;
+  var insertAt = anchor.valEnd;
+  var start = insertAt + prefix.length;
+  return {text: text.slice(0, insertAt) + prefix + adjVal + text.slice(insertAt),
+          start: start, end: start + adjVal.length};
+}
+
+function planReplaceValue(text, raw, path, valueText){
+  /* Replace one whole value (a bullet string, a paragraph) in place. */
+  if (!jsonLocate(text, path))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var r = jsonReplaceValue(text, path, valueText);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+function planSetFields(text, raw, targetPath, pairs){
+  /* Several surgical field edits on one object under a single undo step
+     (the label drag commits labelDx and labelDy together). */
+  if (!jsonLocate(text, targetPath))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var out = text;
+  for (var i = 0; i < pairs.length; i++){
+    var r = jsonSetField(out, targetPath, pairs[i][0], pairs[i][1]);
+    if (!r) return {error: 'could not edit the editor text'};
+    out = r.text;
+  }
+  return {text: out};
+}
+function planDeleteListItem(text, raw, containerPath, index){
+  /* Remove one entry from a plain list (bullets, text paragraphs,
+     contract fields). */
+  if (!jsonLocate(text, containerPath))
+    return {error: 'list not found in the editor text'};
+  var r = jsonRemoveMember(text, containerPath, index);
+  if (!r) return {error: 'no such entry'};
+  return r;
+}
+
+function planAddEdgeBetween(text, raw, sectionIdx, fromId, toId){
+  /* Connect mode: the operator clicked the exact source and target. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var nodes = got.d.nodes || {};
+  if (!Object.prototype.hasOwnProperty.call(nodes, fromId))
+    return {error: 'unknown node id "' + fromId + '"'};
+  if (!Object.prototype.hasOwnProperty.call(nodes, toId))
+    return {error: 'unknown node id "' + toId + '"'};
+  if (fromId === toId) return {error: 'source and target are the same node'};
+  var key = fromId + '->' + toId;
+  if ((got.d.edges || []).some(function(e){ return e && builderEdgeKey(e) === key; }))
+    return {error: 'edge "' + key + '" already exists \u2014 click it to edit'};
+  var item = '{"from": ' + JSON.stringify(fromId) + ', "to": ' + JSON.stringify(toId) +
+             ', "kind": "int", "label": "describe the hop"}';
+  var r = jsonInsertListItemOrCreate(text, got.path, 'edges', item);
+  if (!r) return {error: 'could not edit edges in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'edge',
+          index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
+}
+
+function planDuplicateNode(text, raw, sectionIdx, id){
+  /* Copy a node definition under a fresh id and place the copy right
+     beside the original (same row slot, same stack, or floats list). */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var d = got.d;
+  if (!d.nodes || !Object.prototype.hasOwnProperty.call(d.nodes, id))
+    return {error: 'node "' + id + '" not found'};
+  var newId = builderUniqueKey(d.nodes, id);
+  var placed = null;
+  (d.rows || []).forEach(function(row, r){
+    if (placed) return;
+    row.forEach(function(slot, s){
+      if (placed) return;
+      if (slot === id) placed = {path: got.path.concat(['rows', r]), after: s};
+      else if (Array.isArray(slot)){
+        var k = slot.indexOf(id);
+        if (k >= 0) placed = {path: got.path.concat(['rows', r, s]), after: k};
+      }
+    });
+  });
+  var out;
+  if (placed){
+    out = jsonInsertArrayItemAfter(text, placed.path, placed.after, JSON.stringify(newId));
+    if (!out) return {error: 'could not edit rows in the editor text'};
+  } else {
+    var float = (d.floats || []).filter(function(f){ return f && f.id === id; })[0];
+    if (!float) return {error: 'node "' + id + '" has no row or float placement to copy'};
+    out = jsonInsertListItemOrCreate(text, got.path, 'floats',
+      '{"id": ' + JSON.stringify(newId) + ', "side": ' + JSON.stringify(float.side || 'above') + '}');
+    if (!out) return {error: 'could not edit floats in the editor text'};
+  }
+  var def = jsonInsertMember(out.text, got.path.concat(['nodes']), newId,
+    JSON.stringify(builderClone(d.nodes[id])));
+  if (!def) return {error: 'could not edit nodes in the editor text'};
+  return {text: def.text, start: def.start, end: def.end, kind: 'node', id: newId};
+}
+
+function planDuplicateSection(text, raw, sectionIdx){
+  /* Deep-copy a section directly after the original; the copy renders as
+     the next section ordinal (render order is depth-first list order). */
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'no such section'};
+  if (!rec.section.length)
+    return {error: 'this spec is one bare diagram \u2014 wrap it as {"page": {"blocks": [ ... ]}} first'};
+  var clone = builderClone(specValueAt(raw, rec.section));
+  if (clone && typeof clone.heading === 'string') clone.heading += ' (copy)';
+  var parentPath = rec.section.slice(0, -1);
+  var idx = rec.section[rec.section.length - 1];
+  var r = jsonInsertArrayItemAfter(text, parentPath, idx, JSON.stringify(clone, null, 2));
+  if (!r) return {error: 'could not edit the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'section', index: sectionIdx + 1};
+}
+
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
@@ -679,6 +812,35 @@ var BUILDER_GUIDES = {
       ['type', 'widget kind: state leds gauge log screen queue inflight phone … (full list in the authoring contract)'],
       ['title', 'card title above the widget'],
       ['initial', 'widget state before step 1']
+    ]
+  },
+  bullet: {
+    title: 'Bullet — one list point',
+    how: 'Edit the text and Render. A bullet is a plain string, or an object when it needs nesting or step reveals.',
+    fields: [
+      ['text', 'the point itself (object form)'],
+      ['sub', 'nested child bullets (object form)'],
+      ['revealAt, hideAt', 'zero-based step indexes binding the bullet to the diagram click-through']
+    ]
+  },
+  para: {
+    title: 'Paragraph — section prose',
+    how: 'Edit the text and Render. section.text is one string or a list of paragraph strings.',
+    fields: [
+      ['text', 'plain prose; `code` spans render in monospace']
+    ]
+  },
+  crow: {
+    title: 'Contract field — one "on the wire" row',
+    how: 'Edit the row and Render. Rows without a k key are skipped by the renderer.',
+    fields: [
+      ['k', 'field name (required)'],
+      ['v', 'sample value'],
+      ['g', 'gloss — what the field means'],
+      ['hot', 'true highlights the row'],
+      ['delta', 'added | removed | changed badge'],
+      ['link', 'permalink URL — arrow beside the name'],
+      ['revealAt, hideAt', 'zero-based step indexes binding the row to the diagram click-through']
     ]
   },
   section: {
@@ -768,6 +930,9 @@ function initWorkbenchBuilder(opts){
     var sel = t.kind === 'node' ? '[data-dv-node="' + cssQuote(t.id) + '"]' :
               t.kind === 'edge' ? 'path.edge[data-dv-edge="' + t.index + '"]' :
               t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
+              t.kind === 'bullet' ? '[data-dv-bullet="' + t.index + '"]' :
+              t.kind === 'para' ? '[data-dv-para="' + t.index + '"]' :
+              t.kind === 'crow' ? '[data-dv-crow="' + t.index + '"]' :
                                   '[data-dv-panel="' + t.index + '"]';
     try { return secEl.querySelector(sel); } catch (ex){ return null; }
   }
@@ -816,6 +981,14 @@ function initWorkbenchBuilder(opts){
     var parsed = parseEditor();
     if (parsed.error){ formError(parsed.error); return false; }
     return applyPlan(planFor(parsed.raw), opt);
+  }
+  function commitValue(valueText){
+    /* replace the selected element's WHOLE value (bullet string, paragraph) */
+    var parsed = parseEditor();
+    if (parsed.error){ formError(parsed.error); return false; }
+    var path = builderTargetPath(parsed.raw, currentTarget);
+    if (!path){ formError('element not found — click Render, then reselect'); return false; }
+    return applyPlan(planReplaceValue(src.value, parsed.raw, path, valueText));
   }
 
   /* ---- form controls ---- */
@@ -1016,12 +1189,71 @@ function initWorkbenchBuilder(opts){
     ];
   }
 
+  function bulletForm(val, ctx){
+    var isObj = val != null && typeof val === 'object';
+    var rows = [
+      frow('text', textControl(isObj ? val.text : val, function(v){
+        var s = JSON.stringify(v == null ? '' : v);
+        return isObj ? commitSimple('text', s) : commitValue(s);
+      }, {textarea: true}))
+    ];
+    if (isObj && Array.isArray(val.sub) && val.sub.length){
+      var note = document.createElement('span');
+      note.className = 'fctl fnote';
+      note.textContent = val.sub.length + ' nested sub-bullet' + (val.sub.length > 1 ? 's' : '') + ' — edit them in the JSON';
+      rows.push(frow('sub', note));
+    }
+    return rows;
+  }
+  function paraForm(val, ctx){
+    return [
+      frow('text', textControl(val, function(v){
+        return commitValue(JSON.stringify(v == null ? '' : v));
+      }, {textarea: true}))
+    ];
+  }
+  function crowForm(val, ctx){
+    return [
+      frow('k', textControl(val.k, function(v){
+        if (v == null){ formError('a contract row needs k — the field name'); return false; }
+        return commitSimple('k', JSON.stringify(v));
+      }, {required: 'a contract row needs k — the field name'})),
+      frow('v', textControl(val.v, function(v){ return commitSimple('v', v == null ? null : JSON.stringify(v)); })),
+      frow('g', textControl(val.g, function(v){ return commitSimple('g', v == null ? null : JSON.stringify(v)); })),
+      frow('hot', checkboxControl(val.hot, function(on){ return commitSimple('hot', on ? 'true' : null); })),
+      frow('delta', selectControl(['added', 'removed', 'changed'], val.delta, function(v){
+        return commitSimple('delta', v == null ? null : JSON.stringify(v));
+      }, true)),
+      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+    ];
+  }
+
   function deletePlanFor(t, raw){
     if (t.kind === 'node') return planDeleteNode(src.value, raw, t.section, t.id);
     if (t.kind === 'edge') return planDeleteEdge(src.value, raw, t.section, t.index);
     if (t.kind === 'step') return planDeleteStep(src.value, raw, t.section, t.index);
     if (t.kind === 'panel') return planDeletePanel(src.value, raw, t.section, t.index);
+    var rec = specSectionPaths(raw)[t.section];
+    if (!rec) return {error: 'no such section'};
+    if (t.kind === 'bullet') return planDeleteListItem(src.value, raw, rec.section.concat(['bullets']), t.index);
+    if (t.kind === 'para'){
+      var sec = specValueAt(raw, rec.section);
+      if (sec && typeof sec.text === 'string') return planSetField(src.value, raw, rec.section, 'text', null);
+      return planDeleteListItem(src.value, raw, rec.section.concat(['text']), t.index);
+    }
+    if (t.kind === 'crow') return planDeleteListItem(src.value, raw, rec.section.concat(['contract', 'fields']), t.index);
     return planDeleteSection(src.value, raw, t.section);
+  }
+
+  function deleteCurrent(){
+    var t = currentTarget;
+    if (!t) return;
+    commitCascade(function(raw){ return deletePlanFor(t, raw); },
+      {after: function(){
+        currentTarget = null; setSelected(null);
+        if (t.kind === 'section') insertSection = 0;
+        inspectorMessage(t.kind + ' deleted — undo restores it');
+      }});
   }
 
   function renderInspector(){
@@ -1055,7 +1287,8 @@ function initWorkbenchBuilder(opts){
     } else if (t.kind === 'section' && path.length === 0){
       formError('bare diagram — wrap it as {"page": {"blocks": [ ... ]}} to edit heading and accent');
     } else {
-      var val = specValueAt(parsed.raw, path) || {};
+      var val = specValueAt(parsed.raw, path);
+      if (val == null) val = {};
       var rec = specSectionPaths(parsed.raw)[t.section];
       var ctx = {
         page: normalize(parsed.raw) || {},
@@ -1067,12 +1300,34 @@ function initWorkbenchBuilder(opts){
         t.kind === 'node' ? nodeForm(val, ctx) :
         t.kind === 'edge' ? edgeForm(val, ctx) :
         t.kind === 'step' ? stepForm(val, ctx) :
-        t.kind === 'panel' ? panelForm(val, ctx) : sectionForm(val, ctx);
+        t.kind === 'panel' ? panelForm(val, ctx) :
+        t.kind === 'bullet' ? bulletForm(val, ctx) :
+        t.kind === 'para' ? paraForm(val, ctx) :
+        t.kind === 'crow' ? crowForm(val, ctx) : sectionForm(val, ctx);
       rows.forEach(function(r){ form.appendChild(r); });
       guide.appendChild(form);
 
       var acts = document.createElement('div');
       acts.className = 'iacts';
+      if (t.kind === 'node'){
+        acts.appendChild(actionButton('duplicate', function(){
+          commitCascade(function(raw){ return planDuplicateNode(src.value, raw, t.section, t.id); },
+            {after: function(plan){
+              currentTarget = {section: t.section, kind: 'node', id: plan.id};
+              renderInspector();
+            }});
+        }));
+      }
+      if (t.kind === 'section'){
+        acts.appendChild(actionButton('duplicate', function(){
+          commitCascade(function(raw){ return planDuplicateSection(src.value, raw, t.section); },
+            {after: function(plan){
+              currentTarget = {section: plan.index, kind: 'section'};
+              insertSection = plan.index;
+              renderInspector();
+            }});
+        }));
+      }
       if (t.kind === 'step'){
         acts.appendChild(actionButton('↑ earlier', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
@@ -1083,14 +1338,7 @@ function initWorkbenchBuilder(opts){
             {after: function(plan){ t.index = plan.index; renderInspector(); }});
         }));
       }
-      acts.appendChild(actionButton('delete ' + t.kind, function(){
-        commitCascade(function(raw){ return deletePlanFor(t, raw); },
-          {after: function(){
-            currentTarget = null; setSelected(null);
-            if (t.kind === 'section') insertSection = 0;
-            inspectorMessage(t.kind + ' deleted — undo restores it');
-          }});
-      }, 'bdanger'));
+      acts.appendChild(actionButton('delete ' + t.kind, deleteCurrent, 'bdanger'));
       guide.appendChild(acts);
     }
 
@@ -1129,7 +1377,7 @@ function initWorkbenchBuilder(opts){
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
     var gi = parseInt(secEl.getAttribute('data-dv-section'), 10);
     if (isNaN(gi)) return null;
-    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel]');
+    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-para], [data-dv-crow]');
     if (el && secEl.contains(el)){
       if (el.hasAttribute('data-dv-node'))
         return {section: gi, kind: 'node', id: el.getAttribute('data-dv-node'), el: el};
@@ -1137,6 +1385,12 @@ function initWorkbenchBuilder(opts){
         return {section: gi, kind: 'step', index: parseInt(el.getAttribute('data-dv-step'), 10), el: el};
       if (el.hasAttribute('data-dv-panel'))
         return {section: gi, kind: 'panel', index: parseInt(el.getAttribute('data-dv-panel'), 10), el: el};
+      if (el.hasAttribute('data-dv-bullet'))
+        return {section: gi, kind: 'bullet', index: parseInt(el.getAttribute('data-dv-bullet'), 10), el: el};
+      if (el.hasAttribute('data-dv-para'))
+        return {section: gi, kind: 'para', index: parseInt(el.getAttribute('data-dv-para'), 10), el: el};
+      if (el.hasAttribute('data-dv-crow'))
+        return {section: gi, kind: 'crow', index: parseInt(el.getAttribute('data-dv-crow'), 10), el: el};
       /* halo and label clicks resolve to the same edge — highlight the
          visible edge path (the halo has no selected style of its own) */
       var edgeIdx = parseInt(el.getAttribute('data-dv-edge'), 10);
@@ -1160,9 +1414,149 @@ function initWorkbenchBuilder(opts){
     if (loc) selectRange(loc);
   }
 
+  /* ---- connect mode: draw an edge by clicking its two nodes ---- */
+  var connect = null; /* null | {stage:1} | {stage:2, section, fromId} */
+  function connectStatus(text){
+    if (targetLabel) targetLabel.textContent = text;
+  }
+  function cancelConnect(message){
+    connect = null;
+    var parsed = parseEditor();
+    updateTargetLabel(parsed.error ? null : parsed.raw);
+    if (message) inspectorMessage(message);
+  }
+  function startConnect(){
+    if (connect){ cancelConnect('connect cancelled'); return; }
+    var parsed = parseEditor();
+    if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
+    if (!specSectionPaths(parsed.raw).length){ inspectorMessage('no sections found in the editor text'); return; }
+    connect = {stage: 1};
+    connectStatus('connect: click the SOURCE node (Esc cancels)');
+  }
+  function handleConnectClick(target){
+    if (!target || target.kind !== 'node'){
+      cancelConnect('connect cancelled — that was not a node');
+      return;
+    }
+    if (connect.stage === 1){
+      connect = {stage: 2, section: target.section, fromId: target.id};
+      setSelected(target.el);
+      connectStatus('connect: ' + target.id + ' → click the TARGET node');
+      return;
+    }
+    if (target.section !== connect.section){
+      cancelConnect('connect cancelled — the two nodes are in different sections');
+      return;
+    }
+    var fromId = connect.fromId;
+    insertSection = target.section;
+    var parsed = parseEditor();
+    if (parsed.error){ cancelConnect(parsed.error); return; }
+    var plan = planAddEdgeBetween(src.value, parsed.raw, target.section, fromId, target.id);
+    if (plan.error){ cancelConnect(plan.error); return; }
+    pushUndo();
+    src.value = plan.text;
+    render();
+    cancelConnect(null);
+    var el = findTargetEl({section: target.section, kind: 'edge', index: plan.index});
+    selectTarget({section: target.section, kind: 'edge', index: plan.index, el: el}, false);
+    selectRange(plan);
+  }
+
+  /* ---- drag an edge label to set its labelDx/labelDy nudges ---- */
+  var drag = null, suppressClick = false;
+  function svgPointAt(svg, inv, clientX, clientY){
+    var pt = svg.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    return pt.matrixTransform(inv);
+  }
+  view.addEventListener('mousedown', function(ev){
+    if (ev.button !== 0 || connect) return;
+    if (!ev.target.closest) return;
+    var lbl = ev.target.closest('text.lbl[data-dv-edge]');
+    if (!lbl) return;
+    var svg = lbl.ownerSVGElement;
+    if (!svg || !svg.getScreenCTM) return;
+    var ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    var inv = ctm.inverse();
+    var start = svgPointAt(svg, inv, ev.clientX, ev.clientY);
+    drag = {lbl: lbl, svg: svg, inv: inv, x0: start.x, y0: start.y, dx: 0, dy: 0, moved: false};
+    ev.preventDefault(); /* no text selection while dragging */
+  });
+  window.addEventListener('mousemove', function(ev){
+    if (!drag) return;
+    var pt = svgPointAt(drag.svg, drag.inv, ev.clientX, ev.clientY);
+    drag.dx = pt.x - drag.x0;
+    drag.dy = pt.y - drag.y0;
+    if (Math.abs(drag.dx) + Math.abs(drag.dy) > 2) drag.moved = true;
+    if (drag.moved) drag.lbl.setAttribute('transform', 'translate(' + drag.dx + ' ' + drag.dy + ')');
+  });
+  window.addEventListener('mouseup', function(){
+    if (!drag) return;
+    var d = drag;
+    drag = null;
+    if (!d.moved){ d.lbl.removeAttribute('transform'); return; }
+    suppressClick = true; /* the click after a real drag is not a selection */
+    /* that click fires (if at all) before timeouts run — self-clear so a
+       drag released off-target cannot swallow the NEXT genuine click */
+    setTimeout(function(){ suppressClick = false; }, 0);
+    d.lbl.removeAttribute('transform');
+    var secEl = d.lbl.closest('.doc-sec');
+    var gi = secEl ? parseInt(secEl.getAttribute('data-dv-section'), 10) : NaN;
+    var idx = parseInt(d.lbl.getAttribute('data-dv-edge'), 10);
+    if (isNaN(gi) || isNaN(idx)) return;
+    var parsed = parseEditor();
+    if (parsed.error){ inspectorMessage(parsed.error); return; }
+    var target = {section: gi, kind: 'edge', index: idx};
+    var path = builderTargetPath(parsed.raw, target);
+    var e = path ? specValueAt(parsed.raw, path) : null;
+    if (!e){ inspectorMessage('edge not found in the editor text — the render and the editor may be out of sync'); return; }
+    var newDx = Math.round((typeof e.labelDx === 'number' ? e.labelDx : 0) + d.dx);
+    var newDy = Math.round((typeof e.labelDy === 'number' ? e.labelDy : 0) + d.dy);
+    var plan = planSetFields(src.value, parsed.raw, path, [
+      ['labelDx', newDx === 0 ? null : String(newDx)],
+      ['labelDy', newDy === 0 ? null : String(newDy)]
+    ]);
+    if (plan.error){ inspectorMessage(plan.error); return; }
+    pushUndo();
+    src.value = plan.text;
+    render();
+    currentTarget = target;
+    insertSection = gi;
+    rehighlight();
+    renderInspector();
+  });
+
   view.addEventListener('click', function(ev){
+    if (suppressClick){ suppressClick = false; return; }
     var target = targetFromEvent(ev);
+    if (connect){
+      handleConnectClick(target);
+      return;
+    }
     if (target) selectTarget(target);
+  });
+
+  /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape'){
+      if (connect){ cancelConnect('connect cancelled'); return; }
+      if (currentTarget){
+        currentTarget = null;
+        setSelected(null);
+        if (guide) guide.hidden = true;
+      }
+      return;
+    }
+    if (ev.key === 'Delete' || ev.key === 'Backspace'){
+      var ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' ||
+                 ae.tagName === 'BUTTON' || ae.isContentEditable)) return;
+      if (!currentTarget) return;
+      ev.preventDefault();
+      deleteCurrent();
+    }
   });
 
   /* ================= insert buttons ================= */
@@ -1188,7 +1582,7 @@ function initWorkbenchBuilder(opts){
     selectRange(plan);
   }
   var addButtons = {
-    'add-node': ['node', planAddNode], 'add-edge': ['edge', planAddEdge],
+    'add-node': ['node', planAddNode],
     'add-step': ['step', planAddStep], 'add-panel': ['panel', planAddPanel],
     'add-section': ['section', planAddSection]
   };
@@ -1198,6 +1592,9 @@ function initWorkbenchBuilder(opts){
       runInsert(addButtons[id][0], addButtons[id][1]);
     });
   });
+  /* + edge draws by clicking source then target (Esc cancels) */
+  var edgeBtn = document.getElementById('add-edge');
+  if (edgeBtn) edgeBtn.addEventListener('click', startConnect);
 
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);

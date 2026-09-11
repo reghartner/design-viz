@@ -102,14 +102,18 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .ihelp[open] summary{margin-bottom:4px;}
 
 /* builder: selection highlight on the rendered page (svg + widget cards) */
-.docview .node, .docview .edge, .docview .halo, .docview .lbl, .docview .coin,
-.docview .pwidget{cursor:pointer;}
+.docview .node, .docview .edge, .docview .halo, .docview .coin,
+.docview .pwidget, .docview .sec-text[data-dv-para],
+.docview .sec-bullets li[data-dv-bullet], .docview .ctrow{cursor:pointer;}
+.docview text.lbl{cursor:grab;} /* drag nudges labelDx/labelDy; click selects */
 g.node.dv-sel .card{stroke:var(--accent); stroke-width:2.5;}
 path.edge.dv-sel{stroke-width:3.4;}
 text.lbl.dv-sel{fill:var(--accent);}
 g.coin.dv-sel circle{stroke:var(--accent); stroke-width:2.5;}
 .pwidget.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
 section.doc-sec.dv-sel{outline:2px solid var(--accent); outline-offset:3px;}
+p.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
+tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
 .rbtn{background:var(--accent); color:#fff; border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
   padding:7px 16px; border-radius:8px; cursor:pointer;}
 .rbtn:hover{filter:brightness(1.08);}

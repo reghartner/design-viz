@@ -3450,3 +3450,21 @@ test('timeline regressions: seeded events survive step-less specs, junk now keep
   assert.strictEqual(C.formatClock(59.6), '1m');
   assert.strictEqual(C.formatClock(3599.7), '1h');
 });
+
+test('timeline bounds: overflowing durations parse to null; absurd spans clamp and terminate', () => {
+  /* 320 digits of hours overflows a double to Infinity — must be null,
+     never an infinite tick loop */
+  assert.strictEqual(C.parseClock('1'.repeat(320) + 'h'), null);
+  assert.strictEqual(C.parseClock(Number.MAX_VALUE), null);       /* *60 overflows */
+  const big = C.timelineModel({span: '99999h'}, {now: '1h'});      /* ~11 years */
+  assert.strictEqual(big.span, 7 * 86400);                        /* clamped to 7d */
+  assert.ok(big.ticks.length <= 12, 'tick array bounded');
+  assert.strictEqual(big.ticks[big.ticks.length - 1].label, '7d'.replace('7d', C.formatClock(7 * 86400)));
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'hb', type: 'timeline', span: '99999h'}],
+    steps: [{edge: 'a->b'}]
+  }}]}));
+  assert.match(JSON.parse(JSON.stringify(v.warnings)).join('\n'),
+    /span: longer than the drawable maximum \(7d\) — clamped to 7d/);
+});

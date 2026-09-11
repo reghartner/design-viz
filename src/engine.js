@@ -1629,14 +1629,16 @@ function timelineModel(panel, state){
   panel = panel || {}; state = state || {};
   var span = parseClock(panel.span);
   if (span == null || span <= 0) span = 3600;
-  /* tick unit: coarsest table entry giving at most 8 intervals */
+  if (span > TIMELINE_MAX_SPAN) span = TIMELINE_MAX_SPAN; /* validator warns */
+  /* tick unit: coarsest table entry giving at most 8 intervals; the top
+     entry (1d) covers the clamped 7d maximum within the bound */
   var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
   var unit = units[units.length - 1];
   for (var i = 0; i < units.length; i++){
     if (span / units[i] <= 8){ unit = units[i]; break; }
   }
   var ticks = [];
-  for (var ts = 0; ts <= span + 1e-6; ts += unit)
+  for (var ts = 0; ts <= span + 1e-6 && ticks.length <= 12; ts += unit)
     ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
   var every = panel.cadence ? parseClock(panel.cadence.every) : null;
   var beats = [], beatsOmitted = 0;

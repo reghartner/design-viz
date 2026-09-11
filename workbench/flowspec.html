@@ -4274,18 +4274,24 @@ var BUFFER_STATES = ['empty','buffered','protected','uploading','uploaded','drop
    "45s", "1h 30m", or a bare number (minutes) -> seconds; null on junk.
    Shared by the validator, the fold, and the engine model. */
 function parseClock(text){
-  if (typeof text === 'number' && isFinite(text) && text >= 0) return text * 60;
+  /* every return is finite or null — absurd magnitudes (enough digits
+     to overflow a double) must never reach the render loops */
+  function fin(v){ return isFinite(v) ? v : null; }
+  if (typeof text === 'number' && isFinite(text) && text >= 0) return fin(text * 60);
   if (typeof text !== 'string') return null;
   var s = text.trim().toLowerCase();
   if (!s) return null;
-  if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s) * 60;
+  if (/^\d+(\.\d+)?$/.test(s)) return fin(parseFloat(s) * 60);
   var m, total = 0, any = false;
   var re = /(\d+(?:\.\d+)?)\s*(h|m|s)/g;
   while ((m = re.exec(s))){ any = true; total += parseFloat(m[1]) * (m[2] === 'h' ? 3600 : m[2] === 'm' ? 60 : 1); }
   if (!any) return null;
   if (s.replace(/(\d+(?:\.\d+)?)\s*(h|m|s)/g, '').replace(/\s/g, '') !== '') return null;
-  return total;
+  return fin(total);
 }
+/* the widget is a 320-unit-wide strip; a week is the largest span it can
+   present legibly. Longer declared spans clamp here (validator warns). */
+var TIMELINE_MAX_SPAN = 7 * 86400;
 function formatClock(seconds){
   /* 5400 -> "1h30m", 3600 -> "1h", 90 -> "1m30s", 45 -> "45s", 0 -> "0" */
   var h = Math.floor(seconds / 3600);
@@ -4800,6 +4806,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(PP + '.span: timeline needs a span ("6h", "90m") — using 1h');
       else if (parseClock(p.span) == null || parseClock(p.span) <= 0)
         warnings.push(PP + '.span: unreadable span "' + p.span + '" (use "6h" / "90m") — using 1h');
+      else if (parseClock(p.span) > TIMELINE_MAX_SPAN)
+        warnings.push(PP + '.span: longer than the drawable maximum (7d) — clamped to 7d');
       if (p.cadence != null){
         if (typeof p.cadence !== 'object' || parseClock(p.cadence.every) == null || parseClock(p.cadence.every) <= 0)
           warnings.push(PP + '.cadence: expected {every:"30m", label?} with a readable interval — no periodic beats drawn');
@@ -7003,14 +7011,16 @@ function timelineModel(panel, state){
   panel = panel || {}; state = state || {};
   var span = parseClock(panel.span);
   if (span == null || span <= 0) span = 3600;
-  /* tick unit: coarsest table entry giving at most 8 intervals */
+  if (span > TIMELINE_MAX_SPAN) span = TIMELINE_MAX_SPAN; /* validator warns */
+  /* tick unit: coarsest table entry giving at most 8 intervals; the top
+     entry (1d) covers the clamped 7d maximum within the bound */
   var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
   var unit = units[units.length - 1];
   for (var i = 0; i < units.length; i++){
     if (span / units[i] <= 8){ unit = units[i]; break; }
   }
   var ticks = [];
-  for (var ts = 0; ts <= span + 1e-6; ts += unit)
+  for (var ts = 0; ts <= span + 1e-6 && ticks.length <= 12; ts += unit)
     ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
   var every = panel.cadence ? parseClock(panel.cadence.every) : null;
   var beats = [], beatsOmitted = 0;

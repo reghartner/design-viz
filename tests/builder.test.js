@@ -26,7 +26,7 @@ function loadBuilder(){
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
-    ' specFileName, parseValidationPath, validationRawPath, findingLocation,' +
+    ' specFileName, parseValidationPath, findingLocation,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -727,15 +727,38 @@ test('parseValidationPath reads validator field paths and rejects pathless prose
   assert.strictEqual(B.parseValidationPath('no colon here'), null);
 });
 
-test('validationRawPath maps page paths onto wrapped, alias, and bare-diagram shapes', () => {
-  assert.deepStrictEqual(plain(B.validationRawPath({page: {blocks: []}}, ['blocks', 0, 'heading'])),
-    ['page', 'blocks', 0, 'heading']);
-  assert.deepStrictEqual(plain(B.validationRawPath({sections: []}, ['sections', 1])), ['sections', 1]);
-  const bare = {nodes: {a: {}}, rows: [['a']]};
-  assert.deepStrictEqual(plain(B.validationRawPath(bare, ['sections', 0, 'diagram', 'nodes', 'a'])),
-    ['nodes', 'a']);
-  assert.strictEqual(B.validationRawPath(bare, ['title']), null);
-  assert.strictEqual(B.validationRawPath(null, ['blocks', 0]), null);
+test('findingLocation maps page-prefixed findings onto the wrapped page, not page.page', () => {
+  /* validator messages like "page.skin: unknown skin" address the page
+     object itself (Codex cycle-1 MAJOR: the old mapping doubled the
+     wrapper and selected the whole page object for wrapped specs) */
+  const spec = {page: {title: 'T', skin: 'bogus', blocks: [{heading: 'H'}]}};
+  const text = JSON.stringify(spec, null, 2);
+  const skin = B.findingLocation(text, spec, 'page.skin: unknown skin "bogus"');
+  assert.ok(skin.exact);
+  assert.strictEqual(JSON.parse(text.slice(skin.start, skin.end)), 'bogus');
+  /* page.blocks missing entirely: selects the page object, not exact */
+  const noBlocks = {page: {title: 'T'}};
+  const nbText = JSON.stringify(noBlocks, null, 2);
+  const nb = B.findingLocation(nbText, noBlocks, 'page.blocks: required');
+  assert.ok(!nb.exact);
+  assert.deepStrictEqual(JSON.parse(nbText.slice(nb.start, nb.end)), {title: 'T'});
+  /* unwrapped alias page: page-prefixed finding lands on the field */
+  const alias = {skin: 'bogus', sections: [{heading: 'H'}]};
+  const aText = JSON.stringify(alias, null, 2);
+  const a = B.findingLocation(aText, alias, 'page.skin: unknown skin "bogus"');
+  assert.strictEqual(JSON.parse(aText.slice(a.start, a.end)), 'bogus');
+});
+
+test('findingLocation resolves author ids that contain dots via longest-key match', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {'svc.api.v2': {title: 'A', icon: 'gear'}, plain: {title: 'P'}},
+    rows: [['svc.api.v2', 'plain']],
+    edges: [{from: 'svc.api.v2', to: 'plain'}]}}]}};
+  const text = JSON.stringify(spec, null, 2);
+  const hit = B.findingLocation(text, spec,
+    'blocks[0].diagram.nodes.svc.api.v2.icon: unknown icon "x"');
+  assert.ok(hit.exact);
+  assert.strictEqual(JSON.parse(text.slice(hit.start, hit.end)), 'gear');
 });
 
 test('findingLocation selects the exact field and falls back to the nearest parent', () => {

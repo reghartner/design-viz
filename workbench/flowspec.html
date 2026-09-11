@@ -9772,33 +9772,56 @@ function parseValidationPath(message){
   }
   return out.length ? out : null;
 }
-function validationRawPath(raw, pagePath){
-  /* map a normalized-page path onto the raw editor JSON shape */
-  if (raw && raw.page) return ['page'].concat(pagePath);
-  if (raw && (raw.blocks || raw.sections)) return pagePath.slice();
-  if (raw && raw.nodes && raw.rows){
-    /* normalize() wrapped the bare diagram as sections[0].diagram */
-    if (pagePath.length >= 2 && pagePath[0] === 'sections' && pagePath[1] === 0){
-      var rest = pagePath.slice(2);
-      if (rest[0] === 'diagram') rest = rest.slice(1);
-      return rest;
-    }
-    return null;
-  }
-  return null;
-}
 function findingLocation(text, raw, message){
-  /* character range for a validation message, retreating to the nearest
-     existing parent; null when nothing along the path is locatable */
-  var pagePath = parseValidationPath(message);
-  if (!pagePath) return null;
-  var path = validationRawPath(raw, pagePath);
-  if (!path) return null;
-  for (var end = path.length; end > 0; end--){
-    var loc = jsonLocate(text, path.slice(0, end));
-    if (loc) return {start: loc.start, end: loc.end, exact: end === path.length};
+  /* character range for a validation message. The validator addresses
+     the normalized PAGE object; a leading "page" token names that same
+     object. Remaining tokens are resolved GREEDILY against the parsed
+     raw JSON — at each object level the longest dot-join of remaining
+     string tokens that names a real member wins, so author ids that
+     contain dots still resolve. Unresolvable tails retreat to the
+     nearest existing parent (exact: false). */
+  var tokens = parseValidationPath(message);
+  if (!tokens) return null;
+  if (tokens[0] === 'page') tokens = tokens.slice(1);
+  var base, node;
+  if (raw && raw.page){ base = ['page']; node = raw.page; }
+  else if (raw && (raw.blocks || raw.sections)){ base = []; node = raw; }
+  else if (raw && raw.nodes && raw.rows){
+    /* normalize() wrapped the bare diagram as sections[0].diagram */
+    if (tokens.length >= 2 && tokens[0] === 'sections' && tokens[1] === 0){
+      tokens = tokens.slice(2);
+      if (tokens[0] === 'diagram') tokens = tokens.slice(1);
+    } else if (tokens.length){
+      return null; /* the message names page furniture a bare diagram lacks */
+    }
+    base = []; node = raw;
+  } else return null;
+  var path = base.slice();
+  var i = 0;
+  while (i < tokens.length && node != null && typeof node === 'object'){
+    if (Array.isArray(node)){
+      if (typeof tokens[i] !== 'number') break;
+      path.push(tokens[i]);
+      node = node[tokens[i]];
+      i++;
+    } else {
+      var key = null, j;
+      for (j = tokens.length; j > i; j--){
+        var joined = tokens.slice(i, j).map(String).join('.');
+        if (Object.prototype.hasOwnProperty.call(node, joined)){ key = joined; break; }
+      }
+      if (key == null) break;
+      path.push(key);
+      node = node[key];
+      i = j;
+    }
   }
-  return null;
+  var exact = i === tokens.length;
+  var loc = jsonLocate(text, path);
+  while (!loc && path.length){ path.pop(); loc = jsonLocate(text, path); exact = false; }
+  if (!loc) loc = jsonLocate(text, []);
+  if (!loc) return null;
+  return {start: loc.start, end: loc.end, exact: exact};
 }
 
 /* ---------------- per-element authoring guidance ---------------- */

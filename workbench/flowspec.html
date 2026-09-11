@@ -10383,6 +10383,25 @@ function initWorkbenchBuilder(opts){
       el.classList.remove('dv-instep');
     });
   }
+  function stepperFor(sectionOrdinal){
+    var ctl = opts.ctl ? opts.ctl() : null;
+    if (!ctl || !ctl.sections) return null;
+    var rec = null;
+    ctl.sections.forEach(function(s){ if (!rec && s.number === sectionOrdinal + 1) rec = s; });
+    return rec ? rec.stepper : null;
+  }
+  function syncBoardToSelectedStep(){
+    /* selecting a step means SEEING that step: put the board in step
+       view at that index — and keep it there across the builder's own
+       re-renders, which otherwise reopen the diagram's default
+       (usually ambient) view */
+    var t = currentTarget;
+    if (!t || t.kind !== 'step') return;
+    var stepper = stepperFor(t.section);
+    if (!stepper) return;
+    if (stepper.mode() !== 'step') stepper.enterStep(false);
+    if (stepper.current().n !== t.index) stepper.jump(t.index);
+  }
   function applyStepMarkers(){
     clearStepMarkers();
     var t = currentTarget;
@@ -10448,6 +10467,7 @@ function initWorkbenchBuilder(opts){
     autosaveDraft();
     if (opt && opt.after) opt.after(plan);
     rehighlight();
+    syncBoardToSelectedStep();
     applyStepMarkers();
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
@@ -11033,6 +11053,7 @@ function initWorkbenchBuilder(opts){
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
     renderInspector();
+    syncBoardToSelectedStep();
     applyStepMarkers();
     if (focusEditor === false) return;
     var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
@@ -11057,13 +11078,15 @@ function initWorkbenchBuilder(opts){
     else renderInspector(); /* refresh the button label */
   }
   function handleAddToStepClick(target){
+    /* hints go through the inline error slot so the step form stays on
+       screen — inspectorMessage would replace the whole panel */
     if (!target || ['edge', 'node', 'panel'].indexOf(target.kind) < 0){
-      inspectorMessage('add to step: click an edge, node, or panel (Esc or DONE ends)');
+      formError('add to step: click an edge, node, or panel (Esc or DONE ends)');
       addToStepStatus();
       return;
     }
     if (target.section !== addToStep.section){
-      inspectorMessage('that element is in a different section — still adding to step ' + (addToStep.step + 1));
+      formError('that element is in a different section — still adding to step ' + (addToStep.step + 1));
       addToStepStatus();
       return;
     }
@@ -11077,13 +11100,13 @@ function initWorkbenchBuilder(opts){
       var rec = specSectionPaths(parsed.raw)[mode.section];
       var edges = rec ? (specValueAt(parsed.raw, rec.diagram) || {}).edges : null;
       var e = Array.isArray(edges) ? edges[target.index] : null;
-      if (!e){ inspectorMessage('edge not found — the render and the editor may be out of sync'); return; }
+      if (!e){ formError('edge not found — the render and the editor may be out of sync'); return; }
       plan = planStepToggleHop(src.value, parsed.raw, mode.section, mode.step, builderEdgeKey(e));
     } else {
       var rec2 = specSectionPaths(parsed.raw)[mode.section];
       var panels = rec2 ? (specValueAt(parsed.raw, rec2.diagram) || {}).panels : null;
       var pn = Array.isArray(panels) ? panels[target.index] : null;
-      if (!pn || !pn.id){ inspectorMessage('panel not found — the render and the editor may be out of sync'); return; }
+      if (!pn || !pn.id){ formError('panel not found — the render and the editor may be out of sync'); return; }
       plan = planStepTogglePanel(src.value, parsed.raw, mode.section, mode.step, pn.id);
     }
     addModeSurvive = true;
@@ -11238,7 +11261,10 @@ function initWorkbenchBuilder(opts){
     if (addToStep && !addModeSurvive)
       cancelAddToStep('add-to-step ended — the page re-rendered');
     addModeSurvive = false;
-    setTimeout(applyStepMarkers, 0); /* markers live in the rebuilt DOM */
+    setTimeout(function(){
+      syncBoardToSelectedStep(); /* a selected step keeps its step view */
+      applyStepMarkers();        /* markers live in the rebuilt DOM */
+    }, 0);
   }).observe(view, {childList: true});
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
@@ -11739,6 +11765,7 @@ go(false);
 
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
-initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }});
+initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); },
+  ctl: function(){ return lastCtl; }});
 })();
 </script>

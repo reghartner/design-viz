@@ -371,4 +371,5 @@ go(false);
 
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
-initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }});
+initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); },
+  ctl: function(){ return lastCtl; }});

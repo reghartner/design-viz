@@ -52,8 +52,10 @@ function fail(msgs){
   view.appendChild(pre);
 }
 
-/* captured BEFORE boot: the deep-link channel rewrites the hash to its
-   canonical form during wiring, which drops the embed/sk keys */
+/* captured BEFORE boot: the deep-link channel canonicalizes the hash
+   during wiring — it preserves the embed/sk keys only because boot
+   passes them as the preserved prefix, so the request must be read
+   before that first rewrite */
 var embedRequest = embedRequestFromHash(window.location.hash);
 
 /* the embed flag is applied at load; a hash-only navigation (typing or

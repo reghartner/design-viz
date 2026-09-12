@@ -586,7 +586,17 @@ perspectives" of one timeline). Types:
   `events` (`[{"at":"1h30m","label":"missed","kind":"ok|alert|info"}]`) and
   event patches draw dots above the axis. Steps patch `{"now":"2h30m"}` to
   sweep the cursor and `{"events":[...]}` to APPEND events (accumulating like
-  log lines, so any step jump is consistent).
+  log lines, so any step jump is consistent). To CONTRAST several rhythms
+  whose cadences differ by orders of magnitude, declare `lanes` instead of
+  `cadence`: `"lanes":[{"id":"ka","label":"MQTT keepalive","every":"30s"},
+  {"id":"hb","label":"heartbeat","every":"1h"},{"id":"ota","label":"OTA
+  check","every":"1d"}]` (max 4). Every lane shares one wall-clock axis and
+  auto-picks a density regime — individual dots, a true-spacing tick comb, a
+  solid band, or an empty row with a "next in …" promise — with a per-lane
+  count badge, so a 30-second rhythm and a daily rhythm read at a glance.
+  Steps may then also patch `{"miss":[{"lane":"hb","at":"3h"}]}` (appends) to
+  flag an expected beat that never arrived (red marker on that lane), and
+  events may carry `"lane":"hb"` to sit on a lane's row.
 - `phone` — a small generic smartphone frame for flows that end by notifying
   a resident's phone: `{"id":"resident","type":"phone","title":"Resident
   phone","initial":{"clock":"9:41"}}`. `clock` is optional status-bar time

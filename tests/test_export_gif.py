@@ -33,7 +33,7 @@ class ExportGifPureTests(unittest.TestCase):
         self.assertEqual(export_gif.resolve_out_path("walk.gif", page, "visit-path"),
                          pathlib.Path("walk.gif"))
         # an existing directory receives the derived name
-        with tempfile.TemporaryDirectory() as td:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             self.assertEqual(export_gif.resolve_out_path(td, page, None),
                              pathlib.Path(td) / "drip-commander.gif")
         # a trailing separator marks a directory even if it does not exist yet
@@ -200,7 +200,7 @@ class ExportGifPureTests(unittest.TestCase):
 @unittest.skipUnless(CHROME, "Chrome/Chromium not available")
 class ExportGifChromeSmokeTest(unittest.TestCase):
     def inspect_page(self, page, fragment, expression):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             profile = temp_path / "profile"
             profile.mkdir()
@@ -245,7 +245,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
         spec = export_gif.read_embedded_spec(page)
         target = export_gif.choose_target(spec)
         fragments = target.fragments[:2]
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             screenshots = export_gif.capture_frames(
                 page, fragments, CHROME, 1280, temp_path,
@@ -276,7 +276,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
         spec = export_gif.read_embedded_spec(page)
         target = export_gif.choose_target(spec)
         fragment = [target.fragments[0]]
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             (temp_path / "s1").mkdir()
             (temp_path / "s2").mkdir()
@@ -306,7 +306,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
         return page
 
     def test_skin_switch_and_dim_alpha_change_the_captured_frame(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             page = self._inject_doorbell(temp_path)
             spec = export_gif.read_embedded_spec(page)
@@ -346,7 +346,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                 "edges": [{"from": "c", "to": "d"}],
                 "steps": [{"edge": "c->d", "text": "hop"}]}},
         ]}}
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             spec_path = temp_path / "ground.spec.json"
             spec_path.write_text(json.dumps(spec))
@@ -372,7 +372,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertLess(sum(corners[0]), 240)
 
     def test_unknown_skin_fails_with_the_page_token_list(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             page = self._inject_doorbell(temp_path)
             spec = export_gif.read_embedded_spec(page)
@@ -386,7 +386,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertIn("aurora", str(ctx.exception))
 
     def test_dim_alpha_sets_the_variable_the_dim_rules_read(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             page = self._inject_doorbell(temp_path)
             spec = export_gif.read_embedded_spec(page)

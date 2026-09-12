@@ -3694,3 +3694,28 @@ test('parseClock and formatClock understand days', () => {
   assert.strictEqual(C.formatClock(90000), '1d1h');
   assert.strictEqual(C.formatClock(7 * 86400), '7d');
 });
+
+test('cadence lanes: skipped-lane references warn; count matches the drawn beats at the span boundary', () => {
+  /* M1: a miss naming a lane the renderer skipped (duplicate id) warns */
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'tl', type: 'timeline', span: '2h',
+              lanes: [{id: 'hb', every: '1h'}, {id: 'hb', every: '30m'},
+                      {id: 'x', every: 'soon'}]}],
+    steps: [{edge: 'a->b', panels: {tl: {miss: [{lane: 'x', at: '1h'}]}}}]
+  }}]}));
+  assert.match(JSON.parse(JSON.stringify(v.warnings)).join('\n'),
+    /miss\[0\]\.lane: unknown lane "x"/);
+  /* M2: cadence equal to the span draws exactly the one beat it reports;
+     a hair longer reads sparse with zero beats, never "1×" with none */
+  const exact = JSON.parse(JSON.stringify(C.timelineLanesModel(
+    {span: '1h', lanes: [{id: 'a', every: '3600s'}]}, {})));
+  assert.strictEqual(exact.lanes[0].count, 1);
+  assert.strictEqual(exact.lanes[0].regime, 'dots');
+  assert.strictEqual(exact.lanes[0].beats.length, 1);
+  const over = JSON.parse(JSON.stringify(C.timelineLanesModel(
+    {span: '1h', lanes: [{id: 'a', every: '3601s'}]}, {})));
+  assert.strictEqual(over.lanes[0].count, 0);
+  assert.strictEqual(over.lanes[0].regime, 'sparse');
+  assert.strictEqual(over.lanes[0].beats.length, 0);
+});

@@ -74,9 +74,20 @@ function timelineEventWarnings(list, path, warnings){
   });
 }
 function timelineLaneIds(decl){
+  /* mirrors the model's acceptance rules exactly — a lane the renderer
+     skips (missing id, duplicate, unreadable interval, over the 4-lane
+     cap) is NOT a known target, so misses/events naming it warn */
   var ids = [];
+  var seen = {};
   ((decl && Array.isArray(decl.lanes)) ? decl.lanes : []).forEach(function(l){
-    if (l && l.id != null) ids.push(String(l.id));
+    if (ids.length >= 4) return;
+    if (!l || typeof l !== 'object' || l.id == null) return;
+    var id = String(l.id);
+    if (seen[id]) return;
+    var every = parseClock(l.every);
+    if (every == null || every <= 0) return;
+    seen[id] = true;
+    ids.push(id);
   });
   return ids;
 }
@@ -597,8 +608,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
           var tlSpanS = parseClock(p.span);
           if (tlSpanS != null) tlSpanS = Math.min(tlSpanS, TIMELINE_MAX_SPAN);
           if (tlSpanS != null && tlSpanS > 0 &&
-              Math.floor(tlSpanS / parseClock(p.cadence.every)) > TIMELINE_MAX_BEATS)
-            warnings.push(PP + '.cadence: ' + Math.floor(tlSpanS / parseClock(p.cadence.every)) +
+              Math.floor((tlSpanS + 1e-6) / parseClock(p.cadence.every)) > TIMELINE_MAX_BEATS)
+            warnings.push(PP + '.cadence: ' + Math.floor((tlSpanS + 1e-6) / parseClock(p.cadence.every)) +
               ' beats over this span cannot be drawn individually (max ' + TIMELINE_MAX_BEATS +
               ') — the axis renders without beat dots and the meta line reports the count');
         }

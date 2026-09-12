@@ -46,7 +46,8 @@ Everything here — content and tooling — came out of an agent-driven loop:
    corresponds to the 24 GHz radar in Ring's Battery Doorbell Pro. No affiliation with
    either company; everything named in the documents is fictional.
 3. **Widgets.** Agents built the inspector widgets needed to visualize those features —
-   nineteen of them, from state machines and gauges to a ring buffer, a radar sweep, and a
+   twenty of them, from state machines and gauges to a ring buffer, a radar sweep, a
+   wall-clock heartbeat timeline, and a
    phone notification stack.
 4. **Generator + contract.** The page generator was built around a strict authoring
    contract (`contract/authoring-contract.md`) and a written agent runbook

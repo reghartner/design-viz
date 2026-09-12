@@ -352,6 +352,25 @@
 
 /* waterfall widget: latency spans on one shared scale */
 .wfall{display:flex; flex-direction:column; gap:5px;}
+/* timeline widget: wall-clock axis, cadence beats, events, now cursor.
+   Colors ride the per-skin docview text vars so every skin reads. */
+.tlsvg{width:100%; display:block;}
+.tlaxis{stroke:var(--dfaint); stroke-width:1.6; opacity:.6;}
+.tltickline{stroke:var(--dfaint); stroke-width:1; opacity:.45;}
+.tltick{font:8.5px 'IBM Plex Mono',monospace; fill:var(--dfaint);}
+.tlbeat{fill:none; stroke:var(--dfaint); stroke-width:1.4;}
+.tlbeat.past{fill:var(--dtext); stroke:var(--dtext);}
+.tlelapsed{fill:var(--dfaint); opacity:.16;}
+.tlev.tl-ok{fill:#34D399;}
+.tlev.tl-alert{fill:#F87171;}
+.tlev.tl-info{fill:var(--dtext);}
+.tlevlab{font:8.5px 'IBM Plex Mono',monospace; fill:var(--dtext);}
+.tlnow{stroke:var(--dink); stroke-width:1.6;}
+.tlnowhead{fill:var(--dink);}
+.tlband{fill:var(--dtext); opacity:.09;}
+.tlzoom{stroke:var(--dfaint); stroke-width:1; stroke-dasharray:2 3; opacity:.55;}
+.tlmeta{margin-top:4px; font:500 10px 'IBM Plex Mono',monospace; color:var(--dfaint);}
+
 .wfrow{display:flex; align-items:center; gap:8px; opacity:.3; transition:opacity .3s ease;}
 .wfrow.on{opacity:1;}
 .wflabel{font:500 10.5px 'IBM Plex Mono',monospace; width:128px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}

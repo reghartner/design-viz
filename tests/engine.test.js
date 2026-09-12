@@ -25,7 +25,7 @@ function loadCore(overrides = {}){
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
     ' foldPhoneStates, phoneModel, phonePanelHTML, PANEL_TYPES,' +
     ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
-    ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection,' +
+    ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection, parseClock, formatClock, timelineModel,' +
     ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
     ' sectionHasProse, sectionIntroHTML, setProseCollapsed, createProseController, TONE_SET,' +
     ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES};';
@@ -3310,4 +3310,265 @@ test('copy control: a chip with a different glyph gets ITS glyph back after feed
     timeouts.forEach(fn => fn());
     assert.strictEqual(button.innerHTML, '<svg data-glyph="embed"></svg>');
   });
+});
+
+test('timeline: parseClock reads every documented duration form and rejects junk', () => {
+  assert.strictEqual(C.parseClock('2h'), 7200);
+  assert.strictEqual(C.parseClock('1h30m'), 5400);
+  assert.strictEqual(C.parseClock('1h 30m'), 5400);
+  assert.strictEqual(C.parseClock('90m'), 5400);
+  assert.strictEqual(C.parseClock('45s'), 45);
+  assert.strictEqual(C.parseClock(90), 5400);      /* bare number = minutes */
+  assert.strictEqual(C.parseClock('90'), 5400);
+  assert.strictEqual(C.parseClock('soon'), null);
+  assert.strictEqual(C.parseClock('1h30x'), null);
+  assert.strictEqual(C.parseClock(''), null);
+  assert.strictEqual(C.parseClock(null), null);
+  assert.strictEqual(C.formatClock(5400), '1h30m');
+  assert.strictEqual(C.formatClock(3600), '1h');
+  assert.strictEqual(C.formatClock(90), '1m30s');
+  assert.strictEqual(C.formatClock(45), '45s');
+  assert.strictEqual(C.formatClock(0), '0');
+});
+
+test('timeline model: ticks fit the span, beats follow the cadence, now clamps', () => {
+  const m = C.timelineModel(
+    {span: '6h', cadence: {every: '30m', label: 'heartbeat'},
+     events: [{at: '1h30m', label: 'missed', kind: 'alert'}]},
+    {now: '2h', events: [{at: '2h', kind: 'ok'}]});
+  assert.strictEqual(m.span, 21600);
+  assert.strictEqual(m.unit, 3600);              /* 6 hour ticks <= 8 */
+  assert.strictEqual(m.ticks.length, 7);         /* 0h .. 6h */
+  assert.strictEqual(m.ticks[1].label, '1h');
+  assert.strictEqual(m.beats.length, 12);        /* every 30m over 6h */
+  assert.strictEqual(m.events.length, 2);        /* declared + state, merged */
+  assert.strictEqual(m.events[0].kind, 'alert');
+  assert.strictEqual(m.now.label, '2h');
+  /* clamp + defaults */
+  const c = C.timelineModel({span: '1h'}, {now: '90m'});
+  assert.strictEqual(c.now.s, 3600);
+  assert.strictEqual(c.beats.length, 0);
+  const d = C.timelineModel({}, {});
+  assert.strictEqual(d.span, 3600);              /* junk span -> 1h default */
+  assert.strictEqual(d.now, null);
+  /* junk events skipped, unknown kind -> info */
+  const e = C.timelineModel({span: '1h', events: [{at: 'zzz'}, {at: '10m', kind: 'wild'}]}, {});
+  assert.strictEqual(e.events.length, 1);
+  assert.strictEqual(e.events[0].kind, 'info');
+});
+
+test('timeline fold: now replaces per step, events append like log lines', () => {
+  const folded = C.foldPanelStates({
+    panels: [{id: 'hb', type: 'timeline', span: '3h',
+              initial: {now: '0m', events: [{at: '5m', kind: 'ok'}]}}],
+    steps: [
+      {panels: {hb: {now: '1h'}}},
+      {panels: {hb: {now: '2h', events: [{at: '1h30m', label: 'missed', kind: 'alert'}]}}},
+      {panels: {hb: {now: '3h'}}}
+    ]
+  });
+  const states = folded.hb;
+  assert.strictEqual(states[0].now, '1h');
+  assert.strictEqual(JSON.parse(JSON.stringify(states[0].events)).length, 1);
+  assert.strictEqual(states[1].now, '2h');
+  assert.strictEqual(states[1].events.length, 2);   /* appended */
+  assert.strictEqual(states[2].events.length, 2);   /* carried forward */
+  assert.strictEqual(states[2].now, '3h');
+});
+
+test('timeline renderer: overview strip plus the magnified current interval', () => {
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'hb', type: 'timeline', span: '2h',
+    cadence: {every: '30m', label: 'heartbeat'}},
+    {now: '1h', events: [{at: '30m', label: 'ok', kind: 'ok'}]}, 'aurora', [], 0, false);
+  const h = host.innerHTML;
+  assert.ok(h.includes('tlaxis'), 'axis');
+  /* 4 overview cadence beats + the 2 detail end beats */
+  assert.strictEqual((h.match(/tlbeat/g) || []).length, 6);
+  assert.ok(h.includes('tlbeat past'), 'passed beats fill');
+  assert.ok(h.includes('tlband'), 'interval band on the overview');
+  assert.ok(h.includes('tlzoom'), 'zoom connectors');
+  assert.ok(h.includes('tl-ok'), 'event kind class');
+  assert.ok(h.includes('tlnow'), 'now cursor');
+  assert.ok(h.includes('heartbeat every 30m'), 'meta line');
+  assert.ok(h.includes('window 1h–1h30m'), 'window meta: now sits on the 1h beat');
+  assert.ok(h.includes('now 1h'), 'meta now');
+  /* no cadence -> the single-axis fallback, no detail markup */
+  const flat = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(flat, {id: 'hb', type: 'timeline', span: '2h'},
+    {now: '1h'}, 'aurora', [], 0, false);
+  assert.ok(!flat.innerHTML.includes('tlband'));
+  assert.ok(flat.innerHTML.includes('tltick'), 'fallback keeps tick labels');
+});
+
+test('timeline detail window: events BETWEEN long-running beats spread out magnified', () => {
+  const m = C.timelineModel(
+    {span: '4h', cadence: {every: '1h', label: 'heartbeat'},
+     events: [{at: '1h5m', label: 'motion', kind: 'info'},
+              {at: '1h40m', label: 'clip up', kind: 'ok'},
+              {at: '2h30m', kind: 'ok'}]},
+    {now: '1h20m'});
+  const d = JSON.parse(JSON.stringify(m.detail));
+  assert.strictEqual(d.start, 3600);
+  assert.strictEqual(d.end, 7200);
+  assert.strictEqual(d.startLabel, '1h');
+  assert.strictEqual(d.endLabel, '2h');
+  /* only the two between-beat events, repositioned inside the window */
+  assert.strictEqual(d.events.length, 2);
+  assert.ok(Math.abs(d.events[0].pct - (5 / 60) * 100) < 0.01, 'motion at 5m into the hour');
+  assert.ok(Math.abs(d.events[1].pct - (40 / 60) * 100) < 0.01, 'clip at 40m into the hour');
+  assert.ok(Math.abs(d.nowPct - (20 / 60) * 100) < 0.01);
+  assert.strictEqual(d.startPast, true);
+  assert.strictEqual(d.endPast, false);
+  assert.ok(d.ticks.length >= 3 && d.ticks.length <= 8, 'interior minor ticks');
+  /* no cadence or no now -> no detail */
+  assert.strictEqual(C.timelineModel({span: '4h'}, {now: '1h'}).detail, null);
+  assert.strictEqual(C.timelineModel({span: '4h', cadence: {every: '1h'}}, {}).detail, null);
+  /* now past the last full interval clamps the window to the tail */
+  const tail = JSON.parse(JSON.stringify(C.timelineModel(
+    {span: '4h', cadence: {every: '1h'}}, {now: '4h'}).detail));
+  assert.strictEqual(tail.start, 3 * 3600);
+  assert.strictEqual(tail.end, 4 * 3600);
+});
+
+test('timeline validator: bad span/cadence/event/patch fields warn with paths', () => {
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']],
+    edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'hb', type: 'timeline', span: 'whenever',
+              cadence: {every: 'sometimes'},
+              events: [{at: 'later'}, {at: '5m', kind: 'odd'}]}],
+    steps: [{edge: 'a->b', panels: {hb: {now: 'nope', events: 'not-a-list'}}}]
+  }}]}));
+  const w = JSON.parse(JSON.stringify(v.warnings)).join('\n');
+  assert.match(w, /span: unreadable span "whenever"/);
+  assert.match(w, /cadence: expected \{every/);
+  assert.match(w, /events\[0\]\.at: unreadable time/);
+  assert.match(w, /events\[1\]\.kind: unknown kind "odd"/);
+  assert.match(w, /now: unreadable time "nope"/);
+  assert.match(w, /events: expected an array/);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(v.errors)), []);
+});
+
+test('timeline regressions: seeded events survive step-less specs, junk now keeps the cursor, dense cadences report instead of truncating', () => {
+  /* M1: no steps — initial.events must reach the only snapshot */
+  const still = C.foldPanelStates({
+    panels: [{id: 'hb', type: 'timeline', span: '2h',
+              initial: {now: '30m', events: [{at: '15m', kind: 'ok'}]}}],
+    steps: []
+  });
+  assert.strictEqual(still.hb.length, 1);
+  assert.strictEqual(JSON.parse(JSON.stringify(still.hb[0].events)).length, 1);
+  assert.strictEqual(still.hb[0].now, '30m');
+
+  /* M2: an unreadable now patch leaves the carried cursor unchanged */
+  const kept = C.foldPanelStates({
+    panels: [{id: 'hb', type: 'timeline', span: '2h', initial: {now: '30m'}}],
+    steps: [{panels: {hb: {now: 'garbage'}}}, {panels: {hb: {now: '1h'}}}]
+  });
+  assert.strictEqual(kept.hb[0].now, '30m');
+  assert.strictEqual(kept.hb[1].now, '1h');
+
+  /* M3: 48h at 1m = 2880 beats — none drawn, count reported */
+  const dense = C.timelineModel({span: '48h', cadence: {every: '1m'}}, {});
+  assert.strictEqual(dense.beats.length, 0);
+  assert.strictEqual(dense.beatsOmitted, 2880);
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'hb', type: 'timeline', span: '48h',
+    cadence: {every: '1m', label: 'tick'}}, {}, 'aurora', [], 0, false);
+  assert.ok(host.innerHTML.includes('2880 beats — too dense to draw'));
+  /* and the validator warns at declaration time */
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'hb', type: 'timeline', span: '48h', cadence: {every: '1m'}}],
+    steps: [{edge: 'a->b'}]
+  }}]}));
+  assert.match(JSON.parse(JSON.stringify(v.warnings)).join('\n'),
+    /2880 beats over this span cannot be drawn individually/);
+
+  /* MINOR: rounding must carry, never print 60s */
+  assert.strictEqual(C.formatClock(59.6), '1m');
+  assert.strictEqual(C.formatClock(3599.7), '1h');
+});
+
+test('timeline bounds: overflowing durations parse to null; absurd spans clamp and terminate', () => {
+  /* 320 digits of hours overflows a double to Infinity — must be null,
+     never an infinite tick loop */
+  assert.strictEqual(C.parseClock('1'.repeat(320) + 'h'), null);
+  assert.strictEqual(C.parseClock(Number.MAX_VALUE), null);       /* *60 overflows */
+  const big = C.timelineModel({span: '99999h'}, {now: '1h'});      /* ~11 years */
+  assert.strictEqual(big.span, 7 * 86400);                        /* clamped to 7d */
+  assert.ok(big.ticks.length <= 12, 'tick array bounded');
+  assert.strictEqual(big.ticks[big.ticks.length - 1].label, '7d'.replace('7d', C.formatClock(7 * 86400)));
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'hb', type: 'timeline', span: '99999h'}],
+    steps: [{edge: 'a->b'}]
+  }}]}));
+  assert.match(JSON.parse(JSON.stringify(v.warnings)).join('\n'),
+    /span: longer than the drawable maximum \(7d\) — clamped to 7d/);
+});
+
+test('timeline density warning judges the CLAMPED span the model draws', () => {
+  /* 30d at 3h: unclamped 240 beats would warn, but the model clamps to
+     7d = 56 beats and draws them — no warning is correct */
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'hb', type: 'timeline', span: '720h', cadence: {every: '3h'}}],
+    steps: [{edge: 'a->b'}]
+  }}]}));
+  const w = JSON.parse(JSON.stringify(v.warnings)).join('\n');
+  assert.ok(!/cannot be drawn individually/.test(w), w);
+  assert.match(w, /clamped to 7d/);
+  assert.strictEqual(C.timelineModel({span: '720h', cadence: {every: '3h'}}, {}).beats.length, 56);
+});
+
+test('timeline labels: close events stagger to a second row, a third collision drops to hover-only', () => {
+  const m = C.timelineModel(
+    {span: '4h', cadence: {every: '1h'},
+     events: [{at: '1h12m', label: 'motion', kind: 'info'},
+              {at: '1h14m', label: 'clip up', kind: 'ok'},
+              {at: '1h15m', label: 'third here', kind: 'info'},
+              {at: '1h50m', label: 'late', kind: 'ok'}]},
+    {now: '1h20m'});
+  const d = JSON.parse(JSON.stringify(m.detail.events));
+  assert.strictEqual(d[0].labelRow, 0, 'first label on the near row');
+  assert.strictEqual(d[1].labelRow, 1, 'overlapping neighbor staggers up');
+  assert.strictEqual(d[2].labelRow, null, 'third collision keeps only the hover title');
+  assert.strictEqual(d[3].labelRow, 0, 'a distant label returns to the near row');
+  /* renderer: staggered baselines present, dropped label absent */
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'tl', type: 'timeline', span: '4h',
+    cadence: {every: '1h'},
+    events: [{at: '1h12m', label: 'motion', kind: 'info'},
+             {at: '1h14m', label: 'clip up', kind: 'ok'},
+             {at: '1h15m', label: 'third here', kind: 'info'}]},
+    {now: '1h20m'}, 'aurora', [], 0, false);
+  const h = host.innerHTML;
+  assert.ok(h.includes('y="43"') && h.includes('y="32"'), 'two label baselines');
+  assert.ok(!h.includes('>third here<'), 'collided label not drawn');
+  assert.ok(h.includes('third here'), 'its hover title remains');
+});
+
+test('timeline labels: the drawn text matches the measured text — long labels truncate', () => {
+  const m = C.timelineModel(
+    {span: '2h', cadence: {every: '1h'},
+     events: [{at: '20m', label: 'a very long label that keeps going on', kind: 'info'},
+              {at: '40m', label: 'neighbor', kind: 'ok'}]},
+    {now: '30m'});
+  const evs = JSON.parse(JSON.stringify(m.detail.events));
+  assert.strictEqual(evs[0].labelText, 'a very long label tha…');
+  assert.strictEqual(evs[0].labelText.length, 22);
+  /* the truncated (not the full) width drives collision: the neighbor
+     at 40m clears row 0's real occupied end and stays measurable */
+  assert.strictEqual(typeof evs[1].labelRow, 'number');
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'tl', type: 'timeline', span: '2h',
+    cadence: {every: '1h'},
+    events: [{at: '20m', label: 'a very long label that keeps going on', kind: 'info'}]},
+    {now: '30m'}, 'aurora', [], 0, false);
+  const h = host.innerHTML;
+  assert.ok(h.includes('a very long label tha…</text>'), 'truncated text drawn');
+  assert.ok(h.includes('a very long label that keeps going on</title>'), 'full text in the hover title');
+  assert.ok(!h.includes('keeps going on</text>'), 'full text never drawn as a label');
 });

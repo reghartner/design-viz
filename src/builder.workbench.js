@@ -694,7 +694,9 @@ var PANEL_TEMPLATES = {
   signal:    {title: 'Links', links: [{id: 'up', label: 'uplink', transport: 'wifi'}]},
   tiles:     {title: 'Fleet', tiles: [{id: 't1', label: 'UNIT 1'}, {id: 't2', label: 'UNIT 2'}]},
   inflight:  {title: 'In flight', lanes: [{id: 'op', label: 'operation'}]},
-  phone:     {title: 'Phone', initial: {clock: '9:41'}}
+  phone:     {title: 'Phone', initial: {clock: '9:41'}},
+  timeline:  {title: 'Heartbeat', span: '6h', cadence: {every: '30m', label: 'heartbeat'},
+              initial: {now: '0m'}}
 };
 
 /* ---------------- pass 3: direct-manipulation planners ---------------- */
@@ -1108,7 +1110,8 @@ var PANEL_SETUP_FIELDS = {
   signal:    [['links', 'jsonArr'], ['initial', 'json']],
   tiles:     [['tiles', 'jsonArr'], ['states', 'csv'], ['colors', 'json'], ['initial', 'json']],
   inflight:  [['lanes', 'jsonArr'], ['initial', 'json']],
-  phone:     [['initial', 'json']]
+  phone:     [['initial', 'json']],
+  timeline:  [['span', 'text'], ['cadence', 'json'], ['events', 'jsonArr'], ['initial', 'json']]
 };
 
 var SCENE_TOKENS = ['person-at-door-night', 'package-drop', 'static-noise'];
@@ -1158,7 +1161,7 @@ var BUILDER_GUIDES = {
     how: 'Edit the selected JSON, then click Render. Steps patch the panel by id; patches are sparse and folded, so jumping to any step is consistent.',
     fields: [
       ['id', 'the handle steps patch: "panels": {"<id>": {...}}'],
-      ['type', 'widget kind: state leds gauge log screen queue inflight phone … (full list in the authoring contract)'],
+      ['type', 'widget kind: state leds gauge log screen queue inflight phone timeline … (full list in the authoring contract)'],
       ['title', 'card title above the widget'],
       ['initial', 'widget state before step 1']
     ]

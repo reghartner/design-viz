@@ -577,6 +577,16 @@ perspectives" of one timeline). Types:
   The complete bar history is folded before rendering, so step jumps are
   consistent. Bars still open on the last step render open-ended. Because all
   lanes share the same axis, simultaneous bars visibly overlap horizontally.
+- `timeline` — the passing of wall-clock time (minutes to hours) with periodic
+  cadence beats and event dots: `{"id":"hb","type":"timeline","title":"Heartbeat
+  — 6h window","span":"6h","cadence":{"every":"30m","label":"heartbeat"},
+  "initial":{"now":"0m"}}`. Times read `"2h"`, `"90m"`, `"1h30m"`, `"45s"`, or
+  a bare number of minutes. `span` is the whole axis; `cadence` draws a hollow
+  beat dot at every interval (filled once the cursor passes it); declared
+  `events` (`[{"at":"1h30m","label":"missed","kind":"ok|alert|info"}]`) and
+  event patches draw dots above the axis. Steps patch `{"now":"2h30m"}` to
+  sweep the cursor and `{"events":[...]}` to APPEND events (accumulating like
+  log lines, so any step jump is consistent).
 - `phone` — a small generic smartphone frame for flows that end by notifying
   a resident's phone: `{"id":"resident","type":"phone","title":"Resident
   phone","initial":{"clock":"9:41"}}`. `clock` is optional status-bar time

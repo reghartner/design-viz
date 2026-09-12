@@ -10,11 +10,70 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','signal','tiles','inflight','phone'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','signal','tiles','inflight','phone','timeline'];
 var SCENE_NAMES = ['person-at-door-night','package-drop','static-noise'];
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
 var BUFFER_STATES = ['empty','buffered','protected','uploading','uploaded','dropped'];
+/* wall-clock durations for the timeline widget: "2h", "90m", "1h30m",
+   "45s", "1h 30m", or a bare number (minutes) -> seconds; null on junk.
+   Shared by the validator, the fold, and the engine model. */
+function parseClock(text){
+  /* every return is finite or null — absurd magnitudes (enough digits
+     to overflow a double) must never reach the render loops */
+  function fin(v){ return isFinite(v) ? v : null; }
+  if (typeof text === 'number' && isFinite(text) && text >= 0) return fin(text * 60);
+  if (typeof text !== 'string') return null;
+  var s = text.trim().toLowerCase();
+  if (!s) return null;
+  if (/^\d+(\.\d+)?$/.test(s)) return fin(parseFloat(s) * 60);
+  var m, total = 0, any = false;
+  var re = /(\d+(?:\.\d+)?)\s*(h|m|s)/g;
+  while ((m = re.exec(s))){ any = true; total += parseFloat(m[1]) * (m[2] === 'h' ? 3600 : m[2] === 'm' ? 60 : 1); }
+  if (!any) return null;
+  if (s.replace(/(\d+(?:\.\d+)?)\s*(h|m|s)/g, '').replace(/\s/g, '') !== '') return null;
+  return fin(total);
+}
+/* the widget is a 320-unit-wide strip; a week is the largest span it can
+   present legibly. Longer declared spans clamp here (validator warns). */
+var TIMELINE_MAX_SPAN = 7 * 86400;
+function formatClock(seconds){
+  /* 5400 -> "1h30m", 3600 -> "1h", 90 -> "1m30s", 45 -> "45s", 0 -> "0" */
+  var h = Math.floor(seconds / 3600);
+  var rem = seconds - h * 3600;
+  var mn = Math.floor(rem / 60);
+  var sc = Math.round(rem - mn * 60);
+  if (sc === 60){ sc = 0; mn += 1; } /* 59.6s must not read "60s" */
+  if (mn === 60){ mn = 0; h += 1; }
+  var out = '';
+  if (h) out += h + 'h';
+  if (mn) out += mn + 'm';
+  if (sc && !h) out += sc + 's';
+  return out || '0';
+}
+var TIMELINE_EVENT_KINDS = ['ok', 'alert', 'info'];
+/* beat dots stop being drawable well before this; beyond it the renderer
+   omits the dots and says so in the meta line, and the validator warns */
+var TIMELINE_MAX_BEATS = 120;
+function timelineEventWarnings(list, path, warnings){
+  (Array.isArray(list) ? list : []).forEach(function(e, i){
+    var EP = path + '[' + i + ']';
+    if (!e || typeof e !== 'object'){ warnings.push(EP + ': needs {at, label?, kind?} — skipped'); return; }
+    if (parseClock(e.at) == null)
+      warnings.push(EP + '.at: unreadable time "' + e.at + '" (use "1h30m" / "45m" / "90s") — skipped');
+    if (e.kind != null && TIMELINE_EVENT_KINDS.indexOf(e.kind) < 0)
+      warnings.push(EP + '.kind: unknown kind "' + e.kind + '" — using "info" (valid: ' + TIMELINE_EVENT_KINDS.join(' ') + ')');
+  });
+}
+function timelinePatchWarnings(obj, path, warnings){
+  if (!obj || typeof obj !== 'object') return;
+  if (obj.now != null && parseClock(obj.now) == null)
+    warnings.push(path + '.now: unreadable time "' + obj.now + '" (use "1h30m" / "45m" / "90s") — cursor unchanged');
+  if (obj.events != null && !Array.isArray(obj.events))
+    warnings.push(path + '.events: expected an array of {at, label?, kind?} — ignored');
+  else timelineEventWarnings(obj.events, path + '.events', warnings);
+}
+
 /* shared by bufferModel and the fold compactor */
 function bufferSegCount(decl){
   return (decl && typeof decl.segments === 'number' && isFinite(decl.segments))
@@ -447,6 +506,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var radarPanels = {};
   var inflightPanels = {};
   var phonePanels = {};
+  var timelinePanels = {};
   (d.panels || []).forEach(function(p, pi){
     var PP = DP + '.panels[' + pi + ']';
     if (!p || typeof p !== 'object'){ errors.push(PP + ': must be an object {id, type, ...}'); return; }
@@ -484,6 +544,33 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (p.type === 'phone'){
       phonePanels[p.id] = true;
       phonePatchWarnings(p.initial, PP + '.initial', warnings);
+    }
+    if (p.type === 'timeline'){
+      timelinePanels[p.id] = true;
+      if (p.span == null)
+        warnings.push(PP + '.span: timeline needs a span ("6h", "90m") — using 1h');
+      else if (parseClock(p.span) == null || parseClock(p.span) <= 0)
+        warnings.push(PP + '.span: unreadable span "' + p.span + '" (use "6h" / "90m") — using 1h');
+      else if (parseClock(p.span) > TIMELINE_MAX_SPAN)
+        warnings.push(PP + '.span: longer than the drawable maximum (7d) — clamped to 7d');
+      if (p.cadence != null){
+        if (typeof p.cadence !== 'object' || parseClock(p.cadence.every) == null || parseClock(p.cadence.every) <= 0)
+          warnings.push(PP + '.cadence: expected {every:"30m", label?} with a readable interval — no periodic beats drawn');
+        else {
+          /* density is judged on the span the model actually DRAWS —
+             the clamped one — or a legally long span would warn about
+             beats the render happily shows */
+          var tlSpanS = parseClock(p.span);
+          if (tlSpanS != null) tlSpanS = Math.min(tlSpanS, TIMELINE_MAX_SPAN);
+          if (tlSpanS != null && tlSpanS > 0 &&
+              Math.floor(tlSpanS / parseClock(p.cadence.every)) > TIMELINE_MAX_BEATS)
+            warnings.push(PP + '.cadence: ' + Math.floor(tlSpanS / parseClock(p.cadence.every)) +
+              ' beats over this span cannot be drawn individually (max ' + TIMELINE_MAX_BEATS +
+              ') — the axis renders without beat dots and the meta line reports the count');
+        }
+      }
+      timelineEventWarnings(p.events, PP + '.events', warnings);
+      timelinePatchWarnings(p.initial, PP + '.initial', warnings);
     }
     if (PANEL_TYPES.indexOf(p.type) < 0)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PANEL_TYPES.join(' ') + ')');
@@ -693,6 +780,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
           inflightPanels[pid], warnings);
       } else if (phonePanels[pid] && patch[pid]){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
+      } else if (timelinePanels[pid] && patch[pid]){
+        timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       }
     });
     if (st && st.lane && !lanes[st.lane])
@@ -889,6 +978,12 @@ function foldPanelStates(d){
     Object.keys(p.initial || {}).forEach(function(k){ carried[k] = p.initial[k]; });
     var logAcc = [];
     if (Array.isArray(carried.log)){ logAcc = carried.log.slice(); delete carried.log; }
+    /* timeline events accumulate across steps like log lines */
+    var eventAcc = null;
+    if (p.type === 'timeline'){
+      eventAcc = Array.isArray(carried.events) ? carried.events.slice() : [];
+      delete carried.events;
+    }
     var states = [];
     steps.forEach(function(st){
       var patchAll = stepPanelPatch(st) || {};
@@ -903,6 +998,17 @@ function foldPanelStates(d){
         if (k === 'log'){
           var lines = Array.isArray(patch.log) ? patch.log : [patch.log];
           logAcc = logAcc.concat(lines);
+          return;
+        }
+        if (k === 'events' && eventAcc !== null){
+          var evs = Array.isArray(patch.events) ? patch.events : [patch.events];
+          eventAcc = eventAcc.concat(evs);
+          return;
+        }
+        if (k === 'now' && eventAcc !== null){
+          /* the validator promises "cursor unchanged" for unreadable
+             times — honor it instead of wiping the carried cursor */
+          if (parseClock(patch.now) != null) carried.now = patch.now;
           return;
         }
         if (k === 'mark'){
@@ -925,12 +1031,14 @@ function foldPanelStates(d){
       var snap = {};
       Object.keys(carried).forEach(function(k){ snap[k] = carried[k]; });
       if (once) Object.keys(once).forEach(function(k){ snap[k] = once[k]; });
+      if (eventAcc !== null) snap.events = eventAcc.slice();
       snap.log = logAcc.slice();
       states.push(snap);
     });
     if (!steps.length){
       var only = {};
       Object.keys(carried).forEach(function(k){ only[k] = carried[k]; });
+      if (eventAcc !== null) only.events = eventAcc.slice();
       only.log = logAcc.slice();
       states.push(only);
     }

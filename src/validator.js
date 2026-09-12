@@ -91,6 +91,12 @@ function timelineLaneIds(decl){
   });
   return ids;
 }
+function timelineEventLaneWarnings(list, path, laneIds, warnings){
+  (Array.isArray(list) ? list : []).forEach(function(e, i){
+    if (e && e.lane != null && laneIds.indexOf(String(e.lane)) < 0)
+      warnings.push(path + '[' + i + '].lane: unknown lane "' + e.lane + '" — drawn on the axis row');
+  });
+}
 function timelinePatchWarnings(obj, path, decl, warnings){
   if (!obj || typeof obj !== 'object') return;
   var laneIds = timelineLaneIds(decl);
@@ -100,10 +106,7 @@ function timelinePatchWarnings(obj, path, decl, warnings){
     warnings.push(path + '.events: expected an array of {at, label?, kind?} — ignored');
   else {
     timelineEventWarnings(obj.events, path + '.events', warnings);
-    (Array.isArray(obj.events) ? obj.events : []).forEach(function(e, i){
-      if (e && e.lane != null && laneIds.indexOf(String(e.lane)) < 0)
-        warnings.push(path + '.events[' + i + '].lane: unknown lane "' + e.lane + '" — drawn on the axis row');
-    });
+    timelineEventLaneWarnings(obj.events, path + '.events', laneIds, warnings);
   }
   if (obj.miss != null){
     if (!Array.isArray(obj.miss))
@@ -111,8 +114,9 @@ function timelinePatchWarnings(obj, path, decl, warnings){
     else obj.miss.forEach(function(m, i){
       var MP = path + '.miss[' + i + ']';
       if (!m || typeof m !== 'object'){ warnings.push(MP + ': needs {lane, at} — skipped'); return; }
-      if (laneIds.length && (m.lane == null || laneIds.indexOf(String(m.lane)) < 0))
-        warnings.push(MP + '.lane: unknown lane "' + m.lane + '" — skipped');
+      if (m.lane == null || laneIds.indexOf(String(m.lane)) < 0)
+        warnings.push(MP + '.lane: unknown lane "' + m.lane + '" — skipped' +
+          (laneIds.length ? '' : ' (this timeline has no usable lanes)'));
       if (parseClock(m.at) == null)
         warnings.push(MP + '.at: unreadable time "' + m.at + '" — skipped');
     });
@@ -637,6 +641,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         }
       }
       timelineEventWarnings(p.events, PP + '.events', warnings);
+      timelineEventLaneWarnings(p.events, PP + '.events', timelineLaneIds(p), warnings);
       timelinePatchWarnings(p.initial, PP + '.initial', p, warnings);
     }
     if (PANEL_TYPES.indexOf(p.type) < 0)

@@ -3719,3 +3719,29 @@ test('cadence lanes: skipped-lane references warn; count matches the drawn beats
   assert.strictEqual(over.lanes[0].regime, 'sparse');
   assert.strictEqual(over.lanes[0].beats.length, 0);
 });
+
+test('cadence lanes: lane references warn everywhere — declared events, lanes-less misses, all-skipped lanes', () => {
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [
+      /* declaration-level events with an unknown lane */
+      {id: 't1', type: 'timeline', span: '2h',
+       lanes: [{id: 'hb', every: '1h'}],
+       events: [{at: '30m', lane: 'ghost'}]},
+      /* every declared lane is skipped (bad interval) — a miss must still warn */
+      {id: 't2', type: 'timeline', span: '2h',
+       lanes: [{id: 'x', every: 'soon'}]},
+      /* no lanes at all — a miss patch warns instead of vanishing */
+      {id: 't3', type: 'timeline', span: '2h', cadence: {every: '30m'}}
+    ],
+    steps: [{edge: 'a->b', panels: {
+      t2: {miss: [{lane: 'x', at: '1h'}]},
+      t3: {miss: [{lane: 'hb', at: '1h'}]}
+    }}]
+  }}]}));
+  const w = JSON.parse(JSON.stringify(v.warnings)).join('\n');
+  assert.match(w, /events\[0\]\.lane: unknown lane "ghost"/);
+  assert.match(w, /panels\.t2\.miss\[0\]\.lane: unknown lane "x" — skipped \(this timeline has no usable lanes\)/);
+  assert.match(w, /panels\.t3\.miss\[0\]\.lane: unknown lane "hb" — skipped \(this timeline has no usable lanes\)/);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(v.errors)), []);
+});

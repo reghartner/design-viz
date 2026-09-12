@@ -1646,6 +1646,87 @@ function timelineLabelRows(events){
   });
   return events;
 }
+/* cadence lanes: several periodic processes on ONE wall-clock axis,
+   each lane rendered in a density REGIME chosen by its beat count over
+   the span — individual dots, a true-spacing tick comb, a solid band,
+   or an empty row with a "next in …" promise. The regime is the
+   orders-of-magnitude contrast. Pure model. */
+var TL_DOT_MAX = 32;   /* beats drawable as individual dots on the track */
+var TL_COMB_MAX = 120; /* beats drawable as a legible tick comb */
+function timelineLanesModel(panel, state){
+  panel = panel || {}; state = state || {};
+  var span = parseClock(panel.span);
+  if (span == null || span <= 0) span = 3600;
+  if (span > TIMELINE_MAX_SPAN) span = TIMELINE_MAX_SPAN;
+  var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
+  var unit = units[units.length - 1];
+  for (var i = 0; i < units.length; i++){
+    if (span / units[i] <= 8){ unit = units[i]; break; }
+  }
+  var ticks = [];
+  for (var ts = 0; ts <= span + 1e-6 && ticks.length <= 12; ts += unit)
+    ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
+  var nowS = parseClock(state.now);
+  var now = null;
+  if (nowS != null){
+    var nc = Math.min(Math.max(nowS, 0), span);
+    now = {s: nc, pct: nc / span * 100, label: formatClock(nc)};
+  }
+  function normList(list){
+    var out = [];
+    (Array.isArray(list) ? list : []).forEach(function(e){
+      if (!e) return;
+      var at = parseClock(e.at);
+      if (at == null) return;
+      var s = Math.min(Math.max(at, 0), span);
+      out.push({s: s, pct: s / span * 100,
+                lane: e.lane != null ? String(e.lane) : null,
+                label: e.label != null ? String(e.label) : '',
+                kind: ['ok', 'alert', 'info'].indexOf(e.kind) >= 0 ? e.kind : 'info'});
+    });
+    return out;
+  }
+  var allEvents = normList(panel.events).concat(normList(state.events));
+  var misses = normList(state.miss);
+  var seen = Object.create(null);
+  var lanes = [];
+  ((Array.isArray(panel.lanes)) ? panel.lanes : []).forEach(function(l){
+    if (lanes.length >= 4) return;
+    if (!l || typeof l !== 'object' || l.id == null) return;
+    var id = String(l.id);
+    if (seen[id]) return;
+    var every = parseClock(l.every);
+    if (every == null || every <= 0) return;
+    seen[id] = true;
+    var count = Math.floor(span / every + 1e-6);
+    var regime = count < 1 ? 'sparse' : count <= TL_DOT_MAX ? 'dots' :
+                 count <= TL_COMB_MAX ? 'comb' : 'band';
+    var beats = [];
+    if (regime === 'dots'){
+      for (var b = every; b <= span + 1e-6; b += every)
+        beats.push({s: b, pct: b / span * 100, past: !!(now && b <= now.s + 1e-6)});
+    }
+    var badge;
+    if (regime === 'sparse'){
+      if (now){
+        var nextAt = (Math.floor(now.s / every + 1e-6) + 1) * every;
+        badge = 'next in ' + formatClock(nextAt - now.s) + ' \u25b8';
+      } else badge = 'every ' + formatClock(every);
+    } else badge = count + '\u00d7';
+    lanes.push({id: id,
+                label: l.label != null ? String(l.label) : id,
+                every: every, everyLabel: formatClock(every),
+                regime: regime, count: count, beats: beats,
+                spacingPct: every / span * 100,
+                badge: badge,
+                misses: misses.filter(function(m){ return m.lane === id; }),
+                events: allEvents.filter(function(e){ return e.lane === id; })});
+  });
+  return {span: span, spanLabel: formatClock(span), ticks: ticks, now: now,
+          lanes: lanes,
+          axisEvents: allEvents.filter(function(e){ return e.lane == null || !seen[e.lane]; })};
+}
+
 function timelineModel(panel, state){
   panel = panel || {}; state = state || {};
   var span = parseClock(panel.span);
@@ -2256,6 +2337,84 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (mode === 'boot') h += SCENES['static-noise'];
     else if (mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
     h += scrOvl + '</div>';
+  } else if (type === 'timeline' && Array.isArray(panel.lanes) && panel.lanes.length){
+    var lnm = timelineLanesModel(panel, state);
+    var LX0 = 70, LX1 = 252, LW = LX1 - LX0;   /* track range; labels left, badges right */
+    function lx(pct){ return (LX0 + pct / 100 * LW).toFixed(1); }
+    var rowsTop = 22, rowH = 18;
+    var rowsBottom = rowsTop + lnm.lanes.length * rowH;
+    var tlH = rowsBottom + 14;
+    h += '<svg class="tlsvg" viewBox="0 0 320 ' + tlH + '" role="img" aria-label="cadence lanes">';
+    /* shared axis strip on top */
+    h += '<line class="tlaxis" x1="' + LX0 + '" y1="12" x2="' + LX1 + '" y2="12"/>';
+    lnm.ticks.forEach(function(tk){
+      h += '<line class="tltickline" x1="' + lx(tk.pct) + '" y1="8" x2="' + lx(tk.pct) + '" y2="16"/>';
+    });
+    lnm.axisEvents.forEach(function(ev){
+      h += '<circle class="tlev tl-' + ev.kind + '" cx="' + lx(ev.pct) + '" cy="12" r="2.6"><title>' +
+           esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
+    });
+    /* lane rows */
+    lnm.lanes.forEach(function(ln, li){
+      var cy = rowsTop + li * rowH + 9;
+      var labText = ln.label.length > 13 ? ln.label.slice(0, 12) + '\u2026' : ln.label;
+      h += '<text class="tllane" x="2" y="' + (cy + 3) + '">' + esc(labText) +
+           '<title>' + esc(ln.label + ' — every ' + ln.everyLabel) + '</title></text>';
+      h += '<line class="tlrowline" x1="' + LX0 + '" y1="' + cy + '" x2="' + LX1 + '" y2="' + cy + '"/>';
+      var splitX = lnm.now ? parseFloat(lx(lnm.now.pct)) : LX0;
+      if (ln.regime === 'dots'){
+        ln.beats.forEach(function(bt){
+          h += '<circle class="tlbeat' + (bt.past ? ' past' : '') + '" cx="' + lx(bt.pct) + '" cy="' + cy + '" r="2.6"/>';
+        });
+      } else if (ln.regime === 'comb'){
+        var spacing = ln.spacingPct / 100 * LW;
+        var pid = 'tlp' + (++ZF_SEQ);
+        h += '<defs><pattern id="' + pid + '" x="' + LX0 + '" width="' + spacing.toFixed(3) +
+             '" height="' + rowH + '" patternUnits="userSpaceOnUse">' +
+             '<line class="tlcombline" x1="' + spacing.toFixed(3) + '" y1="3" x2="' + spacing.toFixed(3) + '" y2="15"/></pattern></defs>';
+        if (splitX > LX0)
+          h += '<rect class="tlpast" x="' + LX0 + '" y="' + (cy - 9) + '" width="' + (splitX - LX0).toFixed(1) +
+               '" height="' + rowH + '" fill="url(#' + pid + ')"/>';
+        if (splitX < LX1)
+          h += '<rect class="tlfuture" x="' + splitX.toFixed(1) + '" y="' + (cy - 9) + '" width="' + (LX1 - splitX).toFixed(1) +
+               '" height="' + rowH + '" fill="url(#' + pid + ')"/>';
+      } else if (ln.regime === 'band'){
+        if (splitX > LX0)
+          h += '<rect class="tlbandfill tlpast" x="' + LX0 + '" y="' + (cy - 4) + '" width="' + (splitX - LX0).toFixed(1) + '" height="8" rx="2"/>';
+        if (splitX < LX1)
+          h += '<rect class="tlbandfill tlfuture" x="' + splitX.toFixed(1) + '" y="' + (cy - 4) + '" width="' + (LX1 - splitX).toFixed(1) + '" height="8" rx="2"/>';
+      }
+      /* sparse: the badge carries the promise; nothing on the track */
+      ln.misses.forEach(function(m){
+        if (ln.regime === 'dots'){
+          h += '<circle class="tlmissring" cx="' + lx(m.pct) + '" cy="' + cy + '" r="4"><title>' +
+               esc('missed — expected ' + formatClock(m.s)) + '</title></circle>';
+        } else {
+          h += '<line class="tlmiss" x1="' + lx(m.pct) + '" y1="' + (cy - 8) + '" x2="' + lx(m.pct) + '" y2="' + (cy + 8) + '"><title>' +
+               esc('missed — expected ' + formatClock(m.s)) + '</title></line>';
+        }
+      });
+      ln.events.forEach(function(ev){
+        h += '<circle class="tlev tl-' + ev.kind + '" cx="' + lx(ev.pct) + '" cy="' + cy + '" r="3"><title>' +
+             esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
+      });
+      h += '<text class="tlbadge" x="318" y="' + (cy + 3) + '" text-anchor="end">' + esc(ln.badge) + '</text>';
+    });
+    /* the now cursor runs through the axis and every row */
+    if (lnm.now){
+      var lnx = lx(lnm.now.pct);
+      h += '<line class="tlnow" x1="' + lnx + '" y1="6" x2="' + lnx + '" y2="' + rowsBottom + '"/>' +
+           '<circle class="tlnowhead" cx="' + lnx + '" cy="6" r="3"/>';
+    }
+    /* tick labels under the rows */
+    lnm.ticks.forEach(function(tk){
+      h += '<text class="tltick" x="' + lx(tk.pct) + '" y="' + (rowsBottom + 10) + '" text-anchor="middle">' + esc(tk.label) + '</text>';
+    });
+    h += '</svg>';
+    var lmeta = [];
+    if (lnm.now) lmeta.push('now ' + lnm.now.label);
+    lmeta.push('span ' + lnm.spanLabel);
+    h += '<div class="tlmeta">' + esc(lmeta.join(' \u00b7 ')) + '</div>';
   } else if (type === 'timeline'){
     var tlm = timelineModel(panel, state);
     function tlx(pct){ return (6 + pct / 100 * 308).toFixed(1); }

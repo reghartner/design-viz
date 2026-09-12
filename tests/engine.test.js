@@ -25,7 +25,7 @@ function loadCore(overrides = {}){
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
     ' foldPhoneStates, phoneModel, phonePanelHTML, PANEL_TYPES,' +
     ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
-    ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection, parseClock, formatClock, timelineModel,' +
+    ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection, parseClock, formatClock, timelineModel, timelineLanesModel,' +
     ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
     ' sectionHasProse, sectionIntroHTML, setProseCollapsed, createProseController, TONE_SET,' +
     ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES};';
@@ -3571,4 +3571,126 @@ test('timeline labels: the drawn text matches the measured text — long labels 
   assert.ok(h.includes('a very long label tha…</text>'), 'truncated text drawn');
   assert.ok(h.includes('a very long label that keeps going on</title>'), 'full text in the hover title');
   assert.ok(!h.includes('keeps going on</text>'), 'full text never drawn as a label');
+});
+
+test('cadence lanes: the density regime encodes the orders-of-magnitude contrast', () => {
+  const m = C.timelineLanesModel(
+    {span: '6h', lanes: [
+      {id: 'ka', label: 'MQTT keepalive', every: '30s'},
+      {id: 'fp', label: 'flow poll', every: '5m'},
+      {id: 'hb', label: 'heartbeat', every: '1h'},
+      {id: 'ota', label: 'OTA check', every: '1d'}]},
+    {now: '3h'});
+  const lanes = JSON.parse(JSON.stringify(m.lanes));
+  assert.strictEqual(lanes.length, 4);
+  assert.strictEqual(lanes[0].regime, 'band');   /* 720 beats */
+  assert.strictEqual(lanes[0].badge, '720×');
+  assert.strictEqual(lanes[1].regime, 'comb');   /* 72 beats */
+  assert.strictEqual(lanes[1].badge, '72×');
+  assert.strictEqual(lanes[2].regime, 'dots');   /* 6 beats */
+  assert.strictEqual(lanes[2].beats.length, 6);
+  assert.strictEqual(lanes[2].beats.filter(b => b.past).length, 3);
+  assert.strictEqual(lanes[3].regime, 'sparse'); /* 1d over 6h */
+  assert.strictEqual(lanes[3].badge, 'next in 21h ▸');
+  /* no now: the sparse promise falls back to the cadence itself */
+  const idle = JSON.parse(JSON.stringify(C.timelineLanesModel(
+    {span: '6h', lanes: [{id: 'ota', every: '1d'}]}, {})));
+  assert.strictEqual(idle.lanes[0].badge, 'every 1d');
+  assert.strictEqual(idle.now, null);
+});
+
+test('cadence lanes: misses and lane events route to their lane; unknown lanes fall to the axis', () => {
+  const m = JSON.parse(JSON.stringify(C.timelineLanesModel(
+    {span: '6h', lanes: [{id: 'hb', every: '1h'}, {id: 'ka', every: '30s'}]},
+    {now: '3h10m',
+     miss: [{at: '3h', lane: 'hb'}, {at: '2h', lane: 'nope'}],
+     events: [{at: '1h', kind: 'ok', lane: 'hb'},
+              {at: '2h', kind: 'info'},
+              {at: '90m', kind: 'alert', lane: 'ghost'}]})));
+  assert.strictEqual(m.lanes[0].misses.length, 1);
+  assert.strictEqual(m.lanes[0].misses[0].s, 3 * 3600);
+  assert.strictEqual(m.lanes[1].misses.length, 0);
+  assert.strictEqual(m.lanes[0].events.length, 1);
+  /* the laneless event AND the unknown-lane event land on the axis row */
+  assert.strictEqual(m.axisEvents.length, 2);
+});
+
+test('cadence lanes: skipped lanes (bad every, duplicate id, over cap) and clamps', () => {
+  const m = JSON.parse(JSON.stringify(C.timelineLanesModel(
+    {span: '2h', lanes: [
+      {id: 'a', every: '10m'}, {id: 'a', every: '20m'},
+      {id: 'bad', every: 'soon'}, {no_id: true},
+      {id: 'b', every: '30m'}, {id: 'c', every: '15m'},
+      {id: 'd', every: '1h'}, {id: 'e', every: '40m'}]},
+    {})));
+  /* duplicate a dropped, bad/every-less dropped, capped at 4 */
+  assert.deepStrictEqual(m.lanes.map(l => l.id), ['a', 'b', 'c', 'd']);
+});
+
+test('cadence lanes: miss patches accumulate in the fold like events', () => {
+  const folded = C.foldPanelStates({
+    panels: [{id: 'tl', type: 'timeline', span: '6h',
+              lanes: [{id: 'hb', every: '1h'}], initial: {now: '0m'}}],
+    steps: [
+      {panels: {tl: {now: '2h'}}},
+      {panels: {tl: {now: '3h10m', miss: [{lane: 'hb', at: '3h'}]}}},
+      {panels: {tl: {now: '4h'}}}
+    ]
+  });
+  const states = folded.tl;
+  assert.ok(!('miss' in states[0]) || states[0].miss.length === 0);
+  assert.strictEqual(states[1].miss.length, 1);
+  assert.strictEqual(states[2].miss.length, 1); /* carried */
+  assert.strictEqual(states[2].now, '4h');
+});
+
+test('cadence lanes renderer: band/comb/dots/sparse rows, miss markers, badges, one cursor', () => {
+  const host = {innerHTML: '', querySelector: () => null};
+  C.renderPanelBody(host, {id: 'tl', type: 'timeline', span: '6h',
+    lanes: [
+      {id: 'ka', label: 'MQTT keepalive', every: '30s'},
+      {id: 'fp', label: 'flow poll', every: '5m'},
+      {id: 'hb', label: 'heartbeat', every: '1h'},
+      {id: 'ota', label: 'OTA check', every: '1d'}]},
+    {now: '3h10m', miss: [{lane: 'hb', at: '3h'}],
+     events: [{at: '1h', kind: 'ok', lane: 'hb'}]}, 'aurora', [], 0, false);
+  const h = host.innerHTML;
+  assert.ok(h.includes('cadence lanes'), 'lanes aria label');
+  assert.ok(h.includes('tlbandfill'), 'band regime for 30s');
+  assert.ok(h.includes('<pattern'), 'comb regime uses a pattern for the 5m lane');
+  assert.ok(h.includes('tlmissring'), 'dots-regime miss ring on the heartbeat lane');
+  assert.ok(h.includes('720×'), 'keepalive badge');
+  assert.ok(h.includes('next in'), 'sparse promise badge');
+  assert.strictEqual((h.match(/tlnow"/g) || []).length, 1, 'one cursor line through all rows');
+  assert.ok(h.includes('MQTT keepali…'), 'long lane label truncates');
+});
+
+test('cadence lanes validator: lane declaration and miss/lane patch warnings carry paths', () => {
+  const v = C.validate(C.normalize({sections: [{diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b'}],
+    panels: [{id: 'tl', type: 'timeline', span: '6h',
+              cadence: {every: '30m'},
+              lanes: [{id: 'hb', every: '1h'}, {id: 'hb', every: '2h'},
+                      {id: 'x', every: 'soon'}, {every: '5m'}]}],
+    steps: [{edge: 'a->b', panels: {tl: {miss: [{lane: 'zz', at: '1h'}, {lane: 'hb', at: 'bad'}],
+                                         events: [{at: '1h', lane: 'zz'}]}}}]
+  }}]}));
+  const w = JSON.parse(JSON.stringify(v.warnings)).join('\n');
+  assert.match(w, /cadence: ignored when lanes are declared/);
+  assert.match(w, /lanes\[1\]\.id: duplicate lane id/);
+  assert.match(w, /lanes\[2\]\.every: unreadable interval/);
+  assert.match(w, /lanes\[3\]: needs \{id/);
+  assert.match(w, /miss\[0\]\.lane: unknown lane "zz"/);
+  assert.match(w, /miss\[1\]\.at: unreadable time/);
+  assert.match(w, /events\[0\]\.lane: unknown lane "zz"/);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(v.errors)), []);
+});
+
+test('parseClock and formatClock understand days', () => {
+  assert.strictEqual(C.parseClock('1d'), 86400);
+  assert.strictEqual(C.parseClock('1d6h'), 108000);
+  assert.strictEqual(C.parseClock('2d'), 172800);
+  assert.strictEqual(C.formatClock(86400), '1d');
+  assert.strictEqual(C.formatClock(90000), '1d1h');
+  assert.strictEqual(C.formatClock(7 * 86400), '7d');
 });

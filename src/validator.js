@@ -28,27 +28,35 @@ function parseClock(text){
   if (!s) return null;
   if (/^\d+(\.\d+)?$/.test(s)) return fin(parseFloat(s) * 60);
   var m, total = 0, any = false;
-  var re = /(\d+(?:\.\d+)?)\s*(h|m|s)/g;
-  while ((m = re.exec(s))){ any = true; total += parseFloat(m[1]) * (m[2] === 'h' ? 3600 : m[2] === 'm' ? 60 : 1); }
+  var re = /(\d+(?:\.\d+)?)\s*(d|h|m|s)/g;
+  while ((m = re.exec(s))){
+    any = true;
+    total += parseFloat(m[1]) * (m[2] === 'd' ? 86400 : m[2] === 'h' ? 3600 : m[2] === 'm' ? 60 : 1);
+  }
   if (!any) return null;
-  if (s.replace(/(\d+(?:\.\d+)?)\s*(h|m|s)/g, '').replace(/\s/g, '') !== '') return null;
+  if (s.replace(/(\d+(?:\.\d+)?)\s*(d|h|m|s)/g, '').replace(/\s/g, '') !== '') return null;
   return fin(total);
 }
 /* the widget is a 320-unit-wide strip; a week is the largest span it can
    present legibly. Longer declared spans clamp here (validator warns). */
 var TIMELINE_MAX_SPAN = 7 * 86400;
 function formatClock(seconds){
-  /* 5400 -> "1h30m", 3600 -> "1h", 90 -> "1m30s", 45 -> "45s", 0 -> "0" */
-  var h = Math.floor(seconds / 3600);
-  var rem = seconds - h * 3600;
+  /* 5400 -> "1h30m", 3600 -> "1h", 90 -> "1m30s", 45 -> "45s",
+     90000 -> "1d1h", 604800 -> "7d", 0 -> "0". Two largest units. */
+  var d = Math.floor(seconds / 86400);
+  var rem = seconds - d * 86400;
+  var h = Math.floor(rem / 3600);
+  rem -= h * 3600;
   var mn = Math.floor(rem / 60);
   var sc = Math.round(rem - mn * 60);
   if (sc === 60){ sc = 0; mn += 1; } /* 59.6s must not read "60s" */
   if (mn === 60){ mn = 0; h += 1; }
+  if (h === 24){ h = 0; d += 1; }
   var out = '';
+  if (d) out += d + 'd';
   if (h) out += h + 'h';
-  if (mn) out += mn + 'm';
-  if (sc && !h) out += sc + 's';
+  if (mn && !d) out += mn + 'm';
+  if (sc && !h && !d) out += sc + 's';
   return out || '0';
 }
 var TIMELINE_EVENT_KINDS = ['ok', 'alert', 'info'];
@@ -60,18 +68,44 @@ function timelineEventWarnings(list, path, warnings){
     var EP = path + '[' + i + ']';
     if (!e || typeof e !== 'object'){ warnings.push(EP + ': needs {at, label?, kind?} — skipped'); return; }
     if (parseClock(e.at) == null)
-      warnings.push(EP + '.at: unreadable time "' + e.at + '" (use "1h30m" / "45m" / "90s") — skipped');
+      warnings.push(EP + '.at: unreadable time "' + e.at + '" (use "1d" / "1h30m" / "45m" / "90s") — skipped');
     if (e.kind != null && TIMELINE_EVENT_KINDS.indexOf(e.kind) < 0)
       warnings.push(EP + '.kind: unknown kind "' + e.kind + '" — using "info" (valid: ' + TIMELINE_EVENT_KINDS.join(' ') + ')');
   });
 }
-function timelinePatchWarnings(obj, path, warnings){
+function timelineLaneIds(decl){
+  var ids = [];
+  ((decl && Array.isArray(decl.lanes)) ? decl.lanes : []).forEach(function(l){
+    if (l && l.id != null) ids.push(String(l.id));
+  });
+  return ids;
+}
+function timelinePatchWarnings(obj, path, decl, warnings){
   if (!obj || typeof obj !== 'object') return;
+  var laneIds = timelineLaneIds(decl);
   if (obj.now != null && parseClock(obj.now) == null)
-    warnings.push(path + '.now: unreadable time "' + obj.now + '" (use "1h30m" / "45m" / "90s") — cursor unchanged');
+    warnings.push(path + '.now: unreadable time "' + obj.now + '" (use "1d" / "1h30m" / "45m" / "90s") — cursor unchanged');
   if (obj.events != null && !Array.isArray(obj.events))
     warnings.push(path + '.events: expected an array of {at, label?, kind?} — ignored');
-  else timelineEventWarnings(obj.events, path + '.events', warnings);
+  else {
+    timelineEventWarnings(obj.events, path + '.events', warnings);
+    (Array.isArray(obj.events) ? obj.events : []).forEach(function(e, i){
+      if (e && e.lane != null && laneIds.indexOf(String(e.lane)) < 0)
+        warnings.push(path + '.events[' + i + '].lane: unknown lane "' + e.lane + '" — drawn on the axis row');
+    });
+  }
+  if (obj.miss != null){
+    if (!Array.isArray(obj.miss))
+      warnings.push(path + '.miss: expected an array of {lane, at} — ignored');
+    else obj.miss.forEach(function(m, i){
+      var MP = path + '.miss[' + i + ']';
+      if (!m || typeof m !== 'object'){ warnings.push(MP + ': needs {lane, at} — skipped'); return; }
+      if (laneIds.length && (m.lane == null || laneIds.indexOf(String(m.lane)) < 0))
+        warnings.push(MP + '.lane: unknown lane "' + m.lane + '" — skipped');
+      if (parseClock(m.at) == null)
+        warnings.push(MP + '.at: unreadable time "' + m.at + '" — skipped');
+    });
+  }
 }
 
 /* shared by bufferModel and the fold compactor */
@@ -569,8 +603,30 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
               ') — the axis renders without beat dots and the meta line reports the count');
         }
       }
+      if (p.lanes != null){
+        if (!Array.isArray(p.lanes) || !p.lanes.length)
+          warnings.push(PP + '.lanes: expected a non-empty array of {id, label?, every} — lanes ignored');
+        else {
+          if (p.cadence != null)
+            warnings.push(PP + '.cadence: ignored when lanes are declared — each lane carries its own every');
+          if (p.lanes.length > 4)
+            warnings.push(PP + '.lanes: more than 4 lanes — extra lanes are not rendered');
+          var laneSeen = {};
+          p.lanes.forEach(function(l, li){
+            var LP = PP + '.lanes[' + li + ']';
+            if (!l || typeof l !== 'object' || l.id == null){
+              warnings.push(LP + ': needs {id, label?, every} — lane skipped'); return;
+            }
+            if (laneSeen[String(l.id)])
+              warnings.push(LP + '.id: duplicate lane id "' + l.id + '" — later lane skipped');
+            laneSeen[String(l.id)] = true;
+            if (parseClock(l.every) == null || parseClock(l.every) <= 0)
+              warnings.push(LP + '.every: unreadable interval "' + l.every + '" (use "30s" / "5m" / "2h") — lane skipped');
+          });
+        }
+      }
       timelineEventWarnings(p.events, PP + '.events', warnings);
-      timelinePatchWarnings(p.initial, PP + '.initial', warnings);
+      timelinePatchWarnings(p.initial, PP + '.initial', p, warnings);
     }
     if (PANEL_TYPES.indexOf(p.type) < 0)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PANEL_TYPES.join(' ') + ')');
@@ -781,7 +837,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       } else if (phonePanels[pid] && patch[pid]){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (timelinePanels[pid] && patch[pid]){
-        timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
+        timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
       }
     });
     if (st && st.lane && !lanes[st.lane])
@@ -979,10 +1035,12 @@ function foldPanelStates(d){
     var logAcc = [];
     if (Array.isArray(carried.log)){ logAcc = carried.log.slice(); delete carried.log; }
     /* timeline events accumulate across steps like log lines */
-    var eventAcc = null;
+    var eventAcc = null, missAcc = null;
     if (p.type === 'timeline'){
       eventAcc = Array.isArray(carried.events) ? carried.events.slice() : [];
       delete carried.events;
+      missAcc = Array.isArray(carried.miss) ? carried.miss.slice() : [];
+      delete carried.miss;
     }
     var states = [];
     steps.forEach(function(st){
@@ -1003,6 +1061,11 @@ function foldPanelStates(d){
         if (k === 'events' && eventAcc !== null){
           var evs = Array.isArray(patch.events) ? patch.events : [patch.events];
           eventAcc = eventAcc.concat(evs);
+          return;
+        }
+        if (k === 'miss' && missAcc !== null){
+          var ms = Array.isArray(patch.miss) ? patch.miss : [patch.miss];
+          missAcc = missAcc.concat(ms);
           return;
         }
         if (k === 'now' && eventAcc !== null){
@@ -1032,6 +1095,7 @@ function foldPanelStates(d){
       Object.keys(carried).forEach(function(k){ snap[k] = carried[k]; });
       if (once) Object.keys(once).forEach(function(k){ snap[k] = once[k]; });
       if (eventAcc !== null) snap.events = eventAcc.slice();
+      if (missAcc !== null) snap.miss = missAcc.slice();
       snap.log = logAcc.slice();
       states.push(snap);
     });
@@ -1039,6 +1103,7 @@ function foldPanelStates(d){
       var only = {};
       Object.keys(carried).forEach(function(k){ only[k] = carried[k]; });
       if (eventAcc !== null) only.events = eventAcc.slice();
+      if (missAcc !== null) only.miss = missAcc.slice();
       only.log = logAcc.slice();
       states.push(only);
     }

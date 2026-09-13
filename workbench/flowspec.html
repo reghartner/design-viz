@@ -4261,6 +4261,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
           <button class="bbtn" id="add-step">+ step</button>
           <button class="bbtn" id="add-panel">+ panel</button>
           <button class="bbtn" id="add-section">+ section</button>
+          <button class="bbtn" id="add-tabs" title="a tabbed block: two tabs, one starter section each">+ tabs</button>
         <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
         <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
           <button class="bbtn" id="undo-builder" disabled>undo</button>
@@ -11048,6 +11049,36 @@ var BUILDER_TAB_TEMPLATE = [
   '}'
 ].join('\n');
 
+/* a whole tabs container: two tabs, one starter section each — the
+   "+ tab" button on a selected tab grows it from there */
+var BUILDER_TABS_TEMPLATE = [
+  '{',
+  '  "tabs": [',
+  '    ' + BUILDER_TAB_TEMPLATE.replace('"New tab"', '"Tab one"').split('\n').join('\n    ') + ',',
+  '    ' + BUILDER_TAB_TEMPLATE.replace('"New tab"', '"Tab two"').split('\n').join('\n    '),
+  '  ]',
+  '}'
+].join('\n');
+
+function planAddTabs(text, raw){
+  /* append a tabs container to the page's block list — same shape rules
+     as planAddSection */
+  var base, page;
+  if (raw && raw.page){ page = raw.page; base = ['page']; }
+  else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
+  else if (raw && raw.nodes && raw.rows)
+    return {error: 'this spec is a bare diagram — wrap it as {"page": {"blocks": [ {...} ]}} to hold tabs'};
+  else return {error: 'no page to add tabs to'};
+  var key = page.blocks ? 'blocks' : 'sections';
+  if (!jsonLocate(text, base.concat([key])))
+    return {error: 'could not find the ' + key + ' list in the editor text'};
+  var r = jsonInsertMember(text, base.concat([key]), null, BUILDER_TABS_TEMPLATE);
+  if (!r) return {error: 'could not edit the ' + key + ' list in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'tabs',
+          block: (page[key] || []).length,
+          index: specSectionPaths(raw).length};
+}
+
 function planAddTab(text, raw, blockIdx, afterIdx){
   /* insert a renderable tab (one starter section) directly after the
      tab the operator is looking at */
@@ -13165,7 +13196,7 @@ function initWorkbenchBuilder(opts){
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
-    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn, ' +
+    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
     '#starters, #gallery button, #import-mermaid, #import-mermaid-convert';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
@@ -13621,6 +13652,25 @@ function initWorkbenchBuilder(opts){
   /* + edge draws by clicking source then target (Esc cancels) */
   var edgeBtn = document.getElementById('add-edge');
   if (edgeBtn) edgeBtn.addEventListener('click', startConnect);
+  /* + tabs appends a whole tabs container and lands on its first tab —
+     tab targets address by block/tab, so runInsert's section identity
+     does not fit */
+  var tabsBtn = document.getElementById('add-tabs');
+  if (tabsBtn) tabsBtn.addEventListener('click', function(){
+    var parsed = parseEditor();
+    if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
+    var plan = planAddTabs(src.value, parsed.raw);
+    if (plan.error){ inspectorMessage(plan.error); return; }
+    pushUndo();
+    clearMultiSelect(); /* this action establishes a single selection */
+    src.value = plan.text;
+    render();
+    autosaveDraft();
+    insertSection = plan.index; /* inserts now land in the first new tab's section */
+    var el = findTargetEl({kind: 'tab', block: plan.block, tab: 0});
+    selectTarget({kind: 'tab', block: plan.block, tab: 0, el: el}, false);
+    selectRange(plan);
+  });
 
   /* ---- starter gallery: whole-editor replacement is one undo action ---- */
   var gallery = document.getElementById('gallery');

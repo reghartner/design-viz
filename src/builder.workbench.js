@@ -1089,16 +1089,27 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
    PANEL_TYPES and every key the insert palette's starter templates
    carry. */
 
+/* Setup-field control kinds:
+   text / num / csv / scene keep their original meaning; json / jsonArr /
+   jsonAny are raw textareas. New typed kinds (each still offers a raw-JSON
+   fallback in the form):
+     clock — duration string validated by the bundle's parseClock when present
+     map   — {key: value} object edited as key/value rows (colors, tags)
+     rows  — array of objects edited as one input row per item; the shape
+             (third tuple element) lists cols [{k, kind?, req?, options?}]
+             and an optional max; unknown keys on existing items survive edits
+     objf  — one fixed-shape object edited inline (timeline cadence) */
 var PANEL_SETUP_FIELDS = {
-  state:     [['states', 'csv'], ['colors', 'json'], ['initial', 'json']],
-  leds:      [['leds', 'jsonArr'], ['initial', 'json']],
+  state:     [['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
+  leds:      [['leds', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}]}], ['initial', 'json']],
   gauge:     [['unit', 'text'], ['max', 'num'], ['initial', 'json']],
-  log:       [['tags', 'json'], ['initial', 'json']],
+  log:       [['tags', 'map'], ['initial', 'json']],
   screen:    [['scene', 'scene'], ['initial', 'json']],
-  waterfall: [['spans', 'jsonArr'], ['initial', 'json']],
-  orbit:     [['states', 'csv'], ['colors', 'json'], ['initial', 'json']],
+  waterfall: [['spans', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'ms', kind: 'num', req: true}]}],
+              ['initial', 'json']],
+  orbit:     [['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
   zoneframe: [['zones', 'jsonArr'], ['initial', 'json']],
-  xray:      [['layers', 'jsonArr'], ['initial', 'json']],
+  xray:      [['layers', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'holder'}]}], ['initial', 'json']],
   queue:     [['initial', 'json']],
   pir:       [['cone', 'json'], ['sensor', 'json'], ['path', 'jsonArr'], ['initial', 'json']],
   thermo:    [['unit', 'text'], ['min', 'num'], ['max', 'num'], ['warn', 'num'], ['crit', 'num'], ['initial', 'json']],
@@ -1107,14 +1118,115 @@ var PANEL_SETUP_FIELDS = {
   radar:     [['sensor', 'json'], ['facing', 'num'], ['spread', 'num'], ['range', 'num'],
               ['threshold', 'num'], ['rings', 'jsonAny'], ['scale', 'json'],
               ['zones', 'jsonArr'], ['initial', 'json']],
-  signal:    [['links', 'jsonArr'], ['initial', 'json']],
-  tiles:     [['tiles', 'jsonArr'], ['states', 'csv'], ['colors', 'json'], ['initial', 'json']],
-  inflight:  [['lanes', 'jsonArr'], ['initial', 'json']],
+  signal:    [['links', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'},
+                {k: 'transport', kind: 'enum',
+                 options: ['wifi', 'subghz', 'thread', 'zigbee', 'zwave', 'cellular', 'poe', 'ethernet', 'ble']}],
+              max: 6}], ['initial', 'json']],
+  tiles:     [['tiles', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 12}],
+              ['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
+  inflight:  [['lanes', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}]}], ['initial', 'json']],
   phone:     [['initial', 'json']],
-  timeline:  [['span', 'text'], ['cadence', 'json'], ['events', 'jsonArr'], ['initial', 'json']]
+  timeline:  [['span', 'clock'],
+              ['cadence', 'objf', {cols: [{k: 'every', kind: 'clock', req: true}, {k: 'label'}]}],
+              ['lanes', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'},
+                {k: 'every', kind: 'clock', req: true}], max: 4}],
+              ['events', 'rows', {cols: [{k: 'at', kind: 'clock', req: true}, {k: 'label'},
+                {k: 'kind', kind: 'enum', options: ['ok', 'alert', 'info']}, {k: 'lane'}]}],
+              ['initial', 'json']]
 };
 
 var SCENE_TOKENS = ['person-at-door-night', 'package-drop', 'static-noise'];
+
+/* parseClock rides in the same bundle (validator.js); the vm-loaded test
+   copy of this file has no validator, so capture defensively. */
+var BUILDER_CLOCK_PARSE = typeof parseClock === 'function' ? parseClock : null;
+var BUILDER_CLOCK_HINT = 'a duration like 90s, 5m, 2h30m, 1d';
+
+function builderClockInvalid(text){
+  return !!(BUILDER_CLOCK_PARSE && typeof text === 'string' && text.trim() !== '' &&
+            BUILDER_CLOCK_PARSE(text) == null);
+}
+
+/* Merge one edited row into its original item: edited cols overwrite or
+   delete keys; keys the editor does not know about survive untouched. */
+function builderRowMerge(shape, base, values){
+  var item = {};
+  Object.keys(base || {}).forEach(function(k){ item[k] = base[k]; });
+  var error = null;
+  (shape.cols || []).forEach(function(col){
+    if (error) return;
+    var raw = values && typeof values[col.k] === 'string' ? values[col.k].trim() : '';
+    if (raw === ''){
+      if (col.req){ error = col.k + ' is required'; return; }
+      delete item[col.k];
+      return;
+    }
+    if (col.kind === 'num'){
+      var num = Number(raw);
+      if (!isFinite(num)){ error = col.k + ': "' + raw + '" is not a number'; return; }
+      item[col.k] = num;
+      return;
+    }
+    if (col.kind === 'clock' && builderClockInvalid(raw)){
+      error = col.k + ': "' + raw + '" is not ' + BUILDER_CLOCK_HINT; return;
+    }
+    if (col.kind === 'enum' && (col.options || []).indexOf(raw) < 0){
+      error = col.k + ': "' + raw + '" is not one of ' + (col.options || []).join(' | '); return;
+    }
+    item[col.k] = raw;
+  });
+  return error ? {error: error} : {item: item};
+}
+
+/* rows: [{base: originalItem|null, values: {colKey: rawString}}] in display
+   order. Fully-empty NEW rows are dropped; empty EXISTING rows are kept and
+   fail their required columns (deleting is the ✕ button's job, not blanking). */
+function rowsEditorCollect(shape, rows){
+  var items = [];
+  for (var i = 0; i < (rows || []).length; i++){
+    var row = rows[i];
+    var blank = (shape.cols || []).every(function(col){
+      var raw = row.values && typeof row.values[col.k] === 'string' ? row.values[col.k].trim() : '';
+      return raw === '';
+    });
+    if (blank && !row.base) continue;
+    var merged = builderRowMerge(shape, row.base, row.values);
+    if (merged.error) return {error: 'item ' + (i + 1) + ': ' + merged.error};
+    items.push(merged.item);
+  }
+  if (shape.max && items.length > shape.max)
+    return {error: 'at most ' + shape.max + ' items (' + items.length + ' given)'};
+  return {items: items};
+}
+
+/* pairs: [{key: rawString, value: rawString}] -> plain object or null when
+   nothing is left. Blank keys drop the pair; duplicate keys are an error. */
+function mapEditorCollect(pairs){
+  var obj = {}, count = 0;
+  for (var i = 0; i < (pairs || []).length; i++){
+    var key = typeof pairs[i].key === 'string' ? pairs[i].key.trim() : '';
+    var value = typeof pairs[i].value === 'string' ? pairs[i].value.trim() : '';
+    if (key === '') continue;
+    if (Object.prototype.hasOwnProperty.call(obj, key))
+      return {error: 'duplicate key "' + key + '"'};
+    if (value === '') continue;
+    obj[key] = value;
+    count++;
+  }
+  return {obj: count ? obj : null};
+}
+
+/* one fixed-shape object (timeline cadence): all-empty means remove the
+   field entirely; otherwise the same column rules as rows apply. */
+function objFieldsCollect(shape, base, values){
+  var blank = (shape.cols || []).every(function(col){
+    var raw = values && typeof values[col.k] === 'string' ? values[col.k].trim() : '';
+    return raw === '';
+  });
+  if (blank) return {obj: null};
+  var merged = builderRowMerge(shape, base, values);
+  return merged.error ? {error: merged.error} : {obj: merged.item};
+}
 
 /* ---------------- per-element authoring guidance ---------------- */
 
@@ -1863,6 +1975,182 @@ function initWorkbenchBuilder(opts){
       return commitSimple(key, JSON.stringify(parsed));
     }, {textarea: true});
   }
+  /* frow wraps in a <label>, which is wrong for controls holding MANY
+     inputs — this is the same row look on a plain div */
+  function frowBlock(labelText, control){
+    var row = document.createElement('div');
+    row.className = 'frow';
+    var lab = document.createElement('span');
+    lab.className = 'flab'; lab.textContent = labelText;
+    row.appendChild(lab); row.appendChild(control);
+    return row;
+  }
+  function rawJsonFallback(key, cur, jsonKind){
+    var det = document.createElement('details');
+    det.className = 'rawjson';
+    var sum = document.createElement('summary');
+    sum.textContent = 'raw JSON';
+    det.appendChild(sum);
+    det.appendChild(jsonFieldControl(key, cur, jsonKind));
+    return det;
+  }
+  function colInput(col, value){
+    var input;
+    if (col.kind === 'enum'){
+      input = document.createElement('select');
+      input.className = 'fctl';
+      var none = document.createElement('option');
+      none.value = ''; none.textContent = '(' + col.k + ')';
+      input.appendChild(none);
+      (col.options || []).forEach(function(o){
+        var op = document.createElement('option');
+        op.value = o; op.textContent = o;
+        input.appendChild(op);
+      });
+      input.value = (typeof value === 'string' && (col.options || []).indexOf(value) >= 0) ? value : '';
+    } else {
+      input = document.createElement('input');
+      input.type = 'text'; input.className = 'fctl';
+      input.placeholder = col.k + (col.req ? ' *' : '') + (col.kind === 'clock' ? ' (5m, 2h…)' : '');
+      input.value = value == null ? '' : String(value);
+    }
+    return input;
+  }
+  function wireCommit(input, fire){
+    input.addEventListener('change', fire);
+    input.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter' && input.tagName !== 'TEXTAREA'){ ev.preventDefault(); fire(); }
+    });
+  }
+  function rowsFieldControl(key, cur, shape){
+    var wrap = document.createElement('div');
+    wrap.className = 'rowsedit';
+    var rowRefs = [];
+    function commitRows(){
+      var rows = rowRefs.map(function(r){
+        var values = {};
+        Object.keys(r.inputs).forEach(function(k){ values[k] = r.inputs[k].value; });
+        return {base: r.base, values: values};
+      });
+      var out = rowsEditorCollect(shape, rows);
+      if (out.error){ formError(key + ': ' + out.error); return false; }
+      formError('');
+      return commitSimple(key, out.items.length ? JSON.stringify(out.items) : null);
+    }
+    var addBtn = document.createElement('button');
+    function buildRow(base){
+      var line = document.createElement('div');
+      line.className = 'rowline';
+      var ref = {base: base, inputs: {}};
+      (shape.cols || []).forEach(function(col){
+        var input = colInput(col, base ? base[col.k] : null);
+        wireCommit(input, commitRows);
+        ref.inputs[col.k] = input;
+        line.appendChild(input);
+      });
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'bbtn rowx'; x.textContent = '✕';
+      x.title = 'remove this item';
+      x.addEventListener('click', function(){
+        rowRefs.splice(rowRefs.indexOf(ref), 1);
+        line.remove();
+        commitRows();
+      });
+      line.appendChild(x);
+      rowRefs.push(ref);
+      return line;
+    }
+    (Array.isArray(cur) ? cur : []).forEach(function(it){
+      wrap.appendChild(buildRow(it && typeof it === 'object' ? it : {}));
+    });
+    addBtn.type = 'button'; addBtn.className = 'bbtn rowadd'; addBtn.textContent = '+ item';
+    addBtn.addEventListener('click', function(){
+      if (shape.max && rowRefs.length >= shape.max){
+        formError(key + ': at most ' + shape.max + ' items'); return;
+      }
+      var line = buildRow(null);
+      wrap.insertBefore(line, addBtn);
+      var first = line.querySelector('input, select');
+      if (first) first.focus();
+    });
+    wrap.appendChild(addBtn);
+    wrap.appendChild(rawJsonFallback(key, cur, 'jsonArr'));
+    return wrap;
+  }
+  function mapFieldControl(key, cur, opts){
+    var wrap = document.createElement('div');
+    wrap.className = 'rowsedit';
+    var pairRefs = [];
+    function commitPairs(){
+      var out = mapEditorCollect(pairRefs.map(function(p){
+        return {key: p.keyInput.value, value: p.valInput.value};
+      }));
+      if (out.error){ formError(key + ': ' + out.error); return false; }
+      formError('');
+      return commitSimple(key, out.obj ? JSON.stringify(out.obj) : null);
+    }
+    var addBtn = document.createElement('button');
+    function buildPair(k, v){
+      var line = document.createElement('div');
+      line.className = 'rowline';
+      var keyInput = document.createElement('input');
+      keyInput.type = 'text'; keyInput.className = 'fctl';
+      keyInput.placeholder = 'key'; keyInput.value = k == null ? '' : String(k);
+      var valInput = document.createElement('input');
+      valInput.type = 'text'; valInput.className = 'fctl';
+      valInput.placeholder = (opts && opts.valPlaceholder) || 'value';
+      valInput.value = v == null ? '' : String(v);
+      var ref = {keyInput: keyInput, valInput: valInput};
+      wireCommit(keyInput, commitPairs); wireCommit(valInput, commitPairs);
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'bbtn rowx'; x.textContent = '✕';
+      x.title = 'remove this pair';
+      x.addEventListener('click', function(){
+        pairRefs.splice(pairRefs.indexOf(ref), 1);
+        line.remove();
+        commitPairs();
+      });
+      line.appendChild(keyInput); line.appendChild(valInput); line.appendChild(x);
+      pairRefs.push(ref);
+      return line;
+    }
+    var obj = (cur && typeof cur === 'object' && !Array.isArray(cur)) ? cur : {};
+    Object.keys(obj).forEach(function(k){ wrap.appendChild(buildPair(k, obj[k])); });
+    addBtn.type = 'button'; addBtn.className = 'bbtn rowadd'; addBtn.textContent = '+ pair';
+    addBtn.addEventListener('click', function(){
+      var line = buildPair(null, null);
+      wrap.insertBefore(line, addBtn);
+      line.querySelector('input').focus();
+    });
+    wrap.appendChild(addBtn);
+    wrap.appendChild(rawJsonFallback(key, cur, 'json'));
+    return wrap;
+  }
+  function objFieldsControl(key, cur, shape){
+    var wrap = document.createElement('div');
+    wrap.className = 'rowsedit';
+    var line = document.createElement('div');
+    line.className = 'rowline';
+    var base = (cur && typeof cur === 'object' && !Array.isArray(cur)) ? cur : {};
+    var inputs = {};
+    function commitObj(){
+      var values = {};
+      Object.keys(inputs).forEach(function(k){ values[k] = inputs[k].value; });
+      var out = objFieldsCollect(shape, base, values);
+      if (out.error){ formError(key + ': ' + out.error); return false; }
+      formError('');
+      return commitSimple(key, out.obj ? JSON.stringify(out.obj) : null);
+    }
+    (shape.cols || []).forEach(function(col){
+      var input = colInput(col, base[col.k]);
+      wireCommit(input, commitObj);
+      inputs[col.k] = input;
+      line.appendChild(input);
+    });
+    wrap.appendChild(line);
+    wrap.appendChild(rawJsonFallback(key, cur, 'json'));
+    return wrap;
+  }
   function panelSetupRows(val){
     var fields = PANEL_SETUP_FIELDS[val.type] || [['initial', 'json']];
     return fields.map(function(f){
@@ -1873,6 +2161,16 @@ function initWorkbenchBuilder(opts){
         return frow(key, numberControl(cur, function(v){ return commitSimple(key, v == null ? null : String(v)); }));
       if (kind === 'scene')
         return frow(key, selectControl(SCENE_TOKENS, cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }, true));
+      if (kind === 'clock')
+        return frow(key, textControl(cur, function(v){
+          if (v != null && builderClockInvalid(v)){
+            formError(key + ': "' + v + '" is not ' + BUILDER_CLOCK_HINT); return false;
+          }
+          return commitSimple(key, v == null ? null : JSON.stringify(v));
+        }, {placeholder: '90s, 5m, 2h30m, 1d'}));
+      if (kind === 'rows') return frowBlock(key, rowsFieldControl(key, cur, f[2] || {cols: []}));
+      if (kind === 'map') return frowBlock(key, mapFieldControl(key, cur, f[2] || {}));
+      if (kind === 'objf') return frowBlock(key, objFieldsControl(key, cur, f[2] || {cols: []}));
       if (kind === 'csv'){
         /* comma-separated entry is lossy for labels that CONTAIN commas —
            such lists fall back to JSON editing instead of being rewritten */

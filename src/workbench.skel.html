@@ -42,22 +42,30 @@
     </div>
 
     <details class="specbox" open>
-      <summary>page spec JSON — edit &amp; re-render</summary>
-      <div class="buildrow">
-        <span class="lab">INSERT</span>
-        <button class="bbtn" id="add-node">+ node</button>
-        <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
-        <button class="bbtn" id="add-step">+ step</button>
-        <button class="bbtn" id="add-panel">+ panel</button>
-        <button class="bbtn" id="add-section">+ section</button>
-        <button class="bbtn" id="undo-builder" disabled>undo</button>
-        <button class="bbtn" id="redo-builder" disabled>redo</button>
-        <span class="btarget" id="btarget"></span>
-      </div>
+      <summary>spec editor — insert &#183; inspector &#183; JSON source</summary>
       <div class="draftbar" id="draftbar" hidden></div>
-      <div class="palette" id="palette" hidden></div>
-      <div class="guide" id="guide" hidden></div>
-      <textarea id="src" spellcheck="false" aria-label="Page spec JSON source"></textarea>
+      <details class="ssec" id="sec-insert" open>
+        <summary>insert</summary>
+        <div class="buildrow">
+          <button class="bbtn" id="add-node">+ node</button>
+          <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
+          <button class="bbtn" id="add-step">+ step</button>
+          <button class="bbtn" id="add-panel">+ panel</button>
+          <button class="bbtn" id="add-section">+ section</button>
+          <button class="bbtn" id="undo-builder" disabled>undo</button>
+          <button class="bbtn" id="redo-builder" disabled>redo</button>
+          <span class="btarget" id="btarget"></span>
+        </div>
+        <div class="palette" id="palette" hidden></div>
+      </details>
+      <details class="ssec" id="sec-inspect" open hidden>
+        <summary>inspector</summary>
+        <div class="guide" id="guide" hidden></div>
+      </details>
+      <details class="ssec" id="sec-source" open>
+        <summary>JSON source</summary>
+        <textarea id="src" spellcheck="false" aria-label="Page spec JSON source"></textarea>
+      </details>
       <div class="specrow">
         <button class="rbtn" id="go">Render</button>
         <button class="bbtn" id="file-open">open&#8230;</button>

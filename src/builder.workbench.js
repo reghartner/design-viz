@@ -1219,6 +1219,22 @@ var BUILDER_GUIDES = {
   }
 };
 
+/* parse the persisted open/closed state of the editor sections (insert /
+   JSON source). Anything unreadable falls back to open — a corrupt store
+   never hides controls. The inspector section is content-driven (it opens
+   whenever something is selected) and is deliberately not persisted. */
+function builderSectionPrefs(rawText){
+  var prefs = {insert: true, source: true};
+  if (typeof rawText !== 'string' || !rawText) return prefs;
+  var v = null;
+  try { v = JSON.parse(rawText); } catch (ex){ return prefs; }
+  if (v && typeof v === 'object'){
+    if (typeof v.insert === 'boolean') prefs.insert = v.insert;
+    if (typeof v.source === 'boolean') prefs.source = v.source;
+  }
+  return prefs;
+}
+
 /* assigned by initWorkbenchBuilder; boot's message list calls it when a
    finding is clicked (boot renders messages before the builder starts,
    so the indirection is checked at click time) */
@@ -1232,6 +1248,48 @@ function initWorkbenchBuilder(opts){
   var targetLabel = document.getElementById('btarget');
   var undoBtn = document.getElementById('undo-builder');
   var specbox = document.querySelector('.specbox');
+  var secInsert = document.getElementById('sec-insert');
+  var secInspect = document.getElementById('sec-inspect');
+  var secSource = document.getElementById('sec-source');
+
+  /* ---- collapsible editor sections: restore + persist open state ---- */
+  var SECS_KEY = 'dv-workbench-secs';
+  function persistSections(){
+    try {
+      localStorage.setItem(SECS_KEY, JSON.stringify({
+        insert: !secInsert || secInsert.open,
+        source: !secSource || secSource.open
+      }));
+    } catch (ex){ /* storage unavailable: state just resets per load */ }
+  }
+  (function restoreSections(){
+    var stored = null;
+    try { stored = localStorage.getItem(SECS_KEY); } catch (ex){}
+    var prefs = builderSectionPrefs(stored);
+    if (secInsert) secInsert.open = prefs.insert;
+    if (secSource) secSource.open = prefs.source;
+  })();
+  if (secInsert) secInsert.addEventListener('toggle', persistSections);
+  if (secSource) secSource.addEventListener('toggle', persistSections);
+  function sourceVisible(){
+    return (!specbox || specbox.open) && (!secSource || secSource.open);
+  }
+  function openSource(){
+    if (specbox && !specbox.open) specbox.open = true;
+    if (secSource && !secSource.open) secSource.open = true; /* toggle listener persists */
+  }
+  /* the inspector section only exists while it has content. Revealing it
+     also opens the OUTER editor box (else a collapsed specbox hides the
+     freshly rendered inspector) — but never the JSON source section. */
+  function revealInspector(){
+    if (specbox && !specbox.open) specbox.open = true;
+    if (!secInspect) return;
+    secInspect.hidden = false;
+    if (!secInspect.open) secInspect.open = true;
+  }
+  function retireInspector(){
+    if (secInspect) secInspect.hidden = true;
+  }
   var selectedEl = null;
   var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
   var insertSection = 0;    /* zero-based ordinal of the section inserts target */
@@ -1277,8 +1335,15 @@ function initWorkbenchBuilder(opts){
     mirror.remove();
     src.scrollTop = Math.max(0, y - src.clientHeight * 0.35);
   }
-  function selectRange(loc){
-    if (specbox && !specbox.open) specbox.open = true;
+  function selectRange(loc, forceSource){
+    /* selection highlights only matter while the JSON source is showing.
+       A collapsed source section stays collapsed for ordinary selections
+       (that is the point of collapsing it); only an explicit ask to see
+       the JSON — a validation-finding click — reopens it. */
+    if (!sourceVisible()){
+      if (!forceSource) return;
+      openSource();
+    }
     try { src.focus({preventScroll: true}); } catch (ex){ src.focus(); }
     src.setSelectionRange(loc.start, loc.end);
     scrollTextareaTo(loc.start);
@@ -1385,6 +1450,7 @@ function initWorkbenchBuilder(opts){
         render(); /* parse/validation errors surface in the message list */
         setSelected(null); currentTarget = null;
         if (guide) guide.hidden = true;
+        retireInspector();
         autosaveDraft();
       };
       reader.onerror = function(){
@@ -1507,6 +1573,7 @@ function initWorkbenchBuilder(opts){
 
   function inspectorMessage(text){
     if (!guide) return;
+    revealInspector();
     guide.hidden = false;
     guide.innerHTML = '';
     var n = document.createElement('div');
@@ -1947,6 +2014,7 @@ function initWorkbenchBuilder(opts){
   function renderInspector(){
     if (!guide || !currentTarget) return;
     var t = currentTarget;
+    revealInspector();
     guide.hidden = false;
     guide.innerHTML = '';
     var g = BUILDER_GUIDES[t.kind] || {title: t.kind, how: '', fields: []};
@@ -2415,6 +2483,7 @@ function initWorkbenchBuilder(opts){
         currentTarget = null;
         setSelected(null);
         if (guide) guide.hidden = true;
+        retireInspector();
       }
       return;
     }
@@ -2526,7 +2595,7 @@ function initWorkbenchBuilder(opts){
     if (parsed.error) return;
     var loc = findingLocation(src.value, parsed.raw, message);
     if (!loc) return;
-    selectRange(loc);
+    selectRange(loc, true);
     if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent');
   };
 

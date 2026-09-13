@@ -2274,6 +2274,7 @@ function initWorkbenchBuilder(opts){
     formError('');
     pushUndo();
     if (addToStep) addModeSurvive = true; /* builder-internal render — keep the mode */
+    multiSurvive = true; /* plan application — the multi-selection stays */
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -2922,6 +2923,9 @@ function initWorkbenchBuilder(opts){
 
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
+  var multiSurvive = false; /* set by builder-internal renders; a render
+     WITHOUT it (Render button, hand-pasted source) clears the set —
+     coinciding identities in replaced content must never stay selected */
   function multiIdent(t){
     return t.section + '|' + t.kind + '|' + (t.kind === 'node' ? t.id : t.index);
   }
@@ -3439,6 +3443,7 @@ function initWorkbenchBuilder(opts){
     var plan = planAddEdgeBetween(src.value, parsed.raw, target.section, fromId, target.id);
     if (plan.error){ cancelConnect(plan.error); return; }
     pushUndo();
+    multiSurvive = true;
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -3531,6 +3536,7 @@ function initWorkbenchBuilder(opts){
                                  nd.target.getAttribute('data-dv-node'));
       if (ndPlan.error){ inspectorMessage(ndPlan.error); return; }
       pushUndo();
+      multiSurvive = true;
       src.value = ndPlan.text;
       render();
       autosaveDraft();
@@ -3568,6 +3574,7 @@ function initWorkbenchBuilder(opts){
     ]);
     if (plan.error){ inspectorMessage(plan.error); return; }
     pushUndo();
+    multiSurvive = true;
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -3605,6 +3612,12 @@ function initWorkbenchBuilder(opts){
   new MutationObserver(function(){
     cancelNodeDrag(); /* the dragged elements just got detached */
     hideDiff(); /* the diff panel's jump targets got detached too */
+    if (!multiSurvive && multiSel.length){
+      /* a render the builder did not initiate replaced the DOM */
+      clearMultiSelect();
+      dropMultiUI();
+    }
+    multiSurvive = false;
     if (connect) cancelConnect('connect cancelled — the page re-rendered');
     if (addToStep && !addModeSurvive)
       cancelAddToStep('add-to-step ended — the page re-rendered');
@@ -3670,6 +3683,7 @@ function initWorkbenchBuilder(opts){
                                   : planFn(src.value, parsed.raw, insertSection);
     if (plan.error){ inspectorMessage(plan.error); return; }
     pushUndo();
+    multiSurvive = true;
     src.value = plan.text;
     render();
     autosaveDraft();

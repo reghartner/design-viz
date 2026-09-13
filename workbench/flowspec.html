@@ -75,14 +75,6 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .docview{border:1px solid var(--line); border-radius:16px; padding:26px 26px 30px;}
 .docview.sk-aurora{background:#0B1220; --dtext:#B9C7DD; --dink:#EAF2FF; --dfaint:#7E93B8;}
 .docview.sk-daylight{background:#F4F2EC; --dtext:#4A4F58; --dink:#23272E; --dfaint:#79808B;}
-/* the four overlay skins ride the sk-aurora class, so the aurora frame
-   ground above was painting them dark — pastel/editorial rendered as a
-   black box. Overlays repaint the page ground themselves (the body washes
-   in style.core.css) and set their own text vars via body-scoped rules,
-   so the workbench render frame goes transparent and lets that ground
-   show through, matching the published pages. */
-.docview.sk-aurora.sk-editorial, .docview.sk-aurora.sk-terminal,
-.docview.sk-aurora.sk-pastel, .docview.sk-aurora.sk-blueprint{background:transparent;}
 .doc-title{font-family:'Sora',sans-serif; font-weight:700; font-size:24px; color:var(--dink); margin:0 0 4px;}
 .doc-sub{font:500 11px 'IBM Plex Mono',monospace; color:var(--dfaint); margin:0;}
 
@@ -114,8 +106,6 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .bbtn:hover{color:var(--ink); border-color:var(--accent);}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .btarget{font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); margin-left:auto;}
-.importbox{padding:10px 14px; border-bottom:1px solid var(--line);}
-.importbox textarea{display:block; width:100%; margin-bottom:8px;}
 /* draft-recovery offer */
 .draftbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px;
   border-bottom:1px solid var(--line); font:500 12px 'IBM Plex Mono',monospace; color:#B0771A;}
@@ -129,16 +119,7 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .pbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .pbtn svg{width:14px; height:14px;}
 
-.gallery{display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px; border-bottom:1px solid var(--line);
-  max-height:240px; overflow-y:auto;}
-.gallery[hidden]{display:none;}
-.starter-card{display:flex; flex-direction:column; align-items:flex-start; gap:5px; text-align:left;
-  flex:1 1 220px; padding:10px;}
-.starter-card span{font-weight:400;}
-.starter-confirm{display:flex; align-items:center; flex-wrap:wrap; gap:8px; width:100%;
-  font:500 11px 'IBM Plex Mono',monospace; color:var(--sub);}
-
-.guide, .diffbox{border-bottom:1px solid var(--line); padding:10px 14px; font-size:12.5px; line-height:1.5; color:var(--sub);
+.guide{border-bottom:1px solid var(--line); padding:10px 14px; font-size:12.5px; line-height:1.5; color:var(--sub);
   max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}
 .guide .gpath{display:block; margin:2px 0 6px; font:600 11px 'IBM Plex Mono',monospace; color:var(--accent); word-break:break-all;}
@@ -299,11 +280,6 @@ body.sk-aurora.sk-blueprint{
   --accent:#8EEAFF; --accent-ink:#04305E;
   --card:#052956; --codebg:#031F43; --codeink:#D5E9F7;
 }
-
-.diffline{display:block; width:100%; margin:4px 0; text-align:left; overflow-wrap:anywhere;}
-.diffline[data-kind="added"]{border-left:3px solid #36976A;}
-.diffline[data-kind="removed"]{border-left:3px solid #C76A67;}
-.diffline[data-kind="changed"]{border-left:3px solid #B0771A;}
 /* style.core.css — shared doc/board/widget styles for both built pages. */
 .tabbar{display:flex; gap:6px; flex-wrap:wrap; margin-top:24px;}
 .tabunit{display:inline-flex; align-items:stretch; gap:3px;}
@@ -348,14 +324,6 @@ body.sk-aurora.sk-blueprint{
 .sk-daylight .prosetoggle{color:#4956C9; border-color:#C9CDE9; background:#FFFFFF;}
 .sk-daylight .prosetoggle:hover{color:#2A33A0; border-color:#4956C9; background:#EEF0FB;}
 .sec-prose[hidden]{display:none;}
-/* collapsed-prose teaser: one clamped line of the first paragraph/bullet
-   plus a fixed "(expand for more)" suffix; clicking expands the prose */
-.sec-teaser{display:flex; align-items:baseline; gap:8px; margin:0 0 8px; max-width:88ch; cursor:pointer;}
-.sec-teaser[hidden]{display:none;}
-.teasertext{flex:0 1 auto; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
-  color:var(--dtext); font-size:14px;}
-.teasermore{flex:none; color:var(--dfaint); font:500 11px 'IBM Plex Mono',monospace; letter-spacing:.02em;}
-.sec-teaser:hover .teasermore{color:var(--dtext);}
 .sec-text{color:var(--dtext); font-size:14px; max-width:88ch; margin:0 0 8px;}
 .sec-bullets{color:var(--dtext); font-size:13.5px; margin:0 0 8px; padding-left:20px;}
 .sec-bullets li{margin:3px 0;}
@@ -682,16 +650,6 @@ body.sk-aurora.sk-blueprint{
 .tlnow{stroke:var(--dink); stroke-width:1.6;}
 .tlnowhead{fill:var(--dink);}
 .tlband{fill:var(--dtext); opacity:.09;}
-/* cadence lanes */
-.tllane{font:8.5px 'IBM Plex Mono',monospace; fill:var(--dtext);}
-.tlbadge{font:8.5px 'IBM Plex Mono',monospace; fill:var(--dfaint);}
-.tlrowline{stroke:var(--dfaint); stroke-width:.7; opacity:.3;}
-.tlcombline{stroke:var(--dtext); stroke-width:1;}
-rect.tlpast{opacity:.6;}
-rect.tlfuture{opacity:.18;}
-.tlbandfill{fill:var(--dtext);}
-.tlmiss{stroke:#F87171; stroke-width:2;}
-.tlmissring{fill:none; stroke:#F87171; stroke-width:1.6;}
 .tlzoom{stroke:var(--dfaint); stroke-width:1; stroke-dasharray:2 3; opacity:.55;}
 .tlmeta{margin-top:4px; font:500 10px 'IBM Plex Mono',monospace; color:var(--dfaint);}
 
@@ -1308,7 +1266,6 @@ rect.tlfuture{opacity:.18;}
   .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink{display:none !important;}
   .sec-prose[hidden]{display:block !important;}
   .sec-prose{height:auto !important; opacity:1 !important; overflow:visible !important;}
-  .sec-teaser{display:none !important;} /* print expands the prose, so the teaser dupes it */
   .tabpanel[hidden]{display:block !important;}
   .board{border-color:#CCCCCC; overflow:visible;}
   .board svg{min-width:0;}
@@ -4236,21 +4193,12 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
           <button class="bbtn" id="add-step">+ step</button>
           <button class="bbtn" id="add-panel">+ panel</button>
           <button class="bbtn" id="add-section">+ section</button>
-        <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
-        <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
           <button class="bbtn" id="undo-builder" disabled>undo</button>
           <button class="bbtn" id="redo-builder" disabled>redo</button>
           <span class="btarget" id="btarget"></span>
         </div>
         <div class="palette" id="palette" hidden></div>
-        <div class="gallery" id="gallery" hidden></div>
-        <div class="importbox" id="importbox" hidden>
-          <textarea class="fctl" id="import-mermaid-text" rows="8" spellcheck="false" aria-label="Mermaid sequence diagram" placeholder="paste a sequenceDiagram or markdown mermaid fence"></textarea>
-          <button class="bbtn" id="import-mermaid-convert">convert</button>
-          <button class="bbtn" id="import-mermaid-cancel">cancel</button>
-        </div>
       </details>
-      <div class="diffbox" id="diffbox" hidden></div>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
         <div class="guide" id="guide" hidden></div>
@@ -4263,7 +4211,6 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
         <button class="rbtn" id="go">Render</button>
         <button class="bbtn" id="file-open">open&#8230;</button>
         <button class="bbtn" id="file-save">save</button>
-        <button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">diff</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
         <ul class="msgs" id="msgs"></ul>
       </div>
@@ -4359,7 +4306,6 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 <script>
 (function(){
   'use strict';
-var STARTERS = [{"name": "blank flow", "desc": "Three nodes and two hops to make your own.", "spec": {"page": {"title": "Blank flow", "sections": [{"heading": "Your flow", "diagram": {"nodes": {"client": {"title": "Client", "icon": "terminal"}, "service": {"title": "Service", "icon": "gear"}, "store": {"title": "Store", "icon": "db"}}, "rows": [["client", "service", "store"]], "edges": [{"from": "client", "to": "service", "kind": "https"}, {"from": "service", "to": "store", "kind": "int"}], "steps": [{"edge": "client->service", "text": "Send a request"}, {"edge": "service->store", "text": "Store the result"}]}}]}}}, {"name": "panel showcase", "desc": "Five panels updated across four steps.", "spec": {"page": {"title": "Panel showcase", "sections": [{"heading": "Watch the device wake up", "text": ["Advance through the four steps to see sparse patches change device state, indicators, a gauge, an event log, and elapsed time."], "diagram": {"view": "step", "nodes": {"console": {"title": "Console", "icon": "terminal", "tint": "cmd"}, "gateway": {"title": "Gateway", "icon": "router", "tint": "mqtt"}, "device": {"title": "Device", "icon": "chip", "tint": "dev"}}, "rows": [["console", "gateway", "device"]], "edges": [{"from": "console", "to": "gateway", "kind": "https", "label": "wake"}, {"from": "gateway", "to": "device", "kind": "mqtt", "label": "start"}], "panels": [{"id": "status", "type": "state", "title": "Device state", "states": ["OFF", "BOOT", "LIVE"], "initial": {"state": "OFF"}}, {"id": "indicators", "type": "leds", "title": "Indicators", "leds": [{"id": "power", "label": "PWR"}, {"id": "radio", "label": "RADIO"}], "initial": {"power": "off", "radio": "off"}}, {"id": "draw", "type": "gauge", "title": "Current draw", "unit": "mA", "max": 100, "initial": {"value": 0}}, {"id": "events", "type": "log", "title": "Event log", "tags": {"DEV": "#4ADE80"}, "initial": {"log": [{"tag": "DEV", "text": "waiting for wake"}]}}, {"id": "clock", "type": "timeline", "title": "Device schedule", "span": "1h", "lanes": [{"id": "heartbeat", "label": "heartbeat", "every": "10m"}, {"id": "report", "label": "report", "every": "30m"}], "initial": {"now": "0m", "events": []}}], "steps": [{"edge": "console->gateway", "text": "Request a wake-up", "panels": {"events": {"log": [{"tag": "DEV", "text": "wake requested"}]}, "clock": {"now": "5m", "events": [{"at": "5m", "label": "wake", "kind": "info"}]}}}, {"edge": "gateway->device", "text": "Power on and boot", "panels": {"status": {"state": "BOOT"}, "indicators": {"power": "on"}, "draw": {"value": 80}, "events": {"log": [{"tag": "DEV", "text": "boot started"}]}, "clock": {"now": "10m"}}}, {"nodes": ["device"], "text": "Radio connects and the device becomes live", "panels": {"status": {"state": "LIVE"}, "indicators": {"radio": "on"}, "draw": {"value": 35}, "events": {"log": [{"tag": "DEV", "text": "radio connected"}]}, "clock": {"now": "20m", "events": [{"at": "20m", "label": "online", "kind": "ok"}]}}}, {"nodes": ["device"], "text": "Settle into low-power reporting", "panels": {"draw": {"value": 12}, "events": {"log": [{"tag": "DEV", "text": "first report sent"}]}, "clock": {"now": "30m", "events": [{"at": "30m", "label": "report", "kind": "ok"}]}}}]}}]}}}, {"name": "full demo", "desc": "The complete Flowview demo page.", "spec": {"page": {"__demo": true, "title": "Flowview template \u2014 demo spec", "skin": "aurora", "sections": [{"heading": "Replace this spec", "accent": "cyan", "source": "https://example.com/hld/demo#overview", "text": ["This is the built-in demo. Inject your own spec into the flowspec JSON block at the top of this file; the page renders it on load."], "diagram": {"nodes": {"a": {"title": "Client", "sub": "mobile app", "icon": "phone", "tint": "cmd"}, "b": {"title": "API", "sub": "gateway", "icon": "cloud", "tint": "cmd", "link": "https://example.com/hld/demo#api"}, "c": {"title": "Broker", "sub": "MQTT", "icon": "antenna", "tint": "mqtt"}, "d": {"title": "Device", "sub": "t/1 subscriber", "icon": "chip", "tint": "dev"}}, "rows": [["a", "b", "c", "d"]], "edges": [{"from": "a", "to": "b", "kind": "https", "label": "POST /msg"}, {"from": "b", "to": "c", "kind": "mqtt", "label": "PUBLISH t/1"}, {"from": "c", "to": "d", "kind": "mqtt", "label": "deliver"}, {"from": "d", "to": "c", "kind": "mqtt", "ret": true, "label": "PUBACK", "bend": 26, "labelDy": 22}], "steps": [{"edge": "a->b", "text": "Client sends the message"}, {"edge": "b->c", "text": "API publishes to the broker", "link": "https://example.com/hld/demo#publish"}, {"edge": "c->d", "text": "Broker delivers to the subscriber"}, {"edge": "d->c", "text": "Device acknowledges"}]}}]}}}];
 /* ---- src/validator.js ---- */
 /* validator.js — constants, helpers, normalize/validate, panel-state folding.
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
@@ -4391,35 +4337,27 @@ function parseClock(text){
   if (!s) return null;
   if (/^\d+(\.\d+)?$/.test(s)) return fin(parseFloat(s) * 60);
   var m, total = 0, any = false;
-  var re = /(\d+(?:\.\d+)?)\s*(d|h|m|s)/g;
-  while ((m = re.exec(s))){
-    any = true;
-    total += parseFloat(m[1]) * (m[2] === 'd' ? 86400 : m[2] === 'h' ? 3600 : m[2] === 'm' ? 60 : 1);
-  }
+  var re = /(\d+(?:\.\d+)?)\s*(h|m|s)/g;
+  while ((m = re.exec(s))){ any = true; total += parseFloat(m[1]) * (m[2] === 'h' ? 3600 : m[2] === 'm' ? 60 : 1); }
   if (!any) return null;
-  if (s.replace(/(\d+(?:\.\d+)?)\s*(d|h|m|s)/g, '').replace(/\s/g, '') !== '') return null;
+  if (s.replace(/(\d+(?:\.\d+)?)\s*(h|m|s)/g, '').replace(/\s/g, '') !== '') return null;
   return fin(total);
 }
 /* the widget is a 320-unit-wide strip; a week is the largest span it can
    present legibly. Longer declared spans clamp here (validator warns). */
 var TIMELINE_MAX_SPAN = 7 * 86400;
 function formatClock(seconds){
-  /* 5400 -> "1h30m", 3600 -> "1h", 90 -> "1m30s", 45 -> "45s",
-     90000 -> "1d1h", 604800 -> "7d", 0 -> "0". Two largest units. */
-  var d = Math.floor(seconds / 86400);
-  var rem = seconds - d * 86400;
-  var h = Math.floor(rem / 3600);
-  rem -= h * 3600;
+  /* 5400 -> "1h30m", 3600 -> "1h", 90 -> "1m30s", 45 -> "45s", 0 -> "0" */
+  var h = Math.floor(seconds / 3600);
+  var rem = seconds - h * 3600;
   var mn = Math.floor(rem / 60);
   var sc = Math.round(rem - mn * 60);
   if (sc === 60){ sc = 0; mn += 1; } /* 59.6s must not read "60s" */
   if (mn === 60){ mn = 0; h += 1; }
-  if (h === 24){ h = 0; d += 1; }
   var out = '';
-  if (d) out += d + 'd';
   if (h) out += h + 'h';
-  if (mn && !d) out += mn + 'm';
-  if (sc && !h && !d) out += sc + 's';
+  if (mn) out += mn + 'm';
+  if (sc && !h) out += sc + 's';
   return out || '0';
 }
 var TIMELINE_EVENT_KINDS = ['ok', 'alert', 'info'];
@@ -4431,59 +4369,18 @@ function timelineEventWarnings(list, path, warnings){
     var EP = path + '[' + i + ']';
     if (!e || typeof e !== 'object'){ warnings.push(EP + ': needs {at, label?, kind?} — skipped'); return; }
     if (parseClock(e.at) == null)
-      warnings.push(EP + '.at: unreadable time "' + e.at + '" (use "1d" / "1h30m" / "45m" / "90s") — skipped');
+      warnings.push(EP + '.at: unreadable time "' + e.at + '" (use "1h30m" / "45m" / "90s") — skipped');
     if (e.kind != null && TIMELINE_EVENT_KINDS.indexOf(e.kind) < 0)
       warnings.push(EP + '.kind: unknown kind "' + e.kind + '" — using "info" (valid: ' + TIMELINE_EVENT_KINDS.join(' ') + ')');
   });
 }
-function timelineLaneIds(decl){
-  /* mirrors the model's acceptance rules exactly — a lane the renderer
-     skips (missing id, duplicate, unreadable interval, over the 4-lane
-     cap) is NOT a known target, so misses/events naming it warn */
-  var ids = [];
-  var seen = {};
-  ((decl && Array.isArray(decl.lanes)) ? decl.lanes : []).forEach(function(l){
-    if (ids.length >= 4) return;
-    if (!l || typeof l !== 'object' || l.id == null) return;
-    var id = String(l.id);
-    if (seen[id]) return;
-    var every = parseClock(l.every);
-    if (every == null || every <= 0) return;
-    seen[id] = true;
-    ids.push(id);
-  });
-  return ids;
-}
-function timelineEventLaneWarnings(list, path, laneIds, warnings){
-  (Array.isArray(list) ? list : []).forEach(function(e, i){
-    if (e && e.lane != null && laneIds.indexOf(String(e.lane)) < 0)
-      warnings.push(path + '[' + i + '].lane: unknown lane "' + e.lane + '" — drawn on the axis row');
-  });
-}
-function timelinePatchWarnings(obj, path, decl, warnings){
+function timelinePatchWarnings(obj, path, warnings){
   if (!obj || typeof obj !== 'object') return;
-  var laneIds = timelineLaneIds(decl);
   if (obj.now != null && parseClock(obj.now) == null)
-    warnings.push(path + '.now: unreadable time "' + obj.now + '" (use "1d" / "1h30m" / "45m" / "90s") — cursor unchanged');
+    warnings.push(path + '.now: unreadable time "' + obj.now + '" (use "1h30m" / "45m" / "90s") — cursor unchanged');
   if (obj.events != null && !Array.isArray(obj.events))
     warnings.push(path + '.events: expected an array of {at, label?, kind?} — ignored');
-  else {
-    timelineEventWarnings(obj.events, path + '.events', warnings);
-    timelineEventLaneWarnings(obj.events, path + '.events', laneIds, warnings);
-  }
-  if (obj.miss != null){
-    if (!Array.isArray(obj.miss))
-      warnings.push(path + '.miss: expected an array of {lane, at} — ignored');
-    else obj.miss.forEach(function(m, i){
-      var MP = path + '.miss[' + i + ']';
-      if (!m || typeof m !== 'object'){ warnings.push(MP + ': needs {lane, at} — skipped'); return; }
-      if (m.lane == null || laneIds.indexOf(String(m.lane)) < 0)
-        warnings.push(MP + '.lane: unknown lane "' + m.lane + '" — skipped' +
-          (laneIds.length ? '' : ' (this timeline has no usable lanes)'));
-      if (parseClock(m.at) == null)
-        warnings.push(MP + '.at: unreadable time "' + m.at + '" — skipped');
-    });
-  }
+  else timelineEventWarnings(obj.events, path + '.events', warnings);
 }
 
 /* shared by bufferModel and the fold compactor */
@@ -4975,37 +4872,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
           var tlSpanS = parseClock(p.span);
           if (tlSpanS != null) tlSpanS = Math.min(tlSpanS, TIMELINE_MAX_SPAN);
           if (tlSpanS != null && tlSpanS > 0 &&
-              Math.floor((tlSpanS + 1e-6) / parseClock(p.cadence.every)) > TIMELINE_MAX_BEATS)
-            warnings.push(PP + '.cadence: ' + Math.floor((tlSpanS + 1e-6) / parseClock(p.cadence.every)) +
+              Math.floor(tlSpanS / parseClock(p.cadence.every)) > TIMELINE_MAX_BEATS)
+            warnings.push(PP + '.cadence: ' + Math.floor(tlSpanS / parseClock(p.cadence.every)) +
               ' beats over this span cannot be drawn individually (max ' + TIMELINE_MAX_BEATS +
               ') — the axis renders without beat dots and the meta line reports the count');
         }
       }
-      if (p.lanes != null){
-        if (!Array.isArray(p.lanes) || !p.lanes.length)
-          warnings.push(PP + '.lanes: expected a non-empty array of {id, label?, every} — lanes ignored');
-        else {
-          if (p.cadence != null)
-            warnings.push(PP + '.cadence: ignored when lanes are declared — each lane carries its own every');
-          if (p.lanes.length > 4)
-            warnings.push(PP + '.lanes: more than 4 lanes — extra lanes are not rendered');
-          var laneSeen = {};
-          p.lanes.forEach(function(l, li){
-            var LP = PP + '.lanes[' + li + ']';
-            if (!l || typeof l !== 'object' || l.id == null){
-              warnings.push(LP + ': needs {id, label?, every} — lane skipped'); return;
-            }
-            if (laneSeen[String(l.id)])
-              warnings.push(LP + '.id: duplicate lane id "' + l.id + '" — later lane skipped');
-            laneSeen[String(l.id)] = true;
-            if (parseClock(l.every) == null || parseClock(l.every) <= 0)
-              warnings.push(LP + '.every: unreadable interval "' + l.every + '" (use "30s" / "5m" / "2h") — lane skipped');
-          });
-        }
-      }
       timelineEventWarnings(p.events, PP + '.events', warnings);
-      timelineEventLaneWarnings(p.events, PP + '.events', timelineLaneIds(p), warnings);
-      timelinePatchWarnings(p.initial, PP + '.initial', p, warnings);
+      timelinePatchWarnings(p.initial, PP + '.initial', warnings);
     }
     if (PANEL_TYPES.indexOf(p.type) < 0)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PANEL_TYPES.join(' ') + ')');
@@ -5216,7 +5090,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       } else if (phonePanels[pid] && patch[pid]){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (timelinePanels[pid] && patch[pid]){
-        timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
+        timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       }
     });
     if (st && st.lane && !lanes[st.lane])
@@ -5414,12 +5288,10 @@ function foldPanelStates(d){
     var logAcc = [];
     if (Array.isArray(carried.log)){ logAcc = carried.log.slice(); delete carried.log; }
     /* timeline events accumulate across steps like log lines */
-    var eventAcc = null, missAcc = null;
+    var eventAcc = null;
     if (p.type === 'timeline'){
       eventAcc = Array.isArray(carried.events) ? carried.events.slice() : [];
       delete carried.events;
-      missAcc = Array.isArray(carried.miss) ? carried.miss.slice() : [];
-      delete carried.miss;
     }
     var states = [];
     steps.forEach(function(st){
@@ -5440,11 +5312,6 @@ function foldPanelStates(d){
         if (k === 'events' && eventAcc !== null){
           var evs = Array.isArray(patch.events) ? patch.events : [patch.events];
           eventAcc = eventAcc.concat(evs);
-          return;
-        }
-        if (k === 'miss' && missAcc !== null){
-          var ms = Array.isArray(patch.miss) ? patch.miss : [patch.miss];
-          missAcc = missAcc.concat(ms);
           return;
         }
         if (k === 'now' && eventAcc !== null){
@@ -5474,7 +5341,6 @@ function foldPanelStates(d){
       Object.keys(carried).forEach(function(k){ snap[k] = carried[k]; });
       if (once) Object.keys(once).forEach(function(k){ snap[k] = once[k]; });
       if (eventAcc !== null) snap.events = eventAcc.slice();
-      if (missAcc !== null) snap.miss = missAcc.slice();
       snap.log = logAcc.slice();
       states.push(snap);
     });
@@ -5482,7 +5348,6 @@ function foldPanelStates(d){
       var only = {};
       Object.keys(carried).forEach(function(k){ only[k] = carried[k]; });
       if (eventAcc !== null) only.events = eventAcc.slice();
-      if (missAcc !== null) only.miss = missAcc.slice();
       only.log = logAcc.slice();
       states.push(only);
     }
@@ -7221,87 +7086,6 @@ function timelineLabelRows(events){
   });
   return events;
 }
-/* cadence lanes: several periodic processes on ONE wall-clock axis,
-   each lane rendered in a density REGIME chosen by its beat count over
-   the span — individual dots, a true-spacing tick comb, a solid band,
-   or an empty row with a "next in …" promise. The regime is the
-   orders-of-magnitude contrast. Pure model. */
-var TL_DOT_MAX = 32;   /* beats drawable as individual dots on the track */
-var TL_COMB_MAX = 120; /* beats drawable as a legible tick comb */
-function timelineLanesModel(panel, state){
-  panel = panel || {}; state = state || {};
-  var span = parseClock(panel.span);
-  if (span == null || span <= 0) span = 3600;
-  if (span > TIMELINE_MAX_SPAN) span = TIMELINE_MAX_SPAN;
-  var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
-  var unit = units[units.length - 1];
-  for (var i = 0; i < units.length; i++){
-    if (span / units[i] <= 8){ unit = units[i]; break; }
-  }
-  var ticks = [];
-  for (var ts = 0; ts <= span + 1e-6 && ticks.length <= 12; ts += unit)
-    ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
-  var nowS = parseClock(state.now);
-  var now = null;
-  if (nowS != null){
-    var nc = Math.min(Math.max(nowS, 0), span);
-    now = {s: nc, pct: nc / span * 100, label: formatClock(nc)};
-  }
-  function normList(list){
-    var out = [];
-    (Array.isArray(list) ? list : []).forEach(function(e){
-      if (!e) return;
-      var at = parseClock(e.at);
-      if (at == null) return;
-      var s = Math.min(Math.max(at, 0), span);
-      out.push({s: s, pct: s / span * 100,
-                lane: e.lane != null ? String(e.lane) : null,
-                label: e.label != null ? String(e.label) : '',
-                kind: ['ok', 'alert', 'info'].indexOf(e.kind) >= 0 ? e.kind : 'info'});
-    });
-    return out;
-  }
-  var allEvents = normList(panel.events).concat(normList(state.events));
-  var misses = normList(state.miss);
-  var seen = Object.create(null);
-  var lanes = [];
-  ((Array.isArray(panel.lanes)) ? panel.lanes : []).forEach(function(l){
-    if (lanes.length >= 4) return;
-    if (!l || typeof l !== 'object' || l.id == null) return;
-    var id = String(l.id);
-    if (seen[id]) return;
-    var every = parseClock(l.every);
-    if (every == null || every <= 0) return;
-    seen[id] = true;
-    var count = Math.floor((span + 1e-6) / every);
-    var regime = count < 1 ? 'sparse' : count <= TL_DOT_MAX ? 'dots' :
-                 count <= TL_COMB_MAX ? 'comb' : 'band';
-    var beats = [];
-    if (regime === 'dots'){
-      for (var b = every; b <= span + 1e-6; b += every)
-        beats.push({s: b, pct: b / span * 100, past: !!(now && b <= now.s + 1e-6)});
-    }
-    var badge;
-    if (regime === 'sparse'){
-      if (now){
-        var nextAt = (Math.floor((now.s + 1e-6) / every) + 1) * every;
-        badge = 'next in ' + formatClock(nextAt - now.s) + ' \u25b8';
-      } else badge = 'every ' + formatClock(every);
-    } else badge = count + '\u00d7';
-    lanes.push({id: id,
-                label: l.label != null ? String(l.label) : id,
-                every: every, everyLabel: formatClock(every),
-                regime: regime, count: count, beats: beats,
-                spacingPct: every / span * 100,
-                badge: badge,
-                misses: misses.filter(function(m){ return m.lane === id; }),
-                events: allEvents.filter(function(e){ return e.lane === id; })});
-  });
-  return {span: span, spanLabel: formatClock(span), ticks: ticks, now: now,
-          lanes: lanes,
-          axisEvents: allEvents.filter(function(e){ return e.lane == null || !seen[e.lane]; })};
-}
-
 function timelineModel(panel, state){
   panel = panel || {}; state = state || {};
   var span = parseClock(panel.span);
@@ -7320,7 +7104,7 @@ function timelineModel(panel, state){
   var every = panel.cadence ? parseClock(panel.cadence.every) : null;
   var beats = [], beatsOmitted = 0;
   if (every != null && every > 0){
-    var beatCount = Math.floor((span + 1e-6) / every);
+    var beatCount = Math.floor(span / every + 1e-6);
     if (beatCount > TIMELINE_MAX_BEATS){
       /* sub-pixel soup — draw none, report the count instead of
          silently truncating the cadence */
@@ -7912,84 +7696,6 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (mode === 'boot') h += SCENES['static-noise'];
     else if (mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
     h += scrOvl + '</div>';
-  } else if (type === 'timeline' && Array.isArray(panel.lanes) && panel.lanes.length){
-    var lnm = timelineLanesModel(panel, state);
-    var LX0 = 70, LX1 = 252, LW = LX1 - LX0;   /* track range; labels left, badges right */
-    function lx(pct){ return (LX0 + pct / 100 * LW).toFixed(1); }
-    var rowsTop = 22, rowH = 18;
-    var rowsBottom = rowsTop + lnm.lanes.length * rowH;
-    var tlH = rowsBottom + 14;
-    h += '<svg class="tlsvg" viewBox="0 0 320 ' + tlH + '" role="img" aria-label="cadence lanes">';
-    /* shared axis strip on top */
-    h += '<line class="tlaxis" x1="' + LX0 + '" y1="12" x2="' + LX1 + '" y2="12"/>';
-    lnm.ticks.forEach(function(tk){
-      h += '<line class="tltickline" x1="' + lx(tk.pct) + '" y1="8" x2="' + lx(tk.pct) + '" y2="16"/>';
-    });
-    lnm.axisEvents.forEach(function(ev){
-      h += '<circle class="tlev tl-' + ev.kind + '" cx="' + lx(ev.pct) + '" cy="12" r="2.6"><title>' +
-           esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
-    });
-    /* lane rows */
-    lnm.lanes.forEach(function(ln, li){
-      var cy = rowsTop + li * rowH + 9;
-      var labText = ln.label.length > 13 ? ln.label.slice(0, 12) + '\u2026' : ln.label;
-      h += '<text class="tllane" x="2" y="' + (cy + 3) + '">' + esc(labText) +
-           '<title>' + esc(ln.label + ' — every ' + ln.everyLabel) + '</title></text>';
-      h += '<line class="tlrowline" x1="' + LX0 + '" y1="' + cy + '" x2="' + LX1 + '" y2="' + cy + '"/>';
-      var splitX = lnm.now ? parseFloat(lx(lnm.now.pct)) : LX0;
-      if (ln.regime === 'dots'){
-        ln.beats.forEach(function(bt){
-          h += '<circle class="tlbeat' + (bt.past ? ' past' : '') + '" cx="' + lx(bt.pct) + '" cy="' + cy + '" r="2.6"/>';
-        });
-      } else if (ln.regime === 'comb'){
-        var spacing = ln.spacingPct / 100 * LW;
-        var pid = 'tlp' + (++ZF_SEQ);
-        h += '<defs><pattern id="' + pid + '" x="' + LX0 + '" width="' + spacing.toFixed(3) +
-             '" height="' + rowH + '" patternUnits="userSpaceOnUse">' +
-             '<line class="tlcombline" x1="' + spacing.toFixed(3) + '" y1="3" x2="' + spacing.toFixed(3) + '" y2="15"/></pattern></defs>';
-        if (splitX > LX0)
-          h += '<rect class="tlpast" x="' + LX0 + '" y="' + (cy - 9) + '" width="' + (splitX - LX0).toFixed(1) +
-               '" height="' + rowH + '" fill="url(#' + pid + ')"/>';
-        if (splitX < LX1)
-          h += '<rect class="tlfuture" x="' + splitX.toFixed(1) + '" y="' + (cy - 9) + '" width="' + (LX1 - splitX).toFixed(1) +
-               '" height="' + rowH + '" fill="url(#' + pid + ')"/>';
-      } else if (ln.regime === 'band'){
-        if (splitX > LX0)
-          h += '<rect class="tlbandfill tlpast" x="' + LX0 + '" y="' + (cy - 4) + '" width="' + (splitX - LX0).toFixed(1) + '" height="8" rx="2"/>';
-        if (splitX < LX1)
-          h += '<rect class="tlbandfill tlfuture" x="' + splitX.toFixed(1) + '" y="' + (cy - 4) + '" width="' + (LX1 - splitX).toFixed(1) + '" height="8" rx="2"/>';
-      }
-      /* sparse: the badge carries the promise; nothing on the track */
-      ln.misses.forEach(function(m){
-        if (ln.regime === 'dots'){
-          h += '<circle class="tlmissring" cx="' + lx(m.pct) + '" cy="' + cy + '" r="4"><title>' +
-               esc('missed — expected ' + formatClock(m.s)) + '</title></circle>';
-        } else {
-          h += '<line class="tlmiss" x1="' + lx(m.pct) + '" y1="' + (cy - 8) + '" x2="' + lx(m.pct) + '" y2="' + (cy + 8) + '"><title>' +
-               esc('missed — expected ' + formatClock(m.s)) + '</title></line>';
-        }
-      });
-      ln.events.forEach(function(ev){
-        h += '<circle class="tlev tl-' + ev.kind + '" cx="' + lx(ev.pct) + '" cy="' + cy + '" r="3"><title>' +
-             esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
-      });
-      h += '<text class="tlbadge" x="318" y="' + (cy + 3) + '" text-anchor="end">' + esc(ln.badge) + '</text>';
-    });
-    /* the now cursor runs through the axis and every row */
-    if (lnm.now){
-      var lnx = lx(lnm.now.pct);
-      h += '<line class="tlnow" x1="' + lnx + '" y1="6" x2="' + lnx + '" y2="' + rowsBottom + '"/>' +
-           '<circle class="tlnowhead" cx="' + lnx + '" cy="6" r="3"/>';
-    }
-    /* tick labels under the rows */
-    lnm.ticks.forEach(function(tk){
-      h += '<text class="tltick" x="' + lx(tk.pct) + '" y="' + (rowsBottom + 10) + '" text-anchor="middle">' + esc(tk.label) + '</text>';
-    });
-    h += '</svg>';
-    var lmeta = [];
-    if (lnm.now) lmeta.push('now ' + lnm.now.label);
-    lmeta.push('span ' + lnm.spanLabel);
-    h += '<div class="tlmeta">' + esc(lmeta.join(' \u00b7 ')) + '</div>';
   } else if (type === 'timeline'){
     var tlm = timelineModel(panel, state);
     function tlx(pct){ return (6 + pct / 100 * 308).toFixed(1); }
@@ -8912,24 +8618,6 @@ function sectionIntroHTML(sec, gi, sectionReference){
     texts.forEach(function(t, ti){ h += '<p class="sec-text" data-dv-para="' + ti + '">' + inlineMarkup(t) + '</p>'; });
     if (Array.isArray(sec.bullets) && sec.bullets.length) h += bulletsHTML(sec.bullets, true);
     h += '</div>';
-    /* collapsed sections show one clamped line of the prose instead of
-       nothing: the first paragraph, else the first bullet. The teaser is
-       a mouse/touch convenience (click expands); the prosetoggle button
-       stays the accessible control, so this row is aria-hidden. */
-    var teaserSource = '';
-    for (var tt = 0; tt < texts.length && !teaserSource; tt++){
-      if (typeof texts[tt] === 'string' && texts[tt]) teaserSource = texts[tt];
-    }
-    if (!teaserSource && Array.isArray(sec.bullets)){
-      for (var bb = 0; bb < sec.bullets.length && !teaserSource; bb++){
-        var bl = sec.bullets[bb];
-        if (typeof bl === 'string' && bl) teaserSource = bl;
-        else if (bl && typeof bl.text === 'string' && bl.text) teaserSource = bl.text;
-      }
-    }
-    h += '<div class="sec-teaser"' + (defaultCollapsed ? '' : ' hidden') +
-      ' aria-hidden="true" title="Show section prose"><span class="teasertext">' +
-      esc(teaserSource) + '</span><span class="teasermore">&#8230; (expand for more)</span></div>';
   }
   return {html:h, hasProse:hasProse, defaultCollapsed:defaultCollapsed,
           sectionLabel:sectionLabel};
@@ -8953,13 +8641,9 @@ function setProseCollapsed(control, collapsed, animate, win){
                 win.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!animate || reduced || typeof control.proseEl.animate !== 'function'){
     control.proseEl.hidden = collapsed;
-    if (control.teaserEl) control.teaserEl.hidden = !collapsed;
     return changed;
   }
 
-  /* expanding: the teaser leaves immediately; collapsing: it appears when
-     the shrink animation lands (onfinish below), so the two never stack */
-  if (control.teaserEl && !collapsed) control.teaserEl.hidden = true;
   control.proseEl.hidden = false;
   var height = control.proseEl.scrollHeight || 0;
   if (control.proseEl.style) control.proseEl.style.overflow = 'hidden';
@@ -8971,25 +8655,20 @@ function setProseCollapsed(control, collapsed, animate, win){
   animation.onfinish = function(){
     if (control._animationGeneration !== generation) return;
     control.proseEl.hidden = control.collapsed;
-    if (control.teaserEl) control.teaserEl.hidden = !control.collapsed;
     if (control.proseEl.style) control.proseEl.style.overflow = '';
     control.animation = null;
   };
   return changed;
 }
-function createProseController(proseEl, toggleButton, defaultCollapsed, onChange, win, sectionLabel, teaserEl){
+function createProseController(proseEl, toggleButton, defaultCollapsed, onChange, win, sectionLabel){
   if (!proseEl || !toggleButton) return null;
-  var control = {proseEl:proseEl, toggleButton:toggleButton, teaserEl:teaserEl || null,
+  var control = {proseEl:proseEl, toggleButton:toggleButton,
                  defaultCollapsed:!!defaultCollapsed, collapsed:!defaultCollapsed,
                  sectionLabel:sectionLabel || 'this section', animation:null};
   setProseCollapsed(control, control.defaultCollapsed, false, win);
   toggleButton.addEventListener('click', function(){
     if (setProseCollapsed(control, !control.collapsed, true, win) && onChange) onChange();
   });
-  if (teaserEl && typeof teaserEl.addEventListener === 'function')
-    teaserEl.addEventListener('click', function(){
-      if (setProseCollapsed(control, false, true, win) && onChange) onChange();
-    });
   return control;
 }
 
@@ -9009,8 +8688,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var prose = intro.hasProse ? createProseController(
     box.querySelector('.sec-prose'), box.querySelector('.prosetoggle'),
     intro.defaultCollapsed, onProseChange,
-    typeof window !== 'undefined' ? window : null, intro.sectionLabel,
-    box.querySelector('.sec-teaser')) : null;
+    typeof window !== 'undefined' ? window : null, intro.sectionLabel) : null;
   var result = {sectionEl:box, stepper:null,
                 prose:prose,
                 contractCard:box.querySelector('.ctcard'),
@@ -9767,91 +9445,6 @@ function wirePresenter(ctl, view, win){
    tests/builder.test.js); initWorkbenchBuilder at the bottom wires the DOM
    and is only called by boot.workbench.js. */
 
-/* ---------------- Mermaid sequence skeleton ---------------- */
-
-function mermaidToSpec(text){
-  if (typeof text !== 'string') throw new Error('line 1: expected mermaid text');
-  /* Match the CLI: the first mermaid fence wins, even if it is not a sequence. */
-  var fence = /^```mermaid\s*$([\s\S]*?)^```\s*$/m.exec(text);
-  var lines = (fence ? fence[1] : text).split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/)
-    .map(function(ln){ return ln.trim(); }).filter(function(ln){ return ln; });
-  if (!lines.length || lines[0] !== 'sequenceDiagram')
-    throw new Error('line 1: not a sequenceDiagram (first line is ' +
-      JSON.stringify(lines[0] || '<empty>') + '); only mermaid sequenceDiagram input is supported');
-  var order = [], titles = Object.create(null), messages = [], todos = [];
-  var depth = 0, skipped = 0, header = null, blockLine = 0, n = 1;
-  function ensure(pid, title){
-    var id = pid.toLowerCase().replace(/[^a-z0-9]+/g, '');
-    if (!id) throw new Error('line ' + n + ': participant id ' + JSON.stringify(pid) + ' slugs to nothing');
-    if (!Object.prototype.hasOwnProperty.call(titles, id)){
-      order.push(id);
-      titles[id] = title || pid;
-    } else if (title) titles[id] = title;
-    return id;
-  }
-  for (var i = 1; i < lines.length; i++){
-    var ln = lines[i];
-    n = i + 1; /* CLI line numbers count nonblank lines. */
-    if (ln === 'autonumber') continue;
-    if (/^Note\b/i.test(ln)){
-      todos.push('note not converted: ' + ln);
-      continue;
-    }
-    var b = /^(alt|opt|loop|par)\b\s*(.*)$/.exec(ln);
-    if (b){
-      if (!depth){ header = (b[1] + ' ' + b[2]).trim(); skipped = 0; blockLine = n; }
-      depth++;
-      continue;
-    }
-    if (ln === 'else' || ln.indexOf('else ') === 0){
-      if (!depth) throw new Error('line ' + n + ": 'else' outside a block");
-      continue;
-    }
-    if (ln === 'end'){
-      if (!depth) throw new Error('line ' + n + ": 'end' without an open block");
-      depth--;
-      if (!depth) todos.push(header + ' block not converted (' + skipped + ' message(s) inside) — add by hand');
-      continue;
-    }
-    var p = /^participant\s+(\S+?)(?:\s+as\s+(.+?))?\s*$/.exec(ln);
-    if (p){
-      if (!depth) ensure(p[1], p[2]);
-      continue;
-    }
-    var m = /^(\S+?)\s*(-->>|->>)\s*(\S+?)\s*:\s*(.+?)\s*$/.exec(ln);
-    if (m){
-      if (depth){ skipped++; continue; }
-      messages.push({from: ensure(m[1]), to: ensure(m[3]), ret: m[2] === '-->>', text: m[4]});
-      continue;
-    }
-    throw new Error('line ' + n + ': unsupported syntax ' + JSON.stringify(ln) +
-      ' — supported: participant, ->> / -->> messages, autonumber, alt/opt/loop/par blocks, Note');
-  }
-  if (depth) throw new Error('line ' + blockLine + ': unclosed alt/opt/loop/par block');
-  if (!messages.length) throw new Error('line ' + n + ': no messages found outside alt/opt/loop/par blocks');
-  var edges = [], pairs = Object.create(null), steps = [];
-  messages.forEach(function(m){
-    var key = m.from + '->' + m.to;
-    if (!pairs[key]){
-      var kind = /https?|POST|GET/i.test(m.text) ? 'https' :
-        /publish|subscribe|mqtt|qos/i.test(m.text) ? 'mqtt' : 'int';
-      var edge = {from: m.from, to: m.to, kind: kind, label: m.text};
-      if (m.ret) edge.ret = true;
-      pairs[key] = true;
-      edges.push(edge);
-    }
-    steps.push({edge: key, text: m.text});
-  });
-  var half = Math.floor((order.length + 1) / 2), rows = [order.slice(0, half)], nodes = {};
-  if (order.length > half) rows.push(order.slice(half));
-  order.forEach(function(id){ nodes[id] = {title: titles[id], sub: '', icon: 'gear', tint: 'cmd'}; });
-  var title = 'Converted sequence';
-  return {page: {title: title, sections: [{heading: title,
-    text: ['Skeleton generated by mermaid2spec.py — enrich titles, subs, icons, tints, protocols, and prose before use.'],
-    diagram: {view: 'ambient', nodes: nodes, rows: rows, edges: edges, steps: steps}
-  }]}, todos: todos};
-}
-
 /* ---------------- JSON source locator ----------------
    A tolerant scanner over the RAW editor text: given a path (array of object
    keys / array indices), find the character range of the value so the
@@ -10024,17 +9617,6 @@ function specValueAt(raw, path){
   var v = raw;
   for (var i = 0; i < path.length && v != null; i++) v = v[path[i]];
   return v;
-}
-function starterCountLine(spec){
-  var nodes = 0, steps = 0, panels = 0;
-  specSectionPaths(spec).forEach(function(rec){
-    var d = specValueAt(spec, rec.diagram);
-    if (!d) return;
-    nodes += Object.keys(d.nodes || {}).length;
-    steps += (d.steps || []).length;
-    panels += (d.panels || []).length;
-  });
-  return nodes + ' nodes · ' + steps + ' steps · ' + panels + ' panels';
 }
 function builderTargetPath(raw, target){
   /* target: {section:<zero-based ordinal>, kind, id?, index?} → path array
@@ -10708,44 +10290,29 @@ function specFileName(raw){
 function parseValidationPath(message){
   /* leading "ERROR " / "warn " labels are tolerated; returns the path
      segment array or null when the message carries no field path */
-  var input = (message || '').replace(/^(?:ERROR\s+|warn\s+)/, '');
-  if (/^\(whole document\)\s*:/.test(input)) return [];
-  var out = [], i = 0;
-  while (i < input.length){
-    var m;
-    if (input[i] === '"'){
-      var end = jsonSkipString(input, i);
-      try { out.push(JSON.parse(input.slice(i, end))); } catch (ex){ return null; }
-      i = end;
-    } else {
-      m = /^[A-Za-z0-9_$-]+/.exec(input.slice(i));
-      if (!m || (!out.length && !/^[A-Za-z_]/.test(m[0]))) return null;
-      out.push(m[0]); i += m[0].length;
-    }
-    while ((m = /^\[(\d+)\]/.exec(input.slice(i)))){
-      out.push(parseInt(m[1], 10)); i += m[0].length;
-    }
-    if (/^\s*:/.test(input.slice(i))) return out;
-    if (input[i] !== '.') return null;
-    i++;
+  var m = /^(?:ERROR\s+|warn\s+)?([A-Za-z_][A-Za-z0-9_$-]*(?:\[\d+\]|\.[A-Za-z0-9_$-]+)*)\s*:/.exec(message || '');
+  if (!m) return null;
+  var out = [];
+  var re = /([A-Za-z0-9_$-]+)|\[(\d+)\]/g, seg;
+  while ((seg = re.exec(m[1]))){
+    if (seg[1] != null) out.push(seg[1]);
+    else out.push(parseInt(seg[2], 10));
   }
-  return null;
+  return out.length ? out : null;
 }
-function findingLocation(text, raw, message, rawPath){
+function findingLocation(text, raw, message){
   /* character range for a validation message. The validator addresses
      the normalized PAGE object; a leading "page" token names that same
      object. Remaining tokens are resolved GREEDILY against the parsed
      raw JSON — at each object level the longest dot-join of remaining
      string tokens that names a real member wins, so author ids that
      contain dots still resolve. Unresolvable tails retreat to the
-     nearest existing parent (exact: false). rawPath supplies an explicit
-     editor path for diff findings, using the same locator and fallback. */
-  var tokens = rawPath || parseValidationPath(message);
+     nearest existing parent (exact: false). */
+  var tokens = parseValidationPath(message);
   if (!tokens) return null;
-  if (!rawPath && tokens[0] === 'page') tokens = tokens.slice(1);
+  if (tokens[0] === 'page') tokens = tokens.slice(1);
   var base, node;
-  if (rawPath){ base = []; node = raw; }
-  else if (raw && raw.page){ base = ['page']; node = raw.page; }
+  if (raw && raw.page){ base = ['page']; node = raw.page; }
   else if (raw && (raw.blocks || raw.sections)){ base = []; node = raw; }
   else if (raw && raw.nodes && raw.rows){
     /* normalize() wrapped the bare diagram as sections[0].diagram */
@@ -10767,7 +10334,7 @@ function findingLocation(text, raw, message, rawPath){
       i++;
     } else {
       var key = null, j;
-      for (j = rawPath ? i + 1 : tokens.length; j > i; j--){
+      for (j = tokens.length; j > i; j--){
         var joined = tokens.slice(i, j).map(String).join('.');
         if (Object.prototype.hasOwnProperty.call(node, joined)){ key = joined; break; }
       }
@@ -10783,195 +10350,6 @@ function findingLocation(text, raw, message, rawPath){
   if (!loc) loc = jsonLocate(text, []);
   if (!loc) return null;
   return {start: loc.start, end: loc.end, exact: exact};
-}
-
-/* ---------------- draft vs baseline ---------------- */
-
-function diffSpecs(oldObj, newObj){
-  var findings = [], ranks = new Map(), ends = new Map(), ordinal = 0;
-  function object(v){ return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
-  function list(v){ return Array.isArray(v) ? v : []; }
-  function index(v, path){
-    ranks.set(JSON.stringify(path), ordinal++);
-    if (v && typeof v === 'object') Object.keys(v).forEach(function(k){
-      index(v[k], path.concat([Array.isArray(v) ? Number(k) : k]));
-    });
-    ends.set(JSON.stringify(path), ordinal);
-  }
-  index(newObj, []);
-  function existing(path){
-    path = path.slice();
-    while (path.length && !ranks.has(JSON.stringify(path))) path.pop();
-    return path;
-  }
-  function add(path, kind, text, order){
-    var target = existing(path), key = JSON.stringify(target);
-    findings.push({path: builderPathString(target), kind: kind, text: text,
-      order: order == null ? (kind === 'removed' ? ends.get(key) - 0.5 : ranks.get(key)) : order,
-      seq: findings.length});
-  }
-  function fields(a, b, keys, path, label){
-    a = object(a); b = object(b);
-    keys.forEach(function(k){
-      if (JSON.stringify(a[k]) !== JSON.stringify(b[k]))
-        add(path.concat([k]), 'changed', label + ' ' + k + ' changed');
-    });
-  }
-  /* compare EVERY key present on either side (minus the identity keys the
-     pairing used) — a whitelist here silently hides material edits like a
-     node link, a panel initial, or a contract row's hot flag */
-  function allFields(a, b, path, label, except){
-    a = object(a); b = object(b);
-    var seen = {};
-    Object.keys(a).concat(Object.keys(b)).forEach(function(k){
-      if (seen[k] || (except && except.indexOf(k) >= 0)) return;
-      seen[k] = true;
-      if (JSON.stringify(a[k]) !== JSON.stringify(b[k]))
-        add(path.concat([k]), 'changed', label + ' ' + k + ' changed');
-    });
-  }
-  /* Match full identity first; optional similarity disambiguates repeated
-     headings. A unique endpoint residual allows an edge kind edit. */
-  function pairs(a, b, same, score){
-    var matches = new Map(), used = new Set(), candidates = [];
-    a.forEach(function(x, i){ b.forEach(function(y, j){
-      if (same(x, y)) candidates.push({i: i, j: j, score: score ? score(x, y) : 0});
-    }); });
-    candidates.sort(function(x, y){
-      return y.score - x.score || Math.abs(x.i - x.j) - Math.abs(y.i - y.j) || x.i - y.i || x.j - y.j;
-    });
-    candidates.forEach(function(c){
-      if (!used.has(c.i) && !matches.has(c.j)){ used.add(c.i); matches.set(c.j, c.i); }
-    });
-    return {matches: matches, used: used};
-  }
-  function compareList(a, b, path, key, label, except, endpoints){
-    a = list(a); b = list(b);
-    var match = pairs(a, b, function(x, y){
-      return key(object(x)) === key(object(y)) && (!endpoints || endpoints(x) === endpoints(y));
-    });
-    if (endpoints) a.forEach(function(x, i){
-      if (match.used.has(i)) return;
-      var oldLeft = a.filter(function(v, k){ return !match.used.has(k) && endpoints(v) === endpoints(x); });
-      var newLeft = b.map(function(v, j){ return j; }).filter(function(j){
-        return !match.matches.has(j) && endpoints(b[j]) === endpoints(x);
-      });
-      if (oldLeft.length === 1 && newLeft.length === 1){ match.used.add(i); match.matches.set(newLeft[0], i); }
-    });
-    b.forEach(function(v, j){
-      var itemPath = path.concat([j]), name = label + ' ' + key(object(v));
-      if (!match.matches.has(j)) add(itemPath, 'added', name + ' added');
-      else allFields(a[match.matches.get(j)], v, itemPath, name, except);
-    });
-    a.forEach(function(v, i){
-      if (!match.used.has(i)) add(path, 'removed', label + ' ' + key(object(v)) + ' removed');
-    });
-  }
-  function page(raw){ return object(object(raw).page || raw); }
-  function sections(raw){
-    var p = page(raw), base = object(raw).page ? ['page'] : [];
-    var key = Array.isArray(p.blocks) ? 'blocks' : 'sections', result = [], tabs = [];
-    if (p.nodes && p.rows) return {refs: [{value: {diagram: p}, path: [], diagram: []}], tabs: [], base: base};
-    list(p[key]).forEach(function(b, i){
-      var path = base.concat([key, i]);
-      if (Array.isArray(object(b).tabs)) b.tabs.forEach(function(t, j){
-        var tabPath = path.concat(['tabs', j]);
-        tabs.push({value: object(t), path: tabPath});
-        list(object(t).sections).forEach(function(sec, k){
-          var sp = tabPath.concat(['sections', k]);
-          result.push({value: object(sec), path: sp, diagram: sp.concat(['diagram'])});
-        });
-      });
-      else result.push({value: object(b), path: path, diagram: path.concat(['diagram'])});
-    });
-    return {refs: result, tabs: tabs, base: base.concat([key])};
-  }
-  function heading(ref){ return typeof ref.value.heading === 'string' ? ref.value.heading : ''; }
-  function similarity(a, b){
-    var an = Object.keys(object(object(a.value.diagram).nodes));
-    var bn = object(object(b.value.diagram).nodes);
-    var af = list(object(a.value.contract).fields), bf = list(object(b.value.contract).fields);
-    var shared = an.filter(function(k){ return Object.prototype.hasOwnProperty.call(bn, k); }).length;
-    af.forEach(function(f){ if (bf.some(function(g){ return object(f).k === object(g).k; })) shared++; });
-    return shared + (object(a.value.contract).title === object(b.value.contract).title ? 0.25 : 0);
-  }
-  var old = sections(oldObj), next = sections(newObj);
-  var tabs = pairs(old.tabs, next.tabs, function(a, b){ return a.value.label === b.value.label; });
-  function container(path){
-    var target = null, key = JSON.stringify(path);
-    tabs.matches.forEach(function(oi, ni){
-      var ot = old.tabs[oi], nt = next.tabs[ni];
-      if (JSON.stringify(ot.path.concat(['sections'])) === key) target = nt.path.concat(['sections']);
-      if (!target && JSON.stringify(ot.path.slice(0, -1)) === key) target = nt.path.slice(0, -1);
-    });
-    if (!target){
-      target = next.base.concat(path.slice(old.base.length));
-      if (!Array.isArray(specValueAt(newObj, target))) target = next.base;
-    }
-    return existing(target);
-  }
-  fields(page(oldObj), page(newObj), ['title', 'skin'], object(newObj).page ? ['page'] : [], 'page');
-  var match = pairs(old.refs, next.refs, function(a, b){ return heading(a) === heading(b); }, similarity);
-  next.refs.forEach(function(ref, j){
-    var label = heading(ref) || 'section ' + (j + 1), path = ref.path;
-    if (!match.matches.has(j)){ add(path, 'added', 'section ' + label + ' added'); return; }
-    var prev = old.refs[match.matches.get(j)];
-    var a = object(prev.value.diagram), b = object(ref.value.diagram), dp = ref.diagram;
-    var an = object(a.nodes), bn = object(b.nodes);
-    Object.keys(bn).forEach(function(id){
-      var np = dp.concat(['nodes', id]);
-      if (!Object.prototype.hasOwnProperty.call(an, id)) add(np, 'added', label + ': node ' + id + ' added');
-      else allFields(an[id], bn[id], np, label + ': node ' + id);
-    });
-    Object.keys(an).forEach(function(id){
-      if (!Object.prototype.hasOwnProperty.call(bn, id)) add(dp.concat(['nodes']), 'removed', label + ': node ' + id + ' removed');
-    });
-    function endpoints(e){ e = object(e); return JSON.stringify([e.from, e.to]); }
-    compareList(a.edges, b.edges, dp.concat(['edges']), function(e){
-      return e.from + '->' + e.to + (e.kind ? '(' + e.kind + ')' : '');
-    }, label + ': edge', ['from', 'to'], endpoints);
-    var as = list(a.steps), bs = list(b.steps);
-    if (as.length !== bs.length) add(dp.concat(['steps']), 'changed', label + ': step count changed (' + as.length + ' → ' + bs.length + ')');
-    bs.forEach(function(step, i){
-      if (i < as.length) allFields(as[i], step, dp.concat(['steps', i]), label + ': step ' + (i + 1));
-    });
-    compareList(a.panels, b.panels, dp.concat(['panels']), function(p){ return p.id; }, label + ': panel', ['id']);
-    compareList(object(prev.value.contract).fields, object(ref.value.contract).fields,
-      path.concat(['contract', 'fields']), function(f){ return f.k; }, label + ': contract field', ['k']);
-  });
-  old.refs.forEach(function(ref, i){
-    if (match.used.has(i)) return;
-    var parent = ref.path.slice(0, -1), target = container(parent), order;
-    /* Place a removed section before its next surviving old neighbour. */
-    for (var k = i + 1; k < old.refs.length; k++){
-      if (JSON.stringify(old.refs[k].path.slice(0, -1)) !== JSON.stringify(parent)) continue;
-      var found = -1;
-      match.matches.forEach(function(oi, ni){ if (oi === k) found = ni; });
-      if (found >= 0){
-        if (JSON.stringify(next.refs[found].path.slice(0, -1)) !== JSON.stringify(target)) continue;
-        order = ranks.get(JSON.stringify(next.refs[found].path)) - 0.5;
-        break;
-      }
-    }
-    add(target, 'removed', 'section ' + (heading(ref) || 'section ' + (i + 1)) + ' removed', order);
-  });
-  next.tabs.forEach(function(t, i){
-    if (!tabs.matches.has(i)) add(t.path.concat(['label']), 'added', 'tab ' + t.value.label + ' added');
-  });
-  old.tabs.forEach(function(t, i){
-    if (!tabs.used.has(i)) add(container(t.path.slice(0, -1)), 'removed', 'tab ' + t.value.label + ' removed');
-  });
-  findings.sort(function(a, b){ return a.order - b.order || a.seq - b.seq; });
-  return findings.map(function(f){ return {path: f.path, kind: f.kind, text: f.text}; });
-}
-
-function diffSpecTexts(baselineText, currentText){
-  var oldObj, newObj;
-  try { oldObj = JSON.parse(baselineText); }
-  catch (ex){ return {error: 'baseline JSON is unparseable'}; }
-  try { newObj = JSON.parse(currentText); }
-  catch (ex){ return {error: 'current JSON is unparseable'}; }
-  return {findings: diffSpecs(oldObj, newObj)};
 }
 
 /* ---------------- tab management ----------------
@@ -11561,11 +10939,8 @@ var BUILDER_JUMP_TO_FINDING = null;
 /* ---------------- DOM wiring (workbench only) ---------------- */
 
 function initWorkbenchBuilder(opts){
-  var view = opts.view, src = opts.src;
-  function render(){ hideDiff(); opts.render(); }
+  var view = opts.view, src = opts.src, render = opts.render;
   var guide = document.getElementById('guide');
-  var diffbox = document.getElementById('diffbox');
-  var diffBtn = document.getElementById('spec-diff');
   var targetLabel = document.getElementById('btarget');
   var undoBtn = document.getElementById('undo-builder');
   var specbox = document.querySelector('.specbox');
@@ -11688,7 +11063,6 @@ function initWorkbenchBuilder(opts){
     if (redoBtn) redoBtn.disabled = !redoStack.length;
   }
   function pushUndo(){
-    importedText = null;
     undoStack.push(src.value);
     if (undoStack.length > 30) undoStack.shift();
     redoStack.length = 0; /* a new action invalidates the redo line */
@@ -11712,21 +11086,9 @@ function initWorkbenchBuilder(opts){
   if (redoBtn) redoBtn.addEventListener('click', doRedo);
 
   /* ---- draft autosave + recovery offer ---- */
-  var DRAFT_KEY = 'dv-workbench-draft', BASELINE_KEY = 'dv-workbench-baseline';
-  var baselineText = src.value;
-  var initialDraft = readDraft(), recoveredBaseline = null;
-  try {
-    var savedBaseline = JSON.parse(localStorage.getItem(BASELINE_KEY));
-    if (savedBaseline && typeof savedBaseline.text === 'string' && initialDraft &&
-        savedBaseline.draftText === initialDraft.text) recoveredBaseline = savedBaseline.text;
-  } catch (ex){}
-  if (initialDraft && initialDraft.text === src.value && recoveredBaseline != null)
-    baselineText = recoveredBaseline;
+  var DRAFT_KEY = 'dv-workbench-draft';
   function autosaveDraft(){
-    try {
-      localStorage.setItem(BASELINE_KEY, JSON.stringify({text: baselineText, draftText: src.value}));
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({text: src.value, at: Date.now()}));
-    }
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({text: src.value, at: Date.now()})); }
     catch (ex){ /* storage unavailable: the feature degrades to nothing */ }
   }
   function readDraft(){
@@ -11736,18 +11098,16 @@ function initWorkbenchBuilder(opts){
     } catch (ex){ return null; }
   }
   function clearDraft(){
-    try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(BASELINE_KEY); } catch (ex){}
+    try { localStorage.removeItem(DRAFT_KEY); } catch (ex){}
   }
   var draftTimer = null;
   src.addEventListener('input', function(){
-    importedText = null;
-    hideDiff();
     if (draftTimer) clearTimeout(draftTimer);
     draftTimer = setTimeout(autosaveDraft, 800);
   });
   (function offerDraft(){
     var bar = document.getElementById('draftbar');
-    var draft = initialDraft; /* captured once — later autosaves cannot swap it */
+    var draft = readDraft(); /* captured once — later autosaves cannot swap it */
     if (!bar || !draft || draft.text === src.value) return;
     bar.innerHTML = '';
     var label = document.createElement('span');
@@ -11757,7 +11117,6 @@ function initWorkbenchBuilder(opts){
     restore.addEventListener('click', function(){
       pushUndo(); /* restoring is one undoable action */
       src.value = draft.text;
-      baselineText = recoveredBaseline == null ? draft.text : recoveredBaseline;
       render();
       setSelected(null); currentTarget = null;
       clearMultiSelect(); /* identities in the restored draft may coincide */
@@ -11765,19 +11124,16 @@ function initWorkbenchBuilder(opts){
       retireInspector();
       bar.hidden = true;
       autosaveDraft();
-      if (recoveredBaseline == null) inspectorMessage('original baseline unavailable — diff starts from the recovered draft');
     });
     var discard = document.createElement('button');
     discard.type = 'button'; discard.className = 'bbtn'; discard.textContent = 'discard';
     discard.addEventListener('click', function(){
       clearDraft();
-      autosaveDraft();
       bar.hidden = true;
     });
     bar.appendChild(label); bar.appendChild(restore); bar.appendChild(discard);
     bar.hidden = false;
   })();
-  if (!initialDraft || initialDraft.text === src.value) autosaveDraft();
 
   /* ---- open a .spec.json / save the editor to disk ---- */
   var fileInput = document.getElementById('file-input');
@@ -11792,7 +11148,6 @@ function initWorkbenchBuilder(opts){
       reader.onload = function(){
         pushUndo(); /* opening replaces the editor — undoable */
         src.value = String(reader.result);
-        baselineText = src.value;
         render(); /* parse/validation errors surface in the message list */
         setSelected(null); currentTarget = null;
         clearMultiSelect(); /* ids in the new file may coincide — never carry a selection over */
@@ -11819,103 +11174,9 @@ function initWorkbenchBuilder(opts){
       document.body.appendChild(a);
       a.click();
       a.remove();
-      baselineText = src.value;
-      hideDiff();
-      autosaveDraft();
       setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     });
   }
-
-  /* ---- inline Mermaid import ---- */
-  var importBtn = document.getElementById('import-mermaid');
-  var importBox = document.getElementById('importbox');
-  var importText = document.getElementById('import-mermaid-text');
-  var importConvert = document.getElementById('import-mermaid-convert');
-  var importCancel = document.getElementById('import-mermaid-cancel');
-  var importedText = null;
-  function importMessage(cls, message){
-    var list = document.getElementById('msgs');
-    if (!list) return;
-    var li = document.createElement('li');
-    li.className = cls;
-    li.textContent = (cls === 'e' ? 'ERROR ' : 'warn ') + message;
-    list.appendChild(li);
-  }
-  if (importBtn && importBox && importText && importConvert && importCancel){
-    importBtn.addEventListener('click', function(){
-      importBox.hidden = false;
-      importText.focus();
-    });
-    importCancel.addEventListener('click', function(){
-      importBox.hidden = true;
-      importBtn.focus();
-    });
-    importConvert.addEventListener('click', function(){
-      var spec;
-      try { spec = mermaidToSpec(importText.value); }
-      catch (ex){
-        var list = document.getElementById('msgs');
-        if (list) list.innerHTML = '';
-        importMessage('e', ex.message);
-        return;
-      }
-      pushUndo();
-      src.value = JSON.stringify(spec, null, 2);
-      importedText = src.value;
-      setSelected(null); currentTarget = null; insertSection = 0;
-      if (connect) cancelConnect(null);
-      closePalette();
-      clearStepMarkers();
-      if (guide) guide.hidden = true;
-      render();
-      updateTargetLabel(spec);
-      autosaveDraft();
-      importBox.hidden = true;
-      importBtn.focus();
-      if (spec.todos.length) importMessage('w', spec.todos.length + ' todo(s) added to the spec — enrich by hand');
-    });
-    document.addEventListener('keydown', function(ev){
-      /* Programmatic replacement has no native textarea undo entry. */
-      if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
-      if (addToStep || importedText == null || src.value !== importedText) return;
-      if (document.activeElement !== src && document.activeElement !== importBtn) return;
-      ev.preventDefault();
-      doUndo();
-    });
-  }
-
-  /* ---- structural diff; reuse the finding jump and source locator ---- */
-  function hideDiff(){
-    if (diffbox) diffbox.hidden = true;
-    if (diffBtn) diffBtn.setAttribute('aria-expanded', 'false');
-  }
-  if (diffBtn && diffbox) diffBtn.addEventListener('click', function(){
-    if (addToStep) return;
-    if (!diffbox.hidden){ hideDiff(); return; }
-    closePalette();
-    if (guide) guide.hidden = true;
-    diffbox.innerHTML = '';
-    var result = diffSpecTexts(baselineText, src.value);
-    if (result.error || !result.findings.length){
-      var line = document.createElement('div');
-      line.textContent = result.error || 'no changes';
-      diffbox.appendChild(line);
-    } else result.findings.forEach(function(f){
-      var button = document.createElement('button');
-      button.type = 'button'; button.className = 'bbtn diffline';
-      button.textContent = f.text;
-      button.title = f.path;
-      button.setAttribute('data-kind', f.kind);
-      button.addEventListener('click', function(){
-        BUILDER_JUMP_TO_FINDING(f.text, parseValidationPath(f.path + ':'));
-      });
-      diffbox.appendChild(button);
-    });
-    diffbox.hidden = false;
-    diffBtn.setAttribute('aria-expanded', 'true');
-  });
-  var renderBtn = document.getElementById('go');
-  if (renderBtn) renderBtn.addEventListener('click', hideDiff);
 
   /* ---- board highlight by stable identity, re-applied after renders ---- */
   function cssQuote(s){
@@ -12035,6 +11296,7 @@ function initWorkbenchBuilder(opts){
     formError('');
     pushUndo();
     if (addToStep) addModeSurvive = true; /* builder-internal render — keep the mode */
+    multiSurvive = true; /* plan application — the multi-selection stays */
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -12683,6 +11945,9 @@ function initWorkbenchBuilder(opts){
 
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
+  var multiSurvive = false; /* set by builder-internal renders; a render
+     WITHOUT it (Render button, hand-pasted source) clears the set —
+     coinciding identities in replaced content must never stay selected */
   function multiIdent(t){
     return t.section + '|' + t.kind + '|' + (t.kind === 'node' ? t.id : t.index);
   }
@@ -12826,7 +12091,6 @@ function initWorkbenchBuilder(opts){
   }
 
   function renderInspector(){
-    hideDiff();
     if (!guide || !currentTarget) return;
     var t = currentTarget;
     revealInspector();
@@ -13084,9 +12348,8 @@ function initWorkbenchBuilder(opts){
         ': click edges, nodes, panels to toggle — Esc or DONE ends';
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
-    '#undo-builder, #redo-builder, #file-open, #file-save, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
-    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn, ' +
-    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert';
+    '#undo-builder, #redo-builder, #file-open, #file-save, #draftbar .bbtn, ' +
+    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
        step, re-render from outside the mode, or leave the page state
@@ -13200,6 +12463,7 @@ function initWorkbenchBuilder(opts){
     var plan = planAddEdgeBetween(src.value, parsed.raw, target.section, fromId, target.id);
     if (plan.error){ cancelConnect(plan.error); return; }
     pushUndo();
+    multiSurvive = true;
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -13292,6 +12556,7 @@ function initWorkbenchBuilder(opts){
                                  nd.target.getAttribute('data-dv-node'));
       if (ndPlan.error){ inspectorMessage(ndPlan.error); return; }
       pushUndo();
+      multiSurvive = true;
       src.value = ndPlan.text;
       render();
       autosaveDraft();
@@ -13329,6 +12594,7 @@ function initWorkbenchBuilder(opts){
     ]);
     if (plan.error){ inspectorMessage(plan.error); return; }
     pushUndo();
+    multiSurvive = true;
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -13365,7 +12631,12 @@ function initWorkbenchBuilder(opts){
      stale arming is cancelled. */
   new MutationObserver(function(){
     cancelNodeDrag(); /* the dragged elements just got detached */
-    hideDiff(); /* the diff panel's jump targets got detached too */
+    if (!multiSurvive && multiSel.length){
+      /* a render the builder did not initiate replaced the DOM */
+      clearMultiSelect();
+      dropMultiUI();
+    }
+    multiSurvive = false;
     if (connect) cancelConnect('connect cancelled — the page re-rendered');
     if (addToStep && !addModeSurvive)
       cancelAddToStep('add-to-step ended — the page re-rendered');
@@ -13381,9 +12652,6 @@ function initWorkbenchBuilder(opts){
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
       if (nodeDrag){ cancelNodeDrag(); return; }
-      if (importBox && !importBox.hidden){ importBox.hidden = true; if (importBtn) importBtn.focus(); return; }
-      if (diffbox && !diffbox.hidden){ hideDiff(); diffBtn.focus(); return; }
-      if (gallery && !gallery.hidden){ closeGallery(); startersBtn.focus(); return; }
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }
@@ -13431,6 +12699,7 @@ function initWorkbenchBuilder(opts){
                                   : planFn(src.value, parsed.raw, insertSection);
     if (plan.error){ inspectorMessage(plan.error); return; }
     pushUndo();
+    multiSurvive = true;
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -13456,79 +12725,6 @@ function initWorkbenchBuilder(opts){
   var edgeBtn = document.getElementById('add-edge');
   if (edgeBtn) edgeBtn.addEventListener('click', startConnect);
 
-  /* ---- starter gallery: whole-editor replacement is one undo action ---- */
-  var gallery = document.getElementById('gallery');
-  var startersBtn = document.getElementById('starters');
-  var starterUndoText = null;
-  function closeGallery(){
-    if (!gallery) return;
-    gallery.hidden = true;
-    gallery.innerHTML = '';
-    if (startersBtn) startersBtn.setAttribute('aria-expanded', 'false');
-  }
-  function loadStarter(entry){
-    if (addToStep) return;
-    pushUndo();
-    src.value = JSON.stringify(entry.spec, null, 2);
-    starterUndoText = src.value;
-    setSelected(null); currentTarget = null; insertSection = 0;
-    if (connect) cancelConnect();
-    clearStepMarkers();
-    render();
-    updateTargetLabel(entry.spec);
-    if (guide) guide.hidden = true;
-    autosaveDraft();
-    closeGallery();
-    src.focus();
-  }
-  function showGallery(){
-    gallery.innerHTML = '';
-    (opts.starters || []).forEach(function(entry){
-      var card = document.createElement('button');
-      card.type = 'button'; card.className = 'pbtn starter-card';
-      var name = document.createElement('strong'); name.textContent = entry.name;
-      var desc = document.createElement('span'); desc.textContent = entry.desc;
-      var count = document.createElement('span'); count.textContent = starterCountLine(entry.spec);
-      card.appendChild(name); card.appendChild(desc); card.appendChild(count);
-      card.addEventListener('click', function(){
-        if (addToStep) return;
-        if (opts.renderedText && src.value === opts.renderedText()){ loadStarter(entry); return; }
-        showGallery();
-        var row = document.createElement('div'); row.className = 'starter-confirm';
-        var label = document.createElement('span');
-        label.textContent = 'unrendered edits — replace with ' + entry.name + '?';
-        var load = document.createElement('button');
-        load.type = 'button'; load.className = 'bbtn'; load.textContent = 'load & replace';
-        load.addEventListener('click', function(){ loadStarter(entry); });
-        var cancel = document.createElement('button');
-        cancel.type = 'button'; cancel.className = 'bbtn'; cancel.textContent = 'cancel';
-        cancel.addEventListener('click', function(){ showGallery(); gallery.querySelector('button').focus(); });
-        row.appendChild(label); row.appendChild(load); row.appendChild(cancel);
-        gallery.appendChild(row);
-        cancel.focus();
-      });
-      gallery.appendChild(card);
-    });
-    gallery.hidden = false;
-    startersBtn.setAttribute('aria-expanded', 'true');
-  }
-  if (startersBtn && gallery) startersBtn.addEventListener('click', function(){
-    if (addToStep) return;
-    if (!gallery.hidden){ closeGallery(); return; }
-    closePalette();
-    showGallery();
-  });
-  document.addEventListener('keydown', function(ev){
-    /* Programmatic textarea replacements do not enter native undo history. */
-    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
-    if (addToStep || starterUndoText === null || src.value !== starterUndoText || !undoStack.length) return;
-    var ae = document.activeElement;
-    if (ae && ae !== src && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
-    ev.preventDefault();
-    starterUndoText = null;
-    doUndo();
-  });
-
   /* ---- insert palettes: + node picks a preset, + panel picks a type ---- */
   var palette = document.getElementById('palette');
   function closePalette(){
@@ -13553,9 +12749,7 @@ function initWorkbenchBuilder(opts){
     return b;
   }
   function openPalette(kind){
-    hideDiff();
     if (!palette) return;
-    closeGallery();
     if (!palette.hidden && palette.getAttribute('data-kind') === kind){ closePalette(); return; }
     palette.setAttribute('data-kind', kind);
     palette.innerHTML = '';
@@ -13583,10 +12777,10 @@ function initWorkbenchBuilder(opts){
         !(ev.target.closest && ev.target.closest('#palette, #add-node, #add-panel'))) closePalette();
   });
 
-  BUILDER_JUMP_TO_FINDING = function(message, rawPath){
+  BUILDER_JUMP_TO_FINDING = function(message){
     var parsed = parseEditor();
     if (parsed.error) return;
-    var loc = findingLocation(src.value, parsed.raw, message, rawPath);
+    var loc = findingLocation(src.value, parsed.raw, message);
     if (!loc) return;
     selectRange(loc, true);
     if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent');
@@ -13880,7 +13074,6 @@ var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
 var activeSkin = null; /* null = follow spec */
 var lastPage = null;
-var lastRenderedText = null;
 var lastCtl = null;  /* renderPage controller of the current render, for tab restore */
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears
@@ -13965,7 +13158,6 @@ function go(fromText){
   lastCtl = renderPage(view, page, skin);
   restoreActiveTabs(lastCtl, openTabs);
   applySkinClasses(document.body, view, skin);
-  lastRenderedText = src.value;
 }
 
 document.getElementById('go').addEventListener('click', function(){ go(true); });
@@ -13976,7 +13168,6 @@ go(false);
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
 initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); },
-  starters: STARTERS, renderedText: function(){ return lastRenderedText; },
   ctl: function(){ return lastCtl; }});
 })();
 </script>

@@ -3451,7 +3451,7 @@ function initWorkbenchBuilder(opts){
     var plan = planAddEdgeBetween(src.value, parsed.raw, target.section, fromId, target.id);
     if (plan.error){ cancelConnect(plan.error); return; }
     pushUndo();
-    multiSurvive = true;
+    clearMultiSelect(); /* this action establishes a single selection */
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -3544,7 +3544,7 @@ function initWorkbenchBuilder(opts){
                                  nd.target.getAttribute('data-dv-node'));
       if (ndPlan.error){ inspectorMessage(ndPlan.error); return; }
       pushUndo();
-      multiSurvive = true;
+      clearMultiSelect(); /* this action establishes a single selection */
       src.value = ndPlan.text;
       render();
       autosaveDraft();
@@ -3582,7 +3582,7 @@ function initWorkbenchBuilder(opts){
     ]);
     if (plan.error){ inspectorMessage(plan.error); return; }
     pushUndo();
-    multiSurvive = true;
+    clearMultiSelect(); /* this action establishes a single selection */
     src.value = plan.text;
     render();
     autosaveDraft();
@@ -3691,7 +3691,7 @@ function initWorkbenchBuilder(opts){
                                   : planFn(src.value, parsed.raw, insertSection);
     if (plan.error){ inspectorMessage(plan.error); return; }
     pushUndo();
-    multiSurvive = true;
+    clearMultiSelect(); /* this action establishes a single selection */
     src.value = plan.text;
     render();
     autosaveDraft();

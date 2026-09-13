@@ -7,16 +7,19 @@
 :root{
   --bg:#EFF1F4; --ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;
   --accent:#0B8FA9; --card:#FFFFFF; --codebg:#F4F2EC; --codeink:#3A3E33;
+  --selglow:rgba(11,143,169,.30);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
     --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
+    --selglow:rgba(67,200,224,.32);
   }
 }
 :root[data-theme="dark"]{
   --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
   --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
+  --selglow:rgba(67,200,224,.32);
 }
 
 body{background:var(--bg); color:var(--ink); font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif;}
@@ -142,6 +145,12 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
   max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}
 .guide .gpath{display:block; margin:2px 0 6px; font:600 11px 'IBM Plex Mono',monospace; color:var(--accent); word-break:break-all;}
+/* the ordinal line ("step 2 of 3") pulses once after a move so the effect
+   of ↑/↓ is visible even when the form fields themselves do not change */
+@keyframes dvposflash{from{background:var(--selglow);} to{background:transparent;}}
+.guide .gpos{display:inline-block; margin:0 0 6px; padding:1px 6px; border-radius:4px;
+  font:600 11px 'IBM Plex Mono',monospace; color:var(--sub); border:1px solid var(--line);}
+.guide .gpos.gposflash{animation:dvposflash .9s ease-out;}
 .guide .gerr{color:#B0771A; margin:4px 0;}
 .guide ul{margin:6px 0 0; padding-left:16px;}
 .guide li{margin:2px 0;}
@@ -183,16 +192,22 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .docview .pwidget, .docview .sec-text[data-dv-para],
 .docview .sec-bullets li[data-dv-bullet], .docview .ctrow{cursor:pointer;}
 .docview text.lbl{cursor:grab;} /* drag nudges labelDx/labelDy; click selects */
-g.node.dv-sel .card{stroke:var(--accent); stroke-width:2.5;}
-path.edge.dv-sel{stroke-width:3.4;}
-text.lbl.dv-sel{fill:var(--accent);}
-g.coin.dv-sel circle{stroke:var(--accent); stroke-width:2.5;}
-.pwidget.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
-section.doc-sec.dv-sel{outline:2px solid var(--accent); outline-offset:3px;}
-p.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
-tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
-.tabbtn.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
-.schip.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
+/* the selection ring animates its dashes — nothing else on the page moves
+   its stroke, so a selected element cannot be mistaken for a lit step node
+   (solid teal) or a step member (thin static dashes) */
+@keyframes dvselants{to{stroke-dashoffset:-24;}}
+g.node.dv-sel .card{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
+  animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
+path.edge.dv-sel{stroke-width:4; filter:drop-shadow(0 0 4px var(--accent));}
+text.lbl.dv-sel{fill:var(--accent); paint-order:stroke; stroke:var(--selglow); stroke-width:3px;}
+g.coin.dv-sel circle{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
+  animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
+.pwidget.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
+section.doc-sec.dv-sel{outline:2px dashed var(--accent); outline-offset:3px; box-shadow:0 0 0 5px var(--selglow);}
+p.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; border-radius:4px; box-shadow:0 0 0 4px var(--selglow);}
+tr.ctrow.dv-sel{outline:2px dashed var(--accent); outline-offset:-1px;}
+.tabbtn.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
+.schip.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
 
 /* step-contract chips in the step form */
 .mchips{display:flex; flex-wrap:wrap; gap:4px; background:none; border:0; padding:0;}
@@ -10064,6 +10079,31 @@ function builderPathString(path){
     return (i ? '.' : '') + (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(seg) ? seg : JSON.stringify(seg));
   }).join('') : '(whole document)';
 }
+function builderPositionLine(raw, target){
+  /* which slot the selected element occupies among its siblings — only
+     the kinds with move buttons get one */
+  if (!target) return null;
+  if (target.kind === 'step'){
+    var rec = specSectionPaths(raw)[target.section];
+    if (!rec) return null;
+    var d = specValueAt(raw, rec.diagram);
+    if (!d || !Array.isArray(d.steps) || !d.steps[target.index]) return null;
+    return 'step ' + (target.index + 1) + ' of ' + d.steps.length;
+  }
+  if (target.kind === 'section'){
+    var n = specSectionPaths(raw).length;
+    if (typeof target.section !== 'number' || target.section < 0 || target.section >= n) return null;
+    return 'section ' + (target.section + 1) + ' of ' + n;
+  }
+  if (target.kind === 'tab'){
+    var page = raw && raw.page ? raw.page : raw;
+    var key = page && page.blocks ? 'blocks' : 'sections';
+    var block = page && Array.isArray(page[key]) ? page[key][target.block] : null;
+    if (!block || !Array.isArray(block.tabs) || !block.tabs[target.tab]) return null;
+    return 'tab ' + (target.tab + 1) + ' of ' + block.tabs.length;
+  }
+  return null;
+}
 
 /* ---------------- insert planners ----------------
    Each takes the CURRENT editor text plus its parsed form and returns
@@ -11947,6 +11987,15 @@ function initWorkbenchBuilder(opts){
     try { return secEl.querySelector(sel); } catch (ex){ return null; }
   }
   function rehighlight(){ setSelected(findTargetEl(currentTarget)); }
+  function flashPositionLine(){
+    /* one background pulse on the "step 2 of 3" line — the visible proof
+       that a move happened when the form fields themselves look the same */
+    var pos = guide && guide.querySelector('.gpos');
+    if (!pos) return;
+    pos.classList.remove('gposflash');
+    void pos.offsetWidth; /* restart the animation */
+    pos.classList.add('gposflash');
+  }
 
   /* ---- board markers for the selected step's members ---- */
   function clearStepMarkers(){
@@ -12859,6 +12908,14 @@ function initWorkbenchBuilder(opts){
     p.textContent = path ? builderPathString(path) : '';
     guide.appendChild(p);
 
+    var posText = parsed.error ? null : builderPositionLine(parsed.raw, t);
+    if (posText){
+      var pos = document.createElement('span');
+      pos.className = 'gpos';
+      pos.textContent = posText;
+      guide.appendChild(pos);
+    }
+
     var err = document.createElement('div');
     err.className = 'gerr ierr'; err.hidden = true;
     guide.appendChild(err);
@@ -12929,6 +12986,7 @@ function initWorkbenchBuilder(opts){
               insertSection = t.section;
               rehighlight();
               renderInspector();
+              flashPositionLine();
             }});
         };
         acts.appendChild(actionButton('↑ earlier', function(){ moveSection(-1); }));
@@ -12944,11 +13002,11 @@ function initWorkbenchBuilder(opts){
         }));
         acts.appendChild(actionButton('← earlier', function(){
           commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, -1); },
-            {after: function(plan){ t.tab = plan.index; renderInspector(); }});
+            {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('→ later', function(){
           commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, 1); },
-            {after: function(plan){ t.tab = plan.index; renderInspector(); }});
+            {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
       var armedHere = !!(addToStep && t.kind === 'step' &&
@@ -12965,11 +13023,11 @@ function initWorkbenchBuilder(opts){
       if (t.kind === 'step' && !armedHere){
         acts.appendChild(actionButton('↑ earlier', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
-            {after: function(plan){ t.index = plan.index; renderInspector(); }});
+            {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('↓ later', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1); },
-            {after: function(plan){ t.index = plan.index; renderInspector(); }});
+            {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
       if (!armedHere)

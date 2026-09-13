@@ -10862,7 +10862,7 @@ var SCENE_TOKENS = ['person-at-door-night', 'package-drop', 'static-noise'];
 /* parseClock rides in the same bundle (validator.js); the vm-loaded test
    copy of this file has no validator, so capture defensively. */
 var BUILDER_CLOCK_PARSE = typeof parseClock === 'function' ? parseClock : null;
-var BUILDER_CLOCK_HINT = 'a duration like 90s, 5m, 2h30m, 1d';
+var BUILDER_CLOCK_HINT = 'a duration like 90s, 5m, 2h30m';
 
 function builderClockInvalid(text){
   return !!(BUILDER_CLOCK_PARSE && typeof text === 'string' && text.trim() !== '' &&
@@ -10892,7 +10892,10 @@ function builderRowMerge(shape, base, values){
     if (col.kind === 'clock' && builderClockInvalid(raw)){
       error = col.k + ': "' + raw + '" is not ' + BUILDER_CLOCK_HINT; return;
     }
-    if (col.kind === 'enum' && (col.options || []).indexOf(raw) < 0){
+    /* an unknown enum value already ON the item passes through unchanged —
+       editing a sibling column must never delete or reject it */
+    if (col.kind === 'enum' && (col.options || []).indexOf(raw) < 0 &&
+        !(base && base[col.k] === raw)){
       error = col.k + ': "' + raw + '" is not one of ' + (col.options || []).join(' | '); return;
     }
     item[col.k] = raw;
@@ -11680,21 +11683,28 @@ function initWorkbenchBuilder(opts){
     });
     return rows;
   }
-  function jsonFieldControl(key, value, kind){
+  function jsonFieldControl(key, value, kind, after){
     /* kind: 'json' (object) | 'jsonArr' (array) | 'jsonAny' (any JSON —
-       radar rings takes a count OR a radii array) */
+       radar rings takes a count OR a radii array). `after` runs on a
+       successful commit — the typed editors pass a form refresh so the
+       two views of one field can never go stale against each other. */
     return textControl(value === undefined ? '' : JSON.stringify(value), function(v){
-      if (v == null) return commitSimple(key, null);
-      var parsed;
-      try { parsed = JSON.parse(v); }
-      catch (ex){ formError(key + ': not valid JSON (' + ex.message + ')'); return false; }
-      if (kind === 'jsonArr' && !Array.isArray(parsed)){
-        formError(key + ' is a JSON array — [ ... ]'); return false;
+      var ok;
+      if (v == null) ok = commitSimple(key, null);
+      else {
+        var parsed;
+        try { parsed = JSON.parse(v); }
+        catch (ex){ formError(key + ': not valid JSON (' + ex.message + ')'); return false; }
+        if (kind === 'jsonArr' && !Array.isArray(parsed)){
+          formError(key + ' is a JSON array — [ ... ]'); return false;
+        }
+        if (kind === 'json' && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))){
+          formError(key + ' is a JSON object — { ... }'); return false;
+        }
+        ok = commitSimple(key, JSON.stringify(parsed));
       }
-      if (kind === 'json' && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))){
-        formError(key + ' is a JSON object — { ... }'); return false;
-      }
-      return commitSimple(key, JSON.stringify(parsed));
+      if (ok && after) after();
+      return ok;
     }, {textarea: true});
   }
   /* frow wraps in a <label>, which is wrong for controls holding MANY
@@ -11707,13 +11717,20 @@ function initWorkbenchBuilder(opts){
     row.appendChild(lab); row.appendChild(control);
     return row;
   }
+  /* after any successful commit from a typed editor OR its raw fallback,
+     rebuild the form from the fresh JSON — the two views of one field must
+     never go stale against each other. Deferred a tick so the change event
+     finishes on a still-attached input. */
+  function refreshFormSoon(){
+    setTimeout(function(){ if (currentTarget) renderInspector(); }, 0);
+  }
   function rawJsonFallback(key, cur, jsonKind){
     var det = document.createElement('details');
     det.className = 'rawjson';
     var sum = document.createElement('summary');
     sum.textContent = 'raw JSON';
     det.appendChild(sum);
-    det.appendChild(jsonFieldControl(key, cur, jsonKind));
+    det.appendChild(jsonFieldControl(key, cur, jsonKind, refreshFormSoon));
     return det;
   }
   function colInput(col, value){
@@ -11729,7 +11746,15 @@ function initWorkbenchBuilder(opts){
         op.value = o; op.textContent = o;
         input.appendChild(op);
       });
-      input.value = (typeof value === 'string' && (col.options || []).indexOf(value) >= 0) ? value : '';
+      /* an unknown existing value keeps a selectable option (same pattern
+         as selectControl) — coercing it to '' would delete it on the next
+         sibling-column commit */
+      if (typeof value === 'string' && value !== '' && (col.options || []).indexOf(value) < 0){
+        var extra = document.createElement('option');
+        extra.value = value; extra.textContent = value + ' (unknown)';
+        input.appendChild(extra);
+      }
+      input.value = (typeof value === 'string') ? value : '';
     } else {
       input = document.createElement('input');
       input.type = 'text'; input.className = 'fctl';
@@ -11739,17 +11764,26 @@ function initWorkbenchBuilder(opts){
     return input;
   }
   function wireCommit(input, fire){
-    input.addEventListener('change', fire);
+    /* same unchanged-value discipline as commitOnChange: Enter followed by
+       blur must not commit (and push undo for) the same edit twice */
+    var last = input.value;
+    var go = function(){
+      if (input.value === last) return;
+      last = input.value;
+      if (fire() === false) last = null;
+    };
+    input.addEventListener('change', go);
     input.addEventListener('keydown', function(ev){
-      if (ev.key === 'Enter' && input.tagName !== 'TEXTAREA'){ ev.preventDefault(); fire(); }
+      if (ev.key === 'Enter' && input.tagName !== 'TEXTAREA'){ ev.preventDefault(); go(); }
     });
   }
   function rowsFieldControl(key, cur, shape){
     var wrap = document.createElement('div');
     wrap.className = 'rowsedit';
     var rowRefs = [];
-    function commitRows(){
-      var rows = rowRefs.map(function(r){
+    function commitRows(refsOverride){
+      var refs = refsOverride || rowRefs;
+      var rows = refs.map(function(r){
         var values = {};
         Object.keys(r.inputs).forEach(function(k){ values[k] = r.inputs[k].value; });
         return {base: r.base, values: values};
@@ -11757,7 +11791,9 @@ function initWorkbenchBuilder(opts){
       var out = rowsEditorCollect(shape, rows);
       if (out.error){ formError(key + ': ' + out.error); return false; }
       formError('');
-      return commitSimple(key, out.items.length ? JSON.stringify(out.items) : null);
+      var ok = commitSimple(key, out.items.length ? JSON.stringify(out.items) : null);
+      if (ok) refreshFormSoon(); /* resync typed rows, raw fallback, stale bases */
+      return ok;
     }
     var addBtn = document.createElement('button');
     function buildRow(base){
@@ -11774,9 +11810,9 @@ function initWorkbenchBuilder(opts){
       x.type = 'button'; x.className = 'bbtn rowx'; x.textContent = '✕';
       x.title = 'remove this item';
       x.addEventListener('click', function(){
-        rowRefs.splice(rowRefs.indexOf(ref), 1);
-        line.remove();
-        commitRows();
+        /* commit first; only a SUCCESSFUL commit removes the line (via the
+           form refresh) — a failed one must leave form and JSON agreeing */
+        commitRows(rowRefs.filter(function(r){ return r !== ref; }));
       });
       line.appendChild(x);
       rowRefs.push(ref);
@@ -11803,13 +11839,15 @@ function initWorkbenchBuilder(opts){
     var wrap = document.createElement('div');
     wrap.className = 'rowsedit';
     var pairRefs = [];
-    function commitPairs(){
-      var out = mapEditorCollect(pairRefs.map(function(p){
+    function commitPairs(refsOverride){
+      var out = mapEditorCollect((refsOverride || pairRefs).map(function(p){
         return {key: p.keyInput.value, value: p.valInput.value};
       }));
       if (out.error){ formError(key + ': ' + out.error); return false; }
       formError('');
-      return commitSimple(key, out.obj ? JSON.stringify(out.obj) : null);
+      var ok = commitSimple(key, out.obj ? JSON.stringify(out.obj) : null);
+      if (ok) refreshFormSoon();
+      return ok;
     }
     var addBtn = document.createElement('button');
     function buildPair(k, v){
@@ -11828,9 +11866,7 @@ function initWorkbenchBuilder(opts){
       x.type = 'button'; x.className = 'bbtn rowx'; x.textContent = '✕';
       x.title = 'remove this pair';
       x.addEventListener('click', function(){
-        pairRefs.splice(pairRefs.indexOf(ref), 1);
-        line.remove();
-        commitPairs();
+        commitPairs(pairRefs.filter(function(p){ return p !== ref; }));
       });
       line.appendChild(keyInput); line.appendChild(valInput); line.appendChild(x);
       pairRefs.push(ref);
@@ -11861,7 +11897,9 @@ function initWorkbenchBuilder(opts){
       var out = objFieldsCollect(shape, base, values);
       if (out.error){ formError(key + ': ' + out.error); return false; }
       formError('');
-      return commitSimple(key, out.obj ? JSON.stringify(out.obj) : null);
+      var ok = commitSimple(key, out.obj ? JSON.stringify(out.obj) : null);
+      if (ok) refreshFormSoon();
+      return ok;
     }
     (shape.cols || []).forEach(function(col){
       var input = colInput(col, base[col.k]);
@@ -11889,7 +11927,7 @@ function initWorkbenchBuilder(opts){
             formError(key + ': "' + v + '" is not ' + BUILDER_CLOCK_HINT); return false;
           }
           return commitSimple(key, v == null ? null : JSON.stringify(v));
-        }, {placeholder: '90s, 5m, 2h30m, 1d'}));
+        }, {placeholder: '90s, 5m, 2h30m'}));
       if (kind === 'rows') return frowBlock(key, rowsFieldControl(key, cur, f[2] || {cols: []}));
       if (kind === 'map') return frowBlock(key, mapFieldControl(key, cur, f[2] || {}));
       if (kind === 'objf') return frowBlock(key, objFieldsControl(key, cur, f[2] || {cols: []}));

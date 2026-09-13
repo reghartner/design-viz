@@ -1018,6 +1018,12 @@ test('rowsEditorCollect validates clock and enum columns when the parser is pres
   assert.match(withClock.rowsEditorCollect(shape, [
     {base: null, values: {id: 'hb', every: '5m', kind: 'loud'}}
   ]).error, /kind: "loud" is not one of ok \| alert/);
+  /* an unknown enum value ALREADY on the item passes through: editing a
+     sibling column must neither reject nor delete it */
+  const kept = withClock.rowsEditorCollect(shape, [
+    {base: {id: 'hb', every: '5m', kind: 'loud'}, values: {id: 'hb2', every: '5m', kind: 'loud'}}
+  ]);
+  assert.deepStrictEqual(plain(kept.items), [{id: 'hb2', every: '5m', kind: 'loud'}]);
   /* without a parser (this vm copy), clock text passes through unvalidated */
   const noParser = B.rowsEditorCollect(shape, [
     {base: null, values: {id: 'hb', every: 'soonish', kind: ''}}

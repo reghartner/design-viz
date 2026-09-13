@@ -11948,6 +11948,14 @@ function initWorkbenchBuilder(opts){
   var multiSurvive = false; /* set by builder-internal renders; a render
      WITHOUT it (Render button, hand-pasted source) clears the set —
      coinciding identities in replaced content must never stay selected */
+  /* the flag is consumed by the mutation observer — but a builder render
+     that FAILS validation mutates nothing and would leave it stale, so an
+     explicit user render request invalidates it first (capture phase runs
+     before boot's own Render handler) */
+  (function(){
+    var goBtn = document.getElementById('go');
+    if (goBtn) goBtn.addEventListener('click', function(){ multiSurvive = false; }, true);
+  })();
   function multiIdent(t){
     return t.section + '|' + t.kind + '|' + (t.kind === 'node' ? t.id : t.index);
   }

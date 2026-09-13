@@ -220,9 +220,15 @@ tr.ctrow.dv-sel{outline:2px dashed var(--accent); outline-offset:-1px;}
   font:700 11px 'IBM Plex Mono',monospace; padding:3px 6px; cursor:pointer;}
 .mx:hover{color:#C0392B;}
 
-/* node drag-to-swap: dashed source, accent-ringed drop target */
-g.node.dv-dragsrc .card{stroke-dasharray:5 3; opacity:.75;}
+/* node drag-to-swap: dashed source, accent-ringed drop target, and a
+   see-through ghost that follows the cursor — snapping into the target's
+   slot (with a fainter copy of the target in the vacated slot) so the
+   swap is visible before release */
+g.node.dv-dragsrc .card{stroke-dasharray:5 3; opacity:.45;}
 g.node.dv-droptgt .card{stroke:var(--accent); stroke-width:3;}
+g.node.dv-ghost{opacity:.55; pointer-events:none;}
+g.node.dv-ghost .card{stroke:var(--accent); stroke-width:2;}
+g.node.dv-ghost.dv-ghostback{opacity:.3;}
 
 /* members of the selected step, marked on the board (distinct from the
    selection ring: dashed) */

@@ -62,6 +62,19 @@ class BuildTests(unittest.TestCase):
     def test_workbench_has_no_spec_block(self):
         self.assertEqual(len(BLOCK_RE.findall(self.texts["flowspec.html"])), 0)
 
+    def test_workbench_embeds_starters_inside_boot_iife(self):
+        text = self.texts["flowspec.html"]
+        self.assertNotIn("{{STARTERS}}", text)
+        match = re.search(r"\(function\(\)\{\s*'use strict';\s*var STARTERS = (.*);", text)
+        self.assertIsNotNone(match)
+        starters = json.loads(match.group(1))
+        self.assertEqual([entry["name"] for entry in starters],
+                         ["blank flow", "panel showcase", "full demo"])
+        for entry, source in zip(starters, ["starters/minimal.json", "starters/panels-tour.json",
+                                          "flowview.demo.json"]):
+            self.assertTrue(entry["desc"])
+            self.assertEqual(entry["spec"], json.loads((ROOT / "src" / source).read_text()))
+
     def test_flowview_has_separate_empty_derived_backlink_block(self):
         blocks = BACKLINK_RE.findall(self.texts["flowview.html"])
         self.assertEqual(len(blocks), 1)

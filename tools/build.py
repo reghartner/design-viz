@@ -9,11 +9,19 @@
 
 Deterministic: same src -> byte-identical output. Run from anywhere.
 """
+import json
 import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
+
+# Reuse the canonical demo so its gallery entry cannot drift.
+STARTERS = [
+    ("blank flow", "Three nodes and two hops to make your own.", "starters/minimal.json"),
+    ("panel showcase", "Five panels updated across four steps.", "starters/panels-tour.json"),
+    ("full demo", "The complete Flowview demo page.", "flowview.demo.json"),
+]
 
 
 def read(name: str) -> str:
@@ -58,6 +66,10 @@ def main() -> int:
         "STYLE_CORE": core_css,
         "ICONS": icons,
         "JS": js_bundle("validator.js", "engine.js", "builder.workbench.js", "boot.workbench.js"),
+        "STARTERS": json.dumps([
+            {"name": name, "desc": desc, "spec": json.loads(read(source))}
+            for name, desc, source in STARTERS
+        ], ensure_ascii=True).replace("<", "\\u003c"),
     })
     (ROOT / "workbench" / "flowspec.html").write_text(workbench)
 

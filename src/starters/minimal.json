@@ -1,0 +1,26 @@
+{
+  "page": {
+    "title": "Blank flow",
+    "sections": [
+      {
+        "heading": "Your flow",
+        "diagram": {
+          "nodes": {
+            "client": {"title": "Client", "icon": "terminal"},
+            "service": {"title": "Service", "icon": "gear"},
+            "store": {"title": "Store", "icon": "db"}
+          },
+          "rows": [["client", "service", "store"]],
+          "edges": [
+            {"from": "client", "to": "service", "kind": "https"},
+            {"from": "service", "to": "store", "kind": "int"}
+          ],
+          "steps": [
+            {"edge": "client->service", "text": "Send a request"},
+            {"edge": "service->store", "text": "Store the result"}
+          ]
+        }
+      }
+    ]
+  }
+}

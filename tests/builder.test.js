@@ -16,7 +16,7 @@ function loadBuilder(extraGlobals){
   const code =
     fs.readFileSync(path.join(ROOT, 'src', 'builder.workbench.js'), 'utf8') + '\n' +
     ';__exports = {jsonLocate, jsonContainer, jsonInsertMember, jsonInsertListItemOrCreate,' +
-    ' specSectionPaths, specValueAt, builderTargetPath, builderPathString,' +
+    ' specSectionPaths, specValueAt, starterCountLine, builderTargetPath, builderPathString,' +
     ' builderUniqueKey, builderFlatRowIds,' +
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
     ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
@@ -659,6 +659,181 @@ function loadValidator(){
   return sandbox.__exports;
 }
 const V = loadValidator();
+
+test('starter specs parse and validate with zero errors and warnings', () => {
+  for (const source of ['starters/minimal.json', 'starters/panels-tour.json', 'flowview.demo.json']){
+    const spec = JSON.parse(fs.readFileSync(path.join(ROOT, 'src', source), 'utf8'));
+    const result = V.validate(V.normalize(spec));
+    assert.deepStrictEqual(plain(result.errors), [], source);
+    assert.deepStrictEqual(plain(result.warnings), [], source);
+  }
+});
+
+test('starterCountLine totals all sections and tabs, skipping prose-only sections', () => {
+  assert.strictEqual(B.starterCountLine(SPEC), '4 nodes · 1 steps · 1 panels');
+  assert.strictEqual(B.starterCountLine({sections: SPEC.page.blocks}), '4 nodes · 1 steps · 1 panels');
+  assert.strictEqual(B.starterCountLine(SPEC.page.blocks[0].diagram), '2 nodes · 1 steps · 0 panels');
+  assert.strictEqual(B.starterCountLine({}), '0 nodes · 0 steps · 0 panels');
+});
+
+test('starter scaffolds have the promised nodes, steps, panels and timeline lanes', () => {
+  const minimal = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/starters/minimal.json'), 'utf8'));
+  assert.strictEqual(B.starterCountLine(minimal), '3 nodes · 2 steps · 0 panels');
+  assert.strictEqual(minimal.page.sections.length, 1);
+  assert.strictEqual(minimal.page.sections[0].diagram.rows.length, 1);
+  assert.strictEqual(minimal.page.sections[0].diagram.edges.length, 2);
+  const tour = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/starters/panels-tour.json'), 'utf8'));
+  assert.strictEqual(B.starterCountLine(tour), '3 nodes · 4 steps · 5 panels');
+  const d = tour.page.sections[0].diagram;
+  assert.deepStrictEqual(d.panels.map(p => p.type), ['state', 'leds', 'gauge', 'log', 'timeline']);
+  for (const panel of d.panels){
+    assert.ok(panel.initial, panel.id);
+    assert.ok(d.steps.some(step => step.panels && step.panels[panel.id]), panel.id);
+  }
+  assert.strictEqual(d.panels[4].lanes.length, 2);
+  assert.ok(d.panels[4].lanes.every(lane => lane.id && lane.label && lane.every));
+});
+
+/* Small event/element stub for gallery wiring; rendering is counted separately. */
+function galleryHarness(){
+  const handlers = {};
+  const elements = {};
+  const document = {
+    activeElement: null,
+    getElementById: id => elements[id] || null,
+    querySelector: () => null,
+    addEventListener(type, fn, capture){
+      (handlers[type] || (handlers[type] = [])).push({fn, capture});
+    },
+    createElement: tag => new Element(tag)
+  };
+  class Element {
+    constructor(tag){
+      this.tagName = tag.toUpperCase(); this.children = []; this.listeners = {};
+      this.attributes = {}; this.hidden = true; this.value = ''; this.className = '';
+    }
+    set innerHTML(value){ this.children = []; }
+    setAttribute(key, value){ this.attributes[key] = value; }
+    getAttribute(key){ return this.attributes[key]; }
+    appendChild(child){ this.children.push(child); child.parent = this; return child; }
+    addEventListener(type, fn){ (this.listeners[type] || (this.listeners[type] = [])).push(fn); }
+    focus(){ document.activeElement = this; }
+    querySelector(selector){
+      return this.children.find(child => selector === 'button' && child.tagName === 'BUTTON') || null;
+    }
+    querySelectorAll(){ return []; }
+    closest(selectors){
+      for (const selector of selectors.split(',').map(s => s.trim())){
+        if (selector === '#' + this.id) return this;
+        if (selector === '#gallery button' && this.tagName === 'BUTTON'){
+          for (let p = this.parent; p; p = p.parent) if (p.id === 'gallery') return this;
+        }
+      }
+      return null;
+    }
+  }
+  for (const id of ['src', 'docview', 'starters', 'gallery', 'undo-builder', 'redo-builder']){
+    elements[id] = new Element(id === 'src' ? 'textarea' : id.includes('builder') || id === 'starters' ? 'button' : 'div');
+    elements[id].id = id;
+  }
+  const src = elements.src;
+  src.value = TEXT;
+  let renderedText = TEXT;
+  let renderCount = 0;
+  let arm;
+  const code = fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8');
+  const sandbox = {console, document, window: {addEventListener(){}},
+    MutationObserver: class {observe(){}}, setTimeout(){},
+    captureArm(fn){ arm = fn; }};
+  // Expose only the existing mode state to exercise capture-phase blocking.
+  vm.runInNewContext(code.replace('  var initial = parseEditor();',
+    '  captureArm(function(){ addToStep = {section: 0, step: 0}; });\n  var initial = parseEditor();'), sandbox);
+  const starter = {name: 'blank flow', desc: 'a starting point',
+    spec: JSON.parse(fs.readFileSync(path.join(ROOT, 'src/starters/minimal.json'), 'utf8'))};
+  sandbox.initWorkbenchBuilder({src, view: elements.docview, starters: [starter],
+    renderedText: () => renderedText, render(){ renderCount++; renderedText = src.value; }});
+  function fire(target, type = 'click', extra = {}){
+    const ev = {target, preventDefault(){ this.defaultPrevented = true; },
+      stopPropagation(){ this.stopped = true; }, ...extra};
+    for (const h of handlers[type] || []) if (h.capture) h.fn(ev);
+    if (!ev.stopped){
+      for (const fn of target.listeners[type] || []) fn.call(target, ev);
+      for (const h of handlers[type] || []) if (!h.capture) h.fn(ev);
+    }
+    return ev;
+  }
+  return {elements, src, starter, fire, arm, document, renders: () => renderCount};
+}
+
+test('gallery toggles, shows counts, loads a rendered editor and preserves undo/redo', () => {
+  const h = galleryHarness(), e = h.elements;
+  h.fire(e.starters);
+  assert.strictEqual(e.gallery.hidden, false);
+  assert.strictEqual(e.starters.getAttribute('aria-expanded'), 'true');
+  assert.strictEqual(e.gallery.children[0].children[2].textContent, '3 nodes · 2 steps · 0 panels');
+  h.fire(e.starters);
+  assert.strictEqual(e.gallery.hidden, true);
+  h.fire(e.starters);
+  h.fire(e.gallery.children[0]);
+  assert.strictEqual(h.src.value, JSON.stringify(h.starter.spec, null, 2));
+  assert.strictEqual(h.renders(), 1);
+  assert.strictEqual(e.gallery.hidden, true);
+  h.fire(e['undo-builder']);
+  assert.strictEqual(h.src.value, TEXT);
+  h.fire(e['redo-builder']);
+  assert.deepStrictEqual(JSON.parse(h.src.value), h.starter.spec);
+});
+
+test('gallery protects unrendered invalid text, cancels or confirms, and undo restores exact edits', () => {
+  const h = galleryHarness(), e = h.elements;
+  const dirty = ' { unfinished JSON\n';
+  h.src.value = dirty;
+  h.fire(e.starters);
+  h.fire(e.gallery.children[0]);
+  assert.strictEqual(h.src.value, dirty);
+  assert.strictEqual(h.renders(), 0);
+  h.fire(e.gallery.children[1].children[2]); // cancel
+  assert.strictEqual(e.gallery.children.length, 1);
+  assert.strictEqual(h.src.value, dirty);
+  h.fire(e.gallery.children[0]);
+  h.src.value += 'newer edit';
+  h.fire(e.gallery.children[1].children[1]); // load & replace
+  assert.deepStrictEqual(JSON.parse(h.src.value), h.starter.spec);
+  h.fire(e['undo-builder']);
+  assert.strictEqual(h.src.value, dirty + 'newer edit');
+});
+
+test('gallery Escape dismisses confirmation and Ctrl/Cmd-Z undoes a starter load', () => {
+  for (const modifier of ['ctrlKey', 'metaKey']){
+    const h = galleryHarness(), e = h.elements;
+    h.src.value = TEXT + '\n';
+    h.fire(e.starters);
+    h.fire(e.gallery.children[0]);
+    h.fire(e.gallery, 'keydown', {key: 'Escape'});
+    assert.strictEqual(e.gallery.hidden, true);
+    assert.strictEqual(h.document.activeElement, e.starters);
+    h.fire(e.starters);
+    h.fire(e.gallery.children[0]);
+    h.fire(e.gallery.children[1].children[1]);
+    const ev = h.fire(h.src, 'keydown', {key: 'z', [modifier]: true});
+    assert.strictEqual(ev.defaultPrevented, true);
+    assert.strictEqual(h.src.value, TEXT + '\n');
+  }
+});
+
+test('ADD TO STEP blocks gallery toggle, cards and pending replacement controls', () => {
+  const h = galleryHarness(), e = h.elements;
+  h.src.value = 'unfinished';
+  h.fire(e.starters);
+  h.fire(e.gallery.children[0]);
+  const controls = [e.starters, e.gallery.children[0], ...e.gallery.children[1].children.slice(1)];
+  h.arm();
+  for (const control of controls){
+    assert.strictEqual(h.fire(control).defaultPrevented, true);
+    assert.strictEqual(h.src.value, 'unfinished');
+    assert.strictEqual(h.renders(), 0);
+  }
+});
 
 test('node presets cover distinct icons with legal icon and tint tokens', () => {
   const icons = B.NODE_PRESETS.map(p => p.icon);

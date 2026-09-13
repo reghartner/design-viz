@@ -31,7 +31,7 @@ function loadBuilder(extraGlobals){
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, SCENE_TOKENS,' +
     ' builderSectionPrefs,' +
-    ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes,' +
+    ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes, builderDeletePlan, planBulkSetField, planBulkDelete, BUILDER_MULTI_KINDS,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   if (extraGlobals) Object.assign(sandbox, extraGlobals);
@@ -1886,4 +1886,77 @@ test('diffSpecs sees edits outside any whitelist: node link, panel initial, cont
   for (const f of found) assert.strictEqual(f.kind, 'changed');
   /* identical specs still yield nothing under the all-keys comparison */
   assert.deepStrictEqual(plain(B.diffSpecs(base, JSON.parse(JSON.stringify(base)))), []);
+});
+
+/* ---------------- multi-select: bulk planners ---------------- */
+
+function bulkSpec(){
+  return {page: {blocks: [{heading: 'S', diagram: {
+    nodes: {a: {title: 'A'}, b: {title: 'B', tint: 'dev'}, c: {title: 'C'}},
+    rows: [['a', 'b', 'c']],
+    edges: [{from: 'a', to: 'b'}, {from: 'b', to: 'c', kind: 'mqtt'}],
+    steps: [{edge: 'a->b', text: 's1'}, {edge: 'b->c', text: 's2'}, {nodes: ['c'], text: 's3'}]
+  }}]}};
+}
+
+test('planBulkSetField writes the same field to every target and reports the failing item', () => {
+  const spec = bulkSpec();
+  const text = JSON.stringify(spec, null, 2);
+  const targets = [
+    {section: 0, kind: 'node', id: 'a'},
+    {section: 0, kind: 'node', id: 'c'}
+  ];
+  const plan = B.planBulkSetField(text, targets, 'tint', '"mqtt"');
+  const nodes = JSON.parse(plan.text).page.blocks[0].diagram.nodes;
+  assert.strictEqual(nodes.a.tint, 'mqtt');
+  assert.strictEqual(nodes.c.tint, 'mqtt');
+  assert.strictEqual(nodes.b.tint, 'dev', 'unselected node untouched');
+  assert.strictEqual(plan.count, 2);
+  /* null removes from all */
+  const cleared = B.planBulkSetField(plan.text, targets, 'tint', null);
+  const n2 = JSON.parse(cleared.text).page.blocks[0].diagram.nodes;
+  assert.ok(!('tint' in n2.a) && !('tint' in n2.c));
+  /* an unresolvable target names its position */
+  /* a missing node maps to a path but fails the locate — either way the
+     error names WHICH selection broke */
+  const bad = B.planBulkSetField(text, [targets[0], {section: 0, kind: 'node', id: 'ghost'}], 'tint', '"dev"');
+  assert.match(bad.error, /selection 2/);
+});
+
+test('planBulkDelete removes index targets highest-first so nothing shifts', () => {
+  const spec = bulkSpec();
+  const text = JSON.stringify(spec, null, 2);
+  /* deliberately pass ASCENDING order — the planner must sort descending */
+  const plan = B.planBulkDelete(text, [
+    {section: 0, kind: 'step', index: 0},
+    {section: 0, kind: 'step', index: 2}
+  ]);
+  const steps = JSON.parse(plan.text).page.blocks[0].diagram.steps;
+  assert.deepStrictEqual(steps.map(s => s.text), ['s2'], 'exactly steps 1 and 3 died');
+  assert.strictEqual(plan.count, 2);
+});
+
+test('planBulkDelete of nodes runs each cascade (rows and steps pruned)', () => {
+  const spec = bulkSpec();
+  const text = JSON.stringify(spec, null, 2);
+  const plan = B.planBulkDelete(text, [
+    {section: 0, kind: 'node', id: 'a'},
+    {section: 0, kind: 'node', id: 'c'}
+  ]);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(Object.keys(d.nodes), ['b']);
+  assert.deepStrictEqual(plain(d.rows), [['b']]);
+  const mentions = JSON.stringify(d);
+  assert.ok(mentions.indexOf('"a->b"') < 0 && mentions.indexOf('"b->c"') < 0,
+    'edges/steps touching deleted nodes are pruned by the cascades');
+});
+
+test('builderDeletePlan matches the wiring dispatch for every multi kind', () => {
+  const spec = bulkSpec();
+  const text = JSON.stringify(spec, null, 2);
+  for (const kind of B.BUILDER_MULTI_KINDS){
+    assert.ok(['node', 'edge', 'step', 'panel', 'bullet', 'crow'].includes(kind), kind);
+  }
+  const edgeGone = B.builderDeletePlan(text, spec, {section: 0, kind: 'edge', index: 1});
+  assert.strictEqual(JSON.parse(edgeGone.text).page.blocks[0].diagram.edges.length, 1);
 });

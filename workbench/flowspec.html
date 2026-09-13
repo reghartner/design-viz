@@ -11123,6 +11123,63 @@ function planSwapNodes(text, raw, sectionIdx, idA, idB){
   return plan;
 }
 
+/* ---------------- multi-select: bulk planners ----------------
+   A multi-selection is HOMOGENEOUS (one kind) — mixed-kind bulk deletes
+   interact with cascades (a node delete prunes edges/steps) in ways that
+   silently invalidate sibling targets. Deletes apply highest-index-first
+   per section so earlier deletions cannot shift later targets. */
+var BUILDER_MULTI_KINDS = ['node', 'edge', 'step', 'panel', 'bullet', 'crow'];
+
+function builderDeletePlan(text, raw, t){
+  if (t.kind === 'tab') return planDeleteTab(text, raw, t.block, t.tab);
+  if (t.kind === 'node') return planDeleteNode(text, raw, t.section, t.id);
+  if (t.kind === 'edge') return planDeleteEdge(text, raw, t.section, t.index);
+  if (t.kind === 'step') return planDeleteStep(text, raw, t.section, t.index);
+  if (t.kind === 'panel') return planDeletePanel(text, raw, t.section, t.index);
+  var rec = specSectionPaths(raw)[t.section];
+  if (!rec) return {error: 'no such section'};
+  if (t.kind === 'bullet') return planDeleteListItem(text, raw, rec.section.concat(['bullets']), t.index);
+  if (t.kind === 'para'){
+    var sec = specValueAt(raw, rec.section);
+    if (sec && typeof sec.text === 'string') return planSetField(text, raw, rec.section, 'text', null);
+    return planDeleteListItem(text, raw, rec.section.concat(['text']), t.index);
+  }
+  if (t.kind === 'crow') return planDeleteListItem(text, raw, rec.section.concat(['contract', 'fields']), t.index);
+  return planDeleteSection(text, raw, t.section);
+}
+
+function planBulkSetField(text, targets, key, valueTextOrNull){
+  var cur = text;
+  for (var i = 0; i < targets.length; i++){
+    var raw;
+    try { raw = JSON.parse(cur); }
+    catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
+    var path = builderTargetPath(raw, targets[i]);
+    if (!path) return {error: 'selection ' + (i + 1) + ' no longer resolves — re-render and reselect'};
+    var plan = planSetField(cur, raw, path, key, valueTextOrNull);
+    if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
+    cur = plan.text;
+  }
+  return {text: cur, count: targets.length};
+}
+
+function planBulkDelete(text, targets){
+  var list = targets.slice().sort(function(a, b){
+    if ((a.section || 0) !== (b.section || 0)) return (b.section || 0) - (a.section || 0);
+    return (typeof b.index === 'number' ? b.index : 0) - (typeof a.index === 'number' ? a.index : 0);
+  });
+  var cur = text;
+  for (var i = 0; i < list.length; i++){
+    var raw;
+    try { raw = JSON.parse(cur); }
+    catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
+    var plan = builderDeletePlan(cur, raw, list[i]);
+    if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
+    cur = plan.text;
+  }
+  return {text: cur, count: list.length};
+}
+
 /* ---------------- step contract editing ----------------
    A step's membership: hops (edge / edges), lit nodes (nodes), and
    panel patches (panels). Toggles normalize the hop shape: zero hops
@@ -11644,6 +11701,7 @@ function initWorkbenchBuilder(opts){
     updateHistoryButtons();
     render();
     setSelected(null); currentTarget = null;
+    clearMultiSelect();
     clearStepMarkers();
     inspectorMessage(message);
     autosaveDraft();
@@ -11733,6 +11791,7 @@ function initWorkbenchBuilder(opts){
         baselineText = src.value;
         render(); /* parse/validation errors surface in the message list */
         setSelected(null); currentTarget = null;
+        clearMultiSelect(); /* ids in the new file may coincide — never carry a selection over */
         if (guide) guide.hidden = true;
         retireInspector();
         autosaveDraft();
@@ -12604,21 +12663,7 @@ function initWorkbenchBuilder(opts){
   }
 
   function deletePlanFor(t, raw){
-    if (t.kind === 'tab') return planDeleteTab(src.value, raw, t.block, t.tab);
-    if (t.kind === 'node') return planDeleteNode(src.value, raw, t.section, t.id);
-    if (t.kind === 'edge') return planDeleteEdge(src.value, raw, t.section, t.index);
-    if (t.kind === 'step') return planDeleteStep(src.value, raw, t.section, t.index);
-    if (t.kind === 'panel') return planDeletePanel(src.value, raw, t.section, t.index);
-    var rec = specSectionPaths(raw)[t.section];
-    if (!rec) return {error: 'no such section'};
-    if (t.kind === 'bullet') return planDeleteListItem(src.value, raw, rec.section.concat(['bullets']), t.index);
-    if (t.kind === 'para'){
-      var sec = specValueAt(raw, rec.section);
-      if (sec && typeof sec.text === 'string') return planSetField(src.value, raw, rec.section, 'text', null);
-      return planDeleteListItem(src.value, raw, rec.section.concat(['text']), t.index);
-    }
-    if (t.kind === 'crow') return planDeleteListItem(src.value, raw, rec.section.concat(['contract', 'fields']), t.index);
-    return planDeleteSection(src.value, raw, t.section);
+    return builderDeletePlan(src.value, raw, t);
   }
 
   function deleteCurrent(){
@@ -12630,6 +12675,142 @@ function initWorkbenchBuilder(opts){
         if (t.kind === 'section') insertSection = 0;
         inspectorMessage(t.kind + ' deleted — undo restores it');
       }});
+  }
+
+  /* ================= multi-select (shift/ctrl/cmd-click) ================= */
+  var multiSel = [];
+  function multiIdent(t){
+    return t.section + '|' + t.kind + '|' + (t.kind === 'node' ? t.id : t.index);
+  }
+  function clearMultiSelect(){
+    multiSel.forEach(function(t){ if (t.el && t.el.classList) t.el.classList.remove('dv-sel'); });
+    multiSel = [];
+  }
+  function dropMultiUI(){
+    if (guide) guide.hidden = true;
+    retireInspector();
+  }
+  /* after a re-render the selected elements are new DOM: re-resolve each
+     identity, drop the ones that no longer exist, re-ring the rest */
+  function reapplyMultiSel(){
+    if (!multiSel.length) return;
+    multiSel = multiSel.filter(function(t){
+      var el = findTargetEl(t);
+      if (!el) return false;
+      t.el = el;
+      el.classList.add('dv-sel');
+      return true;
+    });
+    if (!multiSel.length) dropMultiUI();
+    else renderMultiInspector();
+  }
+  function toggleMultiSelect(target){
+    if (BUILDER_MULTI_KINDS.indexOf(target.kind) < 0){
+      inspectorMessage('multi-select supports nodes, edges, steps, panels, bullets, and contract rows');
+      return;
+    }
+    if (multiSel.length && multiSel[0].kind !== target.kind){
+      inspectorMessage('multi-select holds ' + multiSel[0].kind + 's — Esc clears it, then start over');
+      return;
+    }
+    /* a shift-click after a plain click grows the pair naturally: seed the
+       set with the current single selection when the kinds match. The
+       single-selection ring is dropped FIRST — the seed then re-rings the
+       same element as a multi member. */
+    var prev = currentTarget;
+    currentTarget = null;
+    setSelected(null);
+    if (!multiSel.length && prev && prev.kind === target.kind &&
+        multiIdent(prev) !== multiIdent(target)){
+      var seedEl = findTargetEl(prev);
+      if (seedEl){
+        multiSel.push({section: prev.section, kind: prev.kind,
+                       id: prev.id, index: prev.index, el: seedEl});
+        seedEl.classList.add('dv-sel');
+      }
+    }
+    var key = multiIdent(target), existing = -1;
+    multiSel.forEach(function(t, i){ if (multiIdent(t) === key) existing = i; });
+    if (existing >= 0){
+      var gone = multiSel.splice(existing, 1)[0];
+      if (gone.el && gone.el.classList) gone.el.classList.remove('dv-sel');
+    } else {
+      multiSel.push({section: target.section, kind: target.kind,
+                     id: target.id, index: target.index, el: target.el});
+      if (target.el && target.el.classList) target.el.classList.add('dv-sel');
+    }
+    if (!multiSel.length){ dropMultiUI(); return; }
+    if (multiSel.length === 1){
+      /* one left: collapse back to an ordinary single selection */
+      var only = multiSel[0];
+      clearMultiSelect();
+      selectTarget({section: only.section, kind: only.kind, id: only.id,
+                    index: only.index, el: only.el}, false);
+      return;
+    }
+    renderMultiInspector();
+  }
+  function applyBulkField(key, valueTextOrNull){
+    var plan = planBulkSetField(src.value, multiSel, key, valueTextOrNull);
+    return applyPlan(plan); /* the re-render observer re-rings + re-renders the multi form */
+  }
+  function bulkDeleteSelected(){
+    var n = multiSel.length, kind = multiSel[0].kind;
+    var plan = planBulkDelete(src.value, multiSel);
+    if (applyPlan(plan)){
+      clearMultiSelect();
+      inspectorMessage(n + ' ' + kind + (n > 1 ? 's' : '') + ' deleted — undo restores them');
+    }
+  }
+  function renderMultiInspector(){
+    if (!guide || multiSel.length < 2) return;
+    revealInspector();
+    guide.hidden = false;
+    guide.innerHTML = '';
+    var kind = multiSel[0].kind;
+    var head = document.createElement('b');
+    head.textContent = multiSel.length + ' ' + kind + 's selected';
+    guide.appendChild(head);
+    var p = document.createElement('span');
+    p.className = 'gpath';
+    p.textContent = 'shift-click adds/removes · Esc clears';
+    guide.appendChild(p);
+    var err = document.createElement('div');
+    err.className = 'gerr ierr'; err.hidden = true;
+    guide.appendChild(err);
+    var form = document.createElement('div');
+    form.className = 'iform';
+    /* every control writes the SAME value to every selected element;
+       an empty value removes the field from all of them */
+    if (kind === 'node'){
+      form.appendChild(frow('tint', selectControl(['cmd', 'auth', 'data', 'mqtt', 'dev'], null, function(v){
+        return applyBulkField('tint', v == null ? null : JSON.stringify(v));
+      }, true)));
+      form.appendChild(frow('icon', selectControl(
+        ['terminal', 'cloud', 'shield', 'gear', 'db', 'antenna', 'thermo', 'pump',
+         'router', 'package', 'key', 'server', 'chip', 'phone'], null, function(v){
+        return applyBulkField('icon', v == null ? null : JSON.stringify(v));
+      }, true)));
+    }
+    if (kind === 'edge'){
+      form.appendChild(frow('kind', textControl(null, function(v){
+        return applyBulkField('kind', v == null ? null : JSON.stringify(v));
+      }, {placeholder: 'https | int | mqtt | declared protocol'})));
+      form.appendChild(frow('ret', checkboxControl(false, function(on){
+        return applyBulkField('ret', on ? 'true' : null);
+      })));
+    }
+    if (kind === 'step'){
+      form.appendChild(frow('lane', textControl(null, function(v){
+        return applyBulkField('lane', v == null ? null : JSON.stringify(v));
+      }, {placeholder: 'lane id from page.lanes — empty removes'})));
+    }
+    if (form.childNodes.length) guide.appendChild(form);
+    var acts = document.createElement('div');
+    acts.className = 'iacts';
+    acts.appendChild(actionButton('delete ' + multiSel.length + ' ' + kind + 's',
+      bulkDeleteSelected, 'bdanger'));
+    guide.appendChild(acts);
   }
 
   function renderInspector(){
@@ -13156,7 +13337,13 @@ function initWorkbenchBuilder(opts){
       handleConnectClick(target);
       return;
     }
-    if (target) selectTarget(target);
+    if (!target) return;
+    if (ev.shiftKey || ev.metaKey || ev.ctrlKey){
+      toggleMultiSelect(target);
+      return;
+    }
+    if (multiSel.length) clearMultiSelect(); /* a plain click is single-select again */
+    selectTarget(target);
   });
 
   /* a re-render outside the connect flow (Render button, skin switch)
@@ -13174,6 +13361,7 @@ function initWorkbenchBuilder(opts){
     setTimeout(function(){
       syncBoardToSelectedStep(); /* a selected step keeps its step view */
       applyStepMarkers();        /* markers live in the rebuilt DOM */
+      reapplyMultiSel();         /* multi-selection rings live there too */
     }, 0);
   }).observe(view, {childList: true});
 
@@ -13187,6 +13375,7 @@ function initWorkbenchBuilder(opts){
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }
+      if (multiSel.length){ clearMultiSelect(); dropMultiUI(); return; }
       if (currentTarget){
         currentTarget = null;
         setSelected(null);
@@ -13199,6 +13388,15 @@ function initWorkbenchBuilder(opts){
       var ae = document.activeElement;
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' ||
                  ae.tagName === 'BUTTON' || ae.isContentEditable)) return;
+      if (multiSel.length){
+        ev.preventDefault();
+        if (addToStep){
+          formError('finish ADD TO STEP first (DONE or Esc) — delete is paused while the mode is armed');
+          return;
+        }
+        bulkDeleteSelected();
+        return;
+      }
       if (!currentTarget) return;
       ev.preventDefault();
       if (addToStep){

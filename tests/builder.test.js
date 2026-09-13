@@ -12,7 +12,7 @@ const vm = require('node:vm');
 
 const ROOT = path.join(__dirname, '..');
 
-function loadBuilder(){
+function loadBuilder(extraGlobals){
   const code =
     fs.readFileSync(path.join(ROOT, 'src', 'builder.workbench.js'), 'utf8') + '\n' +
     ';__exports = {jsonLocate, jsonContainer, jsonInsertMember, jsonInsertListItemOrCreate,' +
@@ -31,8 +31,10 @@ function loadBuilder(){
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, SCENE_TOKENS,' +
     ' builderSectionPrefs,' +
+    ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
+  if (extraGlobals) Object.assign(sandbox, extraGlobals);
   vm.runInNewContext(code, sandbox);
   return sandbox.__exports;
 }
@@ -922,7 +924,8 @@ test('builderStepHops merges the malformed both-keys shape without dropping hops
 
 test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known control kinds', () => {
   assert.deepStrictEqual(Object.keys(B.PANEL_SETUP_FIELDS).sort(), [...V.PANEL_TYPES].sort());
-  const kinds = new Set(['text', 'num', 'csv', 'scene', 'json', 'jsonArr', 'jsonAny']);
+  const kinds = new Set(['text', 'num', 'csv', 'scene', 'json', 'jsonArr', 'jsonAny',
+                         'clock', 'rows', 'map', 'objf']);
   for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
     assert.ok(fields.length >= 1, type);
     for (const [key, kind] of fields){
@@ -971,4 +974,97 @@ test('builderSectionPrefs honors stored booleans and ignores everything else', (
   /* non-boolean values and unknown keys fall back to open */
   assert.deepStrictEqual(plain(B.builderSectionPrefs('{"insert":"no","source":1,"extra":true}')),
     {insert: true, source: true});
+});
+
+/* ---------------- typed panel setup editors: pure collectors ---------------- */
+
+test('rowsEditorCollect merges edits, keeps unknown keys, drops blank new rows, enforces req/num/max', () => {
+  const shape = {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'ms', kind: 'num', req: true}], max: 3};
+  const out = B.rowsEditorCollect(shape, [
+    {base: {id: 'dns', label: 'DNS', ms: 40, weird: 7}, values: {id: 'dns', label: 'lookup', ms: '55'}},
+    {base: null, values: {id: '', label: '', ms: ''}},           /* blank new row: dropped */
+    {base: null, values: {id: 'tls', label: '', ms: '120'}}
+  ]);
+  assert.deepStrictEqual(plain(out.items), [
+    {id: 'dns', label: 'lookup', ms: 55, weird: 7},               /* unknown key survives */
+    {id: 'tls', ms: 120}                                          /* empty optional col omitted */
+  ]);
+  assert.match(B.rowsEditorCollect(shape, [
+    {base: null, values: {id: '', label: 'x', ms: '9'}}
+  ]).error, /item 1: id is required/);
+  assert.match(B.rowsEditorCollect(shape, [
+    {base: null, values: {id: 'a', label: '', ms: 'fast'}}
+  ]).error, /ms: "fast" is not a number/);
+  assert.match(B.rowsEditorCollect(shape, [1, 2, 3, 4].map(n => (
+    {base: null, values: {id: 'i' + n, label: '', ms: String(n)}}
+  ))).error, /at most 3 items/);
+  /* blanking an EXISTING row fails required cols instead of silently dropping */
+  assert.match(B.rowsEditorCollect(shape, [
+    {base: {id: 'keep', ms: 4}, values: {id: '', label: '', ms: ''}}
+  ]).error, /item 1: id is required/);
+});
+
+test('rowsEditorCollect validates clock and enum columns when the parser is present', () => {
+  const withClock = loadBuilder({parseClock: t => (/^\d+m$/.test(t) ? Number(t.slice(0, -1)) * 60 : null)});
+  const shape = {cols: [{k: 'id', req: true}, {k: 'every', kind: 'clock', req: true},
+                        {k: 'kind', kind: 'enum', options: ['ok', 'alert']}]};
+  const good = withClock.rowsEditorCollect(shape, [
+    {base: null, values: {id: 'hb', every: '5m', kind: 'alert'}}
+  ]);
+  assert.deepStrictEqual(plain(good.items), [{id: 'hb', every: '5m', kind: 'alert'}]);
+  assert.match(withClock.rowsEditorCollect(shape, [
+    {base: null, values: {id: 'hb', every: 'soonish', kind: ''}}
+  ]).error, /every: "soonish" is not a duration/);
+  assert.match(withClock.rowsEditorCollect(shape, [
+    {base: null, values: {id: 'hb', every: '5m', kind: 'loud'}}
+  ]).error, /kind: "loud" is not one of ok \| alert/);
+  /* an unknown enum value ALREADY on the item passes through: editing a
+     sibling column must neither reject nor delete it */
+  const kept = withClock.rowsEditorCollect(shape, [
+    {base: {id: 'hb', every: '5m', kind: 'loud'}, values: {id: 'hb2', every: '5m', kind: 'loud'}}
+  ]);
+  assert.deepStrictEqual(plain(kept.items), [{id: 'hb2', every: '5m', kind: 'loud'}]);
+  /* without a parser (this vm copy), clock text passes through unvalidated */
+  const noParser = B.rowsEditorCollect(shape, [
+    {base: null, values: {id: 'hb', every: 'soonish', kind: ''}}
+  ]);
+  assert.deepStrictEqual(plain(noParser.items), [{id: 'hb', every: 'soonish'}]);
+});
+
+test('mapEditorCollect drops blank pairs, rejects duplicates, and empties to null', () => {
+  assert.deepStrictEqual(plain(B.mapEditorCollect([
+    {key: 'OK', value: '#34D399'},
+    {key: '', value: '#111111'},          /* blank key: dropped */
+    {key: 'BAD', value: ''},              /* blank value: dropped */
+    {key: 'ERR', value: '#F87171'}
+  ]).obj), {OK: '#34D399', ERR: '#F87171'});
+  assert.match(B.mapEditorCollect([
+    {key: 'A', value: '1'}, {key: 'A', value: '2'}
+  ]).error, /duplicate key "A"/);
+  assert.strictEqual(B.mapEditorCollect([{key: '', value: ''}]).obj, null);
+});
+
+test('objFieldsCollect keeps unknown keys, removes on all-empty, and validates like a row', () => {
+  const shape = {cols: [{k: 'every', req: true}, {k: 'label'}]};
+  const out = B.objFieldsCollect(shape, {every: '30m', label: 'heartbeat', extra: true},
+                                 {every: '1h', label: ''});
+  assert.deepStrictEqual(plain(out.obj), {every: '1h', extra: true});
+  assert.strictEqual(B.objFieldsCollect(shape, {every: '30m'}, {every: '', label: ''}).obj, null);
+  assert.match(B.objFieldsCollect(shape, {}, {every: '', label: 'x'}).error, /every is required/);
+});
+
+test('every PANEL_SETUP_FIELDS entry uses a known control kind with a sane shape', () => {
+  const known = ['text', 'num', 'csv', 'scene', 'json', 'jsonArr', 'jsonAny',
+                 'clock', 'rows', 'map', 'objf'];
+  Object.keys(B.PANEL_SETUP_FIELDS).forEach(type => {
+    B.PANEL_SETUP_FIELDS[type].forEach(f => {
+      assert.ok(known.includes(f[1]), type + '.' + f[0] + ' kind ' + f[1]);
+      if (f[1] === 'rows' || f[1] === 'objf'){
+        assert.ok(Array.isArray(f[2].cols) && f[2].cols.length, type + '.' + f[0] + ' needs cols');
+        f[2].cols.forEach(c => assert.ok(typeof c.k === 'string' && c.k, type + '.' + f[0] + ' col key'));
+      }
+    });
+    const last = B.PANEL_SETUP_FIELDS[type][B.PANEL_SETUP_FIELDS[type].length - 1];
+    assert.strictEqual(last[0], 'initial', type + ' ends with initial');
+  });
 });

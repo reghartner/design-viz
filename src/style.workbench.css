@@ -133,6 +133,18 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 textarea.fctl{resize:vertical; min-height:44px;}
 .fctl:focus-visible{outline:2px solid var(--accent); outline-offset:-1px;}
 .fnum{flex:0 1 90px;}
+/* typed setup-field editors: item rows, key/value maps, raw JSON fallback.
+   width:0 + grow shares the row evenly regardless of the inputs' intrinsic
+   size; minmax(0,1fr) stops the grid track from growing past the column. */
+.rowsedit{flex:1; min-width:0; display:grid; grid-template-columns:minmax(0,1fr); gap:4px;}
+.rowline{display:flex; gap:4px; align-items:center; min-width:0;}
+.rowline .fctl{flex:1 1 0; width:0; min-width:0;}
+.rowx{flex:none; padding:4px 7px;}
+.rowadd{justify-self:start; padding:4px 9px;}
+.rawjson > summary{cursor:pointer; font:600 10px 'IBM Plex Mono',monospace; color:var(--sub); user-select:none;}
+.rawjson > summary:hover{color:var(--ink);}
+.rawjson[open] > summary{margin-bottom:4px;}
+.rawjson textarea.fctl{width:100%; box-sizing:border-box;}
 .fchk{border:0; background:none; padding:0;}
 .fnote{border:0; background:none; font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); padding:0;}
 .iacts{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}

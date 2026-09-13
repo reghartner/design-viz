@@ -3527,8 +3527,16 @@ function initWorkbenchBuilder(opts){
     var c = el.cloneNode(true);
     c.removeAttribute('id');
     c.removeAttribute('data-dv-node');
+    c.setAttribute('aria-hidden', 'true'); /* pure visual feedback */
     var withId = c.querySelectorAll('[id]');
     for (var i = 0; i < withId.length; i++) withId[i].removeAttribute('id');
+    /* pointer-events:none stops the mouse, not the keyboard — strip
+       focusable descendants (node links, backref chips) too */
+    var focusable = c.querySelectorAll('[tabindex], a[href]');
+    for (var j = 0; j < focusable.length; j++){
+      focusable[j].removeAttribute('tabindex');
+      focusable[j].removeAttribute('href');
+    }
     c.classList.remove('dv-sel', 'dv-instep', 'dv-dragsrc', 'dv-droptgt');
     c.classList.add('dv-ghost');
     return c;

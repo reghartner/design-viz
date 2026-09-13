@@ -2952,6 +2952,14 @@ function initWorkbenchBuilder(opts){
       inspectorMessage('multi-select holds ' + multiSel[0].kind + 's — Esc clears it, then start over');
       return;
     }
+    /* a mismatched modifier-click against an existing SINGLE selection is
+       refused the same way — it must leave that selection standing, never
+       silently replace it */
+    if (!multiSel.length && currentTarget && currentTarget.kind !== target.kind){
+      inspectorMessage('multi-select works within one kind — the current selection is a ' +
+        currentTarget.kind + '; plain-click to switch');
+      return;
+    }
     /* a shift-click after a plain click grows the pair naturally: seed the
        set with the current single selection when the kinds match. The
        single-selection ring is dropped FIRST — the seed then re-rings the

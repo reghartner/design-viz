@@ -1891,12 +1891,16 @@ test('diffSpecs sees edits outside any whitelist: node link, panel initial, cont
 /* ---------------- multi-select: bulk planners ---------------- */
 
 function bulkSpec(){
-  return {page: {blocks: [{heading: 'S', diagram: {
-    nodes: {a: {title: 'A'}, b: {title: 'B', tint: 'dev'}, c: {title: 'C'}},
-    rows: [['a', 'b', 'c']],
-    edges: [{from: 'a', to: 'b'}, {from: 'b', to: 'c', kind: 'mqtt'}],
-    steps: [{edge: 'a->b', text: 's1'}, {edge: 'b->c', text: 's2'}, {nodes: ['c'], text: 's3'}]
-  }}]}};
+  return {page: {blocks: [{heading: 'S',
+    bullets: ['first point', 'second point'],
+    contract: {fields: [{k: 'topic', v: 'a/b'}, {k: 'ttl', v: '30s'}]},
+    diagram: {
+      nodes: {a: {title: 'A'}, b: {title: 'B', tint: 'dev'}, c: {title: 'C'}},
+      rows: [['a', 'b', 'c']],
+      edges: [{from: 'a', to: 'b'}, {from: 'b', to: 'c', kind: 'mqtt'}],
+      panels: [{id: 'q', type: 'queue', initial: {state: 'empty'}}],
+      steps: [{edge: 'a->b', text: 's1'}, {edge: 'b->c', text: 's2'}, {nodes: ['c'], text: 's3'}]
+    }}]}};
 }
 
 test('planBulkSetField writes the same field to every target and reports the failing item', () => {
@@ -1951,12 +1955,27 @@ test('planBulkDelete of nodes runs each cascade (rows and steps pruned)', () => 
     'edges/steps touching deleted nodes are pruned by the cascades');
 });
 
-test('builderDeletePlan matches the wiring dispatch for every multi kind', () => {
+test('builderDeletePlan deletes the right element for every multi kind', () => {
   const spec = bulkSpec();
   const text = JSON.stringify(spec, null, 2);
-  for (const kind of B.BUILDER_MULTI_KINDS){
-    assert.ok(['node', 'edge', 'step', 'panel', 'bullet', 'crow'].includes(kind), kind);
-  }
-  const edgeGone = B.builderDeletePlan(text, spec, {section: 0, kind: 'edge', index: 1});
-  assert.strictEqual(JSON.parse(edgeGone.text).page.blocks[0].diagram.edges.length, 1);
+  assert.deepStrictEqual(plain(B.BUILDER_MULTI_KINDS),
+    ['node', 'edge', 'step', 'panel', 'bullet', 'crow']);
+
+  const node = JSON.parse(B.builderDeletePlan(text, spec, {section: 0, kind: 'node', id: 'c'}).text);
+  assert.deepStrictEqual(Object.keys(node.page.blocks[0].diagram.nodes), ['a', 'b']);
+
+  const edge = JSON.parse(B.builderDeletePlan(text, spec, {section: 0, kind: 'edge', index: 1}).text);
+  assert.deepStrictEqual(edge.page.blocks[0].diagram.edges, [{from: 'a', to: 'b'}]);
+
+  const step = JSON.parse(B.builderDeletePlan(text, spec, {section: 0, kind: 'step', index: 1}).text);
+  assert.deepStrictEqual(step.page.blocks[0].diagram.steps.map(s => s.text), ['s1', 's3']);
+
+  const panel = JSON.parse(B.builderDeletePlan(text, spec, {section: 0, kind: 'panel', index: 0}).text);
+  assert.ok(!panel.page.blocks[0].diagram.panels || panel.page.blocks[0].diagram.panels.length === 0);
+
+  const bullet = JSON.parse(B.builderDeletePlan(text, spec, {section: 0, kind: 'bullet', index: 0}).text);
+  assert.deepStrictEqual(plain(bullet.page.blocks[0].bullets), ['second point']);
+
+  const crow = JSON.parse(B.builderDeletePlan(text, spec, {section: 0, kind: 'crow', index: 1}).text);
+  assert.deepStrictEqual(plain(crow.page.blocks[0].contract.fields), [{k: 'topic', v: 'a/b'}]);
 });

@@ -70,6 +70,14 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .docview{border:1px solid var(--line); border-radius:16px; padding:26px 26px 30px;}
 .docview.sk-aurora{background:#0B1220; --dtext:#B9C7DD; --dink:#EAF2FF; --dfaint:#7E93B8;}
 .docview.sk-daylight{background:#F4F2EC; --dtext:#4A4F58; --dink:#23272E; --dfaint:#79808B;}
+/* the four overlay skins ride the sk-aurora class, so the aurora frame
+   ground above was painting them dark — pastel/editorial rendered as a
+   black box. Overlays repaint the page ground themselves (the body washes
+   in style.core.css) and set their own text vars via body-scoped rules,
+   so the workbench render frame goes transparent and lets that ground
+   show through, matching the published pages. */
+.docview.sk-aurora.sk-editorial, .docview.sk-aurora.sk-terminal,
+.docview.sk-aurora.sk-pastel, .docview.sk-aurora.sk-blueprint{background:transparent;}
 .doc-title{font-family:'Sora',sans-serif; font-weight:700; font-size:24px; color:var(--dink); margin:0 0 4px;}
 .doc-sub{font:500 11px 'IBM Plex Mono',monospace; color:var(--dfaint); margin:0;}
 

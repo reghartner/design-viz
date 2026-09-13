@@ -31,7 +31,7 @@ function loadBuilder(extraGlobals){
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, SCENE_TOKENS,' +
     ' builderSectionPrefs,' +
-    ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge,' +
+    ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   if (extraGlobals) Object.assign(sandbox, extraGlobals);
@@ -1067,4 +1067,60 @@ test('every PANEL_SETUP_FIELDS entry uses a known control kind with a sane shape
     const last = B.PANEL_SETUP_FIELDS[type][B.PANEL_SETUP_FIELDS[type].length - 1];
     assert.strictEqual(last[0], 'initial', type + ' ends with initial');
   });
+});
+
+/* ---------------- reordering: swap planners ---------------- */
+
+test('jsonSwapListItems trades two item spans and keeps each item formatting', () => {
+  const text = '{\n  "list": [\n    {"a": 1},\n    "middle",\n    {"c":\n     3}\n  ]\n}';
+  const swap = B.jsonSwapListItems(text, ['list'], 0, 2);
+  assert.deepStrictEqual(JSON.parse(swap.text).list, [{c: 3}, 'middle', {a: 1}]);
+  assert.ok(swap.text.includes('{"c":\n     3}'), 'multi-line item formatting survives');
+  assert.strictEqual(swap.text.slice(swap.first.start, swap.first.end), '{"c":\n     3}');
+  assert.strictEqual(swap.text.slice(swap.second.start, swap.second.end), '{"a": 1}');
+  assert.strictEqual(B.jsonSwapListItems(text, ['list'], 1, 1), null);
+  assert.strictEqual(B.jsonSwapListItems(text, ['list'], 0, 9), null);
+});
+
+test('planMoveSection moves within its own list, hops tab containers, and stops at the ends', () => {
+  const text = TEXT; /* SPEC: blocks[0]=plain section, blocks[1]=tabs container */
+  const down = B.planMoveSection(text, SPEC, 0, 1);
+  const parsed = JSON.parse(down.text);
+  assert.ok(Array.isArray(parsed.page.blocks[0].tabs), 'the tabs container moved first');
+  assert.strictEqual(parsed.page.blocks[1].heading, 'Plain');
+  assert.deepStrictEqual(plain(down.newPath), ['page', 'blocks', 1]);
+  /* the moved-down section's selection span parses back to the section */
+  assert.deepStrictEqual(JSON.parse(down.text.slice(down.start, down.end)).heading, 'Plain');
+
+  assert.match(B.planMoveSection(text, SPEC, 0, -1).error, /already first/);
+  /* inside a tab list: the only section of tab One cannot move */
+  assert.match(B.planMoveSection(text, SPEC, 1, 1).error, /already last/);
+  assert.match(B.planMoveSection(text, SPEC, 1, -1).error, /already first/);
+});
+
+test('planSwapNodes swaps layout slots across rows, stacks, and floats only', () => {
+  const spec = {page: {blocks: [{heading: 'S', diagram: {
+    nodes: {a: {title: 'A'}, b: {title: 'B'}, c: {title: 'C'}, f: {title: 'F'}},
+    rows: [['a', ['b', 'c']]],
+    floats: [{id: 'f', side: 'above'}],
+    edges: [{from: 'a', to: 'b'}],
+    steps: [{edge: 'a->b', text: 't'}]
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  const inRows = B.planSwapNodes(text, spec, 0, 'a', 'c');
+  const d1 = JSON.parse(inRows.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(plain(d1.rows), [['c', ['b', 'a']]]);
+  assert.deepStrictEqual(plain(d1.edges), [{from: 'a', to: 'b'}], 'edges keep identities');
+  assert.strictEqual(d1.steps[0].edge, 'a->b', 'steps keep identities');
+
+  const withFloat = B.planSwapNodes(text, spec, 0, 'a', 'f');
+  const d2 = JSON.parse(withFloat.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(plain(d2.rows), [['f', ['b', 'c']]]);
+  assert.deepStrictEqual(plain(d2.floats), [{id: 'a', side: 'above'}]);
+
+  assert.match(B.planSwapNodes(text, spec, 0, 'a', 'a').error, /DIFFERENT node/);
+  const unplaced = {page: {blocks: [{heading: 'S', diagram: {
+    nodes: {a: {}, ghost: {}}, rows: [['a']]}}]}};
+  assert.match(B.planSwapNodes(JSON.stringify(unplaced, null, 2), unplaced, 0, 'a', 'ghost').error,
+    /"ghost" has no layout slot/);
 });

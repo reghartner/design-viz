@@ -977,6 +977,91 @@ function planMoveTab(text, raw, blockIdx, tabIdx, delta){
   return r;
 }
 
+/* ---------------- reordering ---------------- */
+
+/* swap two items of one JSON array textually — each item keeps its own
+   formatting, only the two spans trade places. Returns the swapped text
+   plus the new spans: first = the slot at the SMALLER index, second = the
+   slot at the larger. */
+function jsonSwapListItems(text, listPath, i, j){
+  if (i === j) return null;
+  if (i > j){ var t = i; i = j; j = t; }
+  var a = jsonLocate(text, listPath.concat([i]));
+  var b = jsonLocate(text, listPath.concat([j]));
+  if (!a || !b) return null;
+  return {
+    text: text.slice(0, a.start) + text.slice(b.start, b.end) +
+          text.slice(a.end, b.start) + text.slice(a.start, a.end) + text.slice(b.end),
+    first: {start: a.start, end: a.start + (b.end - b.start)},
+    second: {start: b.end - (a.end - a.start), end: b.end}
+  };
+}
+
+/* move a section one slot within ITS OWN list (the top-level blocks list,
+   or its tab's sections list). A neighbor blocks-list entry may be a tabs
+   container — the move hops over it whole. Returns newPath (the section's
+   list slot after the move); the caller recomputes the flat ordinal from
+   it, because hopping a tabs container shifts ordinals by its section
+   count. */
+function planMoveSection(text, raw, sectionIdx, delta){
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'section not found — reselect and try again'};
+  var spath = rec.section;
+  if (!spath.length) return {error: 'a bare-diagram page has only one section'};
+  var listPath = spath.slice(0, -1);
+  var idx = spath[spath.length - 1];
+  var list = specValueAt(raw, listPath);
+  if (!Array.isArray(list)) return {error: 'section list not found in the editor text'};
+  var to = idx + delta;
+  if (to < 0) return {error: 'already first in its list'};
+  if (to >= list.length) return {error: 'already last in its list'};
+  var swap = jsonSwapListItems(text, listPath, idx, to);
+  if (!swap) return {error: 'could not locate both sections in the editor text'};
+  var span = delta < 0 ? swap.first : swap.second;
+  return {text: swap.text, start: span.start, end: span.end,
+          kind: 'section', newPath: listPath.concat([to])};
+}
+
+/* swap the LAYOUT positions of two nodes: every appearance in rows
+   (slots and stacks) and floats trades ids. Node definitions, edges, and
+   steps keep their ids — only placement moves. */
+function planSwapNodes(text, raw, sectionIdx, idA, idB){
+  if (idA === idB) return {error: 'drop on a DIFFERENT node to swap places'};
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'section not found — reselect and try again'};
+  var d = specValueAt(raw, rec.diagram);
+  if (!d) return {error: 'no diagram in this section'};
+  var found = {a: false, b: false};
+  function sw(id){
+    if (id === idA){ found.a = true; return idB; }
+    if (id === idB){ found.b = true; return idA; }
+    return id;
+  }
+  var rows = Array.isArray(d.rows) ? d.rows.map(function(row){
+    if (!Array.isArray(row)) return row;
+    return row.map(function(slot){ return Array.isArray(slot) ? slot.map(sw) : sw(slot); });
+  }) : null;
+  var floats = Array.isArray(d.floats) ? d.floats.map(function(f){
+    if (!f || typeof f !== 'object' || typeof f.id !== 'string') return f;
+    var nid = sw(f.id);
+    if (nid === f.id) return f;
+    var copy = {};
+    Object.keys(f).forEach(function(k){ copy[k] = f[k]; });
+    copy.id = nid;
+    return copy;
+  }) : null;
+  if (!found.a || !found.b)
+    return {error: 'node "' + (found.a ? idB : idA) + '" has no layout slot (rows or floats) to swap'};
+  var pairs = [];
+  if (rows && JSON.stringify(rows) !== JSON.stringify(d.rows)) pairs.push(['rows', JSON.stringify(rows)]);
+  if (floats && JSON.stringify(floats) !== JSON.stringify(d.floats)) pairs.push(['floats', JSON.stringify(floats)]);
+  if (!pairs.length) return {error: 'nothing changed'};
+  var plan = planSetFields(text, raw, rec.diagram, pairs);
+  if (plan.error) return plan;
+  plan.kind = 'node';
+  return plan;
+}
+
 /* ---------------- step contract editing ----------------
    A step's membership: hops (edge / edges), lit nodes (nodes), and
    panel patches (panels). Toggles normalize the hop shape: zero hops
@@ -2074,6 +2159,30 @@ function initWorkbenchBuilder(opts){
       return ok;
     }
     var addBtn = document.createElement('button');
+    function rowIsBlank(ref){
+      return !ref.base && Object.keys(ref.inputs).every(function(k){
+        return ref.inputs[k].value.trim() === '';
+      });
+    }
+    function moveRow(ref, delta){
+      /* commit-first like removal: the reordered list is committed and the
+         success-path form refresh redraws the order; a blank uncommitted
+         line has no JSON to reorder, so moving it is a no-op */
+      if (rowIsBlank(ref)) return;
+      var i = rowRefs.indexOf(ref), to = i + delta;
+      if (i < 0 || to < 0 || to >= rowRefs.length) return;
+      var reordered = rowRefs.slice();
+      reordered.splice(i, 1);
+      reordered.splice(to, 0, ref);
+      commitRows(reordered);
+    }
+    function smallButton(text, title, onClick){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'bbtn rowx'; b.textContent = text;
+      b.title = title;
+      b.addEventListener('click', onClick);
+      return b;
+    }
     function buildRow(base){
       var line = document.createElement('div');
       line.className = 'rowline';
@@ -2084,15 +2193,13 @@ function initWorkbenchBuilder(opts){
         ref.inputs[col.k] = input;
         line.appendChild(input);
       });
-      var x = document.createElement('button');
-      x.type = 'button'; x.className = 'bbtn rowx'; x.textContent = '✕';
-      x.title = 'remove this item';
-      x.addEventListener('click', function(){
-        /* commit first; only a SUCCESSFUL commit removes the line (via the
-           form refresh) — a failed one must leave form and JSON agreeing */
+      line.appendChild(smallButton('↑', 'move this item up', function(){ moveRow(ref, -1); }));
+      line.appendChild(smallButton('↓', 'move this item down', function(){ moveRow(ref, 1); }));
+      /* commit first; only a SUCCESSFUL commit removes the line (via the
+         form refresh) — a failed one must leave form and JSON agreeing */
+      line.appendChild(smallButton('✕', 'remove this item', function(){
         commitRows(rowRefs.filter(function(r){ return r !== ref; }));
-      });
-      line.appendChild(x);
+      }));
       rowRefs.push(ref);
       return line;
     }
@@ -2421,6 +2528,27 @@ function initWorkbenchBuilder(opts){
               renderInspector();
             }});
         }));
+        /* the plan hands back the section's new LIST slot; the flat ordinal
+           is recomputed because moving over a tabs container hops all of
+           its sections at once */
+        var moveSection = function(delta){
+          commitCascade(function(raw){ return planMoveSection(src.value, raw, t.section, delta); },
+            {after: function(plan){
+              var parsed = parseEditor();
+              if (!parsed.error){
+                var key = JSON.stringify(plan.newPath);
+                specSectionPaths(parsed.raw).forEach(function(rec, i){
+                  if (JSON.stringify(rec.section) === key) t.section = i;
+                });
+              }
+              currentTarget = {section: t.section, kind: 'section'};
+              insertSection = t.section;
+              rehighlight();
+              renderInspector();
+            }});
+        };
+        acts.appendChild(actionButton('↑ earlier', function(){ moveSection(-1); }));
+        acts.appendChild(actionButton('↓ later', function(){ moveSection(1); }));
       }
       if (t.kind === 'tab'){
         acts.appendChild(actionButton('+ tab', function(){
@@ -2708,8 +2836,18 @@ function initWorkbenchBuilder(opts){
     selectRange(plan);
   }
 
-  /* ---- drag an edge label to set its labelDx/labelDy nudges ---- */
-  var drag = null, suppressClick = false;
+  /* ---- drag an edge label to set its labelDx/labelDy nudges;
+          drag a node card onto another to swap their layout slots ---- */
+  var drag = null, nodeDrag = null, suppressClick = false;
+  /* one cancellation path for the node drag: Escape, and every observed
+     re-render (which detaches the dragged elements), both land here */
+  function cancelNodeDrag(){
+    if (!nodeDrag) return;
+    var nd = nodeDrag;
+    nodeDrag = null;
+    if (nd.el && nd.el.classList) nd.el.classList.remove('dv-dragsrc');
+    if (nd.target && nd.target.classList) nd.target.classList.remove('dv-droptgt');
+  }
   function svgPointAt(svg, inv, clientX, clientY){
     var pt = svg.createSVGPoint();
     pt.x = clientX; pt.y = clientY;
@@ -2718,6 +2856,17 @@ function initWorkbenchBuilder(opts){
   view.addEventListener('mousedown', function(ev){
     if (ev.button !== 0 || connect) return;
     if (!ev.target.closest) return;
+    var nodeEl = ev.target.closest('g.node[data-dv-node]');
+    if (nodeEl && !addToStep && !ev.target.closest('.nbackref, .nlink, a, button')){
+      var ndSec = nodeEl.closest('.doc-sec');
+      if (ndSec && ndSec.hasAttribute('data-dv-section')){
+        nodeDrag = {el: nodeEl, secEl: ndSec, id: nodeEl.getAttribute('data-dv-node'),
+                    gi: parseInt(ndSec.getAttribute('data-dv-section'), 10),
+                    x0: ev.clientX, y0: ev.clientY, moved: false, target: null};
+        ev.preventDefault(); /* no text selection while dragging */
+      }
+      return;
+    }
     var lbl = ev.target.closest('text.lbl[data-dv-edge]');
     if (!lbl) return;
     var svg = lbl.ownerSVGElement;
@@ -2734,6 +2883,19 @@ function initWorkbenchBuilder(opts){
     ev.preventDefault(); /* no text selection while dragging */
   });
   window.addEventListener('mousemove', function(ev){
+    if (nodeDrag){
+      var ddx = ev.clientX - nodeDrag.x0, ddy = ev.clientY - nodeDrag.y0;
+      if (ddx * ddx + ddy * ddy > 25) nodeDrag.moved = true; /* > 5px straight-line */
+      if (!nodeDrag.moved) return;
+      nodeDrag.el.classList.add('dv-dragsrc');
+      var over = document.elementFromPoint(ev.clientX, ev.clientY);
+      var tgt = over && over.closest ? over.closest('g.node[data-dv-node]') : null;
+      if (tgt && (tgt === nodeDrag.el || !nodeDrag.secEl.contains(tgt))) tgt = null;
+      if (nodeDrag.target && nodeDrag.target !== tgt) nodeDrag.target.classList.remove('dv-droptgt');
+      if (tgt) tgt.classList.add('dv-droptgt');
+      nodeDrag.target = tgt;
+      return;
+    }
     if (!drag) return;
     var pt = svgPointAt(drag.svg, drag.inv, ev.clientX, ev.clientY);
     drag.dx = pt.x - drag.x0;
@@ -2742,6 +2904,30 @@ function initWorkbenchBuilder(opts){
     if (drag.moved) drag.lbl.setAttribute('transform', 'translate(' + drag.dx + ' ' + drag.dy + ')');
   });
   window.addEventListener('mouseup', function(){
+    if (nodeDrag){
+      var nd = nodeDrag;
+      nodeDrag = null;
+      nd.el.classList.remove('dv-dragsrc');
+      if (nd.target) nd.target.classList.remove('dv-droptgt');
+      if (!nd.moved) return; /* a plain click: selection proceeds normally */
+      suppressClick = true;
+      setTimeout(function(){ suppressClick = false; }, 0);
+      if (!nd.target) return; /* released over nothing: no change */
+      var ndParsed = parseEditor();
+      if (ndParsed.error){ inspectorMessage(ndParsed.error); return; }
+      var ndPlan = planSwapNodes(src.value, ndParsed.raw, nd.gi, nd.id,
+                                 nd.target.getAttribute('data-dv-node'));
+      if (ndPlan.error){ inspectorMessage(ndPlan.error); return; }
+      pushUndo();
+      src.value = ndPlan.text;
+      render();
+      autosaveDraft();
+      currentTarget = {section: nd.gi, kind: 'node', id: nd.id};
+      insertSection = nd.gi;
+      rehighlight();
+      renderInspector();
+      return;
+    }
     if (!drag) return;
     var d = drag;
     drag = null;
@@ -2799,6 +2985,7 @@ function initWorkbenchBuilder(opts){
      clear the state synchronously before this observer runs, so only
      stale arming is cancelled. */
   new MutationObserver(function(){
+    cancelNodeDrag(); /* the dragged elements just got detached */
     if (connect) cancelConnect('connect cancelled — the page re-rendered');
     if (addToStep && !addModeSurvive)
       cancelAddToStep('add-to-step ended — the page re-rendered');
@@ -2812,6 +2999,7 @@ function initWorkbenchBuilder(opts){
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
+      if (nodeDrag){ cancelNodeDrag(); return; }
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }

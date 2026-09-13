@@ -182,6 +182,10 @@ tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
   font:700 11px 'IBM Plex Mono',monospace; padding:3px 6px; cursor:pointer;}
 .mx:hover{color:#C0392B;}
 
+/* node drag-to-swap: dashed source, accent-ringed drop target */
+g.node.dv-dragsrc .card{stroke-dasharray:5 3; opacity:.75;}
+g.node.dv-droptgt .card{stroke:var(--accent); stroke-width:3;}
+
 /* members of the selected step, marked on the board (distinct from the
    selection ring: dashed) */
 g.node.dv-instep .card{stroke:var(--accent); stroke-width:2; stroke-dasharray:5 3;}

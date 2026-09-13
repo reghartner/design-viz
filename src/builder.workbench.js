@@ -1998,6 +1998,10 @@ function initWorkbenchBuilder(opts){
       src.value = draft.text;
       baselineText = recoveredBaseline == null ? draft.text : recoveredBaseline;
       render();
+      setSelected(null); currentTarget = null;
+      clearMultiSelect(); /* identities in the restored draft may coincide */
+      if (guide) guide.hidden = true;
+      retireInspector();
       bar.hidden = true;
       autosaveDraft();
       if (recoveredBaseline == null) inspectorMessage('original baseline unavailable — diff starts from the recovered draft');

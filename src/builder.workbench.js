@@ -1056,6 +1056,19 @@ function diffSpecs(oldObj, newObj){
         add(path.concat([k]), 'changed', label + ' ' + k + ' changed');
     });
   }
+  /* compare EVERY key present on either side (minus the identity keys the
+     pairing used) — a whitelist here silently hides material edits like a
+     node link, a panel initial, or a contract row's hot flag */
+  function allFields(a, b, path, label, except){
+    a = object(a); b = object(b);
+    var seen = {};
+    Object.keys(a).concat(Object.keys(b)).forEach(function(k){
+      if (seen[k] || (except && except.indexOf(k) >= 0)) return;
+      seen[k] = true;
+      if (JSON.stringify(a[k]) !== JSON.stringify(b[k]))
+        add(path.concat([k]), 'changed', label + ' ' + k + ' changed');
+    });
+  }
   /* Match full identity first; optional similarity disambiguates repeated
      headings. A unique endpoint residual allows an edge kind edit. */
   function pairs(a, b, same, score){
@@ -1071,7 +1084,7 @@ function diffSpecs(oldObj, newObj){
     });
     return {matches: matches, used: used};
   }
-  function compareList(a, b, path, key, label, keys, endpoints){
+  function compareList(a, b, path, key, label, except, endpoints){
     a = list(a); b = list(b);
     var match = pairs(a, b, function(x, y){
       return key(object(x)) === key(object(y)) && (!endpoints || endpoints(x) === endpoints(y));
@@ -1087,7 +1100,7 @@ function diffSpecs(oldObj, newObj){
     b.forEach(function(v, j){
       var itemPath = path.concat([j]), name = label + ' ' + key(object(v));
       if (!match.matches.has(j)) add(itemPath, 'added', name + ' added');
-      else fields(a[match.matches.get(j)], v, keys, itemPath, name);
+      else allFields(a[match.matches.get(j)], v, itemPath, name, except);
     });
     a.forEach(function(v, i){
       if (!match.used.has(i)) add(path, 'removed', label + ' ' + key(object(v)) + ' removed');
@@ -1147,7 +1160,7 @@ function diffSpecs(oldObj, newObj){
     Object.keys(bn).forEach(function(id){
       var np = dp.concat(['nodes', id]);
       if (!Object.prototype.hasOwnProperty.call(an, id)) add(np, 'added', label + ': node ' + id + ' added');
-      else fields(an[id], bn[id], ['title', 'sub', 'icon', 'tint'], np, label + ': node ' + id);
+      else allFields(an[id], bn[id], np, label + ': node ' + id);
     });
     Object.keys(an).forEach(function(id){
       if (!Object.prototype.hasOwnProperty.call(bn, id)) add(dp.concat(['nodes']), 'removed', label + ': node ' + id + ' removed');
@@ -1155,15 +1168,15 @@ function diffSpecs(oldObj, newObj){
     function endpoints(e){ e = object(e); return JSON.stringify([e.from, e.to]); }
     compareList(a.edges, b.edges, dp.concat(['edges']), function(e){
       return e.from + '->' + e.to + (e.kind ? '(' + e.kind + ')' : '');
-    }, label + ': edge', ['label', 'kind'], endpoints);
+    }, label + ': edge', ['from', 'to'], endpoints);
     var as = list(a.steps), bs = list(b.steps);
     if (as.length !== bs.length) add(dp.concat(['steps']), 'changed', label + ': step count changed (' + as.length + ' → ' + bs.length + ')');
     bs.forEach(function(step, i){
-      if (i < as.length) fields(as[i], step, ['text'], dp.concat(['steps', i]), label + ': step ' + (i + 1));
+      if (i < as.length) allFields(as[i], step, dp.concat(['steps', i]), label + ': step ' + (i + 1));
     });
-    compareList(a.panels, b.panels, dp.concat(['panels']), function(p){ return p.id; }, label + ': panel', ['type', 'title']);
+    compareList(a.panels, b.panels, dp.concat(['panels']), function(p){ return p.id; }, label + ': panel', ['id']);
     compareList(object(prev.value.contract).fields, object(ref.value.contract).fields,
-      path.concat(['contract', 'fields']), function(f){ return f.k; }, label + ': contract field', ['v']);
+      path.concat(['contract', 'fields']), function(f){ return f.k; }, label + ': contract field', ['k']);
   });
   old.refs.forEach(function(ref, i){
     if (match.used.has(i)) return;
@@ -1908,11 +1921,8 @@ function initWorkbenchBuilder(opts){
   }
   var draftTimer = null;
   src.addEventListener('input', function(){
-<<<<<<< HEAD
     importedText = null;
-=======
     hideDiff();
->>>>>>> 1227951 (workbench: spec diff view — what changed versus the opened/saved baseline)
     if (draftTimer) clearTimeout(draftTimer);
     draftTimer = setTimeout(autosaveDraft, 800);
   });
@@ -1992,7 +2002,6 @@ function initWorkbenchBuilder(opts){
     });
   }
 
-<<<<<<< HEAD
   /* ---- inline Mermaid import ---- */
   var importBtn = document.getElementById('import-mermaid');
   var importBox = document.getElementById('importbox');
@@ -2050,7 +2059,7 @@ function initWorkbenchBuilder(opts){
       doUndo();
     });
   }
-=======
+
   /* ---- structural diff; reuse the finding jump and source locator ---- */
   function hideDiff(){
     if (diffbox) diffbox.hidden = true;
@@ -2083,7 +2092,6 @@ function initWorkbenchBuilder(opts){
   });
   var renderBtn = document.getElementById('go');
   if (renderBtn) renderBtn.addEventListener('click', hideDiff);
->>>>>>> 1227951 (workbench: spec diff view — what changed versus the opened/saved baseline)
 
   /* ---- board highlight by stable identity, re-applied after renders ---- */
   function cssQuote(s){
@@ -3412,11 +3420,8 @@ function initWorkbenchBuilder(opts){
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
       if (nodeDrag){ cancelNodeDrag(); return; }
-<<<<<<< HEAD
       if (importBox && !importBox.hidden){ importBox.hidden = true; if (importBtn) importBtn.focus(); return; }
-=======
       if (diffbox && !diffbox.hidden){ hideDiff(); diffBtn.focus(); return; }
->>>>>>> 1227951 (workbench: spec diff view — what changed versus the opened/saved baseline)
       if (gallery && !gallery.hidden){ closeGallery(); startersBtn.focus(); return; }
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }

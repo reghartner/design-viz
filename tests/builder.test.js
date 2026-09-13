@@ -1300,7 +1300,6 @@ test('planSwapNodes swaps layout slots across rows, stacks, and floats only', ()
     /"ghost" has no layout slot/);
 });
 
-<<<<<<< HEAD
 /* ================= Mermaid import ================= */
 const MERMAID_SEQ = 'sequenceDiagram\nparticipant A as Alpha Svc\nparticipant B\n' +
   'A->>B: POST /things\nB-->>A: created\n';
@@ -1602,7 +1601,8 @@ test('generated workbench validates imported skeletons and retains expected auth
   assert.strictEqual(lint.length, 4);
   const simple = sandbox.normalize(sandbox.mermaidToSpec(MERMAID_SEQ));
   assert.deepStrictEqual(plain(sandbox.validate(simple)), {errors: [], warnings: []});
-=======
+});
+
 /* ================= baseline diff ================= */
 function diffFixture(){
   return {page: {title: 'T', skin: 'aurora', blocks: [{heading: 'H', diagram: {
@@ -1857,5 +1857,33 @@ test('saved invalid JSON reports an unparseable baseline and mismatched storage 
   const recovery = diffWorkbench(storage);
   recovery.ids.draftbar.children[1].click();
   assert.match(recovery.ids.guide.children[0].textContent, /original baseline unavailable/);
->>>>>>> 1227951 (workbench: spec diff view — what changed versus the opened/saved baseline)
+});
+
+test('diffSpecs sees edits outside any whitelist: node link, panel initial, contract hot, step panels, edge ret', () => {
+  const base = {page: {title: 'T', blocks: [{heading: 'S',
+    contract: {fields: [{k: 'topic', v: 'a/b', hot: true}]},
+    diagram: {
+      nodes: {n1: {title: 'N', link: 'https://a'}, n2: {title: 'M'}},
+      rows: [['n1', 'n2']],
+      edges: [{from: 'n1', to: 'n2', kind: 'int', ret: false}],
+      panels: [{id: 'p1', type: 'gauge', initial: {value: 1}}],
+      steps: [{edge: 'n1->n2', text: 't', panels: {p1: {value: 2}}}]
+    }}]}};
+  const next = JSON.parse(JSON.stringify(base));
+  next.page.blocks[0].diagram.nodes.n1.link = 'https://b';
+  next.page.blocks[0].diagram.panels[0].initial = {value: 9};
+  next.page.blocks[0].contract.fields[0].hot = false;
+  next.page.blocks[0].diagram.steps[0].panels = {p1: {value: 3}};
+  next.page.blocks[0].diagram.edges[0].ret = true;
+  const found = plain(B.diffSpecs(base, next));
+  assert.deepStrictEqual(found.map(f => f.text).sort(), [
+    'S: contract field topic hot changed',
+    'S: edge n1->n2(int) ret changed',
+    'S: node n1 link changed',
+    'S: panel p1 initial changed',
+    'S: step 1 panels changed'
+  ]);
+  for (const f of found) assert.strictEqual(f.kind, 'changed');
+  /* identical specs still yield nothing under the all-keys comparison */
+  assert.deepStrictEqual(plain(B.diffSpecs(base, JSON.parse(JSON.stringify(base)))), []);
 });

@@ -30,7 +30,7 @@ function loadBuilder(extraGlobals){
     ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts,' +
     ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE, planAddTabs, BUILDER_TABS_TEMPLATE,' +
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
-    ' PANEL_SETUP_FIELDS, SCENE_TOKENS,' +
+    ' PANEL_SETUP_FIELDS, PANEL_PATCH_FIELDS, patchSummaryLine, panelPatchFields, patchFieldsCollect, SCENE_TOKENS,' +
     ' builderSectionPrefs,' +
     ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes, builderDeletePlan, planBulkSetField, planBulkDelete, BUILDER_MULTI_KINDS,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
@@ -654,7 +654,7 @@ test('planDuplicateNode clones a float entry wholesale and places it after the o
 function loadValidator(){
   const code =
     fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
-    ';__exports = {validate, normalize, ICON_SET, TINT_SET, PANEL_TYPES};';
+    ';__exports = {validate, normalize, parseClock, ICON_SET, TINT_SET, PANEL_TYPES};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
   return sandbox.__exports;
@@ -1097,6 +1097,129 @@ test('builderStepHops merges the malformed both-keys shape without dropping hops
 });
 
 /* ================= panel setup field table ================= */
+
+test('patchSummaryLine caps summaries at two pairs and handles empty patches', () => {
+  assert.strictEqual(B.patchSummaryLine({}), 'empty patch');
+  assert.strictEqual(B.patchSummaryLine({state: 'held', label: 'hello', reason: 'hidden'}),
+    'state → held · label → hello');
+});
+
+test('patchSummaryLine compacts arrays and objects and prints scalar values bare', () => {
+  assert.strictEqual(B.patchSummaryLine({events: [{at: '1m'}, {}], subject: {x: 2}}),
+    'events → [2 items] · subject → {…}');
+  assert.strictEqual(B.patchSummaryLine({value: 12.5, cold: false}), 'value → 12.5 · cold → false');
+  assert.strictEqual(B.patchSummaryLine({label: 'bare string', alert: true}), 'label → bare string · alert → true');
+  assert.strictEqual(B.patchSummaryLine({cells: [], notify: null}), 'cells → [0 items] · notify → null');
+});
+
+test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and nonempty enums', () => {
+  assert.deepStrictEqual(Object.keys(B.PANEL_PATCH_FIELDS).sort(), [...V.PANEL_TYPES].sort());
+  const kinds = new Set(['text', 'num', 'bool', 'enum', 'clock', 'json', 'jsonArr', 'jsonAny']);
+  for (const fields of Object.values(B.PANEL_PATCH_FIELDS)){
+    for (const [key, kind, extra] of fields){
+      assert.ok(typeof key === 'string' && key.length);
+      assert.ok(kinds.has(kind), kind);
+      if (kind === 'enum') assert.ok(Array.isArray(extra) && extra.length > 0);
+    }
+  }
+  const expected = {
+    state: ['state'], leds: [], gauge: ['value'], log: ['log'], screen: ['mode', 'banner'],
+    waterfall: ['reveal', 'highlight', 'total'], orbit: ['state', 'via'],
+    zoneframe: ['zones', 'subject', 'verdict'], xray: ['layers', 'hop'],
+    queue: ['state', 'label', 'from', 'to', 'reason'], pir: ['subject', 'tripped', 'status', 'banner'],
+    thermo: ['value', 'label'], battery: ['charge', 'trend', 'source', 'cold', 'note', 'label'],
+    buffer: ['cells', 'mark', 'head', 'note', 'label'], radar: ['subject', 'threshold', 'alert', 'status', 'banner'],
+    signal: [], tiles: [], inflight: ['start', 'end', 'mark'], phone: ['clock', 'notify', 'clear'],
+    timeline: ['now', 'events', 'miss']
+  };
+  for (const [type, keys] of Object.entries(expected))
+    assert.deepStrictEqual(plain(B.PANEL_PATCH_FIELDS[type].map(f => f[0])), keys);
+});
+
+test('panelPatchFields uses declaration vocabularies only when nonempty and falls back for unknown types', () => {
+  for (const type of ['state', 'orbit']){
+    assert.deepStrictEqual(plain(B.panelPatchFields({type, states: ['idle', 'busy']})[0]),
+      ['state', 'enum', ['idle', 'busy']]);
+    for (const states of [[], undefined, 'invalid'])
+      assert.deepStrictEqual(plain(B.panelPatchFields({type, states})[0]), ['state', 'text']);
+  }
+  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'gauge'})), [['value', 'num']]);
+  for (const decl of [null, {}, {type: 'future-widget'}, {type: 'toString'}])
+    assert.strictEqual(B.panelPatchFields(decl), null);
+  assert.strictEqual(B.PANEL_PATCH_FIELDS.state[0][1], 'text', 'table stays unchanged');
+});
+
+test('panelPatchFields expands declared led tile and signal ids with the correct nested fields', () => {
+  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'leds', leds: [{id: 'power'}, null, {}, {id: ''}]})),
+    [['power', 'enum', ['on', 'off', 'tx', 'rx']]]);
+  const tile = {type: 'tiles', tiles: [{id: 'front'}], states: ['ready']};
+  assert.deepStrictEqual(plain(B.panelPatchFields(tile)),
+    [['front', 'objf', [['state', 'enum', ['ready']], ['sub', 'text']]]]);
+  tile.states = [];
+  assert.deepStrictEqual(plain(B.panelPatchFields(tile)[0][2][0]), ['state', 'text']);
+  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'signal', links: [{id: 'uplink'}]})),
+    [['uplink', 'objf', [['state', 'enum', ['ok', 'weak', 'retrying', 'lost', 'jammed']],
+      ['bars', 'num', {min: 0, max: 4}], ['note', 'text']]]]);
+  for (const type of ['leds', 'tiles', 'signal']) assert.deepStrictEqual(plain(B.panelPatchFields({type})), []);
+});
+
+test('patchFieldsCollect omits blank fields and preserves false zero and unknown enum tokens', () => {
+  const fields = [['state', 'enum', ['ok']], ['note', 'text'], ['bars', 'num'], ['cold', 'bool']];
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(fields,
+    {state: 'future state ', note: '  ', bars: '0', cold: 'false'}).item),
+    {state: 'future state ', bars: 0, cold: false});
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(fields, {}).item), {});
+  assert.deepStrictEqual(plain(B.patchFieldsCollect([['label', 'text']], {label: ' hello ', unknown: 'ignored'}).item),
+    {label: 'hello'});
+  assert.strictEqual(B.patchFieldsCollect([['cold', 'bool']], {cold: 'true'}).item.cold, true);
+  assert.match(B.patchFieldsCollect([['cold', 'bool']], {cold: 'yes'}).error, /true or false/);
+});
+
+test('patchFieldsCollect rejects invalid numbers and enforces signal bars bounds', () => {
+  const fields = [['bars', 'num', {min: 0, max: 4}]];
+  for (const value of ['oops', '2x', 'Infinity', '1e400'])
+    assert.match(B.patchFieldsCollect(fields, {bars: value}).error, /not a number/);
+  for (const value of ['-1', '5'])
+    assert.match(B.patchFieldsCollect(fields, {bars: value}).error, /from 0 to 4/);
+  for (const value of ['0', '2.5', '4'])
+    assert.strictEqual(B.patchFieldsCollect(fields, {bars: value}).item.bars, Number(value));
+  assert.strictEqual(B.patchFieldsCollect([['value', 'num']], {value: '-1.5e2'}).item.value, -150);
+});
+
+test('patchFieldsCollect validates complex JSON shapes and distinguishes null from deletion', () => {
+  const fields = [['subject', 'json'], ['events', 'jsonArr'], ['notify', 'jsonAny']];
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(fields,
+    {subject: '{"x":2}', events: '[{"at":"1m"}]', notify: 'null'}).item),
+    {subject: {x: 2}, events: [{at: '1m'}], notify: null});
+  for (const raw of ['null', '[]', 'false', '2'])
+    assert.match(B.patchFieldsCollect([fields[0]], {subject: raw}).error, /JSON object/);
+  assert.match(B.patchFieldsCollect([fields[1]], {events: '{}'}).error, /JSON array/);
+  assert.match(B.patchFieldsCollect([fields[2]], {notify: '{bad'}).error, /not valid JSON/);
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(fields, {notify: ' '}).item), {});
+  assert.deepStrictEqual(plain(B.patchFieldsCollect([fields[2]], {notify: '[1]'}).item), {notify: [1]});
+});
+
+test('patchFieldsCollect validates clocks when parseClock is available', () => {
+  const clocks = loadBuilder({parseClock: V.parseClock});
+  const fields = [['now', 'clock']];
+  assert.strictEqual(clocks.patchFieldsCollect(fields, {now: '1h 30m'}).item.now, '1h 30m');
+  assert.strictEqual(clocks.patchFieldsCollect(fields, {now: '0'}).item.now, '0');
+  assert.match(clocks.patchFieldsCollect(fields, {now: 'yesterday'}).error, /duration/);
+  assert.deepStrictEqual(plain(clocks.patchFieldsCollect(fields, {now: '  '}).item), {});
+  assert.strictEqual(B.patchFieldsCollect(fields, {now: 'unvalidated'}).item.now, 'unvalidated');
+});
+
+test('patchFieldsCollect builds whole tile and link replacements and omits all-empty entries', () => {
+  const tileFields = B.panelPatchFields({type: 'tiles', tiles: [{id: 't'}], states: []})[0][2];
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(tileFields, {state: 'anything', sub: 'caption'}).item),
+    {state: 'anything', sub: 'caption'});
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(tileFields, {state: '', sub: 'caption'}).item), {sub: 'caption'});
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(tileFields, {state: '', sub: ' '}).item), {});
+  const linkFields = B.panelPatchFields({type: 'signal', links: [{id: 'l'}]})[0][2];
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(linkFields, {state: 'future', bars: '0', note: ''}).item),
+    {state: 'future', bars: 0});
+  assert.deepStrictEqual(plain(B.patchFieldsCollect(linkFields, {state: '', bars: '', note: ''}).item), {});
+});
 
 test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known control kinds', () => {
   assert.deepStrictEqual(Object.keys(B.PANEL_SETUP_FIELDS).sort(), [...V.PANEL_TYPES].sort());

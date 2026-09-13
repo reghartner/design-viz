@@ -28,7 +28,7 @@ function loadBuilder(extraGlobals){
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
     ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts,' +
-    ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE,' +
+    ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE, planAddTabs, BUILDER_TABS_TEMPLATE,' +
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, SCENE_TOKENS,' +
     ' builderSectionPrefs,' +
@@ -2006,4 +2006,55 @@ test('builderPositionLine: bare-diagram and bare-page spec shapes', () => {
   assert.equal(B.builderPositionLine(bare, {kind: 'step', section: 0, index: 0}), 'step 1 of 1');
   const barePage = {sections: [{heading: 'A'}, {heading: 'B'}]};
   assert.equal(B.builderPositionLine(barePage, {kind: 'section', section: 1}), 'section 2 of 2');
+});
+
+/* ---- planAddTabs: the "+ tabs" insert ---- */
+
+test('planAddTabs appends a two-tab container and reports its landing spot', () => {
+  const spec = {page: {blocks: [{heading: 'A', text: ['x']}]}};
+  const text = JSON.stringify(spec, null, 2);
+  const plan = B.planAddTabs(text, spec);
+  assert.ok(!plan.error);
+  assert.equal(plan.kind, 'tabs');
+  assert.equal(plan.block, 1);
+  assert.equal(plan.index, 1); /* first new section's flat ordinal */
+  const after = JSON.parse(plan.text);
+  const block = after.page.blocks[1];
+  assert.equal(block.tabs.length, 2);
+  assert.deepStrictEqual(block.tabs.map(t => t.label), ['Tab one', 'Tab two']);
+  block.tabs.forEach(t => {
+    assert.equal(t.sections.length, 1);
+    assert.ok(t.sections[0].diagram);
+  });
+  /* both new tab sections are addressable */
+  assert.equal(B.specSectionPaths(after).length, 3);
+});
+
+test('planAddTabs handles bare-page specs and refuses bare diagrams', () => {
+  const barePage = {sections: [{heading: 'A'}]};
+  const plan = B.planAddTabs(JSON.stringify(barePage, null, 2), barePage);
+  assert.ok(!plan.error);
+  const after = JSON.parse(plan.text);
+  assert.equal(after.sections[1].tabs.length, 2);
+
+  const bare = {nodes: {x: {}}, rows: [['x']]};
+  assert.match(B.planAddTabs(JSON.stringify(bare), bare).error, /bare diagram/);
+  assert.match(B.planAddTabs('null', null).error, /no page/);
+});
+
+test('planAddTabs after an existing tabs container: block vs flat-ordinal math', () => {
+  /* blocks: [plain, tabs(2 tabs x 1 section), plain] = 4 flat sections */
+  const spec = {page: {blocks: [
+    {heading: 'A'},
+    {tabs: [{label: 'T1', sections: [{heading: 'B'}]},
+            {label: 'T2', sections: [{heading: 'C'}]}]},
+    {heading: 'D'}
+  ]}};
+  const plan = B.planAddTabs(JSON.stringify(spec, null, 2), spec);
+  assert.ok(!plan.error);
+  assert.equal(plan.block, 3);  /* list slot among blocks */
+  assert.equal(plan.index, 4);  /* flat section ordinal of the first new tab section */
+  const after = JSON.parse(plan.text);
+  assert.equal(after.page.blocks.length, 4);
+  assert.equal(B.specSectionPaths(after).length, 6);
 });

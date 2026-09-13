@@ -2181,3 +2181,11 @@ test('planAddTabs after an existing tabs container: block vs flat-ordinal math',
   assert.equal(after.page.blocks.length, 4);
   assert.equal(B.specSectionPaths(after).length, 6);
 });
+
+test('patchFieldsCollect: a trueOnly bool refuses false (phone clear)', () => {
+  const clear = [['clear', 'bool', {trueOnly: true}]];
+  assert.strictEqual(B.patchFieldsCollect(clear, {clear: 'true'}).item.clear, true);
+  assert.match(B.patchFieldsCollect(clear, {clear: 'false'}).error, /only true/);
+  assert.deepStrictEqual(Object.keys(B.patchFieldsCollect(clear, {clear: ''}).item), []);
+  assert.deepStrictEqual(plain(B.PANEL_PATCH_FIELDS.phone[2]), ['clear', 'bool', {trueOnly: true}]);
+});

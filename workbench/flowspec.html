@@ -11449,7 +11449,7 @@ var PANEL_PATCH_FIELDS = {
   signal:    [],
   tiles:     [],
   inflight:  [['start', 'jsonArr'], ['end', 'jsonArr'], ['mark', 'jsonArr']],
-  phone:     [['clock', 'text'], ['notify', 'jsonAny'], ['clear', 'bool']],
+  phone:     [['clock', 'text'], ['notify', 'jsonAny'], ['clear', 'bool', {trueOnly: true}]],
   timeline:  [['now', 'clock'], ['events', 'jsonArr'], ['miss', 'jsonArr']]
 };
 var OPEN_PATCH_EDITORS = new Set();
@@ -11502,6 +11502,10 @@ function patchFieldsCollect(fields, values){
         return {error: key + ': use a number from ' + extra.min + ' to ' + extra.max};
     } else if (kind === 'bool'){
       if (raw !== 'true' && raw !== 'false') return {error: key + ': use true or false'};
+      /* the validator accepts only literal true for phone clear — false is
+         an always-warned no-op, so the form refuses to write it */
+      if (extra && extra.trueOnly && raw === 'false')
+        return {error: key + ': only true (or unset) — false is ignored by the renderer'};
       value = raw === 'true';
     } else if (kind === 'clock' && builderClockInvalid(raw)){
       return {error: key + ': "' + raw + '" is not ' + BUILDER_CLOCK_HINT};
@@ -12511,7 +12515,8 @@ function initWorkbenchBuilder(opts){
     function fieldInput(f, value){
       var input;
       if (f[1] === 'enum' || f[1] === 'bool'){
-        input = colInput({k: f[0], kind: 'enum', options: f[1] === 'bool' ? ['true', 'false'] : f[2]},
+        var boolOpts = f[2] && f[2].trueOnly ? ['true'] : ['true', 'false'];
+        input = colInput({k: f[0], kind: 'enum', options: f[1] === 'bool' ? boolOpts : f[2]},
           value == null ? null : String(value));
         input.options[0].textContent = '(unset)';
       } else if (['json', 'jsonArr', 'jsonAny'].indexOf(f[1]) >= 0){

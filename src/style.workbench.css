@@ -32,11 +32,29 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 @media (min-width:1181px){
   .workwrap{display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:16px; align-items:start;}
   .workwrap .specbox{position:sticky; top:12px; margin-top:30px;}
-  /* fill the viewport beside the page; the 252px budget covers the sticky
-     offset, the summary bar, the insert row, and the render row — and grows
-     by the guide panel's 200px cap while guidance is showing */
-  .workwrap .specbox #src{height:calc(100vh - 252px);}
-  .workwrap .specbox:has(.guide:not([hidden])) #src{height:max(200px, calc(100vh - 592px));}
+  /* the editor column is a flex stack capped to the viewport. The JSON
+     source section absorbs the leftover height while it is open;
+     collapsing it hands that height to the inspector section instead
+     (the :has() rows below), so a long inspector form gets the room.
+     A <details> element boxes its non-summary children inside the
+     ::details-content pseudo, so every flex pipe below styles that
+     pseudo too — flex on the details alone reaches only the summary. */
+  .workwrap .specbox[open]{display:flex; flex-direction:column; max-height:calc(100vh - 24px);}
+  /* while the source section is open the column takes a DEFINITE height so
+     flex-grow can hand the leftover to the textarea; collapsed, the column
+     hugs its content under the same cap */
+  .workwrap .specbox[open]:has(#sec-source[open]){height:calc(100vh - 24px);}
+  .workwrap .specbox[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
+  .workwrap .specbox > summary, .workwrap .ssec > summary{flex:none;}
+  .workwrap .ssec{min-height:0;}
+  .workwrap #sec-source[open]{flex:1 1 240px; display:flex; flex-direction:column;}
+  .workwrap #sec-source[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
+  .workwrap #sec-source[open] #src{flex:1 1 auto; height:auto; min-height:140px; resize:none;}
+  .workwrap #sec-inspect[open]{flex:0 1 auto; display:flex; flex-direction:column;}
+  .workwrap #sec-inspect[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
+  .workwrap #sec-inspect[open] .guide{overflow-y:auto;}
+  .workwrap .specbox:has(#sec-source:not([open])) #sec-inspect[open]{flex:1 1 auto;}
+  .workwrap .specbox:has(#sec-source:not([open])) #sec-inspect[open] .guide{max-height:none; flex:1 1 auto;}
   .workwrap .msgs{max-height:120px; overflow-y:auto;}
 }
 
@@ -57,9 +75,19 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 
 /* spec editor */
 .specbox{margin-top:14px; border:1px solid var(--line); border-radius:10px; background:var(--card);}
-.specbox summary{cursor:pointer; padding:9px 14px; font:600 12px 'IBM Plex Mono',monospace; color:var(--sub);}
-.specbox summary:hover{color:var(--ink);}
-.specbox[open] summary{border-bottom:1px solid var(--line);}
+.specbox > summary{cursor:pointer; padding:9px 14px; font:600 12px 'IBM Plex Mono',monospace; color:var(--sub);}
+.specbox > summary:hover{color:var(--ink);}
+.specbox[open] > summary{border-bottom:1px solid var(--line);}
+
+/* collapsible editor sections: insert / inspector / JSON source */
+/* class display rules (flex on .draftbar/.palette and the section rows
+   above) would otherwise beat the hidden attribute's UA display:none */
+.specbox [hidden]{display:none !important;}
+.ssec > summary{cursor:pointer; padding:7px 14px; font:600 11px 'IBM Plex Mono',monospace;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--sub);
+  border-bottom:1px solid var(--line); user-select:none;}
+.ssec > summary:hover{color:var(--ink);}
+.ssec > summary:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
 .specbox #src{display:block; width:100%; box-sizing:border-box; height:440px; border:0; resize:vertical;
   background:var(--codebg); color:var(--codeink); font:12px/1.5 'IBM Plex Mono',monospace; padding:12px 14px; tab-size:2;}
 .specbox #src:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}

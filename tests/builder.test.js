@@ -30,6 +30,7 @@ function loadBuilder(){
     ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE,' +
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, SCENE_TOKENS,' +
+    ' builderSectionPrefs,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -952,4 +953,22 @@ test('the timeline palette starter renders a validator-clean heartbeat setup', (
   const v = V.validate(V.normalize(plain(JSON.parse(plan.text))));
   assert.deepStrictEqual(plain(v.errors), []);
   assert.deepStrictEqual(plain(v.warnings), []);
+});
+
+/* ---------------- collapsible editor sections: persisted prefs ---------------- */
+
+test('builderSectionPrefs defaults to everything open on missing/garbage input', () => {
+  for (const raw of [null, undefined, '', 'not json', '42', '"str"', '[]']){
+    assert.deepStrictEqual(plain(B.builderSectionPrefs(raw)), {insert: true, source: true});
+  }
+});
+
+test('builderSectionPrefs honors stored booleans and ignores everything else', () => {
+  assert.deepStrictEqual(plain(B.builderSectionPrefs('{"insert":false,"source":false}')),
+    {insert: false, source: false});
+  assert.deepStrictEqual(plain(B.builderSectionPrefs('{"source":false}')),
+    {insert: true, source: false});
+  /* non-boolean values and unknown keys fall back to open */
+  assert.deepStrictEqual(plain(B.builderSectionPrefs('{"insert":"no","source":1,"extra":true}')),
+    {insert: true, source: true});
 });

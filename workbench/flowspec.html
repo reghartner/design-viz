@@ -178,6 +178,12 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .rawjson > summary:hover{color:var(--ink);}
 .rawjson[open] > summary{margin-bottom:4px;}
 .rawjson textarea.fctl{width:100%; box-sizing:border-box;}
+.patchedit{min-width:0; border:1px solid var(--line); border-radius:6px; padding:6px 8px;}
+.patchedit > summary{cursor:pointer; font:600 11px/1.5 'IBM Plex Mono',monospace; color:var(--sub); overflow-wrap:anywhere;}
+.patchedit > summary:hover{color:var(--ink);}
+.patchedit[open] > summary{margin-bottom:8px;}
+.patchedit > summary:focus-visible, .patchedit .rawjson > summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+.patchedit .rawjson{margin-top:4px;}
 .fchk{border:0; background:none; padding:0;}
 .fnote{border:0; background:none; font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); padding:0;}
 .iacts{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
@@ -11419,6 +11425,102 @@ var PANEL_SETUP_FIELDS = {
               ['initial', 'json']]
 };
 
+/* Dynamic-key types are expanded from their declarations by panelPatchFields. */
+var PANEL_PATCH_FIELDS = {
+  state:     [['state', 'text']],
+  leds:      [],
+  gauge:     [['value', 'num']],
+  log:       [['log', 'jsonArr']],
+  screen:    [['mode', 'enum', ['off', 'boot', 'live', 'rec', 'save']], ['banner', 'text']],
+  waterfall: [['reveal', 'num'], ['highlight', 'text'], ['total', 'text']],
+  orbit:     [['state', 'text'], ['via', 'text']],
+  zoneframe: [['zones', 'jsonArr'], ['subject', 'json'],
+              ['verdict', 'enum', ['alert', 'suppress', 'never-captured']]],
+  xray:      [['layers', 'jsonArr'], ['hop', 'text']],
+  queue:     [['state', 'enum', ['empty', 'enqueue', 'held', 'dequeue']], ['label', 'text'],
+              ['from', 'text'], ['to', 'text'], ['reason', 'text']],
+  pir:       [['subject', 'json'], ['tripped', 'bool'], ['status', 'text'], ['banner', 'text']],
+  thermo:    [['value', 'num'], ['label', 'text']],
+  battery:   [['charge', 'num'], ['trend', 'enum', ['charging', 'draining', 'idle']],
+              ['source', 'enum', ['solar', 'wired', 'poe', 'cells']], ['cold', 'bool'],
+              ['note', 'text'], ['label', 'text']],
+  buffer:    [['cells', 'jsonArr'], ['mark', 'jsonArr'], ['head', 'num'], ['note', 'text'], ['label', 'text']],
+  radar:     [['subject', 'json'], ['threshold', 'num'], ['alert', 'bool'], ['status', 'text'], ['banner', 'text']],
+  signal:    [],
+  tiles:     [],
+  inflight:  [['start', 'jsonArr'], ['end', 'jsonArr'], ['mark', 'jsonArr']],
+  phone:     [['clock', 'text'], ['notify', 'jsonAny'], ['clear', 'bool', {trueOnly: true}]],
+  timeline:  [['now', 'clock'], ['events', 'jsonArr'], ['miss', 'jsonArr']]
+};
+var OPEN_PATCH_EDITORS = new Set();
+
+function patchSummaryLine(patchObj){
+  var keys = Object.keys(patchObj || {}).slice(0, 2);
+  if (!keys.length) return 'empty patch';
+  return keys.map(function(key){
+    var value = patchObj[key];
+    var compact = Array.isArray(value) ? '[' + value.length + ' items]' :
+      value !== null && typeof value === 'object' ? '{…}' : String(value);
+    return key + ' → ' + compact;
+  }).join(' · ');
+}
+
+function panelPatchFields(decl){
+  if (!decl || !Object.prototype.hasOwnProperty.call(PANEL_PATCH_FIELDS, decl.type)) return null;
+  var states = Array.isArray(decl.states) ? decl.states.map(String) : [];
+  var stateField = states.length ? ['state', 'enum', states] : ['state', 'text'];
+  if (decl.type === 'state') return [stateField];
+  if (decl.type === 'orbit') return [stateField, ['via', 'text']];
+  if (['leds', 'tiles', 'signal'].indexOf(decl.type) >= 0){
+    var ids = decl[decl.type === 'signal' ? 'links' : decl.type];
+    return (Array.isArray(ids) ? ids : []).filter(function(item){
+      return item && typeof item.id === 'string' && item.id !== '';
+    }).map(function(item){
+      if (decl.type === 'leds') return [item.id, 'enum', ['on', 'off', 'tx', 'rx']];
+      return [item.id, 'objf', decl.type === 'tiles' ? [stateField, ['sub', 'text']] :
+        [['state', 'enum', ['ok', 'weak', 'retrying', 'lost', 'jammed']],
+         ['bars', 'num', {min: 0, max: 4}], ['note', 'text']]];
+    });
+  }
+  return PANEL_PATCH_FIELDS[decl.type];
+}
+
+/* Collect only the supplied fields. Blank values omit keys; callers merge
+   at the patch level, but dynamic tile/link objects replace wholesale. */
+function patchFieldsCollect(fields, values){
+  var item = Object.create(null);
+  for (var i = 0; i < fields.length; i++){
+    var f = fields[i], key = f[0], kind = f[1], extra = f[2];
+    var raw = values[key] == null ? '' : String(values[key]);
+    if (kind !== 'enum') raw = raw.trim();
+    if (raw === '') continue;
+    var value = raw;
+    if (kind === 'num'){
+      value = Number(raw);
+      if (!isFinite(value)) return {error: key + ': "' + raw + '" is not a number'};
+      if (extra && (value < extra.min || value > extra.max))
+        return {error: key + ': use a number from ' + extra.min + ' to ' + extra.max};
+    } else if (kind === 'bool'){
+      if (raw !== 'true' && raw !== 'false') return {error: key + ': use true or false'};
+      /* the validator accepts only literal true for phone clear — false is
+         an always-warned no-op, so the form refuses to write it */
+      if (extra && extra.trueOnly && raw === 'false')
+        return {error: key + ': only true (or unset) — false is ignored by the renderer'};
+      value = raw === 'true';
+    } else if (kind === 'clock' && builderClockInvalid(raw)){
+      return {error: key + ': "' + raw + '" is not ' + BUILDER_CLOCK_HINT};
+    } else if (kind === 'json' || kind === 'jsonArr' || kind === 'jsonAny'){
+      try { value = JSON.parse(raw); }
+      catch (ex){ return {error: key + ': not valid JSON (' + ex.message + ')'}; }
+      if (kind === 'jsonArr' && !Array.isArray(value)) return {error: key + ' is a JSON array — [ ... ]'};
+      if (kind === 'json' && (!value || typeof value !== 'object' || Array.isArray(value)))
+        return {error: key + ' is a JSON object — { ... }'};
+    }
+    item[key] = value;
+  }
+  return {item: item};
+}
+
 var SCENE_TOKENS = ['person-at-door-night', 'package-drop', 'static-noise'];
 
 /* parseClock rides in the same bundle (validator.js); the vm-loaded test
@@ -12367,16 +12469,120 @@ function initWorkbenchBuilder(opts){
     rows.push(chipRow('panels',
       pids.map(function(pid){ return {key: pid, label: pid}; }),
       'none', toggled(planStepTogglePanel)));
-    /* every patch gets its own editor, open by default */
+    var declarations = (ctx.diagram && ctx.diagram.panels) || [];
     pids.forEach(function(pid){
-      rows.push(frow('patch ' + pid, textControl(JSON.stringify(val.panels[pid]), function(v){
-        if (v == null){ formError('a patch is a JSON object — remove the panel chip instead'); return false; }
-        return commitCascade(function(raw){
-          return planStepSetPanelPatch(src.value, raw, t.section, t.index, pid, v);
-        }, {after: function(){ renderInspector(); }});
-      }, {textarea: true})));
+      var decl = Array.isArray(declarations) ? declarations.filter(function(p){ return p && p.id === pid; })[0] : null;
+      rows.push(panelPatchControl(pid, val.panels[pid], decl, t));
     });
     return rows;
+  }
+  function panelPatchControl(pid, patch, decl, target){
+    var det = document.createElement('details');
+    det.className = 'patchedit';
+    det.open = OPEN_PATCH_EDITORS.has(pid);
+    det.addEventListener('toggle', function(ev){
+      if (ev.target !== det || !guide.contains(det)) return;
+      if (det.open) OPEN_PATCH_EDITORS.add(pid);
+      else OPEN_PATCH_EDITORS.delete(pid);
+    });
+    var summary = document.createElement('summary');
+    summary.textContent = pid + ' · ' + patchSummaryLine(patch);
+    det.appendChild(summary);
+    var body = document.createElement('div');
+    body.className = 'rowsedit';
+    det.appendChild(body);
+
+    function commitPatch(key, value, whole){
+      if (addToStep){
+        formError('finish ADD TO STEP first (DONE or Esc) — this control is paused while the mode is armed');
+        return false;
+      }
+      var ok = commitCascade(function(raw){
+        var next = value;
+        if (!whole){
+          var got = builderStepAt(raw, target.section, target.index);
+          if (!got || !got.st.panels || !Object.prototype.hasOwnProperty.call(got.st.panels, pid))
+            return {error: 'panel "' + pid + '" is not in this step'};
+          next = Object.assign(Object.create(null), got.st.panels[pid]);
+          if (value === undefined) delete next[key];
+          else next[key] = value;
+        }
+        return planStepSetPanelPatch(src.value, raw, target.section, target.index, pid, JSON.stringify(next));
+      });
+      if (ok) refreshFormSoon();
+      return ok;
+    }
+    function fieldInput(f, value){
+      var input;
+      if (f[1] === 'enum' || f[1] === 'bool'){
+        var boolOpts = f[2] && f[2].trueOnly ? ['true'] : ['true', 'false'];
+        input = colInput({k: f[0], kind: 'enum', options: f[1] === 'bool' ? boolOpts : f[2]},
+          value == null ? null : String(value));
+        input.options[0].textContent = '(unset)';
+      } else if (['json', 'jsonArr', 'jsonAny'].indexOf(f[1]) >= 0){
+        input = document.createElement('textarea');
+        input.className = 'fctl';
+        input.value = value === undefined ? '' : JSON.stringify(value);
+      } else {
+        input = colInput({k: f[0], kind: f[1]}, value);
+        if (f[1] === 'num') input.className += ' fnum';
+      }
+      input.setAttribute('aria-label', f[0]);
+      return input;
+    }
+    function rawControl(){
+      return textControl(JSON.stringify(patch), function(v){
+        if (v == null){ formError('a patch is a JSON object — remove the panel chip instead'); return false; }
+        var out = patchFieldsCollect([['patch', 'json']], {patch: v});
+        if (out.error){ formError(out.error); return false; }
+        return commitPatch(null, out.item.patch, true);
+      }, {textarea: true});
+    }
+    var fields = panelPatchFields(decl);
+    if (fields === null){
+      body.appendChild(frow('patch ' + pid, rawControl()));
+      return det;
+    }
+    fields.forEach(function(f){
+      var key = f[0], cur = patch && patch[key];
+      if (f[1] === 'objf'){
+        var group = document.createElement('div');
+        group.className = 'rowsedit';
+        var inputs = Object.create(null);
+        function commitGroup(){
+          var values = Object.create(null);
+          Object.keys(inputs).forEach(function(k){ values[k] = inputs[k].value; });
+          var out = patchFieldsCollect(f[2], values);
+          if (out.error){ formError(key + ': ' + out.error); return false; }
+          return commitPatch(key, Object.keys(out.item).length ? out.item : undefined);
+        }
+        f[2].forEach(function(col){
+          var input = fieldInput(col, cur && cur[col[0]]);
+          inputs[col[0]] = input;
+          wireCommit(input, commitGroup);
+          group.appendChild(frow(col[0], input));
+        });
+        body.appendChild(frowBlock(key, group));
+      } else {
+        var input = fieldInput(f, cur);
+        wireCommit(input, function(){
+          var values = Object.create(null);
+          values[key] = input.value;
+          var out = patchFieldsCollect([f], values);
+          if (out.error){ formError(out.error); return false; }
+          return commitPatch(key, out.item[key]);
+        });
+        body.appendChild(frow(key, input));
+      }
+    });
+    var rawFold = document.createElement('details');
+    rawFold.className = 'rawjson';
+    var rawSummary = document.createElement('summary');
+    rawSummary.textContent = 'raw JSON';
+    rawFold.appendChild(rawSummary);
+    rawFold.appendChild(rawControl());
+    body.appendChild(rawFold);
+    return det;
   }
   function jsonFieldControl(key, value, kind, after){
     /* kind: 'json' (object) | 'jsonArr' (array) | 'jsonAny' (any JSON —
@@ -13197,7 +13403,7 @@ function initWorkbenchBuilder(opts){
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
-    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert';
+    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, .patchedit .fctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
        step, re-render from outside the mode, or leave the page state

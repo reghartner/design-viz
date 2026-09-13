@@ -1278,8 +1278,11 @@ function initWorkbenchBuilder(opts){
     if (specbox && !specbox.open) specbox.open = true;
     if (secSource && !secSource.open) secSource.open = true; /* toggle listener persists */
   }
-  /* the inspector section only exists while it has content */
+  /* the inspector section only exists while it has content. Revealing it
+     also opens the OUTER editor box (else a collapsed specbox hides the
+     freshly rendered inspector) — but never the JSON source section. */
   function revealInspector(){
+    if (specbox && !specbox.open) specbox.open = true;
     if (!secInspect) return;
     secInspect.hidden = false;
     if (!secInspect.open) secInspect.open = true;

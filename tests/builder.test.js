@@ -2006,6 +2006,8 @@ test('builderPositionLine: bare-diagram and bare-page spec shapes', () => {
   assert.equal(B.builderPositionLine(bare, {kind: 'step', section: 0, index: 0}), 'step 1 of 1');
   const barePage = {sections: [{heading: 'A'}, {heading: 'B'}]};
   assert.equal(B.builderPositionLine(barePage, {kind: 'section', section: 1}), 'section 2 of 2');
+});
+
 /* ---- planAddTabs: the "+ tabs" insert ---- */
 
 test('planAddTabs appends a two-tab container and reports its landing spot', () => {
@@ -2038,4 +2040,21 @@ test('planAddTabs handles bare-page specs and refuses bare diagrams', () => {
   const bare = {nodes: {x: {}}, rows: [['x']]};
   assert.match(B.planAddTabs(JSON.stringify(bare), bare).error, /bare diagram/);
   assert.match(B.planAddTabs('null', null).error, /no page/);
+});
+
+test('planAddTabs after an existing tabs container: block vs flat-ordinal math', () => {
+  /* blocks: [plain, tabs(2 tabs x 1 section), plain] = 4 flat sections */
+  const spec = {page: {blocks: [
+    {heading: 'A'},
+    {tabs: [{label: 'T1', sections: [{heading: 'B'}]},
+            {label: 'T2', sections: [{heading: 'C'}]}]},
+    {heading: 'D'}
+  ]}};
+  const plan = B.planAddTabs(JSON.stringify(spec, null, 2), spec);
+  assert.ok(!plan.error);
+  assert.equal(plan.block, 3);  /* list slot among blocks */
+  assert.equal(plan.index, 4);  /* flat section ordinal of the first new tab section */
+  const after = JSON.parse(plan.text);
+  assert.equal(after.page.blocks.length, 4);
+  assert.equal(B.specSectionPaths(after).length, 6);
 });

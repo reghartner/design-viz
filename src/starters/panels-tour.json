@@ -1,0 +1,50 @@
+{
+  "page": {
+    "title": "Panel showcase",
+    "sections": [
+      {
+        "heading": "Watch the device wake up",
+        "text": ["Advance through the four steps to see sparse patches change device state, indicators, a gauge, an event log, and elapsed time."],
+        "diagram": {
+          "view": "step",
+          "nodes": {
+            "console": {"title": "Console", "icon": "terminal", "tint": "cmd"},
+            "gateway": {"title": "Gateway", "icon": "router", "tint": "mqtt"},
+            "device": {"title": "Device", "icon": "chip", "tint": "dev"}
+          },
+          "rows": [["console", "gateway", "device"]],
+          "edges": [
+            {"from": "console", "to": "gateway", "kind": "https", "label": "wake"},
+            {"from": "gateway", "to": "device", "kind": "mqtt", "label": "start"}
+          ],
+          "panels": [
+            {"id": "status", "type": "state", "title": "Device state", "states": ["OFF", "BOOT", "LIVE"], "initial": {"state": "OFF"}},
+            {"id": "indicators", "type": "leds", "title": "Indicators", "leds": [{"id": "power", "label": "PWR"}, {"id": "radio", "label": "RADIO"}], "initial": {"power": "off", "radio": "off"}},
+            {"id": "draw", "type": "gauge", "title": "Current draw", "unit": "mA", "max": 100, "initial": {"value": 0}},
+            {"id": "events", "type": "log", "title": "Event log", "tags": {"DEV": "#4ADE80"}, "initial": {"log": [{"tag": "DEV", "text": "waiting for wake"}]}},
+            {"id": "clock", "type": "timeline", "title": "Device schedule", "span": "1h", "lanes": [{"id": "heartbeat", "label": "heartbeat", "every": "10m"}, {"id": "report", "label": "report", "every": "30m"}], "initial": {"now": "0m", "events": []}}
+          ],
+          "steps": [
+            {"edge": "console->gateway", "text": "Request a wake-up", "panels": {
+              "events": {"log": [{"tag": "DEV", "text": "wake requested"}]},
+              "clock": {"now": "5m", "events": [{"at": "5m", "label": "wake", "kind": "info"}]}
+            }},
+            {"edge": "gateway->device", "text": "Power on and boot", "panels": {
+              "status": {"state": "BOOT"}, "indicators": {"power": "on"}, "draw": {"value": 80},
+              "events": {"log": [{"tag": "DEV", "text": "boot started"}]}, "clock": {"now": "10m"}
+            }},
+            {"nodes": ["device"], "text": "Radio connects and the device becomes live", "panels": {
+              "status": {"state": "LIVE"}, "indicators": {"radio": "on"}, "draw": {"value": 35},
+              "events": {"log": [{"tag": "DEV", "text": "radio connected"}]},
+              "clock": {"now": "20m", "events": [{"at": "20m", "label": "online", "kind": "ok"}]}
+            }},
+            {"nodes": ["device"], "text": "Settle into low-power reporting", "panels": {
+              "draw": {"value": 12}, "events": {"log": [{"tag": "DEV", "text": "first report sent"}]},
+              "clock": {"now": "30m", "events": [{"at": "30m", "label": "report", "kind": "ok"}]}
+            }}
+          ]
+        }
+      }
+    ]
+  }
+}

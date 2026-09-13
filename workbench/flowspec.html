@@ -119,6 +119,15 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .pbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .pbtn svg{width:14px; height:14px;}
 
+.gallery{display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px; border-bottom:1px solid var(--line);
+  max-height:240px; overflow-y:auto;}
+.gallery[hidden]{display:none;}
+.starter-card{display:flex; flex-direction:column; align-items:flex-start; gap:5px; text-align:left;
+  flex:1 1 220px; padding:10px;}
+.starter-card span{font-weight:400;}
+.starter-confirm{display:flex; align-items:center; flex-wrap:wrap; gap:8px; width:100%;
+  font:500 11px 'IBM Plex Mono',monospace; color:var(--sub);}
+
 .guide{border-bottom:1px solid var(--line); padding:10px 14px; font-size:12.5px; line-height:1.5; color:var(--sub);
   max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}
@@ -4212,11 +4221,13 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
           <button class="bbtn" id="add-step">+ step</button>
           <button class="bbtn" id="add-panel">+ panel</button>
           <button class="bbtn" id="add-section">+ section</button>
+        <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
           <button class="bbtn" id="undo-builder" disabled>undo</button>
           <button class="bbtn" id="redo-builder" disabled>redo</button>
           <span class="btarget" id="btarget"></span>
         </div>
         <div class="palette" id="palette" hidden></div>
+        <div class="gallery" id="gallery" hidden></div>
       </details>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
@@ -4325,6 +4336,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 <script>
 (function(){
   'use strict';
+var STARTERS = [{"name": "blank flow", "desc": "Three nodes and two hops to make your own.", "spec": {"page": {"title": "Blank flow", "sections": [{"heading": "Your flow", "diagram": {"nodes": {"client": {"title": "Client", "icon": "terminal"}, "service": {"title": "Service", "icon": "gear"}, "store": {"title": "Store", "icon": "db"}}, "rows": [["client", "service", "store"]], "edges": [{"from": "client", "to": "service", "kind": "https"}, {"from": "service", "to": "store", "kind": "int"}], "steps": [{"edge": "client->service", "text": "Send a request"}, {"edge": "service->store", "text": "Store the result"}]}}]}}}, {"name": "panel showcase", "desc": "Five panels updated across four steps.", "spec": {"page": {"title": "Panel showcase", "sections": [{"heading": "Watch the device wake up", "text": ["Advance through the four steps to see sparse patches change device state, indicators, a gauge, an event log, and elapsed time."], "diagram": {"view": "step", "nodes": {"console": {"title": "Console", "icon": "terminal", "tint": "cmd"}, "gateway": {"title": "Gateway", "icon": "router", "tint": "mqtt"}, "device": {"title": "Device", "icon": "chip", "tint": "dev"}}, "rows": [["console", "gateway", "device"]], "edges": [{"from": "console", "to": "gateway", "kind": "https", "label": "wake"}, {"from": "gateway", "to": "device", "kind": "mqtt", "label": "start"}], "panels": [{"id": "status", "type": "state", "title": "Device state", "states": ["OFF", "BOOT", "LIVE"], "initial": {"state": "OFF"}}, {"id": "indicators", "type": "leds", "title": "Indicators", "leds": [{"id": "power", "label": "PWR"}, {"id": "radio", "label": "RADIO"}], "initial": {"power": "off", "radio": "off"}}, {"id": "draw", "type": "gauge", "title": "Current draw", "unit": "mA", "max": 100, "initial": {"value": 0}}, {"id": "events", "type": "log", "title": "Event log", "tags": {"DEV": "#4ADE80"}, "initial": {"log": [{"tag": "DEV", "text": "waiting for wake"}]}}, {"id": "clock", "type": "timeline", "title": "Device schedule", "span": "1h", "lanes": [{"id": "heartbeat", "label": "heartbeat", "every": "10m"}, {"id": "report", "label": "report", "every": "30m"}], "initial": {"now": "0m", "events": []}}], "steps": [{"edge": "console->gateway", "text": "Request a wake-up", "panels": {"events": {"log": [{"tag": "DEV", "text": "wake requested"}]}, "clock": {"now": "5m", "events": [{"at": "5m", "label": "wake", "kind": "info"}]}}}, {"edge": "gateway->device", "text": "Power on and boot", "panels": {"status": {"state": "BOOT"}, "indicators": {"power": "on"}, "draw": {"value": 80}, "events": {"log": [{"tag": "DEV", "text": "boot started"}]}, "clock": {"now": "10m"}}}, {"nodes": ["device"], "text": "Radio connects and the device becomes live", "panels": {"status": {"state": "LIVE"}, "indicators": {"radio": "on"}, "draw": {"value": 35}, "events": {"log": [{"tag": "DEV", "text": "radio connected"}]}, "clock": {"now": "20m", "events": [{"at": "20m", "label": "online", "kind": "ok"}]}}}, {"nodes": ["device"], "text": "Settle into low-power reporting", "panels": {"draw": {"value": 12}, "events": {"log": [{"tag": "DEV", "text": "first report sent"}]}, "clock": {"now": "30m", "events": [{"at": "30m", "label": "report", "kind": "ok"}]}}}]}}]}}}, {"name": "full demo", "desc": "The complete Flowview demo page.", "spec": {"page": {"__demo": true, "title": "Flowview template \u2014 demo spec", "skin": "aurora", "sections": [{"heading": "Replace this spec", "accent": "cyan", "source": "https://example.com/hld/demo#overview", "text": ["This is the built-in demo. Inject your own spec into the flowspec JSON block at the top of this file; the page renders it on load."], "diagram": {"nodes": {"a": {"title": "Client", "sub": "mobile app", "icon": "phone", "tint": "cmd"}, "b": {"title": "API", "sub": "gateway", "icon": "cloud", "tint": "cmd", "link": "https://example.com/hld/demo#api"}, "c": {"title": "Broker", "sub": "MQTT", "icon": "antenna", "tint": "mqtt"}, "d": {"title": "Device", "sub": "t/1 subscriber", "icon": "chip", "tint": "dev"}}, "rows": [["a", "b", "c", "d"]], "edges": [{"from": "a", "to": "b", "kind": "https", "label": "POST /msg"}, {"from": "b", "to": "c", "kind": "mqtt", "label": "PUBLISH t/1"}, {"from": "c", "to": "d", "kind": "mqtt", "label": "deliver"}, {"from": "d", "to": "c", "kind": "mqtt", "ret": true, "label": "PUBACK", "bend": 26, "labelDy": 22}], "steps": [{"edge": "a->b", "text": "Client sends the message"}, {"edge": "b->c", "text": "API publishes to the broker", "link": "https://example.com/hld/demo#publish"}, {"edge": "c->d", "text": "Broker delivers to the subscriber"}, {"edge": "d->c", "text": "Device acknowledges"}]}}]}}}];
 /* ---- src/validator.js ---- */
 /* validator.js — constants, helpers, normalize/validate, panel-state folding.
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
@@ -9905,6 +9917,17 @@ function specValueAt(raw, path){
   for (var i = 0; i < path.length && v != null; i++) v = v[path[i]];
   return v;
 }
+function starterCountLine(spec){
+  var nodes = 0, steps = 0, panels = 0;
+  specSectionPaths(spec).forEach(function(rec){
+    var d = specValueAt(spec, rec.diagram);
+    if (!d) return;
+    nodes += Object.keys(d.nodes || {}).length;
+    steps += (d.steps || []).length;
+    panels += (d.panels || []).length;
+  });
+  return nodes + ' nodes · ' + steps + ' steps · ' + panels + ' panels';
+}
 function builderTargetPath(raw, target){
   /* target: {section:<zero-based ordinal>, kind, id?, index?} → path array
      into the raw editor JSON, or null. Tabs address by block index
@@ -12439,7 +12462,8 @@ function initWorkbenchBuilder(opts){
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #draftbar .bbtn, ' +
-    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn';
+    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn, ' +
+    '#starters, #gallery button';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
        step, re-render from outside the mode, or leave the page state
@@ -12726,6 +12750,7 @@ function initWorkbenchBuilder(opts){
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
       if (nodeDrag){ cancelNodeDrag(); return; }
+      if (gallery && !gallery.hidden){ closeGallery(); startersBtn.focus(); return; }
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }
@@ -12788,6 +12813,79 @@ function initWorkbenchBuilder(opts){
   var edgeBtn = document.getElementById('add-edge');
   if (edgeBtn) edgeBtn.addEventListener('click', startConnect);
 
+  /* ---- starter gallery: whole-editor replacement is one undo action ---- */
+  var gallery = document.getElementById('gallery');
+  var startersBtn = document.getElementById('starters');
+  var starterUndoText = null;
+  function closeGallery(){
+    if (!gallery) return;
+    gallery.hidden = true;
+    gallery.innerHTML = '';
+    if (startersBtn) startersBtn.setAttribute('aria-expanded', 'false');
+  }
+  function loadStarter(entry){
+    if (addToStep) return;
+    pushUndo();
+    src.value = JSON.stringify(entry.spec, null, 2);
+    starterUndoText = src.value;
+    setSelected(null); currentTarget = null; insertSection = 0;
+    if (connect) cancelConnect();
+    clearStepMarkers();
+    render();
+    updateTargetLabel(entry.spec);
+    if (guide) guide.hidden = true;
+    autosaveDraft();
+    closeGallery();
+    src.focus();
+  }
+  function showGallery(){
+    gallery.innerHTML = '';
+    (opts.starters || []).forEach(function(entry){
+      var card = document.createElement('button');
+      card.type = 'button'; card.className = 'pbtn starter-card';
+      var name = document.createElement('strong'); name.textContent = entry.name;
+      var desc = document.createElement('span'); desc.textContent = entry.desc;
+      var count = document.createElement('span'); count.textContent = starterCountLine(entry.spec);
+      card.appendChild(name); card.appendChild(desc); card.appendChild(count);
+      card.addEventListener('click', function(){
+        if (addToStep) return;
+        if (opts.renderedText && src.value === opts.renderedText()){ loadStarter(entry); return; }
+        showGallery();
+        var row = document.createElement('div'); row.className = 'starter-confirm';
+        var label = document.createElement('span');
+        label.textContent = 'unrendered edits — replace with ' + entry.name + '?';
+        var load = document.createElement('button');
+        load.type = 'button'; load.className = 'bbtn'; load.textContent = 'load & replace';
+        load.addEventListener('click', function(){ loadStarter(entry); });
+        var cancel = document.createElement('button');
+        cancel.type = 'button'; cancel.className = 'bbtn'; cancel.textContent = 'cancel';
+        cancel.addEventListener('click', function(){ showGallery(); gallery.querySelector('button').focus(); });
+        row.appendChild(label); row.appendChild(load); row.appendChild(cancel);
+        gallery.appendChild(row);
+        cancel.focus();
+      });
+      gallery.appendChild(card);
+    });
+    gallery.hidden = false;
+    startersBtn.setAttribute('aria-expanded', 'true');
+  }
+  if (startersBtn && gallery) startersBtn.addEventListener('click', function(){
+    if (addToStep) return;
+    if (!gallery.hidden){ closeGallery(); return; }
+    closePalette();
+    showGallery();
+  });
+  document.addEventListener('keydown', function(ev){
+    /* Programmatic textarea replacements do not enter native undo history. */
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
+    if (addToStep || starterUndoText === null || src.value !== starterUndoText || !undoStack.length) return;
+    var ae = document.activeElement;
+    if (ae && ae !== src && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    ev.preventDefault();
+    starterUndoText = null;
+    doUndo();
+  });
+
   /* ---- insert palettes: + node picks a preset, + panel picks a type ---- */
   var palette = document.getElementById('palette');
   function closePalette(){
@@ -12813,6 +12911,7 @@ function initWorkbenchBuilder(opts){
   }
   function openPalette(kind){
     if (!palette) return;
+    closeGallery();
     if (!palette.hidden && palette.getAttribute('data-kind') === kind){ closePalette(); return; }
     palette.setAttribute('data-kind', kind);
     palette.innerHTML = '';
@@ -13137,6 +13236,7 @@ var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
 var activeSkin = null; /* null = follow spec */
 var lastPage = null;
+var lastRenderedText = null;
 var lastCtl = null;  /* renderPage controller of the current render, for tab restore */
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears
@@ -13221,6 +13321,7 @@ function go(fromText){
   lastCtl = renderPage(view, page, skin);
   restoreActiveTabs(lastCtl, openTabs);
   applySkinClasses(document.body, view, skin);
+  lastRenderedText = src.value;
 }
 
 document.getElementById('go').addEventListener('click', function(){ go(true); });
@@ -13231,6 +13332,7 @@ go(false);
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
 initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); },
+  starters: STARTERS, renderedText: function(){ return lastRenderedText; },
   ctl: function(){ return lastCtl; }});
 })();
 </script>

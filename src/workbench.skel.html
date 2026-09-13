@@ -52,11 +52,13 @@
           <button class="bbtn" id="add-step">+ step</button>
           <button class="bbtn" id="add-panel">+ panel</button>
           <button class="bbtn" id="add-section">+ section</button>
+        <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
           <button class="bbtn" id="undo-builder" disabled>undo</button>
           <button class="bbtn" id="redo-builder" disabled>redo</button>
           <span class="btarget" id="btarget"></span>
         </div>
         <div class="palette" id="palette" hidden></div>
+        <div class="gallery" id="gallery" hidden></div>
       </details>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
@@ -165,6 +167,7 @@
 <script>
 (function(){
   'use strict';
+var STARTERS = {{STARTERS}};
 {{JS}}
 })();
 </script>

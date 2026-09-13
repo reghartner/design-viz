@@ -282,6 +282,7 @@ var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
 var activeSkin = null; /* null = follow spec */
 var lastPage = null;
+var lastRenderedText = null;
 var lastCtl = null;  /* renderPage controller of the current render, for tab restore */
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears
@@ -366,6 +367,7 @@ function go(fromText){
   lastCtl = renderPage(view, page, skin);
   restoreActiveTabs(lastCtl, openTabs);
   applySkinClasses(document.body, view, skin);
+  lastRenderedText = src.value;
 }
 
 document.getElementById('go').addEventListener('click', function(){ go(true); });
@@ -376,4 +378,5 @@ go(false);
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
 initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); },
+  starters: STARTERS, renderedText: function(){ return lastRenderedText; },
   ctl: function(){ return lastCtl; }});

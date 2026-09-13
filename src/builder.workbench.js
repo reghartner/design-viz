@@ -179,6 +179,17 @@ function specValueAt(raw, path){
   for (var i = 0; i < path.length && v != null; i++) v = v[path[i]];
   return v;
 }
+function starterCountLine(spec){
+  var nodes = 0, steps = 0, panels = 0;
+  specSectionPaths(spec).forEach(function(rec){
+    var d = specValueAt(spec, rec.diagram);
+    if (!d) return;
+    nodes += Object.keys(d.nodes || {}).length;
+    steps += (d.steps || []).length;
+    panels += (d.panels || []).length;
+  });
+  return nodes + ' nodes · ' + steps + ' steps · ' + panels + ' panels';
+}
 function builderTargetPath(raw, target){
   /* target: {section:<zero-based ordinal>, kind, id?, index?} → path array
      into the raw editor JSON, or null. Tabs address by block index
@@ -2713,7 +2724,8 @@ function initWorkbenchBuilder(opts){
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #draftbar .bbtn, ' +
-    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn';
+    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn, ' +
+    '#starters, #gallery button';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
        step, re-render from outside the mode, or leave the page state
@@ -3000,6 +3012,7 @@ function initWorkbenchBuilder(opts){
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
       if (nodeDrag){ cancelNodeDrag(); return; }
+      if (gallery && !gallery.hidden){ closeGallery(); startersBtn.focus(); return; }
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }
@@ -3062,6 +3075,79 @@ function initWorkbenchBuilder(opts){
   var edgeBtn = document.getElementById('add-edge');
   if (edgeBtn) edgeBtn.addEventListener('click', startConnect);
 
+  /* ---- starter gallery: whole-editor replacement is one undo action ---- */
+  var gallery = document.getElementById('gallery');
+  var startersBtn = document.getElementById('starters');
+  var starterUndoText = null;
+  function closeGallery(){
+    if (!gallery) return;
+    gallery.hidden = true;
+    gallery.innerHTML = '';
+    if (startersBtn) startersBtn.setAttribute('aria-expanded', 'false');
+  }
+  function loadStarter(entry){
+    if (addToStep) return;
+    pushUndo();
+    src.value = JSON.stringify(entry.spec, null, 2);
+    starterUndoText = src.value;
+    setSelected(null); currentTarget = null; insertSection = 0;
+    if (connect) cancelConnect();
+    clearStepMarkers();
+    render();
+    updateTargetLabel(entry.spec);
+    if (guide) guide.hidden = true;
+    autosaveDraft();
+    closeGallery();
+    src.focus();
+  }
+  function showGallery(){
+    gallery.innerHTML = '';
+    (opts.starters || []).forEach(function(entry){
+      var card = document.createElement('button');
+      card.type = 'button'; card.className = 'pbtn starter-card';
+      var name = document.createElement('strong'); name.textContent = entry.name;
+      var desc = document.createElement('span'); desc.textContent = entry.desc;
+      var count = document.createElement('span'); count.textContent = starterCountLine(entry.spec);
+      card.appendChild(name); card.appendChild(desc); card.appendChild(count);
+      card.addEventListener('click', function(){
+        if (addToStep) return;
+        if (opts.renderedText && src.value === opts.renderedText()){ loadStarter(entry); return; }
+        showGallery();
+        var row = document.createElement('div'); row.className = 'starter-confirm';
+        var label = document.createElement('span');
+        label.textContent = 'unrendered edits — replace with ' + entry.name + '?';
+        var load = document.createElement('button');
+        load.type = 'button'; load.className = 'bbtn'; load.textContent = 'load & replace';
+        load.addEventListener('click', function(){ loadStarter(entry); });
+        var cancel = document.createElement('button');
+        cancel.type = 'button'; cancel.className = 'bbtn'; cancel.textContent = 'cancel';
+        cancel.addEventListener('click', function(){ showGallery(); gallery.querySelector('button').focus(); });
+        row.appendChild(label); row.appendChild(load); row.appendChild(cancel);
+        gallery.appendChild(row);
+        cancel.focus();
+      });
+      gallery.appendChild(card);
+    });
+    gallery.hidden = false;
+    startersBtn.setAttribute('aria-expanded', 'true');
+  }
+  if (startersBtn && gallery) startersBtn.addEventListener('click', function(){
+    if (addToStep) return;
+    if (!gallery.hidden){ closeGallery(); return; }
+    closePalette();
+    showGallery();
+  });
+  document.addEventListener('keydown', function(ev){
+    /* Programmatic textarea replacements do not enter native undo history. */
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
+    if (addToStep || starterUndoText === null || src.value !== starterUndoText || !undoStack.length) return;
+    var ae = document.activeElement;
+    if (ae && ae !== src && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    ev.preventDefault();
+    starterUndoText = null;
+    doUndo();
+  });
+
   /* ---- insert palettes: + node picks a preset, + panel picks a type ---- */
   var palette = document.getElementById('palette');
   function closePalette(){
@@ -3087,6 +3173,7 @@ function initWorkbenchBuilder(opts){
   }
   function openPalette(kind){
     if (!palette) return;
+    closeGallery();
     if (!palette.hidden && palette.getAttribute('data-kind') === kind){ closePalette(); return; }
     palette.setAttribute('data-kind', kind);
     palette.innerHTML = '';

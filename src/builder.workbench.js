@@ -2839,6 +2839,15 @@ function initWorkbenchBuilder(opts){
   /* ---- drag an edge label to set its labelDx/labelDy nudges;
           drag a node card onto another to swap their layout slots ---- */
   var drag = null, nodeDrag = null, suppressClick = false;
+  /* one cancellation path for the node drag: Escape, and every observed
+     re-render (which detaches the dragged elements), both land here */
+  function cancelNodeDrag(){
+    if (!nodeDrag) return;
+    var nd = nodeDrag;
+    nodeDrag = null;
+    if (nd.el && nd.el.classList) nd.el.classList.remove('dv-dragsrc');
+    if (nd.target && nd.target.classList) nd.target.classList.remove('dv-droptgt');
+  }
   function svgPointAt(svg, inv, clientX, clientY){
     var pt = svg.createSVGPoint();
     pt.x = clientX; pt.y = clientY;
@@ -2976,6 +2985,7 @@ function initWorkbenchBuilder(opts){
      clear the state synchronously before this observer runs, so only
      stale arming is cancelled. */
   new MutationObserver(function(){
+    cancelNodeDrag(); /* the dragged elements just got detached */
     if (connect) cancelConnect('connect cancelled — the page re-rendered');
     if (addToStep && !addModeSurvive)
       cancelAddToStep('add-to-step ended — the page re-rendered');
@@ -2989,6 +2999,7 @@ function initWorkbenchBuilder(opts){
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
+      if (nodeDrag){ cancelNodeDrag(); return; }
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }

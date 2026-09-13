@@ -3515,11 +3515,85 @@ function initWorkbenchBuilder(opts){
     nodeDrag = null;
     if (nd.el && nd.el.classList) nd.el.classList.remove('dv-dragsrc');
     if (nd.target && nd.target.classList) nd.target.classList.remove('dv-droptgt');
+    dropNodeDragGhosts(nd);
+  }
+  function nodeTranslateXY(el){
+    var m = /translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/.exec(el.getAttribute('transform') || '');
+    return m ? {x: parseFloat(m[1]), y: parseFloat(m[2])} : null;
+  }
+  function nodeGhostClone(el){
+    /* a see-through copy riding the same SVG coordinate space; ids are
+       stripped so the document never holds duplicates */
+    var c = el.cloneNode(true);
+    c.removeAttribute('id');
+    c.removeAttribute('data-dv-node');
+    c.setAttribute('aria-hidden', 'true'); /* pure visual feedback */
+    var withId = c.querySelectorAll('[id]');
+    for (var i = 0; i < withId.length; i++) withId[i].removeAttribute('id');
+    /* pointer-events:none stops the mouse, not the keyboard — strip
+       focusable descendants (node links, backref chips) too */
+    var focusable = c.querySelectorAll('[tabindex], a[href]');
+    for (var j = 0; j < focusable.length; j++){
+      focusable[j].removeAttribute('tabindex');
+      focusable[j].removeAttribute('href');
+    }
+    c.classList.remove('dv-sel', 'dv-instep', 'dv-dragsrc', 'dv-droptgt');
+    c.classList.add('dv-ghost');
+    return c;
+  }
+  function dropNodeDragGhosts(nd){
+    if (nd.ghost && nd.ghost.parentNode) nd.ghost.parentNode.removeChild(nd.ghost);
+    if (nd.ghostBack && nd.ghostBack.parentNode) nd.ghostBack.parentNode.removeChild(nd.ghostBack);
+    nd.ghost = null; nd.ghostBack = null;
   }
   function svgPointAt(svg, inv, clientX, clientY){
     var pt = svg.createSVGPoint();
     pt.x = clientX; pt.y = clientY;
     return pt.matrixTransform(inv);
+  }
+  function updateNodeDragGhost(ev){
+    var nd = nodeDrag;
+    if (!nd || !nd.moved) return;
+    var svg = nd.el.ownerSVGElement;
+    if (!svg || !svg.getScreenCTM) return;
+    if (!nd.srcXY) nd.srcXY = nodeTranslateXY(nd.el);
+    if (!nd.srcXY) return; /* unexpected markup: the drag still works, minus the ghost */
+    if (!nd.ghost){
+      nd.ghost = nodeGhostClone(nd.el);
+      nd.el.parentNode.appendChild(nd.ghost);
+    }
+    /* the back ghost is a copy of ONE specific target — a target change
+       throws it away so the preview never shows a stale card */
+    if (nd.ghostBack && nd.ghostBackFor !== nd.target){
+      if (nd.ghostBack.parentNode) nd.ghostBack.parentNode.removeChild(nd.ghostBack);
+      nd.ghostBack = null;
+    }
+    if (nd.target){
+      var tgtXY = nodeTranslateXY(nd.target);
+      if (tgtXY){
+        /* landing preview: the dragged card snaps into the target's slot,
+           and a fainter copy of the target sits in the vacated slot — the
+           swap exactly as it will land on release */
+        nd.ghost.setAttribute('transform', 'translate(' + tgtXY.x + ' ' + tgtXY.y + ')');
+        if (!nd.ghostBack){
+          nd.ghostBack = nodeGhostClone(nd.target);
+          nd.ghostBack.classList.add('dv-ghostback');
+          nd.ghostBackFor = nd.target;
+          nd.el.parentNode.appendChild(nd.ghostBack);
+        }
+        nd.ghostBack.setAttribute('transform', 'translate(' + nd.srcXY.x + ' ' + nd.srcXY.y + ')');
+        return;
+      }
+    }
+    var ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    var inv;
+    try { inv = ctm.inverse(); } catch (ex){ return; }
+    var here = svgPointAt(svg, inv, ev.clientX, ev.clientY);
+    var start = svgPointAt(svg, inv, nd.x0, nd.y0);
+    if (!isFinite(here.x) || !isFinite(here.y) || !isFinite(start.x) || !isFinite(start.y)) return;
+    nd.ghost.setAttribute('transform', 'translate(' + (nd.srcXY.x + (here.x - start.x)) +
+                          ' ' + (nd.srcXY.y + (here.y - start.y)) + ')');
   }
   view.addEventListener('mousedown', function(ev){
     if (ev.button !== 0 || connect) return;
@@ -3562,6 +3636,7 @@ function initWorkbenchBuilder(opts){
       if (nodeDrag.target && nodeDrag.target !== tgt) nodeDrag.target.classList.remove('dv-droptgt');
       if (tgt) tgt.classList.add('dv-droptgt');
       nodeDrag.target = tgt;
+      updateNodeDragGhost(ev);
       return;
     }
     if (!drag) return;
@@ -3577,6 +3652,7 @@ function initWorkbenchBuilder(opts){
       nodeDrag = null;
       nd.el.classList.remove('dv-dragsrc');
       if (nd.target) nd.target.classList.remove('dv-droptgt');
+      dropNodeDragGhosts(nd);
       if (!nd.moved) return; /* a plain click: selection proceeds normally */
       suppressClick = true;
       setTimeout(function(){ suppressClick = false; }, 0);

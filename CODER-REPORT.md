@@ -1,57 +1,60 @@
-# Mermaid sequenceDiagram import
+# Workbench spec diff — coder report
 
-Implemented the inline workbench import and left the changes uncommitted. No git commands or new dependencies were used.
+Implemented the draft-versus-baseline diff view. Changes remain uncommitted; no git commands were run.
 
-## Files
+## Changes by file
 
-- `src/builder.workbench.js`: added the pure Mermaid converter and inline import handlers. Successful conversion snapshots the prior editor text, writes pretty JSON, resets selection, renders, saves the draft, closes the box, and appends one todo-count warning. Conversion errors appear as text in the message list without changing the editor or undo history. Both opening and converting are blocked by ADD TO STEP. Existing undo/redo buttons work; Ctrl-Z/Cmd-Z also restores an unchanged import when the editor or import button has focus. Hand edits retain native text undo behavior.
-- `src/workbench.skel.html`: added `import mermaid…` immediately after `+ section`, followed by the hidden inline textarea and convert/cancel controls. The textarea has an accessible name; controls reuse `.fctl` and `.bbtn`, including their existing focus-visible styles.
-- `src/style.workbench.css`: added import-box spacing and full-width textarea layout. The box retains native hidden behavior.
-- `tests/builder.test.js`: exported `mermaidToSpec` through the existing VM export pattern and added 14 tests, including mock-DOM interaction coverage and validation using the generated bundle.
-- `workbench/flowspec.html`: regenerated with `python3 tools/build.py`.
+- `src/workbench.skel.html`: added the lowercase `diff` button next to save, with `aria-controls` and `aria-expanded`, and the hidden `diffbox` between the palette and guide.
+- `src/builder.workbench.js`: added structural comparisons and parse guards; wired accessible finding buttons through the existing finding jump, `findingLocation`, `jsonLocate`, and textarea selection machinery. Extended validation-path parsing to read the existing quoted-key display syntax. Diff closes on its button, Escape, render, editor input, and opening an inspector/palette. Added the button and finding controls to `ADD_MODE_BLOCKED`.
+- `src/builder.workbench.js`: added an in-memory baseline and guarded `dv-workbench-baseline` persistence alongside drafts. Open and save reset the baseline. Recovery captures the stored draft and baseline before subsequent autosaves can replace either. Baseline records include the associated draft text to reject mismatched storage writes. Existing undo handling remains in use for editor replacements.
+- `src/style.workbench.css`: shared guide sizing/scrolling with the diff panel, adjusted sticky-editor space, and added full-width finding buttons with kind indicators. Buttons inherit the existing `.bbtn:focus-visible` outline.
+- `tests/builder.test.js`: exported the two new pure entry points through the existing VM test pattern and added 12 tests, including mocked-DOM recovery and interaction tests.
+- `workbench/flowspec.html`: regenerated using `python3 tools/build.py`.
 - `CODER-REPORT.md`: this requested report.
 
-No changes were needed in `src/boot.workbench.js`. The mandated build also regenerates `template/flowview.html` from its unchanged source inputs; its bytes are stable.
+`src/boot.workbench.js` did not need changes. The build also regenerates `template/flowview.html`; no template source was changed.
 
-## Pure function
+## Pure functions and contracts
 
-`mermaidToSpec(text: string) -> spec object`: converts the Python tool's supported Mermaid sequence subset into its default skeleton page, preserving message order, folded edges, protocol inference, participant naming, row order, and todos; throws an Error with line information for invalid input. It has no DOM or storage effects.
+- `diffSpecs(oldObj, newObj) -> Array<{path, kind, text}>`: returns deterministic structural findings for the requested page, section, diagram, contract, and tab fields, ordered against the new document; never mutates either input.
+- `diffSpecTexts(baselineText, currentText) -> {error} | {findings}`: parses baseline first, then current text; returns exactly one side-specific error or the structural findings.
 
-The test-only `mermaidDiagram(text)` helper returns the converted page's first diagram.
+Existing helpers extended:
 
-Oracle details preserved: the first Mermaid fence wins even if it contains another diagram type; nonblank lines determine parser line numbers; nested blocks contribute to their outer block's skipped-message count; notes inside blocks remain separate todos; declarations inside blocks are ignored; the first message fixes an edge's label, kind, and return status. General errors also include line context.
+- `parseValidationPath(message)`: additionally accepts quoted keys emitted by `builderPathString` and the whole-document path.
+- `findingLocation(text, raw, message, rawPath?)`: optional explicit raw path bypasses normalized-page inference while retaining the existing locator and nearest-parent fallback. Existing validation callers remain unchanged.
+
+Private helpers inside `diffSpecs` are exercised through its public tests: `object(v)` and `list(v)` normalize malformed containers; `pairs(a,b,same,score)` matches identities deterministically; `page(raw)` and `sections(raw)` normalize/walk supported shapes; `heading(ref)` and `similarity(a,b)` identify/disambiguate sections; `existing(path)` finds a surviving parent; `container(path)` maps removed lists through tab and page-shape changes. Internal accumulators `index`, `add`, `fields`, and `compareList` build traversal ranks and findings. The local `endpoints(e)` helper encodes edge endpoint identity.
 
 ## Added tests
 
-1. `mermaidToSpec makes a bland two-participant page with solid and return edges`: exact nodes, titles, gear/cmd defaults, rows, edges, steps, page title, and empty todos.
-2. `mermaidToSpec slugs implicit participants and honors later aliases without reordering`: implicit declarations, slug collisions, later alias updates, and a prototype-named participant.
-3. `mermaidToSpec extracts the first markdown mermaid fence as the Python oracle does`: markdown extraction, later-fence exclusion, and rejection when the first fence is not a sequence.
-4. `mermaidToSpec infers protocols in Python priority order and splits serpentine rows`: autonumber, HTTPS precedence over MQTT, plain calls, encounter-order row splitting, and a one-node row.
-5. `mermaidToSpec folds repeated pairs with first label kind and arrow winning but keeps every step`: repeated solid/dashed pairs deduplicate edges while retaining all narrative steps.
-6. `mermaidToSpec records alt opt loop and par todos and skips their messages and participants`: exact todo wording/counts and omission of skipped participants and steps for all four block types.
-7. `mermaidToSpec counts nested blocks once and preserves notes in encounter order`: nested and empty blocks, case-insensitive notes, and todo ordering.
-8. `mermaidToSpec rejects garbage and malformed or message-free input with line information`: wrong diagram, unknown/empty arrows, unmatched else/end, unclosed blocks, empty slugs, invalid syntax inside blocks, empty input, and non-string input.
-9. `mermaidToSpec converts the cumulus HLD and validates skeletons with zero errors`: eight Cumulus nodes, at least ten edges, twelve steps, and validator acceptance for Cumulus, simple, and repeated-pair skeletons.
-10. `Mermaid import UI opens focuses cancels and preserves editor and history on failure`: focus transfer, error text, open-box persistence, cancel, and untouched editor/history.
-11. `Mermaid import UI renders pretty JSON appends one todo warning and supports undo redo and Ctrl-Z`: replacement, render count, autosave, warning preservation/count, close, undo/redo, and keyboard undo.
-12. `Mermaid import UI leaves native text undo alone and adds no warning without todos`: no extra import warning for empty todos and no interception after a hand edit.
-13. `Mermaid import UI blocks opening and conversion while ADD TO STEP is armed`: arms the real step-inspector mode, exercises capture-phase blocking, allows cancel, and resumes after Escape.
-14. `generated workbench validates imported skeletons and retains expected authoring lint`: runs the converter, validator, and engine from the regenerated workbench bundle; verifies zero validation errors/warnings and the four expected Cumulus lint findings.
+1. `diffSpecs identical specs are empty and comparisons do not mutate inputs`: identical documents produce no findings and preserve input text.
+2. `diffSpecs reports exactly node added, edge removed, step text and contract v changes`: asserts all four exact paths, kinds, texts, and order.
+3. `diffSpecs pairs sections by heading and orders added and removed sections around survivors`: checks heading identity, removal links, and reorder-only silence.
+4. `diffSpecs is deterministic with repeated headings, reordered nodes, and parallel edges`: repeated calls agree; section/node reorder and parallel edge identity resolve correctly; a unique residual kind edit is reported as changed.
+5. `diffSpecs covers page, node, edge, step count, panel, field, and tab changes in document order`: covers remaining requested fields and verifies every resulting path resolves.
+6. `diffSpecs paths reuse findingLocation for quoted ids, bare diagrams, and missing containers`: verifies exact selection for punctuation/quotes/backslashes and parent fallback for malformed shapes.
+7. `diffSpecTexts reports only the first unparseable side and otherwise returns findings`: baseline/current/both-invalid guards and unchanged valid input.
+8. `diff UI toggles, selects JSON, and hides on Escape, input, and render attempts`: tests button wiring, selected text, expanded state, parse-error display, and dismissal.
+9. `baseline survives autosave and recovery, and open/save reset it without breaking undo`: recovery retains the original, open/save reset it, and undo after open remains relative to the newly opened baseline across reload.
+10. `legacy draft recovery falls back visibly, discard keeps demo baseline, and unavailable storage is safe`: tests legacy recovery notice, discard, and storage exceptions.
+11. `removed sections stay in their tab list across reordered tabs and page aliases`: verifies removal placement and links as tabs reorder and blocks become sections.
+12. `saved invalid JSON reports an unparseable baseline and mismatched storage falls back safely`: checks invalid saved baselines and unrelated companion records.
 
-## Verification
+## Validation
 
-- `python3 -m unittest discover -s tests -v`: PASS, 157 tests.
-- `node --test tests/*.test.js`: PASS, 283 tests.
-- `python3 tools/build.py`: PASS. A byte-for-byte comparison of both generated pages before and after another build passed. This replaces the ticket's git-based drift command to obey its explicit prohibition on all git commands.
-- `node tools/validate.js --quiet examples/cumulus/cumulus-page.spec.json examples/cumulus/cumulus-page.spec.v2.json examples/doorbell/doorbell.spec.json examples/doorbell-atlas/atlas.spec.json`: PASS, zero errors for every file; respective existing warning totals are 12, 13, 4, and 5.
-- Additional direct Python-oracle comparison: all 15 complete spec objects matched, covering Cumulus, each block type, nesting, notes, aliases, both arrow types, protocol inference, pair folding, fences, and self-messages.
+- `python3 -m unittest discover -s tests -v`: **157 passed**, including existing browser-export smoke tests.
+- `node --test tests/*.test.js`: **281 passed**.
+- `python3 tools/build.py`: passed. A subsequent rebuild produced byte-identical contents for both generated pages.
+- Requested four-example validation command: **zero errors**; warning counts were 12, 13, 4, and 5 respectively.
+- The requested `git diff --exit-code template/ workbench/` suffix was not run because the ticket explicitly forbids every git command. Used direct before/after byte comparisons to verify regeneration stability instead; did not compare against the git index.
 
-## Skeleton warnings
+## Baseline fallback and limits
 
-The converted Cumulus skeleton has zero validator errors and zero validator warnings. The bundled renderer's advisory lint produces four findings: two preserved message labels exceed their automatically allocated edge space, and two repeated steps share the first edge (p->b and d->r), so their step coins overlap. A simple repeated-pair skeleton likewise produces one shared-edge lint finding. These follow from the required verbatim first-message labels, bland automatic layout, and retained steps referencing folded pairs. Authoring/enrichment is the place to resolve presentation issues; silently dropping messages or changing their labels would violate the import contract. Todos generate the separate single import-summary warning required by the ticket.
+Legacy draft records contain only `{text, at}`. Their original file/demo cannot be identified reliably without a companion baseline. Recovery therefore uses the recovered text as baseline and displays “original baseline unavailable — diff starts from the recovered draft”. Missing, corrupt, or mismatched companion records use the same fallback. New drafts persist their original baseline.
 
-## Limits and scope
+Removed items select their surviving container; removed sections stay near their original list/surviving neighbour. Edges pair by endpoint-plus-kind identity first; a unique unmatched pair sharing endpoints reports a kind change. Duplicate headings use shared node IDs/contract keys and deterministic greedy matching, rather than Python's exhaustive assignment for small duplicate groups. Byte parity with the Python tool was explicitly out of scope.
 
-The computer-use tool reported that no browser was available, so the new import UI was not visually inspected and actual browser focus/native undo behavior was not manually verified. Mock-DOM tests exercise its real handlers and capture-phase blocking; the generated converter/validator/engine are tested directly. Existing Python browser smoke tests also passed, but do not exercise this new UI.
+No connected browser was available through the UI tool, so the new panel's visual appearance and real-browser keyboard/add-mode interactions were not manually verified. Interaction and storage behavior are covered by mocked-DOM tests; the ADD TO STEP blocklist was inspected. The existing save flow triggers a download and cannot observe whether the user cancels it at the browser level.
 
-No deliberate feature cuts. Block conversion, note rendering, semantic enrichment, extra Mermaid syntax, and a general keyboard-history redesign remain outside this ticket's defined scope.
+No requested field category was cut. No dependencies or unrelated source changes were added.

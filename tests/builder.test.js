@@ -26,7 +26,7 @@ function loadBuilder(extraGlobals){
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
-    ' specFileName, parseValidationPath, findingLocation,' +
+    ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts,' +
     ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE,' +
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, SCENE_TOKENS,' +
@@ -1300,6 +1300,7 @@ test('planSwapNodes swaps layout slots across rows, stacks, and floats only', ()
     /"ghost" has no layout slot/);
 });
 
+<<<<<<< HEAD
 /* ================= Mermaid import ================= */
 const MERMAID_SEQ = 'sequenceDiagram\nparticipant A as Alpha Svc\nparticipant B\n' +
   'A->>B: POST /things\nB-->>A: created\n';
@@ -1601,4 +1602,260 @@ test('generated workbench validates imported skeletons and retains expected auth
   assert.strictEqual(lint.length, 4);
   const simple = sandbox.normalize(sandbox.mermaidToSpec(MERMAID_SEQ));
   assert.deepStrictEqual(plain(sandbox.validate(simple)), {errors: [], warnings: []});
+=======
+/* ================= baseline diff ================= */
+function diffFixture(){
+  return {page: {title: 'T', skin: 'aurora', blocks: [{heading: 'H', diagram: {
+    nodes: {a: {title: 'A'}, b: {title: 'B'}}, rows: [['a', 'b']],
+    edges: [{from: 'a', to: 'b', kind: 'int', label: 'call'}],
+    steps: [{text: 'first'}], panels: [{id: 'p', type: 'state', title: 'Status'}]
+  }, contract: {fields: [{k: 'version', v: '1'}]}}]}};
+}
+
+test('diffSpecs identical specs are empty and comparisons do not mutate inputs', () => {
+  const spec = diffFixture(), before = JSON.stringify(spec);
+  assert.deepStrictEqual(plain(B.diffSpecs(spec, plain(spec))), []);
+  assert.strictEqual(JSON.stringify(spec), before);
+});
+
+test('diffSpecs reports exactly node added, edge removed, step text and contract v changes', () => {
+  const old = diffFixture(), next = plain(old), section = next.page.blocks[0];
+  section.diagram.nodes.c = {title: 'C'};
+  section.diagram.edges = [];
+  section.diagram.steps[0].text = 'next';
+  section.contract.fields[0].v = '2';
+  assert.deepStrictEqual(plain(B.diffSpecs(old, next)), [
+    {path: 'page.blocks[0].diagram.nodes.c', kind: 'added', text: 'H: node c added'},
+    {path: 'page.blocks[0].diagram.edges', kind: 'removed', text: 'H: edge a->b(int) removed'},
+    {path: 'page.blocks[0].diagram.steps[0].text', kind: 'changed', text: 'H: step 1 text changed'},
+    {path: 'page.blocks[0].contract.fields[0].v', kind: 'changed', text: 'H: contract field version v changed'}
+  ]);
+});
+
+test('diffSpecs pairs sections by heading and orders added and removed sections around survivors', () => {
+  const old = {sections: [{heading: 'Gone'}, {heading: 'Kept'}]};
+  const next = {sections: [{heading: 'Kept'}, {heading: 'New'}]};
+  assert.deepStrictEqual(plain(B.diffSpecs(old, next)), [
+    {path: 'sections', kind: 'removed', text: 'section Gone removed'},
+    {path: 'sections[1]', kind: 'added', text: 'section New added'}
+  ]);
+  assert.deepStrictEqual(plain(B.diffSpecs(old, {sections: [...old.sections].reverse()})), []);
+});
+
+test('diffSpecs is deterministic with repeated headings, reordered nodes, and parallel edges', () => {
+  const old = diffFixture(), next = plain(old);
+  old.page.blocks.push({heading: 'H', diagram: {nodes: {z: {title: 'Z'}}, rows: [['z']]}});
+  next.page.blocks.unshift(plain(old.page.blocks[1]));
+  next.page.blocks[1].diagram.nodes = {b: {title: 'updated'}, a: {title: 'also updated'}};
+  const first = plain(B.diffSpecs(old, next));
+  assert.deepStrictEqual(first, plain(B.diffSpecs(old, next)));
+  assert.deepStrictEqual(first.map(f => f.path), [
+    'page.blocks[1].diagram.nodes.b.title', 'page.blocks[1].diagram.nodes.a.title'
+  ]);
+  const before = {nodes: {}, rows: [], edges: [
+    {from: 'a', to: 'b', kind: 'int', label: 'one'}, {from: 'a', to: 'b', kind: 'mqtt', label: 'two'}
+  ]};
+  const after = plain(before); after.edges.reverse();
+  assert.deepStrictEqual(plain(B.diffSpecs(before, after)), []);
+  after.edges[1].kind = 'https';
+  assert.deepStrictEqual(plain(B.diffSpecs(before, after)), [
+    {path: 'edges[1].kind', kind: 'changed', text: 'section 1: edge a->b(https) kind changed'}
+  ]);
+});
+
+test('diffSpecs covers page, node, edge, step count, panel, field, and tab changes in document order', () => {
+  const old = diffFixture(), next = plain(old), s = next.page.blocks[0], d = s.diagram;
+  next.page.title = 'New'; next.page.skin = 'daylight';
+  Object.assign(d.nodes.a, {title: 'AA', sub: 'sub', icon: 'db', tint: 'data'});
+  delete d.nodes.b;
+  d.edges[0].label = 'new'; d.edges.push({from: 'b', to: 'a'});
+  d.steps.push({text: 'second'});
+  Object.assign(d.panels[0], {title: 'New status', type: 'log'});
+  d.panels.push({id: 'q'});
+  s.contract.fields = [{k: 'new', v: '3'}];
+  old.page.blocks.push({tabs: [{label: 'old', sections: []}]});
+  next.page.blocks.push({tabs: [{label: 'new', sections: []}]});
+  const findings = plain(B.diffSpecs(old, next));
+  assert.deepStrictEqual(findings.map(f => [f.kind, f.path]), [
+    ['changed', 'page.title'], ['changed', 'page.skin'],
+    ...['title', 'sub', 'icon', 'tint'].map(k => ['changed', 'page.blocks[0].diagram.nodes.a.' + k]),
+    ['removed', 'page.blocks[0].diagram.nodes'],
+    ['changed', 'page.blocks[0].diagram.edges[0].label'], ['added', 'page.blocks[0].diagram.edges[1]'],
+    ['changed', 'page.blocks[0].diagram.steps'],
+    ['changed', 'page.blocks[0].diagram.panels[0].type'], ['changed', 'page.blocks[0].diagram.panels[0].title'],
+    ['added', 'page.blocks[0].diagram.panels[1]'],
+    ['added', 'page.blocks[0].contract.fields[0]'], ['removed', 'page.blocks[0].contract.fields'],
+    ['added', 'page.blocks[1].tabs[0].label'], ['removed', 'page.blocks[1].tabs']
+  ]);
+  const text = JSON.stringify(next, null, 2);
+  for (const f of findings){
+    const loc = B.findingLocation(text, next, f.text, B.parseValidationPath(f.path + ':'));
+    assert.ok(loc && loc.exact, f.path);
+  }
+  assert.strictEqual(B.diffSpecs(next, old).filter(f => /panel q removed/.test(f.text)).length, 1);
+});
+
+test('diffSpecs paths reuse findingLocation for quoted ids, bare diagrams, and missing containers', () => {
+  const id = 'svc.api [0]: "quoted" \\';
+  const old = {nodes: {[id]: {title: 'Old'}}, rows: [[id]]};
+  const next = plain(old); next.nodes[id].title = 'New';
+  const f = B.diffSpecs(old, next)[0], text = JSON.stringify(next, null, 2);
+  const tokens = B.parseValidationPath(f.path + ': ' + f.text);
+  assert.deepStrictEqual(plain(tokens), ['nodes', id, 'title']);
+  const loc = B.findingLocation(text, next, f.text, tokens);
+  assert.ok(loc.exact);
+  assert.strictEqual(JSON.parse(text.slice(loc.start, loc.end)), 'New');
+  for (const value of [null, 42, [], {}, {page: {blocks: 'invalid'}}, {sections: [null]}]){
+    for (const f of B.diffSpecs(diffFixture(), value)){
+      assert.ok(B.findingLocation(JSON.stringify(value), value, f.text, B.parseValidationPath(f.path + ':')));
+    }
+  }
+});
+
+test('diffSpecTexts reports only the first unparseable side and otherwise returns findings', () => {
+  assert.deepStrictEqual(plain(B.diffSpecTexts('{', '{}')), {error: 'baseline JSON is unparseable'});
+  assert.deepStrictEqual(plain(B.diffSpecTexts('{}', '{')), {error: 'current JSON is unparseable'});
+  assert.deepStrictEqual(plain(B.diffSpecTexts('{', '{')), {error: 'baseline JSON is unparseable'});
+  assert.deepStrictEqual(plain(B.diffSpecTexts('{}', '{}')), {findings: []});
+});
+
+function diffWorkbench(storage = new Map(), options = {}){
+  const listeners = new Map(), timers = new Map();
+  let timerId = 0, observer;
+  function element(tag = 'div'){
+    const events = new Map();
+    return {tagName: tag.toUpperCase(), hidden: true, children: [], style: {}, attributes: {},
+      value: '', clientWidth: 440, clientHeight: 300,
+      classList: {add(){}, remove(){}, toggle(){}},
+      addEventListener(type, fn){ if (!events.has(type)) events.set(type, []); events.get(type).push(fn); },
+      fire(type, event = {}){ for (const fn of events.get(type) || []) fn.call(this, event); },
+      click(){ this.fire('click', {target: this}); },
+      appendChild(child){ this.children.push(child); return child; },
+      set innerHTML(value){ this.children = []; },
+      setAttribute(k, v){ this.attributes[k] = v; }, getAttribute(k){ return this.attributes[k]; },
+      querySelector(){ return null; }, querySelectorAll(){ return []; },
+      focus(){ document.activeElement = this; }, remove(){}, closest(){ return null; },
+      setSelectionRange(start, end){ this.selectionStart = start; this.selectionEnd = end; }
+    };
+  }
+  const ids = Object.fromEntries(['src', 'diffbox', 'spec-diff', 'draftbar', 'guide', 'go',
+    'file-input', 'file-open', 'file-save', 'undo-builder', 'redo-builder'].map(id => [id, element()]));
+  const document = {body: element(), activeElement: null,
+    getElementById(id){ return ids[id] || null; }, querySelector(){ return null; },
+    createElement: element, createTextNode: text => ({textContent: text}),
+    addEventListener(type, fn, capture){
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push({fn, capture});
+    }
+  };
+  const sandbox = {console, document, window: {addEventListener(){}}, Blob,
+    URL: {createObjectURL(){ return 'blob:test'; }, revokeObjectURL(){}},
+    getComputedStyle(){ return {}; },
+    setTimeout(fn){ timers.set(++timerId, fn); return timerId; }, clearTimeout(id){ timers.delete(id); },
+    MutationObserver: class {constructor(fn){ observer = fn; } observe(){}},
+    FileReader: class {readAsText(file){ this.result = file.text; this.onload(); }},
+    localStorage: {
+      getItem(k){ if (options.storageThrows) throw Error('blocked'); return storage.get(k) || null; },
+      setItem(k, v){ if (options.storageThrows) throw Error('blocked'); storage.set(k, v); },
+      removeItem(k){ if (options.storageThrows) throw Error('blocked'); storage.delete(k); }
+    }
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8'), sandbox);
+  ids.src.value = JSON.stringify(diffFixture());
+  sandbox.initWorkbenchBuilder({view: element(), src: ids.src, render(){ observer(); }});
+  return {ids, storage, sandbox,
+    lines(){ return ids.diffbox.children.map(c => c.textContent); },
+    diff(){ ids['spec-diff'].click(); return this.lines(); },
+    flush(){ const fns = [...timers.values()]; timers.clear(); fns.forEach(fn => fn()); },
+    key(key){ for (const {fn} of listeners.get('keydown') || []) fn({key}); },
+    render(){ observer(); }
+  };
+}
+
+test('diff UI toggles, selects JSON, and hides on Escape, input, and render attempts', () => {
+  const w = diffWorkbench(), src = w.ids.src;
+  assert.deepStrictEqual(w.diff(), ['no changes']);
+  w.diff(); assert.ok(w.ids.diffbox.hidden);
+  const spec = JSON.parse(src.value); spec.page.title = 'Changed'; src.value = JSON.stringify(spec);
+  assert.deepStrictEqual(w.diff(), ['page title changed']);
+  w.ids.diffbox.children[0].click();
+  assert.strictEqual(JSON.parse(src.value.slice(src.selectionStart, src.selectionEnd)), 'Changed');
+  w.key('Escape'); assert.ok(w.ids.diffbox.hidden);
+  assert.strictEqual(w.ids['spec-diff'].attributes['aria-expanded'], 'false');
+  w.diff(); src.fire('input'); assert.ok(w.ids.diffbox.hidden);
+  src.value = '{';
+  assert.deepStrictEqual(w.diff(), ['current JSON is unparseable']);
+  w.ids.go.click(); assert.ok(w.ids.diffbox.hidden);
+  w.diff(); w.render(); assert.ok(w.ids.diffbox.hidden);
+});
+
+test('baseline survives autosave and recovery, and open/save reset it without breaking undo', () => {
+  const w = diffWorkbench(), next = diffFixture(); next.page.title = 'Draft';
+  w.ids.src.value = JSON.stringify(next); w.ids.src.fire('input'); w.flush();
+  const recovered = diffWorkbench(w.storage);
+  assert.ok(!recovered.ids.draftbar.hidden);
+  recovered.ids.draftbar.children[1].click();
+  assert.deepStrictEqual(recovered.diff(), ['page title changed']);
+  recovered.ids['file-save'].click();
+  assert.deepStrictEqual(recovered.diff(), ['no changes']);
+  assert.strictEqual(JSON.parse(w.storage.get('dv-workbench-baseline')).text, JSON.stringify(next));
+  const file = plain(next); file.page.skin = 'daylight';
+  recovered.ids['file-input'].files = [{text: JSON.stringify(file)}];
+  recovered.ids['file-input'].fire('change');
+  assert.deepStrictEqual(recovered.diff(), ['no changes']);
+  recovered.ids['undo-builder'].click();
+  assert.deepStrictEqual(recovered.diff(), ['page skin changed']);
+  const reload = diffWorkbench(w.storage);
+  reload.ids.draftbar.children[1].click();
+  assert.deepStrictEqual(reload.diff(), ['page skin changed']);
+});
+
+test('legacy draft recovery falls back visibly, discard keeps demo baseline, and unavailable storage is safe', () => {
+  const spec = diffFixture(); spec.page.title = 'Legacy';
+  const storage = new Map([['dv-workbench-draft', JSON.stringify({text: JSON.stringify(spec), at: 1})]]);
+  const legacy = diffWorkbench(storage);
+  legacy.ids.draftbar.children[1].click();
+  assert.match(legacy.ids.guide.children[0].textContent, /original baseline unavailable/);
+  assert.deepStrictEqual(legacy.diff(), ['no changes']);
+  const discard = diffWorkbench(storage);
+  discard.ids.draftbar.children[2].click();
+  assert.deepStrictEqual(discard.diff(), ['no changes']);
+  assert.strictEqual(JSON.parse(storage.get('dv-workbench-baseline')).text, discard.ids.src.value);
+  const blocked = diffWorkbench(new Map(), {storageThrows: true});
+  assert.deepStrictEqual(blocked.diff(), ['no changes']);
+  blocked.ids.src.fire('input'); blocked.flush();
+  blocked.ids['file-save'].click();
+});
+
+test('removed sections stay in their tab list across reordered tabs and page aliases', () => {
+  const old = {page: {blocks: [{tabs: [
+    {label: 'A', sections: [{heading: 'Gone'}]},
+    {label: 'B', sections: [{heading: 'Kept', diagram: {nodes: {a: {title: 'A'}}, rows: [['a']]}}]}
+  ]}]}};
+  const next = {sections: plain(old.page.blocks)};
+  next.sections[0].tabs[0].sections = [];
+  next.sections[0].tabs[1].sections[0].diagram.nodes.a.title = 'New';
+  let findings = plain(B.diffSpecs(old, next));
+  assert.strictEqual(findings[0].text, 'section Gone removed');
+  assert.strictEqual(findings[0].path, 'sections[0].tabs[0].sections');
+  next.sections[0].tabs.reverse();
+  findings = plain(B.diffSpecs(old, next));
+  assert.strictEqual(findings[1].text, 'section Gone removed');
+  assert.strictEqual(findings[1].path, 'sections[0].tabs[1].sections');
+});
+
+test('saved invalid JSON reports an unparseable baseline and mismatched storage falls back safely', () => {
+  const w = diffWorkbench();
+  w.ids.src.value = '{'; w.ids['file-save'].click();
+  assert.deepStrictEqual(w.diff(), ['baseline JSON is unparseable']);
+  w.ids.src.value = JSON.stringify(diffFixture()); w.ids.src.fire('input');
+  assert.deepStrictEqual(w.diff(), ['baseline JSON is unparseable']);
+  const storage = new Map([
+    ['dv-workbench-draft', JSON.stringify({text: '{', at: 1})],
+    ['dv-workbench-baseline', JSON.stringify({text: '{}', draftText: 'different draft'})]
+  ]);
+  const recovery = diffWorkbench(storage);
+  recovery.ids.draftbar.children[1].click();
+  assert.match(recovery.ids.guide.children[0].textContent, /original baseline unavailable/);
+>>>>>>> 1227951 (workbench: spec diff view — what changed versus the opened/saved baseline)
 });

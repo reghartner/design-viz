@@ -947,29 +947,44 @@ function specFileName(raw){
 function parseValidationPath(message){
   /* leading "ERROR " / "warn " labels are tolerated; returns the path
      segment array or null when the message carries no field path */
-  var m = /^(?:ERROR\s+|warn\s+)?([A-Za-z_][A-Za-z0-9_$-]*(?:\[\d+\]|\.[A-Za-z0-9_$-]+)*)\s*:/.exec(message || '');
-  if (!m) return null;
-  var out = [];
-  var re = /([A-Za-z0-9_$-]+)|\[(\d+)\]/g, seg;
-  while ((seg = re.exec(m[1]))){
-    if (seg[1] != null) out.push(seg[1]);
-    else out.push(parseInt(seg[2], 10));
+  var input = (message || '').replace(/^(?:ERROR\s+|warn\s+)/, '');
+  if (/^\(whole document\)\s*:/.test(input)) return [];
+  var out = [], i = 0;
+  while (i < input.length){
+    var m;
+    if (input[i] === '"'){
+      var end = jsonSkipString(input, i);
+      try { out.push(JSON.parse(input.slice(i, end))); } catch (ex){ return null; }
+      i = end;
+    } else {
+      m = /^[A-Za-z0-9_$-]+/.exec(input.slice(i));
+      if (!m || (!out.length && !/^[A-Za-z_]/.test(m[0]))) return null;
+      out.push(m[0]); i += m[0].length;
+    }
+    while ((m = /^\[(\d+)\]/.exec(input.slice(i)))){
+      out.push(parseInt(m[1], 10)); i += m[0].length;
+    }
+    if (/^\s*:/.test(input.slice(i))) return out;
+    if (input[i] !== '.') return null;
+    i++;
   }
-  return out.length ? out : null;
+  return null;
 }
-function findingLocation(text, raw, message){
+function findingLocation(text, raw, message, rawPath){
   /* character range for a validation message. The validator addresses
      the normalized PAGE object; a leading "page" token names that same
      object. Remaining tokens are resolved GREEDILY against the parsed
      raw JSON — at each object level the longest dot-join of remaining
      string tokens that names a real member wins, so author ids that
      contain dots still resolve. Unresolvable tails retreat to the
-     nearest existing parent (exact: false). */
-  var tokens = parseValidationPath(message);
+     nearest existing parent (exact: false). rawPath supplies an explicit
+     editor path for diff findings, using the same locator and fallback. */
+  var tokens = rawPath || parseValidationPath(message);
   if (!tokens) return null;
-  if (tokens[0] === 'page') tokens = tokens.slice(1);
+  if (!rawPath && tokens[0] === 'page') tokens = tokens.slice(1);
   var base, node;
-  if (raw && raw.page){ base = ['page']; node = raw.page; }
+  if (rawPath){ base = []; node = raw; }
+  else if (raw && raw.page){ base = ['page']; node = raw.page; }
   else if (raw && (raw.blocks || raw.sections)){ base = []; node = raw; }
   else if (raw && raw.nodes && raw.rows){
     /* normalize() wrapped the bare diagram as sections[0].diagram */
@@ -991,7 +1006,7 @@ function findingLocation(text, raw, message){
       i++;
     } else {
       var key = null, j;
-      for (j = tokens.length; j > i; j--){
+      for (j = rawPath ? i + 1 : tokens.length; j > i; j--){
         var joined = tokens.slice(i, j).map(String).join('.');
         if (Object.prototype.hasOwnProperty.call(node, joined)){ key = joined; break; }
       }
@@ -1007,6 +1022,182 @@ function findingLocation(text, raw, message){
   if (!loc) loc = jsonLocate(text, []);
   if (!loc) return null;
   return {start: loc.start, end: loc.end, exact: exact};
+}
+
+/* ---------------- draft vs baseline ---------------- */
+
+function diffSpecs(oldObj, newObj){
+  var findings = [], ranks = new Map(), ends = new Map(), ordinal = 0;
+  function object(v){ return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
+  function list(v){ return Array.isArray(v) ? v : []; }
+  function index(v, path){
+    ranks.set(JSON.stringify(path), ordinal++);
+    if (v && typeof v === 'object') Object.keys(v).forEach(function(k){
+      index(v[k], path.concat([Array.isArray(v) ? Number(k) : k]));
+    });
+    ends.set(JSON.stringify(path), ordinal);
+  }
+  index(newObj, []);
+  function existing(path){
+    path = path.slice();
+    while (path.length && !ranks.has(JSON.stringify(path))) path.pop();
+    return path;
+  }
+  function add(path, kind, text, order){
+    var target = existing(path), key = JSON.stringify(target);
+    findings.push({path: builderPathString(target), kind: kind, text: text,
+      order: order == null ? (kind === 'removed' ? ends.get(key) - 0.5 : ranks.get(key)) : order,
+      seq: findings.length});
+  }
+  function fields(a, b, keys, path, label){
+    a = object(a); b = object(b);
+    keys.forEach(function(k){
+      if (JSON.stringify(a[k]) !== JSON.stringify(b[k]))
+        add(path.concat([k]), 'changed', label + ' ' + k + ' changed');
+    });
+  }
+  /* Match full identity first; optional similarity disambiguates repeated
+     headings. A unique endpoint residual allows an edge kind edit. */
+  function pairs(a, b, same, score){
+    var matches = new Map(), used = new Set(), candidates = [];
+    a.forEach(function(x, i){ b.forEach(function(y, j){
+      if (same(x, y)) candidates.push({i: i, j: j, score: score ? score(x, y) : 0});
+    }); });
+    candidates.sort(function(x, y){
+      return y.score - x.score || Math.abs(x.i - x.j) - Math.abs(y.i - y.j) || x.i - y.i || x.j - y.j;
+    });
+    candidates.forEach(function(c){
+      if (!used.has(c.i) && !matches.has(c.j)){ used.add(c.i); matches.set(c.j, c.i); }
+    });
+    return {matches: matches, used: used};
+  }
+  function compareList(a, b, path, key, label, keys, endpoints){
+    a = list(a); b = list(b);
+    var match = pairs(a, b, function(x, y){
+      return key(object(x)) === key(object(y)) && (!endpoints || endpoints(x) === endpoints(y));
+    });
+    if (endpoints) a.forEach(function(x, i){
+      if (match.used.has(i)) return;
+      var oldLeft = a.filter(function(v, k){ return !match.used.has(k) && endpoints(v) === endpoints(x); });
+      var newLeft = b.map(function(v, j){ return j; }).filter(function(j){
+        return !match.matches.has(j) && endpoints(b[j]) === endpoints(x);
+      });
+      if (oldLeft.length === 1 && newLeft.length === 1){ match.used.add(i); match.matches.set(newLeft[0], i); }
+    });
+    b.forEach(function(v, j){
+      var itemPath = path.concat([j]), name = label + ' ' + key(object(v));
+      if (!match.matches.has(j)) add(itemPath, 'added', name + ' added');
+      else fields(a[match.matches.get(j)], v, keys, itemPath, name);
+    });
+    a.forEach(function(v, i){
+      if (!match.used.has(i)) add(path, 'removed', label + ' ' + key(object(v)) + ' removed');
+    });
+  }
+  function page(raw){ return object(object(raw).page || raw); }
+  function sections(raw){
+    var p = page(raw), base = object(raw).page ? ['page'] : [];
+    var key = Array.isArray(p.blocks) ? 'blocks' : 'sections', result = [], tabs = [];
+    if (p.nodes && p.rows) return {refs: [{value: {diagram: p}, path: [], diagram: []}], tabs: [], base: base};
+    list(p[key]).forEach(function(b, i){
+      var path = base.concat([key, i]);
+      if (Array.isArray(object(b).tabs)) b.tabs.forEach(function(t, j){
+        var tabPath = path.concat(['tabs', j]);
+        tabs.push({value: object(t), path: tabPath});
+        list(object(t).sections).forEach(function(sec, k){
+          var sp = tabPath.concat(['sections', k]);
+          result.push({value: object(sec), path: sp, diagram: sp.concat(['diagram'])});
+        });
+      });
+      else result.push({value: object(b), path: path, diagram: path.concat(['diagram'])});
+    });
+    return {refs: result, tabs: tabs, base: base.concat([key])};
+  }
+  function heading(ref){ return typeof ref.value.heading === 'string' ? ref.value.heading : ''; }
+  function similarity(a, b){
+    var an = Object.keys(object(object(a.value.diagram).nodes));
+    var bn = object(object(b.value.diagram).nodes);
+    var af = list(object(a.value.contract).fields), bf = list(object(b.value.contract).fields);
+    var shared = an.filter(function(k){ return Object.prototype.hasOwnProperty.call(bn, k); }).length;
+    af.forEach(function(f){ if (bf.some(function(g){ return object(f).k === object(g).k; })) shared++; });
+    return shared + (object(a.value.contract).title === object(b.value.contract).title ? 0.25 : 0);
+  }
+  var old = sections(oldObj), next = sections(newObj);
+  var tabs = pairs(old.tabs, next.tabs, function(a, b){ return a.value.label === b.value.label; });
+  function container(path){
+    var target = null, key = JSON.stringify(path);
+    tabs.matches.forEach(function(oi, ni){
+      var ot = old.tabs[oi], nt = next.tabs[ni];
+      if (JSON.stringify(ot.path.concat(['sections'])) === key) target = nt.path.concat(['sections']);
+      if (!target && JSON.stringify(ot.path.slice(0, -1)) === key) target = nt.path.slice(0, -1);
+    });
+    if (!target){
+      target = next.base.concat(path.slice(old.base.length));
+      if (!Array.isArray(specValueAt(newObj, target))) target = next.base;
+    }
+    return existing(target);
+  }
+  fields(page(oldObj), page(newObj), ['title', 'skin'], object(newObj).page ? ['page'] : [], 'page');
+  var match = pairs(old.refs, next.refs, function(a, b){ return heading(a) === heading(b); }, similarity);
+  next.refs.forEach(function(ref, j){
+    var label = heading(ref) || 'section ' + (j + 1), path = ref.path;
+    if (!match.matches.has(j)){ add(path, 'added', 'section ' + label + ' added'); return; }
+    var prev = old.refs[match.matches.get(j)];
+    var a = object(prev.value.diagram), b = object(ref.value.diagram), dp = ref.diagram;
+    var an = object(a.nodes), bn = object(b.nodes);
+    Object.keys(bn).forEach(function(id){
+      var np = dp.concat(['nodes', id]);
+      if (!Object.prototype.hasOwnProperty.call(an, id)) add(np, 'added', label + ': node ' + id + ' added');
+      else fields(an[id], bn[id], ['title', 'sub', 'icon', 'tint'], np, label + ': node ' + id);
+    });
+    Object.keys(an).forEach(function(id){
+      if (!Object.prototype.hasOwnProperty.call(bn, id)) add(dp.concat(['nodes']), 'removed', label + ': node ' + id + ' removed');
+    });
+    function endpoints(e){ e = object(e); return JSON.stringify([e.from, e.to]); }
+    compareList(a.edges, b.edges, dp.concat(['edges']), function(e){
+      return e.from + '->' + e.to + (e.kind ? '(' + e.kind + ')' : '');
+    }, label + ': edge', ['label', 'kind'], endpoints);
+    var as = list(a.steps), bs = list(b.steps);
+    if (as.length !== bs.length) add(dp.concat(['steps']), 'changed', label + ': step count changed (' + as.length + ' → ' + bs.length + ')');
+    bs.forEach(function(step, i){
+      if (i < as.length) fields(as[i], step, ['text'], dp.concat(['steps', i]), label + ': step ' + (i + 1));
+    });
+    compareList(a.panels, b.panels, dp.concat(['panels']), function(p){ return p.id; }, label + ': panel', ['type', 'title']);
+    compareList(object(prev.value.contract).fields, object(ref.value.contract).fields,
+      path.concat(['contract', 'fields']), function(f){ return f.k; }, label + ': contract field', ['v']);
+  });
+  old.refs.forEach(function(ref, i){
+    if (match.used.has(i)) return;
+    var parent = ref.path.slice(0, -1), target = container(parent), order;
+    /* Place a removed section before its next surviving old neighbour. */
+    for (var k = i + 1; k < old.refs.length; k++){
+      if (JSON.stringify(old.refs[k].path.slice(0, -1)) !== JSON.stringify(parent)) continue;
+      var found = -1;
+      match.matches.forEach(function(oi, ni){ if (oi === k) found = ni; });
+      if (found >= 0){
+        if (JSON.stringify(next.refs[found].path.slice(0, -1)) !== JSON.stringify(target)) continue;
+        order = ranks.get(JSON.stringify(next.refs[found].path)) - 0.5;
+        break;
+      }
+    }
+    add(target, 'removed', 'section ' + (heading(ref) || 'section ' + (i + 1)) + ' removed', order);
+  });
+  next.tabs.forEach(function(t, i){
+    if (!tabs.matches.has(i)) add(t.path.concat(['label']), 'added', 'tab ' + t.value.label + ' added');
+  });
+  old.tabs.forEach(function(t, i){
+    if (!tabs.used.has(i)) add(container(t.path.slice(0, -1)), 'removed', 'tab ' + t.value.label + ' removed');
+  });
+  findings.sort(function(a, b){ return a.order - b.order || a.seq - b.seq; });
+  return findings.map(function(f){ return {path: f.path, kind: f.kind, text: f.text}; });
+}
+
+function diffSpecTexts(baselineText, currentText){
+  var oldObj, newObj;
+  try { oldObj = JSON.parse(baselineText); }
+  catch (ex){ return {error: 'baseline JSON is unparseable'}; }
+  try { newObj = JSON.parse(currentText); }
+  catch (ex){ return {error: 'current JSON is unparseable'}; }
+  return {findings: diffSpecs(oldObj, newObj)};
 }
 
 /* ---------------- tab management ----------------
@@ -1539,8 +1730,11 @@ var BUILDER_JUMP_TO_FINDING = null;
 /* ---------------- DOM wiring (workbench only) ---------------- */
 
 function initWorkbenchBuilder(opts){
-  var view = opts.view, src = opts.src, render = opts.render;
+  var view = opts.view, src = opts.src;
+  function render(){ hideDiff(); opts.render(); }
   var guide = document.getElementById('guide');
+  var diffbox = document.getElementById('diffbox');
+  var diffBtn = document.getElementById('spec-diff');
   var targetLabel = document.getElementById('btarget');
   var undoBtn = document.getElementById('undo-builder');
   var specbox = document.querySelector('.specbox');
@@ -1686,9 +1880,21 @@ function initWorkbenchBuilder(opts){
   if (redoBtn) redoBtn.addEventListener('click', doRedo);
 
   /* ---- draft autosave + recovery offer ---- */
-  var DRAFT_KEY = 'dv-workbench-draft';
+  var DRAFT_KEY = 'dv-workbench-draft', BASELINE_KEY = 'dv-workbench-baseline';
+  var baselineText = src.value;
+  var initialDraft = readDraft(), recoveredBaseline = null;
+  try {
+    var savedBaseline = JSON.parse(localStorage.getItem(BASELINE_KEY));
+    if (savedBaseline && typeof savedBaseline.text === 'string' && initialDraft &&
+        savedBaseline.draftText === initialDraft.text) recoveredBaseline = savedBaseline.text;
+  } catch (ex){}
+  if (initialDraft && initialDraft.text === src.value && recoveredBaseline != null)
+    baselineText = recoveredBaseline;
   function autosaveDraft(){
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({text: src.value, at: Date.now()})); }
+    try {
+      localStorage.setItem(BASELINE_KEY, JSON.stringify({text: baselineText, draftText: src.value}));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({text: src.value, at: Date.now()}));
+    }
     catch (ex){ /* storage unavailable: the feature degrades to nothing */ }
   }
   function readDraft(){
@@ -1698,17 +1904,21 @@ function initWorkbenchBuilder(opts){
     } catch (ex){ return null; }
   }
   function clearDraft(){
-    try { localStorage.removeItem(DRAFT_KEY); } catch (ex){}
+    try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(BASELINE_KEY); } catch (ex){}
   }
   var draftTimer = null;
   src.addEventListener('input', function(){
+<<<<<<< HEAD
     importedText = null;
+=======
+    hideDiff();
+>>>>>>> 1227951 (workbench: spec diff view — what changed versus the opened/saved baseline)
     if (draftTimer) clearTimeout(draftTimer);
     draftTimer = setTimeout(autosaveDraft, 800);
   });
   (function offerDraft(){
     var bar = document.getElementById('draftbar');
-    var draft = readDraft(); /* captured once — later autosaves cannot swap it */
+    var draft = initialDraft; /* captured once — later autosaves cannot swap it */
     if (!bar || !draft || draft.text === src.value) return;
     bar.innerHTML = '';
     var label = document.createElement('span');
@@ -1718,19 +1928,23 @@ function initWorkbenchBuilder(opts){
     restore.addEventListener('click', function(){
       pushUndo(); /* restoring is one undoable action */
       src.value = draft.text;
+      baselineText = recoveredBaseline == null ? draft.text : recoveredBaseline;
       render();
       bar.hidden = true;
       autosaveDraft();
+      if (recoveredBaseline == null) inspectorMessage('original baseline unavailable — diff starts from the recovered draft');
     });
     var discard = document.createElement('button');
     discard.type = 'button'; discard.className = 'bbtn'; discard.textContent = 'discard';
     discard.addEventListener('click', function(){
       clearDraft();
+      autosaveDraft();
       bar.hidden = true;
     });
     bar.appendChild(label); bar.appendChild(restore); bar.appendChild(discard);
     bar.hidden = false;
   })();
+  if (!initialDraft || initialDraft.text === src.value) autosaveDraft();
 
   /* ---- open a .spec.json / save the editor to disk ---- */
   var fileInput = document.getElementById('file-input');
@@ -1745,6 +1959,7 @@ function initWorkbenchBuilder(opts){
       reader.onload = function(){
         pushUndo(); /* opening replaces the editor — undoable */
         src.value = String(reader.result);
+        baselineText = src.value;
         render(); /* parse/validation errors surface in the message list */
         setSelected(null); currentTarget = null;
         if (guide) guide.hidden = true;
@@ -1770,10 +1985,14 @@ function initWorkbenchBuilder(opts){
       document.body.appendChild(a);
       a.click();
       a.remove();
+      baselineText = src.value;
+      hideDiff();
+      autosaveDraft();
       setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     });
   }
 
+<<<<<<< HEAD
   /* ---- inline Mermaid import ---- */
   var importBtn = document.getElementById('import-mermaid');
   var importBox = document.getElementById('importbox');
@@ -1831,6 +2050,40 @@ function initWorkbenchBuilder(opts){
       doUndo();
     });
   }
+=======
+  /* ---- structural diff; reuse the finding jump and source locator ---- */
+  function hideDiff(){
+    if (diffbox) diffbox.hidden = true;
+    if (diffBtn) diffBtn.setAttribute('aria-expanded', 'false');
+  }
+  if (diffBtn && diffbox) diffBtn.addEventListener('click', function(){
+    if (addToStep) return;
+    if (!diffbox.hidden){ hideDiff(); return; }
+    closePalette();
+    if (guide) guide.hidden = true;
+    diffbox.innerHTML = '';
+    var result = diffSpecTexts(baselineText, src.value);
+    if (result.error || !result.findings.length){
+      var line = document.createElement('div');
+      line.textContent = result.error || 'no changes';
+      diffbox.appendChild(line);
+    } else result.findings.forEach(function(f){
+      var button = document.createElement('button');
+      button.type = 'button'; button.className = 'bbtn diffline';
+      button.textContent = f.text;
+      button.title = f.path;
+      button.setAttribute('data-kind', f.kind);
+      button.addEventListener('click', function(){
+        BUILDER_JUMP_TO_FINDING(f.text, parseValidationPath(f.path + ':'));
+      });
+      diffbox.appendChild(button);
+    });
+    diffbox.hidden = false;
+    diffBtn.setAttribute('aria-expanded', 'true');
+  });
+  var renderBtn = document.getElementById('go');
+  if (renderBtn) renderBtn.addEventListener('click', hideDiff);
+>>>>>>> 1227951 (workbench: spec diff view — what changed versus the opened/saved baseline)
 
   /* ---- board highlight by stable identity, re-applied after renders ---- */
   function cssQuote(s){
@@ -2611,6 +2864,7 @@ function initWorkbenchBuilder(opts){
   }
 
   function renderInspector(){
+    hideDiff();
     if (!guide || !currentTarget) return;
     var t = currentTarget;
     revealInspector();
@@ -2868,7 +3122,7 @@ function initWorkbenchBuilder(opts){
         ': click edges, nodes, panels to toggle — Esc or DONE ends';
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
-    '#undo-builder, #redo-builder, #file-open, #file-save, #draftbar .bbtn, ' +
+    '#undo-builder, #redo-builder, #file-open, #file-save, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#add-node, #add-edge, #add-step, #add-panel, #add-section, #palette .pbtn, ' +
     '#starters, #gallery button, #import-mermaid, #import-mermaid-convert';
   function addModeBlocker(ev){
@@ -3143,6 +3397,7 @@ function initWorkbenchBuilder(opts){
      stale arming is cancelled. */
   new MutationObserver(function(){
     cancelNodeDrag(); /* the dragged elements just got detached */
+    hideDiff(); /* the diff panel's jump targets got detached too */
     if (connect) cancelConnect('connect cancelled — the page re-rendered');
     if (addToStep && !addModeSurvive)
       cancelAddToStep('add-to-step ended — the page re-rendered');
@@ -3157,7 +3412,11 @@ function initWorkbenchBuilder(opts){
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
       if (nodeDrag){ cancelNodeDrag(); return; }
+<<<<<<< HEAD
       if (importBox && !importBox.hidden){ importBox.hidden = true; if (importBtn) importBtn.focus(); return; }
+=======
+      if (diffbox && !diffbox.hidden){ hideDiff(); diffBtn.focus(); return; }
+>>>>>>> 1227951 (workbench: spec diff view — what changed versus the opened/saved baseline)
       if (gallery && !gallery.hidden){ closeGallery(); startersBtn.focus(); return; }
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
@@ -3318,6 +3577,7 @@ function initWorkbenchBuilder(opts){
     return b;
   }
   function openPalette(kind){
+    hideDiff();
     if (!palette) return;
     closeGallery();
     if (!palette.hidden && palette.getAttribute('data-kind') === kind){ closePalette(); return; }
@@ -3347,10 +3607,10 @@ function initWorkbenchBuilder(opts){
         !(ev.target.closest && ev.target.closest('#palette, #add-node, #add-panel'))) closePalette();
   });
 
-  BUILDER_JUMP_TO_FINDING = function(message){
+  BUILDER_JUMP_TO_FINDING = function(message, rawPath){
     var parsed = parseEditor();
     if (parsed.error) return;
-    var loc = findingLocation(src.value, parsed.raw, message);
+    var loc = findingLocation(src.value, parsed.raw, message, rawPath);
     if (!loc) return;
     selectRange(loc, true);
     if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent');

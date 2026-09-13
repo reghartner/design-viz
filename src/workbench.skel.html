@@ -66,6 +66,7 @@
           <button class="bbtn" id="import-mermaid-cancel">cancel</button>
         </div>
       </details>
+      <div class="diffbox" id="diffbox" hidden></div>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
         <div class="guide" id="guide" hidden></div>
@@ -78,6 +79,7 @@
         <button class="rbtn" id="go">Render</button>
         <button class="bbtn" id="file-open">open&#8230;</button>
         <button class="bbtn" id="file-save">save</button>
+        <button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">diff</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
         <ul class="msgs" id="msgs"></ul>
       </div>

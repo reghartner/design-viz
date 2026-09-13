@@ -15,7 +15,7 @@ const ROOT = path.join(__dirname, '..');
 function loadBuilder(extraGlobals){
   const code =
     fs.readFileSync(path.join(ROOT, 'src', 'builder.workbench.js'), 'utf8') + '\n' +
-    ';__exports = {jsonLocate, jsonContainer, jsonInsertMember, jsonInsertListItemOrCreate,' +
+    ';__exports = {mermaidToSpec, jsonLocate, jsonContainer, jsonInsertMember, jsonInsertListItemOrCreate,' +
     ' specSectionPaths, specValueAt, starterCountLine, builderTargetPath, builderPathString,' +
     ' builderUniqueKey, builderFlatRowIds,' +
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
@@ -1298,4 +1298,307 @@ test('planSwapNodes swaps layout slots across rows, stacks, and floats only', ()
     nodes: {a: {}, ghost: {}}, rows: [['a']]}}]}};
   assert.match(B.planSwapNodes(JSON.stringify(unplaced, null, 2), unplaced, 0, 'a', 'ghost').error,
     /"ghost" has no layout slot/);
+});
+
+/* ================= Mermaid import ================= */
+const MERMAID_SEQ = 'sequenceDiagram\nparticipant A as Alpha Svc\nparticipant B\n' +
+  'A->>B: POST /things\nB-->>A: created\n';
+
+function mermaidDiagram(text){ return B.mermaidToSpec(text).page.sections[0].diagram; }
+
+test('mermaidToSpec makes a bland two-participant page with solid and return edges', () => {
+  const spec = plain(B.mermaidToSpec(MERMAID_SEQ));
+  assert.strictEqual(spec.page.title, 'Converted sequence');
+  assert.strictEqual(spec.page.sections[0].heading, spec.page.title);
+  const d = spec.page.sections[0].diagram;
+  assert.strictEqual(d.view, 'ambient');
+  assert.deepStrictEqual(d.nodes, {
+    a: {title: 'Alpha Svc', sub: '', icon: 'gear', tint: 'cmd'},
+    b: {title: 'B', sub: '', icon: 'gear', tint: 'cmd'}
+  });
+  assert.deepStrictEqual(d.rows, [['a'], ['b']]);
+  assert.deepStrictEqual(d.edges, [
+    {from: 'a', to: 'b', kind: 'https', label: 'POST /things'},
+    {from: 'b', to: 'a', kind: 'int', label: 'created', ret: true}
+  ]);
+  assert.deepStrictEqual(d.steps, [
+    {edge: 'a->b', text: 'POST /things'}, {edge: 'b->a', text: 'created'}
+  ]);
+  assert.deepStrictEqual(spec.todos, []);
+});
+
+test('mermaidToSpec slugs implicit participants and honors later aliases without reordering', () => {
+  const d = mermaidDiagram('sequenceDiagram\nFoo-Bar->>constructor: hi\n' +
+    'participant Foo_Bar as New label\nparticipant Foo-Bar\n');
+  assert.deepStrictEqual(Object.keys(d.nodes), ['foobar', 'constructor']);
+  assert.strictEqual(d.nodes.foobar.title, 'New label');
+  assert.strictEqual(d.nodes.constructor.title, 'constructor');
+});
+
+test('mermaidToSpec extracts the first markdown mermaid fence as the Python oracle does', () => {
+  assert.deepStrictEqual(plain(B.mermaidToSpec('# Intro\n\n```mermaid\n' + MERMAID_SEQ +
+    '```\nprose\n```mermaid\nsequenceDiagram\nX->>Y: later\n```')), plain(B.mermaidToSpec(MERMAID_SEQ)));
+  assert.throws(() => B.mermaidToSpec('```mermaid\nflowchart TD\n```\n```mermaid\n' +
+    MERMAID_SEQ + '```'), /line 1: not a sequenceDiagram/);
+});
+
+test('mermaidToSpec infers protocols in Python priority order and splits serpentine rows', () => {
+  const d = mermaidDiagram('sequenceDiagram\nautonumber\nA->>B: GET mqtt status\n' +
+    'B->>C: PUBLISH topic (QoS 1)\nC->>D: plain call\nD->>E: subscribe\n');
+  assert.deepStrictEqual(plain(d.edges.map(e => e.kind)), ['https', 'mqtt', 'int', 'mqtt']);
+  assert.deepStrictEqual(plain(d.rows), [['a', 'b', 'c'], ['d', 'e']]);
+  assert.deepStrictEqual(plain(mermaidDiagram('sequenceDiagram\nA->>A: self').rows), [['a']]);
+});
+
+test('mermaidToSpec folds repeated pairs with first label kind and arrow winning but keeps every step', () => {
+  for (const arrow of ['->>', '-->>']){
+    const d = mermaidDiagram('sequenceDiagram\nA' + arrow + 'B: first\n' +
+      'A-->>B: GET second\nA->>B: PUBLISH third');
+    assert.strictEqual(d.edges.length, 1);
+    assert.strictEqual(d.edges[0].label, 'first');
+    assert.strictEqual(d.edges[0].kind, 'int');
+    assert.strictEqual(d.edges[0].ret, arrow === '-->>' ? true : undefined);
+    assert.deepStrictEqual(plain(d.steps), [
+      {edge: 'a->b', text: 'first'}, {edge: 'a->b', text: 'GET second'},
+      {edge: 'a->b', text: 'PUBLISH third'}
+    ]);
+  }
+});
+
+test('mermaidToSpec records alt opt loop and par todos and skips their messages and participants', () => {
+  for (const block of ['alt', 'opt', 'loop', 'par']){
+    const spec = B.mermaidToSpec('sequenceDiagram\nA->>B: outside\n' + block + ' condition\n' +
+      'participant C as Hidden\nB->>C: skipped\nelse other\nC-->>A: also skipped\nend');
+    assert.deepStrictEqual(plain(spec.todos), [block + ' condition block not converted (2 message(s) inside) — add by hand']);
+    const d = spec.page.sections[0].diagram;
+    assert.deepStrictEqual(Object.keys(d.nodes), ['a', 'b']);
+    assert.deepStrictEqual(plain(d.steps), [{edge: 'a->b', text: 'outside'}]);
+  }
+});
+
+test('mermaidToSpec counts nested blocks once and preserves notes in encounter order', () => {
+  const spec = B.mermaidToSpec('sequenceDiagram\nNote over A: before\nA->>B: outside\n' +
+    'alt outer\nA->>B: one\nloop inner\nnote over B: inside\nB-->>A: two\nend\nend\nopt empty\nend');
+  assert.deepStrictEqual(plain(spec.todos), [
+    'note not converted: Note over A: before', 'note not converted: note over B: inside',
+    'alt outer block not converted (2 message(s) inside) — add by hand',
+    'opt empty block not converted (0 message(s) inside) — add by hand'
+  ]);
+  assert.strictEqual(spec.page.sections[0].diagram.steps.length, 1);
+});
+
+test('mermaidToSpec rejects garbage and malformed or message-free input with line information', () => {
+  const cases = [
+    ['', /line 1: not a sequenceDiagram/],
+    ['flowchart TD\nA-->B', /line 1: not a sequenceDiagram/],
+    ['sequenceDiagram\n\nA-xB: dies', /line 2: unsupported syntax.*A-xB/],
+    ['sequenceDiagram\nelse ok', /line 2: 'else' outside/],
+    ['sequenceDiagram\nend', /line 2: 'end' without/],
+    ['sequenceDiagram\nalt x\nA->>B: inside', /line 2: unclosed/],
+    ['sequenceDiagram\nparticipant A', /line 2: no messages/],
+    ['sequenceDiagram\nopt x\nA->>B: inside\nend', /line 4: no messages/],
+    ['sequenceDiagram\nA->>!!!: hi', /line 2: participant id.*slugs to nothing/],
+    ['sequenceDiagram\nA->>B:', /line 2: unsupported syntax/],
+    ['sequenceDiagram\nA->>B: hi\nalt x\nactivate B\nend', /line 4: unsupported syntax/]
+  ];
+  for (const [input, error] of cases) assert.throws(() => B.mermaidToSpec(input), error);
+  assert.throws(() => B.mermaidToSpec(null), /line 1: expected mermaid text/);
+});
+
+test('mermaidToSpec converts the cumulus HLD and validates skeletons with zero errors', () => {
+  const hld = fs.readFileSync(path.join(ROOT, 'examples/cumulus/cumulus-hld.md'), 'utf8');
+  const converted = B.mermaidToSpec(hld);
+  const d = converted.page.sections[0].diagram;
+  assert.strictEqual(Object.keys(d.nodes).length, 8);
+  assert.ok(d.edges.length >= 10);
+  assert.strictEqual(d.steps.length, 12);
+  for (const spec of [converted, B.mermaidToSpec(MERMAID_SEQ),
+    B.mermaidToSpec('sequenceDiagram\nA->>B: first\nA->>B: second')]){
+    assert.deepStrictEqual(plain(V.validate(V.normalize(spec)).errors), []);
+  }
+});
+
+/* Minimal event DOM: exercise the real import/history/mode handlers without a browser. */
+function importHarness(){
+  const elements = {}, listeners = {}, doc = {activeElement: null};
+  function element(tag = 'div', id = ''){
+    const attrs = {}, handlers = {};
+    const el = {tagName: tag.toUpperCase(), id, className: '', children: [], style: {},
+      value: '', hidden: false, disabled: false, textContent: '',
+      addEventListener(type, fn){ (handlers[type] ||= []).push(fn); },
+      appendChild(child){ this.children.push(child); child.parentNode = this; return child; },
+      setAttribute(k, v){ attrs[k] = String(v); },
+      getAttribute(k){ return attrs[k] ?? null; },
+      hasAttribute(k){ return Object.hasOwn(attrs, k); },
+      remove(){ if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(c => c !== this); },
+      focus(){ doc.activeElement = this; },
+      setSelectionRange(){},
+      contains(child){ return child === this || this.children.some(c => c.contains(child)); },
+      matches(selector){
+        if (selector.startsWith('#')) return this.id === selector.slice(1);
+        if (selector.startsWith('.')) return this.className.split(' ').includes(selector.slice(1));
+        if (selector.startsWith('[')) return this.hasAttribute(selector.slice(1, -1));
+        return this.tagName.toLowerCase() === selector;
+      },
+      closest(selectors){
+        for (let at = this; at; at = at.parentNode){
+          if (selectors.split(',').some(s => at.matches(s.trim()))) return at;
+        }
+        return null;
+      },
+      querySelectorAll(selector){
+        return this.children.flatMap(c => [...(c.matches(selector) ? [c] : []), ...c.querySelectorAll(selector)]);
+      },
+      querySelector(selector){ return this.querySelectorAll(selector)[0] || null; },
+      fire(type, props = {}){
+        const ev = {target: this, key: '', preventDefault(){ this.defaultPrevented = true; },
+          stopPropagation(){ this.stopped = true; }, ...props};
+        for (const rec of listeners[type] || []) if (rec.capture) rec.fn(ev);
+        if (!ev.stopped){
+          for (let at = this; at; at = at.parentNode) for (const fn of at.handlers[type] || []) fn(ev);
+          for (const rec of listeners[type] || []) if (!rec.capture) rec.fn(ev);
+        }
+        return ev;
+      }, handlers
+    };
+    el.classList = {
+      add(c){ el.className += ' ' + c; },
+      remove(c){ el.className = el.className.split(' ').filter(x => x !== c).join(' '); }
+    };
+    Object.defineProperty(el, 'innerHTML', {set(){ el.children = []; }, get(){ return ''; }});
+    if (id) elements[id] = el;
+    return el;
+  }
+  doc.body = element('body');
+  doc.createElement = element;
+  doc.createTextNode = text => Object.assign(element('span'), {textContent: text});
+  doc.getElementById = id => elements[id] || null;
+  doc.querySelector = () => null;
+  doc.addEventListener = (type, fn, capture) => { (listeners[type] ||= []).push({fn, capture}); };
+  for (const id of ['docview', 'src', 'guide', 'btarget', 'msgs', 'importbox', 'import-mermaid-text',
+    'import-mermaid', 'import-mermaid-convert', 'import-mermaid-cancel', 'undo-builder', 'redo-builder']){
+    const tag = id === 'src' || id === 'import-mermaid-text' ? 'textarea' :
+      id.includes('builder') || id.startsWith('import-mermaid') ? 'button' : 'div';
+    doc.body.appendChild(element(tag, id));
+  }
+  elements.importbox.hidden = true;
+  elements['undo-builder'].disabled = true;
+  elements.src.value = TEXT;
+  const saved = {};
+  const sandbox = {console, document: doc, window: {addEventListener(){}},
+    MutationObserver: class {observe(){}}, setTimeout(){}, clearTimeout(){},
+    getComputedStyle(){ return {}; },
+    localStorage: {getItem(k){ return saved[k] || null; }, setItem(k, v){ saved[k] = v; }}};
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/validator.js'), 'utf8') + '\n' +
+    fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8'), sandbox);
+  let renders = 0;
+  sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, render(){
+    renders++;
+    elements.msgs.innerHTML = '';
+    const finding = element('li'); finding.textContent = 'existing validator warning';
+    elements.msgs.appendChild(finding);
+  }});
+  return {elements, doc, element, saved, get renders(){ return renders; },
+    click(id){ return elements[id].fire('click'); }};
+}
+
+test('Mermaid import UI opens focuses cancels and preserves editor and history on failure', () => {
+  const h = importHarness(), e = h.elements;
+  h.click('import-mermaid');
+  assert.strictEqual(e.importbox.hidden, false);
+  assert.strictEqual(h.doc.activeElement, e['import-mermaid-text']);
+  e['import-mermaid-text'].value = 'sequenceDiagram\nA-xB: <bad>';
+  h.click('import-mermaid-convert');
+  assert.strictEqual(e.src.value, TEXT);
+  assert.strictEqual(h.renders, 0);
+  assert.strictEqual(e['undo-builder'].disabled, true);
+  assert.strictEqual(e.importbox.hidden, false);
+  assert.strictEqual(e.msgs.children.length, 1);
+  assert.strictEqual(e.msgs.children[0].className, 'e');
+  assert.match(e.msgs.children[0].textContent, /line 2: unsupported syntax.*<bad>/);
+  h.click('import-mermaid-cancel');
+  assert.strictEqual(e.importbox.hidden, true);
+  assert.strictEqual(h.doc.activeElement, e['import-mermaid']);
+  assert.strictEqual(e.src.value, TEXT);
+});
+
+test('Mermaid import UI renders pretty JSON appends one todo warning and supports undo redo and Ctrl-Z', () => {
+  const h = importHarness(), e = h.elements;
+  const input = MERMAID_SEQ + 'Note over A: one\nopt two\nA->>B: skipped\nend';
+  h.click('import-mermaid');
+  e['import-mermaid-text'].value = input;
+  h.click('import-mermaid-convert');
+  const imported = JSON.stringify(B.mermaidToSpec(input), null, 2);
+  assert.strictEqual(e.src.value, imported);
+  assert.strictEqual(h.renders, 1);
+  assert.strictEqual(e.importbox.hidden, true);
+  assert.strictEqual(e.msgs.children.length, 2);
+  assert.strictEqual(e.msgs.children[0].textContent, 'existing validator warning');
+  assert.match(e.msgs.children[1].textContent, /warn 2 todo\(s\) added/);
+  assert.strictEqual(JSON.parse(h.saved['dv-workbench-draft']).text, imported);
+  h.click('undo-builder');
+  assert.strictEqual(e.src.value, TEXT);
+  h.click('redo-builder');
+  assert.strictEqual(e.src.value, imported);
+  e.src.focus();
+  const key = e.src.fire('keydown', {key: 'z', ctrlKey: true});
+  assert.strictEqual(key.defaultPrevented, true);
+  assert.strictEqual(e.src.value, TEXT);
+  assert.strictEqual(h.renders, 4);
+});
+
+test('Mermaid import UI leaves native text undo alone and adds no warning without todos', () => {
+  const h = importHarness(), e = h.elements;
+  h.click('import-mermaid');
+  e['import-mermaid-text'].value = MERMAID_SEQ;
+  h.click('import-mermaid-convert');
+  assert.strictEqual(e.msgs.children.length, 1);
+  e.src.focus();
+  e.src.value += ' ';
+  e.src.fire('input');
+  const key = e.src.fire('keydown', {key: 'z', metaKey: true});
+  assert.ok(!key.defaultPrevented);
+  assert.strictEqual(h.renders, 1);
+});
+
+test('Mermaid import UI blocks opening and conversion while ADD TO STEP is armed', () => {
+  const h = importHarness(), e = h.elements;
+  h.click('import-mermaid');
+  e['import-mermaid-text'].value = MERMAID_SEQ;
+  const section = h.element(); section.className = 'doc-sec'; section.setAttribute('data-dv-section', '0');
+  const coin = h.element(); coin.setAttribute('data-dv-step', '0');
+  e.docview.appendChild(section); section.appendChild(coin);
+  coin.fire('click');
+  const arm = e.guide.querySelectorAll('button').find(b => b.textContent === 'ADD TO STEP');
+  assert.ok(arm, 'the real step inspector exposes the mode');
+  arm.fire('click');
+  assert.match(e.btarget.textContent, /add to step 1/);
+  assert.strictEqual(h.click('import-mermaid-convert').defaultPrevented, true);
+  assert.strictEqual(e.src.value, TEXT);
+  assert.strictEqual(h.renders, 0);
+  h.click('import-mermaid-cancel');
+  assert.strictEqual(e.importbox.hidden, true);
+  assert.strictEqual(h.click('import-mermaid').defaultPrevented, true);
+  assert.strictEqual(e.importbox.hidden, true);
+  e.src.fire('keydown', {key: 'Escape'});
+  h.click('import-mermaid');
+  assert.strictEqual(e.importbox.hidden, false);
+  h.click('import-mermaid-convert');
+  assert.strictEqual(h.renders, 1);
+});
+
+test('generated workbench validates imported skeletons and retains expected authoring lint', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'workbench/flowspec.html'), 'utf8');
+  const sandbox = {console};
+  vm.runInNewContext(html.slice(html.indexOf('/* ---- src/validator.js ---- */'),
+    html.indexOf('/* ---- src/boot.workbench.js ---- */')), sandbox);
+  const hld = fs.readFileSync(path.join(ROOT, 'examples/cumulus/cumulus-hld.md'), 'utf8');
+  const page = sandbox.normalize(sandbox.mermaidToSpec(hld));
+  assert.deepStrictEqual(plain(sandbox.validate(page)), {errors: [], warnings: []});
+  const lint = sandbox.lintPage(page);
+  assert.strictEqual(lint.filter(w => w.includes('longer than its edge can carry')).length, 2);
+  assert.strictEqual(lint.filter(w => w.includes('shares first edge')).length, 2);
+  assert.strictEqual(lint.length, 4);
+  const simple = sandbox.normalize(sandbox.mermaidToSpec(MERMAID_SEQ));
+  assert.deepStrictEqual(plain(sandbox.validate(simple)), {errors: [], warnings: []});
 });

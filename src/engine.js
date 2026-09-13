@@ -3337,6 +3337,24 @@ function sectionIntroHTML(sec, gi, sectionReference){
     texts.forEach(function(t, ti){ h += '<p class="sec-text" data-dv-para="' + ti + '">' + inlineMarkup(t) + '</p>'; });
     if (Array.isArray(sec.bullets) && sec.bullets.length) h += bulletsHTML(sec.bullets, true);
     h += '</div>';
+    /* collapsed sections show one clamped line of the prose instead of
+       nothing: the first paragraph, else the first bullet. The teaser is
+       a mouse/touch convenience (click expands); the prosetoggle button
+       stays the accessible control, so this row is aria-hidden. */
+    var teaserSource = '';
+    for (var tt = 0; tt < texts.length && !teaserSource; tt++){
+      if (typeof texts[tt] === 'string' && texts[tt]) teaserSource = texts[tt];
+    }
+    if (!teaserSource && Array.isArray(sec.bullets)){
+      for (var bb = 0; bb < sec.bullets.length && !teaserSource; bb++){
+        var bl = sec.bullets[bb];
+        if (typeof bl === 'string' && bl) teaserSource = bl;
+        else if (bl && typeof bl.text === 'string' && bl.text) teaserSource = bl.text;
+      }
+    }
+    h += '<div class="sec-teaser"' + (defaultCollapsed ? '' : ' hidden') +
+      ' aria-hidden="true" title="Show section prose"><span class="teasertext">' +
+      esc(teaserSource) + '</span><span class="teasermore">&#8230; (expand for more)</span></div>';
   }
   return {html:h, hasProse:hasProse, defaultCollapsed:defaultCollapsed,
           sectionLabel:sectionLabel};
@@ -3360,9 +3378,13 @@ function setProseCollapsed(control, collapsed, animate, win){
                 win.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!animate || reduced || typeof control.proseEl.animate !== 'function'){
     control.proseEl.hidden = collapsed;
+    if (control.teaserEl) control.teaserEl.hidden = !collapsed;
     return changed;
   }
 
+  /* expanding: the teaser leaves immediately; collapsing: it appears when
+     the shrink animation lands (onfinish below), so the two never stack */
+  if (control.teaserEl && !collapsed) control.teaserEl.hidden = true;
   control.proseEl.hidden = false;
   var height = control.proseEl.scrollHeight || 0;
   if (control.proseEl.style) control.proseEl.style.overflow = 'hidden';
@@ -3374,20 +3396,25 @@ function setProseCollapsed(control, collapsed, animate, win){
   animation.onfinish = function(){
     if (control._animationGeneration !== generation) return;
     control.proseEl.hidden = control.collapsed;
+    if (control.teaserEl) control.teaserEl.hidden = !control.collapsed;
     if (control.proseEl.style) control.proseEl.style.overflow = '';
     control.animation = null;
   };
   return changed;
 }
-function createProseController(proseEl, toggleButton, defaultCollapsed, onChange, win, sectionLabel){
+function createProseController(proseEl, toggleButton, defaultCollapsed, onChange, win, sectionLabel, teaserEl){
   if (!proseEl || !toggleButton) return null;
-  var control = {proseEl:proseEl, toggleButton:toggleButton,
+  var control = {proseEl:proseEl, toggleButton:toggleButton, teaserEl:teaserEl || null,
                  defaultCollapsed:!!defaultCollapsed, collapsed:!defaultCollapsed,
                  sectionLabel:sectionLabel || 'this section', animation:null};
   setProseCollapsed(control, control.defaultCollapsed, false, win);
   toggleButton.addEventListener('click', function(){
     if (setProseCollapsed(control, !control.collapsed, true, win) && onChange) onChange();
   });
+  if (teaserEl && typeof teaserEl.addEventListener === 'function')
+    teaserEl.addEventListener('click', function(){
+      if (setProseCollapsed(control, false, true, win) && onChange) onChange();
+    });
   return control;
 }
 
@@ -3407,7 +3434,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var prose = intro.hasProse ? createProseController(
     box.querySelector('.sec-prose'), box.querySelector('.prosetoggle'),
     intro.defaultCollapsed, onProseChange,
-    typeof window !== 'undefined' ? window : null, intro.sectionLabel) : null;
+    typeof window !== 'undefined' ? window : null, intro.sectionLabel,
+    box.querySelector('.sec-teaser')) : null;
   var result = {sectionEl:box, stepper:null,
                 prose:prose,
                 contractCard:box.querySelector('.ctcard'),

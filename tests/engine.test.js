@@ -3745,3 +3745,71 @@ test('cadence lanes: lane references warn everywhere — declared events, lanes-
   assert.match(w, /panels\.t3\.miss\[0\]\.lane: unknown lane "hb" — skipped \(this timeline has no usable lanes\)/);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(v.errors)), []);
 });
+
+/* ---------------- collapsed-prose teaser ---------------- */
+
+test('collapsed sections carry a one-line teaser of the first paragraph or bullet', () => {
+  const authored = C.sectionIntroHTML(
+    {heading:'Boiler', text:['First paragraph here', 'Second'], collapsed:true}, 0, 'boiler');
+  assert.ok(authored.html.includes('<div class="sec-teaser" aria-hidden="true"'), authored.html);
+  assert.ok(authored.html.includes('<span class="teasertext">First paragraph here</span>'), authored.html);
+  assert.ok(authored.html.includes('(expand for more)'), authored.html);
+
+  const expanded = C.sectionIntroHTML({heading:'Open', text:'Body'}, 1, 'open');
+  assert.ok(expanded.html.includes('<div class="sec-teaser" hidden'), 'teaser starts hidden when prose shows');
+
+  const bulletsOnly = C.sectionIntroHTML(
+    {heading:'Lists', bullets:[{text:'Bullet lead'}, 'later'], collapsed:true}, 2, 'lists');
+  assert.ok(bulletsOnly.html.includes('<span class="teasertext">Bullet lead</span>'), bulletsOnly.html);
+
+  const noProse = C.sectionIntroHTML({heading:'Diagram only', diagram:{}}, 3, 'diagram-only');
+  assert.ok(!noProse.html.includes('sec-teaser'), noProse.html);
+
+  /* teaser text is escaped, not markup-expanded */
+  const hostile = C.sectionIntroHTML(
+    {heading:'H', text:['<img src=x onerror=alert(1)>'], collapsed:true}, 4, 'hostile');
+  assert.ok(!hostile.html.includes('<img'), hostile.html);
+});
+
+test('the teaser shows while collapsed, hides on expand, and its click expands the prose', () => {
+  const events = [];
+  const attributes = {}, listeners = {};
+  const toggle = {
+    setAttribute(name, value){ attributes[name] = String(value); },
+    addEventListener(type, fn){ listeners['toggle:' + type] = fn; }
+  };
+  let proseHidden = false, teaserHidden = true;
+  const prose = {scrollHeight: 80};
+  Object.defineProperty(prose, 'hidden', {
+    get(){ return proseHidden; },
+    set(v){ proseHidden = !!v; events.push('prose:' + proseHidden); }
+  });
+  const teaser = {
+    addEventListener(type, fn){ listeners['teaser:' + type] = fn; }
+  };
+  Object.defineProperty(teaser, 'hidden', {
+    get(){ return teaserHidden; },
+    set(v){ teaserHidden = !!v; events.push('teaser:' + teaserHidden); }
+  });
+  /* reduced motion -> the synchronous path */
+  const win = {matchMedia(){ return {matches:true}; }};
+  const control = C.createProseController(prose, toggle, true, null, win, 'Sect', teaser);
+  assert.strictEqual(proseHidden, true, 'authored-collapsed prose starts hidden');
+  assert.strictEqual(teaserHidden, false, 'teaser starts visible while collapsed');
+  listeners['teaser:click']();
+  assert.strictEqual(proseHidden, false, 'teaser click expands the prose');
+  assert.strictEqual(teaserHidden, true, 'teaser leaves once expanded');
+  assert.strictEqual(control.collapsed, false);
+  listeners['toggle:click']();
+  assert.strictEqual(proseHidden, true, 'toggle collapse returns');
+  assert.strictEqual(teaserHidden, false, 'teaser returns with the collapse');
+  /* clicking the teaser is expand-only: a second click while expanded is a no-op */
+  listeners['teaser:click']();
+  assert.strictEqual(control.collapsed, false);
+});
+
+test('print styles hide the teaser (the prose itself prints expanded)', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  assert.match(css, /@media print\{[\s\S]*?\.sec-teaser\{display:none !important;\}/);
+  assert.ok(css.includes('.sec-teaser[hidden]{display:none;}'), 'hidden attribute wins over flex');
+});

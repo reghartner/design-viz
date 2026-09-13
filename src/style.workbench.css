@@ -2,16 +2,19 @@
 :root{
   --bg:#EFF1F4; --ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;
   --accent:#0B8FA9; --card:#FFFFFF; --codebg:#F4F2EC; --codeink:#3A3E33;
+  --selglow:rgba(11,143,169,.30);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
     --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
+    --selglow:rgba(67,200,224,.32);
   }
 }
 :root[data-theme="dark"]{
   --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
   --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
+  --selglow:rgba(67,200,224,.32);
 }
 
 body{background:var(--bg); color:var(--ink); font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif;}
@@ -137,6 +140,12 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
   max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}
 .guide .gpath{display:block; margin:2px 0 6px; font:600 11px 'IBM Plex Mono',monospace; color:var(--accent); word-break:break-all;}
+/* the ordinal line ("step 2 of 3") pulses once after a move so the effect
+   of ↑/↓ is visible even when the form fields themselves do not change */
+@keyframes dvposflash{from{background:var(--selglow);} to{background:transparent;}}
+.guide .gpos{display:inline-block; margin:0 0 6px; padding:1px 6px; border-radius:4px;
+  font:600 11px 'IBM Plex Mono',monospace; color:var(--sub); border:1px solid var(--line);}
+.guide .gpos.gposflash{animation:dvposflash .9s ease-out;}
 .guide .gerr{color:#B0771A; margin:4px 0;}
 .guide ul{margin:6px 0 0; padding-left:16px;}
 .guide li{margin:2px 0;}
@@ -178,16 +187,26 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .docview .pwidget, .docview .sec-text[data-dv-para],
 .docview .sec-bullets li[data-dv-bullet], .docview .ctrow{cursor:pointer;}
 .docview text.lbl{cursor:grab;} /* drag nudges labelDx/labelDy; click selects */
-g.node.dv-sel .card{stroke:var(--accent); stroke-width:2.5;}
-path.edge.dv-sel{stroke-width:3.4;}
-text.lbl.dv-sel{fill:var(--accent);}
-g.coin.dv-sel circle{stroke:var(--accent); stroke-width:2.5;}
-.pwidget.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
-section.doc-sec.dv-sel{outline:2px solid var(--accent); outline-offset:3px;}
-p.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
-tr.ctrow.dv-sel{outline:2px solid var(--accent); outline-offset:-1px;}
-.tabbtn.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
-.schip.dv-sel{outline:2px solid var(--accent); outline-offset:2px;}
+/* the selection ring animates its dashes — nothing else on the page moves
+   its stroke, so a selected element cannot be mistaken for a lit step node
+   (solid teal) or a step member (thin static dashes) */
+@keyframes dvselants{to{stroke-dashoffset:-24;}}
+g.node.dv-sel .card{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
+  animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
+path.edge.dv-sel{stroke-width:4; filter:drop-shadow(0 0 4px var(--accent));}
+text.lbl.dv-sel{fill:var(--accent); paint-order:stroke; stroke:var(--selglow); stroke-width:3px;}
+g.coin.dv-sel circle{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
+  animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
+@media (prefers-reduced-motion: reduce){
+  g.node.dv-sel .card, g.coin.dv-sel circle{animation:none;}
+  .guide .gpos.gposflash{animation:none; background:var(--selglow);}
+}
+.pwidget.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
+section.doc-sec.dv-sel{outline:2px dashed var(--accent); outline-offset:3px; box-shadow:0 0 0 5px var(--selglow);}
+p.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; border-radius:4px; box-shadow:0 0 0 4px var(--selglow);}
+tr.ctrow.dv-sel{outline:2px dashed var(--accent); outline-offset:-1px;}
+.tabbtn.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
+.schip.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
 
 /* step-contract chips in the step form */
 .mchips{display:flex; flex-wrap:wrap; gap:4px; background:none; border:0; padding:0;}

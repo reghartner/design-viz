@@ -17,6 +17,7 @@ function loadBuilder(extraGlobals){
     fs.readFileSync(path.join(ROOT, 'src', 'builder.workbench.js'), 'utf8') + '\n' +
     ';__exports = {mermaidToSpec, jsonLocate, jsonContainer, jsonInsertMember, jsonInsertListItemOrCreate,' +
     ' specSectionPaths, specValueAt, starterCountLine, builderTargetPath, builderPathString,' +
+    ' builderPositionLine,' +
     ' builderUniqueKey, builderFlatRowIds,' +
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
     ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
@@ -1978,4 +1979,31 @@ test('builderDeletePlan deletes the right element for every multi kind', () => {
 
   const crow = JSON.parse(B.builderDeletePlan(text, spec, {section: 0, kind: 'crow', index: 1}).text);
   assert.deepStrictEqual(plain(crow.page.blocks[0].contract.fields), [{k: 'topic', v: 'a/b'}]);
+});
+
+/* ---- builderPositionLine: the "step 2 of 3" inspector ordinal ---- */
+
+test('builderPositionLine: step/section/tab ordinals, null off the ends', () => {
+  const spec = {page: {blocks: [
+    {heading: 'A', diagram: {nodes: {x: {}}, rows: [['x']],
+      steps: [{text: '1'}, {text: '2'}, {text: '3'}]}},
+    {tabs: [{label: 'T1', sections: [{heading: 'B'}]},
+            {label: 'T2', sections: [{heading: 'C'}]}]}
+  ]}};
+  assert.equal(B.builderPositionLine(spec, {kind: 'step', section: 0, index: 1}), 'step 2 of 3');
+  assert.equal(B.builderPositionLine(spec, {kind: 'step', section: 0, index: 9}), null);
+  assert.equal(B.builderPositionLine(spec, {kind: 'section', section: 0}), 'section 1 of 3');
+  assert.equal(B.builderPositionLine(spec, {kind: 'section', section: 2}), 'section 3 of 3');
+  assert.equal(B.builderPositionLine(spec, {kind: 'section', section: 3}), null);
+  assert.equal(B.builderPositionLine(spec, {kind: 'tab', block: 1, tab: 0}), 'tab 1 of 2');
+  assert.equal(B.builderPositionLine(spec, {kind: 'tab', block: 0, tab: 0}), null);
+  assert.equal(B.builderPositionLine(spec, {kind: 'node', section: 0, id: 'x'}), null);
+  assert.equal(B.builderPositionLine(spec, null), null);
+});
+
+test('builderPositionLine: bare-diagram and bare-page spec shapes', () => {
+  const bare = {nodes: {x: {}}, rows: [['x']], steps: [{text: '1'}]};
+  assert.equal(B.builderPositionLine(bare, {kind: 'step', section: 0, index: 0}), 'step 1 of 1');
+  const barePage = {sections: [{heading: 'A'}, {heading: 'B'}]};
+  assert.equal(B.builderPositionLine(barePage, {kind: 'section', section: 1}), 'section 2 of 2');
 });

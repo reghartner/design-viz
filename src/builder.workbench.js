@@ -303,6 +303,31 @@ function builderPathString(path){
     return (i ? '.' : '') + (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(seg) ? seg : JSON.stringify(seg));
   }).join('') : '(whole document)';
 }
+function builderPositionLine(raw, target){
+  /* which slot the selected element occupies among its siblings — only
+     the kinds with move buttons get one */
+  if (!target) return null;
+  if (target.kind === 'step'){
+    var rec = specSectionPaths(raw)[target.section];
+    if (!rec) return null;
+    var d = specValueAt(raw, rec.diagram);
+    if (!d || !Array.isArray(d.steps) || !d.steps[target.index]) return null;
+    return 'step ' + (target.index + 1) + ' of ' + d.steps.length;
+  }
+  if (target.kind === 'section'){
+    var n = specSectionPaths(raw).length;
+    if (typeof target.section !== 'number' || target.section < 0 || target.section >= n) return null;
+    return 'section ' + (target.section + 1) + ' of ' + n;
+  }
+  if (target.kind === 'tab'){
+    var page = raw && raw.page ? raw.page : raw;
+    var key = page && page.blocks ? 'blocks' : 'sections';
+    var block = page && Array.isArray(page[key]) ? page[key][target.block] : null;
+    if (!block || !Array.isArray(block.tabs) || !block.tabs[target.tab]) return null;
+    return 'tab ' + (target.tab + 1) + ' of ' + block.tabs.length;
+  }
+  return null;
+}
 
 /* ---------------- insert planners ----------------
    Each takes the CURRENT editor text plus its parsed form and returns
@@ -2186,6 +2211,15 @@ function initWorkbenchBuilder(opts){
     try { return secEl.querySelector(sel); } catch (ex){ return null; }
   }
   function rehighlight(){ setSelected(findTargetEl(currentTarget)); }
+  function flashPositionLine(){
+    /* one background pulse on the "step 2 of 3" line — the visible proof
+       that a move happened when the form fields themselves look the same */
+    var pos = guide && guide.querySelector('.gpos');
+    if (!pos) return;
+    pos.classList.remove('gposflash');
+    void pos.offsetWidth; /* restart the animation */
+    pos.classList.add('gposflash');
+  }
 
   /* ---- board markers for the selected step's members ---- */
   function clearStepMarkers(){
@@ -3098,6 +3132,14 @@ function initWorkbenchBuilder(opts){
     p.textContent = path ? builderPathString(path) : '';
     guide.appendChild(p);
 
+    var posText = parsed.error ? null : builderPositionLine(parsed.raw, t);
+    if (posText){
+      var pos = document.createElement('span');
+      pos.className = 'gpos';
+      pos.textContent = posText;
+      guide.appendChild(pos);
+    }
+
     var err = document.createElement('div');
     err.className = 'gerr ierr'; err.hidden = true;
     guide.appendChild(err);
@@ -3168,6 +3210,7 @@ function initWorkbenchBuilder(opts){
               insertSection = t.section;
               rehighlight();
               renderInspector();
+              flashPositionLine();
             }});
         };
         acts.appendChild(actionButton('↑ earlier', function(){ moveSection(-1); }));
@@ -3183,11 +3226,11 @@ function initWorkbenchBuilder(opts){
         }));
         acts.appendChild(actionButton('← earlier', function(){
           commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, -1); },
-            {after: function(plan){ t.tab = plan.index; renderInspector(); }});
+            {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('→ later', function(){
           commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, 1); },
-            {after: function(plan){ t.tab = plan.index; renderInspector(); }});
+            {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
       var armedHere = !!(addToStep && t.kind === 'step' &&
@@ -3204,11 +3247,11 @@ function initWorkbenchBuilder(opts){
       if (t.kind === 'step' && !armedHere){
         acts.appendChild(actionButton('↑ earlier', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
-            {after: function(plan){ t.index = plan.index; renderInspector(); }});
+            {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('↓ later', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1); },
-            {after: function(plan){ t.index = plan.index; renderInspector(); }});
+            {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
       if (!armedHere)

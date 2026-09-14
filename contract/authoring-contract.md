@@ -684,9 +684,9 @@ perspectives" of one timeline). Types:
   frame pixels (x right, y down). Camera `facing` is degrees clockwise from
   +x and defaults toward frame center; `spread` defaults to 80 (clamped
   10–180), `range` to 70 (clamped 20–160). Kinds and states: camera
-  `scan` (default), `sleep`, `detect`, `off`; entry `closed` (default),
+  `scan` (default), `sleep`, `detect`, `rec` (sweep stays live and a red recording light blinks), `off`; entry `closed` (default),
   `open`, `alert`; sensor `ok` (default), `warn`, `alert`, `off`; hub
-  `idle` (default), `rx`, `alert`. Sensors accept an `icon` from the shared
+  `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`. Sensors accept an `icon` from the shared
   icon set (default/fallback `gear`). Every device has a marker and label.
   Patch DEVICE IDS directly: `{"cam":"detect","signals":[{"from":"cam",
   "to":"hub"}]}`. Device states carry across steps; `signals` belongs
@@ -699,7 +699,19 @@ perspectives" of one timeline). Types:
   non-finite positions, and duplicate ids are ignored; unknown states use
   the kind default with a warning. `signals` is the sole reserved device
   id. Unlike the general folding rules below, homemap treats `log`, `mark`,
-  and `enterOnce` as ordinary device ids.
+  and `enterOnce` as ordinary device ids. Optional `subjects` declares moving
+  actors: `[{"id":"walker","label":"Visitor","icon":"gear","x":20,"y":150}]`.
+  Each subject needs a unique nonempty id distinct from device ids and
+  `signals`, plus finite starting `x`/`y` in the same 320×180 frame (clamped
+  to its bounds). Labels default to the id; omit `icon` for a plain ring dot,
+  or use a shared icon token (unknown icons warn and fall back to `gear`).
+  `initial` and step patches address subject ids with objects:
+  `{"walker":{"x":120,"y":60}}`; `{"walker":null}` hides the subject.
+  Positions and hidden state carry across steps; invalid subject patches
+  warn and are ignored. Visible subjects glide from the previous position
+  on animated steps, with their label and optional icon. Reappearing after
+  hiding starts at the new position without a glide; reduced motion disables
+  glides. Invalid subject declarations warn and are ignored.
 - `signal` — link health for 1–6 named radio/wired links:
   `{"id":"net","type":"signal","links":[{"id":"wifi","label":"WiFi",
   "transport":"wifi"},{"id":"cell","label":"Cellular","transport":

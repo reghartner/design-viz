@@ -4929,6 +4929,14 @@ function initWorkbenchBuilder(opts){
         page: normalize(parsed.raw) || {},
         diagram: rec ? specValueAt(parsed.raw, rec.diagram) : null
       };
+      if (t.kind === 'step' && ctx.diagram && ctx.diagram.paths){
+        var sharing = diagramPathList(ctx.diagram).filter(function(route){return route.indices.indexOf(t.index) >= 0;});
+        if (sharing.length > 1){
+          var sharedNote = document.createElement('p'); sharedNote.className = 'fnote shared-step-note';
+          sharedNote.textContent = 'Shared step — edits apply to: ' + sharing.map(function(route){return route.label;}).join(', ') + '.';
+          guide.appendChild(sharedNote);
+        }
+      }
       var form = document.createElement('div');
       form.className = 'iform';
       if (t.kind === 'tab') ensureAccentDatalist();

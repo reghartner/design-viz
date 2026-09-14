@@ -5160,8 +5160,9 @@ function diagramForPath(d, id){
   return Object.assign({}, d, {steps:path.indices.map(function(i){ return d.steps[i]; }),
     _sourceIndices:path.indices, _pathId:path.id});
 }
-/* Each row starts at its fork beat and ends at its final step. Compare
-   earlier declarations so nested alternatives keep stable rows too. */
+/* Color a branch starting at its first differing step; every common-prefix
+   beat stays shared. A wholly shared path has start > end. Compare earlier
+   declarations so nested alternatives keep stable rows too. */
 function pathStepRows(paths){
   return paths.map(function(path,i){
     var shared = 0;
@@ -5170,7 +5171,7 @@ function pathStepRows(paths){
       while (n < path.indices.length && n < prior.indices.length && path.indices[n] === prior.indices[n]) n++;
       shared = Math.max(shared,n);
     });
-    return {path:path, start:i ? Math.max(0,shared - 1) : 0, end:path.indices.length - 1};
+    return {path:path, start:i ? shared : 0, end:path.indices.length - 1};
   });
 }
 function validatePaths(d, path, errors){
@@ -10008,7 +10009,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var path = row.path, line = document.createElement('div'); line.className = 'path-row';
       line.setAttribute('role','group');
       line.setAttribute('aria-label',path.label + ', steps 1 through ' + (row.end + 1) +
-        (row.start ? ', shared steps before fork at ' + (row.start + 1) : ''));
+        (row.start > row.end ? ', all steps shared' : row.start ? ', shared steps before fork at ' + (row.start + 1) : ''));
       line.setAttribute('data-path-row',path.id); line.style.setProperty('--path-color',path.color);
       var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
       choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);

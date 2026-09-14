@@ -4,8 +4,8 @@ Use **starters… → alternate paths** in the workbench for a six-step happy
 path and a four-step **Dropped signal** path on the same command diagram.
 The transport controls stay at the upper left. Below them, each path has a
 colored chip on the left and a row of aligned step numbers on the right. Both
-paths share steps 1–3. The alternate row shows steps 1–2 as shadows at 35%
-opacity in the happy-path color, then steps 3–4 at full strength. Space after
+paths share steps 1–3. The alternate row shows all three as shadows at 35%
+opacity in the happy-path color, then its distinct step 4 at full strength. Space after
 its ending stays blank. Shared shadows are clickable and keep the alternate
 selected; the current step and keyboard-focused shadow have full opacity.
 Nested alternates inherit each shared beat's earlier path color. Selecting
@@ -36,7 +36,10 @@ also hides the label and choices.
    the main insertion toolbar also appends to the active path.
 
 Shared steps have one body: changing a shared caption or patch updates every
-path referencing it. Duplicate a step to make an independent copy. **Delete
+path referencing it. The inspector names those paths when a shared step is
+selected. The first colored branch step is the first differing reference, so
+editing its caption or patch leaves the aligned happy-path step untouched.
+Duplicate a step to make an independent copy. **Delete
 step** removes the shared body and its references from all paths; the editor
 refuses a deletion that would empty a path. **Remove alternate** removes only
 that path, retaining its step bodies in JSON for reuse. The document outline
@@ -81,12 +84,14 @@ Use distinct step bodies for retry attempts. Optional `label` defaults to
 “Happy path” for the first path and the path ID for others. Optional `color`
 accepts hex; defaults cycle cyan, orange, purple, pink and green.
 
-The longest common prefix with an earlier declared path determines each
-row’s starting column, including the last shared beat. Paths with different
-first steps start in column 1. The primary row displays its full sequence;
-all rows stay visible and keep the same columns when selecting a path. A path
-starting at 3 and ending at 5 displays only 3, 4 and 5 beneath those same
-numbers on the primary row. On narrow screens the rows scroll together.
+The longest common prefix with an earlier declared path determines where
+each row's colored branch begins: immediately after the last shared beat.
+Paths with different first steps branch in column 1. A path that ends within
+a shared prefix shows only shadows, with no invented branch. The primary row
+displays its full sequence; all rows stay visible and keep the same columns
+when selecting a path. A path diverging at 3 and ending at 5 displays shared
+shadows at 1–2, then colored steps 3–5 beneath those same numbers on the
+primary row. On narrow screens the rows scroll together.
 A later shared step is allowed, but its state
 still comes from that path's complete preceding sequence. This models authored
 outcomes, not executable conditions or a simulation of failure probabilities.

@@ -284,6 +284,7 @@ var CONTRACT = [
   '  then reference different outcome steps. Path chips sit left of aligned step',
   '  rows beneath playback controls. Shared steps before the fork appear as',
   '  clickable 35%-opacity shadows; columns after the path ends stay blank.',
+  '  The colored branch begins at the first differing step, after all shared steps.',
   '  Each path has its own playback ending and folded panel state.',
   '  Example: happy=[accept,auth,queue,deliver,ack], drop=[accept,auth,queue,lost].',
   '  Path IDs must be unique; each path needs existing, non-repeated step IDs.',

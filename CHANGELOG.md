@@ -1,5 +1,14 @@
 # Changelog
 
+## Alternate branch boundary (2026-09-14)
+
+- Fixed an off-by-one that colored the last shared step as the first alternate
+  step. All shared-prefix steps now use shadows; the branch color starts at the
+  first differing step. Paths that only share a prefix have no invented branch.
+- The step inspector names every path affected by editing a shared step.
+  Distinct branch captions and panel patches remain independent of the aligned
+  happy-path step. Existing specs need no changes.
+
 ## Homemap visual polish (2026-09-14)
 
 - Device icons, state badges, softly raised room walls, and people avatars make

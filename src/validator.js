@@ -849,8 +849,9 @@ function diagramForPath(d, id){
   return Object.assign({}, d, {steps:path.indices.map(function(i){ return d.steps[i]; }),
     _sourceIndices:path.indices, _pathId:path.id});
 }
-/* Each row starts at its fork beat and ends at its final step. Compare
-   earlier declarations so nested alternatives keep stable rows too. */
+/* Color a branch starting at its first differing step; every common-prefix
+   beat stays shared. A wholly shared path has start > end. Compare earlier
+   declarations so nested alternatives keep stable rows too. */
 function pathStepRows(paths){
   return paths.map(function(path,i){
     var shared = 0;
@@ -859,7 +860,7 @@ function pathStepRows(paths){
       while (n < path.indices.length && n < prior.indices.length && path.indices[n] === prior.indices[n]) n++;
       shared = Math.max(shared,n);
     });
-    return {path:path, start:i ? Math.max(0,shared - 1) : 0, end:path.indices.length - 1};
+    return {path:path, start:i ? shared : 0, end:path.indices.length - 1};
   });
 }
 function validatePaths(d, path, errors){

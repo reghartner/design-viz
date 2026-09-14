@@ -22,7 +22,7 @@ function fixture(){return {view:'step',nodes:{api:{},device:{}},rows:[['api','de
 test('path rows align their fork and end positions without changing the registry',()=>{
   const c=load(),d=fixture(),before=JSON.stringify(d),paths=c.diagramPathList(d);
   assert.deepEqual(plain(paths.map(p=>p.indices)),[[0,1,2,3,4],[0,1,2,5]]);
-  assert.deepEqual(plain(c.pathStepRows(paths).map(row=>[row.path.id,row.start,row.end])),[['happy',0,4],['dropped',2,3]]);
+  assert.deepEqual(plain(c.pathStepRows(paths).map(row=>[row.path.id,row.start,row.end])),[['happy',0,4],['dropped',3,3]]);
   assert.equal(c.diagramForPath(d,'dropped').steps[3],d.steps[5]);
   assert.equal(JSON.stringify(d),before);
 });
@@ -30,7 +30,7 @@ test('nested forks use their closest earlier prefix; disjoint paths begin in col
   const c=load(),d=fixture();
   d.paths.push({id:'nested',steps:['one','two','three','drop','five']},
     {id:'early',steps:['one','drop']},{id:'separate',steps:['drop']});
-  assert.deepEqual(plain(c.pathStepRows(c.diagramPathList(d)).map(row=>[row.start,row.end])),[[0,4],[2,3],[3,4],[0,1],[0,0]]);
+  assert.deepEqual(plain(c.pathStepRows(c.diagramPathList(d)).map(row=>[row.start,row.end])),[[0,4],[3,3],[4,4],[1,1],[0,0]]);
 });
 test('selected sequences fold append operations, transient state and node tones without success leaking into failure',()=>{
   const c=load(),d=fixture(),happy=c.diagramForPath(d,'happy'),drop=c.diagramForPath(d,'dropped');
@@ -152,13 +152,13 @@ test('path references round-trip through copied hashes without changing old hash
   assert.equal(c.parseHash(hash).p,'drop signal');assert.equal(c.parseHash('#d=signal&s=three').p,undefined);
 });
 
-test('an alternate running from three to five occupies the same columns and keeps its row on selection',()=>{
+test('an alternate diverging at four occupies the same columns and keeps its row on selection',()=>{
   const d=fixture();d.paths[1].steps.push('five');const h=harness(d);
   const matrix=h.term.chips.children[0],happy=matrix.children[0],drop=matrix.children[1];
   assert.equal(happy.children[0].textContent,'Happy path');assert.equal(drop.children[0].textContent,'Dropped signal');
   assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4,5]);
   assert.deepEqual(drop.children.slice(1).map(b=>b.style.gridColumn),happy.children.slice(1).map(b=>b.style.gridColumn));
-  assert.deepEqual(drop.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,false,false,false]);
+  assert.deepEqual(drop.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,false,false]);
   assert.equal(drop.children[1].style['--path-color'],d.paths[0].color);
   assert.match(drop.children[1].getAttribute('aria-label'),/shared with Happy path/);
   assert.equal(matrix.style['--path-step-count'],5);
@@ -183,11 +183,56 @@ test('shared shadows end with their own path and use the correct ancestor for ne
     {id:'separate',steps:['drop']});
   const h=harness(d),rows=h.term.chips.children[0].children,drop=rows[1],nested=rows[2],separate=rows[3];
   assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4],'no ghost after the failure ending');
-  assert.deepEqual(nested.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,false,false]);
+  assert.deepEqual(nested.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,true,false]);
   assert.equal(nested.children[1].style['--path-color'],d.paths[0].color);
   assert.equal(separate.children.length,2);assert.equal(separate.children[1].className,'schip');
   d.paths.push({id:'nested-again',steps:['one','two','three','drop','five','four']});
   const deep=harness(d).term.chips.children[0].children[4];
   assert.equal(deep.children[4].style['--path-color'],d.paths[1].color);
   assert.match(deep.children[4].getAttribute('aria-label'),/shared with Dropped signal/);
+});
+
+test('the first colored alternate selects and edits its own caption and panel patch',()=>{
+  const d=fixture(),h=harness(d),row=h.term.chips.children[0].children[1];
+  const first=row.children.slice(1).find(b=>!b.className.includes('shared-step-shadow'));
+  first.fire('click');
+  assert.equal(h.sp.current().id,'drop');
+  assert.equal(h.sp.sourceIndex(),5);
+  assert.equal(h.paints.at(-1).state,'lost');
+  const target={kind:'step',section:0,index:h.sp.sourceIndex(),pathId:h.sp.path()};
+  const edit=h.c.planSetField(JSON.stringify(d),d,h.c.builderTargetPath(d,target),'text',JSON.stringify('Alternate edited'));
+  assert.equal(edit.error,undefined);
+  const edited=JSON.parse(edit.text);
+  const patch=h.c.planStepSetPanelPatch(edit.text,edited,0,target.index,'state',JSON.stringify({state:'pending'}));
+  assert.equal(patch.error,undefined);
+  const next=JSON.parse(patch.text);
+  assert.deepEqual(next.steps.slice(0,5),d.steps.slice(0,5),'happy-path bodies remain byte-for-byte equivalent');
+  assert.deepEqual(next.paths,d.paths,'an edit must not shift either sequence');
+  assert.equal(next.steps[5].text,'Alternate edited');
+  assert.equal(h.c.foldPanelStates(h.c.diagramForPath(next,'dropped')).state[3].state,'pending');
+  assert.equal(h.c.foldPanelStates(h.c.diagramForPath(next,'happy')).state[3].state,'applied');
+  const baseEdit=h.c.planSetField(patch.text,next,['steps',3],'text',JSON.stringify('Happy path edited'));
+  assert.deepEqual(JSON.parse(baseEdit.text).steps[5],next.steps[5],'editing the aligned base step leaves the alternate untouched');
+});
+
+test('new forks color their new outcome and leave the complete prefix shared',()=>{
+  const c=load(),d=fixture(),plan=c.planPathStepEdit(JSON.stringify(d),d,0,'happy',2,'fork');
+  assert.equal(plan.error,undefined);
+  const next=JSON.parse(plan.text),h=harness(next),row=h.term.chips.children[0].children[2];
+  assert.deepEqual(row.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,false]);
+  row.children[4].fire('click');
+  assert.equal(h.sp.path(),plan.pathId);assert.equal(h.sp.sourceIndex(),plan.index);
+  assert.equal(h.sp.current().id,next.steps[plan.index].id);
+});
+
+test('paths ending inside a shared prefix show only shared shadows, without an invented branch',()=>{
+  const d=fixture();d.paths.push({id:'short',steps:['one','two']},{id:'identical',steps:d.paths[0].steps.slice()});
+  const h=harness(d),rows=h.term.chips.children[0].children;
+  for(const row of rows.slice(2)){
+    assert.ok(row.children.slice(1).every(b=>b.className.includes('shared-step-shadow')));
+    assert.match(row.getAttribute('aria-label'),/all steps shared/);
+    assert.doesNotMatch(row.getAttribute('aria-label'),/fork at/);
+    row.children.at(-1).fire('click');
+    assert.equal(h.term.btnNext.disabled,true);
+  }
 });

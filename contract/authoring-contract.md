@@ -918,14 +918,20 @@ Below the transport controls, each path has a colored chip on the left and
 a row of steps on the right. Step numbers align in shared columns. The
 primary row shows all its steps. An alternate shows its earlier shared beats
 as shadows at 35% opacity, using each beat's earlier path color. Its full-strength
-steps begin at the final shared beat of its longest common prefix with an
-earlier path and end at its own last step; space after the ending stays blank.
+steps begin immediately after the longest common prefix with an earlier path,
+at the first differing step, and end at its own last step; space after the
+ending stays blank. Every beat in the common prefix is shared, including its
+last beat. A path ending inside that prefix has only shared shadows.
 Shared shadows are clickable and become fully opaque when current or keyboard
 focused. No shared prefix means column 1. Clicking a path chip always selects
 step 1 of that path, including its shared lead-in, and pauses playback; clicking a number
 selects that path and step. Rows stay in place when switching. Both routes
 use the same nodes, edges, rows and panels. Path colors identify choices;
 protocol colors retain their meaning on edges.
+
+The workbench inspector names all paths referencing a shared step before its
+editing controls. Edits to that shared body affect those paths; edits to a
+distinct branch step leave the aligned base-path step unchanged.
 
 The selected path supplies numbered coins, packet scheduling, playback,
 node-tone folding and panel-state folding from initial values. Another path’s

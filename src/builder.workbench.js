@@ -3020,7 +3020,8 @@ function initWorkbenchBuilder(opts){
       frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
       frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
-      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
+      frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); }))
     ];
   }
   function edgeForm(val, ctx){
@@ -3039,6 +3040,7 @@ function initWorkbenchBuilder(opts){
       frow('to', endpoint('to')),
       frow('kind', selectControl(protocolKinds(ctx.page), val.kind || 'int', function(v){ return commitSimple('kind', JSON.stringify(v || 'int')); })),
       frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
+      frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
       frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
       frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
@@ -3088,6 +3090,7 @@ function initWorkbenchBuilder(opts){
       return commitSimple('lane', v == null ? null : JSON.stringify(v));
     }, true)));
     rows.push(frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})));
+    rows.push(frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })));
 
     /* ---- the step's contract: hops, lit nodes, panel patches ---- */
     rows.push(chipRow('hops',
@@ -3777,6 +3780,10 @@ function initWorkbenchBuilder(opts){
     if (form.childNodes.length) guide.appendChild(form);
     var acts = document.createElement('div');
     acts.className = 'iacts';
+    if (kind === 'node' || kind === 'edge'){
+      acts.appendChild(actionButton('mark delta', function(){ return applyBulkField('delta', 'true'); }));
+      acts.appendChild(actionButton('clear delta', function(){ return applyBulkField('delta', null); }));
+    }
     if (kind === 'node'){
       acts.appendChild(actionButton('stack together', function(){
         var secs = {};

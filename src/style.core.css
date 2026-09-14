@@ -1,4 +1,5 @@
 /* style.core.css — shared doc/board/widget styles for both built pages. */
+:root{--delta:#2FBF71;}
 .tabbar{display:flex; gap:6px; flex-wrap:wrap; margin-top:24px;}
 .tabunit{display:inline-flex; align-items:stretch; gap:3px;}
 .tabbtn{font:600 12px 'IBM Plex Mono',monospace; padding:7px 14px; border-radius:8px; cursor:pointer;}
@@ -945,6 +946,24 @@ rect.tlfuture{opacity:.18;}
 .sk-daylight .tbtn:hover{border-color:#4956C9; color:#4956C9;}
 .schips{display:flex; gap:5px; flex-wrap:wrap;}
 .schip{font:700 11px 'IBM Plex Mono',monospace; width:26px; height:26px; border-radius:7px; cursor:pointer; padding:0;}
+.dvdelta{fill:var(--delta); stroke:rgba(0,0,0,.4); stroke-width:1; pointer-events:none;}
+.schip.dvd{position:relative;}
+.schip.dvd::after{content:''; border-left:4px solid transparent; border-right:4px solid transparent;
+  border-bottom:7px solid var(--delta); position:absolute; top:-3px; right:-3px; pointer-events:none;}
+/* Delta-only wins over each skin's inactive-step opacity rules. */
+.dv-deltaonly g.node:not(.dvd):not(.lit),
+.dv-deltaonly path.edge:not(.dvd):not(.lit),
+.dv-deltaonly path.halo:not(.dvd):not(.lit),
+.dv-deltaonly text.lbl:not(.dvd):not(.lit),
+.dv-deltaonly g.coin:not(.dvd):not(.lit){opacity:.18 !important;}
+.dv-deltaonly .dvd, .dv-deltaonly .dvdelta, .dv-deltaonly .lit{opacity:1 !important;}
+.termbar.dv-deltaonly .schip:not(.dvd):not([aria-current="true"]){opacity:.35 !important;}
+.termbar.dv-deltaonly .schip[aria-current="true"]{opacity:1 !important;}
+@media (prefers-reduced-motion: no-preference){
+  .dv-deltaonly g.node, .dv-deltaonly path.edge, .dv-deltaonly path.halo,
+  .dv-deltaonly text.lbl, .dv-deltaonly g.coin,
+  .termbar.dv-deltaonly .schip{transition:opacity .25s !important;}
+}
 .sk-aurora .schip{background:#141A21; border:1px solid #2A343F; color:#6E7B8A;}
 .sk-aurora .schip[aria-current="true"]{border-color:#38E1FF; color:#8AE8FF; background:#0C2230;}
 .sk-daylight .schip{background:#FFFFFF; border:1px solid #E0DCD1; color:#6B6F7A;}

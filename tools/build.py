@@ -23,6 +23,7 @@ STARTERS = [
     ("software & IoT", "Data state, decision checks, and resource budgets across two design stories.", "starters/software-systems.json"),
     ("retries & circuits", "Bounded retry success, deadline admission, and open/half-open recovery across three scenarios.", "starters/resilience.json"),
     ("replica positions", "Read-your-writes, lag, offline replicas and incomparable histories on one position ruler.", "starters/replication.json"),
+    ("rollout decisions", "Canary promotion, traffic rollback and firmware trial confirmation with explicit evidence and held waves.", "starters/rollout.json"),
     ("Honeycomb trace", "A fictional checkout trace with concurrent spans and a recorded payment error.", "starters/honeycomb-trace.json"),
     ("complex trace", "Shared dependencies, service cycles and concurrent branches in reserved routing lanes.", "starters/complex-trace.json"),
     ("full demo", "The complete Flowview demo page.", "flowview.demo.json"),

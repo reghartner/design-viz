@@ -1,0 +1,2406 @@
+{
+  "page": {
+    "title": "Canary and firmware rollout decisions",
+    "skin": "aurora",
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Canary promotion",
+            "sections": [
+              {
+                "heading": "Hold for evidence, then promote",
+                "source": "https://argoproj.github.io/argo-rollouts/features/canary/",
+                "text": [
+                  "Fictional, editable explanation. Versions, samples, p95 values, timings and policy outcomes are authored; this is not live telemetry, a statistical proof or an executable rollout policy. The source chip is a pattern reference, not evidence for these numbers."
+                ],
+                "bullets": [
+                  "Example promotion requires at least 1000 v2 requests in one named completed window, failed-request rate at most 1%, and p95 at most 250 ms. These are illustrative thresholds, not production recommendations.",
+                  "Configured traffic weights sum to 100. They are router settings, not observed request fractions or pod-count percentages. Cohort names stay fixed to track v1 and v2.",
+                  "Error rate uses failed requests / all requests from the same window. p95 is a separately authored distribution statistic; it cannot be derived from those counts. Readiness, routing and sampled health are separate.",
+                  "Only v2 is sampled in these windows; the old cohort tile is an explicitly older baseline report. This is not a matched-control comparison. Deployment capacity and data compatibility are assumptions of this example."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "routing": "lanes",
+                  "nodes": {
+                    "policy": {
+                      "title": "Release policy",
+                      "icon": "shield"
+                    },
+                    "router": {
+                      "title": "Traffic router",
+                      "icon": "router"
+                    },
+                    "old": {
+                      "title": "Old service v1",
+                      "icon": "cloud"
+                    },
+                    "new": {
+                      "title": "New service v2",
+                      "icon": "cloud",
+                      "tint": "data"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "policy",
+                      "router"
+                    ],
+                    [
+                      "old",
+                      "new"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "policy",
+                      "to": "router",
+                      "kind": "int",
+                      "label": "set weights"
+                    },
+                    {
+                      "from": "router",
+                      "to": "old",
+                      "kind": "https",
+                      "label": "old cohort"
+                    },
+                    {
+                      "from": "router",
+                      "to": "new",
+                      "kind": "https",
+                      "label": "new cohort"
+                    },
+                    {
+                      "from": "new",
+                      "to": "policy",
+                      "kind": "int",
+                      "label": "window report"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "cohorts",
+                      "type": "tiles",
+                      "title": "Deployment / sampled health",
+                      "tiles": [
+                        {
+                          "id": "old",
+                          "label": "Old cohort"
+                        },
+                        {
+                          "id": "new",
+                          "label": "New cohort"
+                        }
+                      ],
+                      "states": [
+                        "LAST REPORT",
+                        "NO DATA",
+                        "WITHIN LIMIT",
+                        "OVER LIMIT"
+                      ],
+                      "colors": {
+                        "LAST REPORT": "#94A3B8",
+                        "NO DATA": "#94A3B8",
+                        "WITHIN LIMIT": "#4ADE80",
+                        "OVER LIMIT": "#F87171"
+                      }
+                    },
+                    {
+                      "id": "evidence",
+                      "type": "table",
+                      "title": "Traffic configuration and evidence",
+                      "columns": [
+                        {
+                          "id": "fact",
+                          "label": "Fact"
+                        },
+                        {
+                          "id": "old",
+                          "label": "Old v1"
+                        },
+                        {
+                          "id": "new",
+                          "label": "New v2"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "limits",
+                      "type": "budget",
+                      "title": "Named canary window / ceilings",
+                      "metrics": [
+                        {
+                          "id": "errors",
+                          "label": "Failed requests",
+                          "unit": "%",
+                          "max": 1
+                        },
+                        {
+                          "id": "latency",
+                          "label": "p95 latency",
+                          "unit": "ms",
+                          "max": 250
+                        }
+                      ]
+                    },
+                    {
+                      "id": "gate",
+                      "type": "checks",
+                      "title": "Authored rollout decision",
+                      "checks": [
+                        {
+                          "id": "sample",
+                          "label": "Minimum sample"
+                        },
+                        {
+                          "id": "errors",
+                          "label": "Error ceiling"
+                        },
+                        {
+                          "id": "latency",
+                          "label": "Latency ceiling"
+                        },
+                        {
+                          "id": "decision",
+                          "label": "Release decision"
+                        }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "promote.staged",
+                      "text": "Both versions are deployed and ready. New v2 has zero configured traffic and no sampled request health. A ready process is not a passing canary.",
+                      "nodes": [
+                        "old",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "NO DATA",
+                            "sub": "v2 · none"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 100,
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "none"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": "none"
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": "not measured"
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": null,
+                            "latency": null
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pending",
+                              "detail": "0 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pending",
+                              "detail": "No request denominator yet"
+                            },
+                            "latency": {
+                              "status": "pending",
+                              "detail": "No latency sample yet"
+                            },
+                            "decision": {
+                              "status": "warn",
+                              "detail": "HOLD: expose a bounded canary before evaluating it"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "promote.canary",
+                      "text": "The router acknowledges a 95/5 weight configuration. W1 starts for v2; zero completed requests means no error-rate denominator, not a 0% failure rate.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "NO DATA",
+                            "sub": "v2 · W1"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 95,
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W1 · t=0–2 min"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": "not measured"
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": null,
+                            "latency": null
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pending",
+                              "detail": "0 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pending",
+                              "detail": "No request denominator yet"
+                            },
+                            "latency": {
+                              "status": "pending",
+                              "detail": "No latency sample yet"
+                            },
+                            "decision": {
+                              "status": "warn",
+                              "detail": "HOLD at 5%: collect the named window"
+                            }
+                          }
+                        }
+                      },
+                      "edge": "policy->router"
+                    },
+                    {
+                      "id": "promote.hold",
+                      "text": "W1 closes with 200 requests and one failure. Its error and latency values fit the example ceilings, but 200 is below the 1000-request minimum. Hold the traffic configuration.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "WITHIN LIMIT",
+                            "sub": "v2 · W1"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 95,
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W1 · t=0–2 min"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 200
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 1
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": 180
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": 0.5,
+                            "latency": 180
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "warn",
+                              "detail": "200 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pass",
+                              "detail": "1 / 200 = 0.5% failed requests; ceiling 1%"
+                            },
+                            "latency": {
+                              "status": "pass",
+                              "detail": "Authored p95 180 ms; ceiling 250 ms"
+                            },
+                            "decision": {
+                              "status": "warn",
+                              "detail": "HOLD at 5%: insufficient sample despite values within limits"
+                            }
+                          }
+                        }
+                      },
+                      "edge": "new->policy"
+                    },
+                    {
+                      "id": "promote.authorize50",
+                      "text": "Separate, non-overlapping W2 closes with 1000 requests and five failures. All authored gates pass. Authorize 50%, while the acknowledged routing configuration remains 5% until the next step.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "WITHIN LIMIT",
+                            "sub": "v2 · W2"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 95,
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W2 · t=2–12 min"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 1000
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": 180
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": 0.5,
+                            "latency": 180
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pass",
+                              "detail": "1000 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pass",
+                              "detail": "5 / 1000 = 0.5% failed requests; ceiling 1%"
+                            },
+                            "latency": {
+                              "status": "pass",
+                              "detail": "Authored p95 180 ms; ceiling 250 ms"
+                            },
+                            "decision": {
+                              "status": "pass",
+                              "detail": "PROMOTE TO 50% authorized from W2; not yet applied"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "promote.apply50",
+                      "text": "The router acknowledges 50/50. W3 is a new window: its measurements and gates start empty rather than carrying a previous passing value into a different traffic configuration.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "NO DATA",
+                            "sub": "v2 · W3"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 50,
+                                "new": 50
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W3 · t=12–14 min"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 50
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": "not measured"
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": null,
+                            "latency": null
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pending",
+                              "detail": "0 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pending",
+                              "detail": "No request denominator yet"
+                            },
+                            "latency": {
+                              "status": "pending",
+                              "detail": "No latency sample yet"
+                            },
+                            "decision": {
+                              "status": "warn",
+                              "detail": "HOLD at 50%: collect W3"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "promote.authorize100",
+                      "text": "W3 closes with 1000 requests and four failures. The example policy authorizes 100% after the checks pass; routing is still 50% at this decision beat.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "WITHIN LIMIT",
+                            "sub": "v2 · W3"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 50,
+                                "new": 50
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W3 · t=12–14 min"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 50
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 1000
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 4
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": 170
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": 0.4,
+                            "latency": 170
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pass",
+                              "detail": "1000 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pass",
+                              "detail": "4 / 1000 = 0.4% failed requests; ceiling 1%"
+                            },
+                            "latency": {
+                              "status": "pass",
+                              "detail": "Authored p95 170 ms; ceiling 250 ms"
+                            },
+                            "decision": {
+                              "status": "pass",
+                              "detail": "PROMOTE TO 100% authorized from W3; not yet applied"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "promote.apply100",
+                      "text": "The router acknowledges 0/100. The old v1 deployment still exists at zero configured traffic. New W4 health is unknown; continued monitoring is required and its outcome is outside this story.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "NO DATA",
+                            "sub": "v2 · W4"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 0,
+                                "new": 100
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W4 · starts t=14 min"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 100
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": "not measured"
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": null,
+                            "latency": null
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pending",
+                              "detail": "0 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pending",
+                              "detail": "No request denominator yet"
+                            },
+                            "latency": {
+                              "status": "pending",
+                              "detail": "No latency sample yet"
+                            },
+                            "decision": {
+                              "status": "skip",
+                              "detail": "100% configuration APPLIED; W4 monitoring remains pending"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Traffic rollback",
+            "sections": [
+              {
+                "heading": "Abort the canary and restore routing",
+                "source": "https://argoproj.github.io/argo-rollouts/features/analysis/",
+                "text": [
+                  "Fictional, editable explanation. Versions, samples, p95 values, timings and policy outcomes are authored; this is not live telemetry, a statistical proof or an executable rollout policy. The source chip is a pattern reference, not evidence for these numbers."
+                ],
+                "bullets": [
+                  "Example promotion requires at least 1000 v2 requests in one named completed window, failed-request rate at most 1%, and p95 at most 250 ms. These are illustrative thresholds, not production recommendations.",
+                  "Configured traffic weights sum to 100. They are router settings, not observed request fractions or pod-count percentages. Cohort names stay fixed to track v1 and v2.",
+                  "Error rate uses failed requests / all requests from the same window. p95 is a separately authored distribution statistic; it cannot be derived from those counts. Readiness, routing and sampled health are separate.",
+                  "Only v2 is sampled in these windows; the old cohort tile is an explicitly older baseline report. This is not a matched-control comparison. Deployment capacity and data compatibility are assumptions of this example."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "routing": "lanes",
+                  "nodes": {
+                    "policy": {
+                      "title": "Release policy",
+                      "icon": "shield"
+                    },
+                    "router": {
+                      "title": "Traffic router",
+                      "icon": "router"
+                    },
+                    "old": {
+                      "title": "Old service v1",
+                      "icon": "cloud"
+                    },
+                    "new": {
+                      "title": "New service v2",
+                      "icon": "cloud",
+                      "tint": "data"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "policy",
+                      "router"
+                    ],
+                    [
+                      "old",
+                      "new"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "policy",
+                      "to": "router",
+                      "kind": "int",
+                      "label": "set weights"
+                    },
+                    {
+                      "from": "router",
+                      "to": "old",
+                      "kind": "https",
+                      "label": "old cohort"
+                    },
+                    {
+                      "from": "router",
+                      "to": "new",
+                      "kind": "https",
+                      "label": "new cohort"
+                    },
+                    {
+                      "from": "new",
+                      "to": "policy",
+                      "kind": "int",
+                      "label": "window report"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "cohorts",
+                      "type": "tiles",
+                      "title": "Deployment / sampled health",
+                      "tiles": [
+                        {
+                          "id": "old",
+                          "label": "Old cohort"
+                        },
+                        {
+                          "id": "new",
+                          "label": "New cohort"
+                        }
+                      ],
+                      "states": [
+                        "LAST REPORT",
+                        "NO DATA",
+                        "WITHIN LIMIT",
+                        "OVER LIMIT"
+                      ],
+                      "colors": {
+                        "LAST REPORT": "#94A3B8",
+                        "NO DATA": "#94A3B8",
+                        "WITHIN LIMIT": "#4ADE80",
+                        "OVER LIMIT": "#F87171"
+                      }
+                    },
+                    {
+                      "id": "evidence",
+                      "type": "table",
+                      "title": "Traffic configuration and evidence",
+                      "columns": [
+                        {
+                          "id": "fact",
+                          "label": "Fact"
+                        },
+                        {
+                          "id": "old",
+                          "label": "Old v1"
+                        },
+                        {
+                          "id": "new",
+                          "label": "New v2"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "limits",
+                      "type": "budget",
+                      "title": "Named canary window / ceilings",
+                      "metrics": [
+                        {
+                          "id": "errors",
+                          "label": "Failed requests",
+                          "unit": "%",
+                          "max": 1
+                        },
+                        {
+                          "id": "latency",
+                          "label": "p95 latency",
+                          "unit": "ms",
+                          "max": 250
+                        }
+                      ]
+                    },
+                    {
+                      "id": "gate",
+                      "type": "checks",
+                      "title": "Authored rollout decision",
+                      "checks": [
+                        {
+                          "id": "sample",
+                          "label": "Minimum sample"
+                        },
+                        {
+                          "id": "errors",
+                          "label": "Error ceiling"
+                        },
+                        {
+                          "id": "latency",
+                          "label": "Latency ceiling"
+                        },
+                        {
+                          "id": "decision",
+                          "label": "Release decision"
+                        }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "rollback.staged",
+                      "text": "An independent rollout begins with both versions ready and v2 receiving zero configured traffic. Baseline readiness does not prove the new request path is healthy.",
+                      "nodes": [
+                        "old",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "NO DATA",
+                            "sub": "v2 · none"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 100,
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "none"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": "none"
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": "not measured"
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": null,
+                            "latency": null
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pending",
+                              "detail": "0 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pending",
+                              "detail": "No request denominator yet"
+                            },
+                            "latency": {
+                              "status": "pending",
+                              "detail": "No latency sample yet"
+                            },
+                            "decision": {
+                              "status": "warn",
+                              "detail": "HOLD: begin the canary evaluation"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "rollback.canary",
+                      "text": "The router acknowledges a 95/5 configuration and opens W1 for v2.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "NO DATA",
+                            "sub": "v2 · W1"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 95,
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W1 · t=0–10 min"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": "not measured"
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": null,
+                            "latency": null
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pending",
+                              "detail": "0 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "pending",
+                              "detail": "No request denominator yet"
+                            },
+                            "latency": {
+                              "status": "pending",
+                              "detail": "No latency sample yet"
+                            },
+                            "decision": {
+                              "status": "warn",
+                              "detail": "HOLD at 5% pending W1"
+                            }
+                          }
+                        }
+                      },
+                      "edge": "policy->router"
+                    },
+                    {
+                      "id": "rollback.abort",
+                      "text": "W1 closes with 1000 requests, 25 failures and p95 310 ms. Both ceilings fail. The policy orders a traffic rollback; the previous 5% configuration is still acknowledged at this beat.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "OVER LIMIT",
+                            "sub": "v2 · W1"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 95,
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W1 · t=0–10 min"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 1000
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 25
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": 310
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": 2.5,
+                            "latency": 310
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pass",
+                              "detail": "1000 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "fail",
+                              "detail": "25 / 1000 = 2.5% failed requests; ceiling 1%"
+                            },
+                            "latency": {
+                              "status": "fail",
+                              "detail": "Authored p95 310 ms; ceiling 250 ms"
+                            },
+                            "decision": {
+                              "status": "fail",
+                              "detail": "ROLL BACK TRAFFIC authorized: W1 failed both ceilings"
+                            }
+                          }
+                        }
+                      },
+                      "edge": "new->policy"
+                    },
+                    {
+                      "id": "rollback.applied",
+                      "text": "The router acknowledges 100/0. The failing W1 evidence stays visible with its original 5% window weight. New v2 remains deployed; this traffic rollback does not reverse writes, schema changes, or already in-flight work.",
+                      "nodes": [
+                        "policy",
+                        "router",
+                        "new"
+                      ],
+                      "panels": {
+                        "cohorts": {
+                          "old": {
+                            "state": "LAST REPORT",
+                            "sub": "v1 · baseline"
+                          },
+                          "new": {
+                            "state": "OVER LIMIT",
+                            "sub": "v2 · W1"
+                          }
+                        },
+                        "evidence": {
+                          "rows": [
+                            {
+                              "id": "ready",
+                              "cells": {
+                                "fact": "Deployed / readiness",
+                                "old": "v1 / ready",
+                                "new": "v2 / ready"
+                              }
+                            },
+                            {
+                              "id": "weight",
+                              "cells": {
+                                "fact": "Configured traffic %",
+                                "old": 100,
+                                "new": 0
+                              }
+                            },
+                            {
+                              "id": "window",
+                              "cells": {
+                                "fact": "Evidence window",
+                                "old": "baseline report",
+                                "new": "W1 · t=0–10 min (closed)"
+                              }
+                            },
+                            {
+                              "id": "measuredWeight",
+                              "cells": {
+                                "fact": "Window routing weight %",
+                                "old": "not sampled",
+                                "new": 5
+                              }
+                            },
+                            {
+                              "id": "requests",
+                              "cells": {
+                                "fact": "Window requests",
+                                "old": "not sampled",
+                                "new": 1000
+                              }
+                            },
+                            {
+                              "id": "failures",
+                              "cells": {
+                                "fact": "Window failed requests",
+                                "old": "not sampled",
+                                "new": 25
+                              }
+                            },
+                            {
+                              "id": "p95",
+                              "cells": {
+                                "fact": "Window p95 (ms)",
+                                "old": "not sampled",
+                                "new": 310
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "errors": 2.5,
+                            "latency": 310
+                          }
+                        },
+                        "gate": {
+                          "results": {
+                            "sample": {
+                              "status": "pass",
+                              "detail": "1000 / 1000 minimum requests in the named canary window"
+                            },
+                            "errors": {
+                              "status": "fail",
+                              "detail": "25 / 1000 = 2.5% failed requests; ceiling 1%"
+                            },
+                            "latency": {
+                              "status": "fail",
+                              "detail": "Authored p95 310 ms; ceiling 250 ms"
+                            },
+                            "decision": {
+                              "status": "warn",
+                              "detail": "Traffic rollback APPLIED; retain W1 for investigation"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Firmware trial",
+            "sections": [
+              {
+                "heading": "Trial boot, confirmation and a held wave",
+                "source": "https://docs.mcuboot.com/design.html#boot-swap-types",
+                "text": [
+                  "Fictional ten-device campaign. All versions, package checks, health outcomes and reports are authored. This models a two-slot bootloader configured for reversible test upgrades, with a valid retained image and a policy permitting reversion. It does not promise that every bootloader or device can roll back."
+                ],
+                "bullets": [
+                  "The version table records the latest available reports, not a continuously known device state. Running image, persistent confirmation and the other-slot image are separate facts.",
+                  "A and B are individual canaries. The eight-device later wave is an explicitly homogeneous last-reported v1 cohort and never receives v2 authorization in this story.",
+                  "Signature and hardware compatibility checks do not establish runtime health. Missing telemetry does not establish confirmation, failure or rollback.",
+                  "A successful v1 self-test after reversion is different from passing the v2 release gate. A confirmed v2 image does not automatically revert with an unconfirmed peer."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "routing": "lanes",
+                  "nodes": {
+                    "control": {
+                      "title": "Campaign gate",
+                      "icon": "shield"
+                    },
+                    "artifact": {
+                      "title": "Signed image v2",
+                      "icon": "package"
+                    },
+                    "a": {
+                      "title": "Canary A",
+                      "icon": "chip"
+                    },
+                    "b": {
+                      "title": "Canary B",
+                      "icon": "chip"
+                    },
+                    "wave": {
+                      "title": "Later wave",
+                      "sub": "8 devices · held",
+                      "icon": "antenna"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "control",
+                      "a",
+                      "b"
+                    ],
+                    [
+                      "artifact",
+                      "wave"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "control",
+                      "to": "a",
+                      "kind": "mqtt",
+                      "label": "trial policy"
+                    },
+                    {
+                      "from": "control",
+                      "to": "b",
+                      "kind": "mqtt",
+                      "label": "trial policy"
+                    },
+                    {
+                      "from": "a",
+                      "to": "artifact",
+                      "kind": "https",
+                      "label": "fetch image"
+                    },
+                    {
+                      "from": "b",
+                      "to": "artifact",
+                      "kind": "https",
+                      "label": "fetch image"
+                    },
+                    {
+                      "from": "a",
+                      "to": "control",
+                      "kind": "mqtt",
+                      "label": "boot report"
+                    },
+                    {
+                      "from": "b",
+                      "to": "control",
+                      "kind": "mqtt",
+                      "label": "boot report"
+                    },
+                    {
+                      "from": "control",
+                      "to": "wave",
+                      "kind": "mqtt",
+                      "label": "gated update"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "fleet",
+                      "type": "tiles",
+                      "title": "Reported self-test / cohort scope",
+                      "tiles": [
+                        {
+                          "id": "a",
+                          "label": "Canary A"
+                        },
+                        {
+                          "id": "b",
+                          "label": "Canary B"
+                        },
+                        {
+                          "id": "wave",
+                          "label": "Later wave (8)"
+                        }
+                      ],
+                      "states": [
+                        "LAST REPORT",
+                        "UNKNOWN",
+                        "PASSED"
+                      ],
+                      "colors": {
+                        "LAST REPORT": "#94A3B8",
+                        "UNKNOWN": "#94A3B8",
+                        "PASSED": "#4ADE80"
+                      }
+                    },
+                    {
+                      "id": "versions",
+                      "type": "table",
+                      "title": "Latest reported boot facts",
+                      "columns": [
+                        {
+                          "id": "device",
+                          "label": "Device"
+                        },
+                        {
+                          "id": "running",
+                          "label": "Running"
+                        },
+                        {
+                          "id": "confirmation",
+                          "label": "Confirmation"
+                        },
+                        {
+                          "id": "other",
+                          "label": "Other slot"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "campaign",
+                      "type": "table",
+                      "title": "Campaign intent and authorization",
+                      "columns": [
+                        {
+                          "id": "fact",
+                          "label": "Fact"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Value"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "gate",
+                      "type": "checks",
+                      "title": "Authored release gates",
+                      "checks": [
+                        {
+                          "id": "signature",
+                          "label": "Package signature"
+                        },
+                        {
+                          "id": "compat",
+                          "label": "Compatibility / rollback policy"
+                        },
+                        {
+                          "id": "a",
+                          "label": "A confirms target v2"
+                        },
+                        {
+                          "id": "b",
+                          "label": "B confirms target v2"
+                        },
+                        {
+                          "id": "expand",
+                          "label": "Later-wave decision"
+                        }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "firmware.baseline",
+                      "text": "Two canaries and the later wave last reported confirmed v1. Target v2 is only a campaign intent. No package has been accepted or written yet.",
+                      "nodes": [
+                        "control",
+                        "a",
+                        "b"
+                      ],
+                      "panels": {
+                        "fleet": {
+                          "a": {
+                            "state": "LAST REPORT",
+                            "sub": "v1"
+                          },
+                          "b": {
+                            "state": "LAST REPORT",
+                            "sub": "v1"
+                          },
+                          "wave": {
+                            "state": "LAST REPORT",
+                            "sub": "8 × v1; held"
+                          }
+                        },
+                        "versions": {
+                          "rows": [
+                            {
+                              "id": "a",
+                              "cells": {
+                                "device": "Canary A",
+                                "running": "v1",
+                                "confirmation": "v1 confirmed",
+                                "other": "empty"
+                              }
+                            },
+                            {
+                              "id": "b",
+                              "cells": {
+                                "device": "Canary B",
+                                "running": "v1",
+                                "confirmation": "v1 confirmed",
+                                "other": "empty"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "device": "Later wave (8)",
+                                "running": "v1 (last report)",
+                                "confirmation": "v1 confirmed",
+                                "other": "no candidate"
+                              }
+                            }
+                          ]
+                        },
+                        "campaign": {
+                          "rows": [
+                            {
+                              "id": "target",
+                              "cells": {
+                                "fact": "Campaign target",
+                                "value": "v2"
+                              }
+                            },
+                            {
+                              "id": "scope",
+                              "cells": {
+                                "fact": "Trial scope",
+                                "value": "2 named canaries / 10 devices"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "fact": "Later-wave authorization",
+                                "value": "HOLD · all 8 remain outside v2 rollout"
+                              }
+                            },
+                            {
+                              "id": "decision",
+                              "cells": {
+                                "fact": "Decision",
+                                "value": "HOLD: preflight before trial"
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "signature": {
+                              "status": "pending",
+                              "detail": "Package verification not complete"
+                            },
+                            "compat": {
+                              "status": "pending",
+                              "detail": "Compatibility and rollback policy not checked"
+                            },
+                            "a": {
+                              "status": "pending",
+                              "detail": "No v2 trial yet"
+                            },
+                            "b": {
+                              "status": "pending",
+                              "detail": "No v2 trial yet"
+                            },
+                            "expand": {
+                              "status": "warn",
+                              "detail": "HOLD: preflight before trial"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "firmware.preflight",
+                      "text": "The example package passes signature, board compatibility and rollback-policy checks. Active and confirmed versions are still v1. A valid image is not proof of runtime health.",
+                      "nodes": [
+                        "control",
+                        "artifact"
+                      ],
+                      "panels": {
+                        "fleet": {
+                          "a": {
+                            "state": "LAST REPORT",
+                            "sub": "v1"
+                          },
+                          "b": {
+                            "state": "LAST REPORT",
+                            "sub": "v1"
+                          },
+                          "wave": {
+                            "state": "LAST REPORT",
+                            "sub": "8 × v1; held"
+                          }
+                        },
+                        "versions": {
+                          "rows": [
+                            {
+                              "id": "a",
+                              "cells": {
+                                "device": "Canary A",
+                                "running": "v1",
+                                "confirmation": "v1 confirmed",
+                                "other": "empty"
+                              }
+                            },
+                            {
+                              "id": "b",
+                              "cells": {
+                                "device": "Canary B",
+                                "running": "v1",
+                                "confirmation": "v1 confirmed",
+                                "other": "empty"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "device": "Later wave (8)",
+                                "running": "v1 (last report)",
+                                "confirmation": "v1 confirmed",
+                                "other": "no candidate"
+                              }
+                            }
+                          ]
+                        },
+                        "campaign": {
+                          "rows": [
+                            {
+                              "id": "target",
+                              "cells": {
+                                "fact": "Campaign target",
+                                "value": "v2"
+                              }
+                            },
+                            {
+                              "id": "scope",
+                              "cells": {
+                                "fact": "Trial scope",
+                                "value": "2 named canaries / 10 devices"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "fact": "Later-wave authorization",
+                                "value": "HOLD · all 8 remain outside v2 rollout"
+                              }
+                            },
+                            {
+                              "id": "decision",
+                              "cells": {
+                                "fact": "Decision",
+                                "value": "HOLD: preflight permits staging only"
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "signature": {
+                              "status": "pass",
+                              "detail": "Authored package signature check"
+                            },
+                            "compat": {
+                              "status": "pass",
+                              "detail": "Authored board compatibility / rollback policy check"
+                            },
+                            "a": {
+                              "status": "pending",
+                              "detail": "No v2 trial yet"
+                            },
+                            "b": {
+                              "status": "pending",
+                              "detail": "No v2 trial yet"
+                            },
+                            "expand": {
+                              "status": "warn",
+                              "detail": "HOLD: preflight permits staging only"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "firmware.staged",
+                      "text": "Both canaries report v2 fully written to their inactive slot. They still run confirmed v1. The later wave has no candidate image and receives no update command.",
+                      "nodes": [
+                        "control",
+                        "a",
+                        "b"
+                      ],
+                      "panels": {
+                        "fleet": {
+                          "a": {
+                            "state": "LAST REPORT",
+                            "sub": "v1"
+                          },
+                          "b": {
+                            "state": "LAST REPORT",
+                            "sub": "v1"
+                          },
+                          "wave": {
+                            "state": "LAST REPORT",
+                            "sub": "8 × v1; held"
+                          }
+                        },
+                        "versions": {
+                          "rows": [
+                            {
+                              "id": "a",
+                              "cells": {
+                                "device": "Canary A",
+                                "running": "v1",
+                                "confirmation": "v1 confirmed",
+                                "other": "v2 staged"
+                              }
+                            },
+                            {
+                              "id": "b",
+                              "cells": {
+                                "device": "Canary B",
+                                "running": "v1",
+                                "confirmation": "v1 confirmed",
+                                "other": "v2 staged"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "device": "Later wave (8)",
+                                "running": "v1 (last report)",
+                                "confirmation": "v1 confirmed",
+                                "other": "no candidate"
+                              }
+                            }
+                          ]
+                        },
+                        "campaign": {
+                          "rows": [
+                            {
+                              "id": "target",
+                              "cells": {
+                                "fact": "Campaign target",
+                                "value": "v2"
+                              }
+                            },
+                            {
+                              "id": "scope",
+                              "cells": {
+                                "fact": "Trial scope",
+                                "value": "2 named canaries / 10 devices"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "fact": "Later-wave authorization",
+                                "value": "HOLD · all 8 remain outside v2 rollout"
+                              }
+                            },
+                            {
+                              "id": "decision",
+                              "cells": {
+                                "fact": "Decision",
+                                "value": "HOLD: trial boot only the canaries"
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "signature": {
+                              "status": "pass",
+                              "detail": "Authored package signature check"
+                            },
+                            "compat": {
+                              "status": "pass",
+                              "detail": "Authored board compatibility / rollback policy check"
+                            },
+                            "a": {
+                              "status": "pending",
+                              "detail": "Staging is not confirmation"
+                            },
+                            "b": {
+                              "status": "pending",
+                              "detail": "Staging is not confirmation"
+                            },
+                            "expand": {
+                              "status": "warn",
+                              "detail": "HOLD: trial boot only the canaries"
+                            }
+                          }
+                        }
+                      },
+                      "edges": [
+                        "a->artifact",
+                        "b->artifact"
+                      ]
+                    },
+                    {
+                      "id": "firmware.trial",
+                      "text": "Both canaries report trial boots of v2, not yet confirmed; v1 is retained in the other slot. Self-test results have not arrived. Running v2 alone does not admit the next wave.",
+                      "nodes": [
+                        "control",
+                        "a",
+                        "b"
+                      ],
+                      "panels": {
+                        "fleet": {
+                          "a": {
+                            "state": "UNKNOWN",
+                            "sub": "v2 trial"
+                          },
+                          "b": {
+                            "state": "UNKNOWN",
+                            "sub": "v2 trial"
+                          },
+                          "wave": {
+                            "state": "LAST REPORT",
+                            "sub": "8 × v1; held"
+                          }
+                        },
+                        "versions": {
+                          "rows": [
+                            {
+                              "id": "a",
+                              "cells": {
+                                "device": "Canary A",
+                                "running": "v2 trial",
+                                "confirmation": "v2 unconfirmed",
+                                "other": "v1 retained"
+                              }
+                            },
+                            {
+                              "id": "b",
+                              "cells": {
+                                "device": "Canary B",
+                                "running": "v2 trial",
+                                "confirmation": "v2 unconfirmed",
+                                "other": "v1 retained"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "device": "Later wave (8)",
+                                "running": "v1 (last report)",
+                                "confirmation": "v1 confirmed",
+                                "other": "no candidate"
+                              }
+                            }
+                          ]
+                        },
+                        "campaign": {
+                          "rows": [
+                            {
+                              "id": "target",
+                              "cells": {
+                                "fact": "Campaign target",
+                                "value": "v2"
+                              }
+                            },
+                            {
+                              "id": "scope",
+                              "cells": {
+                                "fact": "Trial scope",
+                                "value": "2 named canaries / 10 devices"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "fact": "Later-wave authorization",
+                                "value": "HOLD · all 8 remain outside v2 rollout"
+                              }
+                            },
+                            {
+                              "id": "decision",
+                              "cells": {
+                                "fact": "Decision",
+                                "value": "HOLD: wait for both canary confirmations"
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "signature": {
+                              "status": "pass",
+                              "detail": "Authored package signature check"
+                            },
+                            "compat": {
+                              "status": "pass",
+                              "detail": "Authored board compatibility / rollback policy check"
+                            },
+                            "a": {
+                              "status": "pending",
+                              "detail": "Await self-test and confirmation report"
+                            },
+                            "b": {
+                              "status": "pending",
+                              "detail": "Await self-test and confirmation report"
+                            },
+                            "expand": {
+                              "status": "warn",
+                              "detail": "HOLD: wait for both canary confirmations"
+                            }
+                          }
+                        }
+                      },
+                      "edges": [
+                        "control->a",
+                        "control->b"
+                      ]
+                    },
+                    {
+                      "id": "firmware.partial",
+                      "text": "Canary A reports self-test success and persistent confirmation of v2. B sends no fresh report. B may have changed locally: its last trial report does not establish its current confirmation or running image.",
+                      "nodes": [
+                        "a",
+                        "control"
+                      ],
+                      "panels": {
+                        "fleet": {
+                          "a": {
+                            "state": "PASSED",
+                            "sub": "v2"
+                          },
+                          "b": {
+                            "state": "UNKNOWN",
+                            "sub": "last report: v2"
+                          },
+                          "wave": {
+                            "state": "LAST REPORT",
+                            "sub": "8 × v1; held"
+                          }
+                        },
+                        "versions": {
+                          "rows": [
+                            {
+                              "id": "a",
+                              "cells": {
+                                "device": "Canary A",
+                                "running": "v2",
+                                "confirmation": "v2 confirmed",
+                                "other": "v1 retained"
+                              }
+                            },
+                            {
+                              "id": "b",
+                              "cells": {
+                                "device": "Canary B",
+                                "running": "last report: v2",
+                                "confirmation": "current unknown",
+                                "other": "last: v1 retained"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "device": "Later wave (8)",
+                                "running": "v1 (last report)",
+                                "confirmation": "v1 confirmed",
+                                "other": "no candidate"
+                              }
+                            }
+                          ]
+                        },
+                        "campaign": {
+                          "rows": [
+                            {
+                              "id": "target",
+                              "cells": {
+                                "fact": "Campaign target",
+                                "value": "v2"
+                              }
+                            },
+                            {
+                              "id": "scope",
+                              "cells": {
+                                "fact": "Trial scope",
+                                "value": "2 named canaries / 10 devices"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "fact": "Later-wave authorization",
+                                "value": "HOLD · all 8 remain outside v2 rollout"
+                              }
+                            },
+                            {
+                              "id": "decision",
+                              "cells": {
+                                "fact": "Decision",
+                                "value": "HOLD: one confirmation, one unknown"
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "signature": {
+                              "status": "pass",
+                              "detail": "Authored package signature check"
+                            },
+                            "compat": {
+                              "status": "pass",
+                              "detail": "Authored board compatibility / rollback policy check"
+                            },
+                            "a": {
+                              "status": "pass",
+                              "detail": "Fresh v2 self-test and confirmation report"
+                            },
+                            "b": {
+                              "status": "pending",
+                              "detail": "Missing fresh report; do not infer rollback or success"
+                            },
+                            "expand": {
+                              "status": "warn",
+                              "detail": "HOLD: one confirmation, one unknown"
+                            }
+                          }
+                        }
+                      },
+                      "edge": "a->control"
+                    },
+                    {
+                      "id": "firmware.reverted",
+                      "text": "B reconnects with a fresh boot report: its unconfirmed trial reverted to v1 on reset and v1 self-test passed. A remains confirmed on v2. Stop expansion; a rollback of A would need a separately authorized update compatible with the device policy.",
+                      "nodes": [
+                        "b",
+                        "control"
+                      ],
+                      "panels": {
+                        "fleet": {
+                          "a": {
+                            "state": "PASSED",
+                            "sub": "v2"
+                          },
+                          "b": {
+                            "state": "PASSED",
+                            "sub": "v1"
+                          },
+                          "wave": {
+                            "state": "LAST REPORT",
+                            "sub": "8 × v1; held"
+                          }
+                        },
+                        "versions": {
+                          "rows": [
+                            {
+                              "id": "a",
+                              "cells": {
+                                "device": "Canary A",
+                                "running": "v2",
+                                "confirmation": "v2 confirmed",
+                                "other": "v1 retained"
+                              }
+                            },
+                            {
+                              "id": "b",
+                              "cells": {
+                                "device": "Canary B",
+                                "running": "v1",
+                                "confirmation": "v1 confirmed",
+                                "other": "v2 not confirmed"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "device": "Later wave (8)",
+                                "running": "v1 (last report)",
+                                "confirmation": "v1 confirmed",
+                                "other": "no candidate"
+                              }
+                            }
+                          ]
+                        },
+                        "campaign": {
+                          "rows": [
+                            {
+                              "id": "target",
+                              "cells": {
+                                "fact": "Campaign target",
+                                "value": "v2"
+                              }
+                            },
+                            {
+                              "id": "scope",
+                              "cells": {
+                                "fact": "Trial scope",
+                                "value": "2 named canaries / 10 devices"
+                              }
+                            },
+                            {
+                              "id": "wave",
+                              "cells": {
+                                "fact": "Later-wave authorization",
+                                "value": "HOLD · all 8 remain outside v2 rollout"
+                              }
+                            },
+                            {
+                              "id": "decision",
+                              "cells": {
+                                "fact": "Decision",
+                                "value": "HOLD: mixed canary versions; no later-wave promotion"
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "signature": {
+                              "status": "pass",
+                              "detail": "Authored package signature check"
+                            },
+                            "compat": {
+                              "status": "pass",
+                              "detail": "Authored board compatibility / rollback policy check"
+                            },
+                            "a": {
+                              "status": "pass",
+                              "detail": "A remains confirmed on v2"
+                            },
+                            "b": {
+                              "status": "fail",
+                              "detail": "B reported reversion to v1; v2 was not confirmed"
+                            },
+                            "expand": {
+                              "status": "warn",
+                              "detail": "HOLD: mixed canary versions; no later-wave promotion"
+                            }
+                          }
+                        }
+                      },
+                      "edge": "b->control"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

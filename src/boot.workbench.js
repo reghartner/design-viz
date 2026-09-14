@@ -202,7 +202,7 @@ var CONTRACT = [
   '                        "icon":"<icon>", "tint":"<tint>",',
   '                        "group":"<groupId>",          // optional: containment boundary',
   '                        "link":"<permalink URL>"}},   // optional: clickable arrow on the card',
-  '    "groups": {"<groupId>": {"title":"<boundary title>"}},  // draw a dashed box around members',
+  '    "groups": {"<groupId>": {"title":"<boundary title>", "icon":"<icon>"}}, // optional icon; dashed box around members',
   '    "rows":   [["<id>", "<id>", ...],           // row 1, left-to-right',
   '               ["<id>", ["<id>","<id>"], ...]], // row 2, right-to-left; nested array = stack',
   '    "floats": [{"id":"<id>", "side":"above"}],  // branch nodes (auth, signing)',
@@ -271,7 +271,7 @@ var CONTRACT = [
   '- Use tabs to group related diagrams and click-throughs into one experience;',
   '  a diagram repeated in another tab with view:"step" gives readers a guided',
   '  version at zero extra authoring cost.',
-  '- icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone',
+  '- icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone house camera doorbell lock bulb car',
   '- tints: cmd auth data mqtt dev',
   '- Edge labels: protocol verbs and topics (POST /x, PUBLISH a/b/c) read best.'
 ].join('\n');

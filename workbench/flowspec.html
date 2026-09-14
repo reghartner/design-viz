@@ -514,7 +514,9 @@ body.sk-aurora.sk-blueprint{
 .sk-daylight .grpbox{stroke:#C9C2B2; fill:rgba(73,86,201,.03);}
 .grptitle{font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.1em; text-transform:uppercase;}
 .sk-aurora .grptitle{fill:#5E7396;}
+.sk-aurora .grpicon{color:#5E7396;}
 .sk-daylight .grptitle{fill:#8A8474;}
+.sk-daylight .grpicon{color:#8A8474;}
 
 /* permalink + derived sibling affordances — zero footprint when absent */
 .nlink,.nbackref{cursor:pointer;}
@@ -1320,7 +1322,7 @@ rect.tlfuture{opacity:.18;}
 .stepmode .lbl{opacity:var(--dv-dim, .35);}
 .stepmode .lbl.lit{opacity:1;}
 .stepmode .coin:not(.lit){opacity:var(--dv-dim, .4);}
-.stepmode .grpbox, .stepmode .grptitle{opacity:.55;}
+.stepmode .grpbox, .stepmode .grptitle, .stepmode .grpicon{opacity:.55;}
 .sk-aurora .stepmode .node.lit .card{stroke:#3E9FC4;}
 .sk-aurora .stepmode .coin.lit circle{stroke:#8AE8FF;}
 .sk-daylight .stepmode .node.lit .card{stroke:#4956C9;}
@@ -1429,6 +1431,7 @@ rect.tlfuture{opacity:.18;}
   .sk-aurora .coin text, .sk-daylight .coin text{fill:#333333;}
   .sk-aurora .grpbox, .sk-daylight .grpbox{stroke:#999999; fill:none;}
   .sk-aurora .grptitle, .sk-daylight .grptitle{fill:#666666;}
+  .sk-aurora .grpicon, .sk-daylight .grpicon{color:#666666;}
   .edge{animation:none !important;}
   .pkt, .halo{display:none !important;}
   /* per-step panel state is ambiguous on paper, so widgets are hidden — EXCEPT
@@ -1733,6 +1736,8 @@ body.sk-editorial .sk-aurora .grpbox,
 body.sk-editorial .sk-daylight .grpbox{stroke:#AEA392; fill:rgba(14,91,86,.025);}
 body.sk-editorial .sk-aurora .grptitle,
 body.sk-editorial .sk-daylight .grptitle{fill:#6F6B62;}
+body.sk-editorial .sk-aurora .grpicon,
+body.sk-editorial .sk-daylight .grpicon{color:#6F6B62;}
 body.sk-editorial .sk-aurora .card,
 body.sk-editorial .sk-daylight .card{
   fill:#FFFDF8;
@@ -2407,6 +2412,7 @@ body.sk-editorial .errbox{
   body.sk-terminal .sk-aurora .lbl{fill:var(--tm-text); font-size:10px;}
   body.sk-terminal .sk-aurora .grpbox{fill:#07100C; stroke:var(--tm-line); stroke-width:1;}
   body.sk-terminal .sk-aurora .grptitle{fill:var(--tm-muted); letter-spacing:.15em;}
+  body.sk-terminal .sk-aurora .grpicon{color:var(--tm-muted);}
   body.sk-terminal .sk-aurora .coin circle{fill:var(--tm-ground); stroke:var(--tm-good); stroke-width:1;}
   body.sk-terminal .sk-aurora .coin text{fill:var(--tm-good);}
   body.sk-terminal .sk-aurora .stepmode .node.lit .card{stroke:var(--tm-good);}
@@ -2989,6 +2995,8 @@ body.sk-editorial .errbox{
   }
   body.sk-pastel .sk-aurora .grptitle,
   body.sk-pastel .sk-daylight .grptitle { fill:#75839A; }
+  body.sk-pastel .sk-aurora .grpicon,
+  body.sk-pastel .sk-daylight .grpicon { color:#75839A; }
   body.sk-pastel .card,
   body.sk-pastel .sk-aurora .card,
   body.sk-pastel .sk-daylight .card {
@@ -3747,6 +3755,7 @@ body.sk-editorial .errbox{
   body.sk-blueprint .grpbox{rx:2px;stroke-dasharray:5 4;}
   body.sk-blueprint .docview .grpbox{stroke:#5DAAC2;fill:rgba(77,210,239,.025);}
   body.sk-blueprint .docview .grptitle{fill:#8FBED4;letter-spacing:.12em;}
+  body.sk-blueprint .docview .grpicon{color:#8FBED4;}
   body.sk-blueprint .docview .card{fill:#08366D;stroke:#A6E7F3;stroke-width:1.15;rx:2px;filter:none;}
   body.sk-blueprint .docview .t1{
     fill:#FFFFFF;
@@ -4295,6 +4304,12 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
     <symbol id="i-server" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="4.5" width="16" height="6" rx="1.5"/><rect x="4" y="13.5" width="16" height="6" rx="1.5"/><circle cx="7.4" cy="7.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="7.4" cy="16.5" r="0.9" fill="currentColor" stroke="none"/></g></symbol>
     <symbol id="i-chip" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="7" y="7" width="10" height="10" rx="2"/><line x1="9.5" y1="7" x2="9.5" y2="4.2"/><line x1="14.5" y1="7" x2="14.5" y2="4.2"/><line x1="9.5" y1="19.8" x2="9.5" y2="17"/><line x1="14.5" y1="19.8" x2="14.5" y2="17"/><line x1="7" y1="9.5" x2="4.2" y2="9.5"/><line x1="7" y1="14.5" x2="4.2" y2="14.5"/><line x1="19.8" y1="9.5" x2="17" y2="9.5"/><line x1="19.8" y1="14.5" x2="17" y2="14.5"/></g></symbol>
     <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="8" y="3.5" width="8" height="17" rx="2"/><line x1="11" y1="17.5" x2="13" y2="17.5"/></g></symbol>
+    <symbol id="i-house" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5M5 9v12h5v-7h4v7h5V9"/></g></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="3.5"/><path d="M12 18v3m-4 0h8"/></g></symbol>
+    <symbol id="i-doorbell" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="3"/><path d="M10 7h4"/><circle cx="12" cy="15" r="2.5"/></g></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></g></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17v-1c0-2-3-3-3-7a6 6 0 0 1 12 0c0 4-3 5-3 7v1Zm0 3h6m-5 2h4"/></g></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17H2v-5l3-1 3-5h7l4 5 3 2v4h-2M8 17h8M5 11h14M12 6v5"/><circle cx="6" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></g></symbol>
   </defs>
 </svg>
 
@@ -4483,7 +4498,7 @@ var STARTERS = [{"name": "blank flow", "desc": "Three nodes and two hops to make
 
 var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
 var LEFT_X = 110, RIGHT_X = 885;
-var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone'];
+var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car'];
 var TINT_SET = ['cmd','auth','data','mqtt','dev'];
 /* Per-step node state is semantic narrative state, never an authored color.
    `base` is the explicit clearing token; null clears too. */
@@ -5001,6 +5016,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.floats[' + fi + '].side: unknown side "' + f.side + '" — using "above" (valid: above, below)');
   });
   var groups = (d.groups && typeof d.groups === 'object') ? d.groups : {};
+  Object.keys(groups).forEach(function(key){
+    var meta = groups[key];
+    if (!meta || !Object.prototype.hasOwnProperty.call(meta, 'icon')) return;
+    if (typeof meta.icon !== 'string')
+      warnings.push(DP + '.groups.' + key + '.icon: must be a string — icon ignored');
+    else if (ICON_SET.indexOf(meta.icon) < 0)
+      warnings.push(DP + '.groups.' + key + '.icon: unknown icon "' + meta.icon + '" — using "gear" (valid: ' + ICON_SET.join(' ') + ')');
+  });
   Object.keys(d.nodes).forEach(function(id){
     if (!placed[id]) warnings.push(DP + '.nodes.' + id + ': defined but not placed in rows or floats — it will not be drawn');
     var n = d.nodes[id] || {};
@@ -6735,8 +6758,10 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   Object.keys(L.groups).forEach(function(g){
     var b = L.groups[g];
     var meta = groupDefs[g] || {};
+    var groupIcon = typeof meta.icon === 'string' ? (ICON_SET.indexOf(meta.icon) >= 0 ? meta.icon : 'gear') : null;
     s += '<g class="grp" data-dv-group="' + esc(g) + '"><rect class="grpbox" x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="14"/>' +
-         '<text class="grptitle" x="' + (b.x + 14) + '" y="' + (b.y + 16) + '">' + esc(meta.title || g) + '</text></g>';
+         (groupIcon == null ? '' : '<use href="#i-' + esc(groupIcon) + '" class="grpicon" x="' + (b.x + 12) + '" y="' + (b.y + 5) + '" width="14" height="14" aria-hidden="true"/>') +
+         '<text class="grptitle" x="' + (b.x + (groupIcon == null ? 14 : 32)) + '" y="' + (b.y + 16) + '">' + esc(meta.title || g) + '</text></g>';
   });
 
   var edgeIds = {};
@@ -10574,6 +10599,22 @@ function planSetGroupTitle(text, raw, sectionIdx, key, titleOrNull){
   });
 }
 
+function planSetGroupIcon(text, raw, sectionIdx, key, iconOrNull){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (typeof key !== 'string' || !key.trim()) return {error: 'a group needs a key'};
+  var shape = builderGroupsShapeError(got.d);
+  if (shape) return shape;
+  return builderRewrite(text, raw, got.path, function(d){
+    var groups = Object.assign(Object.create(null), d.groups || {});
+    var meta = Object.assign(Object.create(null), groups[key] || {});
+    if (iconOrNull == null || iconOrNull.trim() === '') delete meta.icon;
+    else meta.icon = iconOrNull.trim();
+    groups[key] = meta;
+    d.groups = groups;
+  });
+}
+
 function planRenameGroup(text, raw, sectionIdx, oldKey, newKey){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
@@ -12031,6 +12072,7 @@ var BUILDER_GUIDES = {
     fields: [
       ['key', 'rename the declaration and every member reference'],
       ['title', 'boundary label — empty falls back to the key'],
+      ['icon', 'optional icon beside the boundary label — empty removes it'],
       ['members', 'remove individual nodes with ×; deleting the group keeps its nodes']
     ]
   },
@@ -12045,7 +12087,7 @@ var BUILDER_GUIDES = {
       ['group', 'containment-boundary id — members get a dashed box'],
       ['link', 'permalink URL — clickable ↗ on the card corner']
     ],
-    tokens: 'icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone · tints: cmd auth data mqtt dev'
+    tokens: 'icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone house camera doorbell lock bulb car · tints: cmd auth data mqtt dev'
   },
   edge: {
     title: 'Edge — one hop between nodes',
@@ -12923,6 +12965,10 @@ function initWorkbenchBuilder(opts){
         return commitGroup(function(raw){ return planSetGroupTitle(src.value, raw, t.section, t.id, v); },
           {after: function(){ renderInspector(); }});
       }, {list: null})),
+      frow('icon', selectControl(ICON_SET, val.icon || '', function(v){
+        return commitGroup(function(raw){ return planSetGroupIcon(src.value, raw, t.section, t.id, v); },
+          {after: function(){ renderInspector(); }});
+      }, true)),
       memberRow
     ];
   }
@@ -13693,8 +13739,7 @@ function initWorkbenchBuilder(opts){
         return applyBulkField('tint', v == null ? null : JSON.stringify(v));
       }, true)));
       form.appendChild(frow('icon', selectControl(
-        ['terminal', 'cloud', 'shield', 'gear', 'db', 'antenna', 'thermo', 'pump',
-         'router', 'package', 'key', 'server', 'chip', 'phone'], null, function(v){
+        ICON_SET, null, function(v){
         return applyBulkField('icon', v == null ? null : JSON.stringify(v));
       }, true)));
     }
@@ -15088,7 +15133,7 @@ var CONTRACT = [
   '                        "icon":"<icon>", "tint":"<tint>",',
   '                        "group":"<groupId>",          // optional: containment boundary',
   '                        "link":"<permalink URL>"}},   // optional: clickable arrow on the card',
-  '    "groups": {"<groupId>": {"title":"<boundary title>"}},  // draw a dashed box around members',
+  '    "groups": {"<groupId>": {"title":"<boundary title>", "icon":"<icon>"}}, // optional icon; dashed box around members',
   '    "rows":   [["<id>", "<id>", ...],           // row 1, left-to-right',
   '               ["<id>", ["<id>","<id>"], ...]], // row 2, right-to-left; nested array = stack',
   '    "floats": [{"id":"<id>", "side":"above"}],  // branch nodes (auth, signing)',
@@ -15157,7 +15202,7 @@ var CONTRACT = [
   '- Use tabs to group related diagrams and click-throughs into one experience;',
   '  a diagram repeated in another tab with view:"step" gives readers a guided',
   '  version at zero extra authoring cost.',
-  '- icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone',
+  '- icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone house camera doorbell lock bulb car',
   '- tints: cmd auth data mqtt dev',
   '- Edge labels: protocol verbs and topics (POST /x, PUBLISH a/b/c) read best.'
 ].join('\n');

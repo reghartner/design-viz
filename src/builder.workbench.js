@@ -640,6 +640,22 @@ function planSetGroupTitle(text, raw, sectionIdx, key, titleOrNull){
   });
 }
 
+function planSetGroupIcon(text, raw, sectionIdx, key, iconOrNull){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (typeof key !== 'string' || !key.trim()) return {error: 'a group needs a key'};
+  var shape = builderGroupsShapeError(got.d);
+  if (shape) return shape;
+  return builderRewrite(text, raw, got.path, function(d){
+    var groups = Object.assign(Object.create(null), d.groups || {});
+    var meta = Object.assign(Object.create(null), groups[key] || {});
+    if (iconOrNull == null || iconOrNull.trim() === '') delete meta.icon;
+    else meta.icon = iconOrNull.trim();
+    groups[key] = meta;
+    d.groups = groups;
+  });
+}
+
 function planRenameGroup(text, raw, sectionIdx, oldKey, newKey){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
@@ -2097,6 +2113,7 @@ var BUILDER_GUIDES = {
     fields: [
       ['key', 'rename the declaration and every member reference'],
       ['title', 'boundary label — empty falls back to the key'],
+      ['icon', 'optional icon beside the boundary label — empty removes it'],
       ['members', 'remove individual nodes with ×; deleting the group keeps its nodes']
     ]
   },
@@ -2111,7 +2128,7 @@ var BUILDER_GUIDES = {
       ['group', 'containment-boundary id — members get a dashed box'],
       ['link', 'permalink URL — clickable ↗ on the card corner']
     ],
-    tokens: 'icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone · tints: cmd auth data mqtt dev'
+    tokens: 'icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone house camera doorbell lock bulb car · tints: cmd auth data mqtt dev'
   },
   edge: {
     title: 'Edge — one hop between nodes',
@@ -2989,6 +3006,10 @@ function initWorkbenchBuilder(opts){
         return commitGroup(function(raw){ return planSetGroupTitle(src.value, raw, t.section, t.id, v); },
           {after: function(){ renderInspector(); }});
       }, {list: null})),
+      frow('icon', selectControl(ICON_SET, val.icon || '', function(v){
+        return commitGroup(function(raw){ return planSetGroupIcon(src.value, raw, t.section, t.id, v); },
+          {after: function(){ renderInspector(); }});
+      }, true)),
       memberRow
     ];
   }
@@ -3759,8 +3780,7 @@ function initWorkbenchBuilder(opts){
         return applyBulkField('tint', v == null ? null : JSON.stringify(v));
       }, true)));
       form.appendChild(frow('icon', selectControl(
-        ['terminal', 'cloud', 'shield', 'gear', 'db', 'antenna', 'thermo', 'pump',
-         'router', 'package', 'key', 'server', 'chip', 'phone'], null, function(v){
+        ICON_SET, null, function(v){
         return applyBulkField('icon', v == null ? null : JSON.stringify(v));
       }, true)));
     }

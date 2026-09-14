@@ -1038,8 +1038,10 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   Object.keys(L.groups).forEach(function(g){
     var b = L.groups[g];
     var meta = groupDefs[g] || {};
+    var groupIcon = typeof meta.icon === 'string' ? (ICON_SET.indexOf(meta.icon) >= 0 ? meta.icon : 'gear') : null;
     s += '<g class="grp" data-dv-group="' + esc(g) + '"><rect class="grpbox" x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="14"/>' +
-         '<text class="grptitle" x="' + (b.x + 14) + '" y="' + (b.y + 16) + '">' + esc(meta.title || g) + '</text></g>';
+         (groupIcon == null ? '' : '<use href="#i-' + esc(groupIcon) + '" class="grpicon" x="' + (b.x + 12) + '" y="' + (b.y + 5) + '" width="14" height="14" aria-hidden="true"/>') +
+         '<text class="grptitle" x="' + (b.x + (groupIcon == null ? 14 : 32)) + '" y="' + (b.y + 16) + '">' + esc(meta.title || g) + '</text></g>';
   });
 
   var edgeIds = {};

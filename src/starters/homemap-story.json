@@ -6,7 +6,7 @@
       {
         "heading": "A visitor at the door",
         "text": [
-          "Start with the place and the people. The map follows the selected path; expand Data flow to inspect the services behind it. In the workbench, select a step to change devices, place the visitor, or add a local signal."
+          "Start with the place and the people. Switch between Home and Data flow to follow the same step from either perspective. In the workbench, select a step to change devices, place the visitor, or add a local signal."
         ],
         "diagram": {
           "primaryPanel": "home",

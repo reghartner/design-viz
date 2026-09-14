@@ -4,12 +4,25 @@ Start with **starters… → home story** for a visitor-at-the-door scene with a
 
 ## Make the map the centerpiece
 
-Click the homemap's title and choose **Presentation → Centerpiece**. This writes
-`diagram.primaryPanel: "home"` (using your panel's ID). The map gets the main
-space, with Ambient/Step controls above and its timeline below. Other panels
-appear beside it when space permits and below on narrower screens. Expand
-**Data flow** to inspect the supporting service diagram. Choose **Sidebar** to
-return to the standard layout. Existing diagrams keep their current layout.
+Use **Home / Data flow** above a diagram to switch its focus live. Home gives
+the map the main space; Data flow gives that space to the service diagram and
+places the map beside it (below on narrow screens). The timeline follows the
+main view. Your selected path, step, device state, playback, and diagram sizing
+stay intact. In Home view, you can also expand **Data flow** below for a quick
+look at the supporting diagram.
+
+To choose the default when a page opens, click the homemap's title in the
+workbench and choose **Presentation → Centerpiece**. This writes
+`diagram.primaryPanel: "home"` (using your panel's ID). **Sidebar** defaults
+to Data flow. Existing homemaps automatically get the live switch; they keep
+their authored opening layout. With multiple homemaps, the declared centerpiece
+is preferred, otherwise the first homemap is used. An explicitly featured panel
+of another type uses its title in place of Home.
+
+Switching is a reading preference for the current page, not a spec edit or undo
+entry. Workbench edits and skin changes retain it. A full page reload uses the
+authored default again; changing Presentation in the inspector takes precedence
+over the current reading preference.
 
 Room rectangles are optional: use the homemap panel's **rooms** table to add
 labels and x/y/w/h values inside the 320×180 frame. Devices and people use that
@@ -51,6 +64,6 @@ all paths that reference it. Unique alternate steps leave the happy path intact.
 The placement controls refuse to write if the source changed since the inspector
 was opened; reselect the step after manual JSON changes.
 
-Published pages keep playback and the Data flow disclosure. Editing controls are
+Published pages keep playback, the live view switch, and the Data flow disclosure. Editing controls are
 workbench-only. The map supports all six skins, phones, exported HTML and embeds;
 the primary panel is retained in print.

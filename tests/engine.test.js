@@ -151,11 +151,12 @@ test('a centerpiece keeps its map and timeline together before the optional flow
   const map = layoutNode('div'), controls = layoutNode('div'), board = layoutNode('div');
   layout.primaryHost.appendChild(map); layout.controlsHost.appendChild(controls); layout.diagramHost.appendChild(board);
   assert.equal(layout.controlsHost, layout.primaryHost);
-  assert.deepEqual(section.children.map(c=>c.tag), ['div', 'details']);
-  assert.equal(section.children[1].children[0].textContent, 'Data flow');
-  assert.equal(section.children[1].open, undefined, 'flow starts collapsed');
-  assert.deepEqual(layout.primaryHost.children, [layout.modesHost, map, controls]);
-  assert.equal(layout.diagramHost.parentNode, section.children[1]);
+  assert.deepEqual(section.children.map(c=>c.tag), ['div', 'div', 'details']);
+  assert.deepEqual(section.children[0].children, [layout.viewChoicesHost, layout.modesHost]);
+  assert.equal(section.children[2].children[0].textContent, 'Data flow');
+  assert.equal(section.children[2].open, undefined, 'flow starts collapsed');
+  assert.deepEqual(layout.primaryHost.children, [map, controls]);
+  assert.equal(layout.diagramHost.parentNode, section.children[2]);
 });
 
 test('boards without panels retain the original grid and section-sibling step bar structure', () => {

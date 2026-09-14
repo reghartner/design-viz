@@ -979,21 +979,28 @@ function planMoveGroup(text, raw, sectionIdx, groupKey, drop){
       (!Number.isInteger(drop.gap) || drop.gap < 0 || drop.gap > rows.length)))
     return {error: 'no row slot there'};
   return builderRewrite(text, raw, got.path.concat(['rows']), function(copy){
-    var run = [], kept = [], target = null, droppedAbove = 0;
+    var run = [], kept = [], target = null, droppedAbove = 0, removedBeforeSlot = 0;
     copy.forEach(function(row, r){
       var remaining = [];
-      row.forEach(function(slot){
+      row.forEach(function(slot, si){
+        var consumed = false;
         if (!Array.isArray(slot)){
-          if (members[slot]) run.push(slot);
+          if (members[slot]){ run.push(slot); consumed = true; }
           else remaining.push(slot);
-          return;
+        } else {
+          var extracted = slot.filter(function(id){ return members[id]; });
+          if (!extracted.length) remaining.push(slot);
+          else if (extracted.length === slot.length){ run.push(slot); consumed = true; }
+          else {
+            var leftover = slot.filter(function(id){ return !members[id]; });
+            remaining.push(leftover.length === 1 ? leftover[0] : leftover);
+            extracted.forEach(function(id){ run.push(id); });
+          }
         }
-        var extracted = slot.filter(function(id){ return members[id]; });
-        if (!extracted.length){ remaining.push(slot); return; }
-        if (extracted.length === slot.length){ run.push(slot); return; }
-        var leftover = slot.filter(function(id){ return !members[id]; });
-        remaining.push(leftover.length === 1 ? leftover[0] : leftover);
-        extracted.forEach(function(id){ run.push(id); });
+        /* drop.slot is a PRE-removal index: slots fully lifted into the
+           run before it no longer occupy a position (a partial stack
+           still does — its leftover stays behind) */
+        if (consumed && inRow && r === drop.row && si < drop.slot) removedBeforeSlot++;
       });
       if (remaining.length){
         kept.push(remaining);
@@ -1001,10 +1008,11 @@ function planMoveGroup(text, raw, sectionIdx, groupKey, drop){
       } else if (!inRow && r < drop.gap) droppedAbove++;
     });
     if (inRow){
-      /* Keep the pre-removal row's identity, but clamp its slot against
-         the surviving row. A wholly lifted target row is a no-op. */
+      /* Keep the pre-removal row's identity, convert the slot to the
+         surviving row's indexing, then clamp. A wholly lifted target row
+         is a no-op. */
       if (!target) return {error: 'already there'};
-      var slotIdx = Math.max(0, Math.min(drop.slot, target.length));
+      var slotIdx = Math.max(0, Math.min(drop.slot - removedBeforeSlot, target.length));
       run.forEach(function(slot, i){ target.splice(slotIdx + i, 0, slot); });
     } else kept.splice(drop.gap - droppedAbove, 0, run);
     if (JSON.stringify(kept) === JSON.stringify(rows)) return {error: 'already there'};
@@ -5091,10 +5099,6 @@ function initWorkbenchBuilder(opts){
       var slot = 0;
       for (var j = 1; j < gapXs.length; j++)
         if (Math.abs(pt.x - gapXs[j]) < Math.abs(pt.x - gapXs[slot])) slot = j;
-      /* A gap inside a carried run is not a destination. Keep the line
-         hidden there, just as row dragging hides its source gaps. */
-      if (slot > 0 && slot < slots.length &&
-          builderFlatRowIds([[slots[slot - 1], slots[slot]]]).every(function(id){ return gd.members[id]; })) return;
       pick = {row: row, slot: slot};
       x1 = x2 = gapXs[slot]; y1 = boxes[row].y1 - 6; y2 = boxes[row].y2 + 6;
     } else {

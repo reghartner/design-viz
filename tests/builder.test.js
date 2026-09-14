@@ -2446,12 +2446,22 @@ function movedGroupRows(spec, drop){
   return next.rows;
 }
 
-test('planMoveGroup moves earlier and later within a row and clamps the post-removal slot', () => {
+test('planMoveGroup converts pre-removal slots within a row and clamps the result', () => {
   const spec = groupMoveFixture([['c', 'a', 'b', 'd', 'e']]);
   assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 0}), [['a', 'b', 'c', 'd', 'e']]);
-  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 2}), [['c', 'd', 'a', 'b', 'e']]);
+  // slot 4 is the visual gap between d and e; the two lifted slots before it no longer count
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 4}), [['c', 'd', 'a', 'b', 'e']]);
   assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 99}), [['c', 'd', 'e', 'a', 'b']]);
   assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: -5}), [['a', 'b', 'c', 'd', 'e']]);
+  // gaps inside or immediately after the contiguous run land it back where it was
+  for (const slot of [1, 2, 3])
+    assert.equal(B.planMoveGroup(JSON.stringify(spec), spec, 0, 'g', {row: 0, slot}).error, 'already there');
+});
+
+test('planMoveGroup gathers a non-contiguous group and can land it at a gap between its own members', () => {
+  const spec = groupMoveFixture([['a', 'b', 'c', 'd']], ['a', 'b', 'd']);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 1}), [['a', 'b', 'd', 'c']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 3}), [['c', 'a', 'b', 'd']]);
 });
 
 test('planMoveGroup inserts into the original target row even when earlier rows disappear', () => {

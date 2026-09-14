@@ -50,6 +50,12 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
   .workwrap .specbox[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
   .workwrap .specbox > summary, .workwrap .ssec > summary{flex:none;}
   .workwrap .ssec{min-height:0;}
+  /* the insert section holds pop-open panes (starter gallery, node/panel
+     palettes, mermaid import). As a shrinkable flex item it could get
+     LESS than its content height in the viewport-capped column, and the
+     overflow painted OVER the inspector below. It never shrinks now —
+     the inspector and JSON source absorb instead (both scroll inside). */
+  .workwrap #sec-insert{flex-shrink:0;}
   .workwrap #sec-source[open]{flex:1 1 240px; display:flex; flex-direction:column;}
   .workwrap #sec-source[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
   .workwrap #sec-source[open] #src{flex:1 1 auto; height:auto; min-height:140px; resize:none;}

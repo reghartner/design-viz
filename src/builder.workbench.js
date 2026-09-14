@@ -1004,6 +1004,40 @@ function parseStarterManifest(text){
   return {entries: entries, skipped: skipped};
 }
 
+/* ---------------- export: spec -> published page ----------------
+   Client-side mirror of tools/inject.py: swap the template's one
+   line-anchored flowspec JSON block for the editor text and retitle
+   the page. Tag literals are concatenated so this file survives being
+   inlined into a <script> block by the build. */
+
+var FLOWSPEC_OPEN = '<scr' + 'ipt type="application/json" id="flowspec">';
+var FLOWSPEC_CLOSE = '</scr' + 'ipt>';
+
+function buildExportHtml(templateText, specText){
+  if (specText.indexOf('</scr' + 'ipt') >= 0)
+    return {error: 'the spec contains a literal "</scr' + 'ipt" — escape it as "<\\/scr' + 'ipt" first'};
+  var spec;
+  try { spec = JSON.parse(specText); }
+  catch (ex){ return {error: 'not valid JSON (' + ex.message + ')'}; }
+  var openRe = new RegExp('^' + FLOWSPEC_OPEN.replace(/[/\\^$.*+?()[\]{}|]/g, '\\$&') + '$', 'gm');
+  var opens = templateText.match(openRe) || [];
+  if (opens.length !== 1)
+    return {error: 'the page template must hold exactly one flowspec block — found ' + opens.length};
+  var start = templateText.search(openRe);
+  var bodyFrom = start + FLOWSPEC_OPEN.length;
+  var end = templateText.indexOf('\n' + FLOWSPEC_CLOSE, bodyFrom);
+  if (end < 0) return {error: 'the page template’s flowspec block never closes'};
+  var out = templateText.slice(0, bodyFrom) + '\n' + specText.trim() +
+            templateText.slice(end);
+  var page = spec && spec.page ? spec.page : spec;
+  var title = page && typeof page.title === 'string' ? page.title : '';
+  if (title){
+    var safe = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    out = out.replace(/<title>[\s\S]*?<\/title>/, '<title>' + safe + '</title>');
+  }
+  return {html: out};
+}
+
 /* ---------------- clickable validation findings ----------------
    Validator and lint messages open with a field path relative to the
    normalized PAGE object ("blocks[0].tabs[1].sections[0].diagram.
@@ -2258,6 +2292,75 @@ function initWorkbenchBuilder(opts){
       setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     });
   }
+
+  /* ---- export: spec JSON + published page HTML into a picked folder ---- */
+  var EXPORT_TEMPLATE_PATHS = ['../template/flowview.html', 'template/flowview.html', 'flowview.html'];
+  function fetchExportTemplate(done){
+    /* first reachable candidate holding exactly one flowspec block wins */
+    if (typeof fetch !== 'function'){ done('this browser cannot fetch the page template'); return; }
+    var i = 0;
+    function tryNext(){
+      if (i >= EXPORT_TEMPLATE_PATHS.length){
+        done('could not load the page template (' + EXPORT_TEMPLATE_PATHS.join(' / ') + ') — ' +
+             'serve the workbench over http beside template/flowview.html; ' +
+             'save still downloads the JSON alone');
+        return;
+      }
+      var path = EXPORT_TEMPLATE_PATHS[i++];
+      fetch(path, {cache: 'no-store'}).then(function(resp){
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.text();
+      }).then(function(text){
+        if (text.indexOf(FLOWSPEC_OPEN) >= 0) done(null, text);
+        else tryNext();
+      })['catch'](tryNext);
+    }
+    tryNext();
+  }
+  function downloadTextFile(name, contents, mime){
+    var blob = new Blob([contents], {type: mime});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+  function writeIntoDirectory(dir, name, contents){
+    return dir.getFileHandle(name, {create: true}).then(function(h){
+      return h.createWritable();
+    }).then(function(w){
+      return w.write(contents).then(function(){ return w.close(); });
+    });
+  }
+  var exportBtn = document.getElementById('file-export');
+  if (exportBtn) exportBtn.addEventListener('click', function(){
+    var parsed = parseEditor();
+    if (parsed.error){ inspectorMessage('export needs valid JSON — ' + parsed.error); return; }
+    var jsonName = specFileName(parsed.raw);
+    var htmlName = jsonName.replace(/\.spec\.json$/, '') + '.html';
+    fetchExportTemplate(function(err, tplText){
+      if (err){ inspectorMessage(err); return; }
+      var built = buildExportHtml(tplText, src.value.trim());
+      if (built.error){ inspectorMessage(built.error); return; }
+      if (window.showDirectoryPicker){
+        window.showDirectoryPicker({mode: 'readwrite'}).then(function(dir){
+          return writeIntoDirectory(dir, jsonName, src.value)
+            .then(function(){ return writeIntoDirectory(dir, htmlName, built.html); })
+            .then(function(){ inspectorMessage('exported ' + jsonName + ' and ' + htmlName); });
+        })['catch'](function(ex){
+          if (ex && ex.name === 'AbortError') return; /* picker dismissed */
+          inspectorMessage('export failed: ' + (ex && ex.message ? ex.message : ex));
+        });
+      } else {
+        /* no folder picker in this browser: plain downloads instead */
+        downloadTextFile(jsonName, src.value, 'application/json');
+        downloadTextFile(htmlName, built.html, 'text/html');
+        inspectorMessage('no folder picker here — downloaded ' + jsonName + ' and ' + htmlName);
+      }
+    });
+  });
 
   /* ---- inline Mermaid import ---- */
   var importBtn = document.getElementById('import-mermaid');
@@ -3651,7 +3754,7 @@ function initWorkbenchBuilder(opts){
         ': click edges, nodes, panels to toggle — Esc or DONE ends';
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
-    '#undo-builder, #redo-builder, #file-open, #file-save, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
+    '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
     '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, .patchedit .fctl';
   function addModeBlocker(ev){

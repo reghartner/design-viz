@@ -56,7 +56,7 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
      flex-grow can hand the leftover to the textarea; collapsed, the column
      hugs its content under the same cap */
   .workwrap .specbox[open]:has(#sec-source[open]){height:calc(100vh - 24px);}
-  .workwrap .specbox[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
+  .workwrap .specbox[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow-y:auto;}
   .workwrap .specbox > summary, .workwrap .ssec > summary{flex:none;}
   .workwrap .ssec{min-height:0;}
   /* the insert section holds pop-open panes (starter gallery, node/panel
@@ -65,10 +65,10 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
      overflow painted OVER the inspector below. It never shrinks now —
      the inspector and JSON source absorb instead (both scroll inside). */
   .workwrap #sec-insert{flex-shrink:0;}
-  .workwrap #sec-source[open]{flex:1 1 240px; display:flex; flex-direction:column;}
+  .workwrap #sec-source[open]{flex:1 1 240px; min-height:120px; display:flex; flex-direction:column;}
   .workwrap #sec-source[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
-  .workwrap #sec-source[open] #src{flex:1 1 auto; height:auto; min-height:140px; resize:none;}
-  .workwrap #sec-inspect[open]{flex:0 1 auto; display:flex; flex-direction:column;}
+  .workwrap #sec-source[open] #src{flex:1 1 auto; height:auto; min-height:60px; resize:none;}
+  .workwrap #sec-inspect[open]{flex:0 1 auto; min-height:90px; display:flex; flex-direction:column;}
   .workwrap #sec-inspect[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
   .workwrap #sec-inspect[open] .guide{overflow-y:auto;}
   .workwrap .specbox:has(#sec-source:not([open])) #sec-inspect[open]{flex:1 1 auto;}
@@ -77,6 +77,19 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 }
 
 .toolrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:30px 0 12px;}
+.outline-results{max-height:220px; overflow:auto; display:flex; flex-direction:column; gap:3px; margin:6px 0;}
+.outline-item{display:block; text-align:left; border:1px solid transparent; border-radius:5px; padding:6px 8px; color:var(--ink); background:var(--card); cursor:pointer; font:12px/1.4 system-ui,sans-serif;}
+.outline-item span,.outline-item small{display:block; overflow-wrap:anywhere;}
+.outline-item small,.outline-status,#sec-outline summary small{color:var(--sub); font-size:10px;}
+.outline-item:hover,.outline-item:focus-visible{border-color:var(--accent); outline:none; background:var(--codebg);}
+#sec-outline{flex-shrink:0;}
+#outline-search{width:100%; box-sizing:border-box;}
+.tracebox{padding:12px; margin:8px 0; border:1px solid var(--accent); border-radius:8px; max-height:52vh; overflow:auto; flex-shrink:0;}
+.tracebox p{font-size:12px; color:var(--sub); margin:5px 0 10px;}
+.tracebox label{display:block; font-size:12px; margin-top:9px;}
+.tracebox label small{color:var(--sub);}
+.tracebox .fctl{display:block; width:100%; box-sizing:border-box;}
+#trace-feedback{font-size:12px; color:var(--accent); overflow-wrap:anywhere; margin-top:8px;}
 .toolrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
 .skbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
   padding:6px 12px; border-radius:8px; cursor:pointer;}
@@ -456,6 +469,13 @@ body.sk-aurora.sk-blueprint{
 .boardgrid.haspanels > .diagramcol{min-width:0;}
 .boardgrid.haspanels > .panelcol{align-self:start;}
 @media (max-width:980px){ .boardgrid.haspanels{grid-template-columns:1fr;} }
+/* The workbench consumes part of a wide viewport with its editor. Measure
+   the preview itself so adding panels cannot shrink its board to a thumbnail. */
+.docview{container-type:inline-size;}
+@container (max-width:900px){
+  .boardgrid.haspanels{grid-template-columns:1fr;}
+  .boardgrid.haspanels > .panelcol{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); align-items:start;}
+}
 
 .board{margin-top:12px; border-radius:12px; overflow-x:auto;
   border:1px solid color-mix(in srgb, var(--acc) 30%, transparent);}
@@ -599,6 +619,50 @@ body.sk-aurora.sk-blueprint{
 .sk-daylight .tint-dev{color:#0E9382;}
 
 /* ---------- inspector panels ---------- */
+.swpanel{color:var(--dtext); font:12px/1.5 'IBM Plex Sans',system-ui,sans-serif; overflow-wrap:anywhere;}
+.wf-timed{max-height:350px; overflow:auto;}
+.wf-timed .wflabel{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.wfrow.wf-error .wfbar{background:#DD5A65;}
+.wfrow.wf-error .wfms{font-weight:700; text-decoration:underline dotted;}
+.swtablewrap{overflow:auto; max-height:300px; border:1px solid color-mix(in srgb,var(--dtext) 20%,transparent); border-radius:6px;}
+.swtablewrap:focus-visible{outline:2px solid var(--dink); outline-offset:2px;}
+.swtable{width:100%; border-collapse:collapse; font:11px/1.5 'IBM Plex Mono',monospace; text-align:left;}
+.swtable th,.swtable td{padding:7px 8px; border-bottom:1px solid color-mix(in srgb,var(--dtext) 14%,transparent); vertical-align:top;}
+.swtable th{font-size:10px; color:var(--dink);}
+.swtable td{min-width:45px; max-width:180px;}
+.swtable tr:last-child td{border-bottom:0;}
+.swcaption{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%);}
+.swrow-added{background:color-mix(in srgb,var(--dtext) 5%,transparent);}
+.swrow-changed{background:color-mix(in srgb,var(--dtext) 9%,transparent);}
+.swrow-removed td:not(:last-child){text-decoration:line-through; opacity:.7;}
+.swbadge{display:inline-block; border:1px solid currentColor; border-radius:4px; padding:1px 5px; font:600 9px/1.5 'IBM Plex Mono',monospace; text-transform:uppercase; white-space:nowrap;}
+.sw-pass,.sw-added{color:#5EDAA0;}
+.sw-fail,.sw-removed{color:#FF9494;}
+.sw-warn,.sw-changed{color:#EEC16A;}
+.sw-pending,.sw-skip,.sw-neutral{color:var(--dfaint);}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-pass,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-added{color:#18724C;}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-fail,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-removed{color:#B32938;}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-warn,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-changed{color:#865B06;}
+.swsummary,.swcheckhead{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+.swsummary{color:var(--dink); font-weight:600; margin-bottom:8px;}
+.swsummary span{font-size:10px; color:var(--dfaint); font-weight:400;}
+.swchecks{list-style:none; margin:0; padding:0; max-height:300px; overflow:auto;}
+.swchecks li,.swmetric{padding:8px 0; border-bottom:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);}
+.swchecks li:last-child,.swmetric:last-child{border-bottom:0;}
+.swcheckhead>span:first-child{color:var(--dink); font-weight:600;}
+.swdetail,.swnote,.swempty{font-size:11px; color:var(--dfaint); margin-top:4px;}
+.swnote{padding-top:8px; border-top:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);}
+.swmeasure{font:11px/1.6 'IBM Plex Mono',monospace; margin:4px 0 6px;}
+.swmeasure strong{font-size:19px; color:var(--dink);}
+.swtrack{height:7px; border-radius:4px; position:relative; background:color-mix(in srgb,var(--dtext) 12%,transparent);}
+.swfill{height:100%; border-radius:4px; background:currentColor;}
+.swthreshold{position:absolute; top:-3px; height:13px; border-left:1px dashed var(--dink);}
+@media print{
+  .panelcol .pwidget.pt-table,.panelcol .pwidget.pt-checks,.panelcol .pwidget.pt-budget{display:block !important; break-inside:avoid;}
+  .panelcol:has(.pt-table),.panelcol:has(.pt-checks),.panelcol:has(.pt-budget){display:flex !important;}
+  .swtablewrap,.swchecks{max-height:none; overflow:visible;}
+  .swbadge{color:inherit;}
+}
 .panelcol{display:flex; flex-direction:column; gap:10px; margin-top:12px;}
 .pwidget{border-radius:12px; padding:12px 14px;}
 .sk-aurora .pwidget{background:#0B1220; border:1px solid #25364F;}
@@ -4432,6 +4496,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
           <span class="bgroup" role="group" aria-label="load and import">
             <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
             <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
+            <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
           </span>
           <span class="bgroup" role="group" aria-label="history">
             <button class="bbtn" id="undo-builder" disabled>undo</button>
@@ -4449,6 +4514,27 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
         </div>
       </details>
       <div class="diffbox" id="diffbox" hidden></div>
+      <div class="tracebox" id="tracebox" hidden>
+        <b>Honeycomb trace → diagram</b>
+        <p>Paste event JSON or open an export. Conversion runs locally. The imported spec replaces the editor in one undo step.</p>
+        <button class="bbtn" id="trace-open">open trace JSON…</button>
+        <input type="file" id="trace-file" accept=".json,application/json" hidden>
+        <label>Trace events<textarea class="fctl" id="trace-text" rows="5" spellcheck="false" placeholder='[{"trace.trace_id":"…", "trace.span_id":"…", "duration_ms":20, …}]'></textarea></label>
+        <label>Trace ID <small>only needed for multiple traces</small><input class="fctl" id="trace-id" type="text"></label>
+        <label>Source link <small>optional Honeycomb trace URL</small><input class="fctl" id="trace-url" type="url" placeholder="https://ui.honeycomb.io/…"></label>
+        <details><summary>Custom field names</summary>
+          <p>Default fields: trace.trace_id, trace.span_id, trace.parent_id, service.name, name, timestamp, duration_ms, error. Override only the fields that differ. Time is ISO with timezone or Unix seconds; duration is milliseconds.</p>
+          <textarea class="fctl" id="trace-fields" rows="3" aria-label="Trace field mapping" placeholder='{"service":"app.service", "timestamp":"time"}'></textarea>
+        </details>
+        <div id="trace-feedback" role="status"></div>
+        <div class="specrow"><button class="rbtn" id="trace-convert">Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
+      </div>
+      <details class="ssec" id="sec-outline">
+        <summary>document outline <small>⌘/Ctrl K</small></summary>
+        <input class="fctl" type="search" id="outline-search" aria-label="Search document outline" placeholder="Find a node, panel, step, or section…">
+        <div class="outline-status" id="outline-status" role="status"></div>
+        <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
+      </details>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
         <div class="guide" id="guide" hidden></div>
@@ -4502,7 +4588,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
       <tr><td>diagram.rows</td><td><code>[[slot, ...], ...]</code></td><td>Flow-ordered slots per row. A slot is a node id, or an <b>array of ids = a stack</b> (fan-out targets in one column). Even rows lay left&#8594;right, odd rows right&#8594;left — the serpentine. The wrap edge between rows is detected automatically.</td></tr>
       <tr><td>diagram.floats</td><td><code>[{id, side:"above"}]</code></td><td>Branch nodes off the main flow (auth, signing). X position computed from the edges that touch them.</td></tr>
       <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> of the hop (default <code>int</code>). Zero-based reveal indices draw the edge only for the selected step interval. <code>bend</code>/<code>labelDx</code>/<code>labelDy</code> are optional manual nudges.</td></tr>
-      <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Twenty types are documented in <code>contract/authoring-contract.md</code>, including <code>inflight</code> for overlapping operations and <code>phone</code> for an accumulating push-notification stack.</td></tr>
+      <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Twenty-three types are documented in <code>contract/authoring-contract.md</code>, including <code>table</code> for data snapshots, <code>checks</code> for authored decisions, and <code>budget</code> for resource limits. <code>waterfall</code> supports <code>startMs</code> offsets for overlapping trace spans.</td></tr>
       <tr><td>diagram.steps</td><td><code>[{edge | edges, nodes?, panels?, lane?, text, link?}]</code></td><td>Ordered narrative. <code>edge:"from-&gt;to"</code> or <code>edges:[...]</code> for hops that happen together — their packets fire in order, staggered. A step may be <b>edgeless</b>: light <code>nodes:[...]</code> directly and/or patch panels. <code>panels</code> carries SPARSE per-panel patches; the engine folds them into complete per-step state so any jump is consistent (<code>log</code> appends; <code>enterOnce</code> applies only at its own step). Drives the numbered coins, the ambient packet schedule, AND the click-through.</td></tr>
       <tr><td>icons</td><td colspan="2"><code>terminal cloud shield gear db antenna thermo pump router package key server chip phone</code></td></tr>
       <tr><td>tints</td><td colspan="2"><code>cmd auth data mqtt dev</code></td></tr>
@@ -4558,7 +4644,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 <script>
 (function(){
   'use strict';
-var STARTERS = [{"name": "blank flow", "desc": "Three nodes and two hops to make your own.", "spec": {"page": {"title": "Blank flow", "sections": [{"heading": "Your flow", "diagram": {"nodes": {"client": {"title": "Client", "icon": "terminal"}, "service": {"title": "Service", "icon": "gear"}, "store": {"title": "Store", "icon": "db"}}, "rows": [["client", "service", "store"]], "edges": [{"from": "client", "to": "service", "kind": "https"}, {"from": "service", "to": "store", "kind": "int"}], "steps": [{"edge": "client->service", "text": "Send a request"}, {"edge": "service->store", "text": "Store the result"}]}}]}}}, {"name": "panel showcase", "desc": "Five panels updated across four steps.", "spec": {"page": {"title": "Panel showcase", "sections": [{"heading": "Watch the device wake up", "text": ["Advance through the four steps to see sparse patches change device state, indicators, a gauge, an event log, and elapsed time."], "diagram": {"view": "step", "nodes": {"console": {"title": "Console", "icon": "terminal", "tint": "cmd"}, "gateway": {"title": "Gateway", "icon": "router", "tint": "mqtt"}, "device": {"title": "Device", "icon": "chip", "tint": "dev"}}, "rows": [["console", "gateway", "device"]], "edges": [{"from": "console", "to": "gateway", "kind": "https", "label": "wake"}, {"from": "gateway", "to": "device", "kind": "mqtt", "label": "start"}], "panels": [{"id": "status", "type": "state", "title": "Device state", "states": ["OFF", "BOOT", "LIVE"], "initial": {"state": "OFF"}}, {"id": "indicators", "type": "leds", "title": "Indicators", "leds": [{"id": "power", "label": "PWR"}, {"id": "radio", "label": "RADIO"}], "initial": {"power": "off", "radio": "off"}}, {"id": "draw", "type": "gauge", "title": "Current draw", "unit": "mA", "max": 100, "initial": {"value": 0}}, {"id": "events", "type": "log", "title": "Event log", "tags": {"DEV": "#4ADE80"}, "initial": {"log": [{"tag": "DEV", "text": "waiting for wake"}]}}, {"id": "clock", "type": "timeline", "title": "Device schedule", "span": "1h", "lanes": [{"id": "heartbeat", "label": "heartbeat", "every": "10m"}, {"id": "report", "label": "report", "every": "30m"}], "initial": {"now": "0m", "events": []}}], "steps": [{"edge": "console->gateway", "text": "Request a wake-up", "panels": {"events": {"log": [{"tag": "DEV", "text": "wake requested"}]}, "clock": {"now": "5m", "events": [{"at": "5m", "label": "wake", "kind": "info"}]}}}, {"edge": "gateway->device", "text": "Power on and boot", "panels": {"status": {"state": "BOOT"}, "indicators": {"power": "on"}, "draw": {"value": 80}, "events": {"log": [{"tag": "DEV", "text": "boot started"}]}, "clock": {"now": "10m"}}}, {"nodes": ["device"], "text": "Radio connects and the device becomes live", "panels": {"status": {"state": "LIVE"}, "indicators": {"radio": "on"}, "draw": {"value": 35}, "events": {"log": [{"tag": "DEV", "text": "radio connected"}]}, "clock": {"now": "20m", "events": [{"at": "20m", "label": "online", "kind": "ok"}]}}}, {"nodes": ["device"], "text": "Settle into low-power reporting", "panels": {"draw": {"value": 12}, "events": {"log": [{"tag": "DEV", "text": "first report sent"}]}, "clock": {"now": "30m", "events": [{"at": "30m", "label": "report", "kind": "ok"}]}}}]}}]}}}, {"name": "full demo", "desc": "The complete Flowview demo page.", "spec": {"page": {"__demo": true, "title": "Flowview template \u2014 demo spec", "skin": "aurora", "sections": [{"heading": "Replace this spec", "accent": "cyan", "source": "https://example.com/hld/demo#overview", "text": ["This is the built-in demo. Inject your own spec into the flowspec JSON block at the top of this file; the page renders it on load."], "diagram": {"nodes": {"a": {"title": "Client", "sub": "mobile app", "icon": "phone", "tint": "cmd"}, "b": {"title": "API", "sub": "gateway", "icon": "cloud", "tint": "cmd", "link": "https://example.com/hld/demo#api"}, "c": {"title": "Broker", "sub": "MQTT", "icon": "antenna", "tint": "mqtt"}, "d": {"title": "Device", "sub": "t/1 subscriber", "icon": "chip", "tint": "dev"}}, "rows": [["a", "b", "c", "d"]], "edges": [{"from": "a", "to": "b", "kind": "https", "label": "POST /msg"}, {"from": "b", "to": "c", "kind": "mqtt", "label": "PUBLISH t/1"}, {"from": "c", "to": "d", "kind": "mqtt", "label": "deliver"}, {"from": "d", "to": "c", "kind": "mqtt", "ret": true, "label": "PUBACK", "bend": 26, "labelDy": 22}], "steps": [{"edge": "a->b", "text": "Client sends the message"}, {"edge": "b->c", "text": "API publishes to the broker", "link": "https://example.com/hld/demo#publish"}, {"edge": "c->d", "text": "Broker delivers to the subscriber"}, {"edge": "d->c", "text": "Device acknowledges"}]}}]}}}];
+var STARTERS = [{"name": "blank flow", "desc": "Three nodes and two hops to make your own.", "spec": {"page": {"title": "Blank flow", "sections": [{"heading": "Your flow", "diagram": {"nodes": {"client": {"title": "Client", "icon": "terminal"}, "service": {"title": "Service", "icon": "gear"}, "store": {"title": "Store", "icon": "db"}}, "rows": [["client", "service", "store"]], "edges": [{"from": "client", "to": "service", "kind": "https"}, {"from": "service", "to": "store", "kind": "int"}], "steps": [{"edge": "client->service", "text": "Send a request"}, {"edge": "service->store", "text": "Store the result"}]}}]}}}, {"name": "panel showcase", "desc": "Five panels updated across four steps.", "spec": {"page": {"title": "Panel showcase", "sections": [{"heading": "Watch the device wake up", "text": ["Advance through the four steps to see sparse patches change device state, indicators, a gauge, an event log, and elapsed time."], "diagram": {"view": "step", "nodes": {"console": {"title": "Console", "icon": "terminal", "tint": "cmd"}, "gateway": {"title": "Gateway", "icon": "router", "tint": "mqtt"}, "device": {"title": "Device", "icon": "chip", "tint": "dev"}}, "rows": [["console", "gateway", "device"]], "edges": [{"from": "console", "to": "gateway", "kind": "https", "label": "wake"}, {"from": "gateway", "to": "device", "kind": "mqtt", "label": "start"}], "panels": [{"id": "status", "type": "state", "title": "Device state", "states": ["OFF", "BOOT", "LIVE"], "initial": {"state": "OFF"}}, {"id": "indicators", "type": "leds", "title": "Indicators", "leds": [{"id": "power", "label": "PWR"}, {"id": "radio", "label": "RADIO"}], "initial": {"power": "off", "radio": "off"}}, {"id": "draw", "type": "gauge", "title": "Current draw", "unit": "mA", "max": 100, "initial": {"value": 0}}, {"id": "events", "type": "log", "title": "Event log", "tags": {"DEV": "#4ADE80"}, "initial": {"log": [{"tag": "DEV", "text": "waiting for wake"}]}}, {"id": "clock", "type": "timeline", "title": "Device schedule", "span": "1h", "lanes": [{"id": "heartbeat", "label": "heartbeat", "every": "10m"}, {"id": "report", "label": "report", "every": "30m"}], "initial": {"now": "0m", "events": []}}], "steps": [{"edge": "console->gateway", "text": "Request a wake-up", "panels": {"events": {"log": [{"tag": "DEV", "text": "wake requested"}]}, "clock": {"now": "5m", "events": [{"at": "5m", "label": "wake", "kind": "info"}]}}}, {"edge": "gateway->device", "text": "Power on and boot", "panels": {"status": {"state": "BOOT"}, "indicators": {"power": "on"}, "draw": {"value": 80}, "events": {"log": [{"tag": "DEV", "text": "boot started"}]}, "clock": {"now": "10m"}}}, {"nodes": ["device"], "text": "Radio connects and the device becomes live", "panels": {"status": {"state": "LIVE"}, "indicators": {"radio": "on"}, "draw": {"value": 35}, "events": {"log": [{"tag": "DEV", "text": "radio connected"}]}, "clock": {"now": "20m", "events": [{"at": "20m", "label": "online", "kind": "ok"}]}}}, {"nodes": ["device"], "text": "Settle into low-power reporting", "panels": {"draw": {"value": 12}, "events": {"log": [{"tag": "DEV", "text": "first report sent"}]}, "clock": {"now": "30m", "events": [{"at": "30m", "label": "report", "kind": "ok"}]}}}]}}]}}}, {"name": "software & IoT", "desc": "Data state, decision checks, and resource budgets across two design stories.", "spec": {"page": {"title": "Software & IoT \u2014 state, decisions, budgets", "skin": "aurora", "blocks": [{"tabs": [{"label": "Software request", "sections": [{"heading": "Checkout and duplicate delivery", "accent": "cyan", "text": ["Fictional software example. All values are illustrative design inputs, not production telemetry. Step through a write, a duplicate request, and the saved response."], "diagram": {"view": "step", "nodes": {"client": {"title": "Client", "icon": "terminal"}, "api": {"title": "Checkout API", "icon": "cloud"}, "store": {"title": "Order store", "icon": "db", "tint": "data"}}, "rows": [["client", "api", "store"]], "edges": [{"from": "client", "to": "api", "kind": "https", "label": "POST /orders"}, {"from": "api", "to": "store", "kind": "int", "label": "atomic insert"}, {"from": "store", "to": "api", "kind": "int", "ret": true, "label": "saved response"}, {"from": "api", "to": "client", "kind": "https", "ret": true, "label": "order result"}], "panels": [{"id": "orders", "type": "table", "title": "Order record", "columns": [{"id": "field", "label": "Field"}, {"id": "value", "label": "Value"}], "initial": {"rows": []}}, {"id": "gates", "type": "checks", "title": "Request decisions", "checks": [{"id": "auth", "label": "Caller authorized"}, {"id": "unique", "label": "Idempotency key is new"}], "initial": {"results": {"auth": {"status": "pending", "detail": "Scope from the request token"}, "unique": {"status": "pending", "detail": "Compare the stored idempotency key"}}}}, {"id": "limits", "type": "budget", "title": "Request budgets", "metrics": [{"id": "latency", "label": "Elapsed time", "unit": "ms", "max": 300, "warn": 240}, {"id": "writes", "label": "Durable writes", "unit": "writes", "max": 1}], "initial": {"values": {"latency": null, "writes": 0}, "note": "Illustrative upper bounds; measured values would come from a trace."}}], "steps": [{"edge": "client->api", "text": "An authorized caller submits a new idempotency key.", "panels": {"gates": {"results": {"auth": {"status": "pass", "detail": "Scope from the request token"}, "unique": {"status": "pass", "detail": "Compare the stored idempotency key"}}}, "limits": {"values": {"latency": 20, "writes": 0}}}}, {"edge": "api->store", "text": "One atomic insert records the order and the response.", "panels": {"orders": {"rows": [{"id": "status", "cells": {"field": "status", "value": "accepted"}, "status": "changed"}, {"id": "version", "cells": {"field": "version", "value": 1}}]}, "limits": {"values": {"latency": 120, "writes": 1}}}}, {"text": "The same request arrives again. The new-key check fails, so the API takes the replay path.", "panels": {"gates": {"results": {"auth": {"status": "pass", "detail": "Scope from the request token"}, "unique": {"status": "fail", "detail": "Compare the stored idempotency key"}}}}, "nodes": ["client", "api"]}, {"edge": "store->api", "text": "The stored response is read; no additional write occurs.", "panels": {"limits": {"values": {"latency": 150, "writes": 1}}}}, {"edge": "api->client", "text": "The caller gets the original response and order version.", "panels": {"orders": {"note": "A failed new-key check selected the replay path; it did not create another order."}}}]}}]}, {"label": "IoT reconciliation", "sections": [{"heading": "Device shadow reconciliation", "accent": "green", "text": ["Fictional IoT example. A device reconnects with an older reported configuration and applies the newer desired version. Values and limits are illustrative."], "diagram": {"view": "step", "nodes": {"shadow": {"title": "Desired state", "icon": "db", "tint": "data"}, "broker": {"title": "Broker", "icon": "antenna", "tint": "mqtt"}, "device": {"title": "Edge controller", "icon": "chip", "tint": "dev"}}, "rows": [["shadow", "broker", "device"]], "edges": [{"from": "shadow", "to": "broker", "kind": "mqtt", "label": "desired version"}, {"from": "broker", "to": "device", "kind": "mqtt", "label": "reconcile"}, {"from": "device", "to": "broker", "kind": "mqtt", "ret": true, "label": "reported state"}], "panels": [{"id": "shadowstate", "type": "table", "title": "Desired vs reported", "columns": [{"id": "field", "label": "Field"}, {"id": "desired", "label": "Desired"}, {"id": "reported", "label": "Reported"}], "initial": {"rows": [{"id": "version", "cells": {"field": "version", "desired": 8, "reported": 7}, "status": "changed"}, {"id": "mode", "cells": {"field": "mode", "desired": "eco", "reported": "normal"}, "status": "changed"}]}}, {"id": "guards", "type": "checks", "title": "Apply safeguards", "checks": [{"id": "newer", "label": "Version is newer"}, {"id": "safe", "label": "Actuator is idle"}]}, {"id": "memory", "type": "budget", "title": "Device memory", "metrics": [{"id": "ram", "label": "Staging buffer", "unit": "KiB", "max": 64, "warn": 48}], "initial": {"values": {"ram": 12}}}], "steps": [{"edge": "shadow->broker", "text": "Desired version 8 is published for the reconnecting device."}, {"edge": "broker->device", "text": "The device checks version ordering and the actuator interlock.", "panels": {"guards": {"results": {"newer": {"status": "pass", "detail": "8 > 7"}, "safe": {"status": "pass", "detail": "Actuator reports idle"}}}, "memory": {"values": {"ram": 52}}}}, {"edge": "device->broker", "text": "After applying version 8, the device reports the matching state and releases staging memory.", "panels": {"shadowstate": {"rows": [{"id": "version", "cells": {"field": "version", "desired": 8, "reported": 8}}, {"id": "mode", "cells": {"field": "mode", "desired": "eco", "reported": "eco"}}]}, "memory": {"values": {"ram": 12}}}}]}}]}]}]}}}, {"name": "Honeycomb trace", "desc": "A fictional checkout trace with concurrent spans and a recorded payment error.", "spec": {"page": {"title": "Fictional checkout \u2014 imported Honeycomb trace", "skin": "aurora", "protocols": {"trace": {"label": "Span parent relationship", "color": "#38BDF8"}}, "blocks": [{"heading": "Observed request", "accent": "cyan", "text": ["Imported trace fictional-checkout-001: 6 spans across 5 services; observed extent 300 ms.", "Inspect spans in start-time order. Overlapping bars retain their original offsets; parent spans include child time. The total is elapsed extent, not a sum of durations. Arrows mean span parent relationships, not a verified network protocol.", "This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success."], "bullets": [], "diagram": {"view": "step", "nodes": {"svc1": {"title": "checkout", "sub": "observed service", "icon": "server", "tint": "cmd"}, "svc2": {"title": "identity", "sub": "observed service", "icon": "server", "tint": "cmd"}, "svc3": {"title": "inventory", "sub": "observed service", "icon": "server", "tint": "cmd"}, "svc4": {"title": "payments", "sub": "observed service", "icon": "server", "tint": "cmd"}, "svc5": {"title": "audit", "sub": "observed service", "icon": "server", "tint": "cmd"}}, "rows": [["svc1", "svc2", "svc3", "svc4", "svc5"]], "edges": [{"from": "svc1", "to": "svc2", "kind": "trace"}, {"from": "svc1", "to": "svc3", "kind": "trace"}, {"from": "svc1", "to": "svc4", "kind": "trace"}, {"from": "svc1", "to": "svc5", "kind": "trace"}], "panels": [{"id": "timing", "type": "waterfall", "title": "Observed span timing", "spans": [{"id": "root", "label": "checkout \u00b7 POST /orders", "ms": 300, "startMs": 0, "error": false}, {"id": "cache", "label": "checkout \u00b7 idempotency lookup", "ms": 5, "startMs": 10, "error": false}, {"id": "auth", "label": "identity \u00b7 authorize", "ms": 40, "startMs": 20, "error": false}, {"id": "stock", "label": "inventory \u00b7 reserve stock", "ms": 100, "startMs": 30, "error": false}, {"id": "pay", "label": "payments \u00b7 authorize payment", "ms": 100, "startMs": 150, "error": true}, {"id": "audit", "label": "audit \u00b7 record failed checkout", "ms": 20, "startMs": 260, "error": false}]}, {"id": "span", "type": "table", "title": "Selected span", "columns": [{"id": "field", "label": "Field"}, {"id": "value", "label": "Observed value"}]}], "steps": [{"id": "root", "nodes": ["svc1"], "text": "+0 ms \u00b7 checkout \u00b7 POST /orders \u00b7 duration 300 ms", "panels": {"timing": {"highlight": "root"}, "span": {"rows": [{"id": "span_id", "cells": {"field": "span_id", "value": "root"}}, {"id": "parent_id", "cells": {"field": "parent_id", "value": null}}, {"id": "service", "cells": {"field": "service", "value": "checkout"}}, {"id": "operation", "cells": {"field": "operation", "value": "POST /orders"}}, {"id": "start_ms", "cells": {"field": "start_ms", "value": 0}}, {"id": "duration_ms", "cells": {"field": "duration_ms", "value": 300}}, {"id": "error", "cells": {"field": "error", "value": "not flagged"}}]}}}, {"id": "cache", "nodes": ["svc1"], "text": "+10 ms \u00b7 checkout \u00b7 idempotency lookup \u00b7 duration 5 ms", "panels": {"timing": {"highlight": "cache"}, "span": {"rows": [{"id": "span_id", "cells": {"field": "span_id", "value": "cache"}}, {"id": "parent_id", "cells": {"field": "parent_id", "value": "root"}}, {"id": "service", "cells": {"field": "service", "value": "checkout"}}, {"id": "operation", "cells": {"field": "operation", "value": "idempotency lookup"}}, {"id": "start_ms", "cells": {"field": "start_ms", "value": 10}}, {"id": "duration_ms", "cells": {"field": "duration_ms", "value": 5}}, {"id": "error", "cells": {"field": "error", "value": "not flagged"}}]}}}, {"id": "auth", "nodes": ["svc2"], "text": "+20 ms \u00b7 identity \u00b7 authorize \u00b7 duration 40 ms", "panels": {"timing": {"highlight": "auth"}, "span": {"rows": [{"id": "span_id", "cells": {"field": "span_id", "value": "auth"}}, {"id": "parent_id", "cells": {"field": "parent_id", "value": "root"}}, {"id": "service", "cells": {"field": "service", "value": "identity"}}, {"id": "operation", "cells": {"field": "operation", "value": "authorize"}}, {"id": "start_ms", "cells": {"field": "start_ms", "value": 20}}, {"id": "duration_ms", "cells": {"field": "duration_ms", "value": 40}}, {"id": "error", "cells": {"field": "error", "value": "not flagged"}}]}}, "edge": "svc1->svc2"}, {"id": "stock", "nodes": ["svc3"], "text": "+30 ms \u00b7 inventory \u00b7 reserve stock \u00b7 duration 100 ms", "panels": {"timing": {"highlight": "stock"}, "span": {"rows": [{"id": "span_id", "cells": {"field": "span_id", "value": "stock"}}, {"id": "parent_id", "cells": {"field": "parent_id", "value": "root"}}, {"id": "service", "cells": {"field": "service", "value": "inventory"}}, {"id": "operation", "cells": {"field": "operation", "value": "reserve stock"}}, {"id": "start_ms", "cells": {"field": "start_ms", "value": 30}}, {"id": "duration_ms", "cells": {"field": "duration_ms", "value": 100}}, {"id": "error", "cells": {"field": "error", "value": "not flagged"}}]}}, "edge": "svc1->svc3"}, {"id": "pay", "nodes": ["svc4"], "text": "+150 ms \u00b7 payments \u00b7 authorize payment \u00b7 duration 100 ms \u00b7 recorded error", "panels": {"timing": {"highlight": "pay"}, "span": {"rows": [{"id": "span_id", "cells": {"field": "span_id", "value": "pay"}}, {"id": "parent_id", "cells": {"field": "parent_id", "value": "root"}}, {"id": "service", "cells": {"field": "service", "value": "payments"}}, {"id": "operation", "cells": {"field": "operation", "value": "authorize payment"}}, {"id": "start_ms", "cells": {"field": "start_ms", "value": 150}}, {"id": "duration_ms", "cells": {"field": "duration_ms", "value": 100}}, {"id": "error", "cells": {"field": "error", "value": "recorded error"}}]}}, "edge": "svc1->svc4"}, {"id": "audit", "nodes": ["svc5"], "text": "+260 ms \u00b7 audit \u00b7 record failed checkout \u00b7 duration 20 ms", "panels": {"timing": {"highlight": "audit"}, "span": {"rows": [{"id": "span_id", "cells": {"field": "span_id", "value": "audit"}}, {"id": "parent_id", "cells": {"field": "parent_id", "value": "root"}}, {"id": "service", "cells": {"field": "service", "value": "audit"}}, {"id": "operation", "cells": {"field": "operation", "value": "record failed checkout"}}, {"id": "start_ms", "cells": {"field": "start_ms", "value": 260}}, {"id": "duration_ms", "cells": {"field": "duration_ms", "value": 20}}, {"id": "error", "cells": {"field": "error", "value": "not flagged"}}]}}, "edge": "svc1->svc5"}]}}]}}}, {"name": "full demo", "desc": "The complete Flowview demo page.", "spec": {"page": {"__demo": true, "title": "Flowview template \u2014 demo spec", "skin": "aurora", "sections": [{"heading": "Replace this spec", "accent": "cyan", "source": "https://example.com/hld/demo#overview", "text": ["This is the built-in demo. Inject your own spec into the flowspec JSON block at the top of this file; the page renders it on load."], "diagram": {"nodes": {"a": {"title": "Client", "sub": "mobile app", "icon": "phone", "tint": "cmd"}, "b": {"title": "API", "sub": "gateway", "icon": "cloud", "tint": "cmd", "link": "https://example.com/hld/demo#api"}, "c": {"title": "Broker", "sub": "MQTT", "icon": "antenna", "tint": "mqtt"}, "d": {"title": "Device", "sub": "t/1 subscriber", "icon": "chip", "tint": "dev"}}, "rows": [["a", "b", "c", "d"]], "edges": [{"from": "a", "to": "b", "kind": "https", "label": "POST /msg"}, {"from": "b", "to": "c", "kind": "mqtt", "label": "PUBLISH t/1"}, {"from": "c", "to": "d", "kind": "mqtt", "label": "deliver"}, {"from": "d", "to": "c", "kind": "mqtt", "ret": true, "label": "PUBACK", "bend": 26, "labelDy": 22}], "steps": [{"edge": "a->b", "text": "Client sends the message"}, {"edge": "b->c", "text": "API publishes to the broker", "link": "https://example.com/hld/demo#publish"}, {"edge": "c->d", "text": "Broker delivers to the subscriber"}, {"edge": "d->c", "text": "Device acknowledges"}]}}]}}}];
 /* ---- src/validator.js ---- */
 /* validator.js — constants, helpers, normalize/validate, panel-state folding.
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
@@ -4572,7 +4658,94 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget'];
+var TABLE_STATUSES = ['neutral','added','changed','removed'];
+var CHECK_STATUSES = ['pending','pass','fail','warn','skip'];
+
+/* Software panels carry authored snapshots, not executable rules or live
+   telemetry. These helpers are shared with their defensive render models. */
+function panelObject(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
+function panelOwn(obj, key){ return panelObject(obj) && Object.prototype.hasOwnProperty.call(obj, key); }
+function softwarePanelItems(p){
+  var key = p.type === 'table' ? 'columns' : p.type === 'checks' ? 'checks' : 'metrics';
+  var max = p.type === 'table' ? 4 : p.type === 'checks' ? 12 : 6;
+  var seen = Object.create(null);
+  return (Array.isArray(p[key]) ? p[key] : []).slice(0, max).filter(function(item){
+    if (!panelObject(item) || typeof item.id !== 'string' || !item.id || seen[item.id]) return false;
+    seen[item.id] = true;
+    return true;
+  });
+}
+function softwarePanelWarnings(p, path, warnings){
+  var key = p.type === 'table' ? 'columns' : p.type === 'checks' ? 'checks' : 'metrics';
+  var max = p.type === 'table' ? 4 : p.type === 'checks' ? 12 : 6;
+  var seen = Object.create(null);
+  if (!Array.isArray(p[key]) || !p[key].length)
+    warnings.push(path + '.' + key + ': needs 1–' + max + ' entries with unique string ids');
+  else {
+    if (p[key].length > max) warnings.push(path + '.' + key + ': only the first ' + max + ' entries render');
+    p[key].forEach(function(item, i){
+      var at = path + '.' + key + '[' + i + ']';
+      if (!panelObject(item) || typeof item.id !== 'string' || !item.id){
+        warnings.push(at + '.id: needs a non-empty string — entry skipped'); return;
+      }
+      if (seen[item.id]) warnings.push(at + '.id: duplicate id "' + item.id + '" — later entry skipped');
+      seen[item.id] = true;
+      if (p.type === 'budget'){
+        if (!isFiniteNum(item.max) || item.max <= 0)
+          warnings.push(at + '.max: needs a finite positive upper limit — rendered as NO LIMIT');
+        if (item.warn != null && (!isFiniteNum(item.warn) || item.warn < 0 || item.warn > item.max))
+          warnings.push(at + '.warn: expected a number from 0 to max — warning threshold ignored');
+      }
+    });
+  }
+  softwarePanelPatchWarnings(p.initial, path + '.initial', p, warnings);
+}
+function softwarePanelPatchWarnings(state, path, p, warnings){
+  if (state == null) return;
+  if (!panelObject(state)){ warnings.push(path + ': expected a state object — ignored'); return; }
+  var items = softwarePanelItems(p), ids = items.map(function(item){ return item.id; });
+  if (p.type === 'table' && state.rows != null){
+    if (!Array.isArray(state.rows)) warnings.push(path + '.rows: expected an array — rendered empty');
+    else {
+      if (state.rows.length > 12) warnings.push(path + '.rows: only the first 12 rows render');
+      var seen = Object.create(null);
+      state.rows.forEach(function(row, i){
+        var at = path + '.rows[' + i + ']';
+        if (!panelObject(row) || typeof row.id !== 'string' || !row.id){
+          warnings.push(at + '.id: needs a non-empty string — row skipped'); return;
+        }
+        if (seen[row.id]) warnings.push(at + '.id: duplicate row id — later row skipped');
+        seen[row.id] = true;
+        if (!panelObject(row.cells)) warnings.push(at + '.cells: expected an object keyed by column id');
+        else Object.keys(row.cells).forEach(function(id){
+          if (ids.indexOf(id) < 0) warnings.push(at + '.cells.' + id + ': unknown column — ignored');
+          else if (row.cells[id] != null && typeof row.cells[id] === 'object')
+            warnings.push(at + '.cells.' + id + ': use a string, number, boolean, or null — object rendered as JSON');
+        });
+        if (row.status != null && TABLE_STATUSES.indexOf(row.status) < 0)
+          warnings.push(at + '.status: expected ' + TABLE_STATUSES.join('|') + ' — using neutral');
+      });
+    }
+  }
+  var key = p.type === 'checks' ? 'results' : p.type === 'budget' ? 'values' : null;
+  if (key && state[key] != null){
+    if (!panelObject(state[key])) warnings.push(path + '.' + key + ': expected an object keyed by declared id');
+    else Object.keys(state[key]).forEach(function(id){
+      var at = path + '.' + key + '.' + id, v = state[key][id];
+      if (ids.indexOf(id) < 0){ warnings.push(at + ': unknown declared id — ignored'); return; }
+      if (p.type === 'checks' && (!panelObject(v) || (v.status != null && CHECK_STATUSES.indexOf(v.status) < 0)))
+        warnings.push(at + ': expected {status: pending|pass|fail|warn|skip, detail?} — using pending');
+      if (p.type === 'budget' && v !== null && (!isFiniteNum(v) || v < 0))
+        warnings.push(at + ': expected a finite non-negative number or null — rendered as NO DATA');
+    });
+  }
+  if (panelObject(state.enterOnce)){
+    var once = Object.assign({}, state.enterOnce);
+    delete once.enterOnce;
+    softwarePanelPatchWarnings(once, path + '.enterOnce', p, warnings);
+  }
+}
 var SCENE_NAMES = ['person-at-door-night','package-drop','static-noise'];
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
@@ -5234,6 +5407,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (panelIds[p.id]) errors.push(PP + '.id: duplicate panel id "' + p.id + '"');
     panelIds[p.id] = true;
     panelDeclById[p.id] = p;
+    if (['table','checks','budget'].indexOf(p.type) >= 0)
+      softwarePanelWarnings(p, PP, warnings);
     if (p.type === 'inflight'){
       var laneMap = {};
       inflightPanels[p.id] = {decl:p, lanes:laneMap, open:{}};
@@ -5322,6 +5497,12 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(PP + '.scene: unknown scene "' + p.scene + '" — using "static-noise" (valid: ' + SCENE_NAMES.join(' ') + ')');
     if (p.type === 'waterfall' && !(Array.isArray(p.spans) && p.spans.length))
       warnings.push(PP + '.spans: waterfall needs spans:[{id, label, ms}] — panel renders empty');
+    if (p.type === 'waterfall' && Array.isArray(p.spans)) p.spans.forEach(function(span, si){
+      if (!span || !isFiniteNum(span.ms) || span.ms < 0)
+        warnings.push(PP + '.spans[' + si + '].ms: expected a finite non-negative duration');
+      if (span && span.startMs != null && (!isFiniteNum(span.startMs) || span.startMs < 0))
+        warnings.push(PP + '.spans[' + si + '].startMs: expected a finite non-negative offset — using the previous span end');
+    });
     if (p.type === 'orbit' && !(Array.isArray(p.states) && p.states.length))
       warnings.push(PP + '.states: orbit needs states:[...] — panel renders empty');
     if (p.type === 'zoneframe'){
@@ -5531,6 +5712,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (timelinePanels[pid] && patch[pid]){
         timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
+      } else if (['table','checks','budget'].indexOf(panelDeclById[pid].type) >= 0){
+        softwarePanelPatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
       }
     });
     if (st && st.lane && !lanes[st.lane])
@@ -7200,21 +7383,28 @@ function legendHTML(kinds, anyRet, skin, protos){
 function waterfallModel(spans, state){
   spans = Array.isArray(spans) ? spans : [];
   state = state || {};
-  var total = 0;
-  spans.forEach(function(s){ total += (s && typeof s.ms === 'number' && s.ms > 0) ? s.ms : 0; });
+  var total = 0, cursor = 0;
+  var timed = spans.some(function(s){ return s && isFiniteNum(s.startMs) && s.startMs >= 0; });
+  var measured = spans.map(function(s){
+    var ms = s && isFiniteNum(s.ms) && s.ms > 0 ? s.ms : 0;
+    var start = s && isFiniteNum(s.startMs) && s.startMs >= 0 ? s.startMs : cursor;
+    cursor = start + ms;
+    total = Math.max(total, cursor);
+    return {ms: ms, start: start};
+  });
   var reveal = (typeof state.reveal === 'number') ? clamp(state.reveal, 0, spans.length) : spans.length;
-  var off = 0, shown = 0, rows = [];
+  var shown = 0, rows = [];
   spans.forEach(function(s, i){
-    var ms = (s && typeof s.ms === 'number' && s.ms > 0) ? s.ms : 0;
+    var ms = measured[i].ms, off = measured[i].start;
     var revealed = i < reveal;
-    if (revealed) shown += ms;
+    if (revealed) shown = Math.max(shown, off + ms);
     rows.push({id: s && s.id, label: (s && (s.label || s.id)) || '', ms: ms,
+               startMs: off, error: !!(s && s.error === true),
                offsetPct: total ? off / total * 100 : 0,
                widthPct: total ? ms / total * 100 : 0,
                revealed: revealed, highlight: !!(s && state.highlight === s.id)});
-    off += ms;
   });
-  return {rows: rows, totalMs: total, shownMs: shown,
+  return {rows: rows, totalMs: total, shownMs: shown, timed: timed,
           totalLabel: state.total != null ? String(state.total) : shown + ' ms'};
 }
 
@@ -8125,6 +8315,102 @@ function contractCardHTML(contract, sectionReference){
 
 var ZF_SEQ = 0;
 
+/* ---------------- software state panels ---------------- */
+function tableModel(panel, state){
+  state = state || {};
+  var columns = softwarePanelItems(panel), seen = Object.create(null);
+  var rows = (Array.isArray(state.rows) ? state.rows : []).slice(0, 12).filter(function(row){
+    if (!panelObject(row) || typeof row.id !== 'string' || !row.id || seen[row.id]) return false;
+    seen[row.id] = true;
+    return true;
+  }).map(function(row){
+    return {id: row.id, status: TABLE_STATUSES.indexOf(row.status) >= 0 ? row.status : 'neutral',
+      cells: columns.map(function(col){
+        if (!panelOwn(row.cells, col.id)) return '—';
+        var v = row.cells[col.id];
+        if (v === null) return 'null';
+        return typeof v === 'object' ? JSON.stringify(v) : String(v);
+      })};
+  });
+  return {columns: columns, rows: rows};
+}
+function checksModel(panel, state){
+  state = state || {};
+  return softwarePanelItems(panel).map(function(check){
+    var result = panelOwn(state.results, check.id) && panelObject(state.results[check.id])
+      ? state.results[check.id] : {};
+    return {id: check.id, label: check.label || check.id,
+      status: CHECK_STATUSES.indexOf(result.status) >= 0 ? result.status : 'pending',
+      detail: result.detail == null ? '' : String(result.detail)};
+  });
+}
+function budgetModel(panel, state){
+  state = state || {};
+  return softwarePanelItems(panel).map(function(metric){
+    var raw = panelOwn(state.values, metric.id) ? state.values[metric.id] : null;
+    var value = isFiniteNum(raw) && raw >= 0 ? raw : null;
+    var max = isFiniteNum(metric.max) && metric.max > 0 ? metric.max : null;
+    var warn = max !== null && isFiniteNum(metric.warn) && metric.warn >= 0 && metric.warn <= max ? metric.warn : null;
+    var status = value === null ? 'unknown' : max === null ? 'unbounded' :
+      value > max ? 'over' : value === max ? 'limit' : warn !== null && value >= warn ? 'warn' : 'ok';
+    return {id: metric.id, label: metric.label || metric.id, unit: metric.unit || '',
+      value: value, max: max, warn: warn, status: status,
+      pct: value !== null && max !== null ? Math.min(value / max, 1) * 100 : 0,
+      remaining: value !== null && max !== null ? max - value : null};
+  });
+}
+function softwarePanelHTML(panel, state){
+  state = state || {};
+  var h = '<div class="swpanel">';
+  if (panel.type === 'table'){
+    var table = tableModel(panel, state);
+    h += '<div class="swtablewrap" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Data state') + '">' +
+      '<table class="swtable"><caption class="swcaption">' + esc(panel.title || 'Data state') + '</caption><thead><tr>';
+    table.columns.forEach(function(col){ h += '<th scope="col">' + esc(col.label || col.id) + '</th>'; });
+    h += '<th scope="col">Change</th></tr></thead><tbody>';
+    table.rows.forEach(function(row){
+      h += '<tr class="swrow-' + row.status + '">';
+      row.cells.forEach(function(cell){ h += '<td>' + esc(cell) + '</td>'; });
+      h += '<td><span class="swbadge sw-' + row.status + '">' +
+        (row.status === 'neutral' ? '—' : row.status) + '</span></td></tr>';
+    });
+    if (!table.rows.length) h += '<tr><td colspan="' + (table.columns.length + 1) + '" class="swempty">No rows at this step</td></tr>';
+    h += '</tbody></table></div>';
+  } else if (panel.type === 'checks'){
+    var checks = checksModel(panel, state), passed = checks.filter(function(c){ return c.status === 'pass'; }).length;
+    h += '<div class="swsummary">' + passed + ' / ' + checks.length + ' passed <span>Authored outcomes</span></div><ul class="swchecks">';
+    checks.forEach(function(check){
+      h += '<li><div class="swcheckhead"><span>' + esc(check.label) + '</span>' +
+        '<span class="swbadge sw-' + check.status + '">' + check.status + '</span></div>' +
+        (check.detail ? '<div class="swdetail">' + esc(check.detail) + '</div>' : '') + '</li>';
+    });
+    h += '</ul>';
+    if (!checks.length) h += '<div class="swempty">No checks declared</div>';
+  } else if (panel.type === 'budget'){
+    var metrics = budgetModel(panel, state);
+    var labels = {unknown:'NO DATA', unbounded:'NO LIMIT', over:'OVER LIMIT', limit:'AT LIMIT', warn:'NEAR LIMIT', ok:'WITHIN LIMIT'};
+    metrics.forEach(function(metric){
+      var tone = metric.status === 'over' ? 'fail' : ['warn','limit'].indexOf(metric.status) >= 0 ? 'warn' :
+        metric.status === 'ok' ? 'pass' : 'pending';
+      h += '<div class="swmetric"><div class="swcheckhead"><span>' + esc(metric.label) + '</span>' +
+        '<span class="swbadge sw-' + tone + '">' + labels[metric.status] + '</span></div>' +
+        '<div class="swmeasure"><strong>' + (metric.value === null ? '—' : esc(String(metric.value))) + '</strong>' +
+        ' / ' + (metric.max === null ? '—' : esc(String(metric.max))) + ' ' + esc(metric.unit) + '</div>';
+      if (metric.value !== null && metric.max !== null){
+        h += '<div class="swtrack" role="img" aria-label="' + esc(metric.label + ': ' + metric.value + ' of ' + metric.max + ' ' + metric.unit + ', ' + labels[metric.status]) + '">' +
+          '<div class="swfill sw-' + tone + '" style="width:' + metric.pct.toFixed(2) + '%"></div>';
+        if (metric.warn !== null) h += '<span class="swthreshold" style="left:' + (metric.warn / metric.max * 100).toFixed(2) + '%" title="Warning at ' + esc(String(metric.warn)) + '"></span>';
+        h += '</div><div class="swdetail">' + esc(String(Number(Math.abs(metric.remaining).toPrecision(6)))) +
+          ' ' + esc(metric.unit) + (metric.remaining < 0 ? ' over budget' : ' remaining') + '</div>';
+      }
+      h += '</div>';
+    });
+    if (!metrics.length) h += '<div class="swempty">No budgets declared</div>';
+  }
+  if (state.note) h += '<div class="swnote">' + esc(String(state.note)) + '</div>';
+  return h + '</div>';
+}
+
 /* ---------------- inspector panel widgets ----------------
    Each widget renders ABSOLUTE state (from foldPanelStates) — no deltas, so
    any step jump is consistent. renderPanelBody rebuilds the widget's DOM.
@@ -8146,7 +8432,9 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
      the following identical step skips the rebuild */
   var hBaseline = null;
   state = state || {};
-  if (type === 'state'){
+  if (['table','checks','budget'].indexOf(type) >= 0){
+    h = softwarePanelHTML(panel, state);
+  } else if (type === 'state'){
     var cur = state.state != null ? String(state.state) : '—';
     pulseSelector = '.pchip.cur';
     pulseChanged = Object.prototype.hasOwnProperty.call(host, '_stateCur') && host._stateCur !== cur;
@@ -8522,15 +8810,16 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var wfNow = wm.rows.map(function(r){ return r.revealed; });
     waterfallEntrants = wfPrev ? wfNow.map(function(on, i){ return on && !wfPrev[i]; }) : null;
     host._wfRevealed = wfNow;
-    h += '<div class="wfall">';
+    h += '<div class="wfall' + (wm.timed ? ' wf-timed' : '') + '">';
     wm.rows.forEach(function(r){
-      h += '<div class="wfrow' + (r.revealed ? ' on' : '') + (r.highlight ? ' hl' : '') + '">' +
+      h += '<div class="wfrow' + (r.revealed ? ' on' : '') + (r.highlight ? ' hl' : '') + (r.error ? ' wf-error' : '') +
+           '" title="' + esc(r.label + ' · start +' + r.startMs + ' ms · duration ' + r.ms + ' ms' + (r.error ? ' · recorded error' : '')) + '">' +
            '<span class="wflabel">' + esc(r.label) + '</span>' +
            '<span class="wftrack"><span class="wfbar" style="margin-left:' + r.offsetPct.toFixed(2) +
-           '%;width:' + Math.max(r.widthPct, 1.2).toFixed(2) + '%"></span></span>' +
-           '<span class="wfms">' + (r.revealed ? esc(String(r.ms)) + ' ms' : '&#8212;') + '</span></div>';
+           '%;width:' + Math.max(r.widthPct, wm.timed ? 0 : 1.2).toFixed(2) + '%"></span></span>' +
+           '<span class="wfms">' + (r.revealed ? (r.error ? '! ' : '') + esc(String(r.ms)) + ' ms' : '&#8212;') + '</span></div>';
     });
-    h += '<div class="wftotal">total <b>' + esc(wm.totalLabel) + '</b></div></div>';
+    h += '<div class="wftotal">' + (wm.timed ? 'elapsed extent ' : 'total ') + '<b>' + esc(wm.totalLabel) + '</b></div></div>';
   } else if (type === 'orbit'){
     var ostates = Array.isArray(panel.states) ? panel.states : [];
     var ocur = state.state != null ? String(state.state) : null;
@@ -10279,6 +10568,161 @@ function wirePresenter(ctl, view, win){
     }
   });
 }
+/* ---- src/trace-import.js ---- */
+/* trace-import.js — pure Honeycomb event JSON → Flow Spec conversion.
+   Shared by the workbench and tools/trace2spec.js. No network or secrets. */
+var TRACE_FIELDS = {
+  traceId: 'trace.trace_id', spanId: 'trace.span_id', parentId: 'trace.parent_id',
+  service: 'service.name', name: 'name', timestamp: 'timestamp', duration: 'duration_ms', error: 'error'
+};
+
+function traceToSpec(input, options){
+  options = options || {};
+  var warnings = [], own = function(o, k){ return o && Object.prototype.hasOwnProperty.call(o, k); };
+  var object = function(o){ return !!o && typeof o === 'object' && !Array.isArray(o); };
+  if (typeof input === 'string'){
+    try { input = JSON.parse(input); } catch (ex){ throw new Error('Trace input is not valid JSON: ' + ex.message); }
+  }
+  var events = Array.isArray(input) ? input : input && (input.events || input.spans);
+  if (!Array.isArray(events) || !events.length)
+    throw new Error('Expected a non-empty event array, {events: [...]}, or {spans: [...]}; aggregated query results are not trace events.');
+  if (events.length > 10000) throw new Error('Input exceeds 10,000 events. Export one trace or a focused subtree.');
+  var fields = Object.assign({}, TRACE_FIELDS);
+  if (options.fields != null){
+    if (!object(options.fields)) throw new Error('Field mapping must be an object.');
+    Object.keys(options.fields).forEach(function(k){
+      if (!own(fields, k) || typeof options.fields[k] !== 'string' || !options.fields[k])
+        throw new Error('Unknown or empty field mapping: ' + k);
+      fields[k] = options.fields[k];
+    });
+  }
+  var source = options.sourceUrl || '';
+  if (source){
+    try {
+      var url = new URL(source);
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error();
+    } catch (ex){ throw new Error('Source URL must be an HTTP(S) link without embedded credentials.'); }
+  }
+  function value(event, key){
+    var data = object(event.data) ? event.data : event;
+    if (own(data, fields[key])) return data[fields[key]];
+    if (own(event, fields[key])) return event[fields[key]];
+    // Honeycomb ingestion envelopes put the timestamp outside data as time.
+    if (key === 'timestamp' && fields[key] === TRACE_FIELDS.timestamp && own(event, 'time')) return event.time;
+    return undefined;
+  }
+  function requiredString(v, field, index){
+    if (typeof v !== 'string' || !v.trim()) throw new Error('Event ' + (index + 1) + ': missing string field ' + field + '. Adjust the field mapping if your dataset uses different names.');
+    return v;
+  }
+  function timestamp(v, index){
+    var n = NaN;
+    if (typeof v === 'number' && Number.isFinite(v)) n = v * 1000; // Unix seconds
+    else if (typeof v === 'string' && /^\d{4}-\d\d-\d\dT.+(?:Z|[+-]\d\d:\d\d)$/i.test(v)){
+      n = Date.parse(v);
+      var fraction = /\.(\d+)(?:Z|[+-]\d\d:\d\d)$/i.exec(v);
+      if (fraction) n += Number('0.' + fraction[1]) * 1000 - Number((fraction[1] + '000').slice(0, 3));
+    }
+    if (!Number.isFinite(n)) throw new Error('Event ' + (index + 1) + ': ' + fields.timestamp + ' needs an ISO timestamp with timezone or Unix seconds.');
+    return n;
+  }
+  var traceIds = new Set(), ignored = 0, candidates = [];
+  events.forEach(function(event, index){
+    if (!object(event)) throw new Error('Event ' + (index + 1) + ' must be an object.');
+    var data = object(event.data) ? event.data : event;
+    if (['span_event','link','log'].indexOf(data['meta.annotation_type']) >= 0){ ignored++; return; }
+    var id = requiredString(value(event, 'traceId'), fields.traceId, index);
+    traceIds.add(id); candidates.push({event: event, index: index, traceId: id});
+  });
+  var selected = options.traceId;
+  if (!selected && traceIds.size > 1) throw new Error('Input contains ' + traceIds.size + ' traces. Enter a trace ID to import exactly one.');
+  if (!selected) selected = Array.from(traceIds)[0];
+  candidates = candidates.filter(function(c){ return c.traceId === selected; });
+  if (!candidates.length) throw new Error('No spans found for the selected trace.');
+  if (candidates.length > 200) throw new Error('This trace has ' + candidates.length + ' spans; the first version supports up to 200. Export a focused subtree (nothing was truncated).');
+  if (ignored) warnings.push(ignored + ' non-span annotation(s) excluded.');
+  if (traceIds.size > 1) warnings.push('Imported only trace ' + selected + '; other traces excluded.');
+  var spans = candidates.map(function(c){
+    var e = c.event, index = c.index, data = object(e.data) ? e.data : e;
+    var id = requiredString(value(e, 'spanId'), fields.spanId, index);
+    var parent = value(e, 'parentId');
+    if (parent != null && typeof parent !== 'string') throw new Error('Event ' + (index + 1) + ': parent span ID must be a string.');
+    if (!parent || /^0+$/.test(parent)) parent = null;
+    var ms = value(e, 'duration');
+    if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0)
+      throw new Error('Event ' + (index + 1) + ': ' + fields.duration + ' needs a finite, non-negative number of milliseconds.');
+    var error = value(e, 'error'), status = data['otel.status_code'];
+    return {id: id, parentId: parent, service: requiredString(value(e, 'service'), fields.service, index),
+      name: requiredString(value(e, 'name'), fields.name, index), time: timestamp(value(e, 'timestamp'), index), ms: ms,
+      error: error === true || error === 'true' || status === 2 || status === 'ERROR' || status === 'STATUS_CODE_ERROR'};
+  });
+  var byId = new Map();
+  spans.forEach(function(s){
+    if (byId.has(s.id)) throw new Error('Duplicate span ID: ' + s.id);
+    byId.set(s.id, s);
+  });
+  spans.forEach(function(s){
+    var seen = new Set([s.id]), parent = s.parentId;
+    while (parent && byId.has(parent)){
+      if (seen.has(parent)) throw new Error('Parent cycle at span ' + s.id);
+      seen.add(parent); parent = byId.get(parent).parentId;
+    }
+  });
+  spans.sort(function(a, b){ return a.time - b.time || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
+  var start = spans[0].time, round = function(n){ return Math.round(n * 1000) / 1000; };
+  spans.forEach(function(s){
+    s.startMs = round(s.time - start);
+    if (!Number.isFinite(s.startMs + s.ms)) throw new Error('Span timing exceeds the supported numeric range.');
+  });
+  var missing = spans.filter(function(s){ return s.parentId && !byId.has(s.parentId); });
+  if (missing.length) warnings.push(missing.length + ' span(s) have missing parents; the trace is partial. No missing service or call was invented.');
+  var roots = spans.filter(function(s){ return !s.parentId; });
+  if (roots.length !== 1) warnings.push('Found ' + roots.length + ' root spans; review trace completeness.');
+  var skew = spans.filter(function(s){
+    var parent = byId.get(s.parentId);
+    return parent && (s.time < parent.time || s.time + s.ms > parent.time + parent.ms + 0.001);
+  });
+  if (skew.length) warnings.push(skew.length + ' child span(s) extend outside their parent interval (async work or clock skew); original timing retained.');
+  var services = new Map();
+  spans.forEach(function(s){ if (!services.has(s.service)) services.set(s.service, 'svc' + (services.size + 1)); });
+  if (services.size > 10) throw new Error('This trace spans ' + services.size + ' services; focus the export to at most 10 services for a readable board.');
+  var nodes = {}, ids = [], edges = [], pairs = new Set();
+  services.forEach(function(id, service){
+    ids.push(id); nodes[id] = {title: service, sub: 'observed service', icon: 'server', tint: 'cmd'};
+    if (source) nodes[id].link = source;
+  });
+  spans.forEach(function(s){
+    var parent = byId.get(s.parentId);
+    if (!parent || parent.service === s.service) return;
+    var from = services.get(parent.service), to = services.get(s.service), key = from + '->' + to;
+    if (!pairs.has(key)){ pairs.add(key); edges.push({from: from, to: to, kind: 'trace'}); }
+  });
+  var elapsed = round(Math.max.apply(null, spans.map(function(s){ return s.startMs + s.ms; })));
+  var timing = {id: 'timing', type: 'waterfall', title: 'Observed span timing',
+    spans: spans.map(function(s){ return {id: s.id, label: s.service + ' · ' + s.name, ms: s.ms, startMs: s.startMs, error: s.error}; })};
+  var details = {id: 'span', type: 'table', title: 'Selected span', columns: [{id: 'field', label: 'Field'}, {id: 'value', label: 'Observed value'}]};
+  var steps = spans.map(function(s){
+    var facts = [['span_id', s.id], ['parent_id', s.parentId], ['service', s.service], ['operation', s.name],
+      ['start_ms', s.startMs], ['duration_ms', s.ms], ['error', s.error ? 'recorded error' : 'not flagged']];
+    var st = {id: s.id, nodes: [services.get(s.service)],
+      text: '+' + s.startMs + ' ms · ' + s.service + ' · ' + s.name + ' · duration ' + s.ms + ' ms' + (s.error ? ' · recorded error' : ''),
+      panels: {timing: {highlight: s.id}, span: {rows: facts.map(function(f){ return {id: f[0], cells: {field: f[0], value: f[1]}}; })}}};
+    var parent = byId.get(s.parentId);
+    if (parent && parent.service !== s.service) st.edge = services.get(parent.service) + '->' + services.get(s.service);
+    if (source) st.link = source;
+    return st;
+  });
+  var half = Math.ceil(ids.length / 2), rows = ids.length <= 5 ? [ids] : [ids.slice(0, half), ids.slice(half)];
+  var section = {heading: 'Observed request', accent: 'cyan', text: [
+    'Imported trace ' + selected + ': ' + spans.length + ' spans across ' + services.size + ' services; observed extent ' + elapsed + ' ms.',
+    'Inspect spans in start-time order. Overlapping bars retain their original offsets; parent spans include child time. The total is elapsed extent, not a sum of durations. Arrows mean span parent relationships, not a verified network protocol.',
+    'This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success.'],
+    bullets: warnings.slice(), diagram: {view: 'step', nodes: nodes, rows: rows, edges: edges, panels: [timing, details], steps: steps}};
+  if (source) section.source = source;
+  return {spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'aurora',
+    protocols: edges.length ? {trace: {label: 'Span parent relationship', color: '#38BDF8'}} : {}, blocks: [section]}},
+    warnings: warnings, stats: {traceId: selected, spans: spans.length, services: services.size, elapsedMs: elapsed}};
+}
 /* ---- src/builder.workbench.js ---- */
 /* builder.workbench.js — workbench builder: click a rendered element to jump
    to its definition in the spec editor (with per-element authoring guidance),
@@ -10583,6 +11027,39 @@ function builderTargetPath(raw, target){
   }
   if (target.kind === 'crow') return rec.section.concat(['contract', 'fields', target.index]);
   return null;
+}
+
+/* Search the source tree, including nodes omitted from layout and hidden
+   tabs. Keep raw paths and rendered section ordinals together. */
+function builderOutline(raw, query){
+  var entries = [], terms = String(query || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  specSectionPaths(raw).forEach(function(rec, section){
+    var sec = specValueAt(raw, rec.section) || {}, d = specValueAt(raw, rec.diagram) || {};
+    var ti = rec.section.indexOf('tabs');
+    var tab = ti >= 0 ? {block: rec.section[ti - 1], tab: rec.section[ti + 1]} : null;
+    var parent = ti >= 0 ? specValueAt(raw, rec.section.slice(0, ti + 2)) : null;
+    var context = (parent && parent.label ? parent.label + ' / ' : '') + (sec.heading || 'Section ' + (section + 1));
+    function add(kind, label, extra){
+      var target = Object.assign({section: section, kind: kind}, extra || {});
+      var path = builderTargetPath(raw, target);
+      var haystack = (kind + ' ' + label + ' ' + context + ' ' + builderPathString(path)).toLowerCase();
+      if (terms.every(function(term){ return haystack.indexOf(term) >= 0; }))
+        entries.push({label: label, context: context, target: target, path: path, tab: tab});
+    }
+    add('section', sec.heading || 'Section ' + (section + 1));
+    Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || id) + ' · ' + id, {id: id}); });
+    Object.keys(d.groups || {}).forEach(function(id){ add('group', ((d.groups[id] || {}).title || id) + ' · ' + id, {id: id}); });
+    (Array.isArray(d.edges) ? d.edges : []).forEach(function(e, index){
+      if (e) add('edge', e.from + ' → ' + e.to + (e.label ? ' · ' + e.label : ''), {index: index});
+    });
+    (Array.isArray(d.panels) ? d.panels : []).forEach(function(p, index){
+      if (p) add('panel', (p.title || p.id) + ' · ' + p.type + ' · ' + p.id, {index: index});
+    });
+    (Array.isArray(d.steps) ? d.steps : []).forEach(function(s, index){
+      if (s) add('step', (index + 1) + '. ' + (s.text || s.id || 'Untitled step'), {index: index});
+    });
+  });
+  return entries;
 }
 function builderPathString(path){
   return path.length ? path.map(function(seg, i){
@@ -11233,6 +11710,12 @@ var NODE_PRESETS = [
 ];
 
 var PANEL_TEMPLATES = {
+  table:     {title: 'Data state', columns: [{id: 'key', label: 'Key'}, {id: 'value', label: 'Value'}],
+              initial: {rows: [{id: 'item', cells: {key: 'order.status', value: 'pending'}, status: 'added'}]}},
+  checks:    {title: 'Decision checks', checks: [{id: 'auth', label: 'Authorized'}, {id: 'unique', label: 'Idempotency key is new'}],
+              initial: {results: {auth: {status: 'pending'}, unique: {status: 'pending'}}}},
+  budget:    {title: 'Resource budgets', metrics: [{id: 'latency', label: 'Latency', unit: 'ms', max: 300, warn: 240}],
+              initial: {values: {latency: null}, note: 'Example limit — replace with the design’s target.'}},
   state:     {title: 'Device state', states: ['OFF', 'BOOT', 'LIVE'], initial: {state: 'OFF'}},
   leds:      {title: 'Indicators', leds: [{id: 'power', label: 'PWR'}, {id: 'radio', label: 'RADIO'}],
               initial: {power: 'on'}},
@@ -12166,12 +12649,16 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
              and an optional max; unknown keys on existing items survive edits
      objf  — one fixed-shape object edited inline (timeline cadence) */
 var PANEL_SETUP_FIELDS = {
+  table:     [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 4}], ['initial', 'json']],
+  checks:    [['checks', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 12}], ['initial', 'json']],
+  budget:    [['metrics', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'unit'},
+                {k: 'max', kind: 'num', req: true}, {k: 'warn', kind: 'num'}], max: 6}], ['initial', 'json']],
   state:     [['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
   leds:      [['leds', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}]}], ['initial', 'json']],
   gauge:     [['unit', 'text'], ['max', 'num'], ['initial', 'json']],
   log:       [['tags', 'map'], ['initial', 'json']],
   screen:    [['scene', 'scene'], ['initial', 'json']],
-  waterfall: [['spans', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'ms', kind: 'num', req: true}]}],
+  waterfall: [['spans', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'ms', kind: 'num', req: true}, {k: 'startMs', kind: 'num'}]}],
               ['initial', 'json']],
   orbit:     [['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
   zoneframe: [['zones', 'jsonArr'], ['initial', 'json']],
@@ -12209,6 +12696,9 @@ var PANEL_SETUP_FIELDS = {
 
 /* Dynamic-key types are expanded from their declarations by panelPatchFields. */
 var PANEL_PATCH_FIELDS = {
+  table:     [['rows', 'jsonArr'], ['note', 'text']],
+  checks:    [['results', 'json'], ['note', 'text']],
+  budget:    [['values', 'json'], ['note', 'text']],
   state:     [['state', 'text']],
   leds:      [],
   gauge:     [['value', 'num']],
@@ -12960,6 +13450,55 @@ function initWorkbenchBuilder(opts){
       if (document.activeElement !== src && document.activeElement !== importBtn) return;
       ev.preventDefault();
       doUndo();
+    });
+  }
+
+  /* ---- Honeycomb trace import (local, shared with the CLI) ---- */
+  var traceBtn = document.getElementById('import-trace');
+  var traceBox = document.getElementById('tracebox');
+  if (traceBtn && traceBox){
+    var traceText = document.getElementById('trace-text');
+    var traceFeedback = document.getElementById('trace-feedback');
+    var traceFile = document.getElementById('trace-file');
+    function closeTrace(){ traceBox.hidden = true; traceBtn.setAttribute('aria-expanded', 'false'); traceBtn.focus(); }
+    traceBtn.addEventListener('click', function(){
+      traceBox.hidden = !traceBox.hidden;
+      traceBtn.setAttribute('aria-expanded', String(!traceBox.hidden));
+      if (!traceBox.hidden){ closePalette(); closeGallery(); traceText.focus(); }
+    });
+    document.getElementById('trace-cancel').addEventListener('click', closeTrace);
+    traceBox.addEventListener('keydown', function(ev){ if (ev.key === 'Escape'){ ev.stopPropagation(); closeTrace(); } });
+    document.getElementById('trace-open').addEventListener('click', function(){ traceFile.click(); });
+    traceFile.addEventListener('change', function(){
+      var file = traceFile.files[0];
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024){ traceFeedback.textContent = 'Use a trace export smaller than 10 MB.'; traceFile.value = ''; return; }
+      var reader = new FileReader();
+      reader.onload = function(){ traceText.value = String(reader.result); traceFeedback.textContent = 'Loaded ' + file.name; };
+      reader.onerror = function(){ traceFeedback.textContent = 'Could not read the trace file.'; };
+      reader.readAsText(file); traceFile.value = '';
+    });
+    document.getElementById('trace-convert').addEventListener('click', function(){
+      var result;
+      try {
+        if (traceText.value.length > 10 * 1024 * 1024) throw new Error('Use a trace export smaller than 10 MB.');
+        var mapping = document.getElementById('trace-fields').value.trim();
+        result = traceToSpec(traceText.value, {traceId: document.getElementById('trace-id').value.trim() || undefined,
+          sourceUrl: document.getElementById('trace-url').value.trim(), fields: mapping ? JSON.parse(mapping) : undefined});
+        var verdict = validate(normalize(result.spec));
+        if (verdict.errors.length) throw new Error(verdict.errors.join('\n'));
+      } catch (ex){ traceFeedback.textContent = ex.message; return; }
+      pushUndo();
+      src.value = JSON.stringify(result.spec, null, 2);
+      setSelected(null); currentTarget = null; insertSection = 0;
+      if (connect) cancelConnect(null);
+      clearMultiSelect(); clearStepMarkers();
+      if (guide) guide.hidden = true;
+      retireInspector();
+      render(); updateTargetLabel(result.spec); autosaveDraft();
+      closeTrace();
+      inspectorMessage('Imported ' + result.stats.spans + ' spans across ' + result.stats.services + ' services. ' +
+        result.stats.elapsedMs + ' ms observed extent. ' + (result.warnings.join(' ') || 'Select a step to inspect its source span.'));
     });
   }
 
@@ -14393,6 +14932,75 @@ function initWorkbenchBuilder(opts){
     if (loc) selectRange(loc);
   }
 
+  /* ---- searchable document outline ---- */
+  var outline = document.getElementById('sec-outline');
+  var outlineSearch = document.getElementById('outline-search');
+  var outlineResults = document.getElementById('outline-results');
+  var outlineStatus = document.getElementById('outline-status');
+  function refreshOutline(){
+    if (!outlineResults) return;
+    outlineResults.innerHTML = '';
+    var indexedText = src.value;
+    var entries;
+    try { entries = builderOutline(JSON.parse(src.value), outlineSearch.value); }
+    catch (ex){ outlineStatus.textContent = 'Fix the JSON source to browse its outline.'; return; }
+    outlineStatus.textContent = entries.length ? Math.min(entries.length, 200) + ' of ' + entries.length + ' items' : 'No matching items';
+    entries.slice(0, 200).forEach(function(entry){
+      var button = document.createElement('button');
+      button.type = 'button'; button.className = 'outline-item';
+      var title = document.createElement('span'); title.textContent = entry.target.kind + ' · ' + entry.label;
+      var sub = document.createElement('small'); sub.textContent = entry.context;
+      button.appendChild(title); button.appendChild(sub);
+      button.title = builderPathString(entry.path);
+      button.addEventListener('click', function(){
+        if (addToStep) return;
+        if (src.value !== indexedText){
+          refreshOutline();
+          outlineStatus.textContent = 'Source changed; outline refreshed. Select the item again.';
+          return;
+        }
+        /* Never map fresh JSON onto stale rendered section ordinals. */
+        if (opts.renderedText && opts.renderedText() !== src.value){
+          render();
+          if (opts.renderedText() !== src.value){ inspectorMessage('Fix validation errors before navigating the preview.'); return; }
+        }
+        if (connect) cancelConnect(null);
+        clearMultiSelect();
+        if (entry.tab){
+          var tabButton = document.getElementById('tab-' + entry.tab.block + '-' + entry.tab.tab);
+          if (tabButton) tabButton.click();
+        }
+        var el = findTargetEl(entry.target);
+        selectTarget(Object.assign({}, entry.target, {el: el}), false);
+        var loc = jsonLocate(src.value, entry.path);
+        if (loc && sourceVisible()){
+          src.setSelectionRange(loc.start, loc.end);
+          scrollTextareaTo(loc.start);
+        }
+        if (el) el.scrollIntoView({block: 'nearest', behavior: 'auto'});
+      });
+      outlineResults.appendChild(button);
+    });
+  }
+  if (outlineSearch){
+    outlineSearch.addEventListener('input', refreshOutline);
+    outlineSearch.addEventListener('keydown', function(ev){
+      if ((ev.key === 'ArrowDown' || ev.key === 'Enter') && outlineResults.firstChild){
+        ev.preventDefault(); outlineResults.firstChild.focus();
+      }
+    });
+    var outlineTimer;
+    src.addEventListener('input', function(){ clearTimeout(outlineTimer); outlineTimer = setTimeout(refreshOutline, 200); });
+    new MutationObserver(refreshOutline).observe(view, {childList: true});
+    document.addEventListener('keydown', function(ev){
+      if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || addToStep) return;
+      ev.preventDefault();
+      if (specbox) specbox.open = true;
+      outline.open = true; outlineSearch.focus(); outlineSearch.select();
+    });
+    refreshOutline();
+  }
+
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
   var addModeSurvive = false; /* set around this mode's own re-renders */
@@ -14410,7 +15018,7 @@ function initWorkbenchBuilder(opts){
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
-    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, .patchedit .fctl, .groupctl';
+    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
        step, re-render from outside the mode, or leave the page state
@@ -15488,6 +16096,14 @@ var CONTRACT = [
   '    "edges":  [{"from":"<id>", "to":"<id>", "kind":"https|int|mqtt",',
   '                "ret":false, "label":"<short label>", "revealAt":1, "hideAt":3}],',
   '    "panels": [                              // optional synchronized inspector panels',
+  '      {"id":"data", "type":"table", "columns":[{"id":"key","label":"Field"},{"id":"value","label":"Value"}]}',
+  '                                     // patch {"rows":[{"id":"r","cells":{"key":"status","value":"ready"},"status":"changed"}]}',
+  '      {"id":"gate", "type":"checks", "checks":[{"id":"auth","label":"Authorized"}]}',
+  '                                     // patch {"results":{"auth":{"status":"pass","detail":"scope present"}}}; authored outcomes only',
+  '      {"id":"limits", "type":"budget", "metrics":[{"id":"ram","label":"Memory","unit":"KiB","max":64,"warn":48}]}',
+  '                                     // patch {"values":{"ram":52}}; missing/null = NO DATA; rows/results/values replace wholesale',
+  '      {"id":"trace", "type":"waterfall", "spans":[{"id":"a","label":"request","ms":100,"startMs":0}]}',
+  '                                     // startMs preserves concurrent offsets; total is elapsed extent, not summed nested time',
   '      {"id":"<pid>", "type":"state", "title":"...", "states":["OFF","BOOT"], "initial":{"state":"OFF"}},',
   '      {"id":"<pid>", "type":"leds",  "title":"...", "leds":[{"id":"radio","label":"RADIO"}], "initial":{"radio":"on"}},',
   '      {"id":"<pid>", "type":"gauge", "title":"...", "unit":"mA", "max":400, "initial":{"value":2}},',

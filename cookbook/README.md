@@ -23,6 +23,8 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 
 | You were asked for… | Recipe |
 |---|---|
+| database/cache/payload state, decision gates, or resource limits | `software-state.md` |
+| a Honeycomb trace turned into an editable diagram | [`../docs/trace-import.md`](../docs/trace-import.md) (input and CLI guide) |
 | a temperature readout with warning / shutdown thresholds | `temperature.md` |
 | a battery / charge level that drains and raises a low event | `battery-level.md` |
 | motion detection — a sensor cone, an approach, a trip | `motion-detection.md` |
@@ -40,7 +42,10 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
   state, so any step jump renders correctly. Patch only what changed.
 - The engine COMPUTES verdict-like state (a pir subject's tripped/clear, a
   thermo zone) from declared geometry/thresholds — author inputs, not
-  conclusions.
+  conclusions for these computed widgets. `checks` instead displays explicitly
+  sourced outcomes; it never runs rules or verifies a system. `table` change
+  badges are also authored. `budget` computes comparisons from sourced values
+  and limits, and shows missing data explicitly.
 - Every step needs content (an edge, nodes, or a panel patch), and each
   edge-bearing step needs a DISTINCT first edge or its number coin lands on
   another step's coin (the validator lint names both steps when this happens).

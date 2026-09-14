@@ -363,6 +363,46 @@ perspectives" of one timeline). Types:
   `on` `off` `tx` `rx` (tx/rx pulse).
 - `gauge` — numeric bar: `{"id":"pw","type":"gauge","unit":"mA","max":400,
   "initial":{"value":2}}`. Patched via `{"value": <number>}`.
+- `table` — a data snapshot for database records, cache entries, payloads,
+  or desired/reported device state. Declare 1–4 columns with unique string
+  ids: `{"id":"data","type":"table","title":"Order record",
+  "columns":[{"id":"key","label":"Field"},{"id":"value","label":"Value"}],
+  "initial":{"rows":[]}}`. Patch `{"rows":[{"id":"status",
+  "cells":{"key":"status","value":"accepted"},"status":"changed"}],
+  "note":"Committed before publication"}`. Each row needs a unique string
+  `id` and `cells` keyed by column id; cell values are strings, numbers,
+  booleans, or null. Missing cells show an em dash; explicit null shows
+  `null`. Row status is `neutral` (default), `added`, `changed`, or `removed`;
+  removed rows stay visible with a strike-through. Badges are AUTHOR-DECLARED,
+  not a computed diff. Every `rows` patch REPLACES the full snapshot; use
+  `[]` to clear it. At most 12 rows render; larger inputs warn. The table
+  scrolls inside its card. Optional `note` persists until replaced/cleared.
+- `checks` — authored decisions and invariants for authorization, idempotency,
+  rollout gates, or hardware interlocks: `{"id":"gate","type":"checks",
+  "checks":[{"id":"scope","label":"Caller authorized"}],
+  "initial":{"results":{"scope":{"status":"pending"}}}}`. Declare 1–12
+  checks with unique string ids. Patch `{"results":{"scope":{"status":"pass",
+  "detail":"Required scope present"}},"note":"Proceed to storage"}`.
+  Status is `pending` (default), `pass`, `fail`, `warn`, or `skip`; detail is
+  optional supporting text. The summary counts only explicit passes. This
+  displays the source's stated outcome; it DOES NOT execute rules or verify
+  the design. A `results` patch REPLACES the entire result map; omitted ids
+  become pending. No patch preserves the previous map. Use `{}` to reset.
+- `budget` — upper-bound comparisons for latency, memory, queue depth, power,
+  bytes, or cost: `{"id":"limits","type":"budget","metrics":[
+  {"id":"ram","label":"Staging memory","unit":"KiB","max":64,"warn":48}],
+  "initial":{"values":{"ram":null}}}`. Declare 1–6 metrics with unique
+  string ids and a finite positive `max`; optional `warn` is an ABSOLUTE
+  threshold in the same unit, from zero through max. Patch
+  `{"values":{"ram":52},"note":"Image staged"}`. Values must be finite,
+  non-negative numbers, or null for no data. Missing values show NO DATA,
+  never zero. At warn: NEAR LIMIT; at max: AT LIMIT; above max: OVER LIMIT.
+  Bars saturate at 100% while the actual value and excess remain visible.
+  Without `warn`, no warning threshold is inferred. A `values` patch
+  REPLACES the full map; include every metric known at this step. Missing
+  limits show NO LIMIT. Only upper-bound resource usage is supported; do
+  not use for lower-bound availability targets. Limits and values must come
+  from the source; label fictional/illustrative examples explicitly.
 - `log` — appending monospace event lines: `{"id":"log","type":"log",
   "tags":{"NET":"#38E1FF"}}`. Patched via
   `{"log":[{"tag":"NET","text":"line"}]}` — log patches APPEND. Log panels
@@ -407,6 +447,15 @@ perspectives" of one timeline). Types:
   "highlight": "<span id>", "total": "<override label, e.g. 640 ms p95>"}`.
   Spans draw Gantt-style: each starts where the previous ended; the total line
   shows the revealed sum unless `total` overrides it.
+  For traces and concurrent work, each span may carry `startMs` (finite,
+  non-negative milliseconds from a shared origin) and `error:true` (a
+  recorded error, shown with an exclamation mark). Explicit offsets preserve
+  nesting and overlap. A span without `startMs` starts at the preceding
+  span's end. When any offset is present, the total is the furthest revealed
+  end time, labeled **elapsed extent**, NEVER the sum of nested durations.
+  All spans use the furthest overall end as the scale. Long offset-based
+  waterfalls scroll inside the panel; hover a row for full name, offset,
+  and duration. `highlight` selects a span without hiding the rest.
 - `orbit` — a state machine on a ring: `{"id":"conn","type":"orbit",
   "states":["ONLINE","OFFLINE"],"colors":{"ONLINE":"#4ADE80"},
   "initial":{"state":"ONLINE"}}`. Patched via `{"state":"<value>",

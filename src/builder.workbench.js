@@ -302,6 +302,39 @@ function builderTargetPath(raw, target){
   if (target.kind === 'crow') return rec.section.concat(['contract', 'fields', target.index]);
   return null;
 }
+
+/* Search the source tree, including nodes omitted from layout and hidden
+   tabs. Keep raw paths and rendered section ordinals together. */
+function builderOutline(raw, query){
+  var entries = [], terms = String(query || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  specSectionPaths(raw).forEach(function(rec, section){
+    var sec = specValueAt(raw, rec.section) || {}, d = specValueAt(raw, rec.diagram) || {};
+    var ti = rec.section.indexOf('tabs');
+    var tab = ti >= 0 ? {block: rec.section[ti - 1], tab: rec.section[ti + 1]} : null;
+    var parent = ti >= 0 ? specValueAt(raw, rec.section.slice(0, ti + 2)) : null;
+    var context = (parent && parent.label ? parent.label + ' / ' : '') + (sec.heading || 'Section ' + (section + 1));
+    function add(kind, label, extra){
+      var target = Object.assign({section: section, kind: kind}, extra || {});
+      var path = builderTargetPath(raw, target);
+      var haystack = (kind + ' ' + label + ' ' + context + ' ' + builderPathString(path)).toLowerCase();
+      if (terms.every(function(term){ return haystack.indexOf(term) >= 0; }))
+        entries.push({label: label, context: context, target: target, path: path, tab: tab});
+    }
+    add('section', sec.heading || 'Section ' + (section + 1));
+    Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || id) + ' · ' + id, {id: id}); });
+    Object.keys(d.groups || {}).forEach(function(id){ add('group', ((d.groups[id] || {}).title || id) + ' · ' + id, {id: id}); });
+    (Array.isArray(d.edges) ? d.edges : []).forEach(function(e, index){
+      if (e) add('edge', e.from + ' → ' + e.to + (e.label ? ' · ' + e.label : ''), {index: index});
+    });
+    (Array.isArray(d.panels) ? d.panels : []).forEach(function(p, index){
+      if (p) add('panel', (p.title || p.id) + ' · ' + p.type + ' · ' + p.id, {index: index});
+    });
+    (Array.isArray(d.steps) ? d.steps : []).forEach(function(s, index){
+      if (s) add('step', (index + 1) + '. ' + (s.text || s.id || 'Untitled step'), {index: index});
+    });
+  });
+  return entries;
+}
 function builderPathString(path){
   return path.length ? path.map(function(seg, i){
     if (typeof seg === 'number') return '[' + seg + ']';
@@ -951,6 +984,12 @@ var NODE_PRESETS = [
 ];
 
 var PANEL_TEMPLATES = {
+  table:     {title: 'Data state', columns: [{id: 'key', label: 'Key'}, {id: 'value', label: 'Value'}],
+              initial: {rows: [{id: 'item', cells: {key: 'order.status', value: 'pending'}, status: 'added'}]}},
+  checks:    {title: 'Decision checks', checks: [{id: 'auth', label: 'Authorized'}, {id: 'unique', label: 'Idempotency key is new'}],
+              initial: {results: {auth: {status: 'pending'}, unique: {status: 'pending'}}}},
+  budget:    {title: 'Resource budgets', metrics: [{id: 'latency', label: 'Latency', unit: 'ms', max: 300, warn: 240}],
+              initial: {values: {latency: null}, note: 'Example limit — replace with the design’s target.'}},
   state:     {title: 'Device state', states: ['OFF', 'BOOT', 'LIVE'], initial: {state: 'OFF'}},
   leds:      {title: 'Indicators', leds: [{id: 'power', label: 'PWR'}, {id: 'radio', label: 'RADIO'}],
               initial: {power: 'on'}},
@@ -1884,12 +1923,16 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
              and an optional max; unknown keys on existing items survive edits
      objf  — one fixed-shape object edited inline (timeline cadence) */
 var PANEL_SETUP_FIELDS = {
+  table:     [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 4}], ['initial', 'json']],
+  checks:    [['checks', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 12}], ['initial', 'json']],
+  budget:    [['metrics', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'unit'},
+                {k: 'max', kind: 'num', req: true}, {k: 'warn', kind: 'num'}], max: 6}], ['initial', 'json']],
   state:     [['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
   leds:      [['leds', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}]}], ['initial', 'json']],
   gauge:     [['unit', 'text'], ['max', 'num'], ['initial', 'json']],
   log:       [['tags', 'map'], ['initial', 'json']],
   screen:    [['scene', 'scene'], ['initial', 'json']],
-  waterfall: [['spans', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'ms', kind: 'num', req: true}]}],
+  waterfall: [['spans', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'ms', kind: 'num', req: true}, {k: 'startMs', kind: 'num'}]}],
               ['initial', 'json']],
   orbit:     [['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
   zoneframe: [['zones', 'jsonArr'], ['initial', 'json']],
@@ -1927,6 +1970,9 @@ var PANEL_SETUP_FIELDS = {
 
 /* Dynamic-key types are expanded from their declarations by panelPatchFields. */
 var PANEL_PATCH_FIELDS = {
+  table:     [['rows', 'jsonArr'], ['note', 'text']],
+  checks:    [['results', 'json'], ['note', 'text']],
+  budget:    [['values', 'json'], ['note', 'text']],
   state:     [['state', 'text']],
   leds:      [],
   gauge:     [['value', 'num']],
@@ -2678,6 +2724,55 @@ function initWorkbenchBuilder(opts){
       if (document.activeElement !== src && document.activeElement !== importBtn) return;
       ev.preventDefault();
       doUndo();
+    });
+  }
+
+  /* ---- Honeycomb trace import (local, shared with the CLI) ---- */
+  var traceBtn = document.getElementById('import-trace');
+  var traceBox = document.getElementById('tracebox');
+  if (traceBtn && traceBox){
+    var traceText = document.getElementById('trace-text');
+    var traceFeedback = document.getElementById('trace-feedback');
+    var traceFile = document.getElementById('trace-file');
+    function closeTrace(){ traceBox.hidden = true; traceBtn.setAttribute('aria-expanded', 'false'); traceBtn.focus(); }
+    traceBtn.addEventListener('click', function(){
+      traceBox.hidden = !traceBox.hidden;
+      traceBtn.setAttribute('aria-expanded', String(!traceBox.hidden));
+      if (!traceBox.hidden){ closePalette(); closeGallery(); traceText.focus(); }
+    });
+    document.getElementById('trace-cancel').addEventListener('click', closeTrace);
+    traceBox.addEventListener('keydown', function(ev){ if (ev.key === 'Escape'){ ev.stopPropagation(); closeTrace(); } });
+    document.getElementById('trace-open').addEventListener('click', function(){ traceFile.click(); });
+    traceFile.addEventListener('change', function(){
+      var file = traceFile.files[0];
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024){ traceFeedback.textContent = 'Use a trace export smaller than 10 MB.'; traceFile.value = ''; return; }
+      var reader = new FileReader();
+      reader.onload = function(){ traceText.value = String(reader.result); traceFeedback.textContent = 'Loaded ' + file.name; };
+      reader.onerror = function(){ traceFeedback.textContent = 'Could not read the trace file.'; };
+      reader.readAsText(file); traceFile.value = '';
+    });
+    document.getElementById('trace-convert').addEventListener('click', function(){
+      var result;
+      try {
+        if (traceText.value.length > 10 * 1024 * 1024) throw new Error('Use a trace export smaller than 10 MB.');
+        var mapping = document.getElementById('trace-fields').value.trim();
+        result = traceToSpec(traceText.value, {traceId: document.getElementById('trace-id').value.trim() || undefined,
+          sourceUrl: document.getElementById('trace-url').value.trim(), fields: mapping ? JSON.parse(mapping) : undefined});
+        var verdict = validate(normalize(result.spec));
+        if (verdict.errors.length) throw new Error(verdict.errors.join('\n'));
+      } catch (ex){ traceFeedback.textContent = ex.message; return; }
+      pushUndo();
+      src.value = JSON.stringify(result.spec, null, 2);
+      setSelected(null); currentTarget = null; insertSection = 0;
+      if (connect) cancelConnect(null);
+      clearMultiSelect(); clearStepMarkers();
+      if (guide) guide.hidden = true;
+      retireInspector();
+      render(); updateTargetLabel(result.spec); autosaveDraft();
+      closeTrace();
+      inspectorMessage('Imported ' + result.stats.spans + ' spans across ' + result.stats.services + ' services. ' +
+        result.stats.elapsedMs + ' ms observed extent. ' + (result.warnings.join(' ') || 'Select a step to inspect its source span.'));
     });
   }
 
@@ -4111,6 +4206,75 @@ function initWorkbenchBuilder(opts){
     if (loc) selectRange(loc);
   }
 
+  /* ---- searchable document outline ---- */
+  var outline = document.getElementById('sec-outline');
+  var outlineSearch = document.getElementById('outline-search');
+  var outlineResults = document.getElementById('outline-results');
+  var outlineStatus = document.getElementById('outline-status');
+  function refreshOutline(){
+    if (!outlineResults) return;
+    outlineResults.innerHTML = '';
+    var indexedText = src.value;
+    var entries;
+    try { entries = builderOutline(JSON.parse(src.value), outlineSearch.value); }
+    catch (ex){ outlineStatus.textContent = 'Fix the JSON source to browse its outline.'; return; }
+    outlineStatus.textContent = entries.length ? Math.min(entries.length, 200) + ' of ' + entries.length + ' items' : 'No matching items';
+    entries.slice(0, 200).forEach(function(entry){
+      var button = document.createElement('button');
+      button.type = 'button'; button.className = 'outline-item';
+      var title = document.createElement('span'); title.textContent = entry.target.kind + ' · ' + entry.label;
+      var sub = document.createElement('small'); sub.textContent = entry.context;
+      button.appendChild(title); button.appendChild(sub);
+      button.title = builderPathString(entry.path);
+      button.addEventListener('click', function(){
+        if (addToStep) return;
+        if (src.value !== indexedText){
+          refreshOutline();
+          outlineStatus.textContent = 'Source changed; outline refreshed. Select the item again.';
+          return;
+        }
+        /* Never map fresh JSON onto stale rendered section ordinals. */
+        if (opts.renderedText && opts.renderedText() !== src.value){
+          render();
+          if (opts.renderedText() !== src.value){ inspectorMessage('Fix validation errors before navigating the preview.'); return; }
+        }
+        if (connect) cancelConnect(null);
+        clearMultiSelect();
+        if (entry.tab){
+          var tabButton = document.getElementById('tab-' + entry.tab.block + '-' + entry.tab.tab);
+          if (tabButton) tabButton.click();
+        }
+        var el = findTargetEl(entry.target);
+        selectTarget(Object.assign({}, entry.target, {el: el}), false);
+        var loc = jsonLocate(src.value, entry.path);
+        if (loc && sourceVisible()){
+          src.setSelectionRange(loc.start, loc.end);
+          scrollTextareaTo(loc.start);
+        }
+        if (el) el.scrollIntoView({block: 'nearest', behavior: 'auto'});
+      });
+      outlineResults.appendChild(button);
+    });
+  }
+  if (outlineSearch){
+    outlineSearch.addEventListener('input', refreshOutline);
+    outlineSearch.addEventListener('keydown', function(ev){
+      if ((ev.key === 'ArrowDown' || ev.key === 'Enter') && outlineResults.firstChild){
+        ev.preventDefault(); outlineResults.firstChild.focus();
+      }
+    });
+    var outlineTimer;
+    src.addEventListener('input', function(){ clearTimeout(outlineTimer); outlineTimer = setTimeout(refreshOutline, 200); });
+    new MutationObserver(refreshOutline).observe(view, {childList: true});
+    document.addEventListener('keydown', function(ev){
+      if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || addToStep) return;
+      ev.preventDefault();
+      if (specbox) specbox.open = true;
+      outline.open = true; outlineSearch.focus(); outlineSearch.select();
+    });
+    refreshOutline();
+  }
+
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
   var addModeSurvive = false; /* set around this mode's own re-renders */
@@ -4128,7 +4292,7 @@ function initWorkbenchBuilder(opts){
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
-    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, .patchedit .fctl, .groupctl';
+    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
        step, re-render from outside the mode, or leave the page state

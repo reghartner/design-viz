@@ -21,7 +21,7 @@ BACKLINK_RE = re.compile(
 # bundles builder.workbench.js after the engine, so the chunk ends at the
 # first page-specific fragment marker (builder.* or boot.*).
 ENGINE_CHUNK_RE = re.compile(
-    r"/\* ---- src/validator\.js ---- \*/(.*?)/\* ---- src/(?:builder|boot)\.", re.S)
+    r"/\* ---- src/validator\.js ---- \*/(.*?)/\* ---- src/(?:builder\.|boot\.|trace-import\.)", re.S)
 
 
 class BuildTests(unittest.TestCase):
@@ -69,8 +69,9 @@ class BuildTests(unittest.TestCase):
         self.assertIsNotNone(match)
         starters = json.loads(match.group(1))
         self.assertEqual([entry["name"] for entry in starters],
-                         ["blank flow", "panel showcase", "full demo"])
+                         ["blank flow", "panel showcase", "software & IoT", "Honeycomb trace", "full demo"])
         for entry, source in zip(starters, ["starters/minimal.json", "starters/panels-tour.json",
+                                          "starters/software-systems.json", "starters/honeycomb-trace.json",
                                           "flowview.demo.json"]):
             self.assertTrue(entry["desc"])
             self.assertEqual(entry["spec"], json.loads((ROOT / "src" / source).read_text()))

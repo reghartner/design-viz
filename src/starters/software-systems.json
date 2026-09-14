@@ -1,0 +1,447 @@
+{
+  "page": {
+    "title": "Software & IoT — state, decisions, budgets",
+    "skin": "aurora",
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Software request",
+            "sections": [
+              {
+                "heading": "Checkout and duplicate delivery",
+                "accent": "cyan",
+                "text": [
+                  "Fictional software example. All values are illustrative design inputs, not production telemetry. Step through a write, a duplicate request, and the saved response."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "client": {
+                      "title": "Client",
+                      "icon": "terminal"
+                    },
+                    "api": {
+                      "title": "Checkout API",
+                      "icon": "cloud"
+                    },
+                    "store": {
+                      "title": "Order store",
+                      "icon": "db",
+                      "tint": "data"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "client",
+                      "api",
+                      "store"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "client",
+                      "to": "api",
+                      "kind": "https",
+                      "label": "POST /orders"
+                    },
+                    {
+                      "from": "api",
+                      "to": "store",
+                      "kind": "int",
+                      "label": "atomic insert"
+                    },
+                    {
+                      "from": "store",
+                      "to": "api",
+                      "kind": "int",
+                      "ret": true,
+                      "label": "saved response"
+                    },
+                    {
+                      "from": "api",
+                      "to": "client",
+                      "kind": "https",
+                      "ret": true,
+                      "label": "order result"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "orders",
+                      "type": "table",
+                      "title": "Order record",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Value"
+                        }
+                      ],
+                      "initial": {
+                        "rows": []
+                      }
+                    },
+                    {
+                      "id": "gates",
+                      "type": "checks",
+                      "title": "Request decisions",
+                      "checks": [
+                        {
+                          "id": "auth",
+                          "label": "Caller authorized"
+                        },
+                        {
+                          "id": "unique",
+                          "label": "Idempotency key is new"
+                        }
+                      ],
+                      "initial": {
+                        "results": {
+                          "auth": {
+                            "status": "pending",
+                            "detail": "Scope from the request token"
+                          },
+                          "unique": {
+                            "status": "pending",
+                            "detail": "Compare the stored idempotency key"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "limits",
+                      "type": "budget",
+                      "title": "Request budgets",
+                      "metrics": [
+                        {
+                          "id": "latency",
+                          "label": "Elapsed time",
+                          "unit": "ms",
+                          "max": 300,
+                          "warn": 240
+                        },
+                        {
+                          "id": "writes",
+                          "label": "Durable writes",
+                          "unit": "writes",
+                          "max": 1
+                        }
+                      ],
+                      "initial": {
+                        "values": {
+                          "latency": null,
+                          "writes": 0
+                        },
+                        "note": "Illustrative upper bounds; measured values would come from a trace."
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "client->api",
+                      "text": "An authorized caller submits a new idempotency key.",
+                      "panels": {
+                        "gates": {
+                          "results": {
+                            "auth": {
+                              "status": "pass",
+                              "detail": "Scope from the request token"
+                            },
+                            "unique": {
+                              "status": "pass",
+                              "detail": "Compare the stored idempotency key"
+                            }
+                          }
+                        },
+                        "limits": {
+                          "values": {
+                            "latency": 20,
+                            "writes": 0
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "api->store",
+                      "text": "One atomic insert records the order and the response.",
+                      "panels": {
+                        "orders": {
+                          "rows": [
+                            {
+                              "id": "status",
+                              "cells": {
+                                "field": "status",
+                                "value": "accepted"
+                              },
+                              "status": "changed"
+                            },
+                            {
+                              "id": "version",
+                              "cells": {
+                                "field": "version",
+                                "value": 1
+                              }
+                            }
+                          ]
+                        },
+                        "limits": {
+                          "values": {
+                            "latency": 120,
+                            "writes": 1
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "The same request arrives again. The new-key check fails, so the API takes the replay path.",
+                      "panels": {
+                        "gates": {
+                          "results": {
+                            "auth": {
+                              "status": "pass",
+                              "detail": "Scope from the request token"
+                            },
+                            "unique": {
+                              "status": "fail",
+                              "detail": "Compare the stored idempotency key"
+                            }
+                          }
+                        }
+                      },
+                      "nodes": [
+                        "client",
+                        "api"
+                      ]
+                    },
+                    {
+                      "edge": "store->api",
+                      "text": "The stored response is read; no additional write occurs.",
+                      "panels": {
+                        "limits": {
+                          "values": {
+                            "latency": 150,
+                            "writes": 1
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "api->client",
+                      "text": "The caller gets the original response and order version.",
+                      "panels": {
+                        "orders": {
+                          "note": "A failed new-key check selected the replay path; it did not create another order."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "IoT reconciliation",
+            "sections": [
+              {
+                "heading": "Device shadow reconciliation",
+                "accent": "green",
+                "text": [
+                  "Fictional IoT example. A device reconnects with an older reported configuration and applies the newer desired version. Values and limits are illustrative."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "nodes": {
+                    "shadow": {
+                      "title": "Desired state",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "broker": {
+                      "title": "Broker",
+                      "icon": "antenna",
+                      "tint": "mqtt"
+                    },
+                    "device": {
+                      "title": "Edge controller",
+                      "icon": "chip",
+                      "tint": "dev"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "shadow",
+                      "broker",
+                      "device"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "shadow",
+                      "to": "broker",
+                      "kind": "mqtt",
+                      "label": "desired version"
+                    },
+                    {
+                      "from": "broker",
+                      "to": "device",
+                      "kind": "mqtt",
+                      "label": "reconcile"
+                    },
+                    {
+                      "from": "device",
+                      "to": "broker",
+                      "kind": "mqtt",
+                      "ret": true,
+                      "label": "reported state"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "shadowstate",
+                      "type": "table",
+                      "title": "Desired vs reported",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "desired",
+                          "label": "Desired"
+                        },
+                        {
+                          "id": "reported",
+                          "label": "Reported"
+                        }
+                      ],
+                      "initial": {
+                        "rows": [
+                          {
+                            "id": "version",
+                            "cells": {
+                              "field": "version",
+                              "desired": 8,
+                              "reported": 7
+                            },
+                            "status": "changed"
+                          },
+                          {
+                            "id": "mode",
+                            "cells": {
+                              "field": "mode",
+                              "desired": "eco",
+                              "reported": "normal"
+                            },
+                            "status": "changed"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "guards",
+                      "type": "checks",
+                      "title": "Apply safeguards",
+                      "checks": [
+                        {
+                          "id": "newer",
+                          "label": "Version is newer"
+                        },
+                        {
+                          "id": "safe",
+                          "label": "Actuator is idle"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "memory",
+                      "type": "budget",
+                      "title": "Device memory",
+                      "metrics": [
+                        {
+                          "id": "ram",
+                          "label": "Staging buffer",
+                          "unit": "KiB",
+                          "max": 64,
+                          "warn": 48
+                        }
+                      ],
+                      "initial": {
+                        "values": {
+                          "ram": 12
+                        }
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "edge": "shadow->broker",
+                      "text": "Desired version 8 is published for the reconnecting device."
+                    },
+                    {
+                      "edge": "broker->device",
+                      "text": "The device checks version ordering and the actuator interlock.",
+                      "panels": {
+                        "guards": {
+                          "results": {
+                            "newer": {
+                              "status": "pass",
+                              "detail": "8 > 7"
+                            },
+                            "safe": {
+                              "status": "pass",
+                              "detail": "Actuator reports idle"
+                            }
+                          }
+                        },
+                        "memory": {
+                          "values": {
+                            "ram": 52
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "edge": "device->broker",
+                      "text": "After applying version 8, the device reports the matching state and releases staging memory.",
+                      "panels": {
+                        "shadowstate": {
+                          "rows": [
+                            {
+                              "id": "version",
+                              "cells": {
+                                "field": "version",
+                                "desired": 8,
+                                "reported": 8
+                              }
+                            },
+                            {
+                              "id": "mode",
+                              "cells": {
+                                "field": "mode",
+                                "desired": "eco",
+                                "reported": "eco"
+                              }
+                            }
+                          ]
+                        },
+                        "memory": {
+                          "values": {
+                            "ram": 12
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

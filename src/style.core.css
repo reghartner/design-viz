@@ -65,6 +65,13 @@
 .boardgrid.haspanels > .diagramcol{min-width:0;}
 .boardgrid.haspanels > .panelcol{align-self:start;}
 @media (max-width:980px){ .boardgrid.haspanels{grid-template-columns:1fr;} }
+/* The workbench consumes part of a wide viewport with its editor. Measure
+   the preview itself so adding panels cannot shrink its board to a thumbnail. */
+.docview{container-type:inline-size;}
+@container (max-width:900px){
+  .boardgrid.haspanels{grid-template-columns:1fr;}
+  .boardgrid.haspanels > .panelcol{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); align-items:start;}
+}
 
 .board{margin-top:12px; border-radius:12px; overflow-x:auto;
   border:1px solid color-mix(in srgb, var(--acc) 30%, transparent);}
@@ -208,6 +215,50 @@
 .sk-daylight .tint-dev{color:#0E9382;}
 
 /* ---------- inspector panels ---------- */
+.swpanel{color:var(--dtext); font:12px/1.5 'IBM Plex Sans',system-ui,sans-serif; overflow-wrap:anywhere;}
+.wf-timed{max-height:350px; overflow:auto;}
+.wf-timed .wflabel{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.wfrow.wf-error .wfbar{background:#DD5A65;}
+.wfrow.wf-error .wfms{font-weight:700; text-decoration:underline dotted;}
+.swtablewrap{overflow:auto; max-height:300px; border:1px solid color-mix(in srgb,var(--dtext) 20%,transparent); border-radius:6px;}
+.swtablewrap:focus-visible{outline:2px solid var(--dink); outline-offset:2px;}
+.swtable{width:100%; border-collapse:collapse; font:11px/1.5 'IBM Plex Mono',monospace; text-align:left;}
+.swtable th,.swtable td{padding:7px 8px; border-bottom:1px solid color-mix(in srgb,var(--dtext) 14%,transparent); vertical-align:top;}
+.swtable th{font-size:10px; color:var(--dink);}
+.swtable td{min-width:45px; max-width:180px;}
+.swtable tr:last-child td{border-bottom:0;}
+.swcaption{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%);}
+.swrow-added{background:color-mix(in srgb,var(--dtext) 5%,transparent);}
+.swrow-changed{background:color-mix(in srgb,var(--dtext) 9%,transparent);}
+.swrow-removed td:not(:last-child){text-decoration:line-through; opacity:.7;}
+.swbadge{display:inline-block; border:1px solid currentColor; border-radius:4px; padding:1px 5px; font:600 9px/1.5 'IBM Plex Mono',monospace; text-transform:uppercase; white-space:nowrap;}
+.sw-pass,.sw-added{color:#5EDAA0;}
+.sw-fail,.sw-removed{color:#FF9494;}
+.sw-warn,.sw-changed{color:#EEC16A;}
+.sw-pending,.sw-skip,.sw-neutral{color:var(--dfaint);}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-pass,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-added{color:#18724C;}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-fail,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-removed{color:#B32938;}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-warn,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-changed{color:#865B06;}
+.swsummary,.swcheckhead{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+.swsummary{color:var(--dink); font-weight:600; margin-bottom:8px;}
+.swsummary span{font-size:10px; color:var(--dfaint); font-weight:400;}
+.swchecks{list-style:none; margin:0; padding:0; max-height:300px; overflow:auto;}
+.swchecks li,.swmetric{padding:8px 0; border-bottom:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);}
+.swchecks li:last-child,.swmetric:last-child{border-bottom:0;}
+.swcheckhead>span:first-child{color:var(--dink); font-weight:600;}
+.swdetail,.swnote,.swempty{font-size:11px; color:var(--dfaint); margin-top:4px;}
+.swnote{padding-top:8px; border-top:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);}
+.swmeasure{font:11px/1.6 'IBM Plex Mono',monospace; margin:4px 0 6px;}
+.swmeasure strong{font-size:19px; color:var(--dink);}
+.swtrack{height:7px; border-radius:4px; position:relative; background:color-mix(in srgb,var(--dtext) 12%,transparent);}
+.swfill{height:100%; border-radius:4px; background:currentColor;}
+.swthreshold{position:absolute; top:-3px; height:13px; border-left:1px dashed var(--dink);}
+@media print{
+  .panelcol .pwidget.pt-table,.panelcol .pwidget.pt-checks,.panelcol .pwidget.pt-budget{display:block !important; break-inside:avoid;}
+  .panelcol:has(.pt-table),.panelcol:has(.pt-checks),.panelcol:has(.pt-budget){display:flex !important;}
+  .swtablewrap,.swchecks{max-height:none; overflow:visible;}
+  .swbadge{color:inherit;}
+}
 .panelcol{display:flex; flex-direction:column; gap:10px; margin-top:12px;}
 .pwidget{border-radius:12px; padding:12px 14px;}
 .sk-aurora .pwidget{background:#0B1220; border:1px solid #25364F;}

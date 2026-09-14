@@ -18,7 +18,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 6 | Resizable workbench workspace / focused editing | codex/resizable-workspace | Open: https://github.com/reghartner/design-viz/pull/55 |
 | 7 | Retry/timeout and circuit-breaker stories | codex/resilience-starter | Open: https://github.com/reghartner/design-viz/pull/56 |
 | 8 | Replication / consistency view | codex/replica-positions | Open: https://github.com/reghartner/design-viz/pull/57 |
-| 9 | Stable workbench playback while editing | codex/workbench-playback | Built; opening the focused PR after final checks |
+| 9 | Stable workbench playback while editing | codex/workbench-playback | Open: https://github.com/reghartner/design-viz/pull/58 |
 | 10 | Step-list navigation and editing | TBD | Compact steps, jump, duplicate and reorder using existing planners |
 
 ## Validation and evidence
@@ -72,7 +72,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   independent tab modes and builder editing focus. Full Node and 158 Python
   suites pass. Browser verified retained step through skin/edit/undo, explicit
   playback advancement, JSON focus stopping advancement, and circuit tab
-  return at the same paused step. Check the final PR CI before claiming green.
+  return at the same paused step. Check PR #58 final CI before claiming green.
 
 ## Next continuation
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## Stable workbench playback (2026-09-14)
+
+- Click-through previews start paused; Play remains explicit. Selecting or
+  editing pauses playback, and revealing a tab no longer restarts it.
+- Rebuilding the preview disposes old intervals, delayed packets and caption
+  transitions. Stale callbacks cannot advance a replacement board.
+- Skin and ordinary inspector edits retain an unambiguous current step and
+  preview mode. Removed or ambiguous steps use the default position. Published
+  pages retain autoplay, including the reduced-motion gate.
+
 ## Replica position panel (2026-09-14)
 
 - New `replicas` widget aligns up to eight positions against an explicit

@@ -4557,7 +4557,9 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
   its definition and edit it in an inspector form: field controls, id renames that rewrite every
   reference, deletes that prune references, duplication, step reordering, undo. <b>+ edge</b>
   draws a hop by clicking source then target; <b>dragging an edge label</b> commits its
-  labelDx/labelDy nudge. Esc clears; Delete removes the selection.</p>
+  labelDx/labelDy nudge. Esc clears; Delete removes the selection.
+  Click-through previews start paused; use <b>Play</b> to run them. Selecting an element or
+  editing pauses playback, and ordinary edits keep your current step when it can be matched.</p>
 </header>
 
 <main>
@@ -4738,7 +4740,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
         <ul>
           <li>No collision detection — crowded corridors need <code>bend</code>/<code>labelDy</code> nudges</li>
           <li>Hidden tabs stop painting, but SMIL clocks keep running — ambient dots are mid-path when a tab is revealed (harmless for loops)</li>
-          <li>Switching tabs pauses a running click-through; it resumes from the same step when the tab returns</li>
+          <li>Switching tabs pauses a click-through. In this workbench, use Play to resume from the same step.</li>
           <li>Two floats in one gap overlap; 3+ rows collide corridor labels; stack&#8594;stack edges unsupported</li>
           <li>Group members must be placed adjacently (one stack column works best); the boundary is a bounding box, not a layout constraint</li>
         </ul>
@@ -9931,7 +9933,9 @@ function buildPanels(asideEl, d, skin){
 }
 
 /* ---------------- stepper (click-through) ---------------- */
-function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange){
+function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
+  var autoplay = !options || options.autoplay !== false;
+  var destroyed = false;
   var toneStates = foldNodeTones(d);
   var steps = (d.steps || []).map(function(st){
     return {keys: stepKeys(st).filter(function(k){ return board.edgeIds[k]; }),
@@ -9978,6 +9982,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     var am = document.getElementById(prefix + '-am-' + info.idx);
     if (!am) return;
     var go = function(){
+      if (destroyed) return;
       am.parentNode.style.visibility = 'visible';
       try { am.beginElement(); } catch (ex) {}
     };
@@ -10025,6 +10030,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
   }
   function setStep(i, claimAddressBar, narrativePath){
+    if (destroyed || !N) return;
     var target = ((i % N) + N) % N;
     var tween = shouldTweenStep(paintedStep, target, RM, narrativePath);
     var tonePulses = tonePulseNodes(toneStates, paintedStep, target, RM, narrativePath);
@@ -10060,8 +10066,9 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (onChange) onChange(claimAddressBar !== false);
   }
   function startAuto(){
-    if (timer || RM) return;
-    timer = window.setInterval(function(){ setStep(cur + 1, false); }, 3000);
+    if (destroyed || timer || RM || !N) return;
+    var id = window.setInterval(function(){ if (timer === id) setStep(cur + 1, false); }, 3000);
+    timer = id;
     btnPlay.innerHTML = '&#10074;&#10074;';
     btnPlay.setAttribute('aria-label', 'Pause');
   }
@@ -10085,15 +10092,18 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     btnStep.setAttribute('aria-pressed', mode === 'step' ? 'true' : 'false');
   }
   function enterStep(auto){
+    if (destroyed) return;
+    stopAuto();
     mode = 'step';
     boardDiv.classList.add('stepmode');
     bar.hidden = false;
     paintedStep = null;
     setStep(0, undefined, false);
-    if (auto) startAuto();
+    if (auto && autoplay) startAuto();
     syncToggle();
   }
   function enterAmbient(){
+    if (destroyed) return;
     mode = 'ambient';
     stopAuto();
     clearLit();
@@ -10154,8 +10164,11 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     jump: function(n){ stopAuto(); setStep(n, undefined, false); },
     advance: function(n){ stopAuto(); setStep(n); },
     toggleAuto: function(){ if (timer) stopAuto(); else startAuto(); },
-    onHide: function(){ stopAuto(); settleCurrentStep(); },
-    onShow: function(){ settleCurrentStep(); if (mode === 'step') startAuto(); }
+    /* Pausing must not replace panel contents: an editor may have focus there. */
+    pause: stopAuto,
+    destroy: function(){ destroyed = true; stopAuto(); clearLit(); clearCaptionTween(); },
+    onHide: function(){ if (!destroyed){ stopAuto(); settleCurrentStep(); } },
+    onShow: function(){ if (!destroyed){ settleCurrentStep(); if (mode === 'step' && autoplay) startAuto(); } }
   };
 }
 
@@ -10296,7 +10309,7 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
   return control;
 }
 
-function buildSection(container, sec, gi, sectionReference, protos, skin, lanes, backlinks, onChange, onProseChange){
+function buildSection(container, sec, gi, sectionReference, protos, skin, lanes, backlinks, onChange, onProseChange, options){
   var accRaw = sec.accent;
   var acc = isHex(accRaw) ? accRaw : (ACCENTS[accRaw] || ACCENTS[ACCENT_CYCLE[gi % ACCENT_CYCLE.length]]);
   var box = document.createElement('section');
@@ -10426,15 +10439,15 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, stepN:stepN, stepText:stepText, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep
-  }, d, prefix, board, lanes, panelCtl, onChange);
+  }, d, prefix, board, lanes, panelCtl, onChange, options);
   stepper.copyButton = copyStep;
 
-  if (view === 'step') stepper.enterStep(true); /* autoplay; paused immediately if its tab starts hidden */
+  if (view === 'step') stepper.enterStep(true); /* host may disable automatic playback */
   result.stepper = stepper;
   return result;
 }
 
-function renderPage(view, page, skin, backlinks){
+function renderPage(view, page, skin, backlinks, options){
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);
   backlinks = backlinks || Object.create(null);
@@ -10467,8 +10480,13 @@ function renderPage(view, page, skin, backlinks){
   var deferredHides = [];
   var ctl = {view:view, tabBlock:null, tabBlocks:[], sections:[], steppers:[],
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
+  ctl.destroy = function(){
+    ctl.destroyed = true;
+    ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
+    ctl.onChange = null;
+  };
   function changed(target){
-    if (ctl.rendering) return;
+    if (ctl.rendering || ctl.destroyed) return;
     ctl.activeTarget = target;
     if (ctl.onChange) ctl.onChange();
   }
@@ -10487,7 +10505,7 @@ function renderPage(view, page, skin, backlinks){
           });
           if (primary && primary.number === number) changed({kind:'diagram', section:number});
         }
-      }, function(){ if (ctl.onChange) ctl.onChange(); });
+      }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
                sectionEl:built.sectionEl, stepper:built.stepper, prose:built.prose,
                contractCard:built.contractCard, contractRows:built.contractRows};
@@ -14411,6 +14429,15 @@ function initWorkbenchBuilder(opts){
     ctl.sections.forEach(function(s){ if (!rec && s.number === sectionOrdinal + 1) rec = s; });
     return rec ? rec.stepper : null;
   }
+  function pausePreview(){
+    var ctl = opts.ctl ? opts.ctl() : null;
+    ((ctl && ctl.sections) || []).forEach(function(rec){
+      if (rec.stepper && rec.stepper.pause) rec.stepper.pause();
+    });
+  }
+  src.addEventListener('focusin', pausePreview);
+  src.addEventListener('input', pausePreview);
+  if (guide) guide.addEventListener('focusin', pausePreview);
   function syncBoardToSelectedStep(){
     /* selecting a step means SEEING that step: put the board in step
        view at that index — and keep it there across the builder's own
@@ -14420,6 +14447,7 @@ function initWorkbenchBuilder(opts){
     if (!t || t.kind !== 'step') return;
     var stepper = stepperFor(t.section);
     if (!stepper) return;
+    if (stepper.pause) stepper.pause();
     if (stepper.mode() !== 'step') stepper.enterStep(false);
     if (stepper.current().n !== t.index) stepper.jump(t.index);
   }
@@ -15805,6 +15833,7 @@ function initWorkbenchBuilder(opts){
   }
 
   function selectTarget(target, focusEditor){
+    pausePreview();
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     currentTarget = {section: target.section, kind: target.kind,
@@ -16287,6 +16316,7 @@ function initWorkbenchBuilder(opts){
   view.addEventListener('mousedown', function(ev){
     if (ev.button !== 0 || connect) return;
     if (!ev.target.closest) return;
+    if (targetFromEvent(ev)) pausePreview();
     var grabEl = ev.target.closest('g.dv-rowgrab');
     if (grabEl && !addToStep){
       var grabSec = grabEl.closest('.doc-sec');
@@ -16451,6 +16481,7 @@ function initWorkbenchBuilder(opts){
   view.addEventListener('click', function(ev){
     if (suppressClick){ suppressClick = false; return; }
     var target = targetFromEvent(ev);
+    if (target) pausePreview();
     if (addToStep){
       handleAddToStepClick(target);
       return;
@@ -16775,7 +16806,69 @@ function initWorkbenchBuilder(opts){
   applyRowGrabs(); /* the boot render happened before this wiring ran */
 }
 /* ---- src/workspace.workbench.js ---- */
-/* Workbench layout only. Preferences never enter the spec or undo history. */
+/* Preview position and layout never enter the spec or undo history. */
+function workbenchPreviewSections(page){
+  var sections = [];
+  if (!page) return sections;
+  function add(sec, tab){
+    var d = sec.diagram || {};
+    sections.push({diagram:d, key:JSON.stringify([tab, sec.heading || '',
+      Object.keys(d.nodes || {}).sort(), VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient'])});
+  }
+  blocksOf(page).forEach(function(block){
+    if (block.type === 'section') add(block.sec, null);
+    else block.tabs.forEach(function(tab){ tab.sections.forEach(function(sec){ add(sec, tab.label); }); });
+  });
+  return sections;
+}
+function workbenchPreviewSnapshot(page, ctl){
+  var sections = workbenchPreviewSections(page), saved = [];
+  ((ctl && ctl.sections) || []).forEach(function(rec){
+    var section = sections[rec.number - 1], stepper = rec.stepper;
+    if (!section || !stepper || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    var steps = section.diagram.steps || [], step = steps[stepper.current().n];
+    var id = step && typeof step.id === 'string' && step.id ? step.id : null;
+    var signature = JSON.stringify(step);
+    /* No positional fallback: repeated identities must not restore a different beat. */
+    if (stepper.mode() === 'step' && (id
+      ? steps.filter(function(s){ return s && s.id === id; }).length !== 1
+      : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
+    saved.push({key:section.key, mode:stepper.mode(), id:id, signature:signature});
+  });
+  return {title:page && page.title || '', sections:saved};
+}
+function restoreWorkbenchPreview(page, ctl, saved){
+  if (!saved || (page.title || '') !== saved.title) return;
+  var sections = workbenchPreviewSections(page);
+  ctl.sections.forEach(function(rec){
+    var section = sections[rec.number - 1], stepper = rec.stepper;
+    if (!section || !stepper || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    var matches = saved.sections.filter(function(s){ return s.key === section.key; });
+    if (matches.length !== 1) return;
+    var prior = matches[0];
+    if (prior.mode === 'ambient'){
+      if (stepper.mode() !== 'ambient') stepper.enterAmbient();
+      return;
+    }
+    var indices = [];
+    (section.diagram.steps || []).forEach(function(step, i){
+      if (prior.id ? step && step.id === prior.id : JSON.stringify(step) === prior.signature) indices.push(i);
+    });
+    if (indices.length !== 1) return;
+    if (stepper.mode() !== 'step') stepper.enterStep(false);
+    if (stepper.current().n !== indices[0]) stepper.jump(indices[0]);
+  });
+}
+function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl){
+  var tabs = activeTabReferences(previousCtl);
+  var saved = workbenchPreviewSnapshot(previousPage, previousCtl);
+  if (previousCtl) previousCtl.destroy();
+  var ctl = renderPage(view, page, skin, null, {autoplay:false});
+  restoreActiveTabs(ctl, tabs);
+  restoreWorkbenchPreview(page, ctl, saved);
+  return ctl;
+}
+
 function workspacePrefs(raw){
   var prefs = {editor:440, inspector:40}, value;
   try { value = JSON.parse(raw); } catch (ex){ return prefs; }
@@ -17211,9 +17304,7 @@ var skinBtns = {};
     b.addEventListener('click', function(){
       activeSkin = name; setSkinButtons(name);
       if (lastPage){
-        var openTabs = activeTabReferences(lastCtl);
-        lastCtl = renderPage(view, lastPage, name);
-        restoreActiveTabs(lastCtl, openTabs);
+        lastCtl = renderWorkbenchPreview(view, lastPage, name, lastPage, lastCtl);
         applySkinClasses(document.body, view, name);
       }
     });
@@ -17272,12 +17363,10 @@ function go(fromText){
   var lint = v.errors.length ? [] : lintPage(page);
   showMsgs({errors: v.errors, warnings: v.warnings.concat(lint)});
   if (v.errors.length) return;
-  lastPage = page;
   var skin = currentSkin(page);
   setSkinButtons(skin);
-  var openTabs = activeTabReferences(lastCtl);
-  lastCtl = renderPage(view, page, skin);
-  restoreActiveTabs(lastCtl, openTabs);
+  lastCtl = renderWorkbenchPreview(view, page, skin, lastPage, lastCtl);
+  lastPage = page;
   applySkinClasses(document.body, view, skin);
   lastRenderedText = src.value;
 }

@@ -3583,7 +3583,9 @@ function buildPanels(asideEl, d, skin){
 }
 
 /* ---------------- stepper (click-through) ---------------- */
-function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange){
+function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
+  var autoplay = !options || options.autoplay !== false;
+  var destroyed = false;
   var toneStates = foldNodeTones(d);
   var steps = (d.steps || []).map(function(st){
     return {keys: stepKeys(st).filter(function(k){ return board.edgeIds[k]; }),
@@ -3630,6 +3632,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     var am = document.getElementById(prefix + '-am-' + info.idx);
     if (!am) return;
     var go = function(){
+      if (destroyed) return;
       am.parentNode.style.visibility = 'visible';
       try { am.beginElement(); } catch (ex) {}
     };
@@ -3677,6 +3680,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
   }
   function setStep(i, claimAddressBar, narrativePath){
+    if (destroyed || !N) return;
     var target = ((i % N) + N) % N;
     var tween = shouldTweenStep(paintedStep, target, RM, narrativePath);
     var tonePulses = tonePulseNodes(toneStates, paintedStep, target, RM, narrativePath);
@@ -3712,8 +3716,9 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (onChange) onChange(claimAddressBar !== false);
   }
   function startAuto(){
-    if (timer || RM) return;
-    timer = window.setInterval(function(){ setStep(cur + 1, false); }, 3000);
+    if (destroyed || timer || RM || !N) return;
+    var id = window.setInterval(function(){ if (timer === id) setStep(cur + 1, false); }, 3000);
+    timer = id;
     btnPlay.innerHTML = '&#10074;&#10074;';
     btnPlay.setAttribute('aria-label', 'Pause');
   }
@@ -3737,15 +3742,18 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     btnStep.setAttribute('aria-pressed', mode === 'step' ? 'true' : 'false');
   }
   function enterStep(auto){
+    if (destroyed) return;
+    stopAuto();
     mode = 'step';
     boardDiv.classList.add('stepmode');
     bar.hidden = false;
     paintedStep = null;
     setStep(0, undefined, false);
-    if (auto) startAuto();
+    if (auto && autoplay) startAuto();
     syncToggle();
   }
   function enterAmbient(){
+    if (destroyed) return;
     mode = 'ambient';
     stopAuto();
     clearLit();
@@ -3806,8 +3814,11 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     jump: function(n){ stopAuto(); setStep(n, undefined, false); },
     advance: function(n){ stopAuto(); setStep(n); },
     toggleAuto: function(){ if (timer) stopAuto(); else startAuto(); },
-    onHide: function(){ stopAuto(); settleCurrentStep(); },
-    onShow: function(){ settleCurrentStep(); if (mode === 'step') startAuto(); }
+    /* Pausing must not replace panel contents: an editor may have focus there. */
+    pause: stopAuto,
+    destroy: function(){ destroyed = true; stopAuto(); clearLit(); clearCaptionTween(); },
+    onHide: function(){ if (!destroyed){ stopAuto(); settleCurrentStep(); } },
+    onShow: function(){ if (!destroyed){ settleCurrentStep(); if (mode === 'step' && autoplay) startAuto(); } }
   };
 }
 
@@ -3948,7 +3959,7 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
   return control;
 }
 
-function buildSection(container, sec, gi, sectionReference, protos, skin, lanes, backlinks, onChange, onProseChange){
+function buildSection(container, sec, gi, sectionReference, protos, skin, lanes, backlinks, onChange, onProseChange, options){
   var accRaw = sec.accent;
   var acc = isHex(accRaw) ? accRaw : (ACCENTS[accRaw] || ACCENTS[ACCENT_CYCLE[gi % ACCENT_CYCLE.length]]);
   var box = document.createElement('section');
@@ -4078,15 +4089,15 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, stepN:stepN, stepText:stepText, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep
-  }, d, prefix, board, lanes, panelCtl, onChange);
+  }, d, prefix, board, lanes, panelCtl, onChange, options);
   stepper.copyButton = copyStep;
 
-  if (view === 'step') stepper.enterStep(true); /* autoplay; paused immediately if its tab starts hidden */
+  if (view === 'step') stepper.enterStep(true); /* host may disable automatic playback */
   result.stepper = stepper;
   return result;
 }
 
-function renderPage(view, page, skin, backlinks){
+function renderPage(view, page, skin, backlinks, options){
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);
   backlinks = backlinks || Object.create(null);
@@ -4119,8 +4130,13 @@ function renderPage(view, page, skin, backlinks){
   var deferredHides = [];
   var ctl = {view:view, tabBlock:null, tabBlocks:[], sections:[], steppers:[],
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
+  ctl.destroy = function(){
+    ctl.destroyed = true;
+    ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
+    ctl.onChange = null;
+  };
   function changed(target){
-    if (ctl.rendering) return;
+    if (ctl.rendering || ctl.destroyed) return;
     ctl.activeTarget = target;
     if (ctl.onChange) ctl.onChange();
   }
@@ -4139,7 +4155,7 @@ function renderPage(view, page, skin, backlinks){
           });
           if (primary && primary.number === number) changed({kind:'diagram', section:number});
         }
-      }, function(){ if (ctl.onChange) ctl.onChange(); });
+      }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
                sectionEl:built.sectionEl, stepper:built.stepper, prose:built.prose,
                contractCard:built.contractCard, contractRows:built.contractRows};

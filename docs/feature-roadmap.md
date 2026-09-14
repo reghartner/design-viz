@@ -60,6 +60,8 @@ The effective-state inspector is built in [#54](https://github.com/reghartner/de
    JSON. Source edits clear stale values until refreshed.
 4. **Scenario timeline:** insert, reorder and duplicate beats in a compact
    list; preview changed fields and show concurrent intervals explicitly.
+   Editing playback is stable: previews start paused, dispose old timers on
+   rebuild, and retain an unambiguous current step through ordinary edits.
 5. **Safer structural edits:** preview reference changes for node/panel renames
    and deletions; add shortcuts for existing history without intercepting
    normal text-editor undo. Preserve native typing history.

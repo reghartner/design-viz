@@ -312,9 +312,7 @@ var skinBtns = {};
     b.addEventListener('click', function(){
       activeSkin = name; setSkinButtons(name);
       if (lastPage){
-        var openTabs = activeTabReferences(lastCtl);
-        lastCtl = renderPage(view, lastPage, name);
-        restoreActiveTabs(lastCtl, openTabs);
+        lastCtl = renderWorkbenchPreview(view, lastPage, name, lastPage, lastCtl);
         applySkinClasses(document.body, view, name);
       }
     });
@@ -373,12 +371,10 @@ function go(fromText){
   var lint = v.errors.length ? [] : lintPage(page);
   showMsgs({errors: v.errors, warnings: v.warnings.concat(lint)});
   if (v.errors.length) return;
-  lastPage = page;
   var skin = currentSkin(page);
   setSkinButtons(skin);
-  var openTabs = activeTabReferences(lastCtl);
-  lastCtl = renderPage(view, page, skin);
-  restoreActiveTabs(lastCtl, openTabs);
+  lastCtl = renderWorkbenchPreview(view, page, skin, lastPage, lastCtl);
+  lastPage = page;
   applySkinClasses(document.body, view, skin);
   lastRenderedText = src.value;
 }

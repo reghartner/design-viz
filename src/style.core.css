@@ -4094,17 +4094,17 @@ body.dv-embed .embedcopy{display:none !important;}
 body.dv-embed .docview{max-width:none !important; padding:10px !important; border:0 !important; margin:0 !important;}
 body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transparent !important;
   box-shadow:none !important; padding:0 !important; margin:0 !important; max-width:none !important;}
-/* Alternate paths keep their choices anchored beneath the shared beat. */
-.path-chip {--path-color:#38bdf8;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--path-color);border-radius:14px;padding:5px 10px;background:transparent;color:var(--dink);font:600 11px 'IBM Plex Mono',monospace;line-height:1.4;white-space:nowrap;cursor:pointer}
+/* Alternate paths share fixed step columns beneath the transport buttons. */
+.path-chip {display:inline-flex;align-items:center;gap:6px;border:1px solid var(--path-color);border-radius:14px;padding:5px 10px;background:transparent;color:var(--dink);font:600 11px 'IBM Plex Mono',monospace;line-height:1.4;cursor:pointer;text-align:left}
 .path-chip::before {content:'';width:7px;height:7px;border-radius:50%;background:var(--path-color);flex:none}
 .path-chip[aria-pressed="true"] {box-shadow:inset 0 0 0 1px var(--path-color);font-weight:700}
 .path-chip:focus-visible {outline:2px solid var(--path-color);outline-offset:3px}
-.path-current {cursor:default;font-weight:700}
-.path-chip[hidden] {display:none}
-.path-step-column {display:flex;flex-direction:column;align-items:flex-start;gap:8px;flex:none}
-.path-branches {display:flex;flex-direction:column;align-items:flex-start;gap:5px;border-left:2px solid var(--dfaint);padding:0 0 0 10px;margin:0 0 4px 13px}
-.path-start {color:var(--dtext);font:11px 'IBM Plex Mono',monospace}
-.has-paths .schips {align-items:flex-start;flex-wrap:nowrap;overflow-x:auto;max-width:100%;padding:4px 4px 8px}
-.has-paths .schip[aria-current="true"] {border-color:var(--path-color);box-shadow:0 0 0 1px var(--path-color)}
-.has-paths .tbtn:disabled {opacity:.3;cursor:default}
-@media(max-width:640px){.path-chip{min-height:34px}.has-paths .schips{flex-basis:100%}}
+.termbar.has-paths .schips {display:block;flex-basis:100%;overflow-x:auto;max-width:100%;min-width:0;padding:4px 2px}
+.path-matrix {display:grid;grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),32px);gap:8px 6px;align-items:center;width:max-content}
+.path-row {display:contents}
+.path-matrix .path-chip {justify-self:start;max-width:180px;min-height:32px;box-sizing:border-box}
+.termbar.has-paths .path-row .schip {width:32px;height:32px;margin:0;border-color:color-mix(in srgb,var(--path-color) 45%,transparent)}
+.termbar.has-paths .path-row .schip[aria-current="true"] {border-color:var(--path-color);box-shadow:0 0 0 1px var(--path-color);color:var(--dink)}
+.termbar.has-paths .stepline {flex-basis:100%}
+.termbar.has-paths .tbtn:disabled {opacity:.3;cursor:default}
+@media(max-width:640px){.path-matrix{grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),34px)}.path-matrix .path-chip{max-width:140px;min-height:34px}.termbar.has-paths .path-row .schip{width:34px;height:34px}}

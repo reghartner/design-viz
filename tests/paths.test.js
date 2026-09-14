@@ -19,20 +19,18 @@ function fixture(){return {view:'step',nodes:{api:{},device:{}},rows:[['api','de
   ],paths:[{id:'happy',label:'Happy path',color:'#38bdf8',steps:['one','two','three','four','five']},
     {id:'dropped',label:'Dropped signal',color:'#fb923c',steps:['one','two','three','drop']}]};}
 
-test('paths share a prefix, preserve the registry, and locate the divergence beneath step three',()=>{
+test('path rows align their fork and end positions without changing the registry',()=>{
   const c=load(),d=fixture(),before=JSON.stringify(d),paths=c.diagramPathList(d);
   assert.deepEqual(plain(paths.map(p=>p.indices)),[[0,1,2,3,4],[0,1,2,5]]);
-  assert.deepEqual([...c.pathBranchPoints(paths,paths[0]).keys()],[2]);
-  assert.deepEqual(plain(c.pathBranchPoints(paths,paths[1]).get(2).map(p=>p.id)),['happy','dropped']);
+  assert.deepEqual(plain(c.pathStepRows(paths).map(row=>[row.path.id,row.start,row.end])),[['happy',0,4],['dropped',2,3]]);
   assert.equal(c.diagramForPath(d,'dropped').steps[3],d.steps[5]);
   assert.equal(JSON.stringify(d),before);
 });
-test('paths with no shared prefix branch at the start, and separate fork points remain distinct',()=>{
+test('nested forks use their closest earlier prefix; disjoint paths begin in column one',()=>{
   const c=load(),d=fixture();
-  d.paths.push({id:'early',steps:['one','drop']},{id:'separate',steps:['drop']});
-  const paths=c.diagramPathList(d),groups=c.pathBranchPoints(paths,paths[0]);
-  assert.deepEqual([...groups.keys()],[2,0,-1]);
-  assert.deepEqual(plain(groups.get(-1).map(p=>p.id)),['happy','separate']);
+  d.paths.push({id:'nested',steps:['one','two','three','drop','five']},
+    {id:'early',steps:['one','drop']},{id:'separate',steps:['drop']});
+  assert.deepEqual(plain(c.pathStepRows(c.diagramPathList(d)).map(row=>[row.start,row.end])),[[0,4],[2,3],[3,4],[0,1],[0,0]]);
 });
 test('selected sequences fold append operations, transient state and node tones without success leaking into failure',()=>{
   const c=load(),d=fixture(),happy=c.diagramForPath(d,'happy'),drop=c.diagramForPath(d,'dropped');
@@ -100,16 +98,16 @@ function harness(d=fixture()){
       appendChild(n){this.children.push(n);n.parentNode=this;return n;},removeChild(n){this.children.splice(this.children.indexOf(n),1);},
       setAttribute(k,v){attrs[k]=String(v);},getAttribute:k=>attrs[k]??null,
       addEventListener(k,fn){(events[k]??=[]).push(fn);},fire(k){(events[k]||[]).forEach(fn=>fn({stopPropagation(){}}));},
-      querySelectorAll(){return [];},getBoundingClientRect(){return {left:0,top:0,width:100,height:20};},cloneNode:()=>el()};
+      dispatchEvent(){},querySelectorAll(){return [];},getBoundingClientRect(){return {left:0,top:0,width:100,height:20};},cloneNode:()=>el()};
     Object.defineProperty(e,'firstChild',{get(){return this.children[0];}});return e;
   }
-  const c=load({document:{createElement:el,getElementById:()=>null},window:{matchMedia:()=>({matches:true}),
+  const c=load({CustomEvent:function(type){this.type=type;},document:{createElement:el,getElementById:()=>null},window:{matchMedia:()=>({matches:true}),
     setInterval(fn){intervals.set(++seq,fn);return seq;},clearInterval:id=>intervals.delete(id)},
     setTimeout:()=>1,clearTimeout(){}});
   // Enable timer logic but keep geometry/animation irrelevant to the test.
   c.RM=false;
   const board=()=>({svg:el(),nodeEls:{},edgeIds:{}}),term={};
-  ['bar','chips','pathLabel','stepN','stepText','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep'].forEach(k=>term[k]=el());
+  ['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep'].forEach(k=>term[k]=el());
   term.bar.appendChild(el()).appendChild(term.stepN);
   folded=c.foldPanelStates(c.diagramForPath(d));
   const sp=c.attachStepper(el(),el(),term,d,'test',board(),{},
@@ -131,8 +129,8 @@ test('switching paths pauses, rebuilds the chosen sequence, and stops at its own
 });
 test('pathless diagrams keep unlabeled legacy navigation; a single explicit path has no path label',()=>{
   const d=fixture();delete d.paths;const h=harness(d);
-  assert.equal(h.term.pathLabel.hidden,true);h.sp.jump(-1);assert.equal(h.sp.current().id,'drop');
-  const one=fixture();one.paths.pop();assert.equal(harness(one).term.pathLabel.hidden,true);
+  assert.ok(h.term.chips.children.every(b=>b.className.startsWith('schip')));h.sp.jump(-1);assert.equal(h.sp.current().id,'drop');
+  const one=fixture();one.paths.pop();assert.ok(harness(one).term.chips.children.every(b=>b.className.startsWith('schip')));
 });
 test('selecting the existing path keeps the board, and a one-step path never starts an autoplay timer',()=>{
   const h=harness();h.sp.selectPath('happy',2);assert.equal(h.rendered.length,0);assert.equal(h.sp.current().id,'three');
@@ -152,4 +150,21 @@ test('ordinary edits restore the selected alternate by path and step IDs',()=>{
 test('path references round-trip through copied hashes without changing old hash shapes',()=>{
   const c=load(),hash=c.buildHash({d:'signal',p:'drop signal',m:'step',s:'drop'});
   assert.equal(c.parseHash(hash).p,'drop signal');assert.equal(c.parseHash('#d=signal&s=three').p,undefined);
+});
+
+test('an alternate running from three to five occupies the same columns and keeps its row on selection',()=>{
+  const d=fixture();d.paths[1].steps.push('five');const h=harness(d);
+  const matrix=h.term.chips.children[0],happy=matrix.children[0],drop=matrix.children[1];
+  assert.equal(happy.children[0].textContent,'Happy path');assert.equal(drop.children[0].textContent,'Dropped signal');
+  assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[3,4,5]);
+  assert.deepEqual(drop.children.slice(1).map(b=>b.style.gridColumn),happy.children.slice(3).map(b=>b.style.gridColumn));
+  assert.equal(matrix.style['--path-step-count'],5);
+  drop.children[2].fire('click');
+  assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.current().id,'drop');
+  assert.equal(h.term.chips.children[0],matrix);assert.equal(drop.children[2].getAttribute('aria-current'),'true');
+  assert.equal(drop.children[0].getAttribute('aria-pressed'),'true');assert.equal(happy.children[0].getAttribute('aria-pressed'),'false');
+  h.sp.jump(0);assert.equal(happy.children[1].getAttribute('aria-current'),'true');
+  assert.equal(drop.children[2].getAttribute('aria-current'),'false');
+  happy.children[0].fire('click');assert.equal(h.sp.path(),'happy');assert.equal(h.sp.current().n,0);
+  drop.children[0].fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.current().n,2);
 });

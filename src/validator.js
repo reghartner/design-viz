@@ -783,20 +783,18 @@ function diagramForPath(d, id){
   return Object.assign({}, d, {steps:path.indices.map(function(i){ return d.steps[i]; }),
     _sourceIndices:path.indices, _pathId:path.id});
 }
-function pathBranchPoints(paths, selected){
-  var groups = new Map();
-  paths.forEach(function(p){
-    if (p.id === selected.id) return;
-    var n = 0;
-    while (n < p.indices.length && n < selected.indices.length && p.indices[n] === selected.indices[n]) n++;
-    var at = n - 1; // -1 means the paths diverge before their first step.
-    if (!groups.has(at)) groups.set(at,[selected]);
-    groups.get(at).push(p);
+/* Each row starts at its fork beat and ends at its final step. Compare
+   earlier declarations so nested alternatives keep stable rows too. */
+function pathStepRows(paths){
+  return paths.map(function(path,i){
+    var shared = 0;
+    paths.slice(0,i).forEach(function(prior){
+      var n = 0;
+      while (n < path.indices.length && n < prior.indices.length && path.indices[n] === prior.indices[n]) n++;
+      shared = Math.max(shared,n);
+    });
+    return {path:path, start:i ? Math.max(0,shared - 1) : 0, end:path.indices.length - 1};
   });
-  groups.forEach(function(group,at){
-    groups.set(at,paths.filter(function(p){ return group.indexOf(p) >= 0; }));
-  });
-  return groups;
 }
 function validatePaths(d, path, errors){
   if (d.paths == null) return;

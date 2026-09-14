@@ -10,7 +10,7 @@ of the same time-aware data — an ambient always-animating view and a guided st
 ## The pipeline
 
 **[Alternate paths](docs/alternate-paths.md):** show a happy path and failure
-outcomes on one diagram. Colored choices sit below their shared step; playback
+outcomes on one diagram. Colored path rows align their step numbers beneath the transport controls; playback
 and panel state follow the selected sequence and stop at its own ending.
 Try **starters… → alternate paths**, or fork a beat in **story steps**.
 

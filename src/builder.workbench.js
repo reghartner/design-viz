@@ -3198,7 +3198,9 @@ function initWorkbenchBuilder(opts){
       var coin = secEl.querySelector('[data-dv-step="' + t.index + '"]');
       if (coin) return coin;
       var chipsBox = secEl.querySelector('.schips');
-      return chipsBox && chipsBox.querySelector('[data-step-source="' + t.index + '"]');
+      var sp = stepperFor(t.section), pathId = t.pathId || (sp && sp.path && sp.path());
+      return chipsBox && ((pathId && chipsBox.querySelector('[data-step-path="' + cssQuote(pathId) + '"][data-step-source="' + t.index + '"]')) ||
+        chipsBox.querySelector('[data-step-source="' + t.index + '"]'));
     }
     var sel = t.kind === 'node' ? '[data-dv-node="' + cssQuote(t.id) + '"]' :
               t.kind === 'group' ? '.grp[data-dv-group="' + cssQuote(t.id) + '"]' :
@@ -4596,7 +4598,7 @@ function initWorkbenchBuilder(opts){
       return null;
     }
     /* step chips in the click-through bar both jump playback (engine)
-       and select the step here; the chip's position IS the step index */
+       and select its shared source entry here, independently of its row */
     var chip = ev.target.closest && ev.target.closest('.schip');
     if (chip){
       var chipSec = chip.closest('.doc-sec');
@@ -4614,13 +4616,15 @@ function initWorkbenchBuilder(opts){
       var lineSec = line.closest('.doc-sec');
       var chipsBox = lineSec && lineSec.querySelector('.schips');
       if (!lineSec || !chipsBox || !lineSec.hasAttribute('data-dv-section')) return null;
-      var cur = -1;
+      var cur = -1, currentChip = null;
       Array.prototype.forEach.call(chipsBox.querySelectorAll('.schip'), function(c){
-        if (cur < 0 && c.getAttribute('aria-current') === 'true') cur = Number(c.getAttribute('data-step-source'));
+        if (cur < 0 && c.getAttribute('aria-current') === 'true'){
+          cur = Number(c.getAttribute('data-step-source')); currentChip = c;
+        }
       });
       if (cur < 0) return null;
       return {section: parseInt(lineSec.getAttribute('data-dv-section'), 10),
-              kind: 'step', index: cur, el: chipsBox.querySelector('[data-step-source="'+cur+'"]')};
+              kind: 'step', index: cur, el: currentChip};
     }
     var secEl = ev.target.closest('.doc-sec');
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;

@@ -3,7 +3,8 @@
 ## Alternate execution paths (2026-09-14)
 
 - Added `diagram.paths`: named, colored sequences referencing shared steps.
-  Choices appear beneath their last shared beat; each selected path controls
+  Path chips sit left of aligned step rows beneath the transport controls,
+  leaving blank columns before a fork and after its ending. Each path controls
   its own playback length, node tones and folded panel state.
 - Story steps can fork, rename, recolor and remove alternates, with path-specific
   append, duplicate and move actions, shared source editing and undo.

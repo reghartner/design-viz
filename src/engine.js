@@ -3693,58 +3693,68 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
-  var chipButtons = [];
+  var chipButtons = [], pathButtons = [];
   function paintChips(){
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
-    chipButtons = [];
-    var branches = pathBranchPoints(paths, selectedPath);
-    if (termbar.pathLabel){
-      termbar.pathLabel.hidden = paths.length < 2;
-      termbar.pathLabel.textContent = selectedPath.label;
-      termbar.pathLabel.style.setProperty('--path-color', selectedPath.color);
-    }
-    if (paths.length > 1) bar.style.setProperty('--path-color', selectedPath.color);
-    function appendBranches(column, idx){
-      if (!branches.has(idx)) return;
-      var fork = document.createElement('div'); fork.className = 'path-branches';
-      fork.setAttribute('role','group');
-      fork.setAttribute('aria-label',idx < 0 ? 'Paths from the start' : 'Paths from step ' + (idx + 1));
-      branches.get(idx).forEach(function(path){
-        var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
-        choice.textContent = path.label; choice.style.setProperty('--path-color',path.color);
-        choice.setAttribute('data-dv-path',path.id);
-        choice.setAttribute('aria-pressed',String(path.id === selectedPath.id));
-        choice.addEventListener('click',function(ev){
-          ev.stopPropagation(); selectPath(path.id, Math.max(0,idx));
+    chipButtons = []; pathButtons = [];
+    function appendStep(parent,path,idx,rowNumber){
+      var step = source.steps[path.indices[idx]], b = document.createElement('button');
+      b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '');
+      b.textContent = idx + 1;
+      b.setAttribute('data-step-source',path.indices[idx]);
+      b.setAttribute('aria-label','Go to step ' + (idx + 1) + (paths.length > 1 ? ' on ' + path.label : ''));
+      if (paths.length > 1){
+        b.setAttribute('data-step-path',path.id);
+        b.style.gridColumn = idx + 2; b.style.gridRow = rowNumber + 1;
+      }
+      b.addEventListener('click',function(){
+        stopAuto();
+        if (path.id !== selectedPath.id){
+          selectPath(path.id,idx);
           secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
-          var replacement = Array.prototype.find.call(chipsBox.querySelectorAll('[data-dv-path]'),function(el){
-            return el.getAttribute('data-dv-path') === path.id;
-          });
-          if (replacement) replacement.focus({preventScroll:true});
-        });
-        fork.appendChild(choice);
+        } else setStep(idx);
       });
-      column.appendChild(fork);
+      parent.appendChild(b);
+      chipButtons.push({button:b, path:path, index:idx});
     }
-    if (branches.has(-1)){
-      var start = document.createElement('div'); start.className = 'path-step-column';
-      var label = document.createElement('span'); label.className = 'path-start'; label.textContent = 'Start';
-      start.appendChild(label); appendBranches(start,-1); chipsBox.appendChild(start);
+    if (paths.length < 2){
+      selectedPath.indices.forEach(function(unused,idx){appendStep(chipsBox,selectedPath,idx,0);});
+      return;
     }
-    for (var k = 0; k < N; k++){
-      (function(idx){
-        var column = paths.length > 1 ? document.createElement('div') : chipsBox;
-        if (column !== chipsBox){ column.className = 'path-step-column'; chipsBox.appendChild(column); }
-        var b = document.createElement('button');
-        b.className = 'schip' + (steps[idx].delta ? ' dvd' : '');
-        b.textContent = idx + 1;
-        b.setAttribute('data-step-source', selectedPath.indices[idx]);
-        b.setAttribute('aria-label', 'Go to step ' + (idx + 1));
-        b.addEventListener('click', function(){ stopAuto(); setStep(idx); });
-        column.appendChild(b); chipButtons.push(b);
-        appendBranches(column,idx);
-      })(k);
-    }
+    var matrix = document.createElement('div'); matrix.className = 'path-matrix';
+    matrix.setAttribute('role','group'); matrix.setAttribute('aria-label','Execution paths');
+    matrix.style.setProperty('--path-step-count',Math.max.apply(null,paths.map(function(p){return p.indices.length;})));
+    pathStepRows(paths).forEach(function(row,rowNumber){
+      var path = row.path, line = document.createElement('div'); line.className = 'path-row';
+      line.setAttribute('role','group');
+      line.setAttribute('aria-label',path.label + ', steps ' + (row.start + 1) + ' through ' + (row.end + 1));
+      line.setAttribute('data-path-row',path.id); line.style.setProperty('--path-color',path.color);
+      var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
+      choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);
+      choice.style.gridColumn = 1; choice.style.gridRow = rowNumber + 1;
+      choice.addEventListener('click',function(ev){
+        ev.stopPropagation(); selectPath(path.id,row.start);
+        secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
+      });
+      line.appendChild(choice); pathButtons.push({button:choice,path:path,row:line});
+      for (var i = row.start; i <= row.end; i++) appendStep(line,path,i,rowNumber);
+      matrix.appendChild(line);
+    });
+    chipsBox.appendChild(matrix);
+  }
+  function syncPathControls(){
+    pathButtons.forEach(function(choice){
+      var active = choice.path.id === selectedPath.id;
+      choice.button.setAttribute('aria-pressed',String(active));
+      choice.row.setAttribute('data-selected',String(active));
+    });
+    var active = chipButtons.find(function(chip){return chip.path.id === selectedPath.id && chip.index === cur;});
+    /* Before a fork the active beat is displayed on its shared ancestor row. */
+    if (!active) active = chipButtons.slice().reverse().find(function(chip){
+      return paths.indexOf(chip.path) < paths.indexOf(selectedPath) && chip.index === cur &&
+        chip.path.indices[cur] === selectedPath.indices[cur];
+    });
+    chipButtons.forEach(function(chip){chip.button.setAttribute('aria-current',String(chip === active));});
   }
   paintChips();
 
@@ -3838,8 +3848,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
     var coin = document.getElementById(prefix + '-coin-' + (cur + 1));
     if (coin) coin.classList.add('lit');
-    var chips = chipButtons;
-    for (var j = 0; j < chips.length; j++) chips[j].setAttribute('aria-current', j === cur ? 'true' : 'false');
+    syncPathControls();
     updateCaption(s, tween);
     if (panelCtl) panelCtl.setStep(cur, tween);
     if (explicitPaths){
@@ -3877,7 +3886,6 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     steps = playbackSteps(d); N = steps.length; toneStates = foldNodeTones(d); paintedStep = null;
     if (options && options.renderPath){ board = options.renderPath(d); svg = board.svg; }
     if (panelCtl && panelCtl.setDiagram) panelCtl.setDiagram(d);
-    paintChips();
     mode = 'step'; boardDiv.classList.add('stepmode'); bar.hidden = false; syncToggle();
     setStep(at == null ? 0 : at, true, false);
     if (secBox.dispatchEvent) secBox.dispatchEvent(new CustomEvent('dv:pathrender',{bubbles:true}));
@@ -4263,8 +4271,6 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var btnPlay = document.createElement('button'); btnPlay.className = 'tbtn'; btnPlay.innerHTML = '&#9654;'; btnPlay.setAttribute('aria-label', 'Play');
   var btnNext = document.createElement('button'); btnNext.className = 'tbtn'; btnNext.innerHTML = '&#8250;'; btnNext.setAttribute('aria-label', 'Next step');
   var chips = document.createElement('div'); chips.className = 'schips';
-  var pathLabel = document.createElement('span'); pathLabel.className = 'path-chip path-current'; pathLabel.hidden = true;
-  pathLabel.setAttribute('aria-label','Selected path');
   if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
   var line = document.createElement('div'); line.className = 'stepline';
   var stepN = document.createElement('b'); var stepText = document.createElement('span');
@@ -4282,7 +4288,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   line.appendChild(stepN); line.appendChild(lanePill); line.appendChild(stepText);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
   bar.appendChild(btnPrev); bar.appendChild(btnPlay); bar.appendChild(btnNext);
-  bar.appendChild(pathLabel); bar.appendChild(chips); bar.appendChild(line);
+  bar.appendChild(chips); bar.appendChild(line);
   boardLayout.controlsHost.appendChild(bar);
 
   /* print-only numbered caption list (C4) */
@@ -4300,7 +4306,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.appendChild(ol);
 
   var stepper = attachStepper(box, boardDiv, {
-    bar:bar, chips:chips, pathLabel:pathLabel, stepN:stepN, stepText:stepText, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
+    bar:bar, chips:chips, stepN:stepN, stepText:stepText, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
     printSteps(next);

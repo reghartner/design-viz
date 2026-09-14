@@ -2,8 +2,11 @@
 
 Use **starters… → alternate paths** in the workbench for a six-step happy
 path and a four-step **Dropped signal** path on the same command diagram.
-Both share steps 1–3; choices appear beneath step 3. Selecting a choice pauses
-at that shared step. Next advances into the chosen outcome. The colored label,
+The transport controls stay at the upper left. Below them, each path has a
+colored chip on the left and a row of aligned step numbers on the right. Both
+paths share steps 1–3, so the alternate row begins in column 3 and ends in
+column 4, with blank space on either side. Selecting its chip pauses at the
+fork; clicking a number selects that path and step. The colored chip,
 step count, playback ending, highlighted hops, node tones and panel state all
 follow that path. Chips retain their order when switching.
 
@@ -73,8 +76,13 @@ Use distinct step bodies for retry attempts. Optional `label` defaults to
 “Happy path” for the first path and the path ID for others. Optional `color`
 accepts hex; defaults cycle cyan, orange, purple, pink and green.
 
-The common prefix determines each branch point; paths with different first
-steps are offered under **Start**. A later shared step is allowed, but its state
+The longest common prefix with an earlier declared path determines each
+row’s starting column, including the last shared beat. Paths with different
+first steps start in column 1. The primary row displays its full sequence;
+all rows stay visible and keep the same columns when selecting a path. A path
+starting at 3 and ending at 5 displays only 3, 4 and 5 beneath those same
+numbers on the primary row. On narrow screens the rows scroll together.
+A later shared step is allowed, but its state
 still comes from that path's complete preceding sequence. This models authored
 outcomes, not executable conditions or a simulation of failure probabilities.
 Nodes and edges stay in their declared layout; path colors identify choices

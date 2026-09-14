@@ -1,5 +1,17 @@
 # Changelog
 
+## Canary and firmware rollout stories (2026-09-14)
+
+- New **rollout decisions** starter: hold for sufficient canary evidence,
+  authorize then apply promotion, restore routing after failure, and stage /
+  trial / confirm firmware while holding a later wave on mixed reports.
+- Existing tiles, tables, budgets and checks keep deployed version, configured
+  traffic and observed health separate. Unknown data stays unknown; firmware
+  self-test success on v1 does not pass a v2 confirmation gate.
+- Includes a complete missing-evidence cookbook example and four semantic
+  regressions for denominator consistency, fresh-window resets, rollback scope
+  and per-device boot facts. All measurements and policies are fictional.
+
 ## Story-step workbench editor (2026-09-14)
 
 - Search captions, IDs, lanes, nodes, hops and panel IDs in a compact story

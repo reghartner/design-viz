@@ -25,6 +25,10 @@ The **replica positions** starter compares applied positions against a session
 token while keeping reported lag, offline state and unrelated histories
 distinct. Its [recipe](cookbook/replica-positions.md) also covers device/cloud
 configuration copies.
+The **rollout decisions** starter separates configured traffic, sampled health,
+firmware trial boots and persistent confirmation. Its
+[recipe](cookbook/rollout-decisions.md) covers promotion, holds, traffic rollback
+and missing device reports.
 The workbench's **document outline** (⌘/Ctrl K) searches sections, hidden tabs,
 nodes, groups, edges, panels, and steps and opens the matching inspector.
 See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions.
@@ -35,6 +39,8 @@ with links to their authored JSON and read-only snapshots.
 Use [workspace focus and resizable panes](docs/workbench-workspace.md) for
 more room: drag either divider, use arrow keys, or collapse JSON for a long
 inspector. Dimensions persist locally; phones use a stacked layout.
+The [story-step editor](docs/workbench-steps.md) adds caption search, hidden-tab
+jumps, duplication, appending and reordering through the same undo history.
 
 ```
 design doc (prose / permalinks / mermaid)

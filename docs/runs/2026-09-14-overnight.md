@@ -20,7 +20,8 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 8 | Replication / consistency view | codex/replica-positions | Open: https://github.com/reghartner/design-viz/pull/57 |
 | 9 | Stable workbench playback while editing | codex/workbench-playback | Open: https://github.com/reghartner/design-viz/pull/58 |
 | 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
-| 11 | Canary and firmware rollout stories | TBD | Reuse cohort tiles, tables, budgets and decision checks; keep release version separate from runtime health |
+| 11 | Canary and firmware rollout stories | codex/rollout-starters | Open: https://github.com/reghartner/design-viz/pull/60 |
+| 12 | Phone diagram legibility | TBD | Reduce wasted nested spacing; make wide routed boards readable with an explicit fit control |
 
 ## Validation and evidence
 
@@ -31,7 +32,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51, #52, #53, #54, #55, #56, #57 and #58 passed all GitHub checks.
+- PRs #50, #51, #52, #53, #54, #55, #56, #57, #58 and #59 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -82,22 +83,36 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   Phone view stays within 390 pixels; actions use two columns with 38-pixel
   height. Copies keep full patches, allocate unique IDs and repeat append
   operations; reveal/hide thresholds keep their numeric positions. PR #59
-  final CI still needs checking after the handoff commit.
+  passed all GitHub checks.
+- Rollout stories: 3 scenarios / 13 nodes / 17 steps / 12 existing panels.
+  Four regressions check same-window denominators and traffic sums, adequate
+  evidence before promotion, empty new windows, retained failed telemetry
+  after traffic rollback, and independent firmware running/confirmed/health
+  facts. Full Node and 158 Python suites pass; starter and the complete
+  missing-evidence cookbook example validate without warnings. Browser verified
+  insufficient-sample hold, authorization before application, fresh-window
+  NO DATA, retained rollback evidence at zero configured traffic, missing boot
+  reports, mixed canary outcomes, backward jumps, light/dark and 390-pixel
+  containment. Tables scroll within their panels. No console errors; LAN
+  preview returns HTTP 200. Check PR #60 final CI after the handoff commit.
 
 ## Next continuation
 
-Start from the current `codex/workbench-step-list` branch, inspect checks
+Start from the current `codex/rollout-starters` branch, inspect checks
 and working-tree changes, and create the next focused branch. Do not recreate
 the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
 stories, numeric replica positions and stable paused playback are built.
 The workbench now disposes old steppers, starts paused and preserves unique
 preview positions through ordinary edits; standalone autoplay is unchanged.
 The compact step-list editor is now built, including search, bounded paging,
-duplicate, append, earlier/later, history and stale-source protection. A useful
-next slice is a canary/firmware rollout starter: reuse cohort tiles, tables,
-budgets and authored checks for promotion, hold and rollback, with version,
-traffic assignment and runtime health kept separate. Keep phone layouts and
-native text editing usable. Shared scenario definitions and
+duplicate, append, earlier/later, history and stale-source protection. Canary
+promotion, traffic rollback and firmware trial/confirmation stories are built.
+The next useful slice is phone diagram legibility: the 390-pixel page contains
+its panels, but nested spacing leaves the fitted graph very small. Inspect
+mobile spacing and readable defaults for wide lane-routed boards, keeping an
+explicit fit option and keeping viewport preferences out of authored JSON.
+Avoid claiming zero crossings in arbitrary graphs. Keep native text editing
+usable. Shared scenario definitions and
 trace/HLD mapping remain larger design work, not quick schema shortcuts.
 
 ## Design commitments

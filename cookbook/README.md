@@ -26,6 +26,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |
 | retry attempts, backoff, deadline admission, or circuit recovery | `retries-and-circuits.md` |
 | replica positions, read-your-writes tokens, lag, or device/cloud versions | `replica-positions.md` |
+| canary promotion, traffic rollback, firmware trial/confirmation, or held rollout waves | `rollout-decisions.md` |
 | a Honeycomb trace turned into an editable diagram | [`../docs/trace-import.md`](../docs/trace-import.md) (input and CLI guide) |
 | a temperature readout with warning / shutdown thresholds | `temperature.md` |
 | a battery / charge level that drains and raises a low event | `battery-level.md` |

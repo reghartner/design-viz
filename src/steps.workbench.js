@@ -10,18 +10,20 @@ function builderStorySections(raw){
       label:(parent && parent.label ? parent.label + ' / ' : '') + (sec.heading || 'Section ' + (section + 1))};
   }).filter(Boolean);
 }
-function builderStorySteps(section, query){
+function builderStorySteps(section, query, pathId){
   var terms = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   function count(n, noun){ return n + ' ' + noun + (n === 1 ? '' : 's'); }
-  return (Array.isArray(section.diagram.steps) ? section.diagram.steps : []).map(function(step, index){
+  var route = diagramPathList(section.diagram).find(function(p){return p.id === pathId;}) || diagramPathList(section.diagram)[0];
+  return route.indices.map(function(index,position){
+    var step=section.diagram.steps[index];
     step = step || {};
     var hops = builderStepHops(step), nodes = Array.isArray(step.nodes) ? step.nodes : [];
     var panels = step.panels && typeof step.panels === 'object' ? Object.keys(step.panels) : [];
     var caption = typeof step.text === 'string' && step.text ? step.text : 'Untitled step';
     var id = typeof step.id === 'string' ? step.id : '', lane = typeof step.lane === 'string' ? step.lane : '';
-    var haystack = [index + 1, caption, id, lane].concat(hops, nodes, panels).join(' ').toLowerCase();
+    var haystack = [position + 1, caption, id, lane].concat(hops, nodes, panels).join(' ').toLowerCase();
     if (!terms.every(function(term){ return haystack.indexOf(term) >= 0; })) return null;
-    return {index:index, caption:caption, id:id, lane:lane,
+    return {index:index, position:position, pathId:section.diagram.paths ? route.id : undefined, caption:caption, id:id, lane:lane,
       summary:[lane, count(hops.length, 'hop'), count(nodes.length, 'node'), count(panels.length, 'panel')].filter(Boolean).join(' · '),
       target:{kind:'step', section:section.section, index:index},
       path:section.path.concat(['steps', index]), tab:section.tab};
@@ -35,15 +37,36 @@ function initWorkbenchStepList(opts){
   if (!box || !select || !search || !list || !status || !paging) return null;
   var buttons = {}, sections = [], chosen = null, entries = [], indexedText = null, raw = null;
   var offset = 0, pageSize = 200, lastSelection = '', stale = true;
+  var pathSelect=document.getElementById('steps-path'), pathTools=document.getElementById('steps-path-tools');
+  var pathLabel=document.getElementById('steps-path-label'), pathColor=document.getElementById('steps-path-color');
+  var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
+  var pathSignature='';
+  function route(){
+    var paths=chosen ? diagramPathList(chosen.diagram) : [];
+    var id=chosen && opts.path ? opts.path(chosen.section) : pathSelect && pathSelect.value;
+    return paths.find(function(p){return p.id===id;}) || paths[0];
+  }
+  function pathControls(){
+    if(!pathSelect) return;
+    var paths=chosen ? diagramPathList(chosen.diagram) : [], selected=route();
+    pathTools.hidden=!(chosen && chosen.diagram.paths);
+    pathSelect.innerHTML='';
+    paths.forEach(function(p){var o=document.createElement('option');o.value=p.id;o.textContent=p.label;pathSelect.appendChild(o);});
+    if(selected){pathSelect.value=selected.id;pathLabel.value=selected.label;pathColor.value=selected.color.length===4 ? '#' + selected.color.slice(1).split('').map(function(c){return c+c;}).join('') : selected.color;}
+    pathSignature=selected ? selected.id : '';
+  }
   ['add','duplicate','earlier','later','previous','next'].forEach(function(name){ buttons[name] = document.getElementById('steps-' + name); });
   function current(){
     var target = opts.selection();
     return target && target.kind === 'step' && chosen && target.section === chosen.section ? target.index : -1;
   }
   function controls(){
-    var index = current(), count = chosen && Array.isArray(chosen.diagram.steps) ? chosen.diagram.steps.length : 0;
+    var selected=route(), index = selected ? selected.indices.indexOf(current()) : -1, count=selected ? selected.indices.length : 0;
     var blocked = stale || opts.locked() || !chosen;
     select.disabled = blocked; search.disabled = blocked;
+    if(pathSelect){pathSelect.disabled=blocked;pathLabel.disabled=blocked;pathColor.disabled=blocked;savePath.disabled=blocked;
+      removePath.disabled=blocked || !chosen.diagram.paths || chosen.diagram.paths.length<2 || selected.id===chosen.diagram.paths[0].id;
+      forkButton.disabled=blocked || index<0;}
     buttons.add.disabled = blocked;
     buttons.duplicate.disabled = blocked || index < 0 || index >= count;
     buttons.earlier.disabled = blocked || index <= 0 || index >= count;
@@ -75,8 +98,8 @@ function initWorkbenchStepList(opts){
       button.type = 'button'; button.className = 'story-step';
       button.setAttribute('data-step-index', entry.index);
       button.setAttribute('aria-current', entry.index === index ? 'step' : 'false');
-      button.setAttribute('aria-label', 'Edit step ' + (entry.index + 1) + ': ' + entry.caption);
-      var number = document.createElement('b'); number.textContent = entry.index + 1;
+      button.setAttribute('aria-label', 'Edit step ' + (entry.position + 1) + ': ' + entry.caption);
+      var number = document.createElement('b'); number.textContent = entry.position + 1;
       var text = document.createElement('span'), caption = document.createElement('span'), meta = document.createElement('small');
       caption.className = 'story-caption'; caption.textContent = entry.caption;
       meta.textContent = (entry.id ? entry.id + ' · ' : '') + entry.summary;
@@ -90,7 +113,7 @@ function initWorkbenchStepList(opts){
       });
       list.appendChild(button);
     });
-    var total = chosen && Array.isArray(chosen.diagram.steps) ? chosen.diagram.steps.length : 0;
+    var total = route() ? route().indices.length : 0;
     status.textContent = !chosen ? 'No diagrams in this document.' : !total ? 'No steps yet. Add a beat to begin.' :
       !entries.length ? 'No matching steps. Clear the filter to see the story.' :
       (offset + 1) + '–' + Math.min(offset + pageSize, entries.length) + ' of ' + entries.length +
@@ -99,7 +122,7 @@ function initWorkbenchStepList(opts){
     controls();
   }
   function filter(followSelection){
-    entries = chosen ? builderStorySteps(chosen, search.value) : [];
+    entries = chosen ? builderStorySteps(chosen, search.value, route() && route().id) : [];
     offset = 0;
     if (followSelection){
       var at = entries.findIndex(function(entry){ return entry.index === current(); });
@@ -125,15 +148,16 @@ function initWorkbenchStepList(opts){
     select.disabled = !chosen; search.disabled = !chosen;
     if (chosen) select.value = String(chosen.section);
     lastSelection = JSON.stringify(target);
-    filter(true);
+    pathControls(); filter(true);
   }
   function sync(){
     if (opts.src.value !== indexedText || stale){ refresh(); return; }
+    if(route() && route().id !== pathSignature && pathSelect){pathControls();filter(true);}
     var target = opts.selection(), signature = JSON.stringify(target);
     if (signature !== lastSelection){
       lastSelection = signature;
       var section = sections.find(function(s){ return target && s.section === target.section; });
-      if (section && section !== chosen){ chosen = section; select.value = String(section.section); search.value = ''; filter(true); return; }
+      if (section && section !== chosen){ chosen = section; select.value = String(section.section); search.value = ''; pathControls(); filter(true); return; }
       var at = entries.findIndex(function(entry){ return entry.index === current(); });
       if (at >= 0 && (at < offset || at >= offset + pageSize)){ offset = Math.floor(at / pageSize) * pageSize; paint(); return; }
     }
@@ -145,7 +169,7 @@ function initWorkbenchStepList(opts){
   select.addEventListener('change', function(){
     if (!ready()){ if (chosen) select.value = String(chosen.section); return; }
     chosen = sections.find(function(s){ return String(s.section) === select.value; }) || null;
-    search.value = ''; filter(false);
+    search.value = ''; pathControls(); filter(false);
   });
   search.addEventListener('input', function(){ if (ready()) filter(false); });
   search.addEventListener('keydown', function(ev){
@@ -171,8 +195,8 @@ function initWorkbenchStepList(opts){
   ['add','duplicate','earlier','later'].forEach(function(name){ buttons[name].addEventListener('click', function(){
     if (!ready() || !chosen || buttons[name].disabled) return;
     var index = current(), section = chosen.section;
-    var plan = name === 'add' ? planAddStep(indexedText, raw, section) : name === 'duplicate' ?
-      planDuplicateStep(indexedText, raw, section, index) : planMoveStep(indexedText, raw, section, index, name === 'earlier' ? -1 : 1);
+    var plan = name === 'add' ? planAddStep(indexedText, raw, section, route().id) : name === 'duplicate' ?
+      planDuplicateStep(indexedText, raw, section, index, route().id) : planMoveStep(indexedText, raw, section, index, name === 'earlier' ? -1 : 1, route().id);
     if (plan.error){ status.textContent = plan.error; return; }
     if (!opts.apply(plan, section)) return;
     search.value = ''; refresh();
@@ -186,6 +210,22 @@ function initWorkbenchStepList(opts){
     }
     if (!buttons[name].disabled) buttons[name].focus(); else if (selected) selected.focus();
   }); });
+  if(pathSelect){
+    pathSelect.addEventListener('change',function(){
+      if(!ready()) return;
+      if(opts.selectPath) opts.selectPath(chosen.section,pathSelect.value);
+      search.value='';pathControls();filter(false);
+    });
+    function pathEdit(action){
+      if(!ready() || !chosen) return;
+      var plan=planPathStepEdit(indexedText,raw,chosen.section,route().id,current(),action,{label:pathLabel.value,color:pathColor.value});
+      if(plan.error){status.textContent=plan.error;return;}
+      if(opts.apply(plan,chosen.section)){search.value='';refresh();}
+    }
+    forkButton.addEventListener('click',function(){pathEdit('fork');});
+    savePath.addEventListener('click',function(){pathEdit('metadata');});
+    removePath.addEventListener('click',function(){pathEdit('remove');});
+  }
   opts.src.addEventListener('input', function(){ invalidate(); });
   box.addEventListener('focusin', function(){ if (opts.pause) opts.pause(); });
   box.addEventListener('toggle', function(){ if (box.open) refresh(); });

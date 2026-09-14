@@ -18,6 +18,7 @@ SRC = ROOT / "src"
 
 # Reuse the canonical demo so its gallery entry cannot drift.
 STARTERS = [
+    ("alternate paths", "One shared command diagram: happy path or a dropped signal after step 3.", "starters/alternate-paths.json"),
     ("blank flow", "Three nodes and two hops to make your own.", "starters/minimal.json"),
     ("panel showcase", "Five panels updated across four steps.", "starters/panels-tour.json"),
     ("software & IoT", "Data state, decision checks, and resource budgets across two design stories.", "starters/software-systems.json"),

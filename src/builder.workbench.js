@@ -371,6 +371,12 @@ function builderPositionLine(raw, target){
     if (!rec) return null;
     var d = specValueAt(raw, rec.diagram);
     if (!d || !Array.isArray(d.steps) || !d.steps[target.index]) return null;
+    if (d.paths){
+      var route = diagramPathList(d).find(function(p){return p.id === target.pathId && p.indices.indexOf(target.index) >= 0;}) ||
+        diagramPathList(d).find(function(p){return p.indices.indexOf(target.index) >= 0;});
+      if (route) return 'step ' + (route.indices.indexOf(target.index) + 1) + ' of ' + route.indices.length + ' · ' + route.label;
+      return 'unused step · registry slot ' + (target.index + 1);
+    }
     return 'step ' + (target.index + 1) + ' of ' + d.steps.length;
   }
   if (target.kind === 'section'){
@@ -468,9 +474,10 @@ function planAddEdge(text, raw, sectionIdx){
   return {text: r.text, start: r.start, end: r.end, kind: 'edge',
           index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
 }
-function planAddStep(text, raw, sectionIdx){
+function planAddStep(text, raw, sectionIdx, pathId){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
+  if (got.d.paths) return planPathStepEdit(text,raw,sectionIdx,pathId,-1,'add');
   var edges = Array.isArray(got.d.edges) ? got.d.edges : [];
   /* prefer an edge no step uses as its FIRST hop, so the new numbered coin
      gets its own midpoint (two steps sharing a first hop stack coins) */
@@ -952,14 +959,24 @@ function planDeleteStep(text, raw, sectionIdx, stepIdx){
   if (got.error) return got;
   if (!Array.isArray(got.d.steps) || !got.d.steps[stepIdx])
     return {error: 'step not found — reselect and try again'};
+  if (got.d.paths){
+    var id = got.d.steps[stepIdx].id;
+    if (got.d.paths.some(function(p){return p.steps.length === 1 && p.steps[0] === id;}))
+      return {error:'This is the only step in a path. Remove that path or add another step first.'};
+    return builderRewrite(text,raw,got.path,function(d){
+      d.steps.splice(stepIdx,1);
+      d.paths.forEach(function(p){p.steps=p.steps.filter(function(ref){return ref !== id;});});
+    });
+  }
   return builderRewrite(text, raw, got.path.concat(['steps']), function(steps){
     steps.splice(stepIdx, 1);
   });
 }
 
-function planMoveStep(text, raw, sectionIdx, stepIdx, delta){
+function planMoveStep(text, raw, sectionIdx, stepIdx, delta, pathId){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
+  if (got.d.paths) return planPathStepEdit(text,raw,sectionIdx,pathId,stepIdx,delta < 0 ? 'earlier' : 'later');
   var steps = got.d.steps;
   var to = stepIdx + delta;
   if (!Array.isArray(steps) || !steps[stepIdx]) return {error: 'step not found'};
@@ -973,9 +990,10 @@ function planMoveStep(text, raw, sectionIdx, stepIdx, delta){
   return r;
 }
 
-function planDuplicateStep(text, raw, sectionIdx, stepIdx){
+function planDuplicateStep(text, raw, sectionIdx, stepIdx, pathId){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
+  if (got.d.paths) return planPathStepEdit(text,raw,sectionIdx,pathId,stepIdx,'duplicate');
   var steps = got.d.steps;
   if (!Number.isInteger(stepIdx) || !Array.isArray(steps) || !steps[stepIdx]) return {error:'step not found'};
   var clone = builderClone(steps[stepIdx]);
@@ -987,6 +1005,61 @@ function planDuplicateStep(text, raw, sectionIdx, stepIdx){
   var r = jsonInsertArrayItemAfter(text, got.path.concat(['steps']), stepIdx, JSON.stringify(clone, null, 2));
   if (!r) return {error:'could not edit steps in the editor text'};
   return {text:r.text, start:r.start, end:r.end, kind:'step', index:stepIdx + 1};
+}
+
+/* Path edits change references; shared step bodies remain in one registry. */
+function planPathStepEdit(text,raw,section,pathId,index,action,metadata){
+  var got = builderDiagram(text,raw,section);
+  if (got.error) return got;
+  var resultIndex=index, resultPath=pathId;
+  var r=builderRewrite(text,raw,got.path,function(d){
+    var steps=d.steps || [], taken=Object.create(null);
+    steps.forEach(function(s){if(s && s.id) taken[s.id]=true;});
+    function newId(stem){var id=builderUniqueKey(taken,stem);taken[id]=true;return id;}
+    if (!d.paths){
+      if (action !== 'fork') return {error:'No alternate paths yet.'};
+      if (!steps.length || !steps[index]) return {error:'Select a step to branch from first.'};
+      steps.forEach(function(s){if(!s.id) s.id=newId('step-');});
+      d.paths=[{id:'happy',label:'Happy path',color:'#38bdf8',steps:steps.map(function(s){return s.id;})}];
+    }
+    var p=d.paths.find(function(p){return p.id === pathId;}) || (!pathId ? d.paths[0] : null);
+    if(!p) return {error:'Path no longer exists. Select it again.'};
+    var at=steps[index] ? p.steps.indexOf(steps[index].id) : -1;
+    if (['fork','duplicate','earlier','later'].indexOf(action)>=0 && at<0) return {error:'Select a step in this path first.'};
+    resultPath=p.id;
+    if(action === 'fork'){
+      var pathIds=Object.create(null);d.paths.forEach(function(p){pathIds[p.id]=true;});
+      var id=builderUniqueKey(pathIds,'alternate-');
+      var step={id:newId('outcome-'),text:'Describe what happens on this alternate path',nodes:Object.keys(d.nodes || {}).slice(0,1)};
+      resultIndex=steps.length;steps.push(step);resultPath=id;
+      d.paths.push({id:id,label:d.paths.length===1?'Dropped signal':'Alternate path '+d.paths.length,
+        color:['#fb923c','#c084fc','#f472b6','#4ade80'][(d.paths.length-1)%4],steps:p.steps.slice(0,at+1).concat(step.id)});
+    } else if(action === 'add' || action === 'duplicate'){
+      var step=action==='duplicate'?builderClone(steps[index]):{text:'Describe what happens in this step',nodes:Object.keys(d.nodes || {}).slice(0,1)};
+      step.id=newId(action==='duplicate'?step.id+'-copy':'step-');resultIndex=steps.length;steps.push(step);
+      p.steps.splice(action==='duplicate'?at+1:p.steps.length,0,step.id);
+    } else if(action === 'earlier' || action === 'later'){
+      var to=at+(action==='earlier'?-1:1);
+      if(to<0 || to>=p.steps.length) return {error:'Already at that end of this path.'};
+      p.steps.splice(to,0,p.steps.splice(at,1)[0]);
+    } else if(action === 'metadata'){
+      if(!metadata || typeof metadata.label!=='string' || !metadata.label.trim() || !isHex(metadata.color))
+        return {error:'Give the path a label and a hex color.'};
+      p.label=metadata.label.trim();p.color=metadata.color;
+      if(at<0) resultIndex=steps.findIndex(function(s){return s.id===p.steps[0];});
+    } else if(action === 'remove'){
+      if(d.paths.length<2 || d.paths[0]===p) return {error:'Keep the primary path; remove an alternate instead.'};
+      d.paths=d.paths.filter(function(other){return other!==p;});resultPath=d.paths[0].id;
+      resultIndex=steps.findIndex(function(s){return s.id===d.paths[0].steps[0];});
+    } else return {error:'Unknown path edit.'};
+    var errors=[];validatePaths(d,'diagram',errors);
+    if(errors.length) return {error:errors.join('\n')};
+  });
+  if(r.error) return r;
+  r.kind='step';r.index=resultIndex;r.pathId=resultPath;
+  var range=jsonLocate(r.text,got.path.concat(['steps',resultIndex]));
+  if(range){r.start=range.start;r.end=range.end;}
+  return r;
 }
 
 function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
@@ -2041,7 +2114,13 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
 
 /* Values always come from the engine's fold. Provenance describes authored
    assignments or operation inputs; it never implements a second reducer. */
-function builderEffectivePanelStates(d, stepIndex){
+function builderEffectivePanelStates(d, stepIndex, pathId){
+  if(d && d.paths){
+    var route=diagramPathList(d).find(function(p){return p.id===pathId && p.indices.indexOf(stepIndex)>=0;}) ||
+      diagramPathList(d).find(function(p){return p.indices.indexOf(stepIndex)>=0;});
+    if(!route) return {error:'This step is not part of a path.'};
+    d=diagramForPath(d,route.id);stepIndex=route.indices.indexOf(stepIndex);
+  }
   if (!d || !Array.isArray(d.steps) || !Number.isInteger(stepIndex) || stepIndex<0 || stepIndex>=d.steps.length)
     return {error:'Select an existing step to inspect its effective state.'};
   var panels=Array.isArray(d.panels)?d.panels:[], seen=new Set(), folded;
@@ -2059,7 +2138,7 @@ function builderEffectivePanelStates(d, stepIndex){
     var snapshot=(folded[p.id]||[])[stepIndex]||{};
     function input(i,key,once){
       var patchKey=i==null?null:(d.steps[i].panels && typeof d.steps[i].panels==='object' && !Array.isArray(d.steps[i].panels)?'panels':'patch');
-      var path=i==null?['panels',pi,'initial']:['steps',i,patchKey,p.id];
+      var path=i==null?['panels',pi,'initial']:['steps',d._sourceIndices ? d._sourceIndices[i] : i,patchKey,p.id];
       if (once) path.push('enterOnce'); path.push(key);
       return {step:i,key:key,path:path,label:(i==null?'Initial':('Step '+(i+1)))+(once?' · enterOnce':'')+' · '+key};
     }
@@ -3119,7 +3198,7 @@ function initWorkbenchBuilder(opts){
       var coin = secEl.querySelector('[data-dv-step="' + t.index + '"]');
       if (coin) return coin;
       var chipsBox = secEl.querySelector('.schips');
-      return (chipsBox && chipsBox.children[t.index]) || null;
+      return chipsBox && chipsBox.querySelector('[data-step-source="' + t.index + '"]');
     }
     var sel = t.kind === 'node' ? '[data-dv-node="' + cssQuote(t.id) + '"]' :
               t.kind === 'group' ? '.grp[data-dv-group="' + cssQuote(t.id) + '"]' :
@@ -3175,7 +3254,8 @@ function initWorkbenchBuilder(opts){
     if (!stepper) return;
     if (stepper.pause) stepper.pause();
     if (stepper.mode() !== 'step') stepper.enterStep(false);
-    if (stepper.current().n !== t.index) stepper.jump(t.index);
+    if (stepper.jumpSource) stepper.jumpSource(t.index,t.pathId);
+    else if (stepper.current().n !== t.index) stepper.jump(t.index);
   }
   function applyStepMarkers(){
     clearStepMarkers();
@@ -3591,10 +3671,10 @@ function initWorkbenchBuilder(opts){
       var parsed=parseEditor(), refs=parsed.error?[]:specSectionPaths(parsed.raw), rec=refs[target.section];
       body.textContent=''; indexedText=src.value; populated=true;
       if (parsed.error || !rec){ note.textContent='Fix the JSON source before inspecting effective state.'; return; }
-      var d=specValueAt(parsed.raw,rec.diagram), model=builderEffectivePanelStates(d,target.index);
+      var d=specValueAt(parsed.raw,rec.diagram), model=builderEffectivePanelStates(d,target.index,stepperFor(target.section) && stepperFor(target.section).path());
       if (model.error){ note.textContent=model.error; return; }
-      var st=d.steps[target.index];
-      note.textContent='Step '+(target.index+1)+(st && st.id?' · '+st.id:'')+': folded state sent to each widget, including panels without a patch here. Widget-specific defaults may still apply. Values are read-only; source buttons select the authored JSON. Computed fields list input history, including superseded or ignored inputs.';
+      var st=d.steps[target.index], sp=stepperFor(target.section), route=diagramPathList(d).find(function(p){return sp && p.id===sp.path();}) || diagramPathList(d)[0];
+      note.textContent='Step '+(route.indices.indexOf(target.index)+1)+(st && st.id?' · '+st.id:'')+': folded state sent to each widget, including panels without a patch here. Widget-specific defaults may still apply. Values are read-only; source buttons select the authored JSON. Computed fields list input history, including superseded or ignored inputs.';
       model.panels.forEach(function(p){
         var box=document.createElement('details'); box.className='effective-panel'; box.open=OPEN_EFFECTIVE_PANELS.has(p.id);
         box.addEventListener('toggle',function(ev){
@@ -4459,15 +4539,15 @@ function initWorkbenchBuilder(opts){
       }
       if (t.kind === 'step' && !armedHere){
         acts.appendChild(actionButton('duplicate step', function(){
-          commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index); },
+          commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('↑ move up', function(){
-          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
+          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('↓ move down', function(){
-          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1); },
+          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
@@ -4521,7 +4601,7 @@ function initWorkbenchBuilder(opts){
     if (chip){
       var chipSec = chip.closest('.doc-sec');
       if (!chipSec || !chipSec.hasAttribute('data-dv-section')) return null;
-      var chipIdx = Array.prototype.indexOf.call(chip.parentNode.children, chip);
+      var chipIdx = Number(chip.getAttribute('data-step-source'));
       if (chipIdx < 0) return null;
       return {section: parseInt(chipSec.getAttribute('data-dv-section'), 10),
               kind: 'step', index: chipIdx, el: chip};
@@ -4535,12 +4615,12 @@ function initWorkbenchBuilder(opts){
       var chipsBox = lineSec && lineSec.querySelector('.schips');
       if (!lineSec || !chipsBox || !lineSec.hasAttribute('data-dv-section')) return null;
       var cur = -1;
-      Array.prototype.forEach.call(chipsBox.children, function(c, i){
-        if (cur < 0 && c.getAttribute('aria-current') === 'true') cur = i;
+      Array.prototype.forEach.call(chipsBox.querySelectorAll('.schip'), function(c){
+        if (cur < 0 && c.getAttribute('aria-current') === 'true') cur = Number(c.getAttribute('data-step-source'));
       });
       if (cur < 0) return null;
       return {section: parseInt(lineSec.getAttribute('data-dv-section'), 10),
-              kind: 'step', index: cur, el: chipsBox.children[cur]};
+              kind: 'step', index: cur, el: chipsBox.querySelector('[data-step-source="'+cur+'"]')};
     }
     var secEl = ev.target.closest('.doc-sec');
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
@@ -4582,8 +4662,12 @@ function initWorkbenchBuilder(opts){
     if (target.kind !== 'tab') insertSection = target.section;
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
-    renderInspector();
     syncBoardToSelectedStep();
+    if (currentTarget.kind === 'step'){
+      var sp = stepperFor(currentTarget.section);
+      if (sp && sp.path) currentTarget.pathId = sp.path();
+    }
+    renderInspector();
     applyStepMarkers();
     if (stepList) stepList.sync();
     if (focusEditor === false) return;
@@ -4667,12 +4751,19 @@ function initWorkbenchBuilder(opts){
     pause:pausePreview,
     selection:function(){ return currentTarget; },
     locked:function(){ return !!addToStep || !!connect; },
+    path:function(section){var sp=stepperFor(section);return sp && sp.path();},
+    selectPath:function(section,id){
+      currentTarget=null; clearMultiSelect(); if(guide) guide.hidden=true;
+      var sp=stepperFor(section); if(sp) sp.selectPath(id);
+      applyRowGrabs(); clearStepMarkers();
+    },
     navigate:function(entry){
       clearMultiSelect();
       if (entry.tab){
         var tabButton = document.getElementById('tab-' + entry.tab.block + '-' + entry.tab.tab);
         if (tabButton) tabButton.click();
       }
+      if(entry.pathId){var sp=stepperFor(entry.target.section);if(sp) sp.selectPath(entry.pathId,entry.position);}
       var el = findTargetEl(entry.target);
       selectTarget(Object.assign({}, entry.target, {el:el}), false);
       var loc = jsonLocate(src.value, entry.path);
@@ -4690,11 +4781,19 @@ function initWorkbenchBuilder(opts){
           if (tabButton) tabButton.click();
         }
         currentTarget = {kind:'step', section:section, index:plan.index};
+        if(plan.pathId){currentTarget.pathId=plan.pathId;var sp=stepperFor(section);if(sp) sp.jumpSource(plan.index,plan.pathId);}
         insertSection = section;
         renderInspector();
       }});
     }
   }) : null;
+
+  view.addEventListener('dv:pathrender',applyRowGrabs);
+  view.addEventListener('dv:pathchange',function(){
+    currentTarget=null;clearMultiSelect();if(guide) guide.hidden=true;
+    if(addToStep) cancelAddToStep(null);if(connect) cancelConnect(null);
+    applyRowGrabs();clearStepMarkers();if(stepList) stepList.sync();
+  });
 
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
@@ -4710,7 +4809,7 @@ function initWorkbenchBuilder(opts){
     if (buildRow) buildRow.classList.remove('dv-addmode');
     if (addModeExit) addModeExit.hidden = true;
   }
-  var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
+  var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .path-chip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
     '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
@@ -5496,7 +5595,7 @@ function initWorkbenchBuilder(opts){
       inspectorMessage('no sections found in the editor text'); return;
     }
     var plan = kind === 'section' ? planAddSection(src.value, parsed.raw)
-                                  : planFn(src.value, parsed.raw, insertSection);
+                                  : planFn(src.value, parsed.raw, insertSection, kind === 'step' && stepperFor(insertSection) ? stepperFor(insertSection).path() : undefined);
     if (plan.error){ inspectorMessage(plan.error); return; }
     pushUndo();
     clearMultiSelect(); /* this action establishes a single selection */

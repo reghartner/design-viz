@@ -763,6 +763,65 @@ function inflightPatchWarnings(patch, path, info, warnings){
 }
 
 /* ---------------- normalize + validate ---------------- */
+/* Paths reference a shared step registry. Folding always receives just the
+   selected sequence, so another outcome cannot leak state into this one. */
+function diagramPathList(d){
+  var steps = Array.isArray(d.steps) ? d.steps : [], byId = new Map();
+  steps.forEach(function(s,i){ if (s && typeof s.id === 'string') byId.set(s.id,i); });
+  var colors = ['#38bdf8','#fb923c','#c084fc','#f472b6','#4ade80'];
+  var paths = Array.isArray(d.paths) ? d.paths.filter(function(p){
+    return p && typeof p.id === 'string' && p.id && Array.isArray(p.steps) && p.steps.length &&
+      p.steps.every(function(id){ return byId.has(id); });
+  }).map(function(p,i){
+    return {id:p.id, label:p.label || (i ? p.id : 'Happy path'), color:isHex(p.color) ? p.color : colors[i % colors.length],
+      indices:p.steps.map(function(id){ return byId.get(id); })};
+  }) : [];
+  return paths.length ? paths : [{id:'happy',label:'Happy path',color:colors[0],indices:steps.map(function(s,i){return i;})}];
+}
+function diagramForPath(d, id){
+  var paths = diagramPathList(d), path = paths.find(function(p){ return p.id === id; }) || paths[0];
+  return Object.assign({}, d, {steps:path.indices.map(function(i){ return d.steps[i]; }),
+    _sourceIndices:path.indices, _pathId:path.id});
+}
+function pathBranchPoints(paths, selected){
+  var groups = new Map();
+  paths.forEach(function(p){
+    if (p.id === selected.id) return;
+    var n = 0;
+    while (n < p.indices.length && n < selected.indices.length && p.indices[n] === selected.indices[n]) n++;
+    var at = n - 1; // -1 means the paths diverge before their first step.
+    if (!groups.has(at)) groups.set(at,[selected]);
+    groups.get(at).push(p);
+  });
+  groups.forEach(function(group,at){
+    groups.set(at,paths.filter(function(p){ return group.indexOf(p) >= 0; }));
+  });
+  return groups;
+}
+function validatePaths(d, path, errors){
+  if (d.paths == null) return;
+  if (!Array.isArray(d.paths) || !d.paths.length){ errors.push(path + '.paths: expected a nonempty array of paths'); return; }
+  var ids = new Map(), pathIds = new Set();
+  (Array.isArray(d.steps) ? d.steps : []).forEach(function(s){
+    if (s && typeof s.id === 'string' && s.id) ids.set(s.id,(ids.get(s.id) || 0) + 1);
+  });
+  d.paths.forEach(function(p,i){
+    var at = path + '.paths[' + i + ']';
+    if (!p || typeof p !== 'object' || Array.isArray(p)){ errors.push(at + ': expected a path object'); return; }
+    if (typeof p.id !== 'string' || !p.id.trim() || pathIds.has(p.id)) errors.push(at + '.id: required unique nonempty string');
+    pathIds.add(p.id);
+    if (p.label != null && (typeof p.label !== 'string' || !p.label.trim())) errors.push(at + '.label: expected a nonempty string');
+    if (p.color != null && !isHex(p.color)) errors.push(at + '.color: expected a hex color');
+    if (!Array.isArray(p.steps) || !p.steps.length){ errors.push(at + '.steps: expected one or more step IDs'); return; }
+    var seen = new Set();
+    p.steps.forEach(function(id,j){
+      if (typeof id !== 'string' || ids.get(id) !== 1) errors.push(at + '.steps[' + j + ']: must reference a unique existing step ID');
+      if (seen.has(id)) errors.push(at + '.steps[' + j + ']: repeated step ID; create a distinct step for a repeated operation');
+      seen.add(id);
+    });
+  });
+}
+
 function normalize(raw){
   if (raw && raw.page) return raw.page;
   if (raw && (raw.blocks || raw.sections)) return raw;
@@ -829,6 +888,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var d = sec.diagram;
   if (!d) return;
   var DP = P + '.diagram';
+  validatePaths(d, DP, errors);
   if (d.view && VIEW_SET.indexOf(d.view) < 0)
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
   if (!d.nodes || typeof d.nodes !== 'object'){ errors.push(DP + '.nodes: required — map of node id to {title, sub, icon, tint}'); return; }

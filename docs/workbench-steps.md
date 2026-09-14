@@ -2,7 +2,7 @@
 
 Open **story steps** in the workbench editor. Choose a section, including one
 in a hidden tab, then search by caption, step ID, lane, node, hop or panel ID.
-Numbers always refer to the full story. The metadata counts explicitly listed
+Numbers always refer to the full selected path (or the full story without paths). The metadata counts explicitly listed
 hops, nodes and panel patches at that beat, not the resulting inherited state.
 The list displays up to 200 matches per page, with Previous/Next controls.
 
@@ -13,7 +13,7 @@ filter keeps normal text-editing behavior. Focusing this editor pauses Play.
 An `ambient-only` diagram still permits source editing but has no step preview;
 change `diagram.view` in JSON to `step` or `ambient` to show one.
 
-- **Append step** adds a beat at the end of the chosen section. It uses an
+- **Append step** adds a beat at the end of the chosen path. It uses an
   existing hop when possible; a diagram without edges gets an edgeless beat.
 - **Duplicate** inserts a complete copy after the selected beat. An existing
   step ID gets a unique `-copy1`, `-copy2`, … suffix. ID-less beats stay ID-less.
@@ -35,3 +35,6 @@ Typing in JSON immediately clears the list and disables edits until Render
 succeeds. This protects against acting on stale section or step positions.
 Finish ADD TO STEP or an edge connection before using list actions. The list
 does not intercept text-editor undo or save its navigation state into the spec.
+
+See [alternate paths](alternate-paths.md) for forking after a beat, choosing an
+outcome, and editing shared steps across multiple sequences.

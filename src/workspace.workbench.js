@@ -22,7 +22,8 @@ function workbenchPreviewSnapshot(page, ctl){
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     saved.push(prior);
     if (!stepper) return;
-    var steps = section.diagram.steps || [], step = steps[stepper.current().n];
+    if (stepper.path) prior.path = stepper.path();
+    var steps = diagramForPath(section.diagram, prior.path).steps || [], step = steps[stepper.current().n];
     var id = step && typeof step.id === 'string' && step.id ? step.id : null;
     var signature = JSON.stringify(step);
     /* No positional fallback: repeated identities must not restore a different beat. */
@@ -44,12 +45,13 @@ function restoreWorkbenchPreview(page, ctl, saved){
     var prior = matches[0];
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (!stepper || !prior.mode) return;
+    if (prior.path && stepper.selectPath && !stepper.selectPath(prior.path)) return;
     if (prior.mode === 'ambient'){
       if (stepper.mode() !== 'ambient') stepper.enterAmbient();
       return;
     }
     var indices = [];
-    (section.diagram.steps || []).forEach(function(step, i){
+    (diagramForPath(section.diagram, prior.path).steps || []).forEach(function(step, i){
       if (prior.id ? step && step.id === prior.id : JSON.stringify(step) === prior.signature) indices.push(i);
     });
     if (indices.length !== 1) return;

@@ -17250,7 +17250,7 @@ function initWorkbenchBuilder(opts){
        immediately stop a user-started animation. */
     var transport = ev.target.closest && ev.target.closest('.tbtn');
     var homeMarker = ev.target.closest && ev.target.closest('.pt-homemap [data-device], .pt-homemap [data-subject]');
-    if (homeMarker || (transport && /^(Previous|Next) step$/.test(transport.getAttribute('aria-label') || '') &&
+    if ((homeMarker && !addToStep && !connect) || (transport && /^(Previous|Next) step$/.test(transport.getAttribute('aria-label') || '') &&
         currentTarget && currentTarget.kind === 'step')){
       var activeSection = (homeMarker || transport).closest('.doc-sec');
       if (activeSection){

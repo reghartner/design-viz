@@ -533,6 +533,33 @@ perspectives" of one timeline). Types:
   path map, multi-zone room presence, or approach-before-camera-wake
   sequencing — pair with `pir` when the argument is a binary cone trip
   instead of distance.
+- `homemap` — a 320×180 top-down home with independently patched devices:
+  `{"id":"home","type":"homemap","outline":{"w":300,"h":164},
+  "devices":[{"id":"cam","kind":"camera","label":"Porch cam",
+  "x":46,"y":40,"facing":35,"spread":80,"range":70},
+  {"id":"door","kind":"entry","label":"Front door","x":160,"y":158},
+  {"id":"hub","kind":"hub","label":"Hub","x":160,"y":92}],
+  "initial":{"cam":"scan","door":"closed","hub":"idle"}}`.
+  The centered rounded outline defaults to 300×160; device coordinates are
+  frame pixels (x right, y down). Camera `facing` is degrees clockwise from
+  +x and defaults toward frame center; `spread` defaults to 80 (clamped
+  10–180), `range` to 70 (clamped 20–160). Kinds and states: camera
+  `scan` (default), `sleep`, `detect`, `off`; entry `closed` (default),
+  `open`, `alert`; sensor `ok` (default), `warn`, `alert`, `off`; hub
+  `idle` (default), `rx`, `alert`. Sensors accept an `icon` from the shared
+  icon set (default/fallback `gear`). Every device has a marker and label.
+  Patch DEVICE IDS directly: `{"cam":"detect","signals":[{"from":"cam",
+  "to":"hub"}]}`. Device states carry across steps; `signals` belongs
+  only to its authored step and never carries. It fires one-shot dots
+  between declared endpoints, staggered by 250ms, on animated step paints.
+  Ambient mode uses `initial`, with scanning/detecting camera sweeps and
+  no signal dots. Camera transitions into `detect` and entry transitions
+  into `alert` ripple once; a hub entering `rx` briefly glows. Reduced
+  motion suppresses sweeps, ripples, glows, and signal dots. Invalid kinds,
+  non-finite positions, and duplicate ids are ignored; unknown states use
+  the kind default with a warning. `signals` is the sole reserved device
+  id. Unlike the general folding rules below, homemap treats `log`, `mark`,
+  and `enterOnce` as ordinary device ids.
 - `signal` — link health for 1–6 named radio/wired links:
   `{"id":"net","type":"signal","links":[{"id":"wifi","label":"WiFi",
   "transport":"wifi"},{"id":"cell","label":"Cellular","transport":

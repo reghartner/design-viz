@@ -1517,6 +1517,39 @@ function pointInPoly(x, y, points){
   }
   return inside;
 }
+/* Whole-home geometry is bounded before any value reaches SVG. */
+function homemapModel(panel, state){
+  panel = panel || {}; state = state || {};
+  function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
+  var box = panel.outline || {};
+  var w = fin(box.w) != null ? clamp(box.w, 20, 320) : 300;
+  var h = fin(box.h) != null ? clamp(box.h, 20, 180) : 160;
+  var byId = Object.create(null), seen = Object.create(null), devices = [];
+  (Array.isArray(panel.devices) ? panel.devices : []).forEach(function(d){
+    if (!d || typeof d.id !== 'string' || seen[d.id]) return;
+    seen[d.id] = true;
+    if (!homemapDeviceValid(d)) return;
+    var vocab = HOMEMAP_STATES[d.kind];
+    var x = clamp(d.x, 0, 320), y = clamp(d.y, 0, 180);
+    var facing = fin(d.facing) != null ? d.facing : Math.atan2(90 - y, 160 - x) * 180 / Math.PI;
+    var item = {id: d.id, kind: d.kind, label: String(d.label != null ? d.label : d.id),
+      x: x, y: y, state: Object.prototype.hasOwnProperty.call(state, d.id) && vocab.indexOf(state[d.id]) >= 0 ? state[d.id] : vocab[0],
+      icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
+      facing: ((facing % 360) + 360) % 360,
+      spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
+      range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70};
+    byId[d.id] = item; devices.push(item);
+  });
+  var signals = [];
+  (Array.isArray(state.signals) ? state.signals : []).forEach(function(sig){
+    if (!sig || Array.isArray(sig) || typeof sig.from !== 'string' || typeof sig.to !== 'string') return;
+    var from = byId[sig.from], to = byId[sig.to];
+    if (from && to) signals.push({from: sig.from, to: sig.to,
+      fromXY: {x: from.x, y: from.y}, toXY: {x: to.x, y: to.y}});
+  });
+  return {outline: {x: (320 - w) / 2, y: (180 - h) / 2, w: w, h: h}, devices: devices, signals: signals};
+}
+
 function radarModel(panel, state){
   panel = panel || {}; state = state || {};
   function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
@@ -2733,6 +2766,65 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       h += '</div>';
     });
     h += '</div>';
+  } else if (type === 'homemap'){
+    var hm = homemapModel(panel, state);
+    var hmPrev = host._hmStates || Object.create(null), hmNow = Object.create(null);
+    var hmFresh = Object.create(null), hmHasFresh = false;
+    hm.devices.forEach(function(d){
+      hmNow[d.id] = d.state;
+      if (animate && hmPrev[d.id] !== undefined && hmPrev[d.id] !== d.state &&
+          ((d.kind === 'camera' && d.state === 'detect') ||
+           (d.kind === 'entry' && d.state === 'alert') || (d.kind === 'hub' && d.state === 'rx'))){
+        hmFresh[d.id] = true; hmHasFresh = true;
+      }
+    });
+    host._hmStates = hmNow;
+    var hmSignals = animate && typeof stepIdx === 'number' && stepIdx >= 0 ? hm.signals : [];
+    var buildHomemap = function(transient){
+      var o = hm.outline;
+      var s = '<svg class="hmframe" viewBox="0 0 320 180" role="img" aria-label="' + esc(panel.title || 'Home device map') + '">';
+      s += '<rect class="hmoutline" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="9"/>';
+      /* Wedges below all markers, so one camera cannot obscure another. */
+      hm.devices.forEach(function(d){
+        if (d.kind !== 'camera' || ['scan', 'detect'].indexOf(d.state) < 0) return;
+        var a1 = (d.facing - d.spread / 2) * Math.PI / 180;
+        var a2 = (d.facing + d.spread / 2) * Math.PI / 180;
+        var mid = d.facing * Math.PI / 180;
+        s += '<g class="hmdev hm-camera hm-' + esc(d.state) + '">';
+        s += '<path class="hmwedge" d="M' + d.x + ' ' + d.y +
+          ' L' + (d.x + d.range * Math.cos(a1)).toFixed(1) + ' ' + (d.y + d.range * Math.sin(a1)).toFixed(1) +
+          ' A' + d.range + ' ' + d.range + ' 0 0 1 ' + (d.x + d.range * Math.cos(a2)).toFixed(1) + ' ' +
+          (d.y + d.range * Math.sin(a2)).toFixed(1) + ' Z"/>';
+        if (!RM) s += '<g class="hmsweep" style="transform-origin:' + d.x + 'px ' + d.y + 'px;--sw:' +
+          (d.spread / 2 - 2) + 'deg"><line x1="' + d.x + '" y1="' + d.y + '" x2="' +
+          (d.x + (d.range - 3) * Math.cos(mid)).toFixed(1) + '" y2="' +
+          (d.y + (d.range - 3) * Math.sin(mid)).toFixed(1) + '"/></g>';
+        s += '</g>';
+      });
+      hm.devices.forEach(function(d){
+        s += '<g class="hmdev hm-' + esc(d.kind) + ' hm-' + esc(d.state) + '" data-device="' + esc(d.id) + '">' +
+          '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>';
+        if (transient && hmFresh[d.id]) s += '<circle class="' + (d.kind === 'hub' ? 'hmglow' : 'hmripple') +
+          '" cx="' + d.x + '" cy="' + d.y + '" r="6"/>';
+        s += '<circle class="hmmarker" cx="' + d.x + '" cy="' + d.y + '" r="' + (d.kind === 'hub' ? 7 : 4) + '"/>';
+        if (d.kind === 'hub') s += '<circle class="hmhubring" cx="' + d.x + '" cy="' + d.y + '" r="10"/>';
+        if (d.kind === 'entry') s += '<path class="hmentry" d="M' + (d.x - 7) + ' ' + (d.y - 7) +
+          ' v14 h14 v-14 Z M' + (d.x + 7) + ' ' + (d.y + 7) +
+          (d.state === 'open' ? ' l7 -10' : ' v-14') + '"/>';
+        if (d.kind === 'sensor') s += '<use class="hmicon" href="#i-' + esc(d.icon) + '" x="' +
+          (d.x + 7) + '" y="' + (d.y - 7) + '" width="14" height="14"/>';
+        s += '<text class="hmlbl" x="' + d.x + '" y="' + Math.min(177, d.y + 18) +
+          '" text-anchor="middle">' + esc(d.label) + '</text></g>';
+      });
+      if (!hm.devices.length) s += '<text class="hmlbl" x="160" y="94" text-anchor="middle">No devices configured</text>';
+      if (transient) hmSignals.forEach(function(sig, i){
+        s += '<circle class="hmsig" r="3" style="--hx1:' + sig.fromXY.x + 'px;--hy1:' + sig.fromXY.y +
+          'px;--hx2:' + sig.toXY.x + 'px;--hy2:' + sig.toXY.y + 'px;animation-delay:' + (i * 0.25) + 's"/>';
+      });
+      return s + '</svg>';
+    };
+    h += buildHomemap(true);
+    hBaseline = (hmHasFresh || hmSignals.length) ? buildHomemap(false) : null;
   } else if (type === 'radar'){
     var rm2 = radarModel(panel, state);
     var ridx = typeof stepIdx === 'number' ? stepIdx : 0;
@@ -2906,14 +2998,14 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (host._pulseTimer){ clearTimeout(host._pulseTimer); host._pulseTimer = null; }
     host._ifEpoch = (host._ifEpoch || 0) + 1;
     if (typeof host.querySelectorAll === 'function'){
-      var transientEls = host.querySelectorAll('.dv-chip-pulse,.dv-bar-enter,.pirghost,.pirtrail,.pirripple,.rdripple');
+      var transientEls = host.querySelectorAll('.dv-chip-pulse,.dv-bar-enter,.pirghost,.pirtrail,.pirripple,.rdripple,.hmripple,.hmglow,.hmsig');
       for (var te = transientEls.length - 1; te >= 0; te--){
         var transientEl = transientEls[te];
         if (transientEl.classList){
           transientEl.classList.remove('dv-chip-pulse');
           transientEl.classList.remove('dv-bar-enter');
         }
-        if (/^(pirghost|pirtrail|pirripple|rdripple)$/.test(transientEl.getAttribute('class') || '') &&
+        if (/^(pirghost|pirtrail|pirripple|rdripple|hmripple|hmglow|hmsig)$/.test(transientEl.getAttribute('class') || '') &&
             transientEl.parentNode) transientEl.parentNode.removeChild(transientEl);
       }
       var freshEls = host.querySelectorAll('.fresh');
@@ -3124,14 +3216,20 @@ function buildPanels(asideEl, d, skin){
     card.appendChild(body);
     asideEl.appendChild(card);
     hosts[p.id] = {panel: p, body: body};
-    renderPanelBody(body, p, (folded[p.id] || [])[0], skin, folded[p.id] || [], 0, false);
+    /* Homemap ambient state precedes step zero; other widgets keep their
+       established first-folded-step preview. */
+    var home = p.type === 'homemap';
+    renderPanelBody(body, p, home ? p.initial : (folded[p.id] || [])[0],
+      skin, folded[p.id] || [], home ? -1 : 0, false);
   });
   return {
-    setStep: function(i, animate){
+    setStep: function(i, animate, ambient){
       Object.keys(hosts).forEach(function(pid){
         var states = folded[pid] || [];
         var si = Math.min(i, states.length - 1);
-        renderPanelBody(hosts[pid].body, hosts[pid].panel, states[si], skin, states, si, animate);
+        var panel = hosts[pid].panel;
+        var homeAmbient = ambient && panel.type === 'homemap';
+        renderPanelBody(hosts[pid].body, panel, homeAmbient ? panel.initial : states[si], skin, states, homeAmbient ? -1 : si, animate);
       });
     }
   };
@@ -3312,7 +3410,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     bar.hidden = true;
     setFragmentStep(secBox, 0, false);
     syncToggle();
-    if (panelCtl) panelCtl.setStep(0, false);
+    if (panelCtl) panelCtl.setStep(0, false, true);
     if (onChange) onChange();
   }
 

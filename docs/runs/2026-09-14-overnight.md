@@ -16,7 +16,9 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 4 | Large trace focus by service/subtree and import preview | codex/trace-import-focus | Open: https://github.com/reghartner/design-viz/pull/53 |
 | 5 | Effective step-state inspector and inheritance provenance | codex/effective-state-inspector | Open: https://github.com/reghartner/design-viz/pull/54 |
 | 6 | Resizable workbench workspace / focused editing | codex/resizable-workspace | Open: https://github.com/reghartner/design-viz/pull/55 |
-| 7 | Retry/timeout and circuit-breaker story | TBD | Reuse existing panels; add a focused software recipe/starter |
+| 7 | Retry/timeout and circuit-breaker stories | codex/resilience-starter | Open: https://github.com/reghartner/design-viz/pull/56 |
+| 8 | Replication / consistency view | TBD | Next candidate: replica versions, lag, quorum/read outcome; inspect existing atlas first |
+| 9 | Step-list navigation and editing | TBD | Compact steps, jump, duplicate and reorder using existing planners |
 
 ## Validation and evidence
 
@@ -27,7 +29,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51, #52, #53 and #54 passed all GitHub checks.
+- PRs #50, #51, #52, #53, #54 and #55 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -49,17 +51,28 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   cancellation and blocked storage. Browser verified real divider drags,
   keyboard limits/reset, reload persistence, unchanged spec and undo history,
   focus/exit, source collapse/expand, and a 390-pixel phone viewport. No console
-  errors. PR #55 is open; check final CI before claiming it green.
+  errors. PR #55 passed all GitHub checks.
+- Resilience starter: 3 scenarios / 16 steps / 12 existing panels, plus a
+  complete failed-probe cookbook example. All specs validate without errors or
+  warnings. Full Node and 158 Python tests pass. Browser verified deadline
+  admission, local rejection/call counters, half-open probe state, reset after
+  success, backward jumps and light/dark rendering. Fixed intrinsic panel width
+  so wide tables scroll inside their panel at 390 pixels instead of widening
+  the page. PR #56 is open; check its final CI before claiming it green.
 
 ## Next continuation
 
-Start from the current `codex/resizable-workspace` branch, inspect checks
+Start from the current `codex/resilience-starter` branch, inspect checks
 and working-tree changes, and create the next focused branch. Do not recreate
-the completed PRs above. Workspace resizing and focus are built; keep phone
-layouts usable and retain native text editing. Next, broaden software examples with an
-explicit retry/timeout/circuit-breaker story using existing panels, with honest
-authored timing and outcomes. Only add another widget when it expresses
-something the existing catalog cannot clearly represent.
+the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
+stories are built. Next consider a replication/consistency view (roadmap #10)
+that distinguishes per-replica versions, observed lag and explicitly authored
+read/quorum outcomes. Inspect existing replication atlas examples before
+choosing a new widget; preserve unknown data and avoid implying that a display
+proves consensus or consistency. A compact step-list editor is another bounded
+candidate: use existing selection, duplicate and reorder planners. Keep phone
+layouts and native text editing usable. Shared scenario definitions and
+trace/HLD mapping remain larger design work, not quick schema shortcuts.
 
 ## Design commitments
 

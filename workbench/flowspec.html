@@ -287,6 +287,14 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .rowsedit{flex:1; min-width:0; display:grid; grid-template-columns:minmax(0,1fr); gap:4px;}
 .rowline{display:flex; gap:4px; align-items:center; min-width:0;}
 .rowline .fctl{flex:1 1 0; width:0; min-width:0;}
+/* 5+ column items (homemap devices, budget metrics) render as a card:
+   labeled inputs in a wrapping grid, item actions bottom-right */
+.rowline.rowcard{display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr));
+  gap:4px 6px; align-items:end; border:1px solid var(--line); border-radius:6px; padding:6px;}
+.rowline.rowcard .fctl{flex:none; width:100%; box-sizing:border-box;}
+.rowcell{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.rowk{font:600 9px 'IBM Plex Mono',monospace; color:var(--sub);}
+.rowcardacts{grid-column:1 / -1; display:flex; gap:4px; justify-content:flex-end;}
 .rowx{flex:none; padding:4px 7px;}
 .rowadd{justify-self:start; padding:4px 9px;}
 .rawjson > summary{cursor:pointer; font:600 10px 'IBM Plex Mono',monospace; color:var(--sub); user-select:none;}
@@ -15589,20 +15597,39 @@ function initWorkbenchBuilder(opts){
       return b;
     }
     function buildRow(base){
+      /* 5+ columns cannot share one flex line — the inputs shrink into
+         unreadable slivers. Wide shapes render each item as a card of
+         LABELED inputs in a wrapping grid instead. */
+      var wide = (shape.cols || []).length > 4;
       var line = document.createElement('div');
-      line.className = 'rowline';
+      line.className = wide ? 'rowline rowcard' : 'rowline';
       var ref = {base: base, inputs: {}};
       (shape.cols || []).forEach(function(col){
         var input = colInput(col, base ? base[col.k] : null);
         wireCommit(input, commitRows);
         ref.inputs[col.k] = input;
-        line.appendChild(input);
+        if (wide){
+          var cell = document.createElement('label');
+          cell.className = 'rowcell';
+          var cap = document.createElement('span');
+          cap.className = 'rowk';
+          cap.textContent = col.k + (col.req ? ' *' : '');
+          cell.appendChild(cap);
+          cell.appendChild(input);
+          line.appendChild(cell);
+        } else line.appendChild(input);
       });
-      line.appendChild(smallButton('↑', 'move this item up', function(){ moveRow(ref, -1); }));
-      line.appendChild(smallButton('↓', 'move this item down', function(){ moveRow(ref, 1); }));
+      var acts = line;
+      if (wide){
+        acts = document.createElement('div');
+        acts.className = 'rowcardacts';
+        line.appendChild(acts);
+      }
+      acts.appendChild(smallButton('↑', 'move this item up', function(){ moveRow(ref, -1); }));
+      acts.appendChild(smallButton('↓', 'move this item down', function(){ moveRow(ref, 1); }));
       /* commit first; only a SUCCESSFUL commit removes the line (via the
          form refresh) — a failed one must leave form and JSON agreeing */
-      line.appendChild(smallButton('✕', 'remove this item', function(){
+      acts.appendChild(smallButton('✕', 'remove this item', function(){
         commitRows(rowRefs.filter(function(r){ return r !== ref; }));
       }));
       rowRefs.push(ref);

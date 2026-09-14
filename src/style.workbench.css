@@ -36,8 +36,31 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
    the stack breakpoint the two fall back to the old top/bottom order. */
 .workwrap{max-width:1720px; margin:0 auto; padding:0 22px;}
 .workmain{min-width:0;}
+.workspace-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:1676px;margin:18px auto 0;padding:8px 22px;background:var(--bg);}
+.workspace-hint{font-size:11px;color:var(--sub);}
+.workspace-divider{display:none;touch-action:none;user-select:none;border-radius:5px;position:relative;}
+.workspace-divider::after{content:"";position:absolute;background:var(--line);border-radius:3px;}
+.workspace-divider:hover::after,.workspace-divider:focus-visible::after{background:var(--accent);}
+.workspace-divider:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+body.workspace-dragging,body.workspace-dragging *{user-select:none !important;cursor:inherit !important;}
+body.workspace-focus>header,body.workspace-focus main>.wrap,body.workspace-focus>footer{display:none;}
+body.workspace-focus .workspace-tools{position:sticky;top:0;z-index:60;margin-top:0;max-width:none;}
+body.workspace-focus .workwrap{max-width:none;}
+#workspace-focus[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
+@media (max-width:1180px){.workspace-hint{display:none;}.workwrap{padding:0 12px;}.workspace-tools{padding:8px 12px;}}
 @media (min-width:1181px){
-  .workwrap{display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:16px; align-items:start;}
+  .workwrap{display:grid;grid-template-columns:minmax(0,1fr) 12px var(--workspace-editor,440px);gap:6px;align-items:start;}
+  #workspace-columns{display:block;align-self:stretch;min-height:200px;}
+  #workspace-columns::after{width:3px;left:4px;top:30px;bottom:0;}
+  #workspace-columns{cursor:col-resize;}
+  #workspace-rows{height:12px;flex:none;cursor:row-resize;margin:0 6px;}
+  #workspace-rows::after{height:3px;top:4px;left:0;right:0;}
+  .specbox[open]:has(#sec-inspect[open]:not([hidden])):has(#sec-source[open]) #workspace-rows{display:block;}
+  body.workspace-focus .workmain{max-height:calc(100dvh - var(--workspace-toolbar,48px));overflow:auto;}
+  body.workspace-focus .toolrow{margin-top:12px;}
+  body.workspace-focus .workwrap .specbox{top:calc(var(--workspace-toolbar,48px) + 6px);margin-top:6px;}
+  body.workspace-focus .workwrap .specbox[open]{max-height:calc(100dvh - var(--workspace-toolbar,48px) - 12px);}
+  body.workspace-focus .workwrap .specbox[open]:has(#sec-source[open]){height:calc(100dvh - var(--workspace-toolbar,48px) - 12px);}
   .workwrap .specbox{position:sticky; top:12px; margin-top:30px;}
   /* the editor column is a flex stack capped to the viewport. The JSON
      source section absorbs the leftover height while it is open;
@@ -60,12 +83,12 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
      overflow painted OVER the inspector below. It never shrinks now —
      the inspector and JSON source absorb instead (both scroll inside). */
   .workwrap #sec-insert{flex-shrink:0;}
-  .workwrap #sec-source[open]{flex:1 1 240px; min-height:120px; display:flex; flex-direction:column;}
+  .workwrap #sec-source[open]{flex:var(--workspace-source-share,60) 1 0;min-height:140px;display:flex;flex-direction:column;}
   .workwrap #sec-source[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
   .workwrap #sec-source[open] #src{flex:1 1 auto; height:auto; min-height:60px; resize:none;}
-  .workwrap #sec-inspect[open]{flex:0 1 auto; min-height:90px; display:flex; flex-direction:column;}
+  .workwrap #sec-inspect[open]{flex:var(--workspace-inspector-share,40) 1 0;min-height:120px;display:flex;flex-direction:column;}
   .workwrap #sec-inspect[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
-  .workwrap #sec-inspect[open] .guide{overflow-y:auto;}
+  .workwrap #sec-inspect[open] .guide{overflow-y:auto;max-height:none;flex:1 1 auto;}
   .workwrap .specbox:has(#sec-source:not([open])) #sec-inspect[open]{flex:1 1 auto;}
   .workwrap .specbox:has(#sec-source:not([open])) #sec-inspect[open] .guide{max-height:none; flex:1 1 auto;}
   .workwrap .msgs{max-height:120px; overflow-y:auto;}

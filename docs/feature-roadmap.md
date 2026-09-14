@@ -63,8 +63,9 @@ The effective-state inspector is built in [#54](https://github.com/reghartner/de
 5. **Safer structural edits:** preview reference changes for node/panel renames
    and deletions; add shortcuts for existing history without intercepting
    normal text-editor undo. Preserve native typing history.
-6. **Large-document workspace:** resizable preview/inspector/source columns,
-   focused section mode, persistent outline expansion and search filters.
+6. **Large-document workspace (first slice built):** resizable editor width,
+   inspector/source split, and workspace focus with persistent dimensions.
+   Focused section mode and persistent outline search filters remain future work.
 7. **Shared definitions:** reusable service identities and panel presets with
    explicit instance overrides. Design this with scenario branches so edits
    cannot silently propagate across unrelated stories.

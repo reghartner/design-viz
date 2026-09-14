@@ -1,5 +1,16 @@
 # Changelog
 
+## Resizable workbench workspace (2026-09-14)
+
+- Desktop dividers adjust editor width and inspector/JSON height, with pointer
+  capture, keyboard increments, Home/End limits and double-click reset.
+- Focus workspace hides reference material and keeps the scrolling preview
+  beside the editor; Exit focus restores the previous page scroll.
+- Saved dimensions remain independent of spec/draft/undo state, recover from
+  unavailable storage, and clamp to preserve preview space on smaller windows.
+- Phones use their actual device viewport and stacked panes with no dividers.
+  See [workspace controls](docs/workbench-workspace.md).
+
 ## Effective-state workbench inspector (2026-09-14)
 
 - Selected steps expose the folded state of every panel, including panels

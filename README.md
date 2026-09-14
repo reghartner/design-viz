@@ -25,6 +25,9 @@ See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions
 The [effective-state inspector](docs/workbench-state-inspector.md) explains
 the panel values at a selected step, including inherited and transient values,
 with links to their authored JSON and read-only snapshots.
+Use [workspace focus and resizable panes](docs/workbench-workspace.md) for
+more room: drag either divider, use arrow keys, or collapse JSON for a long
+inspector. Dimensions persist locally; phones use a stacked layout.
 
 ```
 design doc (prose / permalinks / mermaid)

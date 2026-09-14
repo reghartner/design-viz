@@ -3,6 +3,10 @@
   --bg:#EFF1F4; --ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;
   --accent:#0B8FA9; --card:#FFFFFF; --codebg:#F4F2EC; --codeink:#3A3E33;
   --selglow:rgba(11,143,169,.30);
+  /* dark ink on an --accent fill: 4.9:1 on the light-theme teal, 9.4:1 on
+     the dark-theme cyan — both clear WCAG AA for small bold text (white
+     text on the light teal is only 3.8:1, so it is not used) */
+  --accent-ink:#08131C;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -111,13 +115,33 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .specrow{display:flex; align-items:flex-start; gap:12px; padding:10px 14px; border-top:1px solid var(--line); flex-wrap:wrap;}
 
 /* builder: insert buttons + per-element guidance */
-.buildrow{display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--line);}
+.buildrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--line);}
 .buildrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
+/* the insert buttons cluster by job (elements · structure · load · history);
+   a thin rule between clusters makes the grouping read at a glance */
+.bgroup{display:flex; align-items:center; gap:6px;}
+.bgroup + .bgroup{padding-left:10px; border-left:1px solid var(--line);}
 .bbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
   padding:5px 10px; border-radius:7px; cursor:pointer;}
 .bbtn:hover{color:var(--ink); border-color:var(--accent);}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
-.btarget{font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); margin-left:auto;}
+/* the always-visible escape hatch from ADD TO STEP mode: a solid accent
+   pill so the way out is never in doubt, in the app's own callout colour */
+.bexit{background:var(--accent); border:1px solid var(--accent); color:var(--accent-ink); font:700 11px 'IBM Plex Mono',monospace;
+  padding:5px 12px; border-radius:7px; cursor:pointer; margin-left:auto;}
+.bexit:hover{box-shadow:0 0 0 3px var(--selglow);}
+.bexit:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+/* the inspector's own exit from ADD TO STEP mode: same solid-accent pill,
+   no auto-margin (it sits in the .iacts row, not the build row) */
+.bexit-inline{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700;}
+.bexit-inline:hover{box-shadow:0 0 0 3px var(--selglow); color:var(--accent-ink);}
+/* while ADD TO STEP is armed the whole insert row picks up a soft accent
+   wash so the editor plainly reads as "in a mode" and the target line is
+   unmissable */
+.buildrow.dv-addmode{background:var(--selglow); border-bottom-color:var(--accent);}
+.btarget{font:600 11px 'IBM Plex Mono',monospace; color:var(--sub); margin-left:auto;
+  padding:3px 9px; border-radius:6px; background:var(--codebg); border:1px solid var(--line);}
+.buildrow.dv-addmode .btarget{color:var(--accent-ink); background:var(--accent); border-color:var(--accent); margin-left:0;}
 .importbox{padding:10px 14px; border-bottom:1px solid var(--line);}
 .importbox textarea{display:block; width:100%; margin-bottom:8px;}
 /* draft-recovery offer */
@@ -267,6 +291,15 @@ path.edge.dv-instep{stroke-width:3.4;}
 .docview path.halo.dv-instep{display:block; opacity:.5;}
 .stepmode path.edge.dv-instep{opacity:1;}
 .pwidget.dv-instep{outline:2px dashed var(--accent); outline-offset:2px;}
+
+/* the section that inserts land in: a quiet dotted frame set well OUTSIDE
+   the selection ring (offset 8px, muted colour, no animation) so "where a
+   + node / + section goes" is visible without competing with the accent
+   selection highlight. A corner tag names it. */
+section.doc-sec.dv-inserttarget{outline:2px dotted var(--sub); outline-offset:8px; border-radius:6px; position:relative;}
+section.doc-sec.dv-inserttarget::before{content:"insert target"; position:absolute; top:-9px; left:10px;
+  font:700 9px 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--card); background:var(--sub); padding:2px 6px; border-radius:4px; z-index:2; pointer-events:none;}
 .docview .stepline{cursor:pointer;} /* click selects the current step */
 .rbtn{background:var(--accent); color:var(--accent-ink, #fff); border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
   padding:7px 16px; border-radius:8px; cursor:pointer;}

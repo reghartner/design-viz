@@ -308,6 +308,27 @@ function builderPathString(path){
     return (i ? '.' : '') + (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(seg) ? seg : JSON.stringify(seg));
   }).join('') : '(whole document)';
 }
+function builderInsertTargetText(raw, sectionIdx){
+  /* the descriptive part of the insert-target label: "section N · heading",
+     prefixed with the tab name when the target section lives inside a tabs
+     block. A blank/whitespace tab label falls back to "tab N". Returns null
+     when the section ordinal has no section. */
+  var rec = specSectionPaths(raw || {})[sectionIdx];
+  if (!rec) return null;
+  var sec = specValueAt(raw, rec.section);
+  var name = sec && typeof sec.heading === 'string' && sec.heading ? ' · ' + sec.heading : '';
+  var tabName = '';
+  var path = rec.section;
+  var ti = path.indexOf('tabs');
+  if (ti >= 0 && typeof path[ti + 1] === 'number'){
+    var tabsArr = specValueAt(raw, path.slice(0, ti + 1));
+    var tab = Array.isArray(tabsArr) ? tabsArr[path[ti + 1]] : null;
+    var raw2 = tab && typeof tab.label === 'string' ? tab.label.trim() : '';
+    var label = raw2 || ('tab ' + (path[ti + 1] + 1));
+    tabName = 'tab “' + label + '” › ';
+  }
+  return 'into ' + tabName + 'section ' + (sectionIdx + 1) + name;
+}
 function builderPositionLine(raw, target){
   /* which slot the selected element occupies among its siblings — only
      the kinds with move buttons get one */
@@ -2209,6 +2230,8 @@ function initWorkbenchBuilder(opts){
   var diffbox = document.getElementById('diffbox');
   var diffBtn = document.getElementById('spec-diff');
   var targetLabel = document.getElementById('btarget');
+  var buildRow = targetLabel ? targetLabel.closest('.buildrow') : null;
+  var addModeExit = document.getElementById('addmode-exit');
   var undoBtn = document.getElementById('undo-builder');
   var specbox = document.querySelector('.specbox');
   var secInsert = document.getElementById('sec-insert');
@@ -2313,11 +2336,18 @@ function initWorkbenchBuilder(opts){
   }
   function updateTargetLabel(raw){
     if (!targetLabel) return;
-    var rec = specSectionPaths(raw || {})[insertSection];
-    var sec = rec ? specValueAt(raw, rec.section) : null;
-    var name = sec && sec.heading ? ' · ' + sec.heading : '';
-    targetLabel.textContent = 'into section ' + (insertSection + 1) + name +
+    if (addToStep){ addToStepStatus(); return; } /* armed mode owns the label */
+    var desc = builderInsertTargetText(raw || {}, insertSection);
+    targetLabel.textContent = (desc || 'into section ' + (insertSection + 1)) +
       ' — click a section to retarget';
+    markInsertTarget();
+  }
+  function markInsertTarget(){
+    /* frame the section inserts land in, on the board */
+    var prev = view.querySelectorAll('.doc-sec.dv-inserttarget');
+    for (var i = 0; i < prev.length; i++) prev[i].classList.remove('dv-inserttarget');
+    var el = view.querySelector('.doc-sec[data-dv-section="' + insertSection + '"]');
+    if (el) el.classList.add('dv-inserttarget');
   }
 
   /* ---- undo/redo: one snapshot of the editor text per builder action.
@@ -3892,13 +3922,13 @@ function initWorkbenchBuilder(opts){
       var armedHere = !!(addToStep && t.kind === 'step' &&
                          addToStep.section === t.section && addToStep.step === t.index);
       if (t.kind === 'step'){
-        acts.appendChild(actionButton(armedHere ? 'DONE adding (Esc)' : 'ADD TO STEP', function(){
+        acts.appendChild(actionButton(armedHere ? '✕ DONE adding (Esc)' : 'ADD TO STEP', function(){
           if (addToStep){ cancelAddToStep(null); return; }
           if (connect) cancelConnect(null);
           addToStep = {section: t.section, step: t.index};
           addToStepStatus();
           renderInspector();
-        }));
+        }, armedHere ? 'bexit-inline' : ''));
       }
       if (t.kind === 'step' && !armedHere){
         acts.appendChild(actionButton('↑ earlier', function(){
@@ -4034,8 +4064,14 @@ function initWorkbenchBuilder(opts){
   var addModeSurvive = false; /* set around this mode's own re-renders */
   function addToStepStatus(){
     if (targetLabel && addToStep)
-      targetLabel.textContent = 'add to step ' + (addToStep.step + 1) +
-        ': click edges, nodes, panels to toggle — Esc or DONE ends';
+      targetLabel.textContent = 'ADD TO STEP ' + (addToStep.step + 1) +
+        ': click edges, nodes, panels to toggle';
+    if (buildRow) buildRow.classList.toggle('dv-addmode', !!addToStep);
+    if (addModeExit) addModeExit.hidden = !addToStep;
+  }
+  function clearAddModeChrome(){
+    if (buildRow) buildRow.classList.remove('dv-addmode');
+    if (addModeExit) addModeExit.hidden = true;
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
@@ -4070,11 +4106,13 @@ function initWorkbenchBuilder(opts){
   function cancelAddToStep(message){
     if (!addToStep) return;
     addToStep = null;
+    clearAddModeChrome();
     var parsed = parseEditor();
     updateTargetLabel(parsed.error ? null : parsed.raw);
     if (message) inspectorMessage(message);
     else renderInspector(); /* refresh the button label */
   }
+  if (addModeExit) addModeExit.addEventListener('click', function(){ cancelAddToStep(null); });
   function handleAddToStepClick(target){
     /* hints go through the inline error slot so the step form stays on
        screen — inspectorMessage would replace the whole panel */
@@ -4622,6 +4660,7 @@ function initWorkbenchBuilder(opts){
       applyStepMarkers();        /* markers live in the rebuilt DOM */
       reapplyMultiSel();         /* multi-selection rings live there too */
       applyRowGrabs();           /* row grab-handles live there too */
+      markInsertTarget();        /* the insert-target frame lives there too */
     }, 0);
   }).observe(view, {childList: true});
 

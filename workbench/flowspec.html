@@ -8,6 +8,10 @@
   --bg:#EFF1F4; --ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;
   --accent:#0B8FA9; --card:#FFFFFF; --codebg:#F4F2EC; --codeink:#3A3E33;
   --selglow:rgba(11,143,169,.30);
+  /* dark ink on an --accent fill: 4.9:1 on the light-theme teal, 9.4:1 on
+     the dark-theme cyan — both clear WCAG AA for small bold text (white
+     text on the light teal is only 3.8:1, so it is not used) */
+  --accent-ink:#08131C;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -116,13 +120,33 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .specrow{display:flex; align-items:flex-start; gap:12px; padding:10px 14px; border-top:1px solid var(--line); flex-wrap:wrap;}
 
 /* builder: insert buttons + per-element guidance */
-.buildrow{display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--line);}
+.buildrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--line);}
 .buildrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
+/* the insert buttons cluster by job (elements · structure · load · history);
+   a thin rule between clusters makes the grouping read at a glance */
+.bgroup{display:flex; align-items:center; gap:6px;}
+.bgroup + .bgroup{padding-left:10px; border-left:1px solid var(--line);}
 .bbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
   padding:5px 10px; border-radius:7px; cursor:pointer;}
 .bbtn:hover{color:var(--ink); border-color:var(--accent);}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
-.btarget{font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); margin-left:auto;}
+/* the always-visible escape hatch from ADD TO STEP mode: a solid accent
+   pill so the way out is never in doubt, in the app's own callout colour */
+.bexit{background:var(--accent); border:1px solid var(--accent); color:var(--accent-ink); font:700 11px 'IBM Plex Mono',monospace;
+  padding:5px 12px; border-radius:7px; cursor:pointer; margin-left:auto;}
+.bexit:hover{box-shadow:0 0 0 3px var(--selglow);}
+.bexit:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+/* the inspector's own exit from ADD TO STEP mode: same solid-accent pill,
+   no auto-margin (it sits in the .iacts row, not the build row) */
+.bexit-inline{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700;}
+.bexit-inline:hover{box-shadow:0 0 0 3px var(--selglow); color:var(--accent-ink);}
+/* while ADD TO STEP is armed the whole insert row picks up a soft accent
+   wash so the editor plainly reads as "in a mode" and the target line is
+   unmissable */
+.buildrow.dv-addmode{background:var(--selglow); border-bottom-color:var(--accent);}
+.btarget{font:600 11px 'IBM Plex Mono',monospace; color:var(--sub); margin-left:auto;
+  padding:3px 9px; border-radius:6px; background:var(--codebg); border:1px solid var(--line);}
+.buildrow.dv-addmode .btarget{color:var(--accent-ink); background:var(--accent); border-color:var(--accent); margin-left:0;}
 .importbox{padding:10px 14px; border-bottom:1px solid var(--line);}
 .importbox textarea{display:block; width:100%; margin-bottom:8px;}
 /* draft-recovery offer */
@@ -272,6 +296,15 @@ path.edge.dv-instep{stroke-width:3.4;}
 .docview path.halo.dv-instep{display:block; opacity:.5;}
 .stepmode path.edge.dv-instep{opacity:1;}
 .pwidget.dv-instep{outline:2px dashed var(--accent); outline-offset:2px;}
+
+/* the section that inserts land in: a quiet dotted frame set well OUTSIDE
+   the selection ring (offset 8px, muted colour, no animation) so "where a
+   + node / + section goes" is visible without competing with the accent
+   selection highlight. A corner tag names it. */
+section.doc-sec.dv-inserttarget{outline:2px dotted var(--sub); outline-offset:8px; border-radius:6px; position:relative;}
+section.doc-sec.dv-inserttarget::before{content:"insert target"; position:absolute; top:-9px; left:10px;
+  font:700 9px 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--card); background:var(--sub); padding:2px 6px; border-radius:4px; z-index:2; pointer-events:none;}
 .docview .stepline{cursor:pointer;} /* click selects the current step */
 .rbtn{background:var(--accent); color:var(--accent-ink, #fff); border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
   padding:7px 16px; border-radius:8px; cursor:pointer;}
@@ -4283,16 +4316,25 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
       <details class="ssec" id="sec-insert" open>
         <summary>insert</summary>
         <div class="buildrow">
-          <button class="bbtn" id="add-node">+ node</button>
-          <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
-          <button class="bbtn" id="add-step">+ step</button>
-          <button class="bbtn" id="add-panel">+ panel</button>
-          <button class="bbtn" id="add-section">+ section</button>
-          <button class="bbtn" id="add-tabs" title="a tabbed block: two tabs, one starter section each">+ tabs</button>
-        <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
-        <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
-          <button class="bbtn" id="undo-builder" disabled>undo</button>
-          <button class="bbtn" id="redo-builder" disabled>redo</button>
+          <span class="bgroup" role="group" aria-label="add diagram elements">
+            <button class="bbtn" id="add-node">+ node</button>
+            <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
+            <button class="bbtn" id="add-step">+ step</button>
+            <button class="bbtn" id="add-panel">+ panel</button>
+          </span>
+          <span class="bgroup" role="group" aria-label="add page structure">
+            <button class="bbtn" id="add-section">+ section</button>
+            <button class="bbtn" id="add-tabs" title="a tabbed block: two tabs, one starter section each">+ tabs</button>
+          </span>
+          <span class="bgroup" role="group" aria-label="load and import">
+            <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
+            <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
+          </span>
+          <span class="bgroup" role="group" aria-label="history">
+            <button class="bbtn" id="undo-builder" disabled>undo</button>
+            <button class="bbtn" id="redo-builder" disabled>redo</button>
+          </span>
+          <button class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button>
           <span class="btarget" id="btarget"></span>
         </div>
         <div class="palette" id="palette" hidden></div>
@@ -10123,6 +10165,27 @@ function builderPathString(path){
     return (i ? '.' : '') + (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(seg) ? seg : JSON.stringify(seg));
   }).join('') : '(whole document)';
 }
+function builderInsertTargetText(raw, sectionIdx){
+  /* the descriptive part of the insert-target label: "section N · heading",
+     prefixed with the tab name when the target section lives inside a tabs
+     block. A blank/whitespace tab label falls back to "tab N". Returns null
+     when the section ordinal has no section. */
+  var rec = specSectionPaths(raw || {})[sectionIdx];
+  if (!rec) return null;
+  var sec = specValueAt(raw, rec.section);
+  var name = sec && typeof sec.heading === 'string' && sec.heading ? ' · ' + sec.heading : '';
+  var tabName = '';
+  var path = rec.section;
+  var ti = path.indexOf('tabs');
+  if (ti >= 0 && typeof path[ti + 1] === 'number'){
+    var tabsArr = specValueAt(raw, path.slice(0, ti + 1));
+    var tab = Array.isArray(tabsArr) ? tabsArr[path[ti + 1]] : null;
+    var raw2 = tab && typeof tab.label === 'string' ? tab.label.trim() : '';
+    var label = raw2 || ('tab ' + (path[ti + 1] + 1));
+    tabName = 'tab “' + label + '” › ';
+  }
+  return 'into ' + tabName + 'section ' + (sectionIdx + 1) + name;
+}
 function builderPositionLine(raw, target){
   /* which slot the selected element occupies among its siblings — only
      the kinds with move buttons get one */
@@ -12024,6 +12087,8 @@ function initWorkbenchBuilder(opts){
   var diffbox = document.getElementById('diffbox');
   var diffBtn = document.getElementById('spec-diff');
   var targetLabel = document.getElementById('btarget');
+  var buildRow = targetLabel ? targetLabel.closest('.buildrow') : null;
+  var addModeExit = document.getElementById('addmode-exit');
   var undoBtn = document.getElementById('undo-builder');
   var specbox = document.querySelector('.specbox');
   var secInsert = document.getElementById('sec-insert');
@@ -12128,11 +12193,18 @@ function initWorkbenchBuilder(opts){
   }
   function updateTargetLabel(raw){
     if (!targetLabel) return;
-    var rec = specSectionPaths(raw || {})[insertSection];
-    var sec = rec ? specValueAt(raw, rec.section) : null;
-    var name = sec && sec.heading ? ' · ' + sec.heading : '';
-    targetLabel.textContent = 'into section ' + (insertSection + 1) + name +
+    if (addToStep){ addToStepStatus(); return; } /* armed mode owns the label */
+    var desc = builderInsertTargetText(raw || {}, insertSection);
+    targetLabel.textContent = (desc || 'into section ' + (insertSection + 1)) +
       ' — click a section to retarget';
+    markInsertTarget();
+  }
+  function markInsertTarget(){
+    /* frame the section inserts land in, on the board */
+    var prev = view.querySelectorAll('.doc-sec.dv-inserttarget');
+    for (var i = 0; i < prev.length; i++) prev[i].classList.remove('dv-inserttarget');
+    var el = view.querySelector('.doc-sec[data-dv-section="' + insertSection + '"]');
+    if (el) el.classList.add('dv-inserttarget');
   }
 
   /* ---- undo/redo: one snapshot of the editor text per builder action.
@@ -13707,13 +13779,13 @@ function initWorkbenchBuilder(opts){
       var armedHere = !!(addToStep && t.kind === 'step' &&
                          addToStep.section === t.section && addToStep.step === t.index);
       if (t.kind === 'step'){
-        acts.appendChild(actionButton(armedHere ? 'DONE adding (Esc)' : 'ADD TO STEP', function(){
+        acts.appendChild(actionButton(armedHere ? '✕ DONE adding (Esc)' : 'ADD TO STEP', function(){
           if (addToStep){ cancelAddToStep(null); return; }
           if (connect) cancelConnect(null);
           addToStep = {section: t.section, step: t.index};
           addToStepStatus();
           renderInspector();
-        }));
+        }, armedHere ? 'bexit-inline' : ''));
       }
       if (t.kind === 'step' && !armedHere){
         acts.appendChild(actionButton('↑ earlier', function(){
@@ -13849,8 +13921,14 @@ function initWorkbenchBuilder(opts){
   var addModeSurvive = false; /* set around this mode's own re-renders */
   function addToStepStatus(){
     if (targetLabel && addToStep)
-      targetLabel.textContent = 'add to step ' + (addToStep.step + 1) +
-        ': click edges, nodes, panels to toggle — Esc or DONE ends';
+      targetLabel.textContent = 'ADD TO STEP ' + (addToStep.step + 1) +
+        ': click edges, nodes, panels to toggle';
+    if (buildRow) buildRow.classList.toggle('dv-addmode', !!addToStep);
+    if (addModeExit) addModeExit.hidden = !addToStep;
+  }
+  function clearAddModeChrome(){
+    if (buildRow) buildRow.classList.remove('dv-addmode');
+    if (addModeExit) addModeExit.hidden = true;
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
@@ -13885,11 +13963,13 @@ function initWorkbenchBuilder(opts){
   function cancelAddToStep(message){
     if (!addToStep) return;
     addToStep = null;
+    clearAddModeChrome();
     var parsed = parseEditor();
     updateTargetLabel(parsed.error ? null : parsed.raw);
     if (message) inspectorMessage(message);
     else renderInspector(); /* refresh the button label */
   }
+  if (addModeExit) addModeExit.addEventListener('click', function(){ cancelAddToStep(null); });
   function handleAddToStepClick(target){
     /* hints go through the inline error slot so the step form stays on
        screen — inspectorMessage would replace the whole panel */
@@ -14437,6 +14517,7 @@ function initWorkbenchBuilder(opts){
       applyStepMarkers();        /* markers live in the rebuilt DOM */
       reapplyMultiSel();         /* multi-selection rings live there too */
       applyRowGrabs();           /* row grab-handles live there too */
+      markInsertTarget();        /* the insert-target frame lives there too */
     }, 0);
   }).observe(view, {childList: true});
 

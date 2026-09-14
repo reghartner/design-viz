@@ -35,7 +35,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
   At 07:26 local the existing schedule was aligned to the hour so its final
   check runs at 08:00 exactly; the original 08:00 UTC-adjusted expiry remains.
-- PRs #50, #51, #52, #53, #54, #55, #56, #57, #58, #59, #60 and #61 passed all GitHub checks.
+- PRs #50–#62 passed all GitHub checks, verified again at 08:00 local.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -120,31 +120,30 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   from semantic tones, disappear on focus exit and dispose with old previews.
   No new runtime errors after the fix; the fixture's old density warnings remain.
   Browser also verified a static routed graph without panels/steps, full long
-  labels and disambiguated duplicate names. Check PR #62 final head CI after
-  this handoff commit.
+  labels and disambiguated duplicate names. PR #62 head c2cd884 passed all
+  GitHub checks before the final documentation handoff.
 
-## Next continuation
+## Morning handoff — complete at 08:00 local
 
-Start from the current `codex/diagram-node-finder` branch, inspect checks
-and working-tree changes. Do not recreate
-the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
-stories, numeric replica positions and stable paused playback are built.
-The workbench now disposes old steppers, starts paused and preserves unique
-preview positions through ordinary edits; standalone autoplay is unchanged.
-The compact step-list editor is now built, including search, bounded paging,
-duplicate, append, earlier/later, history and stale-source protection. Canary
-promotion, traffic rollback and firmware trial/confirmation stories are built.
-Phone diagram legibility is now built: Auto uses readable sizing on narrow
-diagram columns, with explicit Fit width and Readable, reduced gutters across
-skins, keyboard panning and retained view choices through normal edits.
-Explicit node navigation is now built. At the final 08:00 check, do not start
-another feature. Verify the complete PR stack and phone URL, then provide the
-morning report with the ranked roadmap and key limitations. All PRs stay open;
-do not merge. The current branch contains the cumulative stack. No original
-checkout or unrelated PR #49 files were modified.
-Avoid claiming zero crossings in arbitrary graphs. Keep native text editing
-usable. Shared scenario definitions and
-trace/HLD mapping remain larger design work, not quick schema shortcuts.
+The overnight build is finished. Thirteen focused PRs remain open, stacked in
+review order #50 → #62. The current `codex/diagram-node-finder` branch contains
+the cumulative result. All 39 GitHub checks were green at the morning audit;
+no product changes followed that audit. No PR was merged. The original
+checkout and unrelated PR #49 were left untouched.
+
+Both the workbench URL above and the direct complex-trace demo returned HTTP
+200 at 08:00. The preview servers remain available on port 8765. Direct demo:
+`http://192.168.1.242:8765/template/flowview.html?spec=../src/starters/complex-trace.json`.
+These LAN links require the same network as the host. The browser viewport
+was restored to normal after testing. The overnight automation is finished.
+
+The [ranked roadmap](../feature-roadmap.md) records built slices and remaining
+ideas. The larger next decisions are shared scenario definitions and explicit
+trace-to-HLD mapping. Import currently accepts pasted/exported JSON rather
+than a Honeycomb account connection. Preview accepts up to 10,000 spans;
+an individual diagram is bounded to 200 spans and 30 services, with explicit
+focus and omission counts. Dense graphs can still cross; uncovered span time
+does not establish CPU time, waiting, or a bottleneck.
 
 ## Design commitments
 

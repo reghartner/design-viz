@@ -1013,13 +1013,21 @@ function parseStarterManifest(text){
 var FLOWSPEC_OPEN = '<scr' + 'ipt type="application/json" id="flowspec">';
 var FLOWSPEC_CLOSE = '</scr' + 'ipt>';
 
+function exportTemplateOpeners(templateText){
+  /* line-anchored flowspec block openers (optional CR before the line
+     end so CRLF templates count too) */
+  var openRe = new RegExp('^' + FLOWSPEC_OPEN.replace(/[/\\^$.*+?()[\]{}|]/g, '\\$&') + '\\r?$', 'gm');
+  return (templateText.match(openRe) || []).length;
+}
 function buildExportHtml(templateText, specText){
-  if (specText.indexOf('</scr' + 'ipt') >= 0)
+  /* the close-tag scan is case-insensitive — HTML tag names are, so
+     "</SCRIPT" would break out of the JSON block just as surely */
+  if (/<\/script/i.test(specText))
     return {error: 'the spec contains a literal "</scr' + 'ipt" — escape it as "<\\/scr' + 'ipt" first'};
   var spec;
   try { spec = JSON.parse(specText); }
   catch (ex){ return {error: 'not valid JSON (' + ex.message + ')'}; }
-  var openRe = new RegExp('^' + FLOWSPEC_OPEN.replace(/[/\\^$.*+?()[\]{}|]/g, '\\$&') + '$', 'gm');
+  var openRe = new RegExp('^' + FLOWSPEC_OPEN.replace(/[/\\^$.*+?()[\]{}|]/g, '\\$&') + '\\r?$', 'gm');
   var opens = templateText.match(openRe) || [];
   if (opens.length !== 1)
     return {error: 'the page template must hold exactly one flowspec block — found ' + opens.length};
@@ -2311,7 +2319,10 @@ function initWorkbenchBuilder(opts){
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.text();
       }).then(function(text){
-        if (text.indexOf(FLOWSPEC_OPEN) >= 0) done(null, text);
+        /* a candidate wins only with EXACTLY ONE line-anchored block —
+           an SPA/fallback index that merely mentions the opener does not
+           mask a real template later in the list */
+        if (exportTemplateOpeners(text) === 1) done(null, text);
         else tryNext();
       })['catch'](tryNext);
     }
@@ -2340,26 +2351,37 @@ function initWorkbenchBuilder(opts){
     if (parsed.error){ inspectorMessage('export needs valid JSON — ' + parsed.error); return; }
     var jsonName = specFileName(parsed.raw);
     var htmlName = jsonName.replace(/\.spec\.json$/, '') + '.html';
-    fetchExportTemplate(function(err, tplText){
-      if (err){ inspectorMessage(err); return; }
-      var built = buildExportHtml(tplText, src.value.trim());
-      if (built.error){ inspectorMessage(built.error); return; }
-      if (window.showDirectoryPicker){
-        window.showDirectoryPicker({mode: 'readwrite'}).then(function(dir){
-          return writeIntoDirectory(dir, jsonName, src.value)
+    /* the folder picker needs the click's transient activation, which a
+       fetch would spend — so pick the directory FIRST, then fetch, build,
+       and write. Files are overwritten in place. */
+    if (window.showDirectoryPicker){
+      window.showDirectoryPicker({mode: 'readwrite'}).then(function(dir){
+        fetchExportTemplate(function(err, tplText){
+          if (err){ inspectorMessage(err); return; }
+          var built = buildExportHtml(tplText, src.value.trim());
+          if (built.error){ inspectorMessage(built.error); return; }
+          writeIntoDirectory(dir, jsonName, src.value)
             .then(function(){ return writeIntoDirectory(dir, htmlName, built.html); })
-            .then(function(){ inspectorMessage('exported ' + jsonName + ' and ' + htmlName); });
-        })['catch'](function(ex){
-          if (ex && ex.name === 'AbortError') return; /* picker dismissed */
-          inspectorMessage('export failed: ' + (ex && ex.message ? ex.message : ex));
+            .then(function(){ inspectorMessage('exported ' + jsonName + ' and ' + htmlName + ' (overwritten in place)'); })
+            ['catch'](function(ex){
+              inspectorMessage('export failed while writing: ' + (ex && ex.message ? ex.message : ex));
+            });
         });
-      } else {
-        /* no folder picker in this browser: plain downloads instead */
+      })['catch'](function(ex){
+        if (ex && ex.name === 'AbortError') return; /* picker dismissed */
+        inspectorMessage('export failed: ' + (ex && ex.message ? ex.message : ex));
+      });
+    } else {
+      /* no folder picker in this browser: plain downloads instead */
+      fetchExportTemplate(function(err, tplText){
+        if (err){ inspectorMessage(err); return; }
+        var built = buildExportHtml(tplText, src.value.trim());
+        if (built.error){ inspectorMessage(built.error); return; }
         downloadTextFile(jsonName, src.value, 'application/json');
         downloadTextFile(htmlName, built.html, 'text/html');
         inspectorMessage('no folder picker here — downloaded ' + jsonName + ' and ' + htmlName);
-      }
-    });
+      });
+    }
   });
 
   /* ---- inline Mermaid import ---- */

@@ -2280,10 +2280,22 @@ test('buildExportHtml refuses bad templates and bad specs', () => {
   assert.match(B.buildExportHtml(twice, spec).error, /found 2/);
   assert.match(B.buildExportHtml(miniTemplate(), '{nope').error, /not valid JSON/);
   assert.match(B.buildExportHtml(miniTemplate(), '{"a": "x</scr' + 'ipt>"}').error, /escape it/);
+  /* HTML tag names are case-insensitive — an uppercase close must be caught too */
+  assert.match(B.buildExportHtml(miniTemplate(), '{"a": "x</SCR' + 'IPT><img>"}').error, /escape it/);
+  assert.match(B.buildExportHtml(miniTemplate(), '{"a": "x</ScR' + 'iPt>"}').error, /escape it/);
   /* a prose mention of the opener mid-line is NOT a block (line-anchored) */
   const prose = miniTemplate().replace('<main></main>', '<p>about ' + TPL_OPEN + ' tags</p>');
   const out = B.buildExportHtml(prose, spec);
   assert.ok(!out.error);
+});
+
+test('buildExportHtml accepts a CRLF template', () => {
+  const crlf = miniTemplate().replace(/\n/g, '\r\n');
+  const spec = '{"page": {"title": "T"}}';
+  const out = B.buildExportHtml(crlf, spec);
+  assert.ok(!out.error, out.error);
+  assert.ok(out.html.includes(spec));
+  assert.ok(out.html.includes('<title>T</title>'));
 });
 
 test('buildExportHtml leaves the title alone when the spec has none', () => {

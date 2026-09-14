@@ -124,6 +124,9 @@ body.workspace-focus .workwrap{max-width:none;}
 .story-step[aria-current="step"]>b{color:var(--accent);}
 .story-step:hover{border-color:var(--accent);}
 .story-step:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;}
+/* one background pulse on the just-moved (or just-added) row — same idiom
+   as the inspector's "step 2 of 3" flash */
+.story-step.story-moved{animation:dvposflash .9s ease-out;}
 .story-actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
 .story-actions .bbtn{min-height:32px;}
 .story-actions[hidden]{display:none;}
@@ -323,6 +326,7 @@ g.coin.dv-sel circle{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 
 @media (prefers-reduced-motion: reduce){
   .grp.dv-sel .grpbox, g.node.dv-sel .card, g.coin.dv-sel circle{animation:none;}
   .guide .gpos.gposflash{animation:none; background:var(--selglow);}
+  .story-step.story-moved{animation:none; background:var(--selglow);}
 }
 .pwidget.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
 section.doc-sec.dv-sel{outline:2px dashed var(--accent); outline-offset:3px; box-shadow:0 0 0 5px var(--selglow);}
@@ -4716,10 +4720,10 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
           <div class="story-actions">
             <button class="bbtn" id="steps-add">Append step</button>
             <button class="bbtn" id="steps-duplicate" disabled>Duplicate</button>
-            <button class="bbtn" id="steps-earlier" disabled>↑ Earlier</button>
-            <button class="bbtn" id="steps-later" disabled>↓ Later</button>
+            <button class="bbtn" id="steps-earlier" disabled>↑ Move up</button>
+            <button class="bbtn" id="steps-later" disabled>↓ Move down</button>
           </div>
-          <p class="story-note">Select a beat to edit it. Moves use the full story order. Copies repeat patches, including appended events; inherited state is recalculated. Reveal/hide indices stay positional.</p>
+          <p class="story-note">Select a beat to edit it. Move up/down changes its position in the full story order. Copies repeat patches, including appended events; inherited state is recalculated. Reveal/hide indices stay positional.</p>
         </div>
       </details>
       <details class="ssec" id="sec-inspect" open hidden>
@@ -14647,6 +14651,9 @@ function initWorkbenchBuilder(opts){
     applyStepMarkers();
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
+    /* the story list indexes the editor text; every applied plan changes
+       that text, so re-sync or its rows and highlight go stale */
+    if (stepList) stepList.sync();
     if (plan.start != null) scrollTextareaTo(plan.start);
     return true;
   }
@@ -15814,8 +15821,8 @@ function initWorkbenchBuilder(opts){
               flashPositionLine();
             }});
         };
-        acts.appendChild(actionButton('↑ earlier', function(){ moveSection(-1); }));
-        acts.appendChild(actionButton('↓ later', function(){ moveSection(1); }));
+        acts.appendChild(actionButton('↑ move up', function(){ moveSection(-1); }));
+        acts.appendChild(actionButton('↓ move down', function(){ moveSection(1); }));
       }
       if (t.kind === 'tab'){
         acts.appendChild(actionButton('+ tab', function(){
@@ -15825,11 +15832,11 @@ function initWorkbenchBuilder(opts){
               renderInspector();
             }});
         }));
-        acts.appendChild(actionButton('← earlier', function(){
+        acts.appendChild(actionButton('← move left', function(){
           commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, -1); },
             {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
-        acts.appendChild(actionButton('→ later', function(){
+        acts.appendChild(actionButton('→ move right', function(){
           commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, 1); },
             {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
@@ -15850,11 +15857,11 @@ function initWorkbenchBuilder(opts){
           commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index); },
             {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
-        acts.appendChild(actionButton('↑ earlier', function(){
+        acts.appendChild(actionButton('↑ move up', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
-        acts.appendChild(actionButton('↓ later', function(){
+        acts.appendChild(actionButton('↓ move down', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
@@ -17149,7 +17156,13 @@ function initWorkbenchStepList(opts){
     if (!opts.apply(plan, section)) return;
     search.value = ''; refresh();
     var selected = list.querySelector('[aria-current="step"]');
-    if (selected) selected.scrollIntoView({block:'nearest'});
+    if (selected){
+      selected.scrollIntoView({block:'nearest'});
+      /* a moved row's text looks identical in its new slot — pulse it so
+         the click visibly landed */
+      selected.className = 'story-step story-moved';
+      setTimeout(function(){ selected.className = 'story-step'; }, 900);
+    }
     if (!buttons[name].disabled) buttons[name].focus(); else if (selected) selected.focus();
   }); });
   opts.src.addEventListener('input', function(){ invalidate(); });

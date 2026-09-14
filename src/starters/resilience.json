@@ -1,0 +1,1301 @@
+{
+  "page": {
+    "title": "Retries, deadlines and circuit recovery",
+    "skin": "aurora",
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Retry succeeds",
+            "sections": [
+              {
+                "heading": "A bounded retry succeeds",
+                "text": [
+                  "Fictional design walkthrough, not a trace or simulation. Timings, outcomes and policy thresholds are authored examples."
+                ],
+                "bullets": [
+                  "One idempotent read, at most three attempts, a 1000 ms caller deadline and 200 ms per-attempt timeouts.",
+                  "Backoff values are selected example jitter samples (60 ms from [0,100], then 120 ms from [0,200]); playback does not draw random delays.",
+                  "Rows distinguish caller-observed attempts from client backoff. A caller timeout does not prove that server execution stopped."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "routing": "lanes",
+                  "nodes": {
+                    "caller": {
+                      "title": "Caller",
+                      "icon": "terminal"
+                    },
+                    "policy": {
+                      "title": "Retry policy",
+                      "sub": "inside caller process",
+                      "icon": "gear"
+                    },
+                    "catalog": {
+                      "title": "Catalog API",
+                      "sub": "idempotent read",
+                      "icon": "cloud",
+                      "tint": "data"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "caller",
+                      "policy",
+                      "catalog"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "caller",
+                      "to": "policy",
+                      "kind": "int",
+                      "label": "read request"
+                    },
+                    {
+                      "from": "policy",
+                      "to": "catalog",
+                      "kind": "https",
+                      "label": "GET /availability"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "timing",
+                      "type": "waterfall",
+                      "title": "Completed intervals \u00b7 authored",
+                      "spans": [
+                        {
+                          "id": "a1",
+                          "label": "Attempt 1 \u00b7 HTTP 503",
+                          "startMs": 0,
+                          "ms": 100
+                        },
+                        {
+                          "id": "b1",
+                          "label": "Selected backoff \u00b7 60 ms",
+                          "startMs": 100,
+                          "ms": 60
+                        },
+                        {
+                          "id": "a2",
+                          "label": "Attempt 2 \u00b7 caller timeout",
+                          "startMs": 160,
+                          "ms": 200
+                        },
+                        {
+                          "id": "b2",
+                          "label": "Selected backoff \u00b7 120 ms",
+                          "startMs": 360,
+                          "ms": 120
+                        },
+                        {
+                          "id": "a3",
+                          "label": "Attempt 3 \u00b7 HTTP 200",
+                          "startMs": 480,
+                          "ms": 150
+                        }
+                      ],
+                      "initial": {
+                        "reveal": 0
+                      }
+                    },
+                    {
+                      "id": "attempts",
+                      "type": "table",
+                      "title": "Completed calls",
+                      "columns": [
+                        {
+                          "id": "attempt",
+                          "label": "Call"
+                        },
+                        {
+                          "id": "start",
+                          "label": "Start ms"
+                        },
+                        {
+                          "id": "end",
+                          "label": "End ms"
+                        },
+                        {
+                          "id": "outcome",
+                          "label": "Outcome"
+                        }
+                      ],
+                      "initial": {
+                        "rows": []
+                      }
+                    },
+                    {
+                      "id": "limits",
+                      "type": "budget",
+                      "title": "Caller budget",
+                      "metrics": [
+                        {
+                          "id": "elapsed",
+                          "label": "Elapsed",
+                          "unit": "ms",
+                          "max": 1000,
+                          "warn": 800
+                        },
+                        {
+                          "id": "attempts",
+                          "label": "Attempts started",
+                          "unit": "calls",
+                          "max": 3
+                        }
+                      ],
+                      "initial": {
+                        "values": {
+                          "elapsed": 0,
+                          "attempts": 0
+                        },
+                        "note": "1000 ms remain before the caller deadline. Example values."
+                      }
+                    },
+                    {
+                      "id": "gates",
+                      "type": "checks",
+                      "title": "Decision for next attempt",
+                      "checks": [
+                        {
+                          "id": "safe",
+                          "label": "Safe to repeat"
+                        },
+                        {
+                          "id": "transient",
+                          "label": "Retryable outcome"
+                        },
+                        {
+                          "id": "room",
+                          "label": "Delay + timeout fit"
+                        }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "text": "t=100 ms. Call 1 returned HTTP 503. The policy admits another read: 60 ms selected backoff + 200 ms timeout fit within the remaining 900 ms.",
+                      "nodes": [
+                        "policy",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 1,
+                          "highlight": "a1"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 100,
+                            "attempts": 1
+                          },
+                          "note": "900 ms remain before the caller deadline. Example values."
+                        },
+                        "attempts": {
+                          "rows": [
+                            {
+                              "id": "1",
+                              "cells": {
+                                "attempt": "1",
+                                "start": 0,
+                                "end": 100,
+                                "outcome": "HTTP 503"
+                              }
+                            }
+                          ]
+                        },
+                        "gates": {
+                          "results": {
+                            "safe": {
+                              "status": "pass",
+                              "detail": "Read-only GET; no write is repeated"
+                            },
+                            "transient": {
+                              "status": "pass",
+                              "detail": "HTTP 503 is retryable under this example policy"
+                            },
+                            "room": {
+                              "status": "pass",
+                              "detail": "60 + 200 \u2264 900 ms"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=160 ms. The selected 60 ms backoff finishes. No dependency call occurred during this delay.",
+                      "nodes": [
+                        "policy"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 2,
+                          "highlight": "b1"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 160,
+                            "attempts": 1
+                          },
+                          "note": "840 ms remain before the caller deadline. Example values."
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=360 ms. Call 2 reached its 200 ms caller timeout. The remote operation may still be running; this read is safe to repeat. A 120 ms delay plus another 200 ms timeout fit.",
+                      "nodes": [
+                        "policy",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 3,
+                          "highlight": "a2"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 360,
+                            "attempts": 2
+                          },
+                          "note": "640 ms remain before the caller deadline. Example values."
+                        },
+                        "attempts": {
+                          "rows": [
+                            {
+                              "id": "1",
+                              "cells": {
+                                "attempt": "1",
+                                "start": 0,
+                                "end": 100,
+                                "outcome": "HTTP 503"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "attempt": "2",
+                                "start": 160,
+                                "end": 360,
+                                "outcome": "caller timeout"
+                              }
+                            }
+                          ]
+                        },
+                        "gates": {
+                          "results": {
+                            "safe": {
+                              "status": "pass",
+                              "detail": "Read-only GET; no write is repeated"
+                            },
+                            "transient": {
+                              "status": "pass",
+                              "detail": "Caller timeout is retryable for this read"
+                            },
+                            "room": {
+                              "status": "pass",
+                              "detail": "120 + 200 \u2264 640 ms"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=480 ms. The selected 120 ms backoff finishes. Only this caller layer owns retries.",
+                      "nodes": [
+                        "policy"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 4,
+                          "highlight": "b2"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 480,
+                            "attempts": 2
+                          },
+                          "note": "520 ms remain before the caller deadline. Example values."
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=630 ms. Call 3 succeeds after 150 ms. Return the result with 370 ms left; no fourth attempt is needed or allowed.",
+                      "nodes": [
+                        "catalog",
+                        "policy",
+                        "caller"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 5,
+                          "highlight": "a3"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 630,
+                            "attempts": 3
+                          },
+                          "note": "370 ms remain before the caller deadline. Example values."
+                        },
+                        "attempts": {
+                          "rows": [
+                            {
+                              "id": "1",
+                              "cells": {
+                                "attempt": "1",
+                                "start": 0,
+                                "end": 100,
+                                "outcome": "HTTP 503"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "attempt": "2",
+                                "start": 160,
+                                "end": 360,
+                                "outcome": "caller timeout"
+                              }
+                            },
+                            {
+                              "id": "3",
+                              "cells": {
+                                "attempt": "3",
+                                "start": 480,
+                                "end": 630,
+                                "outcome": "HTTP 200"
+                              }
+                            }
+                          ]
+                        },
+                        "gates": {
+                          "results": {
+                            "safe": {
+                              "status": "pass",
+                              "detail": "Read-only GET"
+                            },
+                            "transient": {
+                              "status": "skip",
+                              "detail": "Success: do not retry"
+                            },
+                            "room": {
+                              "status": "skip",
+                              "detail": "Three-attempt cap reached; request complete"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "accent": "cyan"
+              }
+            ]
+          },
+          {
+            "label": "Retry denied",
+            "sections": [
+              {
+                "heading": "The next attempt cannot fit",
+                "text": [
+                  "Fictional design walkthrough, not a trace or simulation. Timings, outcomes and policy thresholds are authored examples."
+                ],
+                "bullets": [
+                  "Separate scenario: 350 ms attempt timeouts, 1000 ms deadline, at most three attempts.",
+                  "This example requires the full selected delay plus a full attempt timeout to fit; it does not shorten the final timeout.",
+                  "No attempt is started merely because the attempt-count limit has room. An elapsed value of 800 ms does not mean the 1000 ms deadline expired."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "routing": "lanes",
+                  "nodes": {
+                    "caller": {
+                      "title": "Caller",
+                      "icon": "terminal"
+                    },
+                    "policy": {
+                      "title": "Retry policy",
+                      "sub": "inside caller process",
+                      "icon": "gear"
+                    },
+                    "catalog": {
+                      "title": "Catalog API",
+                      "sub": "idempotent read",
+                      "icon": "cloud",
+                      "tint": "data"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "caller",
+                      "policy",
+                      "catalog"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "caller",
+                      "to": "policy",
+                      "kind": "int",
+                      "label": "read request"
+                    },
+                    {
+                      "from": "policy",
+                      "to": "catalog",
+                      "kind": "https",
+                      "label": "GET /availability"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "timing",
+                      "type": "waterfall",
+                      "title": "Completed intervals \u00b7 authored",
+                      "spans": [
+                        {
+                          "id": "a1",
+                          "label": "Attempt 1 \u00b7 caller timeout",
+                          "startMs": 0,
+                          "ms": 350
+                        },
+                        {
+                          "id": "b1",
+                          "label": "Selected backoff \u00b7 100 ms",
+                          "startMs": 350,
+                          "ms": 100
+                        },
+                        {
+                          "id": "a2",
+                          "label": "Attempt 2 \u00b7 caller timeout",
+                          "startMs": 450,
+                          "ms": 350
+                        }
+                      ],
+                      "initial": {
+                        "reveal": 0
+                      }
+                    },
+                    {
+                      "id": "attempts",
+                      "type": "table",
+                      "title": "Completed calls",
+                      "columns": [
+                        {
+                          "id": "attempt",
+                          "label": "Call"
+                        },
+                        {
+                          "id": "start",
+                          "label": "Start ms"
+                        },
+                        {
+                          "id": "end",
+                          "label": "End ms"
+                        },
+                        {
+                          "id": "outcome",
+                          "label": "Outcome"
+                        }
+                      ],
+                      "initial": {
+                        "rows": []
+                      }
+                    },
+                    {
+                      "id": "limits",
+                      "type": "budget",
+                      "title": "Caller budget",
+                      "metrics": [
+                        {
+                          "id": "elapsed",
+                          "label": "Elapsed",
+                          "unit": "ms",
+                          "max": 1000,
+                          "warn": 800
+                        },
+                        {
+                          "id": "attempts",
+                          "label": "Attempts started",
+                          "unit": "calls",
+                          "max": 3
+                        }
+                      ],
+                      "initial": {
+                        "values": {
+                          "elapsed": 0,
+                          "attempts": 0
+                        },
+                        "note": "1000 ms remain before the caller deadline. Example values."
+                      }
+                    },
+                    {
+                      "id": "gates",
+                      "type": "checks",
+                      "title": "Decision for next attempt",
+                      "checks": [
+                        {
+                          "id": "safe",
+                          "label": "Safe to repeat"
+                        },
+                        {
+                          "id": "transient",
+                          "label": "Retryable outcome"
+                        },
+                        {
+                          "id": "room",
+                          "label": "Delay + timeout fit"
+                        }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "text": "t=350 ms. Call 1 times out. This policy requires a full 350 ms timeout after its selected delay; 100 + 350 fits in 650 ms.",
+                      "nodes": [
+                        "policy",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 1,
+                          "highlight": "a1"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 350,
+                            "attempts": 1
+                          },
+                          "note": "650 ms remain before the caller deadline. Example values."
+                        },
+                        "attempts": {
+                          "rows": [
+                            {
+                              "id": "1",
+                              "cells": {
+                                "attempt": "1",
+                                "start": 0,
+                                "end": 350,
+                                "outcome": "caller timeout"
+                              }
+                            }
+                          ]
+                        },
+                        "gates": {
+                          "results": {
+                            "safe": {
+                              "status": "pass",
+                              "detail": "Read-only GET; no write is repeated"
+                            },
+                            "transient": {
+                              "status": "pass",
+                              "detail": "Caller timeout for a read"
+                            },
+                            "room": {
+                              "status": "pass",
+                              "detail": "100 + 350 \u2264 650 ms"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=450 ms. The selected 100 ms backoff finishes; the next call can start.",
+                      "nodes": [
+                        "policy"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 2,
+                          "highlight": "b1"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 450,
+                            "attempts": 1
+                          },
+                          "note": "550 ms remain before the caller deadline. Example values."
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=800 ms. Call 2 times out. Although the attempt cap allows one more call, the next selected 200 ms delay plus a full 350 ms timeout cannot fit in 200 ms.",
+                      "nodes": [
+                        "policy",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 3,
+                          "highlight": "a2"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 800,
+                            "attempts": 2
+                          },
+                          "note": "200 ms remain before the caller deadline. Example values."
+                        },
+                        "attempts": {
+                          "rows": [
+                            {
+                              "id": "1",
+                              "cells": {
+                                "attempt": "1",
+                                "start": 0,
+                                "end": 350,
+                                "outcome": "caller timeout"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "attempt": "2",
+                                "start": 450,
+                                "end": 800,
+                                "outcome": "caller timeout"
+                              }
+                            }
+                          ]
+                        },
+                        "gates": {
+                          "results": {
+                            "safe": {
+                              "status": "pass",
+                              "detail": "Read-only GET; no write is repeated"
+                            },
+                            "transient": {
+                              "status": "pass",
+                              "detail": "Caller timeout for a read"
+                            },
+                            "room": {
+                              "status": "fail",
+                              "detail": "200 + 350 > 200 ms; attempt 3 denied"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "Return failure at t=800 ms. Do not sleep or send a third call. This is an admission decision before the deadline expires, not an elapsed-time overflow.",
+                      "nodes": [
+                        "policy",
+                        "caller"
+                      ],
+                      "panels": {
+                        "timing": {
+                          "reveal": 3,
+                          "highlight": "a2"
+                        },
+                        "limits": {
+                          "values": {
+                            "elapsed": 800,
+                            "attempts": 2
+                          },
+                          "note": "200 ms remain before the caller deadline. Example values."
+                        },
+                        "attempts": {
+                          "note": "Two calls were sent. Planned backoff 2 and attempt 3 never happened."
+                        }
+                      }
+                    }
+                  ]
+                },
+                "accent": "amber"
+              }
+            ]
+          },
+          {
+            "label": "Circuit recovery",
+            "sections": [
+              {
+                "heading": "Open, reject, probe, recover",
+                "text": [
+                  "Fictional design walkthrough, not a trace or simulation. Timings, outcomes and policy thresholds are authored examples."
+                ],
+                "bullets": [
+                  "One caller-process circuit for one dependency; the guard is a logical component, not another network service.",
+                  "Example policy: three consecutive dependency failures open the circuit for five seconds; local rejections do not count. One probe is allowed at a time; one success closes and resets the counter.",
+                  "These are separate caller requests. The timing panel reveals completed intervals, so its extent can lag the clock counter during a delay or probe."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "routing": "lanes",
+                  "nodes": {
+                    "caller": {
+                      "title": "Caller",
+                      "icon": "terminal"
+                    },
+                    "breaker": {
+                      "title": "Circuit guard",
+                      "sub": "one caller process",
+                      "icon": "shield",
+                      "tint": "auth"
+                    },
+                    "catalog": {
+                      "title": "Catalog API",
+                      "icon": "cloud",
+                      "tint": "data"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "caller",
+                      "breaker",
+                      "catalog"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "caller",
+                      "to": "breaker",
+                      "kind": "int",
+                      "label": "admission check"
+                    },
+                    {
+                      "from": "breaker",
+                      "to": "catalog",
+                      "kind": "https",
+                      "label": "admitted call"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "circuit",
+                      "type": "state",
+                      "title": "Local circuit",
+                      "states": [
+                        "CLOSED",
+                        "OPEN",
+                        "HALF-OPEN"
+                      ],
+                      "initial": {
+                        "state": "CLOSED"
+                      }
+                    },
+                    {
+                      "id": "timing",
+                      "type": "waterfall",
+                      "title": "Completed intervals \u00b7 authored",
+                      "spans": [
+                        {
+                          "id": "c1",
+                          "label": "Call 1 \u00b7 HTTP 503",
+                          "startMs": 0,
+                          "ms": 100
+                        },
+                        {
+                          "id": "c2",
+                          "label": "Call 2 \u00b7 HTTP 503",
+                          "startMs": 300,
+                          "ms": 100
+                        },
+                        {
+                          "id": "c3",
+                          "label": "Call 3 \u00b7 HTTP 503",
+                          "startMs": 600,
+                          "ms": 100
+                        },
+                        {
+                          "id": "cooldown",
+                          "label": "Open interval \u00b7 5 seconds",
+                          "startMs": 700,
+                          "ms": 5000
+                        },
+                        {
+                          "id": "probe",
+                          "label": "Probe \u00b7 HTTP 200",
+                          "startMs": 5700,
+                          "ms": 100
+                        },
+                        {
+                          "id": "normal",
+                          "label": "Next call \u00b7 HTTP 200",
+                          "startMs": 6000,
+                          "ms": 80
+                        }
+                      ],
+                      "initial": {
+                        "reveal": 0
+                      }
+                    },
+                    {
+                      "id": "ledger",
+                      "type": "table",
+                      "title": "Circuit counters",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Value"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "gate",
+                      "type": "checks",
+                      "title": "Admission outcome",
+                      "checks": [
+                        {
+                          "id": "admit",
+                          "label": "Dependency call admitted"
+                        }
+                      ]
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "text": "t=100 ms. Call 1 fails with HTTP 503. Record one counted failure; the local circuit stays closed. These are separate caller requests, not retries of one request.",
+                      "nodes": [
+                        "breaker",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "circuit": {
+                          "state": "CLOSED"
+                        },
+                        "timing": {
+                          "reveal": 1,
+                          "highlight": "c1"
+                        },
+                        "ledger": {
+                          "rows": [
+                            {
+                              "id": "Clock ms",
+                              "cells": {
+                                "field": "Clock ms",
+                                "value": 100
+                              }
+                            },
+                            {
+                              "id": "Consecutive failures",
+                              "cells": {
+                                "field": "Consecutive failures",
+                                "value": 1
+                              }
+                            },
+                            {
+                              "id": "Calls sent",
+                              "cells": {
+                                "field": "Calls sent",
+                                "value": 1
+                              }
+                            },
+                            {
+                              "id": "Locally rejected",
+                              "cells": {
+                                "field": "Locally rejected",
+                                "value": 0
+                              }
+                            },
+                            {
+                              "id": "Probe in flight",
+                              "cells": {
+                                "field": "Probe in flight",
+                                "value": false
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "admit": {
+                              "status": "pass",
+                              "detail": "Circuit was closed"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=400 ms. Call 2 fails. Two consecutive counted failures remain below the configured threshold of three.",
+                      "nodes": [
+                        "breaker",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "circuit": {
+                          "state": "CLOSED"
+                        },
+                        "timing": {
+                          "reveal": 2,
+                          "highlight": "c2"
+                        },
+                        "ledger": {
+                          "rows": [
+                            {
+                              "id": "Clock ms",
+                              "cells": {
+                                "field": "Clock ms",
+                                "value": 400
+                              }
+                            },
+                            {
+                              "id": "Consecutive failures",
+                              "cells": {
+                                "field": "Consecutive failures",
+                                "value": 2
+                              }
+                            },
+                            {
+                              "id": "Calls sent",
+                              "cells": {
+                                "field": "Calls sent",
+                                "value": 2
+                              }
+                            },
+                            {
+                              "id": "Locally rejected",
+                              "cells": {
+                                "field": "Locally rejected",
+                                "value": 0
+                              }
+                            },
+                            {
+                              "id": "Probe in flight",
+                              "cells": {
+                                "field": "Probe in flight",
+                                "value": false
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "admit": {
+                              "status": "pass",
+                              "detail": "Circuit was closed"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=700 ms. Call 3 fails and reaches the threshold. Open this circuit until t=5700 ms. The dependency is not called again during that interval.",
+                      "nodes": [
+                        "breaker"
+                      ],
+                      "panels": {
+                        "circuit": {
+                          "state": "OPEN"
+                        },
+                        "timing": {
+                          "reveal": 3,
+                          "highlight": "c3"
+                        },
+                        "ledger": {
+                          "rows": [
+                            {
+                              "id": "Clock ms",
+                              "cells": {
+                                "field": "Clock ms",
+                                "value": 700
+                              }
+                            },
+                            {
+                              "id": "Consecutive failures",
+                              "cells": {
+                                "field": "Consecutive failures",
+                                "value": 3
+                              }
+                            },
+                            {
+                              "id": "Calls sent",
+                              "cells": {
+                                "field": "Calls sent",
+                                "value": 3
+                              }
+                            },
+                            {
+                              "id": "Locally rejected",
+                              "cells": {
+                                "field": "Locally rejected",
+                                "value": 0
+                              }
+                            },
+                            {
+                              "id": "Probe in flight",
+                              "cells": {
+                                "field": "Probe in flight",
+                                "value": false
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "admit": {
+                              "status": "fail",
+                              "detail": "Subsequent calls denied while open"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=900 ms. Another caller request is rejected locally. No dependency call or retry occurs, and this rejection does not increment the dependency-failure counter.",
+                      "nodes": [
+                        "caller",
+                        "breaker"
+                      ],
+                      "panels": {
+                        "circuit": {
+                          "state": "OPEN"
+                        },
+                        "timing": {
+                          "reveal": 3,
+                          "highlight": "c3"
+                        },
+                        "ledger": {
+                          "rows": [
+                            {
+                              "id": "Clock ms",
+                              "cells": {
+                                "field": "Clock ms",
+                                "value": 900
+                              }
+                            },
+                            {
+                              "id": "Consecutive failures",
+                              "cells": {
+                                "field": "Consecutive failures",
+                                "value": 3
+                              }
+                            },
+                            {
+                              "id": "Calls sent",
+                              "cells": {
+                                "field": "Calls sent",
+                                "value": 3
+                              }
+                            },
+                            {
+                              "id": "Locally rejected",
+                              "cells": {
+                                "field": "Locally rejected",
+                                "value": 1
+                              }
+                            },
+                            {
+                              "id": "Probe in flight",
+                              "cells": {
+                                "field": "Probe in flight",
+                                "value": false
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "admit": {
+                              "status": "fail",
+                              "detail": "Open until t=5700 ms"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=5700 ms. The open interval ends. Admit one half-open probe; concurrent requests would be rejected while it runs. The probe has not succeeded yet.",
+                      "nodes": [
+                        "breaker",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "circuit": {
+                          "state": "HALF-OPEN"
+                        },
+                        "timing": {
+                          "reveal": 4,
+                          "highlight": "cooldown"
+                        },
+                        "ledger": {
+                          "rows": [
+                            {
+                              "id": "Clock ms",
+                              "cells": {
+                                "field": "Clock ms",
+                                "value": 5700
+                              }
+                            },
+                            {
+                              "id": "Consecutive failures",
+                              "cells": {
+                                "field": "Consecutive failures",
+                                "value": 3
+                              }
+                            },
+                            {
+                              "id": "Calls sent",
+                              "cells": {
+                                "field": "Calls sent",
+                                "value": 4
+                              }
+                            },
+                            {
+                              "id": "Locally rejected",
+                              "cells": {
+                                "field": "Locally rejected",
+                                "value": 1
+                              }
+                            },
+                            {
+                              "id": "Probe in flight",
+                              "cells": {
+                                "field": "Probe in flight",
+                                "value": true
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "admit": {
+                              "status": "pass",
+                              "detail": "Single probe permit acquired"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=5800 ms. The probe returns HTTP 200. This example closes after one successful probe and resets its consecutive-failure counter. A failed probe would reopen the circuit.",
+                      "nodes": [
+                        "breaker",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "circuit": {
+                          "state": "CLOSED"
+                        },
+                        "timing": {
+                          "reveal": 5,
+                          "highlight": "probe"
+                        },
+                        "ledger": {
+                          "rows": [
+                            {
+                              "id": "Clock ms",
+                              "cells": {
+                                "field": "Clock ms",
+                                "value": 5800
+                              }
+                            },
+                            {
+                              "id": "Consecutive failures",
+                              "cells": {
+                                "field": "Consecutive failures",
+                                "value": 0
+                              }
+                            },
+                            {
+                              "id": "Calls sent",
+                              "cells": {
+                                "field": "Calls sent",
+                                "value": 4
+                              }
+                            },
+                            {
+                              "id": "Locally rejected",
+                              "cells": {
+                                "field": "Locally rejected",
+                                "value": 1
+                              }
+                            },
+                            {
+                              "id": "Probe in flight",
+                              "cells": {
+                                "field": "Probe in flight",
+                                "value": false
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "admit": {
+                              "status": "pass",
+                              "detail": "Probe succeeded; admission restored"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "text": "t=6080 ms. A subsequent normal call succeeds. One local rejection avoided one dependency call during the open interval.",
+                      "nodes": [
+                        "caller",
+                        "breaker",
+                        "catalog"
+                      ],
+                      "panels": {
+                        "circuit": {
+                          "state": "CLOSED"
+                        },
+                        "timing": {
+                          "reveal": 6,
+                          "highlight": "normal"
+                        },
+                        "ledger": {
+                          "rows": [
+                            {
+                              "id": "Clock ms",
+                              "cells": {
+                                "field": "Clock ms",
+                                "value": 6080
+                              }
+                            },
+                            {
+                              "id": "Consecutive failures",
+                              "cells": {
+                                "field": "Consecutive failures",
+                                "value": 0
+                              }
+                            },
+                            {
+                              "id": "Calls sent",
+                              "cells": {
+                                "field": "Calls sent",
+                                "value": 5
+                              }
+                            },
+                            {
+                              "id": "Locally rejected",
+                              "cells": {
+                                "field": "Locally rejected",
+                                "value": 1
+                              }
+                            },
+                            {
+                              "id": "Probe in flight",
+                              "cells": {
+                                "field": "Probe in flight",
+                                "value": false
+                              }
+                            }
+                          ]
+                        },
+                        "gate": {
+                          "results": {
+                            "admit": {
+                              "status": "pass",
+                              "detail": "Circuit closed"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "accent": "violet"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

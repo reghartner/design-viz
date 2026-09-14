@@ -24,6 +24,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | You were asked for… | Recipe |
 |---|---|
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |
+| retry attempts, backoff, deadline admission, or circuit recovery | `retries-and-circuits.md` |
 | a Honeycomb trace turned into an editable diagram | [`../docs/trace-import.md`](../docs/trace-import.md) (input and CLI guide) |
 | a temperature readout with warning / shutdown thresholds | `temperature.md` |
 | a battery / charge level that drains and raises a low event | `battery-level.md` |

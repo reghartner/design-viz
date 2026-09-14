@@ -138,7 +138,7 @@ test('panel boards keep the step bar in the diagram cell before the top-aligned 
 
   const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
   assert.match(css, /\.boardgrid\.haspanels\{[^}]*align-items:start;/);
-  assert.match(css, /\.boardgrid\.haspanels > \.panelcol\{align-self:start;\}/);
+  assert.match(css, /\.boardgrid\.haspanels > \.panelcol\{align-self:start;min-width:0;\}/);
   ['editorial', 'terminal', 'pastel', 'blueprint'].forEach(skin => {
     assert.match(css, new RegExp('body\\.sk-' + skin +
       ' \\.boardgrid\\.haspanels\\s*\\{\\s*grid-template-columns:1fr;'));

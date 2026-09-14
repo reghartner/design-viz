@@ -6927,13 +6927,15 @@ function setFragmentStep(scope, stepIdx, stepMode){
   }
 }
 
-/* A story tween is presentation-only and exists solely between two adjacent
-   already-folded step states. Callers can explicitly suppress the narrative
-   path for deep links/restores; reduced motion is a hard gate. */
+/* A story tween is presentation-only and exists between any two
+   already-painted step states, whatever their distance — arrows, step
+   chips, and step picks all animate alike. Callers explicitly suppress
+   the narrative path for deep links/restores, mode entry, and the
+   autoplay wrap back to step 0; reduced motion is a hard gate. */
 function shouldTweenStep(fromIndex, toIndex, reducedMotion, narrativePath){
   return narrativePath !== false && !reducedMotion &&
     validRevealIndex(fromIndex) && validRevealIndex(toIndex) &&
-    Math.abs(toIndex - fromIndex) === 1;
+    toIndex !== fromIndex;
 }
 
 /* Node-tone state is absolute (foldNodeTones), while its pulse is transient
@@ -10663,7 +10665,10 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (destroyed || timer || RM || !N) return;
     if (explicitPaths && N === 1) return;
     if (explicitPaths && cur === N - 1) setStep(0, false, false);
-    var id = window.setInterval(function(){ if (timer === id) setStep(cur + 1, false); }, 3000);
+    /* the modulo wrap back to step 0 is a jump, not a narrative move */
+    var id = window.setInterval(function(){
+      if (timer === id) setStep(cur + 1, false, cur + 1 < N ? undefined : false);
+    }, 3000);
     timer = id;
     btnPlay.innerHTML = '&#10074;&#10074;';
     btnPlay.setAttribute('aria-label', 'Pause');
@@ -10783,7 +10788,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
         paths.find(function(p){ return p.indices.indexOf(index) >= 0; });
       if (!path) return false;
       if (path.id !== selectedPath.id) selectPath(path.id, path.indices.indexOf(index));
-      else { if (mode !== 'step') enterStep(false); stopAuto(); setStep(path.indices.indexOf(index),true,false); }
+      /* a step pick is a narrative move — it tweens like the arrows */
+      else { if (mode !== 'step') enterStep(false); stopAuto(); setStep(path.indices.indexOf(index),true); }
       return true;
     },
     current: function(){ return {n: cur, id: steps[cur] ? steps[cur].id : null}; },

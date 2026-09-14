@@ -27,7 +27,7 @@ function loadBuilder(extraGlobals){
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
-    ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts,' +
+    ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts, parseStarterManifest,' +
     ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE, planAddTabs, BUILDER_TABS_TEMPLATE,' +
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, PANEL_PATCH_FIELDS, patchSummaryLine, panelPatchFields, patchFieldsCollect, SCENE_TOKENS,' +
@@ -2217,4 +2217,40 @@ test('planMoveRow refuses bad indices and no-op moves', () => {
   assert.match(B.planMoveRow(text, spec, 0, 0, 2).error, /no row slot/);
   assert.match(B.planMoveRow(text, spec, 0, 1, 1).error, /already there/);
   assert.ok(B.planMoveRow(text, spec, 9, 0, 1).error); /* no such section */
+});
+
+/* ---- parseStarterManifest: the hosted starters.json loader ---- */
+
+test('parseStarterManifest accepts an array or a {starters:[...]} wrapper', () => {
+  const spec = {page: {title: 'A', blocks: []}};
+  const arr = B.parseStarterManifest(JSON.stringify([{name: 'One', spec: spec}]));
+  assert.ok(!arr.error);
+  assert.equal(arr.entries.length, 1);
+  assert.equal(arr.entries[0].name, 'One');
+  assert.equal(arr.entries[0].desc, 'from starters.json'); /* default */
+  assert.equal(arr.skipped, 0);
+  const wrapped = B.parseStarterManifest(JSON.stringify(
+    {starters: [{name: 'Two', desc: 'd', spec: spec}]}));
+  assert.equal(wrapped.entries[0].desc, 'd');
+});
+
+test('parseStarterManifest skips malformed entries and counts them', () => {
+  const spec = {page: {title: 'A'}};
+  const out = B.parseStarterManifest(JSON.stringify([
+    {name: 'Good', spec: spec},
+    {name: '', spec: spec},        /* no name */
+    {name: 'NoSpec'},              /* no spec */
+    {name: 'ArrSpec', spec: [1]},  /* spec must be an object */
+    {spec: spec},                  /* no name key */
+    'nonsense'
+  ]));
+  assert.ok(!out.error);
+  assert.deepStrictEqual(plain(out.entries.map(e => e.name)), ['Good']);
+  assert.equal(out.skipped, 5);
+});
+
+test('parseStarterManifest reports invalid JSON and wrong top-level shape', () => {
+  assert.match(B.parseStarterManifest('{nope').error, /not valid JSON/);
+  assert.match(B.parseStarterManifest('42').error, /must be an array/);
+  assert.match(B.parseStarterManifest('{"other": 1}').error, /must be an array/);
 });

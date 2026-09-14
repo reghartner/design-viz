@@ -144,6 +144,9 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .starter-card{display:flex; flex-direction:column; align-items:flex-start; gap:5px; text-align:left;
   flex:1 1 220px; padding:10px;}
 .starter-card span{font-weight:400;}
+.gallery-note{width:100%; font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--sub); padding:4px 0 0; border-top:1px dashed var(--line); margin-top:4px;}
+.gallery-note.gallery-bad{color:#B0771A; text-transform:none; letter-spacing:0;}
 .starter-confirm{display:flex; align-items:center; flex-wrap:wrap; gap:8px; width:100%;
   font:500 11px 'IBM Plex Mono',monospace; color:var(--sub);}
 
@@ -10789,6 +10792,31 @@ function specFileName(raw){
   return (slug || 'flowspec') + '.spec.json';
 }
 
+/* ---------------- hosted starter manifest ----------------
+   A hosted workbench can ship a starters.json BESIDE the page and grow
+   it over time without rebuilding: a top-level array (or
+   {"starters": [...]}) of {name, spec} entries, desc optional. Invalid
+   entries are skipped and counted so one typo never hides the rest. */
+
+function parseStarterManifest(text){
+  var data;
+  try { data = JSON.parse(text); }
+  catch (ex){ return {error: 'starters.json is not valid JSON (' + ex.message + ')'}; }
+  var list = Array.isArray(data) ? data :
+             (data && Array.isArray(data.starters) ? data.starters : null);
+  if (!list) return {error: 'starters.json must be an array of {name, spec} entries (or {"starters": [...]})'};
+  var entries = [], skipped = 0;
+  list.forEach(function(e){
+    var ok = e && typeof e.name === 'string' && e.name.trim() &&
+             e.spec && typeof e.spec === 'object' && !Array.isArray(e.spec);
+    if (ok) entries.push({name: e.name.trim(),
+                          desc: typeof e.desc === 'string' ? e.desc : 'from starters.json',
+                          spec: e.spec});
+    else skipped++;
+  });
+  return {entries: entries, skipped: skipped};
+}
+
 /* ---------------- clickable validation findings ----------------
    Validator and lint messages open with a field path relative to the
    normalized PAGE object ("blocks[0].tabs[1].sections[0].diagram.
@@ -14148,34 +14176,72 @@ function initWorkbenchBuilder(opts){
     closeGallery();
     src.focus();
   }
+  /* the external manifest is fetched once at boot; editing starters.json
+     and reloading the page picks up additions (no rebuild anywhere) */
+  var externalStarters = null; /* {entries, skipped} or {error} once loaded */
+  if (typeof fetch === 'function'){
+    fetch('starters.json', {cache: 'no-store'}).then(function(resp){
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.text();
+    }).then(function(text){
+      externalStarters = parseStarterManifest(text);
+    })['catch'](function(){ /* no manifest beside the page: baked-ins only */ });
+  }
+  function starterCard(entry){
+    var card = document.createElement('button');
+    card.type = 'button'; card.className = 'pbtn starter-card';
+    var name = document.createElement('strong'); name.textContent = entry.name;
+    var desc = document.createElement('span'); desc.textContent = entry.desc;
+    var count = document.createElement('span'); count.textContent = starterCountLine(entry.spec);
+    card.appendChild(name); card.appendChild(desc); card.appendChild(count);
+    card.addEventListener('click', function(){
+      if (addToStep) return;
+      if (opts.renderedText && src.value === opts.renderedText()){ loadStarter(entry); return; }
+      showGallery();
+      var row = document.createElement('div'); row.className = 'starter-confirm';
+      var label = document.createElement('span');
+      label.textContent = 'unrendered edits — replace with ' + entry.name + '?';
+      var load = document.createElement('button');
+      load.type = 'button'; load.className = 'bbtn'; load.textContent = 'load & replace';
+      load.addEventListener('click', function(){ loadStarter(entry); });
+      var cancel = document.createElement('button');
+      cancel.type = 'button'; cancel.className = 'bbtn'; cancel.textContent = 'cancel';
+      cancel.addEventListener('click', function(){ showGallery(); gallery.querySelector('button').focus(); });
+      row.appendChild(label); row.appendChild(load); row.appendChild(cancel);
+      gallery.appendChild(row);
+      cancel.focus();
+    });
+    return card;
+  }
   function showGallery(){
     gallery.innerHTML = '';
     (opts.starters || []).forEach(function(entry){
-      var card = document.createElement('button');
-      card.type = 'button'; card.className = 'pbtn starter-card';
-      var name = document.createElement('strong'); name.textContent = entry.name;
-      var desc = document.createElement('span'); desc.textContent = entry.desc;
-      var count = document.createElement('span'); count.textContent = starterCountLine(entry.spec);
-      card.appendChild(name); card.appendChild(desc); card.appendChild(count);
-      card.addEventListener('click', function(){
-        if (addToStep) return;
-        if (opts.renderedText && src.value === opts.renderedText()){ loadStarter(entry); return; }
-        showGallery();
-        var row = document.createElement('div'); row.className = 'starter-confirm';
-        var label = document.createElement('span');
-        label.textContent = 'unrendered edits — replace with ' + entry.name + '?';
-        var load = document.createElement('button');
-        load.type = 'button'; load.className = 'bbtn'; load.textContent = 'load & replace';
-        load.addEventListener('click', function(){ loadStarter(entry); });
-        var cancel = document.createElement('button');
-        cancel.type = 'button'; cancel.className = 'bbtn'; cancel.textContent = 'cancel';
-        cancel.addEventListener('click', function(){ showGallery(); gallery.querySelector('button').focus(); });
-        row.appendChild(label); row.appendChild(load); row.appendChild(cancel);
-        gallery.appendChild(row);
-        cancel.focus();
-      });
-      gallery.appendChild(card);
+      gallery.appendChild(starterCard(entry));
     });
+    if (externalStarters){
+      var divider = document.createElement('div');
+      divider.className = 'gallery-note';
+      divider.textContent = 'from starters.json';
+      gallery.appendChild(divider);
+      if (externalStarters.error){
+        var bad = document.createElement('div');
+        bad.className = 'gallery-note gallery-bad';
+        bad.textContent = externalStarters.error;
+        gallery.appendChild(bad);
+      } else {
+        externalStarters.entries.forEach(function(entry){
+          gallery.appendChild(starterCard(entry));
+        });
+        if (externalStarters.skipped){
+          var skip = document.createElement('div');
+          skip.className = 'gallery-note gallery-bad';
+          skip.textContent = externalStarters.skipped +
+            ' entr' + (externalStarters.skipped === 1 ? 'y' : 'ies') +
+            ' skipped — each needs a name and a spec object';
+          gallery.appendChild(skip);
+        }
+      }
+    }
     gallery.hidden = false;
     startersBtn.setAttribute('aria-expanded', 'true');
   }

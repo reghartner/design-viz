@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Team Onboarding",
+    "desc": "the standard new-hire flow",
+    "spec": {
+      "page": {
+        "title": "Onboarding",
+        "blocks": [
+          {
+            "heading": "Day one",
+            "text": ["What happens when a new hire starts."],
+            "diagram": {
+              "nodes": {
+                "hr": {"title": "People Ops", "sub": "kicks it off", "icon": "gear", "tint": "cmd"},
+                "it": {"title": "IT", "sub": "provisions access", "icon": "key", "tint": "data"}
+              },
+              "rows": [["hr", "it"]],
+              "edges": [{"from": "hr", "to": "it", "kind": "int", "label": "ticket"}],
+              "steps": [{"edge": "hr->it", "text": "People Ops files the access ticket"}]
+            }
+          }
+        ]
+      }
+    }
+  }
+]

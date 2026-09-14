@@ -272,7 +272,16 @@ is one undo step, and Esc or DONE ends the mode. **Tabs are managed
 in place**: clicking a tab button switches to it AND selects it — the
 form edits its label and highlight, **+ tab** inserts a ready-made
 sibling after it, arrows reorder it, delete removes it (the last tab of
-a block is refused with instructions instead).
+a block is refused with instructions instead). **Hosted starter
+collections**: when the workbench is served from a web host, it fetches
+`starters.json` from beside the page (same directory as
+`workbench/flowspec.html`) and shows those entries in the **starters…**
+gallery under a "from starters.json" divider, below the built-in ones.
+The file is a JSON array (or a `{"starters": [...]}` wrapper) of
+`{"name": ..., "spec": {...}}` entries with an optional `desc`;
+malformed entries are skipped and counted rather than hiding the rest.
+Edit the file and reload the page to grow the collection — no rebuild.
+See `workbench/starters.example.json` for the shape.
 
 ## Embedding one diagram in an iframe
 

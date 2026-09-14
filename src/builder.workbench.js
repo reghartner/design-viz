@@ -1120,7 +1120,9 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
   return builderRewrite(text, raw, got.path, function(d){
     if (!side){
       builderRemoveFloat(d, id);
-      d.rows.push([id]);
+      /* a node malformed into BOTH rows and floats just loses the float
+         entry — appending would duplicate its rows placement */
+      if (!inRows) d.rows.push([id]);
       return;
     }
     if (inRows){

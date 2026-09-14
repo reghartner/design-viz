@@ -3101,3 +3101,12 @@ test('homemap palette starter inserts all device kinds without warnings', () => 
   assert.strictEqual(result.errors.length, 0);
   assert.strictEqual(result.warnings.length, 0);
 });
+
+test('un-floating a node that is malformed into both rows and floats only removes the float entry', () => {
+  const spec = {nodes: {a: {}, x: {}}, rows: [['a', 'x']], floats: [{id: 'x', side: 'above'}]};
+  const plan = B.planSetNodeFloat(JSON.stringify(spec), spec, 0, 'x', null);
+  assert.ok(!plan.error, plan.error);
+  const next = JSON.parse(plan.text);
+  assert.deepStrictEqual(next.rows, [['a', 'x']]);
+  assert.strictEqual(next.floats, undefined);
+});

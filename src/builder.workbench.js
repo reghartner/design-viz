@@ -969,6 +969,13 @@ var PANEL_TEMPLATES = {
   battery:   {title: 'Battery', low: 30, crit: 10, initial: {charge: 80}},
   buffer:    {title: 'Buffer', initial: {}},
   radar:     {title: 'Radar'},
+  homemap:   {title: 'Home', outline: {w: 300, h: 164}, devices: [
+              {id: 'cam1', kind: 'camera', label: 'Porch cam', x: 46, y: 40, facing: 35, spread: 80, range: 70},
+              {id: 'cam2', kind: 'camera', label: 'Yard cam', x: 274, y: 40, facing: 145, spread: 80, range: 70},
+              {id: 'door', kind: 'entry', label: 'Front door', x: 160, y: 158},
+              {id: 'attic', kind: 'sensor', label: 'Attic temp', icon: 'thermo', x: 46, y: 132},
+              {id: 'hub', kind: 'hub', label: 'Hub', x: 160, y: 92}],
+              initial: {cam1: 'scan', cam2: 'sleep', door: 'closed', attic: 'ok', hub: 'idle'}},
   signal:    {title: 'Links', links: [{id: 'up', label: 'uplink', transport: 'wifi'}]},
   tiles:     {title: 'Fleet', tiles: [{id: 't1', label: 'UNIT 1'}, {id: 't2', label: 'UNIT 2'}]},
   inflight:  {title: 'In flight', lanes: [{id: 'op', label: 'operation'}]},
@@ -1895,6 +1902,11 @@ var PANEL_SETUP_FIELDS = {
   radar:     [['sensor', 'json'], ['facing', 'num'], ['spread', 'num'], ['range', 'num'],
               ['threshold', 'num'], ['rings', 'jsonAny'], ['scale', 'json'],
               ['zones', 'jsonArr'], ['initial', 'json']],
+  homemap:   [['outline', 'json'], ['devices', 'rows', {cols: [
+                {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
+                {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
+                {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'}],
+              max: 12}], ['initial', 'json']],
   signal:    [['links', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'},
                 {k: 'transport', kind: 'enum',
                  options: ['wifi', 'subghz', 'thread', 'zigbee', 'zwave', 'cellular', 'poe', 'ethernet', 'ble']}],
@@ -1934,6 +1946,7 @@ var PANEL_PATCH_FIELDS = {
               ['note', 'text'], ['label', 'text']],
   buffer:    [['cells', 'jsonArr'], ['mark', 'jsonArr'], ['head', 'num'], ['note', 'text'], ['label', 'text']],
   radar:     [['subject', 'json'], ['threshold', 'num'], ['alert', 'bool'], ['status', 'text'], ['banner', 'text']],
+  homemap:   [['signals', 'jsonArr']],
   signal:    [],
   tiles:     [],
   inflight:  [['start', 'jsonArr'], ['end', 'jsonArr'], ['mark', 'jsonArr']],
@@ -1957,6 +1970,17 @@ function panelPatchFields(decl){
   if (!decl || !Object.prototype.hasOwnProperty.call(PANEL_PATCH_FIELDS, decl.type)) return null;
   var states = Array.isArray(decl.states) ? decl.states.map(String) : [];
   var stateField = states.length ? ['state', 'enum', states] : ['state', 'text'];
+  if (decl.type === 'homemap'){
+    var vocab = {camera: ['sleep', 'scan', 'detect', 'off'], entry: ['closed', 'open', 'alert'],
+      sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'alert']};
+    var seen = Object.create(null);
+    return (Array.isArray(decl.devices) ? decl.devices : []).filter(function(d){
+      if (!d || typeof d.id !== 'string' || !d.id || seen[d.id]) return false;
+      seen[d.id] = true;
+      return d.id !== 'signals' && typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(vocab, d.kind) &&
+        typeof d.x === 'number' && isFinite(d.x) && typeof d.y === 'number' && isFinite(d.y);
+    }).map(function(d){ return [d.id, 'enum', vocab[d.kind]]; }).concat([['signals', 'jsonArr']]);
+  }
   if (decl.type === 'state') return [stateField];
   if (decl.type === 'orbit') return [stateField, ['via', 'text']];
   if (['leds', 'tiles', 'signal'].indexOf(decl.type) >= 0){

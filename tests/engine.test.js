@@ -20,8 +20,8 @@ function loadCore(overrides = {}){
     ' BUILTIN_PROTOCOLS, SCENES, spreadPositions, resolveLabelCollisions,' +
     ' edgeAutoAdjust, parseHash, buildHash, isValidLinkBase, composeLinkURL, slugify, sectionSlugify, sectionReferences, oneBasedIndex, tabIndexOf, tabReference,' +
     ' stepIndexOf, stepReference, resolveHashTarget, rectsOverlap, overlapArea,' +
-    ' waterfallModel, orbitPositions, zoneModel, xrayModel, pirModel, thermoModel, batteryModel, bufferModel, radarModel, pointInPoly, signalModel, tilesModel, lintPage, CONTRACT_VERSION,' +
-    ' queueModel, queuePanelHTML, contractCardHTML, inlineMarkup, generatedFromHTML, bulletsHTML, renderPanelBody, panelOrder,' +
+    ' waterfallModel, orbitPositions, zoneModel, xrayModel, pirModel, thermoModel, batteryModel, bufferModel, radarModel, homemapModel, pointInPoly, signalModel, tilesModel, lintPage, CONTRACT_VERSION,' +
+    ' queueModel, queuePanelHTML, contractCardHTML, inlineMarkup, generatedFromHTML, bulletsHTML, renderPanelBody, buildPanels, panelOrder,' +
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
     ' foldPhoneStates, phoneBrand, phoneModel, phonePanelHTML, PANEL_TYPES,' +
     ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
@@ -4017,4 +4017,225 @@ test('print styles hide the teaser (the prose itself prints expanded)', () => {
   const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
   assert.match(css, /@media print\{[\s\S]*?\.sec-teaser\{display:none !important;\}/);
   assert.ok(css.includes('.sec-teaser[hidden]{display:none;}'), 'hidden attribute wins over flex');
+});
+
+function plain(v){ return JSON.parse(JSON.stringify(v)); }
+
+function homePanel(){
+  return {id: 'home', type: 'homemap', title: 'Home', devices: [
+    {id: 'cam1', kind: 'camera', label: 'Porch cam', x: 46, y: 40},
+    {id: 'cam2', kind: 'camera', label: 'Yard cam', x: 274, y: 40},
+    {id: 'door', kind: 'entry', label: 'Front door', x: 160, y: 158},
+    {id: 'attic', kind: 'sensor', label: 'Attic temp', x: 46, y: 132, icon: 'thermo'},
+    {id: 'hub', kind: 'hub', label: 'Hub', x: 160, y: 92}
+  ]};
+}
+function homeWarnings(panel, patches = []){
+  return C.validate(C.normalize({nodes: {a: {}}, rows: [['a']], edges: [], panels: [panel],
+    steps: patches.map(patch => ({nodes: ['a'], text: 'Home', panels: {home: patch}}))}));
+}
+
+test('homemapModel: per-kind defaults, explicit enums, unknown states and icon fallback', () => {
+  const p = homePanel();
+  const defaults = ['scan', 'scan', 'closed', 'ok', 'idle'];
+  assert.deepStrictEqual(plain(C.homemapModel(p, {}).devices.map(d => d.state)), defaults);
+  for (const [index, states] of [[0, ['sleep', 'scan', 'detect', 'off']], [2, ['closed', 'open', 'alert']],
+    [3, ['ok', 'warn', 'alert', 'off']], [4, ['idle', 'rx', 'alert']]]){
+    for (const state of states) assert.strictEqual(C.homemapModel(p, {[p.devices[index].id]: state}).devices[index].state, state);
+  }
+  assert.deepStrictEqual(plain(C.homemapModel(p, {cam1: 'bad', cam2: null, door: 'scan', attic: {}, hub: 'ok'}).devices.map(d => d.state)), defaults);
+  assert.strictEqual(C.homemapModel(p).devices[3].icon, 'thermo');
+  p.devices[3].icon = 'x"><script>';
+  assert.strictEqual(C.homemapModel(p).devices[3].icon, 'gear');
+  delete p.devices[3].icon;
+  assert.strictEqual(C.homemapModel(p).devices[3].icon, 'gear');
+});
+
+test('homemapModel: outline defaults/clamps and finite clockwise center-facing camera geometry', () => {
+  const p = homePanel();
+  let m = C.homemapModel(p);
+  assert.deepStrictEqual(plain(m.outline), {x: 10, y: 10, w: 300, h: 160});
+  assert.strictEqual(m.devices[0].range, 70);
+  assert.strictEqual(m.devices[0].spread, 80);
+  assert.ok(m.devices[0].facing > 0 && m.devices[0].facing < 90);
+  assert.ok(m.devices[1].facing > 90 && m.devices[1].facing < 180);
+  for (const [box, expected] of [[{w: 300, h: 164}, {x: 10, y: 8, w: 300, h: 164}],
+    [{w: Infinity, h: 'bad'}, {x: 10, y: 10, w: 300, h: 160}],
+    [{w: 1e308, h: -1e308}, {x: 0, y: 80, w: 320, h: 20}]]){
+    p.outline = box;
+    assert.deepStrictEqual(plain(C.homemapModel(p).outline), expected);
+  }
+  Object.assign(p.devices[0], {x: -1e308, y: 1e308, facing: 1e308, spread: -50, range: 1e308});
+  Object.assign(p.devices[1], {facing: Infinity, spread: 999, range: 1});
+  m = C.homemapModel(p);
+  assert.deepStrictEqual(plain([m.devices[0].x, m.devices[0].y, m.devices[0].spread, m.devices[0].range]), [0, 180, 10, 160]);
+  assert.ok(Number.isFinite(m.devices[0].facing));
+  assert.strictEqual(m.devices[1].spread, 180);
+  assert.strictEqual(m.devices[1].range, 20);
+  Object.assign(p.devices[0], {spread: NaN, range: 'bad'});
+  m = C.homemapModel(p);
+  assert.strictEqual(m.devices[0].spread, 80);
+  assert.strictEqual(m.devices[0].range, 70);
+  const host = {querySelector: () => null};
+  C.renderPanelBody(host, p, {}, 'aurora');
+  assert.doesNotMatch(host.innerHTML, /NaN|Infinity/);
+});
+
+test('homemapModel: drops invalid devices and duplicates, safely handles special property ids', () => {
+  const p = {devices: [null, {}, {id: 'bad', kind: 'bogus', x: 1, y: 2},
+    {id: 'signals', kind: 'camera', x: 1, y: 2}, {id: 'nan', kind: 'camera', x: NaN, y: 2},
+    {id: 'inf', kind: 'camera', x: 1, y: Infinity}, {id: 'str', kind: 'camera', x: '2', y: 2},
+    {id: 'array', kind: ['camera'], x: 1, y: 2},
+    ...['__proto__', 'constructor', 'log', 'mark', 'enterOnce', 'cells'].map(id => ({id, kind: 'camera', x: 1, y: 2})),
+    {id: 'log', kind: 'entry', x: 80, y: 90}]};
+  const m = C.homemapModel(p, JSON.parse('{"__proto__":"detect","constructor":"sleep"}'));
+  assert.deepStrictEqual(plain(m.devices.map(d => d.id)), ['__proto__', 'constructor', 'log', 'mark', 'enterOnce', 'cells']);
+  assert.strictEqual(m.devices[0].state, 'detect');
+  assert.strictEqual(m.devices[1].state, 'sleep');
+  assert.strictEqual(m.devices[2].kind, 'camera');
+});
+
+test('homemapModel: signal endpoint resolution drops invalid entries', () => {
+  const m = C.homemapModel(homePanel(), {signals: [null, [], 'bad', {}, {from: 'cam1'}, {to: 'hub'},
+    {from: 'cam1', to: 'missing'}, {from: 'constructor', to: 'hub'}, {from: ['cam1'], to: 'hub'},
+    {from: 'cam1', to: 'hub'}, {from: 'hub', to: 'door'}]});
+  assert.deepStrictEqual(plain(m.signals), [
+    {from: 'cam1', to: 'hub', fromXY: {x: 46, y: 40}, toXY: {x: 160, y: 92}},
+    {from: 'hub', to: 'door', fromXY: {x: 160, y: 92}, toXY: {x: 160, y: 158}}
+  ]);
+  assert.deepStrictEqual(plain(C.homemapModel(homePanel(), {signals: 'bad'}).signals), []);
+});
+
+test('homemap fold: independent device states carry, signals do not, universal keys remain device ids', () => {
+  const p = homePanel();
+  p.initial = {cam1: 'sleep', cam2: 'scan', log: 'sleep', mark: 'scan', enterOnce: 'off', cells: 'scan',
+    signals: [{from: 'cam1', to: 'hub'}]};
+  const steps = [{panels: {home: {cam1: 'detect', signals: [{from: 'cam1', to: 'hub'}]}}},
+    {panels: {home: {cam2: 'off', log: 'detect', mark: 'off', enterOnce: 'scan', cells: 'sleep'}}}, {nodes: ['a']}];
+  const states = C.foldPanelStates({panels: [p], steps}).home;
+  assert.deepStrictEqual(plain(states.map(s => s.signals.length)), [1, 0, 0]);
+  assert.strictEqual(states[2].cam1, 'detect');
+  assert.strictEqual(states[2].cam2, 'off');
+  assert.strictEqual(states[0].cam2, 'scan');
+  for (const [id, value] of Object.entries({log: 'detect', mark: 'off', enterOnce: 'scan', cells: 'sleep'}))
+    assert.strictEqual(states[2][id], value);
+  assert.deepStrictEqual(plain(C.foldPanelStates({panels: [p]}).home[0].signals), []);
+});
+
+test('homemap render: per-camera sweeps, transition ripples, staggered signals and stable baseline', () => {
+  const p = homePanel(), host = {querySelector: () => null};
+  const states = [{cam1: 'scan', cam2: 'sleep'},
+    {cam1: 'detect', cam2: 'scan', door: 'alert', hub: 'rx', signals: [{from: 'cam1', to: 'hub'}, {from: 'hub', to: 'door'}]},
+    {cam1: 'detect', cam2: 'scan', door: 'alert', hub: 'rx'}];
+  C.renderPanelBody(host, p, states[0], 'aurora', states, 0);
+  assert.strictEqual((host.innerHTML.match(/class="hmsweep"/g) || []).length, 1);
+  assert.match(host.innerHTML, /transform-origin:46px 40px;--sw:38deg/);
+  assert.match(host.innerHTML, /href="#i-thermo"/);
+  assert.doesNotMatch(host.innerHTML, /hmripple|hmsig|hmglow/);
+  C.renderPanelBody(host, p, states[1], 'aurora', states, 1);
+  assert.strictEqual((host.innerHTML.match(/class="hmsweep"/g) || []).length, 2);
+  assert.strictEqual((host.innerHTML.match(/class="hmripple"/g) || []).length, 2);
+  assert.match(host.innerHTML, /class="hmglow"/);
+  assert.match(host.innerHTML, /hm-camera hm-detect/);
+  assert.match(host.innerHTML, /animation-delay:0.25s/);
+  assert.match(host.innerHTML, /--hx1:160px;--hy1:92px;--hx2:160px;--hy2:158px/);
+  assert.doesNotMatch(host._lastHTML, /hmripple|hmsig|hmglow/);
+  host.innerHTML = 'SENTINEL';
+  C.renderPanelBody(host, p, states[2], 'aurora', states, 2);
+  assert.strictEqual(host.innerHTML, 'SENTINEL');
+  C.renderPanelBody(host, p, states[1], 'aurora', states, 3);
+  assert.match(host.innerHTML, /class="hmsig"/);
+  assert.doesNotMatch(host.innerHTML, /hmripple|hmglow/);
+  C.renderPanelBody(host, p, {cam1: 'off', cam2: 'sleep', door: 'open'}, 'aurora', states, 4);
+  assert.doesNotMatch(host.innerHTML, /hmwedge|hmsweep/);
+  assert.match(host.innerHTML, /l7 -10/);
+  C.renderPanelBody(host, p, {cam1: 'detect'}, 'aurora', states, 5);
+  assert.match(host.innerHTML, /hmripple/);
+});
+
+test('homemap render: first render and ambient omit transients; reduced motion is static; author strings escape', () => {
+  const p = homePanel();
+  p.title = '<script>"&'; p.devices[0].label = '<img onerror="oops">';
+  p.devices[0].id = 'a"/><script>'; p.devices[3].icon = 'evil" onload="oops';
+  const state = {[p.devices[0].id]: 'detect', door: 'alert', signals: [{from: 'cam2', to: 'hub'}]};
+  const host = {querySelector: () => null};
+  C.renderPanelBody(host, p, state, 'aurora');
+  assert.doesNotMatch(host.innerHTML, /<script>|<img|onload=|hmripple|hmsig/);
+  assert.match(host.innerHTML, /&lt;img onerror=&quot;oops&quot;&gt;/);
+  assert.match(host.innerHTML, /href="#i-gear"/);
+  const reduced = loadCore({window: {matchMedia: () => ({matches: true})}});
+  reduced.renderPanelBody(host, p, {}, 'aurora', [], 0);
+  reduced.renderPanelBody(host, p, state, 'aurora', [], 1, true);
+  assert.doesNotMatch(host.innerHTML, /hmsweep|hmripple|hmsig|hmglow/);
+  assert.match(host.innerHTML, /hm-camera hm-detect/);
+  assert.match(host.innerHTML, /hmwedge/);
+  C.renderPanelBody(host, {type: 'homemap'}, {}, 'aurora');
+  assert.match(host.innerHTML, /No devices configured/);
+});
+
+test('homemap immediate jumps cancel transients before unchanged-markup skip', () => {
+  const p = homePanel(), removed = [];
+  const nodes = ['hmripple', 'hmglow', 'hmsig'].map(cls => ({getAttribute: () => cls,
+    parentNode: {removeChild: node => removed.push(node)}}));
+  const host = {querySelector: () => null, querySelectorAll: sel => sel.includes('.hmsig') ? nodes : []};
+  C.renderPanelBody(host, p, {}, 'aurora', [], 0);
+  C.renderPanelBody(host, p, {cam1: 'detect', hub: 'rx'}, 'aurora', [], 1);
+  host.innerHTML = 'SENTINEL';
+  C.renderPanelBody(host, p, {cam1: 'detect', hub: 'rx'}, 'aurora', [], 1, false);
+  assert.strictEqual(host.innerHTML, 'SENTINEL');
+  assert.strictEqual(removed.length, 3);
+});
+
+test('homemap controller uses initial states in ambient, including after leaving step mode', () => {
+  function el(){ return {children: [], setAttribute(){}, appendChild(c){this.children.push(c);}, querySelector: () => null}; }
+  const core = loadCore({document: {createElement: el}}), aside = el(), p = homePanel();
+  p.initial = {cam1: 'sleep', cam2: 'scan'};
+  const ctl = core.buildPanels(aside, {panels: [p], steps: [{panels: {home: {cam1: 'detect'}}}]}, 'aurora');
+  const body = aside.children[0].children[1];
+  assert.match(body.innerHTML, /hm-camera hm-sleep/);
+  ctl.setStep(0, false);
+  assert.match(body.innerHTML, /hm-camera hm-detect/);
+  ctl.setStep(0, false, true);
+  assert.match(body.innerHTML, /hm-camera hm-sleep/);
+  assert.doesNotMatch(body.innerHTML, /hm-camera hm-detect|hmsig|hmripple/);
+});
+
+test('homemap validator: all declaration warning paths', () => {
+  for (const devices of [undefined, [], {}, 'bad']){
+    const {errors, warnings} = homeWarnings({id: 'home', type: 'homemap', devices});
+    assert.strictEqual(errors.length, 0);
+    assert.ok(warnings.some(w => w.includes('.panels[0].devices: homemap needs a devices array — rendering a placeholder')));
+  }
+  const p = homePanel();
+  p.devices.push({...p.devices[0]}, {id: 'signals', kind: 'camera', x: 1, y: 2},
+    {id: 'bad', kind: 'dragon', x: 1, y: 2}, {id: 'nonfinite', kind: 'sensor', x: Infinity, y: NaN}, {});
+  Object.assign(p.devices[0], {facing: Infinity, spread: NaN, range: 'bad'});
+  p.devices[3].icon = 'nope';
+  const {errors, warnings} = homeWarnings(p);
+  assert.strictEqual(errors.length, 0);
+  for (const path of ['devices[5].id: duplicate', 'devices[6].id: "signals" is reserved',
+    'devices[7].kind: unknown', 'devices[8].x: must be finite', 'devices[8].y: must be finite',
+    'devices[9].id: needs', 'devices[0].facing: must be finite', 'devices[0].spread: must be finite',
+    'devices[0].range: must be finite', 'devices[3].icon: unknown'])
+    assert.ok(warnings.some(w => w.includes('.panels[0].' + path)), path);
+});
+
+test('homemap validator: initial and step warnings for states/signals; valid panel is silent', () => {
+  const p = homePanel();
+  const bad = {unknown: 'ok', cam1: 'bad', cam2: null, door: 'sleep', attic: 'rx', hub: 'off',
+    signals: [null, [], 'bad', {}, {from: 'cam1'}, {to: 'hub'}, {from: 'missing', to: 'hub'}]};
+  p.initial = bad;
+  const {errors, warnings} = homeWarnings(p, [bad, {signals: 'bad'}]);
+  assert.strictEqual(errors.length, 0);
+  for (const prefix of ['.panels[0].initial', '.steps[0].panels.home']){
+    for (const id of ['unknown', 'cam1', 'cam2', 'door', 'attic', 'hub'])
+      assert.ok(warnings.some(w => w.includes(prefix + '.' + id + ':')), prefix + '.' + id);
+    for (let i = 0; i < bad.signals.length; i++)
+      assert.ok(warnings.some(w => w.includes(prefix + '.signals[' + i + ']:')), prefix + '.signals[' + i + ']');
+  }
+  assert.ok(warnings.some(w => w.includes('.steps[1].panels.home.signals: expected an array')));
+  p.initial = {cam1: 'scan', cam2: 'sleep', door: 'closed', attic: 'ok', hub: 'idle'};
+  p.outline = {w: 300, h: 164};
+  const valid = homeWarnings(p, [{cam1: 'detect', cam2: 'scan', signals: [{from: 'cam1', to: 'hub'}, {from: 'hub', to: 'door'}]}]);
+  assert.deepStrictEqual(plain(valid), {errors: [], warnings: []});
 });

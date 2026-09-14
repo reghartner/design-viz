@@ -10,7 +10,7 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','signal','tiles','inflight','phone','timeline'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline'];
 var SCENE_NAMES = ['person-at-door-night','package-drop','static-noise'];
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
@@ -213,6 +213,73 @@ function tileStateWarnings(obj, path, decl, warnings){
       warnings.push(path + '.' + k + '.state: "' + v.state +
         '" is not in the declared states — tile renders dimmed (valid: ' + vocab.join(' ') + ')');
   });
+}
+
+/* Homemap vocabularies are shared by validation and the pure engine model.
+   First token is the fallback. Only signals is reserved: this panel has its
+   own fold so log/mark/enterOnce remain ordinary device ids. */
+var HOMEMAP_STATES = {
+  camera: ['scan', 'sleep', 'detect', 'off'], entry: ['closed', 'open', 'alert'],
+  sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'alert']
+};
+function homemapDeviceValid(d){
+  return d && typeof d.id === 'string' && d.id !== '' && d.id !== 'signals' &&
+    typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(HOMEMAP_STATES, d.kind) &&
+    isFiniteNum(d.x) && isFiniteNum(d.y);
+}
+function homemapPatchWarnings(obj, path, devices, warnings){
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+  Object.keys(obj).forEach(function(k){
+    if (k === 'signals'){
+      if (!Array.isArray(obj.signals)){
+        warnings.push(path + '.signals: expected an array of {from, to} — ignored');
+        return;
+      }
+      obj.signals.forEach(function(sig, i){
+        if (!sig || typeof sig !== 'object' || Array.isArray(sig) ||
+            typeof sig.from !== 'string' || typeof sig.to !== 'string' ||
+            !devices[sig.from] || !devices[sig.to])
+          warnings.push(path + '.signals[' + i + ']: needs from/to referencing declared device ids — entry ignored');
+      });
+    } else if (!devices[k]){
+      warnings.push(path + '.' + k + ': undeclared device id — state ignored');
+    } else {
+      var vocab = HOMEMAP_STATES[devices[k].kind];
+      if (vocab.indexOf(obj[k]) < 0)
+        warnings.push(path + '.' + k + ': unknown ' + devices[k].kind + ' state "' + obj[k] +
+          '" — using "' + vocab[0] + '" (valid: ' + vocab.join(' ') + ')');
+    }
+  });
+}
+function homemapDeclarationWarnings(panel, path, warnings){
+  var devices = Object.create(null), seen = Object.create(null);
+  if (!(Array.isArray(panel.devices) && panel.devices.length))
+    warnings.push(path + '.devices: homemap needs a devices array — rendering a placeholder');
+  (Array.isArray(panel.devices) ? panel.devices : []).forEach(function(d, i){
+    var dp = path + '.devices[' + i + ']';
+    if (!d || typeof d.id !== 'string' || !d.id){
+      warnings.push(dp + '.id: needs a nonempty string — device ignored');
+      return;
+    }
+    if (d.id === 'signals') warnings.push(dp + '.id: "signals" is reserved — device ignored');
+    if (seen[d.id]) warnings.push(dp + '.id: duplicate device id "' + d.id + '" — duplicate ignored');
+    var duplicate = !!seen[d.id];
+    seen[d.id] = true;
+    if (typeof d.kind !== 'string' || !Object.prototype.hasOwnProperty.call(HOMEMAP_STATES, d.kind))
+      warnings.push(dp + '.kind: unknown kind "' + d.kind + '" — device ignored (valid: camera entry sensor hub)');
+    ['x', 'y'].forEach(function(k){
+      if (!isFiniteNum(d[k])) warnings.push(dp + '.' + k + ': must be finite — device ignored');
+    });
+    if (d.kind === 'camera') ['facing', 'spread', 'range'].forEach(function(k){
+      if (d[k] !== undefined && !isFiniteNum(d[k]))
+        warnings.push(dp + '.' + k + ': must be finite — default used');
+    });
+    if (d.kind === 'sensor' && d.icon !== undefined && ICON_SET.indexOf(d.icon) < 0)
+      warnings.push(dp + '.icon: unknown icon "' + d.icon + '" — using "gear"');
+    if (!duplicate && homemapDeviceValid(d)) devices[d.id] = d;
+  });
+  homemapPatchWarnings(panel.initial, path + '.initial', devices, warnings);
+  return devices;
 }
 
 /* radar per-step patch checks shared by initial and step patches */
@@ -594,6 +661,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var signalPanels = {};
   var tilesPanels = {};
   var radarPanels = {};
+  var homemapPanels = {};
   var inflightPanels = {};
   var phonePanels = {};
   var timelinePanels = {};
@@ -770,6 +838,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       }
       signalLinkWarnings(p.initial, PP + '.initial', warnings);
     }
+    if (p.type === 'homemap') homemapPanels[p.id] = homemapDeclarationWarnings(p, PP, warnings);
     if (p.type === 'radar'){
       radarPanels[p.id] = true;
       radarPatchWarnings(p.initial, PP + '.initial', warnings);
@@ -889,6 +958,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         signalLinkWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (tilesPanels[pid] && patch[pid]){
         tileStateWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, tilesPanels[pid], warnings);
+      } else if (homemapPanels[pid] && patch[pid]){
+        homemapPatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, homemapPanels[pid], warnings);
       } else if (radarPanels[pid] && patch[pid]){
         radarPatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (inflightPanels[pid] && patch[pid]){
@@ -1076,12 +1147,39 @@ function foldPhoneStates(panel, steps){
   return states;
 }
 
+/* Carry device states, but attach signals only to their authored step. */
+function foldHomemapStates(panel, steps){
+  var carried = Object.create(null), states = [];
+  function apply(patch){
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return;
+    Object.keys(patch).forEach(function(k){ if (k !== 'signals') carried[k] = patch[k]; });
+  }
+  function snapshot(signals){
+    var snap = Object.create(null);
+    Object.keys(carried).forEach(function(k){ snap[k] = carried[k]; });
+    snap.signals = Array.isArray(signals) ? signals.slice() : [];
+    return snap;
+  }
+  apply(panel.initial);
+  steps.forEach(function(st){
+    var patch = (stepPanelPatch(st) || {})[panel.id];
+    apply(patch);
+    states.push(snapshot(patch && patch.signals));
+  });
+  if (!steps.length) states.push(snapshot(null));
+  return states;
+}
+
 function foldPanelStates(d){
   var panels = d.panels || [];
   var steps = d.steps || [];
   var out = {};
   panels.forEach(function(p){
     if (!p || !p.id) return;
+    if (p.type === 'homemap'){
+      out[p.id] = foldHomemapStates(p, steps);
+      return;
+    }
     if (p.type === 'inflight'){
       out[p.id] = foldInflightStates(p, steps);
       return;

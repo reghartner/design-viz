@@ -2599,3 +2599,33 @@ test('builderInsertTargetText handles a headingless section and bare shapes', ()
   const bare = {nodes: {a: {}}, rows: [['a']]};
   assert.equal(B.builderInsertTargetText(bare, 0), 'into section 1');
 });
+
+test('homemap setup and dynamic patch fields follow declared devices', () => {
+  assert.deepStrictEqual(plain(B.PANEL_SETUP_FIELDS.homemap), [
+    ['outline', 'json'], ['devices', 'rows', {cols: [
+      {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
+      {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
+      {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'}
+    ], max: 12}], ['initial', 'json']
+  ]);
+  const decl = {type: 'homemap', devices: ['camera', 'entry', 'sensor', 'hub'].map((kind, i) => ({id: 'd' + i, kind, x: 20, y: 40}))};
+  assert.deepStrictEqual(plain(B.panelPatchFields(decl)), [
+    ['d0', 'enum', ['sleep', 'scan', 'detect', 'off']], ['d1', 'enum', ['closed', 'open', 'alert']],
+    ['d2', 'enum', ['ok', 'warn', 'alert', 'off']], ['d3', 'enum', ['idle', 'rx', 'alert']], ['signals', 'jsonArr']
+  ]);
+  decl.devices.push(null, {}, {...decl.devices[0]}, {id: 'signals', kind: 'camera', x: 1, y: 2},
+    {id: 'bad', kind: 'dragon', x: 1, y: 2}, {id: 'nan', kind: 'camera', x: NaN, y: 1});
+  assert.strictEqual(B.panelPatchFields(decl).length, 5);
+  assert.deepStrictEqual(plain(B.panelPatchFields({type: 'homemap'})), [['signals', 'jsonArr']]);
+});
+
+test('homemap palette starter inserts all device kinds without warnings', () => {
+  const plan = B.planAddPanel(TEXT, SPEC, 0, 'homemap');
+  const spec = JSON.parse(plan.text), p = spec.page.blocks[0].diagram.panels[0];
+  assert.strictEqual(p.type, 'homemap');
+  assert.deepStrictEqual(p.devices.map(d => d.kind).sort(), ['camera', 'camera', 'entry', 'hub', 'sensor']);
+  assert.ok(p.devices.find(d => d.kind === 'sensor').label);
+  const result = V.validate(V.normalize(spec));
+  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.warnings.length, 0);
+});

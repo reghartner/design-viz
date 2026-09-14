@@ -2180,12 +2180,10 @@ function planStepTone(text, raw, sectionIdx, stepIdx, nodeId, tokenOrNull){
     Object.keys(cur).forEach(function(k){ tone[k] = cur[k]; });
     if (tokenOrNull == null) delete tone[nodeId];
     else tone[nodeId] = tokenOrNull;
-    var keys = Object.keys(tone);
-    if (keys.length){
-      var plainTone = {};
-      keys.forEach(function(k){ plainTone[k] = tone[k]; });
-      st.tone = plainTone;
-    } else delete st.tone;
+    /* keep the null-prototype object: assigning "__proto__" into a plain
+       {} would hit the inherited setter and silently drop the entry.
+       JSON.stringify serializes own properties of a null-proto object. */
+    if (Object.keys(tone).length) st.tone = tone; else delete st.tone;
   });
 }
 

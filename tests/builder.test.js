@@ -3163,3 +3163,12 @@ test('planStepTone tolerates a null-valued existing tone entry and preserves it 
   const next = JSON.parse(plan.text);
   assert.deepStrictEqual(next.steps[0].tone, {gw: null, db: 'warn'});
 });
+
+test('planStepTone keeps a "__proto__" node id as an ordinary tone key', () => {
+  const spec = JSON.parse('{"nodes":{"__proto__":{},"a":{}},"rows":[["a"]],"steps":[{"text":"x","nodes":["a"]}]}');
+  const plan = B.planStepTone(JSON.stringify(spec), spec, 0, 0, '__proto__', 'alert');
+  assert.ok(!plan.error, plan.error);
+  assert.ok(plan.text.includes('"__proto__": "alert"'), plan.text);
+  const tone = JSON.parse(plan.text).steps[0].tone;
+  assert.strictEqual(Object.getOwnPropertyDescriptor(tone, '__proto__').value, 'alert');
+});

@@ -125,6 +125,14 @@
         <summary>story steps</summary>
         <div class="story-tools">
           <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
+          <div id="steps-path-tools" hidden>
+            <label>Path<select class="fctl" id="steps-path" aria-label="Story path"></select></label>
+            <label>Path label<input class="fctl" id="steps-path-label" aria-label="Path label"></label>
+            <label>Path color<input class="fctl" id="steps-path-color" type="color" aria-label="Path color"></label>
+            <button class="bbtn" id="steps-path-save">Update path</button>
+            <button class="bbtn" id="steps-path-remove">Remove alternate</button>
+          </div>
+          <button class="bbtn" id="steps-fork" disabled>+ Alternate after selected step</button>
           <input class="fctl" type="search" id="steps-search" aria-label="Filter story steps" placeholder="Caption, step ID, lane, node, or panel…">
           <div class="outline-status" id="steps-status" role="status"></div>
           <nav class="story-list" id="steps-list" aria-label="Story steps"></nav>
@@ -138,7 +146,7 @@
             <button class="bbtn" id="steps-earlier" disabled>↑ Move up</button>
             <button class="bbtn" id="steps-later" disabled>↓ Move down</button>
           </div>
-          <p class="story-note">Select a beat to edit it. Move up/down changes its position in the full story order. Copies repeat patches, including appended events; inherited state is recalculated. Reveal/hide indices stay positional.</p>
+          <p class="story-note">Select a beat to edit it or branch after it. Step content is shared by paths that reference it. Append, duplicate and move affect the selected path; deleting a step removes it everywhere. Copies repeat patches, including appended events. Reveal/hide indices stay positional within each path.</p>
         </div>
       </details>
       <details class="ssec" id="sec-inspect" open hidden>
@@ -198,6 +206,7 @@
       <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> of the hop (default <code>int</code>). Zero-based reveal indices draw the edge only for the selected step interval. <code>bend</code>/<code>labelDx</code>/<code>labelDy</code> are optional manual nudges.</td></tr>
       <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Twenty-six types are documented in <code>contract/authoring-contract.md</code>, including <code>table</code> for data snapshots, <code>checks</code> for authored decisions, <code>budget</code> for resource limits, and <code>replicas</code> for positions and reported lag. <code>waterfall</code> supports <code>startMs</code> offsets for overlapping trace spans; <code>trace</code> shows service internals and child-covered versus uncovered wall time.</td></tr>
       <tr><td>steps[n].id</td><td><code>"ota.3"</code></td><td>Optional unique step identifier for deep links, search and preview restoration. Duplicating a step gives its copy a new ID.</td></tr>
+      <tr><td>diagram.paths</td><td><code>[{id, label?, color?, steps:[step IDs]}]</code></td><td>Optional named outcomes sharing one step registry and board. First path is the default. Chips sit left of aligned step rows below playback controls, with blank columns before a fork and after its ending; playback and state follow the selected path and stop at its own ending. No path label unless alternates exist. Story steps can fork, rename, recolor and remove paths.</td></tr>
       <tr><td>diagram.steps</td><td><code>[{edge | edges, nodes?, panels?, lane?, text, link?}]</code></td><td>Ordered narrative. <code>edge:"from-&gt;to"</code> or <code>edges:[...]</code> for hops that happen together — their packets fire in order, staggered. A step may be <b>edgeless</b>: light <code>nodes:[...]</code> directly and/or patch panels. <code>panels</code> carries SPARSE per-panel patches; the engine folds them into complete per-step state so any jump is consistent (<code>log</code> appends; <code>enterOnce</code> applies only at its own step). Drives the numbered coins, the ambient packet schedule, AND the click-through.</td></tr>
       <tr><td>icons</td><td colspan="2"><code>terminal cloud shield gear db antenna thermo pump router package key server chip phone</code></td></tr>
       <tr><td>tints</td><td colspan="2"><code>cmd auth data mqtt dev</code></td></tr>

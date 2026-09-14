@@ -857,7 +857,47 @@ sequence should have steps; a pure topology diagram may omit them (then use
 `"view": "ambient-only"`).
 
 Reserved per-step fields you may see but should only emit if asked: `sticky`,
-`id`, `packets`.
+`packets`. Stable `id` values are required for steps referenced by paths.
+
+### paths — alternate outcomes on the same board
+
+Optional `diagram.paths` is a nonempty array of
+`{id, label?, color?, steps:["step-id", ...]}`. Its first entry is the default
+path. When present, `diagram.steps` is a shared registry: each path references
+its complete ordered sequence by stable step ID. Each path needs a unique
+nonempty `id`, at least one step, and no repeated step IDs. Every reference
+must resolve to exactly one registry step. Use separate step bodies for
+repeated operations such as retry attempts. `label` defaults to “Happy path”
+for the first path and the path ID for others; `color` is optional hex, with
+cyan/orange/purple/pink/green defaults.
+
+For example, declare steps `accept`, `auth`, `queue`, `deliver`, `ack`, `lost`.
+Use paths `{"id":"happy","label":"Happy path","steps":["accept","auth","queue","deliver","ack"]}`
+and `{"id":"drop","label":"Dropped signal","color":"#fb923c","steps":["accept","auth","queue","lost"]}`.
+Below the transport controls, each path has a colored chip on the left and
+a row of steps on the right. Step numbers align in shared columns. The
+primary row shows all its steps; an alternate begins at the final shared
+beat of its longest common prefix with an earlier path and ends at its own
+last step, leaving blank space before and after. No shared prefix means
+column 1. Clicking a chip selects its starting beat; clicking a number
+selects that path and step. Rows stay in place when switching. Both routes
+use the same nodes, edges, rows and panels. Path colors identify choices;
+protocol colors retain their meaning on edges.
+
+The selected path supplies numbered coins, packet scheduling, playback,
+node-tone folding and panel-state folding from initial values. Another path’s
+patches cannot leak into it. Each path ends at its own final step; playback
+stops there and Play replays from the start. Reveal/hide indices are zero-based
+positions in the selected sequence. Print uses the selected path. With fewer
+than two paths, no path label or branch choices appear. Omit `paths` to retain
+legacy playback; `ambient-only` omits path controls. This additive feature
+requires a current renderer, without a schema-version flag.
+
+Editing a shared step affects every referencing path; deleting one must prune
+all references. Removing a path may leave unused registry steps, which never
+play while explicit paths exist. Author paths only for supported outcomes in
+the source document; distinguish observed trace evidence from hypothetical
+failure scenarios. See [the full example and editor workflow](../docs/alternate-paths.md).
 
 ## Validation behavior
 
@@ -908,9 +948,9 @@ You do not author these, but they shape what ids are worth writing:
   - `#t=<tab-label-slug>` selects a tab in the first tab block. For the uncommon
     page with multiple tab blocks, `#b=<1-based-tab-block>&t=<tab-label-slug>`
     selects a tab in a later block.
-  - `d=<section-ref>&m=<ambient|step>[&s=<step-id-or-1-based-number>]` selects
+  - `d=<section-ref>&m=<ambient|step>[&p=<path-id>][&s=<step-id-or-1-based-number>]` selects
     any stepped diagram, opens its containing tab, and restores its mode and
-    folded step state.
+    folded step state. `p` chooses a declared path; absent `p` uses the default.
   - `c=<section-ref>[&r=<1-based-rendered-field-row>]` targets a message-contract
     card and optionally focuses and highlights one rendered row. It does not
     reset diagram mode or step state.

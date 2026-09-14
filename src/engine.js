@@ -952,7 +952,7 @@ function parseHash(h){
       catch (ex) { /* malformed escape: ignore that pair */ }
     }
   });
-  return {b: kv.b != null ? kv.b : null,
+  var result = {b: kv.b != null ? kv.b : null,
           t: kv.t != null ? kv.t : null,
           d: kv.d != null ? kv.d : null,
           c: kv.c != null ? kv.c : null,
@@ -961,6 +961,8 @@ function parseHash(h){
           x: kv.x != null ? kv.x : null,
           e: kv.e != null ? kv.e : null,
           m: (kv.m === 'step' || kv.m === 'ambient') ? kv.m : null};
+  if (kv.p != null) result.p = kv.p;
+  return result;
 }
 function encodeSectionRefList(value){
   return String(value == null ? '' : value).split(',').map(function(ref){
@@ -973,6 +975,7 @@ function buildHash(st){
   if (st && st.t != null) parts.push('t=' + encodeURIComponent(st.t));
   if (st && st.d != null) parts.push('d=' + encodeURIComponent(st.d));
   if (st && st.m) parts.push('m=' + st.m);
+  if (st && st.p != null) parts.push('p=' + encodeURIComponent(st.p));
   if (st && st.s != null) parts.push('s=' + encodeURIComponent(st.s));
   if (st && st.c != null) parts.push('c=' + encodeURIComponent(st.c));
   if (st && st.r != null) parts.push('r=' + encodeURIComponent(st.r));
@@ -1290,7 +1293,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       var stepDelta = d.steps[stepN - 1].delta === true;
       g.setAttribute('class', 'coin' + (stepDelta ? ' dvd' : ''));
       g.setAttribute('id', prefix + '-coin-' + stepN);
-      g.setAttribute('data-dv-step', String(stepN - 1));
+      g.setAttribute('data-dv-step', String(d._sourceIndices ? d._sourceIndices[stepN - 1] : stepN - 1));
       markFragmentElement(g, e);
       var c = document.createElementNS(SVGNS, 'circle');
       c.setAttribute('cx', mid.x); c.setAttribute('cy', mid.y); c.setAttribute('r', 10);
@@ -3695,6 +3698,10 @@ function buildPanels(asideEl, d, skin){
       skin, p.type === 'trace' && !traceNavigation ? [] : folded[p.id] || [], home ? -1 : 0, false);
   });
   return {
+    setDiagram: function(next){
+      folded = foldPanelStates(next);
+      traceNavigation = (next.steps || []).length && next.view !== 'ambient-only';
+    },
     setStep: function(i, animate, ambient){
       Object.keys(hosts).forEach(function(pid){
         var states = folded[pid] || [];
@@ -3712,8 +3719,11 @@ function buildPanels(asideEl, d, skin){
 function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
   var autoplay = !options || options.autoplay !== false;
   var destroyed = false;
+  var source = d, paths = diagramPathList(source), selectedPath = paths[0];
+  var explicitPaths = Array.isArray(source.paths) && source.paths.length > 0;
+  d = diagramForPath(source, selectedPath.id);
   var toneStates = foldNodeTones(d);
-  var steps = (d.steps || []).map(function(st){
+  function playbackSteps(diagram){ return (diagram.steps || []).map(function(st){
     return {keys: stepKeys(st).filter(function(k){ return board.edgeIds[k]; }),
             nodes: stepNodes(st),
             delta: !!(st && st.delta === true),
@@ -3722,7 +3732,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
             packets: (st && Array.isArray(st.packets)) ? st.packets : null,
             text: (st && st.text) || '',
             link: (st && typeof st.link === 'string') ? st.link : null};
-  });
+  }); }
+  var steps = playbackSteps(d);
   var N = steps.length;
   var cur = 0, paintedStep = null, timer = null, mode = 'ambient';
   var pending = [];
@@ -3733,16 +3744,70 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
-  for (var k = 0; k < N; k++){
-    (function(idx){
-      var b = document.createElement('button');
-      b.className = 'schip' + (steps[idx].delta ? ' dvd' : '');
+  var chipButtons = [], pathButtons = [];
+  function paintChips(){
+    while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
+    chipButtons = []; pathButtons = [];
+    function appendStep(parent,path,idx,rowNumber){
+      var step = source.steps[path.indices[idx]], b = document.createElement('button');
+      b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '');
       b.textContent = idx + 1;
-      b.setAttribute('aria-label', 'Go to step ' + (idx + 1));
-      b.addEventListener('click', function(){ stopAuto(); setStep(idx); });
-      chipsBox.appendChild(b);
-    })(k);
+      b.setAttribute('data-step-source',path.indices[idx]);
+      b.setAttribute('aria-label','Go to step ' + (idx + 1) + (paths.length > 1 ? ' on ' + path.label : ''));
+      if (paths.length > 1){
+        b.setAttribute('data-step-path',path.id);
+        b.style.gridColumn = idx + 2; b.style.gridRow = rowNumber + 1;
+      }
+      b.addEventListener('click',function(){
+        stopAuto();
+        if (path.id !== selectedPath.id){
+          selectPath(path.id,idx);
+          secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
+        } else setStep(idx);
+      });
+      parent.appendChild(b);
+      chipButtons.push({button:b, path:path, index:idx});
+    }
+    if (paths.length < 2){
+      selectedPath.indices.forEach(function(unused,idx){appendStep(chipsBox,selectedPath,idx,0);});
+      return;
+    }
+    var matrix = document.createElement('div'); matrix.className = 'path-matrix';
+    matrix.setAttribute('role','group'); matrix.setAttribute('aria-label','Execution paths');
+    matrix.style.setProperty('--path-step-count',Math.max.apply(null,paths.map(function(p){return p.indices.length;})));
+    pathStepRows(paths).forEach(function(row,rowNumber){
+      var path = row.path, line = document.createElement('div'); line.className = 'path-row';
+      line.setAttribute('role','group');
+      line.setAttribute('aria-label',path.label + ', steps ' + (row.start + 1) + ' through ' + (row.end + 1));
+      line.setAttribute('data-path-row',path.id); line.style.setProperty('--path-color',path.color);
+      var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
+      choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);
+      choice.style.gridColumn = 1; choice.style.gridRow = rowNumber + 1;
+      choice.addEventListener('click',function(ev){
+        ev.stopPropagation(); selectPath(path.id,row.start);
+        secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
+      });
+      line.appendChild(choice); pathButtons.push({button:choice,path:path,row:line});
+      for (var i = row.start; i <= row.end; i++) appendStep(line,path,i,rowNumber);
+      matrix.appendChild(line);
+    });
+    chipsBox.appendChild(matrix);
   }
+  function syncPathControls(){
+    pathButtons.forEach(function(choice){
+      var active = choice.path.id === selectedPath.id;
+      choice.button.setAttribute('aria-pressed',String(active));
+      choice.row.setAttribute('data-selected',String(active));
+    });
+    var active = chipButtons.find(function(chip){return chip.path.id === selectedPath.id && chip.index === cur;});
+    /* Before a fork the active beat is displayed on its shared ancestor row. */
+    if (!active) active = chipButtons.slice().reverse().find(function(chip){
+      return paths.indexOf(chip.path) < paths.indexOf(selectedPath) && chip.index === cur &&
+        chip.path.indices[cur] === selectedPath.indices[cur];
+    });
+    chipButtons.forEach(function(chip){chip.button.setAttribute('aria-current',String(chip === active));});
+  }
+  paintChips();
 
   function clearLit(){
     pending.forEach(function(t){ clearTimeout(t); });
@@ -3807,7 +3872,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function setStep(i, claimAddressBar, narrativePath){
     if (destroyed || !N) return;
-    var target = ((i % N) + N) % N;
+    var target = explicitPaths ? Math.max(0,Math.min(N - 1,i)) : ((i % N) + N) % N;
     var tween = shouldTweenStep(paintedStep, target, RM, narrativePath);
     var tonePulses = tonePulseNodes(toneStates, paintedStep, target, RM, narrativePath);
     if (tween) boardDiv.classList.add('dv-step-tween');
@@ -3834,15 +3899,20 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
     var coin = document.getElementById(prefix + '-coin-' + (cur + 1));
     if (coin) coin.classList.add('lit');
-    var chips = chipsBox.children;
-    for (var j = 0; j < chips.length; j++) chips[j].setAttribute('aria-current', j === cur ? 'true' : 'false');
+    syncPathControls();
     updateCaption(s, tween);
     if (panelCtl) panelCtl.setStep(cur, tween);
+    if (explicitPaths){
+      termbar.btnPrev.disabled = cur === 0; termbar.btnNext.disabled = cur === N - 1;
+      if (cur === N - 1) stopAuto();
+    }
     paintedStep = cur;
     if (onChange) onChange(claimAddressBar !== false);
   }
   function startAuto(){
     if (destroyed || timer || RM || !N) return;
+    if (explicitPaths && N === 1) return;
+    if (explicitPaths && cur === N - 1) setStep(0, false, false);
     var id = window.setInterval(function(){ if (timer === id) setStep(cur + 1, false); }, 3000);
     timer = id;
     btnPlay.innerHTML = '&#10074;&#10074;';
@@ -3852,6 +3922,25 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (timer){ window.clearInterval(timer); timer = null; }
     btnPlay.innerHTML = '&#9654;';
     btnPlay.setAttribute('aria-label', 'Play');
+  }
+  function selectPath(id, at){
+    if (destroyed) return false;
+    var next = paths.find(function(p){ return p.id === id; });
+    if (!next) return false;
+    if (next === selectedPath){
+      if (mode !== 'step') enterStep(false);
+      stopAuto(); setStep(at == null ? 0 : at,true,false);
+      return true;
+    }
+    stopAuto(); clearLit(); clearCaptionTween();
+    selectedPath = next; d = diagramForPath(source,id);
+    steps = playbackSteps(d); N = steps.length; toneStates = foldNodeTones(d); paintedStep = null;
+    if (options && options.renderPath){ board = options.renderPath(d); svg = board.svg; }
+    if (panelCtl && panelCtl.setDiagram) panelCtl.setDiagram(d);
+    mode = 'step'; boardDiv.classList.add('stepmode'); bar.hidden = false; syncToggle();
+    setStep(at == null ? 0 : at, true, false);
+    if (secBox.dispatchEvent) secBox.dispatchEvent(new CustomEvent('dv:pathrender',{bubbles:true}));
+    return true;
   }
   function settleCurrentStep(){
     pending.forEach(function(t){ clearTimeout(t); });
@@ -3934,6 +4023,18 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     enterStep: enterStep,
     enterAmbient: enterAmbient,
     mode: function(){ return mode; },
+    path: function(){ return selectedPath.id; },
+    paths: function(){ return paths; },
+    selectPath: selectPath,
+    sourceIndex: function(n){ return selectedPath.indices[n == null ? cur : n]; },
+    jumpSource: function(index, pathId){
+      var path = paths.find(function(p){ return p.id === (pathId || selectedPath.id) && p.indices.indexOf(index) >= 0; }) ||
+        paths.find(function(p){ return p.indices.indexOf(index) >= 0; });
+      if (!path) return false;
+      if (path.id !== selectedPath.id) selectPath(path.id, path.indices.indexOf(index));
+      else { if (mode !== 'step') enterStep(false); stopAuto(); setStep(path.indices.indexOf(index),true,false); }
+      return true;
+    },
     current: function(){ return {n: cur, id: steps[cur] ? steps[cur].id : null}; },
     ids: function(){ return steps.map(function(s){ return s.id; }); },
     stepIndexOf: function(sref){ return stepIndexOf(steps.map(function(s){ return s.id; }), sref); },
@@ -4154,6 +4255,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   if (!sec.diagram) return result;
 
   var d = sec.diagram;
+  var activeDiagram = diagramForPath(d);
   var prefix = 'fs' + gi;
   var hasPanels = Array.isArray(d.panels) && d.panels.length > 0;
 
@@ -4173,10 +4275,10 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     var aside = document.createElement('div');
     aside.className = 'panelcol';
     grid.appendChild(aside);
-    panelCtl = buildPanels(aside, d, skin);
+    panelCtl = buildPanels(aside, activeDiagram, skin);
   }
 
-  var board = renderBoard(bwrap, d, prefix, skin, protos, backlinks);
+  var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks);
   lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
   if (d.routing === 'lanes'){
     result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
@@ -4220,6 +4322,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var btnPlay = document.createElement('button'); btnPlay.className = 'tbtn'; btnPlay.innerHTML = '&#9654;'; btnPlay.setAttribute('aria-label', 'Play');
   var btnNext = document.createElement('button'); btnNext.className = 'tbtn'; btnNext.innerHTML = '&#8250;'; btnNext.setAttribute('aria-label', 'Next step');
   var chips = document.createElement('div'); chips.className = 'schips';
+  if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
   var line = document.createElement('div'); line.className = 'stepline';
   var stepN = document.createElement('b'); var stepText = document.createElement('span');
   var lanePill = document.createElement('span');
@@ -4242,17 +4345,24 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   /* print-only numbered caption list (C4) */
   var ol = document.createElement('ol');
   ol.className = 'printsteps';
-  (d.steps || []).forEach(function(st){
-    var li = document.createElement('li');
-    li.textContent = (st && st.lane ? '[' + st.lane + '] ' : '') + ((st && st.text) || '');
-    ol.appendChild(li);
-  });
+  function printSteps(diagram){
+    ol.innerHTML = '';
+    (diagram.steps || []).forEach(function(st){
+      var li = document.createElement('li');
+      li.textContent = (st && st.lane ? '[' + st.lane + '] ' : '') + ((st && st.text) || '');
+      ol.appendChild(li);
+    });
+  }
+  printSteps(activeDiagram);
   box.appendChild(ol);
 
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, stepN:stepN, stepText:stepText, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep
-  }, d, prefix, board, lanes, panelCtl, onChange, options);
+  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
+    printSteps(next);
+    return renderBoard(bwrap, next, prefix, skin, protos, backlinks);
+  }}));
   stepper.copyButton = copyStep;
 
   if (view === 'step') stepper.enterStep(true); /* host may disable automatic playback */
@@ -4715,6 +4825,7 @@ function wireDeepLinks(ctl, win, preservedHash){
       if (diagramSec && diagramSec.stepper){
         st.d = String(diagramSec.reference);
         st.m = diagramSec.stepper.mode();
+        if (diagramSec.stepper.paths && diagramSec.stepper.paths().length > 1) st.p = diagramSec.stepper.path();
         if (st.m === 'step'){
           var cur = diagramSec.stepper.current();
           st.s = stepReference(diagramSec.stepper.ids(), cur.n);
@@ -4782,9 +4893,11 @@ function wireDeepLinks(ctl, win, preservedHash){
     var diagramTarget = target.diagram;
     if (diagramTarget){
       var diagramSec = section(diagramTarget.section), sp = diagramSec && diagramSec.stepper;
+      if (sp && sp.selectPath) sp.selectPath(st.p || sp.paths()[0].id);
       if (sp && diagramTarget.mode === 'step'){
         sp.enterStep(false);
-        if (diagramTarget.step >= 0) sp.jump(diagramTarget.step);
+        var pathStep = sp.stepIndexOf(st.s);
+        if (pathStep >= 0) sp.jump(pathStep);
       } else if (sp && diagramTarget.mode === 'ambient') sp.enterAmbient();
       targetEl = sp && (sp.scrollTargetEl || sp.sectionEl);
     }

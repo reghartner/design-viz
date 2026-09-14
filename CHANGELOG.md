@@ -1,5 +1,16 @@
 # Changelog
 
+## Alternate execution paths (2026-09-14)
+
+- Added `diagram.paths`: named, colored sequences referencing shared steps.
+  Path chips sit left of aligned step rows beneath the transport controls,
+  leaving blank columns before a fork and after its ending. Each path controls
+  its own playback length, node tones and folded panel state.
+- Story steps can fork, rename, recolor and remove alternates, with path-specific
+  append, duplicate and move actions, shared source editing and undo.
+- Selected paths survive ordinary edits and copied deep links. The alternate
+  paths starter contrasts six happy steps with a four-step dropped signal.
+
 ## Phone diagram legibility (2026-09-14)
 
 - Routed diagrams now offer Auto, Fit width and Readable views. Narrow columns

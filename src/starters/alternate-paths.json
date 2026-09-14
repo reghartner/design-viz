@@ -1,0 +1,47 @@
+{
+  "page": {
+    "title": "One command, two outcomes",
+    "skin": "aurora",
+    "sections": [{
+      "heading": "Command delivery",
+      "text": ["The same command can reach the device or lose its radio signal. Follow the shared first three steps, then choose the Dropped signal row, which starts in column 3. The diagram stays in place; the selected path controls playback and every panel."],
+      "diagram": {
+        "view": "step",
+        "routing": "lanes",
+        "nodes": {
+          "operator": {"title": "Operator", "icon": "phone", "tint": "cmd"},
+          "api": {"title": "Command API", "icon": "cloud", "tint": "cmd"},
+          "broker": {"title": "Broker", "icon": "antenna", "tint": "mqtt"},
+          "device": {"title": "Pump P-7", "icon": "pump", "tint": "dev"},
+          "audit": {"title": "Audit store", "icon": "db", "tint": "data"}
+        },
+        "rows": [["operator", "api", "broker"], ["device", "audit"]],
+        "edges": [
+          {"from": "operator", "to": "api", "kind": "https", "label": "set flow"},
+          {"from": "api", "to": "broker", "kind": "mqtt", "label": "publish command"},
+          {"from": "broker", "to": "device", "kind": "mqtt", "label": "radio delivery"},
+          {"from": "device", "to": "api", "kind": "mqtt", "ret": true, "label": "applied ACK"},
+          {"from": "api", "to": "audit", "kind": "int", "label": "record outcome"}
+        ],
+        "panels": [
+          {"id": "delivery", "type": "state", "title": "Command outcome", "states": ["PENDING", "AUTHORIZED", "QUEUED", "DELIVERED", "APPLIED", "ACKNOWLEDGED", "SIGNAL LOST"], "initial": {"state": "PENDING"}},
+          {"id": "checks", "type": "checks", "title": "What do we know?", "checks": [{"id": "received", "label": "Device received command"}, {"id": "applied", "label": "Device applied command"}, {"id": "ack", "label": "Acknowledgment recorded"}]},
+          {"id": "events", "type": "log", "title": "This path's events"}
+        ],
+        "steps": [
+          {"id": "request", "edge": "operator->api", "text": "Operator requests a new pump flow rate.", "panels": {"events": {"log": [{"text": "Command accepted by API"}]}}},
+          {"id": "authorize", "nodes": ["api"], "text": "The API authorizes this operator and validates the command.", "panels": {"delivery": {"state": "AUTHORIZED"}}},
+          {"id": "publish", "edge": "api->broker", "text": "The broker queues the command. Radio delivery is the next point of failure.", "panels": {"delivery": {"state": "QUEUED"}, "events": {"log": [{"text": "Queued for Pump P-7"}]}}},
+          {"id": "receive", "edge": "broker->device", "text": "The command reaches the pump over the radio link.", "panels": {"delivery": {"state": "DELIVERED"}, "checks": {"results": {"received": {"status": "pass"}}}}},
+          {"id": "apply", "nodes": ["device"], "tone": {"device": "ok"}, "text": "The device applies the requested flow rate.", "panels": {"delivery": {"state": "APPLIED"}, "checks": {"results": {"received": {"status": "pass"}, "applied": {"status": "pass"}}}, "events": {"log": [{"text": "Pump applied the command"}]}}},
+          {"id": "ack", "edges": ["device->api", "api->audit"], "text": "The acknowledgment is recorded. The happy path ends with confirmed application.", "panels": {"delivery": {"state": "ACKNOWLEDGED"}, "checks": {"results": {"received": {"status": "pass"}, "applied": {"status": "pass"}, "ack": {"status": "pass"}}}, "events": {"log": [{"text": "Application acknowledged and recorded"}]}}},
+          {"id": "dropped", "nodes": ["broker", "device"], "tone": {"broker": "warn", "device": "dim"}, "text": "The radio signal drops before delivery. This path ends here: the device never receives or applies this command, and no acknowledgment is recorded.", "panels": {"delivery": {"state": "SIGNAL LOST"}, "checks": {"results": {"received": {"status": "fail", "detail": "Signal dropped before delivery"}, "applied": {"status": "skip", "detail": "Command never arrived"}, "ack": {"status": "skip", "detail": "No acknowledgment"}}}, "events": {"log": [{"text": "Radio delivery failed; no application or ACK"}]}}}
+        ],
+        "paths": [
+          {"id": "happy", "label": "Happy path", "color": "#38bdf8", "steps": ["request", "authorize", "publish", "receive", "apply", "ack"]},
+          {"id": "dropped-signal", "label": "Dropped signal", "color": "#fb923c", "steps": ["request", "authorize", "publish", "dropped"]}
+        ]
+      }
+    }]
+  }
+}

@@ -1523,6 +1523,16 @@ test('mapEditorCollect drops blank pairs, rejects duplicates, and empties to nul
   assert.strictEqual(B.mapEditorCollect([{key: '', value: ''}]).obj, null);
 });
 
+test('phone setup exposes brand fields and drops cleared values like timeline cadence', () => {
+  const expected = ['brand', 'objf', {cols: [{k: 'app'}, {k: 'logo'}, {k: 'accent'}, {k: 'bg'}, {k: 'fg'}]}];
+  assert.deepStrictEqual(plain(B.PANEL_SETUP_FIELDS.phone), [expected, ['initial', 'json']]);
+  const shape = B.PANEL_SETUP_FIELDS.phone[0][2];
+  const base = {app: 'Ring', logo: 'R', accent: '#1D6EF2'};
+  assert.deepStrictEqual(plain(B.objFieldsCollect(shape, base, {app: 'Ring', logo: '', accent: '', bg: '#abc', fg: ''})),
+    {obj: {app: 'Ring', bg: '#abc'}});
+  assert.strictEqual(B.objFieldsCollect(shape, base, {app: '', logo: '', accent: '', bg: '', fg: '  '}).obj, null);
+});
+
 test('objFieldsCollect keeps unknown keys, removes on all-empty, and validates like a row', () => {
   const shape = {cols: [{k: 'every', req: true}, {k: 'label'}]};
   const out = B.objFieldsCollect(shape, {every: '30m', label: 'heartbeat', extra: true},

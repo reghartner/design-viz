@@ -2577,7 +2577,29 @@ function patchFieldsCollect(fields, values){
   return {item: item};
 }
 
-var SCENE_TOKENS = ['person-at-door-night', 'package-drop', 'static-noise'];
+var SCENE_TOKENS = ['person-at-door-night', 'person-through-door', 'package-drop', 'kitchen-fire', 'static-noise'];
+
+/* A local preview never patches camera mode or advances the story. Replay
+   replaces only this SVG, so it cannot reset the diagram's animation. */
+function screenScenePreview(initialScene){
+  var wrap = document.createElement('div'); wrap.className = 'screen-scene-preview';
+  var box = document.createElement('div'); box.className = 'screenbox m-live';
+  box.setAttribute('role', 'img'); wrap.appendChild(box);
+  var foot = document.createElement('div'); foot.className = 'screen-scene-footer';
+  var note = document.createElement('span'); note.className = 'fnote'; note.textContent = 'Simulated clip preview';
+  var replay = document.createElement('button'); replay.type = 'button'; replay.className = 'bbtn';
+  replay.textContent = 'Replay clip';
+  foot.appendChild(note); foot.appendChild(replay); wrap.appendChild(foot);
+  var selected;
+  function setScene(scene){
+    selected = SCENE_TOKENS.indexOf(scene) >= 0 ? scene : 'static-noise';
+    box.innerHTML = SCENES[selected];
+    box.setAttribute('aria-label', SCENE_LABELS[selected] + ' — simulated clip preview');
+  }
+  replay.addEventListener('click', function(){ setScene(selected); });
+  setScene(initialScene);
+  return {element:wrap, setScene:setScene};
+}
 
 /* parseClock rides in the same bundle (validator.js); the vm-loaded test
    copy of this file has no validator, so capture defensively. */
@@ -4535,8 +4557,18 @@ function initWorkbenchBuilder(opts){
         return frow(key, textControl(cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }));
       if (kind === 'num')
         return frow(key, numberControl(cur, function(v){ return commitSimple(key, v == null ? null : String(v)); }));
-      if (kind === 'scene')
-        return frow(key, selectControl(SCENE_TOKENS, cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }, true));
+      if (kind === 'scene'){
+        var scenes = document.createElement('div'); scenes.className = 'screen-scene-control';
+        var preview = screenScenePreview(cur);
+        var picker = selectControl(SCENE_TOKENS, cur, function(v){
+          var ok = commitSimple(key, v == null ? null : JSON.stringify(v));
+          if (ok) preview.setScene(v);
+          return ok;
+        }, true);
+        picker.setAttribute('aria-label', 'Screen scene');
+        scenes.appendChild(picker); scenes.appendChild(preview.element);
+        return frowBlock(key, scenes);
+      }
       if (kind === 'clock')
         return frow(key, textControl(cur, function(v){
           if (v != null && builderClockInvalid(v)){

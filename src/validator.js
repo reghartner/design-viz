@@ -244,7 +244,7 @@ function softwarePanelPatchWarnings(state, path, p, warnings){
     softwarePanelPatchWarnings(once, path + '.enterOnce', p, warnings);
   }
 }
-var SCENE_NAMES = ['person-at-door-night','package-drop','static-noise'];
+var SCENE_NAMES = ['person-at-door-night','person-through-door','package-drop','kitchen-fire','static-noise'];
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
 var BUFFER_STATES = ['empty','buffered','protected','uploading','uploaded','dropped'];

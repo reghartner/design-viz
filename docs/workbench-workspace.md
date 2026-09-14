@@ -50,3 +50,13 @@ At smaller widths, including phones, the preview and editor stack vertically
 and dividers disappear. Focus mode still hides reference material. The JSON
 textarea keeps native text editing and vertical resizing where the browser
 supports it. This is a browser layout, not an operating-system fullscreen mode.
+
+Routed diagrams have their own **Auto / Fit width / Readable** controls.
+Auto uses full-size labels on narrow diagram columns with horizontal scrolling;
+Fit width shows the whole graph. Tab to the diagram region to pan with arrow
+keys. Phone gutters and larger view buttons leave more room for the content.
+The choice belongs to each diagram and follows the same unique-section match
+as preview playback, even for diagrams without steps. It survives normal
+edits, Render and skin changes, independently of whether a step can be matched.
+It is not saved in JSON, drafts, undo or local storage; reloading resets to
+Auto. See [trace viewing](trace-import.md) for sizing and pan behavior.

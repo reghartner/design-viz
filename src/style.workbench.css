@@ -48,6 +48,7 @@ body.workspace-focus .workspace-tools{position:sticky;top:0;z-index:60;margin-to
 body.workspace-focus .workwrap{max-width:none;}
 #workspace-focus[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
 @media (max-width:1180px){.workspace-hint{display:none;}.workwrap{padding:0 12px;}.workspace-tools{padding:8px 12px;}}
+@media (max-width:640px){body{margin:0;}.workwrap{padding:0 8px;}.wrap{padding-inline:16px;}}
 @media (min-width:1181px){
   .workwrap{display:grid;grid-template-columns:minmax(0,1fr) 12px var(--workspace-editor,440px);gap:6px;align-items:start;}
   #workspace-columns{display:block;align-self:stretch;min-height:200px;}

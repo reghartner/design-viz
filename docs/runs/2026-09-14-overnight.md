@@ -21,7 +21,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 9 | Stable workbench playback while editing | codex/workbench-playback | Open: https://github.com/reghartner/design-viz/pull/58 |
 | 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
 | 11 | Canary and firmware rollout stories | codex/rollout-starters | Open: https://github.com/reghartner/design-viz/pull/60 |
-| 12 | Phone diagram legibility | TBD | Reduce wasted nested spacing; make wide routed boards readable with an explicit fit control |
+| 12 | Phone diagram legibility | codex/phone-diagram-legibility | Open: https://github.com/reghartner/design-viz/pull/61 |
 
 ## Validation and evidence
 
@@ -32,7 +32,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51, #52, #53, #54, #55, #56, #57, #58 and #59 passed all GitHub checks.
+- PRs #50, #51, #52, #53, #54, #55, #56, #57, #58, #59 and #60 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -94,11 +94,23 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   NO DATA, retained rollback evidence at zero configured traffic, missing boot
   reports, mixed canary outcomes, backward jumps, light/dark and 390-pixel
   containment. Tables scroll within their panels. No console errors; LAN
-  preview returns HTTP 200. Check PR #60 final CI after the handoff commit.
+  preview returns HTTP 200. PR #60 final head passed all GitHub checks.
+- Phone legibility: five controller/regression tests plus the full Node and
+  158 Python suites pass. Browser verified all six skins at 390 pixels,
+  responsive behavior from 320 to 1920 pixels, keyboard panning, independent
+  hidden-tab choices, retained Fit width through skin changes and source
+  Render, and unchanged JSON when using view controls. The complex trace's
+  Aurora phone board has 320 pixels of usable width (previously 238 in the
+  rollout view); readable SVG labels render at their designed 1180-pixel scale.
+  Published default/trace and embedded trace pages stay within the phone
+  viewport. The trace fixture's existing density warnings remain; no runtime
+  errors. Readable boards center when they first overflow, without snapping
+  back after user panning. Resize observers dispose with replaced previews.
+  Check PR #61 final CI after this handoff commit. LAN preview remains HTTP 200.
 
 ## Next continuation
 
-Start from the current `codex/rollout-starters` branch, inspect checks
+Start from the current `codex/phone-diagram-legibility` branch, inspect checks
 and working-tree changes, and create the next focused branch. Do not recreate
 the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
 stories, numeric replica positions and stable paused playback are built.
@@ -107,10 +119,14 @@ preview positions through ordinary edits; standalone autoplay is unchanged.
 The compact step-list editor is now built, including search, bounded paging,
 duplicate, append, earlier/later, history and stale-source protection. Canary
 promotion, traffic rollback and firmware trial/confirmation stories are built.
-The next useful slice is phone diagram legibility: the 390-pixel page contains
-its panels, but nested spacing leaves the fitted graph very small. Inspect
-mobile spacing and readable defaults for wide lane-routed boards, keeping an
-explicit fit option and keeping viewport preferences out of authored JSON.
+Phone diagram legibility is now built: Auto uses readable sizing on narrow
+diagram columns, with explicit Fit width and Readable, reduced gutters across
+skins, keyboard panning and retained view choices through normal edits.
+The next useful slice is a bounded polish/verification pass on complex trace
+exploration (for example navigating a selected service into view without
+disturbing a user's pan), only if it fits before the morning cutoff. Otherwise
+verify the complete PR stack and prepare the morning report with the phone
+URL, ranked roadmap and key limitations. All PRs stay open; do not merge.
 Avoid claiming zero crossings in arbitrary graphs. Keep native text editing
 usable. Shared scenario definitions and
 trace/HLD mapping remain larger design work, not quick schema shortcuts.

@@ -63,6 +63,9 @@ The effective-state inspector is built in [#54](https://github.com/reghartner/de
    selection. Concurrent interval editing remains a later slice.
    Editing playback is stable: previews start paused, dispose old timers on
    rebuild, and retain an unambiguous current step through ordinary edits.
+   Routed boards now support automatic readable sizing on narrow columns,
+   explicit Fit width / Readable choices, keyboard panning and tighter phone
+   gutters; sizing choices survive normal preview rebuilds.
 5. **Safer structural edits:** preview reference changes for node/panel renames
    and deletions; add shortcuts for existing history without intercepting
    normal text-editor undo. Preserve native typing history.

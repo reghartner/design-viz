@@ -139,6 +139,20 @@ Choose **starters… → complex trace** for a fictional request with shared
 dependencies and a service cycle. Long service labels are abbreviated on
 cards, with the complete name in the card tooltip and span details.
 
+The diagram's **View** controls select **Auto**, **Fit width** or **Readable**.
+Auto uses the designed 1180-pixel board width when the diagram column is at
+most 640 pixels wide; on wider columns it fits. Readable always keeps that
+minimum width, while Fit width shows the whole graph at the available width.
+These are viewing controls, not changes to the imported spec or row layout.
+
+Scroll sideways inside a readable board, or Tab to its named diagram region
+and use the arrow keys. The legend and view controls stay in sight while you
+pan. A newly overflowing board starts horizontally centered; later resizes
+and tab visits preserve an existing pan. In the workbench, a uniquely matched
+section retains its view choice through normal edits and skin changes. A
+rebuilt board starts with a fresh pan position; reload resets its choice to
+Auto. Printed diagrams fit the page and omit the view controls.
+
 `routing: "curves"` (or omitting routing) restores the existing renderer.
 Lane routing supports one to five unstacked cards per row, without floats or
 self-loops. Unsupported edited layouts fall back to curves with a validation

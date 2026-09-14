@@ -1,5 +1,16 @@
 # Changelog
 
+## Phone diagram legibility (2026-09-14)
+
+- Routed diagrams now offer Auto, Fit width and Readable views. Narrow columns
+  open at the designed label size with horizontal scrolling and a centered
+  starting view. The legend stays visible; the diagram is keyboard focusable.
+- View choices survive ordinary workbench edits and skin changes independently
+  of playback, including diagrams without steps. Replacing a preview disposes
+  its resize observers. Viewing state never enters the authored JSON.
+- Reduced phone gutters across all six skins, larger view/mode buttons, and
+  the missing mobile viewport tag for published pages. Print keeps fit sizing.
+
 ## Canary and firmware rollout stories (2026-09-14)
 
 - New **rollout decisions** starter: hold for sufficient canary evidence,

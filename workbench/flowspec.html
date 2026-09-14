@@ -54,6 +54,7 @@ body.workspace-focus .workspace-tools{position:sticky;top:0;z-index:60;margin-to
 body.workspace-focus .workwrap{max-width:none;}
 #workspace-focus[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
 @media (max-width:1180px){.workspace-hint{display:none;}.workwrap{padding:0 12px;}.workspace-tools{padding:8px 12px;}}
+@media (max-width:640px){body{margin:0;}.workwrap{padding:0 8px;}.wrap{padding-inline:16px;}}
 @media (min-width:1181px){
   .workwrap{display:grid;grid-template-columns:minmax(0,1fr) 12px var(--workspace-editor,440px);gap:6px;align-items:start;}
   #workspace-columns{display:block;align-self:stretch;min-height:200px;}
@@ -551,8 +552,23 @@ body.sk-aurora.sk-blueprint{
    980px floor would force a horizontal scrollbar; let the svg scale to fit
    (it collapses to full width below 980px viewport via the grid media query). */
 .boardgrid.haspanels .board svg{min-width:0;}
-.board.board-readable .boardcanvas svg{min-width:1180px;}
-@media print{.board.board-readable .boardcanvas svg{min-width:0;}}
+.diagramcol{container-type:inline-size;}
+.board.board-size-readable .boardcanvas svg{min-width:1180px;}
+.board.board-size-fit .boardcanvas svg,.board.board-size-auto .boardcanvas svg{min-width:0;}
+.board-size{display:flex;flex-wrap:wrap;align-items:center;gap:5px;flex-basis:100%;font:11px 'IBM Plex Mono',monospace;color:var(--dtext);}
+.board-size>span:first-child{margin-right:3px;}
+.board-scroll-hint{display:none;flex-basis:100%;font-size:10px;color:var(--dfaint);}
+.board-overflow .board-scroll-hint{display:block;}
+.board:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+@media screen{
+  @container(max-width:640px){
+    .board.board-size-auto .boardcanvas svg{min-width:1180px;}
+  }
+}
+@media print{
+  .board.board-size-readable .boardcanvas svg{min-width:0;}
+  .board-size{display:none;}
+}
 .lg{position:sticky; left:0; display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:10px 14px;}
 .sk-aurora .lg{background:#0B1220; border-bottom:1px dashed #25364F;}
 .sk-daylight .lg{background:#FBFAF6; border-bottom:1px dashed #E0DCD1;}
@@ -4516,6 +4532,18 @@ button.tr-op{cursor:pointer;}.tr-current{border:2px solid currentColor;padding:6
 .tr-op:focus-visible,.tr-picker select:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 .tr-children{font-size:11px;margin-top:8px;}.tr-children summary{cursor:pointer;font-weight:600;}.tr-children ul{padding-left:18px;}
 @media print{.tr-operations{max-height:none;overflow:visible;}.tr-picker{display:none;}.tr-covered{background:#AAA;print-color-adjust:exact;}}
+
+/* Phone gutters are shared across skins. Keep width for the graph and panel
+   contents instead of nesting desktop-sized page/section margins. */
+@media screen and (max-width:640px){
+  body[class] .docview[class]{padding:16px 8px 28px;}
+  body .docview[class] .doc-sec{padding:12px 8px 14px;margin-top:16px;}
+  body .docview[class] .lg{padding:8px;gap:8px;}
+  body .docview[class] .board-size .mbtn,
+  body .docview[class] .mtoggle .mbtn{min-height:40px;}
+  body .docview[class] .tabbtn{min-height:40px;}
+  body .docview[class] .boardgrid.haspanels>.panelcol{min-width:0;}
+}
 
 /* ---------- URL embed mode (#embed=<section-ref>) ----------
    One section's diagram + panels + step controls, nothing else — for
@@ -10352,6 +10380,50 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
   return control;
 }
 
+/* CSS handles automatic sizing, including hidden tabs and editor resizes.
+   Center a newly scrollable view so centered entry nodes start in sight.
+   These controls are viewport state only; they never patch the diagram. */
+function createBoardSizeControl(board, legend, label){
+  var group = document.createElement('div'); group.className = 'board-size';
+  group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Diagram size');
+  var caption = document.createElement('span'); caption.textContent = 'View'; group.appendChild(caption);
+  var choices = [['auto', 'Auto', 'Readable on narrow diagrams; fit the available width on wider diagrams'],
+    ['fit', 'Fit width', 'Show the whole diagram at the available width'],
+    ['readable', 'Readable', 'Keep labels at their designed size; scroll sideways to explore']];
+  var buttons = {}, mode = 'auto', wasScrollable = null, destroyed = false;
+  function syncOverflow(){
+    if (destroyed || !board.clientWidth) return;
+    var scrollable = board.scrollWidth > board.clientWidth + 1;
+    if (scrollable && !wasScrollable) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
+    board.classList.toggle('board-overflow', scrollable);
+    wasScrollable = scrollable;
+  }
+  function setMode(value){
+    if (destroyed || ['auto', 'fit', 'readable'].indexOf(value) < 0) return;
+    mode = value;
+    choices.forEach(function(choice){
+      board.classList.toggle('board-size-' + choice[0], mode === choice[0]);
+      buttons[choice[0]].setAttribute('aria-pressed', String(mode === choice[0]));
+    });
+    syncOverflow();
+  }
+  choices.forEach(function(choice){
+    var button = document.createElement('button'); button.className = 'mbtn'; button.type = 'button';
+    button.textContent = choice[1]; button.title = choice[2]; buttons[choice[0]] = button;
+    button.addEventListener('click', function(){ setMode(choice[0]); }); group.appendChild(button);
+  });
+  var hint = document.createElement('span'); hint.className = 'board-scroll-hint';
+  hint.textContent = 'Scroll sideways to explore'; group.appendChild(hint);
+  legend.appendChild(group);
+  board.tabIndex = 0; board.setAttribute('role', 'region');
+  board.setAttribute('aria-label', (label || 'Flow') + ' diagram; scroll horizontally to explore');
+  setMode('auto');
+  var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
+  if (observer) observer.observe(board);
+  return {mode:function(){ return mode; }, setMode:setMode,
+    destroy:function(){ destroyed = true; if (observer) observer.disconnect(); }};
+}
+
 function buildSection(container, sec, gi, sectionReference, protos, skin, lanes, backlinks, onChange, onProseChange, options){
   var accRaw = sec.accent;
   var acc = isHex(accRaw) ? accRaw : (ACCENTS[accRaw] || ACCENTS[ACCENT_CYCLE[gi % ACCENT_CYCLE.length]]);
@@ -10370,7 +10442,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     intro.defaultCollapsed, onProseChange,
     typeof window !== 'undefined' ? window : null, intro.sectionLabel,
     box.querySelector('.sec-teaser')) : null;
-  var result = {sectionEl:box, stepper:null,
+  var result = {sectionEl:box, stepper:null, boardSize:null,
                 prose:prose,
                 contractCard:box.querySelector('.ctcard'),
                 contractRows:Array.prototype.slice.call(box.querySelectorAll('.ctrow'))};
@@ -10402,14 +10474,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var board = renderBoard(bwrap, d, prefix, skin, protos, backlinks);
   lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
   if (d.routing === 'lanes'){
-    var sizeBtn=document.createElement('button'); sizeBtn.className='mbtn'; sizeBtn.type='button';
-    sizeBtn.textContent='READABLE SIZE'; sizeBtn.setAttribute('aria-pressed','false');
-    sizeBtn.title='Enlarge cards; scroll horizontally to explore the graph';
-    sizeBtn.addEventListener('click',function(){
-      var on=boardDiv.classList.toggle('board-readable');
-      sizeBtn.setAttribute('aria-pressed',String(on)); sizeBtn.textContent=on?'FIT WIDTH':'READABLE SIZE';
-    });
-    lg.appendChild(sizeBtn);
+    result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
   }
 
   var view = VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient';
@@ -10526,6 +10591,7 @@ function renderPage(view, page, skin, backlinks, options){
   ctl.destroy = function(){
     ctl.destroyed = true;
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
+    ctl.sections.forEach(function(rec){ if (rec.boardSize) rec.boardSize.destroy(); });
     ctl.onChange = null;
   };
   function changed(target){
@@ -10550,7 +10616,7 @@ function renderPage(view, page, skin, backlinks, options){
         }
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
-               sectionEl:built.sectionEl, stepper:built.stepper, prose:built.prose,
+               sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                contractCard:built.contractCard, contractRows:built.contractRows};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);
@@ -17119,7 +17185,11 @@ function workbenchPreviewSnapshot(page, ctl){
   var sections = workbenchPreviewSections(page), saved = [];
   ((ctl && ctl.sections) || []).forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
-    if (!section || !stepper || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    if (!section || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    var prior = {key:section.key};
+    if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
+    saved.push(prior);
+    if (!stepper) return;
     var steps = section.diagram.steps || [], step = steps[stepper.current().n];
     var id = step && typeof step.id === 'string' && step.id ? step.id : null;
     var signature = JSON.stringify(step);
@@ -17127,7 +17197,7 @@ function workbenchPreviewSnapshot(page, ctl){
     if (stepper.mode() === 'step' && (id
       ? steps.filter(function(s){ return s && s.id === id; }).length !== 1
       : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
-    saved.push({key:section.key, mode:stepper.mode(), id:id, signature:signature});
+    prior.mode = stepper.mode(); prior.id = id; prior.signature = signature;
   });
   return {title:page && page.title || '', sections:saved};
 }
@@ -17136,10 +17206,12 @@ function restoreWorkbenchPreview(page, ctl, saved){
   var sections = workbenchPreviewSections(page);
   ctl.sections.forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
-    if (!section || !stepper || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    if (!section || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
     var matches = saved.sections.filter(function(s){ return s.key === section.key; });
     if (matches.length !== 1) return;
     var prior = matches[0];
+    if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
+    if (!stepper || !prior.mode) return;
     if (prior.mode === 'ambient'){
       if (stepper.mode() !== 'ambient') stepper.enterAmbient();
       return;

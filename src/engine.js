@@ -3959,6 +3959,50 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
   return control;
 }
 
+/* CSS handles automatic sizing, including hidden tabs and editor resizes.
+   Center a newly scrollable view so centered entry nodes start in sight.
+   These controls are viewport state only; they never patch the diagram. */
+function createBoardSizeControl(board, legend, label){
+  var group = document.createElement('div'); group.className = 'board-size';
+  group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Diagram size');
+  var caption = document.createElement('span'); caption.textContent = 'View'; group.appendChild(caption);
+  var choices = [['auto', 'Auto', 'Readable on narrow diagrams; fit the available width on wider diagrams'],
+    ['fit', 'Fit width', 'Show the whole diagram at the available width'],
+    ['readable', 'Readable', 'Keep labels at their designed size; scroll sideways to explore']];
+  var buttons = {}, mode = 'auto', wasScrollable = null, destroyed = false;
+  function syncOverflow(){
+    if (destroyed || !board.clientWidth) return;
+    var scrollable = board.scrollWidth > board.clientWidth + 1;
+    if (scrollable && !wasScrollable) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
+    board.classList.toggle('board-overflow', scrollable);
+    wasScrollable = scrollable;
+  }
+  function setMode(value){
+    if (destroyed || ['auto', 'fit', 'readable'].indexOf(value) < 0) return;
+    mode = value;
+    choices.forEach(function(choice){
+      board.classList.toggle('board-size-' + choice[0], mode === choice[0]);
+      buttons[choice[0]].setAttribute('aria-pressed', String(mode === choice[0]));
+    });
+    syncOverflow();
+  }
+  choices.forEach(function(choice){
+    var button = document.createElement('button'); button.className = 'mbtn'; button.type = 'button';
+    button.textContent = choice[1]; button.title = choice[2]; buttons[choice[0]] = button;
+    button.addEventListener('click', function(){ setMode(choice[0]); }); group.appendChild(button);
+  });
+  var hint = document.createElement('span'); hint.className = 'board-scroll-hint';
+  hint.textContent = 'Scroll sideways to explore'; group.appendChild(hint);
+  legend.appendChild(group);
+  board.tabIndex = 0; board.setAttribute('role', 'region');
+  board.setAttribute('aria-label', (label || 'Flow') + ' diagram; scroll horizontally to explore');
+  setMode('auto');
+  var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
+  if (observer) observer.observe(board);
+  return {mode:function(){ return mode; }, setMode:setMode,
+    destroy:function(){ destroyed = true; if (observer) observer.disconnect(); }};
+}
+
 function buildSection(container, sec, gi, sectionReference, protos, skin, lanes, backlinks, onChange, onProseChange, options){
   var accRaw = sec.accent;
   var acc = isHex(accRaw) ? accRaw : (ACCENTS[accRaw] || ACCENTS[ACCENT_CYCLE[gi % ACCENT_CYCLE.length]]);
@@ -3977,7 +4021,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     intro.defaultCollapsed, onProseChange,
     typeof window !== 'undefined' ? window : null, intro.sectionLabel,
     box.querySelector('.sec-teaser')) : null;
-  var result = {sectionEl:box, stepper:null,
+  var result = {sectionEl:box, stepper:null, boardSize:null,
                 prose:prose,
                 contractCard:box.querySelector('.ctcard'),
                 contractRows:Array.prototype.slice.call(box.querySelectorAll('.ctrow'))};
@@ -4009,14 +4053,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var board = renderBoard(bwrap, d, prefix, skin, protos, backlinks);
   lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
   if (d.routing === 'lanes'){
-    var sizeBtn=document.createElement('button'); sizeBtn.className='mbtn'; sizeBtn.type='button';
-    sizeBtn.textContent='READABLE SIZE'; sizeBtn.setAttribute('aria-pressed','false');
-    sizeBtn.title='Enlarge cards; scroll horizontally to explore the graph';
-    sizeBtn.addEventListener('click',function(){
-      var on=boardDiv.classList.toggle('board-readable');
-      sizeBtn.setAttribute('aria-pressed',String(on)); sizeBtn.textContent=on?'FIT WIDTH':'READABLE SIZE';
-    });
-    lg.appendChild(sizeBtn);
+    result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
   }
 
   var view = VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient';
@@ -4133,6 +4170,7 @@ function renderPage(view, page, skin, backlinks, options){
   ctl.destroy = function(){
     ctl.destroyed = true;
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
+    ctl.sections.forEach(function(rec){ if (rec.boardSize) rec.boardSize.destroy(); });
     ctl.onChange = null;
   };
   function changed(target){
@@ -4157,7 +4195,7 @@ function renderPage(view, page, skin, backlinks, options){
         }
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
-               sectionEl:built.sectionEl, stepper:built.stepper, prose:built.prose,
+               sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                contractCard:built.contractCard, contractRows:built.contractRows};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);

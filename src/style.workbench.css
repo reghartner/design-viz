@@ -488,7 +488,7 @@ body.sk-aurora.sk-blueprint{
 .home-edit-map [data-device]{cursor:pointer;}
 .home-edit-map [data-subject]{cursor:grab;touch-action:none;}
 .home-edit-map.placing,.home-edit-map.placing *{cursor:crosshair;touch-action:none;}
-.home-edit-map .hmsweep,.home-edit-map .hmrecdot,.home-edit-map .hmtxring{animation:none;}
+.home-edit-map .hmframe *{animation:none !important;}
 .home-xy{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .home-xy .frow{display:flex;align-items:center;gap:8px;}
 .home-xy .fctl{min-width:0;width:100%;}

@@ -16,6 +16,17 @@ labels and x/y/w/h values inside the 320×180 frame. Devices and people use that
 same coordinate space at every display size. Device state text and static signal
 arrows keep the map readable without motion or hover.
 
+The map's visual treatment is automatic: device icons and state badges, softly
+raised room walls, camera sweeps, breathing activity halos, swinging doors, and
+people with a short fading movement trail. Rooms tint to reflect their current
+contents: an alert/detection takes priority over a warning, then a visible person.
+These tints describe the authored scene; they do not trigger device states or
+simulate sensing. A subject without an `icon` uses a person avatar.
+
+No new spec fields or schema version are needed. Reduced motion and print show
+the final state without animation. The inspector's placement map stays steady
+while you edit, and the main map previews the activity.
+
 ## Tweak one step
 
 1. Select a numbered step, or click a device/person in the main map. The inspector

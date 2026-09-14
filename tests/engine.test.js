@@ -4310,7 +4310,7 @@ test('homemap render: per-camera sweeps, transition ripples, staggered signals a
   assert.doesNotMatch(host.innerHTML, /hmripple|hmglow/);
   C.renderPanelBody(host, p, {cam1: 'off', cam2: 'sleep', door: 'open'}, 'aurora', states, 4);
   assert.doesNotMatch(host.innerHTML, /hmwedge|hmsweep/);
-  assert.match(host.innerHTML, /l7 -10/);
+  assert.match(host.innerHTML, /class="hmdoorleaf hmdoor-opening"/);
   C.renderPanelBody(host, p, {cam1: 'detect'}, 'aurora', states, 5);
   assert.match(host.innerHTML, /hmripple/);
 });
@@ -4337,15 +4337,19 @@ test('homemap render: first render and ambient omit transients; reduced motion i
 
 test('homemap immediate jumps cancel transients before unchanged-markup skip', () => {
   const p = homePanel(), removed = [];
-  const nodes = ['hmripple', 'hmglow', 'hmsig'].map(cls => ({getAttribute: () => cls,
+  const nodes = ['hmripple', 'hmglow', 'hmsig', 'hmtrail'].map(cls => ({getAttribute: () => cls,
     parentNode: {removeChild: node => removed.push(node)}}));
-  const host = {querySelector: () => null, querySelectorAll: sel => sel.includes('.hmsig') ? nodes : []};
+  const doorClasses = new Set(['hmdoor-opening']);
+  const leaf = {classList: {remove: cls => doorClasses.delete(cls)}};
+  const host = {querySelector: () => null, querySelectorAll: sel =>
+    sel.includes('.hmsig') ? nodes : sel.includes('.hmdoor-opening') ? [leaf] : []};
   C.renderPanelBody(host, p, {}, 'aurora', [], 0);
-  C.renderPanelBody(host, p, {cam1: 'detect', hub: 'rx'}, 'aurora', [], 1);
+  C.renderPanelBody(host, p, {cam1: 'detect', hub: 'rx', door: 'open'}, 'aurora', [], 1);
   host.innerHTML = 'SENTINEL';
-  C.renderPanelBody(host, p, {cam1: 'detect', hub: 'rx'}, 'aurora', [], 1, false);
+  C.renderPanelBody(host, p, {cam1: 'detect', hub: 'rx', door: 'open'}, 'aurora', [], 1, false);
   assert.strictEqual(host.innerHTML, 'SENTINEL');
-  assert.strictEqual(removed.length, 3);
+  assert.strictEqual(removed.length, 4);
+  assert.strictEqual(doorClasses.size, 0, 'an immediate repaint settles an in-flight door without rewriting the DOM');
 });
 
 test('homemap controller uses initial states in ambient, including after leaving step mode', () => {
@@ -4465,7 +4469,7 @@ test('homemap subject render: several glides release together and unchanged pain
   core.renderPanelBody(host, p, {}, 'aurora', [], 0);
   assert.strictEqual(raf.length, 0);
   assert.match(markup, /&lt;Visitor &quot;&amp;&gt;/);
-  assert.match(markup, /class="hmsubjectdot" cx="20" cy="150" r="5"/);
+  assert.match(markup, /class="hmsubjectdot" cx="20" cy="150" r="7"/);
   assert.match(markup, /data-subject="__proto__"[\s\S]*href="#i-gear"/);
   const target = JSON.parse('{"walker":{"x":120,"y":60},"__proto__":{"x":50,"y":80}}');
   core.renderPanelBody(host, p, target, 'aurora', [], 1);

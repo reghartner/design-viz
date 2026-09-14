@@ -205,6 +205,7 @@ var CONTRACT = [
   '    "groups": {"<groupId>": {"title":"<boundary title>", "icon":"<icon>"}}, // optional icon; dashed box around members',
   '    "rows":   [["<id>", "<id>", ...],           // row 1, left-to-right',
   '               ["<id>", ["<id>","<id>"], ...]], // row 2, right-to-left; nested array = stack',
+  '    "routing":"curves",                     // optional "lanes": reserved tracks; 1–5 flat cards/row, no floats/self-loops',
   '    "floats": [{"id":"<id>", "side":"above"}],  // branch nodes (auth, signing)',
   '    "edges":  [{"from":"<id>", "to":"<id>", "kind":"https|int|mqtt",',
   '                "ret":false, "label":"<short label>", "revealAt":1, "hideAt":3}],',

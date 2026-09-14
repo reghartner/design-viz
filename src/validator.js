@@ -687,6 +687,15 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
   if (!d.nodes || typeof d.nodes !== 'object'){ errors.push(DP + '.nodes: required — map of node id to {title, sub, icon, tint}'); return; }
   if (!Array.isArray(d.rows) || d.rows.length === 0){ errors.push(DP + '.rows: required — array of rows, each an array of node ids (nested array = stack)'); return; }
+  if (d.routing != null && d.routing !== 'lanes' && d.routing !== 'curves')
+    warnings.push(DP + '.routing: expected "lanes" or "curves" — using curves');
+  if (d.routing === 'lanes'){
+    if ((d.floats || []).length || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
+        (d.edges || []).some(function(e){ return e.from === e.to; }))
+      warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no floats or self-loops — using curves');
+    else if ((d.edges || []).some(function(e){ return e.bend; }))
+      warnings.push(DP + '.routing: lanes computes its own routes; authored edge bends are ignored');
+  }
 
   var placed = {};
   d.rows.forEach(function(slots, r){

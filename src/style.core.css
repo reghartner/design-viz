@@ -82,6 +82,8 @@
    980px floor would force a horizontal scrollbar; let the svg scale to fit
    (it collapses to full width below 980px viewport via the grid media query). */
 .boardgrid.haspanels .board svg{min-width:0;}
+.board.board-readable .boardcanvas svg{min-width:1180px;}
+@media print{.board.board-readable .boardcanvas svg{min-width:0;}}
 .lg{position:sticky; left:0; display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:10px 14px;}
 .sk-aurora .lg{background:#0B1220; border-bottom:1px dashed #25364F;}
 .sk-daylight .lg{background:#FBFAF6; border-bottom:1px dashed #E0DCD1;}
@@ -98,6 +100,9 @@
 
 /* ---------- board internals, per skin ---------- */
 .edge{fill:none; stroke-linecap:round;}
+.lane-bridge{fill:none;stroke-width:7;stroke-linejoin:round;pointer-events:none;}
+.sk-aurora .lane-bridge{stroke:#0B1220;}
+.sk-daylight .lane-bridge{stroke:#FBFAF6;}
 .edge.main{stroke-width:2.2;}
 .edge.retm{stroke-width:1.9;}
 .halo{fill:none; stroke-width:9; stroke-linecap:round; opacity:.13;}

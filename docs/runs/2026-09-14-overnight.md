@@ -10,8 +10,8 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 
 | Order | Scope | Branch | Status |
 |---|---|---|---|
-| 1 | Trace import, software panels and outline | codex/trace-import-foundation | Rebased on current main; opening PR |
-| 2 | Dependency-aware trace rows, crossing reduction and routing | codex/trace-smart-layout | Next; stack on foundation |
+| 1 | Trace import, software panels and outline | codex/trace-import-foundation | Open: https://github.com/reghartner/design-viz/pull/50 |
+| 2 | Dependency-aware trace rows, crossing reduction and routing | codex/trace-smart-layout | Implemented; geometry tests pass; browser verification next |
 | 3 | Internal spans and inclusive / child-covered / uncovered timing | codex/trace-service-time | Next; stack on layout |
 | 4 | Large trace focus by service/subtree and import preview | TBD | Follow core trace readability |
 | 5 | Effective step-state inspector and inheritance provenance | TBD | Next workbench improvement if time permits |

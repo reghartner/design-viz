@@ -20,6 +20,7 @@
         "bullets": [],
         "diagram": {
           "view": "step",
+          "routing": "lanes",
           "nodes": {
             "svc1": {
               "title": "checkout",
@@ -54,11 +55,13 @@
           },
           "rows": [
             [
-              "svc1",
-              "svc2",
-              "svc3",
+              "svc1"
+            ],
+            [
+              "svc5",
               "svc4",
-              "svc5"
+              "svc3",
+              "svc2"
             ]
           ],
           "edges": [

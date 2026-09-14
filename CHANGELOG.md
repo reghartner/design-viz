@@ -1,5 +1,16 @@
 # Changelog
 
+## Complex trace layouts (2026-09-14)
+
+- Trace imports now support 30 services and choose dependency rows, grouping
+  cycles before ranking and reducing crossings with neighbour ordering.
+- Opt-in `routing: "lanes"` reserves connector ports and horizontal tracks,
+  routes around cards, and separates remaining crossings visually. Existing
+  authored curve layouts retain their behavior.
+- Readable size / Fit width toggles support exploring dense boards on phones.
+  Added a fictional 24-span, 17-service starter and geometric regression tests
+  for cycles, shared dependencies, fan-out, long links and dense graphs.
+
 ## Trace import and software design panels (2026-09-14)
 
 - Honeycomb event JSON can be pasted or opened in the workbench and converted

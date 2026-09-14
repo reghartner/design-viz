@@ -5,6 +5,61 @@ var TRACE_FIELDS = {
   service: 'service.name', name: 'name', timestamp: 'timestamp', duration: 'duration_ms', error: 'error'
 };
 
+/* Collapse service cycles before ranking, then order each level by its
+   neighbours. Output is ordinary editable serpentine rows, not stored XYs. */
+function traceRows(ids, edges){
+  var next = new Map(), prev = new Map(), index = new Map(), low = new Map();
+  var stack = [], active = new Set(), components = [], serial = 0;
+  ids.forEach(function(id){ next.set(id, []); prev.set(id, []); });
+  edges.forEach(function(e){
+    if (!next.has(e.from) || !next.has(e.to)) return;
+    next.get(e.from).push(e.to); prev.get(e.to).push(e.from);
+  });
+  function visit(id){
+    index.set(id, serial); low.set(id, serial++); stack.push(id); active.add(id);
+    next.get(id).forEach(function(to){
+      if (!index.has(to)){ visit(to); low.set(id, Math.min(low.get(id), low.get(to))); }
+      else if (active.has(to)) low.set(id, Math.min(low.get(id), index.get(to)));
+    });
+    if (low.get(id) !== index.get(id)) return;
+    var members = [], last;
+    do { last = stack.pop(); active.delete(last); members.push(last); } while (last !== id);
+    components.push(members.sort(function(a,b){ return ids.indexOf(a) - ids.indexOf(b); }));
+  }
+  ids.forEach(function(id){ if (!index.has(id)) visit(id); });
+  var component = new Map(), ranks = [];
+  components.forEach(function(m, i){ m.forEach(function(id){ component.set(id, i); }); });
+  function rank(i){
+    if (ranks[i] != null) return ranks[i];
+    var n = 0;
+    components[i].forEach(function(id){ prev.get(id).forEach(function(from){
+      var p = component.get(from); if (p !== i) n = Math.max(n, rank(p) + 1);
+    }); });
+    return ranks[i] = n;
+  }
+  var levels = [];
+  ids.forEach(function(id){ var r = rank(component.get(id)); (levels[r] || (levels[r] = [])).push(id); });
+  var positions = new Map();
+  function refresh(){ levels.forEach(function(row){ row.forEach(function(id,i){ positions.set(id, (i+.5)/row.length); }); }); }
+  refresh();
+  for (var pass = 0; pass < 6; pass++){
+    var order = levels.map(function(_, i){ return i; });
+    if (pass % 2) order.reverse();
+    order.forEach(function(r){
+      var scores = new Map(), neighbors = pass % 2 ? next : prev;
+      levels[r].forEach(function(id){
+        var ns = neighbors.get(id).filter(function(n){ return rank(component.get(n)) !== r; });
+        scores.set(id, ns.length ? ns.reduce(function(sum,n){ return sum + positions.get(n); },0)/ns.length : positions.get(id));
+      });
+      levels[r].sort(function(a,b){ return scores.get(a)-scores.get(b) || positions.get(a)-positions.get(b) || ids.indexOf(a)-ids.indexOf(b); });
+      refresh();
+    });
+  }
+  var rows = [];
+  levels.forEach(function(level){ for (var i=0; i<level.length; i+=4) rows.push(level.slice(i,i+4)); });
+  return rows.map(function(row,i){ return i%2 ? row.reverse() : row; });
+}
+
 function traceToSpec(input, options){
   options = options || {};
   var warnings = [], own = function(o, k){ return o && Object.prototype.hasOwnProperty.call(o, k); };
@@ -114,7 +169,7 @@ function traceToSpec(input, options){
   if (skew.length) warnings.push(skew.length + ' child span(s) extend outside their parent interval (async work or clock skew); original timing retained.');
   var services = new Map();
   spans.forEach(function(s){ if (!services.has(s.service)) services.set(s.service, 'svc' + (services.size + 1)); });
-  if (services.size > 10) throw new Error('This trace spans ' + services.size + ' services; focus the export to at most 10 services for a readable board.');
+  if (services.size > 30) throw new Error('This trace spans ' + services.size + ' services; focus the export to at most 30 services for a readable board.');
   var nodes = {}, ids = [], edges = [], pairs = new Set();
   services.forEach(function(id, service){
     ids.push(id); nodes[id] = {title: service, sub: 'observed service', icon: 'server', tint: 'cmd'};
@@ -141,12 +196,12 @@ function traceToSpec(input, options){
     if (source) st.link = source;
     return st;
   });
-  var half = Math.ceil(ids.length / 2), rows = ids.length <= 5 ? [ids] : [ids.slice(0, half), ids.slice(half)];
+  var rows = traceRows(ids, edges);
   var section = {heading: 'Observed request', accent: 'cyan', text: [
     'Imported trace ' + selected + ': ' + spans.length + ' spans across ' + services.size + ' services; observed extent ' + elapsed + ' ms.',
     'Inspect spans in start-time order. Overlapping bars retain their original offsets; parent spans include child time. The total is elapsed extent, not a sum of durations. Arrows mean span parent relationships, not a verified network protocol.',
     'This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success.'],
-    bullets: warnings.slice(), diagram: {view: 'step', nodes: nodes, rows: rows, edges: edges, panels: [timing, details], steps: steps}};
+    bullets: warnings.slice(), diagram: {view: 'step', routing: 'lanes', nodes: nodes, rows: rows, edges: edges, panels: [timing, details], steps: steps}};
   if (source) section.source = source;
   return {spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'aurora',
     protocols: edges.length ? {trace: {label: 'Span parent relationship', color: '#38BDF8'}} : {}, blocks: [section]}},

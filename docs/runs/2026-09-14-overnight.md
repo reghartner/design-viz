@@ -19,7 +19,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 7 | Retry/timeout and circuit-breaker stories | codex/resilience-starter | Open: https://github.com/reghartner/design-viz/pull/56 |
 | 8 | Replication / consistency view | codex/replica-positions | Open: https://github.com/reghartner/design-viz/pull/57 |
 | 9 | Stable workbench playback while editing | codex/workbench-playback | Open: https://github.com/reghartner/design-viz/pull/58 |
-| 10 | Step-list navigation and editing | codex/workbench-step-list | Built; opening focused PR after final checks |
+| 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
 | 11 | Canary and firmware rollout stories | TBD | Reuse cohort tiles, tables, budgets and decision checks; keep release version separate from runtime health |
 
 ## Validation and evidence
@@ -81,8 +81,8 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   Escape recovery, and a 401-step story duplicating into visible step 402.
   Phone view stays within 390 pixels; actions use two columns with 38-pixel
   height. Copies keep full patches, allocate unique IDs and repeat append
-  operations; reveal/hide thresholds keep their numeric positions. Final PR
-  CI still needs checking after the handoff commit.
+  operations; reveal/hide thresholds keep their numeric positions. PR #59
+  final CI still needs checking after the handoff commit.
 
 ## Next continuation
 

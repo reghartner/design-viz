@@ -1604,6 +1604,61 @@ function planSwapNodes(text, raw, sectionIdx, idA, idB){
   return plan;
 }
 
+function planStackNodes(text, raw, sectionIdx, nodeIds){
+  /* collect the given nodes into ONE vertical stack (a nested array) in
+     diagram.rows. Every selected id is lifted from wherever it sits; the
+     stack lands at the outer slot the first selected id (flat-row order)
+     occupied. Non-selected nodes keep their positions; empty slots and
+     rows are dropped. */
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'section not found — reselect and try again'};
+  var d = specValueAt(raw, rec.diagram);
+  if (!d || !Array.isArray(d.rows)) return {error: 'no rows layout in this section to stack into'};
+  var want = {};
+  (nodeIds || []).forEach(function(id){ if (typeof id === 'string') want[id] = true; });
+  var wantList = Object.keys(want);
+  if (wantList.length < 2) return {error: 'select at least two nodes to stack'};
+  /* flat-row order of the selected ids, and which of them actually sit in rows */
+  var ordered = [], seen = {};
+  d.rows.forEach(function(row){
+    if (!Array.isArray(row)) return;
+    row.forEach(function(slot){
+      (Array.isArray(slot) ? slot : [slot]).forEach(function(s){
+        if (typeof s === 'string' && want[s] && !seen[s]){ seen[s] = true; ordered.push(s); }
+      });
+    });
+  });
+  var missing = wantList.filter(function(id){ return !seen[id]; });
+  if (missing.length) return {error: 'node "' + missing[0] + '" has no row slot to stack (it may be a float)'};
+  var anchor = ordered[0];
+  var placed = false, newRows = [];
+  d.rows.forEach(function(row){
+    if (!Array.isArray(row)){ newRows.push(row); return; }
+    var newRow = [];
+    row.forEach(function(slot){
+      if (Array.isArray(slot)){
+        var remaining = slot.filter(function(s){ return !(typeof s === 'string' && want[s]); });
+        if (slot.indexOf(anchor) >= 0 && !placed){ newRow.push(ordered.slice()); placed = true; }
+        if (remaining.length > 1) newRow.push(remaining);
+        else if (remaining.length === 1) newRow.push(remaining[0]);
+      } else if (typeof slot === 'string' && want[slot]){
+        if (slot === anchor && !placed){ newRow.push(ordered.slice()); placed = true; }
+        /* other selected string slots are simply lifted out */
+      } else {
+        newRow.push(slot);
+      }
+    });
+    if (newRow.length) newRows.push(newRow);
+  });
+  if (!placed) return {error: 'could not place the stack'};
+  if (JSON.stringify(newRows) === JSON.stringify(d.rows))
+    return {error: 'those nodes are already one stack'};
+  var plan = planSetFields(text, raw, rec.diagram, [['rows', JSON.stringify(newRows)]]);
+  if (plan.error) return plan;
+  plan.kind = 'node';
+  return plan;
+}
+
 /* ---------------- multi-select: bulk planners ----------------
    A multi-selection is HOMOGENEOUS (one kind) — mixed-kind bulk deletes
    interact with cascades (a node delete prunes edges/steps) in ways that
@@ -3692,6 +3747,19 @@ function initWorkbenchBuilder(opts){
     if (form.childNodes.length) guide.appendChild(form);
     var acts = document.createElement('div');
     acts.className = 'iacts';
+    if (kind === 'node'){
+      acts.appendChild(actionButton('stack together', function(){
+        var secs = {};
+        multiSel.forEach(function(t){ secs[t.section] = true; });
+        if (Object.keys(secs).length !== 1){
+          formError('stacking needs nodes from a single section');
+          return;
+        }
+        var sec = multiSel[0].section;
+        var ids = multiSel.map(function(t){ return t.id; });
+        commitGroup(function(raw){ return planStackNodes(src.value, raw, sec, ids); });
+      }));
+    }
     acts.appendChild(actionButton('delete ' + multiSel.length + ' ' + kind + 's',
       bulkDeleteSelected, 'bdanger'));
     guide.appendChild(acts);

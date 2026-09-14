@@ -33,7 +33,7 @@ function loadBuilder(extraGlobals){
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, PANEL_PATCH_FIELDS, patchSummaryLine, panelPatchFields, patchFieldsCollect, SCENE_TOKENS,' +
     ' builderSectionPrefs,' +
-    ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes, builderDeletePlan, planBulkSetField, planBulkDelete, BUILDER_MULTI_KINDS,' +
+    ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes, planStackNodes, builderDeletePlan, planBulkSetField, planBulkDelete, BUILDER_MULTI_KINDS,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const sandbox = {console};
   if (extraGlobals) Object.assign(sandbox, extraGlobals);
@@ -2445,4 +2445,56 @@ test('group planners refuse a non-object diagram.groups instead of corrupting it
   /* the original values survive every refused edit */
   assert.equal(JSON.parse(text).page.blocks[0].diagram.groups, 'occupied');
   assert.deepStrictEqual(JSON.parse(arrText).page.blocks[0].diagram.groups, ['meta']);
+});
+
+/* ---- planStackNodes: collect selected nodes into one vertical stack ---- */
+
+test('planStackNodes collects scattered nodes into a nested stack at the first slot', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {}, b: {}, c: {}, d: {}}, rows: [['a', 'b'], ['c', 'd']]
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  const plan = B.planStackNodes(text, spec, 0, ['b', 'd']);
+  assert.ok(!plan.error, plan.error);
+  assert.equal(plan.kind, 'node');
+  const rows = JSON.parse(plan.text).page.blocks[0].diagram.rows;
+  /* b was first in flat order, so the stack lands in b's slot (row 0); d lifted out, its row collapses */
+  assert.deepStrictEqual(rows, [['a', ['b', 'd']], ['c']]);
+});
+
+test('planStackNodes stacks two side-by-side nodes and drops the emptied sibling slot', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {}, b: {}, c: {}}, rows: [['a', 'b', 'c']]
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  const rows = JSON.parse(B.planStackNodes(text, spec, 0, ['a', 'c']).text)
+    .page.blocks[0].diagram.rows;
+  assert.deepStrictEqual(rows, [[['a', 'c'], 'b']]);
+});
+
+test('planStackNodes merges into an existing stack, keeping non-selected stack members', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {}, b: {}, c: {}, d: {}}, rows: [['a', ['b', 'c']], ['d']]
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  const rows = JSON.parse(B.planStackNodes(text, spec, 0, ['b', 'd']).text)
+    .page.blocks[0].diagram.rows;
+  /* b is first (inside the existing stack); its slot becomes [b,d], c stays beside it as a lone slot */
+  assert.deepStrictEqual(rows, [['a', ['b', 'd'], 'c']]);
+});
+
+test('planStackNodes refuses fewer than two, missing/float nodes, and already-stacked sets', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {}, b: {}, f: {}}, rows: [['a', 'b']], floats: [{id: 'f', side: 'above'}]
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  assert.match(B.planStackNodes(text, spec, 0, ['a']).error, /at least two/);
+  assert.match(B.planStackNodes(text, spec, 0, ['a', 'f']).error, /no row slot/);
+  assert.match(B.planStackNodes(text, spec, 0, ['a', 'zzz']).error, /no row slot/);
+
+  const stacked = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {}, b: {}}, rows: [[['a', 'b']]]
+  }}]}};
+  assert.match(B.planStackNodes(JSON.stringify(stacked, null, 2), stacked, 0, ['a', 'b']).error,
+    /already one stack/);
 });

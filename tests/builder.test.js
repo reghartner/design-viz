@@ -1813,7 +1813,7 @@ test('Mermaid import UI blocks opening and conversion while ADD TO STEP is armed
   const arm = e.guide.querySelectorAll('button').find(b => b.textContent === 'ADD TO STEP');
   assert.ok(arm, 'the real step inspector exposes the mode');
   arm.fire('click');
-  assert.match(e.btarget.textContent, /add to step 1/);
+  assert.match(e.btarget.textContent, /ADD TO STEP 1/);
   assert.strictEqual(h.click('import-mermaid-convert').defaultPrevented, true);
   assert.strictEqual(e.src.value, TEXT);
   assert.strictEqual(h.renders, 0);

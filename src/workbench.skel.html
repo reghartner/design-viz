@@ -47,16 +47,25 @@
       <details class="ssec" id="sec-insert" open>
         <summary>insert</summary>
         <div class="buildrow">
-          <button class="bbtn" id="add-node">+ node</button>
-          <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
-          <button class="bbtn" id="add-step">+ step</button>
-          <button class="bbtn" id="add-panel">+ panel</button>
-          <button class="bbtn" id="add-section">+ section</button>
-          <button class="bbtn" id="add-tabs" title="a tabbed block: two tabs, one starter section each">+ tabs</button>
-        <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
-        <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
-          <button class="bbtn" id="undo-builder" disabled>undo</button>
-          <button class="bbtn" id="redo-builder" disabled>redo</button>
+          <span class="bgroup" role="group" aria-label="add diagram elements">
+            <button class="bbtn" id="add-node">+ node</button>
+            <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
+            <button class="bbtn" id="add-step">+ step</button>
+            <button class="bbtn" id="add-panel">+ panel</button>
+          </span>
+          <span class="bgroup" role="group" aria-label="add page structure">
+            <button class="bbtn" id="add-section">+ section</button>
+            <button class="bbtn" id="add-tabs" title="a tabbed block: two tabs, one starter section each">+ tabs</button>
+          </span>
+          <span class="bgroup" role="group" aria-label="load and import">
+            <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
+            <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
+          </span>
+          <span class="bgroup" role="group" aria-label="history">
+            <button class="bbtn" id="undo-builder" disabled>undo</button>
+            <button class="bbtn" id="redo-builder" disabled>redo</button>
+          </span>
+          <button class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button>
           <span class="btarget" id="btarget"></span>
         </div>
         <div class="palette" id="palette" hidden></div>

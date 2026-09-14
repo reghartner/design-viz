@@ -121,6 +121,26 @@
         <div class="outline-status" id="outline-status" role="status"></div>
         <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
       </details>
+      <details class="ssec" id="sec-steps">
+        <summary>story steps</summary>
+        <div class="story-tools">
+          <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
+          <input class="fctl" type="search" id="steps-search" aria-label="Filter story steps" placeholder="Caption, step ID, lane, node, or panel…">
+          <div class="outline-status" id="steps-status" role="status"></div>
+          <nav class="story-list" id="steps-list" aria-label="Story steps"></nav>
+          <div class="story-actions" id="steps-paging" hidden>
+            <button class="bbtn" id="steps-previous">Previous 200</button>
+            <button class="bbtn" id="steps-next">Next 200</button>
+          </div>
+          <div class="story-actions">
+            <button class="bbtn" id="steps-add">Append step</button>
+            <button class="bbtn" id="steps-duplicate" disabled>Duplicate</button>
+            <button class="bbtn" id="steps-earlier" disabled>↑ Earlier</button>
+            <button class="bbtn" id="steps-later" disabled>↓ Later</button>
+          </div>
+          <p class="story-note">Select a beat to edit it. Moves use the full story order. Copies repeat patches, including appended events; inherited state is recalculated. Reveal/hide indices stay positional.</p>
+        </div>
+      </details>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
         <div class="guide" id="guide" hidden></div>
@@ -177,6 +197,7 @@
       <tr><td>diagram.floats</td><td><code>[{id, side:"above"}]</code></td><td>Branch nodes off the main flow (auth, signing). X position computed from the edges that touch them.</td></tr>
       <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> of the hop (default <code>int</code>). Zero-based reveal indices draw the edge only for the selected step interval. <code>bend</code>/<code>labelDx</code>/<code>labelDy</code> are optional manual nudges.</td></tr>
       <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Twenty-five types are documented in <code>contract/authoring-contract.md</code>, including <code>table</code> for data snapshots, <code>checks</code> for authored decisions, <code>budget</code> for resource limits, and <code>replicas</code> for positions and reported lag. <code>waterfall</code> supports <code>startMs</code> offsets for overlapping trace spans; <code>trace</code> shows service internals and child-covered versus uncovered wall time.</td></tr>
+      <tr><td>steps[n].id</td><td><code>"ota.3"</code></td><td>Optional unique step identifier for deep links, search and preview restoration. Duplicating a step gives its copy a new ID.</td></tr>
       <tr><td>diagram.steps</td><td><code>[{edge | edges, nodes?, panels?, lane?, text, link?}]</code></td><td>Ordered narrative. <code>edge:"from-&gt;to"</code> or <code>edges:[...]</code> for hops that happen together — their packets fire in order, staggered. A step may be <b>edgeless</b>: light <code>nodes:[...]</code> directly and/or patch panels. <code>panels</code> carries SPARSE per-panel patches; the engine folds them into complete per-step state so any jump is consistent (<code>log</code> appends; <code>enterOnce</code> applies only at its own step). Drives the numbered coins, the ambient packet schedule, AND the click-through.</td></tr>
       <tr><td>icons</td><td colspan="2"><code>terminal cloud shield gear db antenna thermo pump router package key server chip phone</code></td></tr>
       <tr><td>tints</td><td colspan="2"><code>cmd auth data mqtt dev</code></td></tr>
@@ -191,7 +212,6 @@
     <table>
       <tr><th>key</th><th>shape</th><th>meaning</th></tr>
       <tr><td>steps[n].sticky</td><td><code>true | false</code></td><td>Explicit persistence flag for board effects across steps (panel state already persists via patch folding).</td></tr>
-      <tr><td>steps[n].id</td><td><code>"ota.3"</code></td><td>Stable step identifier for deep links and unambiguous meeting feedback.</td></tr>
     </table>
     </div>
 

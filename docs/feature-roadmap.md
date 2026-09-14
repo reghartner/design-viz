@@ -58,8 +58,9 @@ The effective-state inspector is built in [#54](https://github.com/reghartner/de
    state sits alongside its sparse patch, with initial/inherited/transient
    origins, computed input history, exact source links and selectable snapshot
    JSON. Source edits clear stale values until refreshed.
-4. **Scenario timeline:** insert, reorder and duplicate beats in a compact
-   list; preview changed fields and show concurrent intervals explicitly.
+4. **Scenario timeline (list built):** search, append, reorder and duplicate
+   beats in a compact captioned list with bounded paging and exact source
+   selection. Concurrent interval editing remains a later slice.
    Editing playback is stable: previews start paused, dispose old timers on
    rebuild, and retain an unambiguous current step through ordinary edits.
 5. **Safer structural edits:** preview reference changes for node/panel renames

@@ -108,6 +108,29 @@ body.workspace-focus .workwrap{max-width:none;}
 .outline-item:hover,.outline-item:focus-visible{border-color:var(--accent); outline:none; background:var(--codebg);}
 #sec-outline{flex-shrink:0;}
 #outline-search{width:100%; box-sizing:border-box;}
+#sec-steps{flex-shrink:0;}
+.story-tools{padding:4px 14px 10px;min-width:0;}
+.story-tools>label{display:block;font-size:11px;color:var(--sub);}
+.story-tools .fctl{display:block;width:100%;box-sizing:border-box;margin:4px 0 7px;}
+.story-list{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto;margin:6px 0;}
+.story-step{display:grid;grid-template-columns:28px minmax(0,1fr);gap:6px;text-align:left;flex-shrink:0;
+  color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:5px;padding:7px;
+  font:12px/1.4 system-ui,sans-serif;cursor:pointer;}
+.story-step>b{font:600 12px/1.6 monospace;color:var(--sub);}
+.story-step small{display:block;font-size:10px;color:var(--sub);overflow-wrap:anywhere;}
+.story-caption{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.story-step[aria-current="step"]{border-color:var(--accent);background:var(--codebg);}
+.story-step[aria-current="step"]>b{color:var(--accent);}
+.story-step:hover{border-color:var(--accent);}
+.story-step:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;}
+.story-actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.story-actions .bbtn{min-height:32px;}
+.story-actions[hidden]{display:none;}
+.story-note{font-size:10px;line-height:1.45;color:var(--sub);margin:8px 0 0;}
+@media(max-width:600px){
+  .story-actions{display:grid;grid-template-columns:1fr 1fr;}
+  .story-actions .bbtn{min-height:38px;}
+}
 .tracebox{padding:12px; margin:8px 0; border:1px solid var(--accent); border-radius:8px; max-height:52vh; overflow:auto; flex-shrink:0;}
 .tracebox p{font-size:12px; color:var(--sub); margin:5px 0 10px;}
 .tracebox label{display:block; font-size:12px; margin-top:9px;}
@@ -4651,6 +4674,26 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
         <div class="outline-status" id="outline-status" role="status"></div>
         <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
       </details>
+      <details class="ssec" id="sec-steps">
+        <summary>story steps</summary>
+        <div class="story-tools">
+          <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
+          <input class="fctl" type="search" id="steps-search" aria-label="Filter story steps" placeholder="Caption, step ID, lane, node, or panel…">
+          <div class="outline-status" id="steps-status" role="status"></div>
+          <nav class="story-list" id="steps-list" aria-label="Story steps"></nav>
+          <div class="story-actions" id="steps-paging" hidden>
+            <button class="bbtn" id="steps-previous">Previous 200</button>
+            <button class="bbtn" id="steps-next">Next 200</button>
+          </div>
+          <div class="story-actions">
+            <button class="bbtn" id="steps-add">Append step</button>
+            <button class="bbtn" id="steps-duplicate" disabled>Duplicate</button>
+            <button class="bbtn" id="steps-earlier" disabled>↑ Earlier</button>
+            <button class="bbtn" id="steps-later" disabled>↓ Later</button>
+          </div>
+          <p class="story-note">Select a beat to edit it. Moves use the full story order. Copies repeat patches, including appended events; inherited state is recalculated. Reveal/hide indices stay positional.</p>
+        </div>
+      </details>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
         <div class="guide" id="guide" hidden></div>
@@ -4707,6 +4750,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
       <tr><td>diagram.floats</td><td><code>[{id, side:"above"}]</code></td><td>Branch nodes off the main flow (auth, signing). X position computed from the edges that touch them.</td></tr>
       <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> of the hop (default <code>int</code>). Zero-based reveal indices draw the edge only for the selected step interval. <code>bend</code>/<code>labelDx</code>/<code>labelDy</code> are optional manual nudges.</td></tr>
       <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Twenty-five types are documented in <code>contract/authoring-contract.md</code>, including <code>table</code> for data snapshots, <code>checks</code> for authored decisions, <code>budget</code> for resource limits, and <code>replicas</code> for positions and reported lag. <code>waterfall</code> supports <code>startMs</code> offsets for overlapping trace spans; <code>trace</code> shows service internals and child-covered versus uncovered wall time.</td></tr>
+      <tr><td>steps[n].id</td><td><code>"ota.3"</code></td><td>Optional unique step identifier for deep links, search and preview restoration. Duplicating a step gives its copy a new ID.</td></tr>
       <tr><td>diagram.steps</td><td><code>[{edge | edges, nodes?, panels?, lane?, text, link?}]</code></td><td>Ordered narrative. <code>edge:"from-&gt;to"</code> or <code>edges:[...]</code> for hops that happen together — their packets fire in order, staggered. A step may be <b>edgeless</b>: light <code>nodes:[...]</code> directly and/or patch panels. <code>panels</code> carries SPARSE per-panel patches; the engine folds them into complete per-step state so any jump is consistent (<code>log</code> appends; <code>enterOnce</code> applies only at its own step). Drives the numbered coins, the ambient packet schedule, AND the click-through.</td></tr>
       <tr><td>icons</td><td colspan="2"><code>terminal cloud shield gear db antenna thermo pump router package key server chip phone</code></td></tr>
       <tr><td>tints</td><td colspan="2"><code>cmd auth data mqtt dev</code></td></tr>
@@ -4721,7 +4765,6 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
     <table>
       <tr><th>key</th><th>shape</th><th>meaning</th></tr>
       <tr><td>steps[n].sticky</td><td><code>true | false</code></td><td>Explicit persistence flag for board effects across steps (panel state already persists via patch folding).</td></tr>
-      <tr><td>steps[n].id</td><td><code>"ota.3"</code></td><td>Stable step identifier for deep links and unambiguous meeting feedback.</td></tr>
     </table>
     </div>
 
@@ -11874,7 +11917,6 @@ function planAddStep(text, raw, sectionIdx){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   var edges = Array.isArray(got.d.edges) ? got.d.edges : [];
-  if (!edges.length) return {error: 'a step names an edge — add an edge first'};
   /* prefer an edge no step uses as its FIRST hop, so the new numbered coin
      gets its own midpoint (two steps sharing a first hop stack coins) */
   var used = {};
@@ -11888,8 +11930,8 @@ function planAddStep(text, raw, sectionIdx){
     var k = e.from + '->' + e.to;
     if (!used[k]){ pick = k; break; }
   }
-  if (!pick) pick = (edges[0] || {}).from + '->' + (edges[0] || {}).to;
-  var item = '{"edge": ' + JSON.stringify(pick) + ', "text": "Describe what happens in this step"}';
+  if (!pick && edges.length) pick = (edges[0] || {}).from + '->' + (edges[0] || {}).to;
+  var item = JSON.stringify(Object.assign(pick ? {edge:pick} : {}, {text:'Describe what happens in this step'}));
   var r = jsonInsertListItemOrCreate(text, got.path, 'steps', item);
   if (!r) return {error: 'could not edit steps in the editor text'};
   return {text: r.text, start: r.start, end: r.end, kind: 'step',
@@ -12330,6 +12372,22 @@ function planMoveStep(text, raw, sectionIdx, stepIdx, delta){
   if (r.error) return r;
   r.index = to;
   return r;
+}
+
+function planDuplicateStep(text, raw, sectionIdx, stepIdx){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var steps = got.d.steps;
+  if (!Number.isInteger(stepIdx) || !Array.isArray(steps) || !steps[stepIdx]) return {error:'step not found'};
+  var clone = builderClone(steps[stepIdx]);
+  if (typeof clone.id === 'string' && clone.id){
+    var taken = Object.create(null);
+    steps.forEach(function(step){ if (step && typeof step.id === 'string') taken[step.id] = true; });
+    clone.id = builderUniqueKey(taken, clone.id + '-copy');
+  }
+  var r = jsonInsertArrayItemAfter(text, got.path.concat(['steps']), stepIdx, JSON.stringify(clone, null, 2));
+  if (!r) return {error:'could not edit steps in the editor text'};
+  return {text:r.text, start:r.start, end:r.end, kind:'step', index:stepIdx + 1};
 }
 
 function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
@@ -15722,6 +15780,10 @@ function initWorkbenchBuilder(opts){
         }, armedHere ? 'bexit-inline' : ''));
       }
       if (t.kind === 'step' && !armedHere){
+        acts.appendChild(actionButton('duplicate step', function(){
+          commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index); },
+            {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
+        }));
         acts.appendChild(actionButton('↑ earlier', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
@@ -15845,6 +15907,7 @@ function initWorkbenchBuilder(opts){
     renderInspector();
     syncBoardToSelectedStep();
     applyStepMarkers();
+    if (stepList) stepList.sync();
     if (focusEditor === false) return;
     var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
     var loc = path ? jsonLocate(src.value, path) : null;
@@ -15919,6 +15982,41 @@ function initWorkbenchBuilder(opts){
     });
     refreshOutline();
   }
+
+  /* The step list shares this builder's selection, render and undo pipeline. */
+  var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({
+    view:view, src:src, renderedText:opts.renderedText,
+    pause:pausePreview,
+    selection:function(){ return currentTarget; },
+    locked:function(){ return !!addToStep || !!connect; },
+    navigate:function(entry){
+      clearMultiSelect();
+      if (entry.tab){
+        var tabButton = document.getElementById('tab-' + entry.tab.block + '-' + entry.tab.tab);
+        if (tabButton) tabButton.click();
+      }
+      var el = findTargetEl(entry.target);
+      selectTarget(Object.assign({}, entry.target, {el:el}), false);
+      var loc = jsonLocate(src.value, entry.path);
+      if (loc && sourceVisible()){
+        src.setSelectionRange(loc.start, loc.end); scrollTextareaTo(loc.start);
+      }
+      if (el) el.scrollIntoView({block:'nearest', behavior:'auto'});
+    },
+    apply:function(plan, section){
+      clearMultiSelect();
+      return applyPlan(plan, {after:function(){
+        var story = builderStorySections(JSON.parse(src.value)).find(function(entry){ return entry.section === section; });
+        if (story && story.tab){
+          var tabButton = document.getElementById('tab-' + story.tab.block + '-' + story.tab.tab);
+          if (tabButton) tabButton.click();
+        }
+        currentTarget = {kind:'step', section:section, index:plan.index};
+        insertSection = section;
+        renderInspector();
+      }});
+    }
+  }) : null;
 
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
@@ -16804,6 +16902,202 @@ function initWorkbenchBuilder(opts){
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);
   applyRowGrabs(); /* the boot render happened before this wiring ran */
+}
+/* ---- src/steps.workbench.js ---- */
+/* Story navigation uses raw section paths; filtered indices never become edit indices. */
+function builderStorySections(raw){
+  return specSectionPaths(raw).map(function(rec, section){
+    var d = specValueAt(raw, rec.diagram), sec = specValueAt(raw, rec.section) || {};
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
+    var ti = rec.section.indexOf('tabs');
+    var parent = ti >= 0 ? specValueAt(raw, rec.section.slice(0, ti + 2)) : null;
+    return {section:section, path:rec.diagram, diagram:d,
+      tab:ti >= 0 ? {block:rec.section[ti - 1], tab:rec.section[ti + 1]} : null,
+      label:(parent && parent.label ? parent.label + ' / ' : '') + (sec.heading || 'Section ' + (section + 1))};
+  }).filter(Boolean);
+}
+function builderStorySteps(section, query){
+  var terms = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  function count(n, noun){ return n + ' ' + noun + (n === 1 ? '' : 's'); }
+  return (Array.isArray(section.diagram.steps) ? section.diagram.steps : []).map(function(step, index){
+    step = step || {};
+    var hops = builderStepHops(step), nodes = Array.isArray(step.nodes) ? step.nodes : [];
+    var panels = step.panels && typeof step.panels === 'object' ? Object.keys(step.panels) : [];
+    var caption = typeof step.text === 'string' && step.text ? step.text : 'Untitled step';
+    var id = typeof step.id === 'string' ? step.id : '', lane = typeof step.lane === 'string' ? step.lane : '';
+    var haystack = [index + 1, caption, id, lane].concat(hops, nodes, panels).join(' ').toLowerCase();
+    if (!terms.every(function(term){ return haystack.indexOf(term) >= 0; })) return null;
+    return {index:index, caption:caption, id:id, lane:lane,
+      summary:[lane, count(hops.length, 'hop'), count(nodes.length, 'node'), count(panels.length, 'panel')].filter(Boolean).join(' · '),
+      target:{kind:'step', section:section.section, index:index},
+      path:section.path.concat(['steps', index]), tab:section.tab};
+  }).filter(Boolean);
+}
+
+function initWorkbenchStepList(opts){
+  var box = document.getElementById('sec-steps'), select = document.getElementById('steps-section');
+  var search = document.getElementById('steps-search'), list = document.getElementById('steps-list');
+  var status = document.getElementById('steps-status'), paging = document.getElementById('steps-paging');
+  if (!box || !select || !search || !list || !status || !paging) return null;
+  var buttons = {}, sections = [], chosen = null, entries = [], indexedText = null, raw = null;
+  var offset = 0, pageSize = 200, lastSelection = '', stale = true;
+  ['add','duplicate','earlier','later','previous','next'].forEach(function(name){ buttons[name] = document.getElementById('steps-' + name); });
+  function current(){
+    var target = opts.selection();
+    return target && target.kind === 'step' && chosen && target.section === chosen.section ? target.index : -1;
+  }
+  function controls(){
+    var index = current(), count = chosen && Array.isArray(chosen.diagram.steps) ? chosen.diagram.steps.length : 0;
+    var blocked = stale || opts.locked() || !chosen;
+    select.disabled = blocked; search.disabled = blocked;
+    buttons.add.disabled = blocked;
+    buttons.duplicate.disabled = blocked || index < 0 || index >= count;
+    buttons.earlier.disabled = blocked || index <= 0 || index >= count;
+    buttons.later.disabled = blocked || index < 0 || index >= count - 1;
+    buttons.previous.disabled = stale || offset === 0;
+    buttons.next.disabled = stale || offset + pageSize >= entries.length;
+  }
+  function invalidate(message){
+    stale = true; list.innerHTML = ''; paging.hidden = true;
+    select.disabled = true; search.disabled = true;
+    status.textContent = message || 'Source changed. Click Render before editing story steps.';
+    controls();
+  }
+  function ready(){
+    if (stale || opts.src.value !== indexedText || (opts.renderedText && opts.renderedText() !== opts.src.value)){
+      invalidate(); return false;
+    }
+    if (opts.locked()){
+      status.textContent = 'Finish ADD TO STEP or edge connection first (Done or Esc).';
+      controls(); return false;
+    }
+    return true;
+  }
+  function paint(){
+    list.innerHTML = '';
+    var index = current();
+    entries.slice(offset, offset + pageSize).forEach(function(entry){
+      var button = document.createElement('button');
+      button.type = 'button'; button.className = 'story-step';
+      button.setAttribute('data-step-index', entry.index);
+      button.setAttribute('aria-current', entry.index === index ? 'step' : 'false');
+      button.setAttribute('aria-label', 'Edit step ' + (entry.index + 1) + ': ' + entry.caption);
+      var number = document.createElement('b'); number.textContent = entry.index + 1;
+      var text = document.createElement('span'), caption = document.createElement('span'), meta = document.createElement('small');
+      caption.className = 'story-caption'; caption.textContent = entry.caption;
+      meta.textContent = (entry.id ? entry.id + ' · ' : '') + entry.summary;
+      text.appendChild(caption); text.appendChild(meta); button.appendChild(number); button.appendChild(text);
+      button.title = entry.caption + '\n' + meta.textContent;
+      button.addEventListener('click', function(){
+        if (!ready()) return;
+        opts.navigate(entry);
+        var selected = list.querySelector('[aria-current="step"]');
+        if (selected) selected.focus({preventScroll:true});
+      });
+      list.appendChild(button);
+    });
+    var total = chosen && Array.isArray(chosen.diagram.steps) ? chosen.diagram.steps.length : 0;
+    status.textContent = !chosen ? 'No diagrams in this document.' : !total ? 'No steps yet. Add a beat to begin.' :
+      !entries.length ? 'No matching steps. Clear the filter to see the story.' :
+      (offset + 1) + '–' + Math.min(offset + pageSize, entries.length) + ' of ' + entries.length +
+      ' matching steps · ' + total + ' total';
+    paging.hidden = entries.length <= pageSize;
+    controls();
+  }
+  function filter(followSelection){
+    entries = chosen ? builderStorySteps(chosen, search.value) : [];
+    offset = 0;
+    if (followSelection){
+      var at = entries.findIndex(function(entry){ return entry.index === current(); });
+      if (at >= 0) offset = Math.floor(at / pageSize) * pageSize;
+    }
+    paint();
+  }
+  function refresh(){
+    if (opts.renderedText && opts.renderedText() !== opts.src.value){ invalidate(); return; }
+    if (indexedText === opts.src.value && !stale){ sync(); return; }
+    try { raw = JSON.parse(opts.src.value); sections = builderStorySections(raw); }
+    catch (ex){ invalidate('Fix the JSON source and click Render to browse story steps.'); return; }
+    var previous = chosen, target = opts.selection();
+    chosen = sections.find(function(section){ return target && target.section === section.section; }) ||
+      sections.find(function(section){ return previous && section.label === previous.label && JSON.stringify(section.path) === JSON.stringify(previous.path); }) || sections[0] || null;
+    indexedText = opts.src.value; stale = false;
+    select.innerHTML = '';
+    sections.forEach(function(section){
+      var option = document.createElement('option'); option.value = String(section.section);
+      option.textContent = (section.section + 1) + ' · ' + section.label;
+      select.appendChild(option);
+    });
+    select.disabled = !chosen; search.disabled = !chosen;
+    if (chosen) select.value = String(chosen.section);
+    lastSelection = JSON.stringify(target);
+    filter(true);
+  }
+  function sync(){
+    if (opts.src.value !== indexedText || stale){ refresh(); return; }
+    var target = opts.selection(), signature = JSON.stringify(target);
+    if (signature !== lastSelection){
+      lastSelection = signature;
+      var section = sections.find(function(s){ return target && s.section === target.section; });
+      if (section && section !== chosen){ chosen = section; select.value = String(section.section); search.value = ''; filter(true); return; }
+      var at = entries.findIndex(function(entry){ return entry.index === current(); });
+      if (at >= 0 && (at < offset || at >= offset + pageSize)){ offset = Math.floor(at / pageSize) * pageSize; paint(); return; }
+    }
+    Array.prototype.forEach.call(list.children, function(button){
+      button.setAttribute('aria-current', Number(button.getAttribute('data-step-index')) === current() ? 'step' : 'false');
+    });
+    controls();
+  }
+  select.addEventListener('change', function(){
+    if (!ready()){ if (chosen) select.value = String(chosen.section); return; }
+    chosen = sections.find(function(s){ return String(s.section) === select.value; }) || null;
+    search.value = ''; filter(false);
+  });
+  search.addEventListener('input', function(){ if (ready()) filter(false); });
+  search.addEventListener('keydown', function(ev){
+    if ((ev.key === 'ArrowDown' || ev.key === 'Enter') && list.firstChild){ ev.preventDefault(); list.firstChild.focus(); }
+  });
+  list.addEventListener('keydown', function(ev){
+    var row = ev.target.closest && ev.target.closest('.story-step');
+    var rows = Array.prototype.slice.call(list.children), at = rows.indexOf(row), next;
+    if (at < 0 || ev.altKey || ev.metaKey || ev.ctrlKey) return;
+    if (ev.key === 'ArrowDown') next = Math.min(at + 1, rows.length - 1);
+    else if (ev.key === 'ArrowUp') next = Math.max(0, at - 1);
+    else if (ev.key === 'Home') next = 0;
+    else if (ev.key === 'End') next = rows.length - 1;
+    else return;
+    ev.preventDefault(); rows[next].focus();
+  });
+  ['previous','next'].forEach(function(name){ buttons[name].addEventListener('click', function(){
+    if (!ready()) return;
+    offset = Math.max(0, Math.min(Math.floor((entries.length - 1) / pageSize) * pageSize,
+      offset + (name === 'next' ? pageSize : -pageSize)));
+    paint(); if (list.firstChild) list.firstChild.focus();
+  }); });
+  ['add','duplicate','earlier','later'].forEach(function(name){ buttons[name].addEventListener('click', function(){
+    if (!ready() || !chosen || buttons[name].disabled) return;
+    var index = current(), section = chosen.section;
+    var plan = name === 'add' ? planAddStep(indexedText, raw, section) : name === 'duplicate' ?
+      planDuplicateStep(indexedText, raw, section, index) : planMoveStep(indexedText, raw, section, index, name === 'earlier' ? -1 : 1);
+    if (plan.error){ status.textContent = plan.error; return; }
+    if (!opts.apply(plan, section)) return;
+    search.value = ''; refresh();
+    var selected = list.querySelector('[aria-current="step"]');
+    if (selected) selected.scrollIntoView({block:'nearest'});
+    if (!buttons[name].disabled) buttons[name].focus(); else if (selected) selected.focus();
+  }); });
+  opts.src.addEventListener('input', function(){ invalidate(); });
+  box.addEventListener('focusin', function(){ if (opts.pause) opts.pause(); });
+  box.addEventListener('toggle', function(){ if (box.open) refresh(); });
+  new MutationObserver(refresh).observe(opts.view, {childList:true});
+  /* Mode transitions do not replace the page; re-evaluate button availability. */
+  document.addEventListener('click', controls);
+  document.addEventListener('keydown', function(ev){
+    /* The builder's Escape handler is registered later; read its settled mode. */
+    if (ev.key === 'Escape') setTimeout(sync, 0);
+  });
+  refresh();
+  return {sync:sync};
 }
 /* ---- src/workspace.workbench.js ---- */
 /* Preview position and layout never enter the spec or undo history. */

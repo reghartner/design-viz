@@ -1,5 +1,17 @@
 # Changelog
 
+## Story-step workbench editor (2026-09-14)
+
+- Search captions, IDs, lanes, nodes, hops and panel IDs in a compact story
+  list. Select across hidden tabs with exact JSON selection and retained list
+  focus. Long stories use bounded pages of 200 matches.
+- Append, duplicate and reorder through the existing undo pipeline. Copies
+  keep complete patches and receive unique step IDs; state-only diagrams can
+  now append edgeless beats. Native text editing and stale-source guards stay
+  intact. Phone actions use a two-column layout.
+- See [Story steps](docs/workbench-steps.md) for positional reveal thresholds,
+  inherited state and repeated append semantics after structural edits.
+
 ## Stable workbench playback (2026-09-14)
 
 - Click-through previews start paused; Play remains explicit. Selecting or

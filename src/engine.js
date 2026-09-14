@@ -1206,7 +1206,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));
     var dot = document.createElementNS(SVGNS, 'circle');
-    dot.setAttribute('class', cls + ' dv-protocol-fill');
+    dot.setAttribute('class', cls + ' dv-protocol-fill' + (info.e.delta === true ? ' dvd' : ''));
     dot.setAttribute('r', SK.glow ? 4 : 3.4);
     dot.setAttribute('fill', col);
     dot.setAttribute('style', protocolColorStyle(protos, info.kind));

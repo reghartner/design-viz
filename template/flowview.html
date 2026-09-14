@@ -979,13 +979,14 @@ rect.tlfuture{opacity:.18;}
 .dv-deltaonly path.edge:not(.dvd):not(.lit),
 .dv-deltaonly path.halo:not(.dvd):not(.lit),
 .dv-deltaonly text.lbl:not(.dvd):not(.lit),
-.dv-deltaonly g.coin:not(.dvd):not(.lit){opacity:.18 !important;}
+.dv-deltaonly g.coin:not(.dvd):not(.lit),
+.dv-deltaonly circle.loopdot:not(.dvd){opacity:.18 !important;}
 .dv-deltaonly .dvd, .dv-deltaonly .dvdelta, .dv-deltaonly .lit{opacity:1 !important;}
 .termbar.dv-deltaonly .schip:not(.dvd):not([aria-current="true"]){opacity:.35 !important;}
 .termbar.dv-deltaonly .schip[aria-current="true"]{opacity:1 !important;}
 @media (prefers-reduced-motion: no-preference){
   .dv-deltaonly g.node, .dv-deltaonly path.edge, .dv-deltaonly path.halo,
-  .dv-deltaonly text.lbl, .dv-deltaonly g.coin,
+  .dv-deltaonly text.lbl, .dv-deltaonly g.coin, .dv-deltaonly circle.loopdot,
   .termbar.dv-deltaonly .schip{transition:opacity .25s !important;}
 }
 .sk-aurora .schip{background:#141A21; border:1px solid #2A343F; color:#6E7B8A;}
@@ -6407,7 +6408,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));
     var dot = document.createElementNS(SVGNS, 'circle');
-    dot.setAttribute('class', cls + ' dv-protocol-fill');
+    dot.setAttribute('class', cls + ' dv-protocol-fill' + (info.e.delta === true ? ' dvd' : ''));
     dot.setAttribute('r', SK.glow ? 4 : 3.4);
     dot.setAttribute('fill', col);
     dot.setAttribute('style', protocolColorStyle(protos, info.kind));

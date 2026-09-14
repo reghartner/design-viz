@@ -533,6 +533,16 @@ test('renaming or deleting a group keeps every child parent link valid', () => {
   g = JSON.parse(plan.text).groups;
   assert.strictEqual(g.mid.parent, undefined);
   assert.strictEqual(g.child.parent, 'mid');
+  // a dangling or cyclic parent on the deleted group must not be handed down
+  const broken = {nodes: {n: {group: 'child'}}, rows: [['n']],
+    groups: {bad: {parent: 'missing'}, child: {parent: 'bad'}}};
+  g = JSON.parse(B.planDeleteGroup(JSON.stringify(broken), broken, 0, 'bad').text).groups;
+  assert.strictEqual(g.child.parent, undefined);
+  const looped = {nodes: {n: {group: 'child'}}, rows: [['n']],
+    groups: {x: {parent: 'y'}, y: {parent: 'x'}, child: {parent: 'x'}}};
+  g = JSON.parse(B.planDeleteGroup(JSON.stringify(looped), looped, 0, 'x').text).groups;
+  assert.strictEqual(g.child.parent, undefined);
+  assert.strictEqual(g.y.parent, undefined);
 });
 
 test('builderGroupParentOptions excludes self and descendants over sanitized links', () => {

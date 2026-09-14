@@ -12381,7 +12381,9 @@ function planDeleteGroup(text, raw, sectionIdx, key){
   var shape = builderGroupsShapeError(got.d);
   if (shape) return shape;
   return builderRewrite(text, raw, got.path, function(d){
-    var promoted = d.groups && d.groups[key] ? d.groups[key].parent : undefined;
+    /* promote through the SANITIZED links: a dangling, self, or cyclic
+       parent on the deleted group must not be handed down to children */
+    var promoted = sanitizedGroupParents(d.groups)[key];
     if (d.groups) delete d.groups[key];
     /* children of the deleted group climb one level: they take its parent,
        or become top-level when it had none */

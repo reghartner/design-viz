@@ -17,8 +17,9 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 5 | Effective step-state inspector and inheritance provenance | codex/effective-state-inspector | Open: https://github.com/reghartner/design-viz/pull/54 |
 | 6 | Resizable workbench workspace / focused editing | codex/resizable-workspace | Open: https://github.com/reghartner/design-viz/pull/55 |
 | 7 | Retry/timeout and circuit-breaker stories | codex/resilience-starter | Open: https://github.com/reghartner/design-viz/pull/56 |
-| 8 | Replication / consistency view | TBD | Next candidate: replica versions, lag, quorum/read outcome; inspect existing atlas first |
-| 9 | Step-list navigation and editing | TBD | Compact steps, jump, duplicate and reorder using existing planners |
+| 8 | Replication / consistency view | codex/replica-positions | Open: https://github.com/reghartner/design-viz/pull/57 |
+| 9 | Stable workbench playback while editing | TBD | Stop re-rendered boards from unexpectedly restarting autoplay |
+| 10 | Step-list navigation and editing | TBD | Compact steps, jump, duplicate and reorder using existing planners |
 
 ## Validation and evidence
 
@@ -29,7 +30,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51, #52, #53, #54 and #55 passed all GitHub checks.
+- PRs #50, #51, #52, #53, #54, #55 and #56 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -58,19 +59,25 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   admission, local rejection/call counters, half-open probe state, reset after
   success, backward jumps and light/dark rendering. Fixed intrinsic panel width
   so wide tables scroll inside their panel at 390 pixels instead of widening
-  the page. PR #56 is open; check its final CI before claiming it green.
+  the page. PR #56 passed all GitHub checks.
+- Replica panel: 10 new tests and full Node/158 Python suites passed.
+  Browser verified same-sequence gaps, equality with nonzero reported lag,
+  offline equality, unrelated histories, backward jumps, light/dark, 390-pixel
+  containment, picker insert/undo, unit edit/undo and keyboard row scrolling.
+  Starter and cookbook validate clean; 25 widget types now have contract and
+  inspector coverage. Check PR #57 final CI before claiming it green.
 
 ## Next continuation
 
-Start from the current `codex/resilience-starter` branch, inspect checks
+Start from the current `codex/replica-positions` branch, inspect checks
 and working-tree changes, and create the next focused branch. Do not recreate
 the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
-stories are built. Next consider a replication/consistency view (roadmap #10)
-that distinguishes per-replica versions, observed lag and explicitly authored
-read/quorum outcomes. Inspect existing replication atlas examples before
-choosing a new widget; preserve unknown data and avoid implying that a display
-proves consensus or consistency. A compact step-list editor is another bounded
-candidate: use existing selection, duplicate and reorder planners. Keep phone
+stories and numeric replica positions are built. Browser checks exposed an
+editing issue: re-rendering after skin changes or inspector edits can restart
+autoplay, replacing a focused panel while the user edits. Address stable
+workbench playback next without changing standalone presentation behavior.
+A compact step-list editor follows: use existing selection, duplicate and
+reorder planners. Keep phone
 layouts and native text editing usable. Shared scenario definitions and
 trace/HLD mapping remain larger design work, not quick schema shortcuts.
 

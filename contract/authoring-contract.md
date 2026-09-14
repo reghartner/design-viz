@@ -374,6 +374,36 @@ perspectives" of one timeline). Types:
   `on` `off` `tx` `rx` (tx/rx pulse).
 - `gauge` — numeric bar: `{"id":"pw","type":"gauge","unit":"mA","max":400,
   "initial":{"value":2}}`. Patched via `{"value": <number>}`.
+- `replicas` — aligned positions for replicas, event consumers or device/cloud
+  copies. Declare 1–8 unique string ids:
+  `{"id":"copies","type":"replicas","unit":"records","replicas":[
+  {"id":"primary","label":"Primary"},{"id":"remote","label":"Remote"}],
+  "initial":{"reference":{"series":"orders/applied/history-a","position":104},
+  "replicas":{"primary":{"series":"orders/applied/history-a","position":104,
+  "role":"primary","status":"online","lagMs":0,"observedAt":"example t=0"},
+  "remote":{"series":"orders/applied/history-a","position":101,"status":"unknown"}}}}`.
+  Patch `reference` (object or null), `replicas` (map or null), and optional
+  `note` text. These fields replace WHOLE previous objects/maps; omitted
+  replica ids in a new map become unknown. Omit a field to carry it forward;
+  `enterOnce` is current-step only. Null resets to unknown, never zero.
+  Each record supports `position` (non-negative safe integer or null),
+  `series` (non-empty string identity or null), `role` (text),
+  `status` (`online|offline|unknown`), `lagMs` (finite non-negative number or
+  null), and `observedAt` (text label describing the observation time).
+  Positions compare ONLY when both position/series pairs are known and their
+  series strings match exactly. Name the same history, partition, branch and
+  position meaning; received and applied cursors must not be mixed silently.
+  Different series keep their numeric labels but do not enter the ruler.
+  The ruler's range is the minimum/maximum comparable position plus reference
+  at this step; equal-only positions sit at its center. It is a position
+  window, not a percentage of data replicated. `unit` defaults to `positions`.
+  Numeric distance is reported separately from supplied milliseconds of lag.
+  Missing lag stays unknown even at the reference; lag is not a catch-up
+  estimate. Availability and observation time remain independent. Equality
+  proves neither commit nor read safety nor quorum. Use `checks` for explicitly
+  sourced read/write policy outcomes. This panel does not elect a leader,
+  simulate consensus, compare opaque LSN/version strings, or infer freshness.
+  See [replication recipe](../cookbook/replica-positions.md).
 - `table` — a data snapshot for database records, cache entries, payloads,
   or desired/reported device state. Declare 1–4 columns with unique string
   ids: `{"id":"data","type":"table","title":"Order record",
@@ -927,6 +957,7 @@ contract stays the authority; a recipe shows the working subset for one task.
    | an ordered event stream (firmware log, audit trail) | `log` |
    | what a camera sees at each step | `screen` |
    | a latency / timing budget across spans | `waterfall` |
+   | replica or consumer positions, lag, and incomparable histories | `replicas` |
    | which regions of a frame are armed / ignored / masked | `zoneframe` |
    | line of sight / wake-on-motion (does an approach trip a sensor?) | `pir` |
    | who can decrypt a payload at which hop | `xray` |

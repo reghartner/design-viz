@@ -221,6 +221,26 @@
 
 /* ---------- inspector panels ---------- */
 .swpanel{color:var(--dtext); font:12px/1.5 'IBM Plex Sans',system-ui,sans-serif; overflow-wrap:anywhere;}
+.replicas-view{color:var(--dtext);font:11px/1.5 'IBM Plex Mono',monospace;overflow-wrap:anywhere;}
+.rep-reference{padding:8px;border:1px solid currentColor;border-radius:6px;margin-bottom:8px;}
+.rep-reference b,.rep-head b{color:var(--dink);}
+.rep-scale,.rep-note,.rep-observed,.rep-series{font-size:10px;color:var(--dfaint);}
+.rep-list{max-height:480px;overflow:auto;}
+.rep-list:focus-visible{outline:2px solid var(--dink);outline-offset:-2px;}
+.rep-row{padding:10px 2px;border-bottom:1px solid color-mix(in srgb,var(--dtext) 22%,transparent);}
+.rep-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.rep-status{font-size:9px;text-transform:uppercase;border:1px solid currentColor;border-radius:4px;padding:1px 4px;}
+.rep-role{font-size:10px;}.rep-value{margin-top:5px;font-weight:600;}
+.rep-track{position:relative;height:18px;margin:4px 6px;background:linear-gradient(transparent 8px,currentColor 8px,currentColor 9px,transparent 9px);}
+.rep-reference-mark{position:absolute;top:0;height:18px;border-left:2px dashed currentColor;opacity:.55;}
+.rep-position-mark{position:absolute;top:4px;width:9px;height:9px;border-radius:50%;background:var(--dink);transform:translateX(-50%);}
+.rep-comparison{font-weight:600;}.rep-note{margin:9px 0 0;}
+@media print{
+  .panelcol .pwidget.pt-replicas{display:block !important;break-inside:avoid;}
+  .panelcol:has(.pt-replicas){display:flex !important;}
+  .rep-list{max-height:none;overflow:visible;}
+  .replicas-view{color:#222;--dink:#111;--dfaint:#555;}
+}
 .wf-timed{max-height:350px; overflow:auto;}
 .wf-timed .wflabel{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .wfrow.wf-error .wfbar{background:#DD5A65;}

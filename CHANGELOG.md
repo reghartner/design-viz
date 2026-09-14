@@ -1,5 +1,16 @@
 # Changelog
 
+## Replica position panel (2026-09-14)
+
+- New `replicas` widget aligns up to eight positions against an explicit
+  reference, comparing only matching sequence identities. Unknown and
+  unrelated cursors stay outside the ruler; zero remains a known position.
+- Reported lag, availability, role and observation labels are independent.
+  Equal positions do not imply zero lag, availability, commit or read safety.
+- Includes validator warnings, setup and step-patch controls, sparse/transient
+  folding, a read-your-writes starter, and a device/cloud authoring recipe.
+  Positions are bounded safe integers; opaque version/LSN parsing is deferred.
+
 ## Retry and circuit-breaker stories (2026-09-14)
 
 - New **retries & circuits** starter: bounded retry success, rejection of an

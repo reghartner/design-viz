@@ -25,7 +25,7 @@ function loadBuilder(extraGlobals){
     ' planSetGroupParent, builderGroupParentOptions,' +
     ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
     ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
-    ' planMoveStep, planMoveRow, planMoveGroup, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
+    ' planMoveStep, planMoveRow, planMoveGroup, planMoveNode, planSetNodeFloat, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
@@ -1797,15 +1797,26 @@ test('mermaidToSpec converts the cumulus HLD and validates skeletons with zero e
 });
 
 /* Minimal event DOM: exercise the real import/history/mode handlers without a browser. */
-function importHarness(ctl){
-  const elements = {}, listeners = {}, doc = {activeElement: null};
+function importHarness(ctl, boardSpec){
+  const elements = {}, listeners = {}, windowListeners = {}, doc = {activeElement: null};
+  let observer;
   function element(tag = 'div', id = ''){
     const attrs = {}, handlers = {};
     const el = {tagName: tag.toUpperCase(), id, className: '', children: [], style: {},
       value: '', hidden: false, disabled: false, textContent: '',
       addEventListener(type, fn){ (handlers[type] ||= []).push(fn); },
       appendChild(child){ this.children.push(child); child.parentNode = this; return child; },
-      setAttribute(k, v){ attrs[k] = String(v); },
+      setAttribute(k, v){ if (k === 'class') this.className = String(v); else attrs[k] = String(v); },
+      removeAttribute(k){ delete attrs[k]; },
+      get firstChild(){ return this.children[0] || null; },
+      removeChild(child){ child.remove(); child.parentNode = null; },
+      cloneNode(deep){
+        const clone = element(tag);
+        clone.className = this.className;
+        for (const [k, v] of Object.entries(attrs)) clone.setAttribute(k, v);
+        if (deep) for (const child of this.children) clone.appendChild(child.cloneNode(true));
+        return clone;
+      },
       getAttribute(k){ return attrs[k] ?? null; },
       hasAttribute(k){ return Object.hasOwn(attrs, k); },
       remove(){ if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(c => c !== this); },
@@ -1813,10 +1824,15 @@ function importHarness(ctl){
       setSelectionRange(){},
       contains(child){ return child === this || this.children.some(c => c.contains(child)); },
       matches(selector){
+        if (selector.includes(',')) return selector.split(',').some(s => this.matches(s.trim()));
         if (selector.startsWith('#')) return this.id === selector.slice(1);
-        if (selector.startsWith('.')) return this.className.split(' ').includes(selector.slice(1));
-        if (selector.startsWith('[')) return this.hasAttribute(selector.slice(1, -1));
-        return this.tagName.toLowerCase() === selector;
+        const tagMatch = selector.match(/^[a-z]+/i);
+        if (tagMatch && this.tagName.toLowerCase() !== tagMatch[0]) return false;
+        for (const [, cls] of selector.matchAll(/\.([a-zA-Z0-9_-]+)/g))
+          if (!this.className.split(' ').includes(cls)) return false;
+        for (const [, key, value] of selector.matchAll(/\[([^=\]]+)(?:="([^"]*)")?\]/g))
+          if (value === undefined ? !this.hasAttribute(key) : this.getAttribute(key) !== value) return false;
+        return true;
       },
       closest(selectors){
         for (let at = this; at; at = at.parentNode){
@@ -1840,8 +1856,9 @@ function importHarness(ctl){
       }, handlers
     };
     el.classList = {
-      add(c){ el.className += ' ' + c; },
-      remove(c){ el.className = el.className.split(' ').filter(x => x !== c).join(' '); }
+      add(...cs){ el.className += ' ' + cs.join(' '); },
+      remove(...cs){ el.className = el.className.split(' ').filter(x => !cs.includes(x)).join(' '); },
+      contains(c){ return el.className.split(' ').includes(c); }
     };
     Object.defineProperty(el, 'innerHTML', {set(){ el.children = []; }, get(){ return ''; }});
     if (id) elements[id] = el;
@@ -1849,8 +1866,10 @@ function importHarness(ctl){
   }
   doc.body = element('body');
   doc.createElement = element;
+  doc.createElementNS = (_ns, tag) => element(tag);
+  doc.elementFromPoint = () => doc.over || null;
   doc.createTextNode = text => Object.assign(element('span'), {textContent: text});
-  doc.getElementById = id => elements[id] || null;
+  doc.getElementById = id => elements[id] || doc.body.querySelector('#' + id);
   doc.querySelector = () => null;
   doc.addEventListener = (type, fn, capture) => { (listeners[type] ||= []).push({fn, capture}); };
   for (const id of ['docview', 'src', 'guide', 'btarget', 'msgs', 'importbox', 'import-mermaid-text',
@@ -1861,10 +1880,33 @@ function importHarness(ctl){
   }
   elements.importbox.hidden = true;
   elements['undo-builder'].disabled = true;
-  elements.src.value = TEXT;
+  elements.src.value = boardSpec ? JSON.stringify(boardSpec) : TEXT;
+  let svg;
+  const cards = {};
+  if (boardSpec){
+    const sec = elements.docview.appendChild(element());
+    sec.className = 'doc-sec'; sec.setAttribute('data-dv-section', '0');
+    svg = sec.appendChild(element('svg'));
+    svg.getScreenCTM = () => ({inverse(){ return {}; }});
+    svg.createSVGPoint = () => ({matrixTransform(){ return {x: this.x, y: this.y}; }});
+    function card(id, x, y){
+      const node = svg.appendChild(element('g'));
+      node.className = 'node'; node.ownerSVGElement = svg;
+      node.setAttribute('data-dv-node', id); node.setAttribute('transform', `translate(${x} ${y})`);
+      const rect = node.appendChild(element('rect'));
+      rect.className = 'card'; rect.setAttribute('width', '100'); rect.setAttribute('height', '60');
+      cards[id] = node;
+    }
+    boardSpec.rows.forEach((row, r) => row.forEach((slot, i) => {
+      (Array.isArray(slot) ? slot : [slot]).forEach((id, j) =>
+        card(id, 100 + (r % 2 ? row.length - i - 1 : i) * 300, 100 + r * 250 + j * 80));
+    }));
+    (boardSpec.floats || []).forEach((f, i) => card(f.id, 100 + i * 300, 0));
+  }
   const saved = {};
-  const sandbox = {console, document: doc, window: {addEventListener(){}},
-    MutationObserver: class {observe(){}}, setTimeout(){}, clearTimeout(){},
+  const sandbox = {console, document: doc,
+    window: {addEventListener(type, fn){ (windowListeners[type] ||= []).push(fn); }},
+    MutationObserver: class {constructor(fn){ observer = fn; } observe(){}}, setTimeout(){}, clearTimeout(){},
     getComputedStyle(){ return {}; },
     localStorage: {getItem(k){ return saved[k] || null; }, setItem(k, v){ saved[k] = v; }}};
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/validator.js'), 'utf8') + '\n' +
@@ -1876,7 +1918,13 @@ function importHarness(ctl){
     const finding = element('li'); finding.textContent = 'existing validator warning';
     elements.msgs.appendChild(finding);
   }});
-  return {elements, doc, element, saved, get renders(){ return renders; },
+  return {elements, doc, element, saved, cards, svg, get renders(){ return renders; },
+    rerender(){ observer(); },
+    move(x, y, over = null){
+      doc.over = over;
+      for (const fn of windowListeners.mousemove || []) fn({clientX: x, clientY: y});
+    },
+    release(){ for (const fn of windowListeners.mouseup || []) fn({}); },
     click(id){ return elements[id].fire('click'); }};
 }
 
@@ -2592,6 +2640,247 @@ test('planMoveGroup rewrites only the rows slice in a nested section, preserving
   assert.deepStrictEqual(next, spec);
 });
 
+/* ---- node gap placement and float membership ---- */
+
+function nodePlacementFixture(rows = [['a', 'b'], ['c', 'd']]){
+  return {nodes: {a: {title: 'A'}, b: {}, c: {}, d: {}, e: {}, f: {}, u: {}}, rows,
+    floats: [{id: 'f', side: 'above', dx: 12, dy: -8}],
+    edges: [{from: 'a', to: 'f'}], steps: [{nodes: ['a', 'f'], text: 'Keep me'}]};
+}
+function changedNodePlacement(spec, planner, id, destination){
+  const before = JSON.stringify(spec), plan = planner(before, spec, 0, id, destination);
+  assert.ok(!plan.error, plan.error);
+  assert.equal(JSON.stringify(spec), before, 'input remains immutable');
+  const next = JSON.parse(plan.text);
+  assert.deepStrictEqual({...next, rows: spec.rows, floats: spec.floats}, spec,
+    'node definitions, edges, steps and other metadata keep their identities');
+  assert.ok(next.rows.length, 'rows never becomes empty');
+  return next;
+}
+function movedNode(rows, id, drop){
+  return changedNodePlacement(nodePlacementFixture(rows), B.planMoveNode, id, drop).rows;
+}
+
+test('planMoveNode converts pre-removal slots and preserves the original target row', () => {
+  assert.deepStrictEqual(movedNode([['a', 'b', 'c', 'd']], 'b', {row: 0, slot: 3}), [['a', 'c', 'b', 'd']]);
+  assert.deepStrictEqual(movedNode([['a', 'b', 'c']], 'c', {row: 0, slot: 0}), [['c', 'a', 'b']]);
+  assert.deepStrictEqual(movedNode([['a', 'b'], ['c', 'd']], 'a', {row: 1, slot: 1}), [['b'], ['c', 'a', 'd']]);
+  assert.deepStrictEqual(movedNode([['a'], ['b'], ['c', 'd']], 'a', {row: 2, slot: 1}), [['b'], ['c', 'a', 'd']]);
+});
+
+test('planMoveNode makes new rows at pre-removal gaps and drops emptied rows', () => {
+  assert.deepStrictEqual(movedNode([['a', 'b'], ['c']], 'a', {gap: 1}), [['b'], ['a'], ['c']]);
+  assert.deepStrictEqual(movedNode([['a'], ['b'], ['c']], 'a', {gap: 3}), [['b'], ['c'], ['a']]);
+  assert.deepStrictEqual(movedNode([['a'], ['b'], ['c']], 'c', {gap: 0}), [['c'], ['a'], ['b']]);
+});
+
+test('planMoveNode extracts strings from stacks and only counts fully lifted slots', () => {
+  assert.deepStrictEqual(movedNode([[['a', 'b', 'c'], 'd']], 'a', {row: 0, slot: 1}), [[['b', 'c'], 'a', 'd']]);
+  assert.deepStrictEqual(movedNode([[['a', 'b'], 'c']], 'a', {row: 0, slot: 1}), [['b', 'a', 'c']]);
+  assert.deepStrictEqual(movedNode([[['a'], 'b', 'c']], 'a', {row: 0, slot: 2}), [['b', 'a', 'c']]);
+  assert.deepStrictEqual(movedNode([[['a']], ['b']], 'a', {row: 1, slot: 1}), [['b', 'a']]);
+  assert.deepStrictEqual(movedNode([[['a', 'b']], ['c']], 'a', {gap: 2}), [['b'], ['c'], ['a']]);
+});
+
+test('planMoveNode takes floats into slot gaps or new rows, removing empty floats arrays', () => {
+  const spec = nodePlacementFixture();
+  const inRow = changedNodePlacement(spec, B.planMoveNode, 'f', {row: 1, slot: 1});
+  assert.deepStrictEqual(inRow.rows, [['a', 'b'], ['c', 'f', 'd']]);
+  assert.ok(!Object.hasOwn(inRow, 'floats'));
+  const newRow = changedNodePlacement(spec, B.planMoveNode, 'f', {gap: 0});
+  assert.deepStrictEqual(newRow.rows, [['f'], ['a', 'b'], ['c', 'd']]);
+  assert.ok(!Object.hasOwn(newRow, 'floats'));
+  spec.floats.push({id: 'e', side: 'below', dx: -3, dy: 10});
+  const withOther = changedNodePlacement(spec, B.planMoveNode, 'f', {gap: 2});
+  assert.deepStrictEqual(withOther.rows, [['a', 'b'], ['c', 'd'], ['f']]);
+  assert.deepStrictEqual(withOther.floats, [spec.floats[1]]);
+});
+
+test('planMoveNode refuses no-ops, unknown/unplaced nodes, and invalid destinations', () => {
+  const spec = nodePlacementFixture([['a', 'b', 'c']]), text = JSON.stringify(spec);
+  for (const slot of [1, 2]) assert.equal(B.planMoveNode(text, spec, 0, 'b', {row: 0, slot}).error, 'already there');
+  const lone = nodePlacementFixture([['a'], ['b']]);
+  for (const drop of [{gap: 0}, {gap: 1}, {row: 0, slot: 1}])
+    assert.equal(B.planMoveNode(JSON.stringify(lone), lone, 0, 'a', drop).error, 'already there');
+  for (const drop of [null, {}, {gap: -1}, {gap: 2}, {gap: 0.5}, {row: 2, slot: 0}, {row: 0, slot: NaN}])
+    assert.ok(B.planMoveNode(text, spec, 0, 'a', drop).error);
+  assert.match(B.planMoveNode(text, spec, 0, 'missing', {gap: 0}).error, /not found/);
+  assert.match(B.planMoveNode(text, spec, 0, 'u', {gap: 0}).error, /no layout slot/);
+  assert.ok(B.planMoveNode(text, spec, 99, 'a', {gap: 0}).error);
+  assert.equal(JSON.stringify(spec), text);
+});
+
+test('planMoveNode preserves bytes outside rows/floats, including nested sections', () => {
+  const diagram = nodePlacementFixture();
+  diagram.floats.push({id: 'e', side: 'below'});
+  const spec = {page: {blocks: [{heading: 'Other', diagram: {nodes: {x: {}}, rows: [['x']]}},
+    {tabs: [{label: 'Tab', sections: [{heading: 'Move', diagram}]}]}]}};
+  const text = JSON.stringify(spec, null, '\t') + '\n';
+  const path = ['page', 'blocks', 1, 'tabs', 0, 'sections', 0, 'diagram'];
+  for (const id of ['a', 'f']){
+    const plan = B.planMoveNode(text, spec, 1, id, {row: 1, slot: 1});
+    assert.ok(!plan.error, plan.error);
+    let restored = plan.text;
+    for (const key of ['rows', 'floats']){
+      const before = B.jsonLocate(text, path.concat(key)), after = B.jsonLocate(restored, path.concat(key));
+      restored = restored.slice(0, after.start) + text.slice(before.start, before.end) + restored.slice(after.end);
+    }
+    assert.equal(restored, text, 'all surrounding bytes are identical');
+  }
+  const deletionText = '{"nodes": {"a":{},"f":{}}, "floats": [{"id":"f"}], "rows": [["a"]], "edges" : [ ]}\n';
+  const deleted = B.planMoveNode(deletionText, JSON.parse(deletionText), 0, 'f', {gap: 1});
+  assert.equal(deleted.text, '{"nodes": {"a":{},"f":{}}, "rows": [["a"],["f"]], "edges" : [ ]}\n');
+});
+
+test('planSetNodeFloat lifts rows into floats, collapses stacks, and appends entries', () => {
+  for (const [rows, expected] of [
+    [[['a', 'b'], ['c']], [['b'], ['c']]],
+    [[[['a', 'b']], ['c']], [['b'], ['c']]],
+    [[[['a', 'b', 'c']], ['d']], [[['b', 'c']], ['d']]],
+    [[['a'], ['b']], [['b']]]
+  ]){
+    const spec = nodePlacementFixture(rows), next = changedNodePlacement(spec, B.planSetNodeFloat, 'a', 'above');
+    assert.deepStrictEqual(next.rows, expected);
+    assert.deepStrictEqual(next.floats, [...spec.floats, {id: 'a', side: 'above'}]);
+  }
+  const spec = nodePlacementFixture();
+  delete spec.floats;
+  const plan = B.planSetNodeFloat(JSON.stringify(spec), spec, 0, 'a', 'below');
+  assert.deepStrictEqual(JSON.parse(plan.text).floats, [{id: 'a', side: 'below'}]);
+});
+
+test('planSetNodeFloat switches sides preserving nudges and returns a float in a new last row', () => {
+  const spec = nodePlacementFixture();
+  const next = changedNodePlacement(spec, B.planSetNodeFloat, 'f', 'below');
+  assert.deepStrictEqual(next.rows, spec.rows);
+  assert.deepStrictEqual(next.floats, [{id: 'f', side: 'below', dx: 12, dy: -8}]);
+  for (const side of [null, '']){
+    const placed = changedNodePlacement(next, B.planSetNodeFloat, 'f', side);
+    assert.deepStrictEqual(placed.rows, [...spec.rows, ['f']]);
+    assert.ok(!Object.hasOwn(placed, 'floats'));
+  }
+  spec.floats.push({id: 'e', side: 'below', dx: 2});
+  assert.deepStrictEqual(changedNodePlacement(spec, B.planSetNodeFloat, 'f', null).floats, [spec.floats[1]]);
+});
+
+test('planSetNodeFloat protects the last rows id and rejects unknown nodes and invalid sides', () => {
+  for (const rows of [[['a']], [[['a']]]]){
+    const spec = nodePlacementFixture(rows), text = JSON.stringify(spec);
+    for (const side of ['above', 'below'])
+      assert.equal(B.planSetNodeFloat(text, spec, 0, 'a', side).error, 'the last node in rows cannot float');
+    assert.equal(JSON.stringify(spec), text);
+  }
+  const spec = nodePlacementFixture(), text = JSON.stringify(spec);
+  assert.equal(B.planSetNodeFloat(text, spec, 0, 'a', null).error, 'already placed in rows');
+  assert.match(B.planSetNodeFloat(text, spec, 0, 'missing', 'above').error, /not found/);
+  assert.ok(B.planSetNodeFloat(text, spec, 0, 'a', 'left').error);
+  assert.ok(B.planSetNodeFloat(text, spec, 99, 'a', 'above').error);
+  assert.ok(B.planSetNodeFloat(text, spec, 0, 'u', null).error);
+  const next = changedNodePlacement(spec, B.planSetNodeFloat, 'u', 'below');
+  assert.deepStrictEqual(next.rows, spec.rows);
+  assert.deepStrictEqual(next.floats, [...spec.floats, {id: 'u', side: 'below'}]);
+});
+
+test('node gap drag shows serpentine slot and row lines and commits with undo and selection', () => {
+  for (const [id, x, y, lineClass, expected] of [
+    ['a', 300, 375, 'dv-slotline', [['b'], ['c', 'a', 'd']]],
+    ['a', 300, 250, 'dv-rowline', [['b'], ['a'], ['c', 'd']]],
+    ['f', 550, 375, 'dv-slotline', [['a', 'b'], ['f', 'c', 'd']]]
+  ]){
+    const h = importHarness(null, nodePlacementFixture());
+    h.cards[id].fire('mousedown', {button: 0, clientX: 120, clientY: 120});
+    h.move(x, y);
+    const line = h.svg.querySelector('line.' + lineClass);
+    assert.ok(line);
+    assert.equal(line.getAttribute('visibility'), 'visible');
+    h.release();
+    assert.deepStrictEqual(JSON.parse(h.elements.src.value).rows, expected);
+    if (id === 'f') assert.ok(!JSON.parse(h.elements.src.value).floats);
+    assert.equal(h.svg.querySelector('line.' + lineClass), null);
+    assert.equal(h.svg.querySelector('.dv-ghost'), null);
+    assert.ok(h.cards[id].classList.contains('dv-sel'));
+    assert.equal(h.renders, 1);
+    h.click('undo-builder');
+    assert.deepStrictEqual(JSON.parse(h.elements.src.value), nodePlacementFixture());
+  }
+});
+
+test('node swap target takes precedence over gap lines and retains both ghost previews', () => {
+  const h = importHarness(null, nodePlacementFixture());
+  h.cards.a.fire('mousedown', {button: 0, clientX: 120, clientY: 120});
+  h.move(300, 250);
+  const line = h.svg.querySelector('.dv-rowline');
+  h.move(420, 375, h.cards.c);
+  assert.equal(line.getAttribute('visibility'), 'hidden');
+  assert.ok(h.cards.c.classList.contains('dv-droptgt'));
+  assert.equal(h.svg.querySelector('.dv-ghost').getAttribute('transform'), 'translate(400 350)');
+  assert.equal(h.svg.querySelector('.dv-ghostback').getAttribute('transform'), 'translate(100 100)');
+  h.release();
+  assert.deepStrictEqual(JSON.parse(h.elements.src.value).rows, [['c', 'b'], ['a', 'd']]);
+  assert.equal(h.svg.querySelector('.dv-rowline'), null);
+  assert.equal(h.svg.querySelector('.dv-ghost'), null);
+});
+
+test('node drag cancels gap feedback on Escape, render and both kinds of row drift', () => {
+  for (const exit of ['escape', 'render', 'drift-before-grab', 'drift-during-move', 'drift-before-drop']){
+    const h = importHarness(null, nodePlacementFixture());
+    function drift(){
+      const d = JSON.parse(h.elements.src.value); d.rows.reverse(); h.elements.src.value = JSON.stringify(d);
+    }
+    if (exit === 'drift-before-grab') drift();
+    h.cards.a.fire('mousedown', {button: 0, clientX: 120, clientY: 120});
+    h.move(300, 250);
+    if (exit === 'escape') h.doc.body.fire('keydown', {key: 'Escape'});
+    if (exit === 'render') h.rerender();
+    if (exit === 'drift-during-move'){ drift(); h.move(300, 260); }
+    if (exit === 'drift-before-drop') drift();
+    const before = h.elements.src.value;
+    h.release();
+    assert.equal(h.elements.src.value, before);
+    assert.equal(h.svg.querySelector('.dv-rowline'), null);
+    assert.equal(h.svg.querySelector('.dv-ghost'), null);
+    assert.equal(h.renders, 0);
+    if (exit.startsWith('drift'))
+      assert.match(h.elements.guide.querySelector('.gerr').textContent, /JSON rows changed since the last render/);
+  }
+});
+
+test('node drag threshold preserves click selection and no-op gaps show no line', () => {
+  const h = importHarness(null, nodePlacementFixture());
+  h.cards.a.fire('mousedown', {button: 0, clientX: 120, clientY: 120});
+  h.move(123, 124);
+  assert.equal(h.svg.querySelector('.dv-ghost'), null);
+  h.release();
+  h.cards.a.fire('click');
+  assert.ok(h.cards.a.classList.contains('dv-sel'));
+  h.cards.a.fire('mousedown', {button: 0, clientX: 120, clientY: 120});
+  h.move(90, 125);
+  assert.equal(h.svg.querySelector('.dv-slotline'), null);
+  h.release();
+  h.cards.b.fire('click');
+  assert.ok(h.cards.a.classList.contains('dv-sel'), 'click after a real drag is suppressed');
+  assert.equal(h.renders, 0);
+});
+
+test('node inspector float dropdown commits membership and refreshes its selected side', () => {
+  const h = importHarness(null, nodePlacementFixture());
+  function floatSelect(){
+    return h.elements.guide.querySelectorAll('.frow').find(row => row.firstChild.textContent === 'float').children[1];
+  }
+  h.cards.a.fire('click');
+  assert.equal(floatSelect().value, '');
+  assert.equal(floatSelect().firstChild.textContent, 'in rows');
+  floatSelect().value = 'below'; floatSelect().fire('change');
+  assert.equal(floatSelect().value, 'below');
+  assert.deepStrictEqual(JSON.parse(h.elements.src.value).rows, [['b'], ['c', 'd']]);
+  floatSelect().value = ''; floatSelect().fire('change');
+  assert.equal(floatSelect().value, '');
+  assert.deepStrictEqual(JSON.parse(h.elements.src.value).rows, [['b'], ['c', 'd'], ['a']]);
+  h.cards.f.fire('click');
+  floatSelect().value = 'below'; floatSelect().fire('change');
+  assert.deepStrictEqual(JSON.parse(h.elements.src.value).floats, [{id: 'f', side: 'below', dx: 12, dy: -8}]);
+});
+
 /* ---- parseStarterManifest: the hosted starters.json loader ---- */
 
 test('parseStarterManifest accepts an array or a {starters:[...]} wrapper', () => {
@@ -2811,4 +3100,13 @@ test('homemap palette starter inserts all device kinds without warnings', () => 
   const result = V.validate(V.normalize(spec));
   assert.strictEqual(result.errors.length, 0);
   assert.strictEqual(result.warnings.length, 0);
+});
+
+test('un-floating a node that is malformed into both rows and floats only removes the float entry', () => {
+  const spec = {nodes: {a: {}, x: {}}, rows: [['a', 'x']], floats: [{id: 'x', side: 'above'}]};
+  const plan = B.planSetNodeFloat(JSON.stringify(spec), spec, 0, 'x', null);
+  assert.ok(!plan.error, plan.error);
+  const next = JSON.parse(plan.text);
+  assert.deepStrictEqual(next.rows, [['a', 'x']]);
+  assert.strictEqual(next.floats, undefined);
 });

@@ -1018,50 +1018,125 @@ function planMoveGroup(text, raw, sectionIdx, groupKey, drop){
   var rows = got.d.rows;
   if (!builderFlatRowIds(rows).some(function(id){ return members[id]; }))
     return {error: 'group "' + groupKey + '" has no nodes placed in rows'};
-  var inRow = drop && Object.prototype.hasOwnProperty.call(drop, 'row');
-  if (!drop || (inRow ? (!Number.isInteger(drop.row) || !rows[drop.row] || !Number.isInteger(drop.slot)) :
-      (!Number.isInteger(drop.gap) || drop.gap < 0 || drop.gap > rows.length)))
-    return {error: 'no row slot there'};
   return builderRewrite(text, raw, got.path.concat(['rows']), function(copy){
-    var run = [], kept = [], target = null, droppedAbove = 0, removedBeforeSlot = 0;
-    copy.forEach(function(row, r){
-      var remaining = [];
-      row.forEach(function(slot, si){
-        var consumed = false;
-        if (!Array.isArray(slot)){
-          if (members[slot]){ run.push(slot); consumed = true; }
-          else remaining.push(slot);
-        } else {
-          var extracted = slot.filter(function(id){ return members[id]; });
-          if (!extracted.length) remaining.push(slot);
-          else if (extracted.length === slot.length){ run.push(slot); consumed = true; }
-          else {
-            var leftover = slot.filter(function(id){ return !members[id]; });
-            remaining.push(leftover.length === 1 ? leftover[0] : leftover);
-            extracted.forEach(function(id){ run.push(id); });
-          }
+    return builderLiftAndInsert(copy, members, drop);
+  });
+}
+
+function builderLiftAndInsert(copy, members, drop, opts){
+  /* Shared pre-removal lift/insert rules for groups and individual nodes.
+     Floating nodes supply a run; float membership can request only a lift. */
+  opts = opts || {};
+  var rows = copy, before = JSON.stringify(copy);
+  var inRow = drop && Object.prototype.hasOwnProperty.call(drop, 'row');
+  if (!opts.liftOnly && (!drop || (inRow ? (!Number.isInteger(drop.row) || !rows[drop.row] || !Number.isInteger(drop.slot)) :
+      (!Number.isInteger(drop.gap) || drop.gap < 0 || drop.gap > rows.length))))
+    return {error: 'no row slot there'};
+  var run = (opts.run || []).slice(), kept = [], target = null, droppedAbove = 0, removedBeforeSlot = 0;
+  copy.forEach(function(row, r){
+    var remaining = [];
+    row.forEach(function(slot, si){
+      var consumed = false;
+      if (!Array.isArray(slot)){
+        if (members[slot]){ run.push(slot); consumed = true; }
+        else remaining.push(slot);
+      } else {
+        var extracted = slot.filter(function(id){ return members[id]; });
+        if (!extracted.length) remaining.push(slot);
+        else if (extracted.length === slot.length){ run.push(opts.plainStacks && slot.length === 1 ? slot[0] : slot); consumed = true; }
+        else {
+          var leftover = slot.filter(function(id){ return !members[id]; });
+          remaining.push(leftover.length === 1 ? leftover[0] : leftover);
+          extracted.forEach(function(id){ run.push(id); });
         }
-        /* drop.slot is a PRE-removal index: slots fully lifted into the
-           run before it no longer occupy a position (a partial stack
-           still does — its leftover stays behind) */
-        if (consumed && inRow && r === drop.row && si < drop.slot) removedBeforeSlot++;
-      });
-      if (remaining.length){
-        kept.push(remaining);
-        if (inRow && r === drop.row) target = remaining;
-      } else if (!inRow && r < drop.gap) droppedAbove++;
+      }
+      /* drop.slot is a PRE-removal index: slots fully lifted into the
+         run before it no longer occupy a position (a partial stack
+         still does — its leftover stays behind) */
+      if (consumed && inRow && r === drop.row && si < drop.slot) removedBeforeSlot++;
     });
-    if (inRow){
-      /* Keep the pre-removal row's identity, convert the slot to the
-         surviving row's indexing, then clamp. A wholly lifted target row
-         is a no-op. */
-      if (!target) return {error: 'already there'};
-      var slotIdx = Math.max(0, Math.min(drop.slot - removedBeforeSlot, target.length));
-      run.forEach(function(slot, i){ target.splice(slotIdx + i, 0, slot); });
-    } else kept.splice(drop.gap - droppedAbove, 0, run);
-    if (JSON.stringify(kept) === JSON.stringify(rows)) return {error: 'already there'};
-    copy.splice(0, copy.length);
-    kept.forEach(function(row){ copy.push(row); });
+    if (remaining.length){
+      kept.push(remaining);
+      if (inRow && r === drop.row) target = remaining;
+    } else if (!opts.liftOnly && !inRow && r < drop.gap) droppedAbove++;
+  });
+  if (opts.liftOnly){
+    /* The caller checked that at least one placed id survives. */
+    if (!kept.length) return {error: 'the last node in rows cannot float'};
+  } else if (inRow){
+    /* Keep the pre-removal row's identity, convert the slot to the
+       surviving row's indexing, then clamp. A wholly lifted target row
+       is a no-op. */
+    if (!target) return {error: 'already there'};
+    var slotIdx = Math.max(0, Math.min(drop.slot - removedBeforeSlot, target.length));
+    run.forEach(function(slot, i){ target.splice(slotIdx + i, 0, slot); });
+  } else kept.splice(drop.gap - droppedAbove, 0, run);
+  if (JSON.stringify(kept) === before) return {error: 'already there'};
+  copy.splice(0, copy.length);
+  kept.forEach(function(row){ copy.push(row); });
+}
+
+function builderRemoveFloat(d, id){
+  if (!Array.isArray(d.floats)) return;
+  d.floats = d.floats.filter(function(f){ return !(f && f.id === id); });
+  if (!d.floats.length) delete d.floats;
+}
+
+function planMoveNode(text, raw, sectionIdx, id, drop){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
+    return {error: 'node "' + id + '" not found'};
+  var inRows = builderFlatRowIds(got.d.rows).indexOf(id) >= 0;
+  var floating = (got.d.floats || []).some(function(f){ return f && f.id === id; });
+  if (!inRows && !floating) return {error: 'node "' + id + '" has no layout slot (rows or floats) to move'};
+  if (!Array.isArray(got.d.rows) || !got.d.rows.length) return {error: 'no rows layout in this section'};
+  var copy = builderClone(got.d.rows), members = Object.create(null);
+  members[id] = true;
+  var out = builderLiftAndInsert(copy, members, drop, {plainStacks: true, run: inRows ? [] : [id]});
+  if (out && out.error) return out;
+  var pairs = [['rows', JSON.stringify(copy)]];
+  if (floating){
+    var d = {floats: builderClone(got.d.floats)};
+    builderRemoveFloat(d, id);
+    pairs.push(['floats', d.floats ? JSON.stringify(d.floats) : null]);
+  }
+  return planSetFields(text, raw, got.path, pairs);
+}
+
+function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
+    return {error: 'node "' + id + '" not found'};
+  var side = sideOrNull == null || sideOrNull === '' ? null : sideOrNull;
+  if (side !== null && side !== 'above' && side !== 'below') return {error: 'float side must be above or below'};
+  var ids = builderFlatRowIds(got.d.rows), inRows = ids.indexOf(id) >= 0;
+  var floating = (got.d.floats || []).some(function(f){ return f && f.id === id; });
+  if (!side && !floating) return {error: inRows ? 'already placed in rows' : 'node "' + id + '" has no float placement'};
+  if (side && inRows && !ids.some(function(other){ return other !== id; }))
+    return {error: 'the last node in rows cannot float'};
+  if (!Array.isArray(got.d.rows) || !got.d.rows.length) return {error: 'no rows layout in this section'};
+  return builderRewrite(text, raw, got.path, function(d){
+    if (!side){
+      builderRemoveFloat(d, id);
+      /* a node malformed into BOTH rows and floats just loses the float
+         entry — appending would duplicate its rows placement */
+      if (!inRows) d.rows.push([id]);
+      return;
+    }
+    if (inRows){
+      var members = Object.create(null);
+      members[id] = true;
+      var out = builderLiftAndInsert(d.rows, members, null, {liftOnly: true});
+      if (out && out.error) return out;
+    }
+    if (floating){
+      d.floats.forEach(function(f){ if (f && f.id === id) f.side = side; });
+    } else {
+      if (!Array.isArray(d.floats)) d.floats = [];
+      d.floats.push({id: id, side: side});
+    }
   });
 }
 
@@ -3458,6 +3533,15 @@ function initWorkbenchBuilder(opts){
   function nodeForm(val, ctx){
     var t = currentTarget;
     ensureGroupDatalist([ctx.diagram]);
+    var floatSide = '';
+    ((ctx.diagram && ctx.diagram.floats) || []).forEach(function(f){
+      if (f && f.id === t.id) floatSide = f.side === 'below' ? 'below' : 'above';
+    });
+    var floatControl = selectControl(['above', 'below'], floatSide, function(v){
+      return commitCascade(function(raw){ return planSetNodeFloat(src.value, raw, t.section, t.id, v); },
+        {after: function(){ renderInspector(); }});
+    }, true);
+    floatControl.firstChild.textContent = 'in rows';
     return [
       frow('id', textControl(t.id, function(v){
         if (v == null){ formError('a node needs an id'); return false; }
@@ -3470,6 +3554,7 @@ function initWorkbenchBuilder(opts){
         return commitGroup(function(raw){ return planSetNodeGroup(src.value, raw, t.section, t.id, v); },
           {after: function(){ ensureGroupDatalist([builderDiagram(src.value, JSON.parse(src.value), t.section).d]); }});
       })),
+      frow('float', floatControl),
       frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
       frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
@@ -4840,7 +4925,7 @@ function initWorkbenchBuilder(opts){
   }
 
   /* ---- drag an edge label to set its labelDx/labelDy nudges;
-          drag a node card onto another to swap their layout slots ---- */
+          drag a node onto another to swap, or into a row/slot gap ---- */
   var drag = null, nodeDrag = null, groupDrag = null, suppressClick = false;
   /* one cancellation path for the node drag: Escape, and every observed
      re-render (which detaches the dragged elements), both land here */
@@ -4851,6 +4936,7 @@ function initWorkbenchBuilder(opts){
     if (nd.el && nd.el.classList) nd.el.classList.remove('dv-dragsrc');
     if (nd.target && nd.target.classList) nd.target.classList.remove('dv-droptgt');
     dropNodeDragGhosts(nd);
+    if (nd.line && nd.line.parentNode) nd.line.parentNode.removeChild(nd.line);
   }
   function cancelGroupDrag(){
     if (!groupDrag) return;
@@ -5127,9 +5213,34 @@ function initWorkbenchBuilder(opts){
       });
       gd.el.classList.add('dv-grabbing');
     }
+    updateGapDrag(gd, ev, function(pick){
+      return planMoveGroup(gd.text, gd.raw, gd.gi, gd.key, pick);
+    }, cancelGroupDrag);
+  }
+  function updateNodeGapDrag(ev){
+    var nd = nodeDrag;
+    nd.pick = null;
+    if (nd.line) nd.line.setAttribute('visibility', 'hidden');
+    if (nd.target) return;
+    var parsed = parseEditor();
+    if (parsed.error){ cancelNodeDrag(); inspectorMessage(parsed.error); return; }
+    var got = builderDiagram(src.value, parsed.raw, nd.gi);
+    if (got.error){ cancelNodeDrag(); inspectorMessage(got.error); return; }
+    if (JSON.stringify(got.d.rows) !== nd.rowsJSON || nd.rowsJSON !== nd.renderRowsJSON){
+      cancelNodeDrag();
+      inspectorMessage('the JSON rows changed since the last render — click Render, then drag');
+      return;
+    }
+    nd.rows = got.d.rows;
+    if (!nd.svg || !nd.svg.getScreenCTM) return;
+    updateGapDrag(nd, ev, function(pick){
+      return planMoveNode(src.value, parsed.raw, nd.gi, nd.id, pick);
+    }, cancelNodeDrag);
+  }
+  function updateGapDrag(gd, ev, planFor, cancel){
     var boxes = sectionRowBoxes(gd.secEl, gd.rows);
-    if (!boxes.length){ cancelGroupDrag(); return; }
-    for (var b = 0; b < boxes.length; b++) if (!boxes[b]){ cancelGroupDrag(); return; }
+    if (!boxes.length){ cancel(); return; }
+    for (var b = 0; b < boxes.length; b++) if (!boxes[b]){ cancel(); return; }
     var ctm = gd.svg.getScreenCTM();
     if (!ctm) return;
     var inv;
@@ -5145,7 +5256,7 @@ function initWorkbenchBuilder(opts){
       /* Treat each slot as a little row to union every card in a stack. */
       var slots = gd.rows[row];
       var slotBoxes = sectionRowBoxes(gd.secEl, slots.map(function(slot){ return [slot]; }));
-      for (var s = 0; s < slotBoxes.length; s++) if (!slotBoxes[s]){ cancelGroupDrag(); return; }
+      for (var s = 0; s < slotBoxes.length; s++) if (!slotBoxes[s]){ cancel(); return; }
       var gapXs = builderSlotGapXs(slotBoxes, row % 2 === 1);
       var slot = 0;
       for (var j = 1; j < gapXs.length; j++)
@@ -5166,7 +5277,7 @@ function initWorkbenchBuilder(opts){
     }
     /* The planner is also the no-op oracle, including whole-row removals
        and non-contiguous groups. Only a real destination gets a line. */
-    if (planMoveGroup(gd.text, gd.raw, gd.gi, gd.key, pick).error) return;
+    if (planFor(pick).error) return;
     gd.pick = pick;
     if (!gd.line){
       gd.line = document.createElementNS(SVG_NS, 'line');
@@ -5199,9 +5310,10 @@ function initWorkbenchBuilder(opts){
     if (nodeEl && !addToStep && !ev.target.closest('.nbackref, .nlink, a, button')){
       var ndSec = nodeEl.closest('.doc-sec');
       if (ndSec && ndSec.hasAttribute('data-dv-section')){
-        nodeDrag = {el: nodeEl, secEl: ndSec, id: nodeEl.getAttribute('data-dv-node'),
-                    gi: parseInt(ndSec.getAttribute('data-dv-section'), 10),
-                    x0: ev.clientX, y0: ev.clientY, moved: false, target: null};
+        var ndGi = parseInt(ndSec.getAttribute('data-dv-section'), 10);
+        nodeDrag = {el: nodeEl, secEl: ndSec, svg: nodeEl.ownerSVGElement, id: nodeEl.getAttribute('data-dv-node'),
+                    gi: ndGi, rowsJSON: JSON.stringify(sectionRowsFor(ndGi)), renderRowsJSON: rowGrabRows[ndGi],
+                    x0: ev.clientX, y0: ev.clientY, moved: false, target: null, pick: null, line: null};
         ev.preventDefault(); /* no text selection while dragging */
       }
       return;
@@ -5254,6 +5366,7 @@ function initWorkbenchBuilder(opts){
       if (tgt) tgt.classList.add('dv-droptgt');
       nodeDrag.target = tgt;
       updateNodeDragGhost(ev);
+      updateNodeGapDrag(ev);
       return;
     }
     if (groupDrag){
@@ -5300,18 +5413,27 @@ function initWorkbenchBuilder(opts){
     }
     if (nodeDrag){
       var nd = nodeDrag;
-      nodeDrag = null;
-      nd.el.classList.remove('dv-dragsrc');
-      if (nd.target) nd.target.classList.remove('dv-droptgt');
-      dropNodeDragGhosts(nd);
+      cancelNodeDrag();
       if (!nd.moved) return; /* a plain click: selection proceeds normally */
       suppressClick = true;
       setTimeout(function(){ suppressClick = false; }, 0);
-      if (!nd.target) return; /* released over nothing: no change */
+      if (!nd.target && !nd.pick) return; /* released without a destination */
       var ndParsed = parseEditor();
       if (ndParsed.error){ inspectorMessage(ndParsed.error); return; }
-      var ndPlan = planSwapNodes(src.value, ndParsed.raw, nd.gi, nd.id,
+      var ndPlan;
+      if (nd.target){
+        ndPlan = planSwapNodes(src.value, ndParsed.raw, nd.gi, nd.id,
                                  nd.target.getAttribute('data-dv-node'));
+      } else {
+        var ndGot = builderDiagram(src.value, ndParsed.raw, nd.gi);
+        if (ndGot.error){ inspectorMessage(ndGot.error); return; }
+        if (JSON.stringify(ndGot.d.rows) !== nd.rowsJSON || nd.rowsJSON !== nd.renderRowsJSON){
+          inspectorMessage('the JSON rows changed since the last render — click Render, then drag');
+          return;
+        }
+        ndPlan = planMoveNode(src.value, ndParsed.raw, nd.gi, nd.id, nd.pick);
+        if (ndPlan.error === 'already there') return;
+      }
       if (ndPlan.error){ inspectorMessage(ndPlan.error); return; }
       pushUndo();
       clearMultiSelect(); /* this action establishes a single selection */

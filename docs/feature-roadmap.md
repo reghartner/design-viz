@@ -20,7 +20,8 @@ L = a schema or architecture change. “Built” describes the current PR stack.
 September 14 update: the trace work is split into [import and panels (#50)](https://github.com/reghartner/design-viz/pull/50),
 [dependency rows and lane routing (#51)](https://github.com/reghartner/design-viz/pull/51),
 and [service-internal timing (#52)](https://github.com/reghartner/design-viz/pull/52).
-Large-trace focus and effective-state editing are the next overnight priorities.
+Large-trace preview and focus are built in [#53](https://github.com/reghartner/design-viz/pull/53).
+The effective-state inspector is the next PR in this stack.
 
 | Rank | Feature | What it explains / representative use cases | Approach and scope | Effort | Status |
 |---|---|---|---|---|---|
@@ -53,10 +54,10 @@ Large-trace focus and effective-state editing are the next overnight priorities.
 2. **Inspect observed behavior (built):** trace import is reversible; malformed
    input is diagnosed without replacing the current work. Span selection is
    the same step selection the editor already supports.
-3. **Explain inherited state:** show a selected step's full effective panel
-   state alongside its sparse patch, with “inherited from step N” indicators.
-   This would address a more consequential editing ambiguity than adding more
-   raw JSON controls.
+3. **Explain inherited state (built):** a selected step's effective panel
+   state sits alongside its sparse patch, with initial/inherited/transient
+   origins, computed input history, exact source links and selectable snapshot
+   JSON. Source edits clear stale values until refreshed.
 4. **Scenario timeline:** insert, reorder and duplicate beats in a compact
    list; preview changed fields and show concurrent intervals explicitly.
 5. **Safer structural edits:** preview reference changes for node/panel renames

@@ -1,5 +1,16 @@
 # Changelog
 
+## Effective-state workbench inspector (2026-09-14)
+
+- Selected steps expose the folded state of every panel, including panels
+  with no patch at that step. Ordinary values identify their initial/current/
+  inherited source; `enterOnce` values are marked as transient.
+- Logs, timeline arrays, buffer paints, notifications and inflight bars show
+  computed input histories. Values come directly from the engine's reducer.
+- Source buttons select exact authored values, and read-only snapshot JSON
+  can be selected for copying. Source edits clear stale results immediately;
+  refresh recalculates the view without changing the document.
+
 ## Trace preview and focused import (2026-09-14)
 
 - Preview up to 10,000 trace events before replacing the workbench document.

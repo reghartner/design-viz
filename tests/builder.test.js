@@ -23,7 +23,7 @@ function loadBuilder(extraGlobals){
     ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
     ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
     ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
-    ' planMoveStep, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
+    ' planMoveStep, planMoveRow, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
@@ -2188,4 +2188,33 @@ test('patchFieldsCollect: a trueOnly bool refuses false (phone clear)', () => {
   assert.match(B.patchFieldsCollect(clear, {clear: 'false'}).error, /only true/);
   assert.deepStrictEqual(Object.keys(B.patchFieldsCollect(clear, {clear: ''}).item), []);
   assert.deepStrictEqual(plain(B.PANEL_PATCH_FIELDS.phone[2]), ['clear', 'bool', {trueOnly: true}]);
+});
+
+/* ---- planMoveRow: whole layout rows move by index ---- */
+
+test('planMoveRow moves a row and preserves nested stacks', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {}, b: {}, c: {}, d: {}},
+    rows: [['a'], ['b', ['c', 'd']], ['b']]
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  const down = B.planMoveRow(text, spec, 0, 0, 2);
+  assert.ok(!down.error);
+  assert.equal(down.index, 2);
+  assert.deepStrictEqual(JSON.parse(down.text).page.blocks[0].diagram.rows,
+    [['b', ['c', 'd']], ['b'], ['a']]);
+  const up = B.planMoveRow(text, spec, 0, 2, 0);
+  assert.deepStrictEqual(JSON.parse(up.text).page.blocks[0].diagram.rows,
+    [['b'], ['a'], ['b', ['c', 'd']]]);
+});
+
+test('planMoveRow refuses bad indices and no-op moves', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {}, b: {}}, rows: [['a'], ['b']]
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  assert.match(B.planMoveRow(text, spec, 0, 5, 0).error, /row not found/);
+  assert.match(B.planMoveRow(text, spec, 0, 0, 2).error, /no row slot/);
+  assert.match(B.planMoveRow(text, spec, 0, 1, 1).error, /already there/);
+  assert.ok(B.planMoveRow(text, spec, 9, 0, 1).error); /* no such section */
 });

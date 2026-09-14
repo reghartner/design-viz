@@ -247,6 +247,17 @@ g.node.dv-ghost{opacity:.55; pointer-events:none;}
 g.node.dv-ghost .card{stroke:var(--accent); stroke-width:2;}
 g.node.dv-ghost.dv-ghostback{opacity:.3;}
 
+/* row grab-handles (workbench-only, injected by the builder) + the
+   insertion line that marks where a dragged row will land */
+g.dv-rowgrab{cursor:grab; opacity:.45;}
+g.dv-rowgrab:hover, g.dv-rowgrab.dv-grabbing{opacity:1;}
+g.dv-rowgrab.dv-grabbing{cursor:grabbing;}
+.dv-rowgrabbg{fill:var(--card); stroke:var(--line); stroke-width:1;}
+g.dv-rowgrab:hover .dv-rowgrabbg, g.dv-rowgrab.dv-grabbing .dv-rowgrabbg{stroke:var(--accent);}
+.dv-rowgrabdot{fill:var(--sub);}
+g.dv-rowgrab:hover .dv-rowgrabdot, g.dv-rowgrab.dv-grabbing .dv-rowgrabdot{fill:var(--accent);}
+line.dv-rowline{stroke:var(--accent); stroke-width:3; stroke-linecap:round; pointer-events:none;}
+
 /* members of the selected step, marked on the board (distinct from the
    selection ring: dashed) */
 g.node.dv-instep .card{stroke:var(--accent); stroke-width:2; stroke-dasharray:5 3;}
@@ -10557,6 +10568,24 @@ function planMoveStep(text, raw, sectionIdx, stepIdx, delta){
   return r;
 }
 
+function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
+  /* lift one layout row out of diagram.rows and re-insert it at toIdx
+     (index AFTER removal — the drop code converts gap positions) */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var rows = got.d.rows;
+  if (!Array.isArray(rows) || !rows[fromIdx]) return {error: 'row not found'};
+  if (toIdx < 0 || toIdx >= rows.length) return {error: 'no row slot there'};
+  if (toIdx === fromIdx) return {error: 'already there'};
+  var r = builderRewrite(text, raw, got.path.concat(['rows']), function(copy){
+    var item = copy.splice(fromIdx, 1)[0];
+    copy.splice(toIdx, 0, item);
+  });
+  if (r.error) return r;
+  r.index = toIdx;
+  return r;
+}
+
 function planDeleteSection(text, raw, sectionIdx){
   var rec = specSectionPaths(raw)[sectionIdx];
   if (!rec) return {error: 'no such section'};
@@ -13624,9 +13653,169 @@ function initWorkbenchBuilder(opts){
     nd.ghost.setAttribute('transform', 'translate(' + (nd.srcXY.x + (here.x - start.x)) +
                           ' ' + (nd.srcXY.y + (here.y - start.y)) + ')');
   }
+  /* ---- drag a row grab-handle to move a whole layout row ---- */
+  var rowDrag = null;
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  function cancelRowDrag(){
+    if (!rowDrag) return;
+    var rd = rowDrag;
+    rowDrag = null;
+    for (var i = 0; i < (rd.memberEls || []).length; i++)
+      rd.memberEls[i].classList.remove('dv-dragsrc');
+    if (rd.line && rd.line.parentNode) rd.line.parentNode.removeChild(rd.line);
+    if (rd.grabEl && rd.grabEl.classList) rd.grabEl.classList.remove('dv-grabbing');
+  }
+  function sectionRowBoxes(secEl, rows){
+    /* per layout row: the union box (svg coords) of its drawn member
+       nodes, or null when none of them are drawn */
+    var boxes = [];
+    for (var i = 0; i < rows.length; i++){
+      var ids = builderFlatRowIds([rows[i]]);
+      var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity, seen = 0;
+      for (var j = 0; j < ids.length; j++){
+        var el = secEl.querySelector('g.node[data-dv-node="' + cssQuote(ids[j]) + '"]');
+        if (!el) continue;
+        var xy = nodeTranslateXY(el);
+        var card = el.querySelector('rect.card');
+        if (!xy || !card) continue;
+        var w = parseFloat(card.getAttribute('width')) || 0;
+        var h = parseFloat(card.getAttribute('height')) || 0;
+        if (x1 > xy.x) x1 = xy.x;
+        if (y1 > xy.y) y1 = xy.y;
+        if (x2 < xy.x + w) x2 = xy.x + w;
+        if (y2 < xy.y + h) y2 = xy.y + h;
+        seen++;
+      }
+      boxes.push(seen ? {x1: x1, y1: y1, x2: x2, y2: y2} : null);
+    }
+    return boxes;
+  }
+  function sectionRowsFor(gi){
+    var parsed = parseEditor();
+    if (parsed.error) return null;
+    var rec = specSectionPaths(parsed.raw)[gi];
+    if (!rec) return null;
+    var d = specValueAt(parsed.raw, rec.diagram);
+    return (d && Array.isArray(d.rows)) ? d.rows : null;
+  }
+  function applyRowGrabs(){
+    /* inject one grab handle per layout row, left of the row band —
+       workbench-only chrome (this file never runs on published pages).
+       Handles are skipped when any row has no drawn nodes: without a
+       box for every row there is no reliable drop geometry. */
+    var secList = view.querySelectorAll('.doc-sec[data-dv-section]');
+    for (var s = 0; s < secList.length; s++){
+      var secEl = secList[s];
+      var old = secEl.querySelectorAll('g.dv-rowgrab');
+      for (var o = 0; o < old.length; o++) old[o].parentNode.removeChild(old[o]);
+      var anyNode = secEl.querySelector('g.node[data-dv-node]');
+      if (!anyNode) continue;
+      var rows = sectionRowsFor(parseInt(secEl.getAttribute('data-dv-section'), 10));
+      if (!rows || rows.length < 2) continue;
+      var boxes = sectionRowBoxes(secEl, rows);
+      var complete = true;
+      for (var b = 0; b < boxes.length; b++) if (!boxes[b]) complete = false;
+      if (!complete) continue;
+      var svg = anyNode.ownerSVGElement;
+      for (var r = 0; r < boxes.length; r++){
+        var box = boxes[r];
+        var g = document.createElementNS(SVG_NS, 'g');
+        g.setAttribute('class', 'dv-rowgrab');
+        g.setAttribute('data-dv-row', String(r));
+        var hx = Math.max(2, box.x1 - 30), hy = (box.y1 + box.y2) / 2 - 11;
+        g.setAttribute('transform', 'translate(' + hx + ' ' + hy + ')');
+        var bg = document.createElementNS(SVG_NS, 'rect');
+        bg.setAttribute('class', 'dv-rowgrabbg');
+        bg.setAttribute('width', '18'); bg.setAttribute('height', '22');
+        bg.setAttribute('rx', '5');
+        g.appendChild(bg);
+        for (var dy = 0; dy < 3; dy++) for (var dx = 0; dx < 2; dx++){
+          var dot = document.createElementNS(SVG_NS, 'circle');
+          dot.setAttribute('class', 'dv-rowgrabdot');
+          dot.setAttribute('cx', String(6.5 + dx * 5));
+          dot.setAttribute('cy', String(6 + dy * 5));
+          dot.setAttribute('r', '1.4');
+          g.appendChild(dot);
+        }
+        var tip = document.createElementNS(SVG_NS, 'title');
+        tip.textContent = 'drag to move this row';
+        g.appendChild(tip);
+        svg.appendChild(g);
+      }
+    }
+  }
+  function updateRowDrag(ev){
+    var rd = rowDrag;
+    if (!rd || !rd.moved) return;
+    if (!rd.boxes){
+      var rows = sectionRowsFor(rd.gi);
+      if (!rows || !rows[rd.row]){ cancelRowDrag(); return; }
+      var boxes = sectionRowBoxes(rd.secEl, rows);
+      for (var b = 0; b < boxes.length; b++) if (!boxes[b]){ cancelRowDrag(); return; }
+      rd.boxes = boxes;
+      rd.memberEls = [];
+      var ids = builderFlatRowIds([rows[rd.row]]);
+      for (var i = 0; i < ids.length; i++){
+        var el = rd.secEl.querySelector('g.node[data-dv-node="' + cssQuote(ids[i]) + '"]');
+        if (el){ el.classList.add('dv-dragsrc'); rd.memberEls.push(el); }
+      }
+      if (rd.grabEl) rd.grabEl.classList.add('dv-grabbing');
+    }
+    var ctm = rd.svg.getScreenCTM();
+    if (!ctm) return;
+    var inv;
+    try { inv = ctm.inverse(); } catch (ex){ return; }
+    var pt = svgPointAt(rd.svg, inv, ev.clientX, ev.clientY);
+    if (!isFinite(pt.y)) return;
+    /* insertion gaps: above row 0, between each adjacent pair, below the
+       last — pick the one nearest the cursor */
+    var boxes2 = rd.boxes, gapYs = [boxes2[0].y1 - 8];
+    for (var k = 1; k < boxes2.length; k++)
+      gapYs.push((boxes2[k - 1].y2 + boxes2[k].y1) / 2);
+    gapYs.push(boxes2[boxes2.length - 1].y2 + 8);
+    var gap = 0;
+    for (var gI = 1; gI < gapYs.length; gI++)
+      if (Math.abs(pt.y - gapYs[gI]) < Math.abs(pt.y - gapYs[gap])) gap = gI;
+    if (gap === rd.row || gap === rd.row + 1){
+      /* landing here changes nothing — show no line */
+      rd.gap = null;
+      if (rd.line) rd.line.setAttribute('visibility', 'hidden');
+      return;
+    }
+    rd.gap = gap;
+    var lx1 = Infinity, lx2 = -Infinity;
+    for (var m = 0; m < boxes2.length; m++){
+      if (lx1 > boxes2[m].x1) lx1 = boxes2[m].x1;
+      if (lx2 < boxes2[m].x2) lx2 = boxes2[m].x2;
+    }
+    if (!rd.line){
+      rd.line = document.createElementNS(SVG_NS, 'line');
+      rd.line.setAttribute('class', 'dv-rowline');
+      rd.svg.appendChild(rd.line);
+    }
+    rd.line.setAttribute('visibility', 'visible');
+    rd.line.setAttribute('x1', String(lx1));
+    rd.line.setAttribute('x2', String(lx2));
+    rd.line.setAttribute('y1', String(gapYs[gap]));
+    rd.line.setAttribute('y2', String(gapYs[gap]));
+  }
   view.addEventListener('mousedown', function(ev){
     if (ev.button !== 0 || connect) return;
     if (!ev.target.closest) return;
+    var grabEl = ev.target.closest('g.dv-rowgrab');
+    if (grabEl && !addToStep){
+      var grabSec = grabEl.closest('.doc-sec');
+      var grabNode = grabSec && grabSec.querySelector('g.node[data-dv-node]');
+      if (grabSec && grabSec.hasAttribute('data-dv-section') && grabNode){
+        rowDrag = {secEl: grabSec, svg: grabNode.ownerSVGElement, grabEl: grabEl,
+                   gi: parseInt(grabSec.getAttribute('data-dv-section'), 10),
+                   row: parseInt(grabEl.getAttribute('data-dv-row'), 10),
+                   x0: ev.clientX, y0: ev.clientY,
+                   moved: false, gap: null, boxes: null, line: null, memberEls: []};
+        ev.preventDefault(); /* no text selection while dragging */
+      }
+      return;
+    }
     var nodeEl = ev.target.closest('g.node[data-dv-node]');
     if (nodeEl && !addToStep && !ev.target.closest('.nbackref, .nlink, a, button')){
       var ndSec = nodeEl.closest('.doc-sec');
@@ -13654,6 +13843,12 @@ function initWorkbenchBuilder(opts){
     ev.preventDefault(); /* no text selection while dragging */
   });
   window.addEventListener('mousemove', function(ev){
+    if (rowDrag){
+      var rdx = ev.clientX - rowDrag.x0, rdy = ev.clientY - rowDrag.y0;
+      if (rdx * rdx + rdy * rdy > 25) rowDrag.moved = true; /* > 5px straight-line */
+      if (rowDrag.moved) updateRowDrag(ev);
+      return;
+    }
     if (nodeDrag){
       var ddx = ev.clientX - nodeDrag.x0, ddy = ev.clientY - nodeDrag.y0;
       if (ddx * ddx + ddy * ddy > 25) nodeDrag.moved = true; /* > 5px straight-line */
@@ -13676,6 +13871,28 @@ function initWorkbenchBuilder(opts){
     if (drag.moved) drag.lbl.setAttribute('transform', 'translate(' + drag.dx + ' ' + drag.dy + ')');
   });
   window.addEventListener('mouseup', function(){
+    if (rowDrag){
+      var rd = rowDrag;
+      var rdGap = rd.gap, rdMoved = rd.moved;
+      cancelRowDrag(); /* classes + line off before any re-render */
+      if (!rdMoved) return;
+      suppressClick = true;
+      setTimeout(function(){ suppressClick = false; }, 0);
+      if (rdGap == null) return; /* released on a no-move gap */
+      var to = rdGap <= rd.row ? rdGap : rdGap - 1;
+      if (to === rd.row) return;
+      var rdParsed = parseEditor();
+      if (rdParsed.error){ inspectorMessage(rdParsed.error); return; }
+      var rdPlan = planMoveRow(src.value, rdParsed.raw, rd.gi, rd.row, to);
+      if (rdPlan.error){ inspectorMessage(rdPlan.error); return; }
+      pushUndo();
+      clearMultiSelect(); /* the board rearranges under the selection */
+      src.value = rdPlan.text;
+      render();
+      autosaveDraft();
+      rehighlight();
+      return;
+    }
     if (nodeDrag){
       var nd = nodeDrag;
       nodeDrag = null;
@@ -13767,6 +13984,7 @@ function initWorkbenchBuilder(opts){
      stale arming is cancelled. */
   new MutationObserver(function(){
     cancelNodeDrag(); /* the dragged elements just got detached */
+    cancelRowDrag();  /* row handles and the drop line got detached too */
     hideDiff(); /* the diff panel's jump targets got detached too */
     if (!multiSurvive && multiSel.length){
       /* a render the builder did not initiate replaced the DOM */
@@ -13782,12 +14000,14 @@ function initWorkbenchBuilder(opts){
       syncBoardToSelectedStep(); /* a selected step keeps its step view */
       applyStepMarkers();        /* markers live in the rebuilt DOM */
       reapplyMultiSel();         /* multi-selection rings live there too */
+      applyRowGrabs();           /* row grab-handles live there too */
     }, 0);
   }).observe(view, {childList: true});
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape'){
+      if (rowDrag){ cancelRowDrag(); return; }
       if (nodeDrag){ cancelNodeDrag(); return; }
       if (importBox && !importBox.hidden){ importBox.hidden = true; if (importBtn) importBtn.focus(); return; }
       if (diffbox && !diffbox.hidden){ hideDiff(); diffBtn.focus(); return; }
@@ -14022,6 +14242,7 @@ function initWorkbenchBuilder(opts){
 
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);
+  applyRowGrabs(); /* the boot render happened before this wiring ran */
 }
 /* ---- src/boot.workbench.js ---- */
 /* boot.workbench.js — demo spec, contract text, and editor wiring for the

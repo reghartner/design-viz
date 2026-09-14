@@ -19,7 +19,8 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 7 | Retry/timeout and circuit-breaker stories | codex/resilience-starter | Open: https://github.com/reghartner/design-viz/pull/56 |
 | 8 | Replication / consistency view | codex/replica-positions | Open: https://github.com/reghartner/design-viz/pull/57 |
 | 9 | Stable workbench playback while editing | codex/workbench-playback | Open: https://github.com/reghartner/design-viz/pull/58 |
-| 10 | Step-list navigation and editing | TBD | Compact steps, jump, duplicate and reorder using existing planners |
+| 10 | Step-list navigation and editing | codex/workbench-step-list | Built; opening focused PR after final checks |
+| 11 | Canary and firmware rollout stories | TBD | Reuse cohort tiles, tables, budgets and decision checks; keep release version separate from runtime health |
 
 ## Validation and evidence
 
@@ -30,7 +31,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51, #52, #53, #54, #55, #56 and #57 passed all GitHub checks.
+- PRs #50, #51, #52, #53, #54, #55, #56, #57 and #58 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -72,19 +73,31 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   independent tab modes and builder editing focus. Full Node and 158 Python
   suites pass. Browser verified retained step through skin/edit/undo, explicit
   playback advancement, JSON focus stopping advancement, and circuit tab
-  return at the same paused step. Check PR #58 final CI before claiming green.
+  return at the same paused step. PR #58 passed all GitHub checks.
+- Story steps: 10 focused tests plus the full Node and 158 Python suites pass.
+  Browser verified hidden-tab jump with exact JSON selection and retained list
+  focus, duplicate/reorder, undo/redo, append into a hidden scenario, stale and
+  invalid source recovery, explicit Play pausing on list focus, ADD TO STEP /
+  Escape recovery, and a 401-step story duplicating into visible step 402.
+  Phone view stays within 390 pixels; actions use two columns with 38-pixel
+  height. Copies keep full patches, allocate unique IDs and repeat append
+  operations; reveal/hide thresholds keep their numeric positions. Final PR
+  CI still needs checking after the handoff commit.
 
 ## Next continuation
 
-Start from the current `codex/workbench-playback` branch, inspect checks
+Start from the current `codex/workbench-step-list` branch, inspect checks
 and working-tree changes, and create the next focused branch. Do not recreate
 the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
 stories, numeric replica positions and stable paused playback are built.
 The workbench now disposes old steppers, starts paused and preserves unique
 preview positions through ordinary edits; standalone autoplay is unchanged.
-Build a compact step-list editor next: use existing selection, duplicate and
-reorder planners. Keep phone
-layouts and native text editing usable. Shared scenario definitions and
+The compact step-list editor is now built, including search, bounded paging,
+duplicate, append, earlier/later, history and stale-source protection. A useful
+next slice is a canary/firmware rollout starter: reuse cohort tiles, tables,
+budgets and authored checks for promotion, hold and rollback, with version,
+traffic assignment and runtime health kept separate. Keep phone layouts and
+native text editing usable. Shared scenario definitions and
 trace/HLD mapping remain larger design work, not quick schema shortcuts.
 
 ## Design commitments

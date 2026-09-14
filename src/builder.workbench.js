@@ -472,7 +472,6 @@ function planAddStep(text, raw, sectionIdx){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   var edges = Array.isArray(got.d.edges) ? got.d.edges : [];
-  if (!edges.length) return {error: 'a step names an edge — add an edge first'};
   /* prefer an edge no step uses as its FIRST hop, so the new numbered coin
      gets its own midpoint (two steps sharing a first hop stack coins) */
   var used = {};
@@ -486,8 +485,8 @@ function planAddStep(text, raw, sectionIdx){
     var k = e.from + '->' + e.to;
     if (!used[k]){ pick = k; break; }
   }
-  if (!pick) pick = (edges[0] || {}).from + '->' + (edges[0] || {}).to;
-  var item = '{"edge": ' + JSON.stringify(pick) + ', "text": "Describe what happens in this step"}';
+  if (!pick && edges.length) pick = (edges[0] || {}).from + '->' + (edges[0] || {}).to;
+  var item = JSON.stringify(Object.assign(pick ? {edge:pick} : {}, {text:'Describe what happens in this step'}));
   var r = jsonInsertListItemOrCreate(text, got.path, 'steps', item);
   if (!r) return {error: 'could not edit steps in the editor text'};
   return {text: r.text, start: r.start, end: r.end, kind: 'step',
@@ -928,6 +927,22 @@ function planMoveStep(text, raw, sectionIdx, stepIdx, delta){
   if (r.error) return r;
   r.index = to;
   return r;
+}
+
+function planDuplicateStep(text, raw, sectionIdx, stepIdx){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var steps = got.d.steps;
+  if (!Number.isInteger(stepIdx) || !Array.isArray(steps) || !steps[stepIdx]) return {error:'step not found'};
+  var clone = builderClone(steps[stepIdx]);
+  if (typeof clone.id === 'string' && clone.id){
+    var taken = Object.create(null);
+    steps.forEach(function(step){ if (step && typeof step.id === 'string') taken[step.id] = true; });
+    clone.id = builderUniqueKey(taken, clone.id + '-copy');
+  }
+  var r = jsonInsertArrayItemAfter(text, got.path.concat(['steps']), stepIdx, JSON.stringify(clone, null, 2));
+  if (!r) return {error:'could not edit steps in the editor text'};
+  return {text:r.text, start:r.start, end:r.end, kind:'step', index:stepIdx + 1};
 }
 
 function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
@@ -4320,6 +4335,10 @@ function initWorkbenchBuilder(opts){
         }, armedHere ? 'bexit-inline' : ''));
       }
       if (t.kind === 'step' && !armedHere){
+        acts.appendChild(actionButton('duplicate step', function(){
+          commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index); },
+            {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
+        }));
         acts.appendChild(actionButton('↑ earlier', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
@@ -4443,6 +4462,7 @@ function initWorkbenchBuilder(opts){
     renderInspector();
     syncBoardToSelectedStep();
     applyStepMarkers();
+    if (stepList) stepList.sync();
     if (focusEditor === false) return;
     var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
     var loc = path ? jsonLocate(src.value, path) : null;
@@ -4517,6 +4537,41 @@ function initWorkbenchBuilder(opts){
     });
     refreshOutline();
   }
+
+  /* The step list shares this builder's selection, render and undo pipeline. */
+  var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({
+    view:view, src:src, renderedText:opts.renderedText,
+    pause:pausePreview,
+    selection:function(){ return currentTarget; },
+    locked:function(){ return !!addToStep || !!connect; },
+    navigate:function(entry){
+      clearMultiSelect();
+      if (entry.tab){
+        var tabButton = document.getElementById('tab-' + entry.tab.block + '-' + entry.tab.tab);
+        if (tabButton) tabButton.click();
+      }
+      var el = findTargetEl(entry.target);
+      selectTarget(Object.assign({}, entry.target, {el:el}), false);
+      var loc = jsonLocate(src.value, entry.path);
+      if (loc && sourceVisible()){
+        src.setSelectionRange(loc.start, loc.end); scrollTextareaTo(loc.start);
+      }
+      if (el) el.scrollIntoView({block:'nearest', behavior:'auto'});
+    },
+    apply:function(plan, section){
+      clearMultiSelect();
+      return applyPlan(plan, {after:function(){
+        var story = builderStorySections(JSON.parse(src.value)).find(function(entry){ return entry.section === section; });
+        if (story && story.tab){
+          var tabButton = document.getElementById('tab-' + story.tab.block + '-' + story.tab.tab);
+          if (tabButton) tabButton.click();
+        }
+        currentTarget = {kind:'step', section:section, index:plan.index};
+        insertSection = section;
+        renderInspector();
+      }});
+    }
+  }) : null;
 
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */

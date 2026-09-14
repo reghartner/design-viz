@@ -1,5 +1,8 @@
 # Workbench space and focus
 
+For a captioned, searchable list with duplicate and reorder controls, see
+[Story steps](workbench-steps.md).
+
 Click-through previews start paused. Use **Play** to run a story; switching
 tabs, selecting an element, or focusing the inspector or JSON source pauses
 playback. Selecting the already displayed step also pauses it. Pausing does

@@ -64,6 +64,12 @@ review the generated spec before sharing it.
 - **Steps:** inspection order by start timestamp, not a synthetic replay of
   start and completion events. All timing bars remain visible; the selected
   span is highlighted and its ID, parent, name, and duration appear in a table.
+- **Inside the service:** select a service or operation to jump to its span.
+  Inclusive duration is its recorded wall time. Child-covered time is the
+  union of direct-child intervals clipped to the parent; overlapping children
+  count once. Uncovered time is the remainder. It can include local work,
+  waiting or missing instrumentation, and is not a CPU measurement. Service
+  span coverage also uses an interval union, so nested spans are not added.
 - **Completeness:** missing parents and unusual root counts appear as visible
   bullets. No missing service or span is fabricated. An export can omit whole
   branches without leaving detectable missing parents, so no import proves
@@ -100,6 +106,27 @@ cards, with the complete name in the card tooltip and span details.
 Lane routing supports one to five unstacked cards per row, without floats or
 self-loops. Unsupported edited layouts fall back to curves with a validation
 warning. Lane routing ignores authored edge bends; label offsets still work.
+
+## Service timing panel
+
+The `trace` panel keeps normalized span IDs, parent IDs, service and operation
+names, start offsets and durations. Its `selected` step state follows the
+selected span. Service operations share one offset scale; nested intervals
+remain visible. Expand direct children to see same-service versus other-service
+operations. A blue segment marks child-covered time; hatching marks uncovered
+time, with numeric values and text definitions alongside.
+
+For the six-span checkout example, the root lasts 300 ms. Its child intervals
+cover 235 ms after combining overlap, leaving 65 ms uncovered. The same-service
+cache operation remains visible inside checkout. The union of checkout’s spans
+is 300 ms, not the 305 ms sum of its root and cache span.
+
+An export can omit child spans without a detectable missing-parent warning,
+so uncovered time is an instrumentation-dependent remainder. It is not proof
+of blocking, CPU execution, critical-path membership, or a bottleneck. Skewed
+and async child intervals are clipped only for the coverage calculation;
+their original timing rows remain unchanged. Invalid timing, duplicate IDs,
+cycles or an unknown selected span show **Timing unavailable**.
 
 ## Agent workflow
 

@@ -10,9 +10,56 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget','trace'];
 var TABLE_STATUSES = ['neutral','added','changed','removed'];
 var CHECK_STATUSES = ['pending','pass','fail','warn','skip'];
+
+/* Never calculate an apparently precise trace breakdown from malformed or
+   cyclic data. Partial, structurally sound traces remain inspectable. */
+function tracePanelData(p){
+  var spans=Array.isArray(p.spans)?p.spans:[], errors=[], notices=[], byId=new Map();
+  if (!spans.length || spans.length>200) return {spans:[],errors:['spans: expected 1–200 spans; timing unavailable'],notices:[]};
+  spans.forEach(function(s,i){
+    var at='spans['+i+']';
+    if (!s || typeof s!=='object'){ errors.push(at+': expected a span object'); return; }
+    ['id','service','name'].forEach(function(k){
+      if (typeof s[k]!=='string' || !s[k].trim()) errors.push(at+'.'+k+': expected a non-empty string');
+    });
+    if (byId.has(s.id)) errors.push(at+'.id: duplicate span id');
+    byId.set(s.id,s);
+    if (s.parentId!=null && typeof s.parentId!=='string') errors.push(at+'.parentId: expected a string or null');
+    if (!isFiniteNum(s.ms) || s.ms<0) errors.push(at+'.ms: expected a finite non-negative duration');
+    if (!isFiniteNum(s.startMs) || s.startMs<0 || !isFiniteNum(s.startMs+s.ms)) errors.push(at+'.startMs: expected a finite non-negative offset and end');
+  });
+  if (errors.length) return {spans:[],errors:errors,notices:[]};
+  var missing=0, skew=0;
+  spans.forEach(function(s){
+    var seen=new Set([s.id]), parent=s.parentId;
+    while (parent && byId.has(parent)){
+      if (seen.has(parent)){ errors.push('spans: parent cycle at '+s.id); break; }
+      seen.add(parent); parent=byId.get(parent).parentId;
+    }
+    var p=byId.get(s.parentId);
+    if (s.parentId && !p) missing++;
+    if (p && (s.startMs<p.startMs || s.startMs+s.ms>p.startMs+p.ms+.001)) skew++;
+  });
+  if (missing) notices.push(missing+' span(s) have missing parents; coverage is partial.');
+  if (skew) notices.push(skew+' child span(s) extend beyond their parent; coverage clips these intervals, while timing rows retain the original offsets.');
+  return {spans:errors.length?[]:spans.slice(),errors:errors,notices:notices};
+}
+function tracePanelPatchWarnings(state,path,p,warnings){
+  if (state==null) return;
+  if (!panelObject(state)){ warnings.push(path+': expected a state object'); return; }
+  if (state.selected!=null && !(Array.isArray(p.spans) && p.spans.some(function(s){ return s && s.id===state.selected; })))
+    warnings.push(path+'.selected: no matching span; timing unavailable');
+  if (state.enterOnce!=null){
+    if (!panelObject(state.enterOnce)) warnings.push(path+'.enterOnce: expected an object');
+    else {
+      var once=Object.assign({},state.enterOnce); delete once.enterOnce;
+      tracePanelPatchWarnings(once,path+'.enterOnce',p,warnings);
+    }
+  }
+}
 
 /* Software panels carry authored snapshots, not executable rules or live
    telemetry. These helpers are shared with their defensive render models. */
@@ -768,6 +815,11 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (panelIds[p.id]) errors.push(PP + '.id: duplicate panel id "' + p.id + '"');
     panelIds[p.id] = true;
     panelDeclById[p.id] = p;
+    if (p.type === 'trace'){
+      var traceData=tracePanelData(p);
+      traceData.errors.concat(traceData.notices).forEach(function(message){ warnings.push(PP+'.'+message); });
+      tracePanelPatchWarnings(p.initial,PP+'.initial',p,warnings);
+    }
     if (['table','checks','budget'].indexOf(p.type) >= 0)
       softwarePanelWarnings(p, PP, warnings);
     if (p.type === 'inflight'){
@@ -1073,6 +1125,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (timelinePanels[pid] && patch[pid]){
         timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
+      } else if (panelDeclById[pid].type === 'trace'){
+        tracePanelPatchWarnings(patch[pid],DP+'.steps['+ti+'].panels.'+pid,panelDeclById[pid],warnings);
       } else if (['table','checks','budget'].indexOf(panelDeclById[pid].type) >= 0){
         softwarePanelPatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
       }

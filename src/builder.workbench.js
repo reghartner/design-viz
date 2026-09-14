@@ -984,6 +984,10 @@ var NODE_PRESETS = [
 ];
 
 var PANEL_TEMPLATES = {
+  trace:     {title:'Inside the service',spans:[
+              {id:'request',service:'api',name:'handle request',startMs:0,ms:100},
+              {id:'parse',parentId:'request',service:'api',name:'parse input',startMs:5,ms:20},
+              {id:'query',parentId:'request',service:'database',name:'query',startMs:30,ms:50}],initial:{selected:'request'}},
   table:     {title: 'Data state', columns: [{id: 'key', label: 'Key'}, {id: 'value', label: 'Value'}],
               initial: {rows: [{id: 'item', cells: {key: 'order.status', value: 'pending'}, status: 'added'}]}},
   checks:    {title: 'Decision checks', checks: [{id: 'auth', label: 'Authorized'}, {id: 'unique', label: 'Idempotency key is new'}],
@@ -1923,6 +1927,7 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
              and an optional max; unknown keys on existing items survive edits
      objf  — one fixed-shape object edited inline (timeline cadence) */
 var PANEL_SETUP_FIELDS = {
+  trace:     [['spans','json'],['initial','json']],
   table:     [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 4}], ['initial', 'json']],
   checks:    [['checks', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 12}], ['initial', 'json']],
   budget:    [['metrics', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'unit'},
@@ -1970,6 +1975,7 @@ var PANEL_SETUP_FIELDS = {
 
 /* Dynamic-key types are expanded from their declarations by panelPatchFields. */
 var PANEL_PATCH_FIELDS = {
+  trace:     [['selected','text']],
   table:     [['rows', 'jsonArr'], ['note', 'text']],
   checks:    [['results', 'json'], ['note', 'text']],
   budget:    [['values', 'json'], ['note', 'text']],

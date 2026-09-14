@@ -4000,6 +4000,34 @@ body.sk-blueprint .sk-daylight .stepmode .node.lit.tone-dim .card{
   .node.tone-pulse .card{animation:none !important;}
 }
 
+/* Observed trace timing: text values carry meaning without relying on color. */
+.tr-time{color:var(--dtext);font:12px/1.5 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
+.tr-service{font-weight:700;font-size:15px;}
+.tr-picker{display:grid;gap:4px;margin-bottom:10px;font-weight:600;}
+.tr-picker select{width:100%;min-width:0;padding:6px;border:1px solid currentColor;border-radius:5px;background:transparent;color:inherit;font:inherit;}
+.tr-picker option{color:#182334;background:#F8FAFC;}
+.tr-coverage,.tr-explain,.tr-key{font-size:11px;line-height:1.45;margin:7px 0;}
+.tr-selected{display:grid;gap:3px;padding:8px 0;border-top:1px solid color-mix(in srgb,currentColor 25%,transparent);}
+.tr-selected code{font-size:10px;}
+.tr-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:5px 0 9px;}
+.tr-metrics dt{font-size:10px;}.tr-metrics dd{margin:0;font-weight:700;font-size:14px;}
+.tr-interval{height:20px;position:relative;border:1px solid currentColor;border-radius:4px;overflow:hidden;
+  background:repeating-linear-gradient(135deg,transparent 0 4px,color-mix(in srgb,currentColor 30%,transparent) 4px 6px);}
+.tr-covered{position:absolute;top:0;bottom:0;background:#287DC1;}
+.tr-zero{background:none;}
+.tr-notice{border-left:3px solid currentColor;padding-left:6px;font-size:11px;}
+.tr-ophead{margin-top:12px;font-weight:600;font-size:11px;}
+.tr-operations{max-height:300px;overflow:auto;}
+.tr-op{display:grid;width:100%;grid-template-columns:minmax(0,1fr);gap:2px;text-align:left;padding:7px;margin:4px 0;
+  color:inherit;background:transparent;border:1px solid color-mix(in srgb,currentColor 25%,transparent);border-radius:5px;font:inherit;}
+button.tr-op{cursor:pointer;}.tr-current{border:2px solid currentColor;padding:6px;}
+.tr-opname{font-weight:600;}.tr-opvalues{font:10px 'IBM Plex Mono',monospace;}
+.tr-optrack{height:7px;position:relative;background:color-mix(in srgb,currentColor 12%,transparent);}
+.tr-optrack>span{position:absolute;top:0;bottom:0;background:currentColor;}
+.tr-op:focus-visible,.tr-picker select:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
+.tr-children{font-size:11px;margin-top:8px;}.tr-children summary{cursor:pointer;font-weight:600;}.tr-children ul{padding-left:18px;}
+@media print{.tr-operations{max-height:none;overflow:visible;}.tr-picker{display:none;}.tr-covered{background:#AAA;print-color-adjust:exact;}}
+
 /* ---------- URL embed mode (#embed=<section-ref>) ----------
    One section's diagram + panels + step controls, nothing else — for
    hosting a single diagram in an iframe. The !important overrides beat

@@ -15,7 +15,12 @@ those do not need to be reinvented.
 ## Ranked features
 
 Effort is relative: S = a focused extension; M = several connected surfaces;
-L = a schema or architecture change. “Built” describes this working-tree change.
+L = a schema or architecture change. “Built” describes the current PR stack.
+
+September 14 update: the trace work is split into [import and panels (#50)](https://github.com/reghartner/design-viz/pull/50),
+[dependency rows and lane routing (#51)](https://github.com/reghartner/design-viz/pull/51),
+and [service-internal timing (#52)](https://github.com/reghartner/design-viz/pull/52).
+Large-trace focus and effective-state editing are the next overnight priorities.
 
 | Rank | Feature | What it explains / representative use cases | Approach and scope | Effort | Status |
 |---|---|---|---|---|---|

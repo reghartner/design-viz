@@ -447,6 +447,229 @@
               ]
             },
             {
+              "id": "internal",
+              "type": "trace",
+              "title": "Inside the service",
+              "spans": [
+                {
+                  "id": "span-1",
+                  "parentId": null,
+                  "service": "gateway",
+                  "name": "handle gateway",
+                  "startMs": 0,
+                  "ms": 1000,
+                  "error": false
+                },
+                {
+                  "id": "span-2",
+                  "parentId": "span-1",
+                  "service": "checkout",
+                  "name": "handle checkout",
+                  "startMs": 100,
+                  "ms": 600,
+                  "error": false
+                },
+                {
+                  "id": "span-11",
+                  "parentId": "span-1",
+                  "service": "identity",
+                  "name": "handle identity",
+                  "startMs": 130,
+                  "ms": 600,
+                  "error": false
+                },
+                {
+                  "id": "span-14",
+                  "parentId": "span-1",
+                  "service": "pricing",
+                  "name": "handle pricing",
+                  "startMs": 160,
+                  "ms": 600,
+                  "error": false
+                },
+                {
+                  "id": "span-3",
+                  "parentId": "span-2",
+                  "service": "payments",
+                  "name": "handle payments",
+                  "startMs": 160,
+                  "ms": 360,
+                  "error": false
+                },
+                {
+                  "id": "span-8",
+                  "parentId": "span-2",
+                  "service": "inventory",
+                  "name": "handle inventory",
+                  "startMs": 178,
+                  "ms": 360,
+                  "error": false
+                },
+                {
+                  "id": "span-12",
+                  "parentId": "span-11",
+                  "service": "cache",
+                  "name": "handle cache",
+                  "startMs": 190,
+                  "ms": 360,
+                  "error": false
+                },
+                {
+                  "id": "span-17",
+                  "parentId": "span-1",
+                  "service": "inventory",
+                  "name": "handle inventory",
+                  "startMs": 190,
+                  "ms": 600,
+                  "error": false
+                },
+                {
+                  "id": "span-4",
+                  "parentId": "span-3",
+                  "service": "risk",
+                  "name": "handle risk",
+                  "startMs": 196,
+                  "ms": 216,
+                  "error": false
+                },
+                {
+                  "id": "span-7",
+                  "parentId": "span-3",
+                  "service": "ledger",
+                  "name": "handle ledger",
+                  "startMs": 206.8,
+                  "ms": 216,
+                  "error": false
+                },
+                {
+                  "id": "span-9",
+                  "parentId": "span-8",
+                  "service": "catalog",
+                  "name": "handle catalog",
+                  "startMs": 214,
+                  "ms": 216,
+                  "error": false
+                },
+                {
+                  "id": "span-5",
+                  "parentId": "span-4",
+                  "service": "checkout",
+                  "name": "handle checkout",
+                  "startMs": 217.6,
+                  "ms": 129.6,
+                  "error": false
+                },
+                {
+                  "id": "span-15",
+                  "parentId": "span-14",
+                  "service": "catalog",
+                  "name": "handle catalog",
+                  "startMs": 220,
+                  "ms": 360,
+                  "error": false
+                },
+                {
+                  "id": "span-20",
+                  "parentId": "span-1",
+                  "service": "notifications",
+                  "name": "handle notifications",
+                  "startMs": 220,
+                  "ms": 600,
+                  "error": false
+                },
+                {
+                  "id": "span-6",
+                  "parentId": "span-4",
+                  "service": "rules",
+                  "name": "handle rules",
+                  "startMs": 224.08,
+                  "ms": 129.6,
+                  "error": false
+                },
+                {
+                  "id": "span-10",
+                  "parentId": "span-8",
+                  "service": "warehouse",
+                  "name": "handle warehouse",
+                  "startMs": 224.8,
+                  "ms": 216,
+                  "error": false
+                },
+                {
+                  "id": "span-13",
+                  "parentId": "span-12",
+                  "service": "database",
+                  "name": "handle database",
+                  "startMs": 226,
+                  "ms": 216,
+                  "error": false
+                },
+                {
+                  "id": "span-16",
+                  "parentId": "span-14",
+                  "service": "rules",
+                  "name": "handle rules",
+                  "startMs": 238,
+                  "ms": 360,
+                  "error": false
+                },
+                {
+                  "id": "span-18",
+                  "parentId": "span-17",
+                  "service": "database",
+                  "name": "handle database",
+                  "startMs": 250,
+                  "ms": 360,
+                  "error": false
+                },
+                {
+                  "id": "span-19",
+                  "parentId": "span-17",
+                  "service": "warehouse",
+                  "name": "handle warehouse",
+                  "startMs": 268,
+                  "ms": 360,
+                  "error": false
+                },
+                {
+                  "id": "span-21",
+                  "parentId": "span-20",
+                  "service": "queue",
+                  "name": "handle queue",
+                  "startMs": 280,
+                  "ms": 360,
+                  "error": false
+                },
+                {
+                  "id": "span-22",
+                  "parentId": "span-21",
+                  "service": "worker",
+                  "name": "handle worker",
+                  "startMs": 316,
+                  "ms": 216,
+                  "error": false
+                },
+                {
+                  "id": "span-23",
+                  "parentId": "span-22",
+                  "service": "database",
+                  "name": "handle database",
+                  "startMs": 337.6,
+                  "ms": 129.6,
+                  "error": false
+                },
+                {
+                  "id": "span-24",
+                  "parentId": "span-22",
+                  "service": "mailer",
+                  "name": "handle mailer",
+                  "startMs": 344.08,
+                  "ms": 129.6,
+                  "error": true
+                }
+              ]
+            },
+            {
               "id": "span",
               "type": "table",
               "title": "Selected span",
@@ -472,6 +695,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-1"
+                },
+                "internal": {
+                  "selected": "span-1"
                 },
                 "span": {
                   "rows": [
@@ -537,6 +763,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-2"
+                },
+                "internal": {
+                  "selected": "span-2"
                 },
                 "span": {
                   "rows": [
@@ -604,6 +833,9 @@
                 "timing": {
                   "highlight": "span-11"
                 },
+                "internal": {
+                  "selected": "span-11"
+                },
                 "span": {
                   "rows": [
                     {
@@ -669,6 +901,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-14"
+                },
+                "internal": {
+                  "selected": "span-14"
                 },
                 "span": {
                   "rows": [
@@ -736,6 +971,9 @@
                 "timing": {
                   "highlight": "span-3"
                 },
+                "internal": {
+                  "selected": "span-3"
+                },
                 "span": {
                   "rows": [
                     {
@@ -801,6 +1039,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-8"
+                },
+                "internal": {
+                  "selected": "span-8"
                 },
                 "span": {
                   "rows": [
@@ -868,6 +1109,9 @@
                 "timing": {
                   "highlight": "span-12"
                 },
+                "internal": {
+                  "selected": "span-12"
+                },
                 "span": {
                   "rows": [
                     {
@@ -933,6 +1177,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-17"
+                },
+                "internal": {
+                  "selected": "span-17"
                 },
                 "span": {
                   "rows": [
@@ -1000,6 +1247,9 @@
                 "timing": {
                   "highlight": "span-4"
                 },
+                "internal": {
+                  "selected": "span-4"
+                },
                 "span": {
                   "rows": [
                     {
@@ -1065,6 +1315,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-7"
+                },
+                "internal": {
+                  "selected": "span-7"
                 },
                 "span": {
                   "rows": [
@@ -1132,6 +1385,9 @@
                 "timing": {
                   "highlight": "span-9"
                 },
+                "internal": {
+                  "selected": "span-9"
+                },
                 "span": {
                   "rows": [
                     {
@@ -1197,6 +1453,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-5"
+                },
+                "internal": {
+                  "selected": "span-5"
                 },
                 "span": {
                   "rows": [
@@ -1264,6 +1523,9 @@
                 "timing": {
                   "highlight": "span-15"
                 },
+                "internal": {
+                  "selected": "span-15"
+                },
                 "span": {
                   "rows": [
                     {
@@ -1329,6 +1591,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-20"
+                },
+                "internal": {
+                  "selected": "span-20"
                 },
                 "span": {
                   "rows": [
@@ -1396,6 +1661,9 @@
                 "timing": {
                   "highlight": "span-6"
                 },
+                "internal": {
+                  "selected": "span-6"
+                },
                 "span": {
                   "rows": [
                     {
@@ -1461,6 +1729,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-10"
+                },
+                "internal": {
+                  "selected": "span-10"
                 },
                 "span": {
                   "rows": [
@@ -1528,6 +1799,9 @@
                 "timing": {
                   "highlight": "span-13"
                 },
+                "internal": {
+                  "selected": "span-13"
+                },
                 "span": {
                   "rows": [
                     {
@@ -1593,6 +1867,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-16"
+                },
+                "internal": {
+                  "selected": "span-16"
                 },
                 "span": {
                   "rows": [
@@ -1660,6 +1937,9 @@
                 "timing": {
                   "highlight": "span-18"
                 },
+                "internal": {
+                  "selected": "span-18"
+                },
                 "span": {
                   "rows": [
                     {
@@ -1725,6 +2005,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-19"
+                },
+                "internal": {
+                  "selected": "span-19"
                 },
                 "span": {
                   "rows": [
@@ -1792,6 +2075,9 @@
                 "timing": {
                   "highlight": "span-21"
                 },
+                "internal": {
+                  "selected": "span-21"
+                },
                 "span": {
                   "rows": [
                     {
@@ -1857,6 +2143,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-22"
+                },
+                "internal": {
+                  "selected": "span-22"
                 },
                 "span": {
                   "rows": [
@@ -1924,6 +2213,9 @@
                 "timing": {
                   "highlight": "span-23"
                 },
+                "internal": {
+                  "selected": "span-23"
+                },
                 "span": {
                   "rows": [
                     {
@@ -1989,6 +2281,9 @@
               "panels": {
                 "timing": {
                   "highlight": "span-24"
+                },
+                "internal": {
+                  "selected": "span-24"
                 },
                 "span": {
                   "rows": [

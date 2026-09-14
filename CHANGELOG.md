@@ -1,5 +1,16 @@
 # Changelog
 
+## Inside-service timing (2026-09-14)
+
+- The new `trace` panel shows inclusive duration, child-covered time and the
+  uncovered remainder for a selected span. Overlapping direct children count
+  once; service coverage also unions nested spans. Original timing is retained.
+- A service picker and operation buttons navigate the shared stepper, keeping
+  topology, waterfall and span details synchronized. Same-service operations,
+  parent IDs, errors, missing parents and skewed intervals remain visible.
+- Includes import integration, picker preset, setup/patch fields, contract
+  documentation, updated starters and 13 focused timing regressions.
+
 ## Complex trace layouts (2026-09-14)
 
 - Trace imports now support 30 services and choose dependency rows, grouping

@@ -452,15 +452,47 @@ function tileStateWarnings(obj, path, decl, warnings){
    First token is the fallback. Only signals is reserved: this panel has its
    own fold so log/mark/enterOnce remain ordinary device ids. */
 var HOMEMAP_STATES = {
-  camera: ['scan', 'sleep', 'detect', 'off'], entry: ['closed', 'open', 'alert'],
-  sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'alert']
+  camera: ['scan', 'sleep', 'detect', 'rec', 'off'], entry: ['closed', 'open', 'alert'],
+  sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'tx', 'alert']
 };
 function homemapDeviceValid(d){
   return d && typeof d.id === 'string' && d.id !== '' && d.id !== 'signals' &&
     typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(HOMEMAP_STATES, d.kind) &&
     isFiniteNum(d.x) && isFiniteNum(d.y);
 }
-function homemapPatchWarnings(obj, path, devices, warnings){
+function homemapSubjectPosition(v){
+  return v && typeof v === 'object' && !Array.isArray(v) && isFiniteNum(v.x) && isFiniteNum(v.y);
+}
+/* Shared declaration filtering keeps model, fold and warnings in agreement. */
+function homemapSubjects(panel, path, warnings){
+  var devices = Object.create(null), seen = Object.create(null), subjects = [];
+  function warn(message){ if (warnings) warnings.push(path + message); }
+  (Array.isArray(panel.devices) ? panel.devices : []).forEach(function(d){
+    if (d && typeof d.id === 'string') devices[d.id] = true;
+  });
+  if (panel.subjects !== undefined && !Array.isArray(panel.subjects))
+    warn('.subjects: expected an array — ignored');
+  (Array.isArray(panel.subjects) ? panel.subjects : []).forEach(function(sub, i){
+    var sp = '.subjects[' + i + ']', valid = true;
+    if (!sub || typeof sub.id !== 'string' || !sub.id){
+      warn(sp + '.id: needs a nonempty string — subject ignored');
+      return;
+    }
+    if (seen[sub.id]){ warn(sp + '.id: duplicate subject id "' + sub.id + '" — duplicate ignored'); valid = false; }
+    seen[sub.id] = true;
+    if (devices[sub.id]){ warn(sp + '.id: collides with a device id — subject ignored'); valid = false; }
+    if (sub.id === 'signals'){ warn(sp + '.id: "signals" is reserved — subject ignored'); valid = false; }
+    ['x', 'y'].forEach(function(k){
+      if (!isFiniteNum(sub[k])){ warn(sp + '.' + k + ': must be finite — subject ignored'); valid = false; }
+    });
+    if (sub.icon !== undefined && ICON_SET.indexOf(sub.icon) < 0)
+      warn(sp + '.icon: unknown icon "' + sub.icon + '" — using "gear"');
+    if (valid) subjects.push(sub);
+  });
+  return subjects;
+}
+function homemapPatchWarnings(obj, path, declaration, warnings){
+  var devices = declaration.devices, subjects = declaration.subjects;
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
   Object.keys(obj).forEach(function(k){
     if (k === 'signals'){
@@ -474,8 +506,11 @@ function homemapPatchWarnings(obj, path, devices, warnings){
             !devices[sig.from] || !devices[sig.to])
           warnings.push(path + '.signals[' + i + ']: needs from/to referencing declared device ids — entry ignored');
       });
+    } else if (subjects[k]){
+      if (obj[k] !== null && !homemapSubjectPosition(obj[k]))
+        warnings.push(path + '.' + k + ': expected an object with finite x/y or null — subject patch ignored');
     } else if (!devices[k]){
-      warnings.push(path + '.' + k + ': undeclared device id — state ignored');
+      warnings.push(path + '.' + k + ': undeclared device or subject id — patch ignored');
     } else {
       var vocab = HOMEMAP_STATES[devices[k].kind];
       if (vocab.indexOf(obj[k]) < 0)
@@ -511,8 +546,11 @@ function homemapDeclarationWarnings(panel, path, warnings){
       warnings.push(dp + '.icon: unknown icon "' + d.icon + '" — using "gear"');
     if (!duplicate && homemapDeviceValid(d)) devices[d.id] = d;
   });
-  homemapPatchWarnings(panel.initial, path + '.initial', devices, warnings);
-  return devices;
+  var subjects = Object.create(null);
+  homemapSubjects(panel, path, warnings).forEach(function(sub){ subjects[sub.id] = sub; });
+  var declaration = {devices: devices, subjects: subjects};
+  homemapPatchWarnings(panel.initial, path + '.initial', declaration, warnings);
+  return declaration;
 }
 
 /* radar per-step patch checks shared by initial and step patches */
@@ -1491,12 +1529,17 @@ function foldPhoneStates(panel, steps){
   return states;
 }
 
-/* Carry device states, but attach signals only to their authored step. */
+/* Carry device states and subject positions; signals belong only to their authored step. */
 function foldHomemapStates(panel, steps){
-  var carried = Object.create(null), states = [];
+  var carried = Object.create(null), states = [], subjects = Object.create(null);
+  homemapSubjects(panel).forEach(function(sub){ subjects[sub.id] = sub; });
   function apply(patch){
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return;
-    Object.keys(patch).forEach(function(k){ if (k !== 'signals') carried[k] = patch[k]; });
+    Object.keys(patch).forEach(function(k){
+      if (k === 'signals') return;
+      if (subjects[k] && patch[k] !== null && !homemapSubjectPosition(patch[k])) return;
+      carried[k] = patch[k];
+    });
   }
   function snapshot(signals){
     var snap = Object.create(null);

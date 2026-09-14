@@ -4183,8 +4183,8 @@ test('homemapModel: per-kind defaults, explicit enums, unknown states and icon f
   const p = homePanel();
   const defaults = ['scan', 'scan', 'closed', 'ok', 'idle'];
   assert.deepStrictEqual(plain(C.homemapModel(p, {}).devices.map(d => d.state)), defaults);
-  for (const [index, states] of [[0, ['sleep', 'scan', 'detect', 'off']], [2, ['closed', 'open', 'alert']],
-    [3, ['ok', 'warn', 'alert', 'off']], [4, ['idle', 'rx', 'alert']]]){
+  for (const [index, states] of [[0, ['sleep', 'scan', 'detect', 'rec', 'off']], [2, ['closed', 'open', 'alert']],
+    [3, ['ok', 'warn', 'alert', 'off']], [4, ['idle', 'rx', 'tx', 'alert']]]){
     for (const state of states) assert.strictEqual(C.homemapModel(p, {[p.devices[index].id]: state}).devices[index].state, state);
   }
   assert.deepStrictEqual(plain(C.homemapModel(p, {cam1: 'bad', cam2: null, door: 'scan', attic: {}, hub: 'ok'}).devices.map(d => d.state)), defaults);
@@ -4382,4 +4382,163 @@ test('homemap validator: initial and step warnings for states/signals; valid pan
   p.outline = {w: 300, h: 164};
   const valid = homeWarnings(p, [{cam1: 'detect', cam2: 'scan', signals: [{from: 'cam1', to: 'hub'}, {from: 'hub', to: 'door'}]}]);
   assert.deepStrictEqual(plain(valid), {errors: [], warnings: []});
+});
+
+test('homemap subjects: declarations, optional icons, finite bounds and invalid ids', () => {
+  const p = homePanel();
+  p.subjects = [{id: 'walker', label: 'Visitor', x: 20, y: 150},
+    {id: 'pet', x: -1e308, y: 1e308, icon: 'thermo'}, {id: '__proto__', x: 3, y: 4, icon: 'unknown'},
+    {id: 'constructor', x: 5, y: 6, icon: null}];
+  const expected = [
+    {id: 'walker', label: 'Visitor', icon: null, x: 20, y: 150, hidden: false},
+    {id: 'pet', label: 'pet', icon: 'thermo', x: 0, y: 180, hidden: false},
+    {id: '__proto__', label: '__proto__', icon: 'gear', x: 3, y: 4, hidden: false},
+    {id: 'constructor', label: 'constructor', icon: 'gear', x: 5, y: 6, hidden: false}
+  ];
+  assert.deepStrictEqual(plain(C.homemapModel(p).subjects), expected);
+  p.subjects.push(null, {}, {id: '', x: 1, y: 2}, {id: 7, x: 1, y: 2},
+    {id: 'walker', x: 1, y: 2}, {id: 'cam1', x: 1, y: 2}, {id: 'signals', x: 1, y: 2},
+    {id: 'nan', x: NaN, y: 2}, {id: 'infinity', x: 1, y: Infinity}, {id: 'string', x: '1', y: 2});
+  assert.deepStrictEqual(plain(C.homemapModel(p).subjects), expected);
+  for (const subjects of [undefined, null, {}, 'bad'])
+    assert.deepStrictEqual(plain(C.homemapModel({...p, subjects}).subjects), []);
+  for (const walker of ['scan', false, [], {}, {x: 5}, {x: Infinity, y: 2}, {x: 1, y: '2'}])
+    assert.deepStrictEqual(plain(C.homemapModel(p, {walker}).subjects[0]), expected[0]);
+  assert.deepStrictEqual(plain(C.homemapModel(p, {walker: {x: 1e308, y: -1e308}}).subjects[0]),
+    {...expected[0], x: 320, y: 0});
+});
+
+test('homemap subject fold: initial override, carry, moves, hide and invalid patches ignored', () => {
+  const p = homePanel();
+  p.subjects = ['walker', '__proto__', 'log', 'mark', 'enterOnce'].map(id => ({id, x: 20, y: 150}));
+  p.initial = JSON.parse('{"walker":{"x":40,"y":100},"__proto__":{"x":1,"y":2},"log":{"x":3,"y":4}}');
+  const patches = [{}, {walker: {x: 120, y: 60}, mark: null, enterOnce: {x: 7, y: 8}},
+    {walker: {x: NaN, y: 10}}, {walker: null}, {walker: 'detect'}, {}, {walker: {x: 240, y: 50}}, {}];
+  const states = C.foldPanelStates({panels: [p], steps: patches.map(home => ({panels: {home}}))}).home;
+  const subjects = states.map(state => C.homemapModel(p, state).subjects[0]);
+  assert.deepStrictEqual(plain(subjects.map(s => [s.x, s.y, s.hidden])), [
+    [40, 100, false], [120, 60, false], [120, 60, false], [20, 150, true],
+    [20, 150, true], [20, 150, true], [240, 50, false], [240, 50, false]
+  ]);
+  assert.deepStrictEqual(plain(states[7].__proto__), {x: 1, y: 2});
+  assert.deepStrictEqual(plain(states[7].log), {x: 3, y: 4});
+  assert.strictEqual(states[7].mark, null);
+  assert.deepStrictEqual(plain(states[7].enterOnce), {x: 7, y: 8});
+  assert.strictEqual(C.homemapModel(p, C.foldPanelStates({panels: [p]}).home[0]).subjects[0].x, 40);
+  p.initial = {walker: {x: 'bad', y: 2}};
+  assert.strictEqual(C.homemapModel(p, C.foldPanelStates({panels: [p]}).home[0]).subjects[0].x, 20);
+});
+
+test('homemap subject render: several glides release together and unchanged paint keeps steady baseline', () => {
+  const raf = [], events = [];
+  const core = loadCore({requestAnimationFrame: fn => raf.push(fn)});
+  const p = homePanel();
+  p.subjects = [{id: 'walker', label: '<Visitor "&>', x: 20, y: 150}, {id: '__proto__', x: 10, y: 30, icon: 'gear'}];
+  let markup = '', nodes = [], writes = 0;
+  const host = {querySelector: () => null,
+    querySelectorAll: selector => selector === '.hmsubject[style]' ? nodes : [],
+    get innerHTML(){ return markup; },
+    set innerHTML(value){
+      writes++; markup = value;
+      nodes = [...value.matchAll(/class="hmsubject"[^>]*style="transform:([^\"]+)"/g)].map(match => ({
+        style: {transform: match[1]}, getBoundingClientRect(){ events.push(this.style.transform); }
+      }));
+    }};
+  core.renderPanelBody(host, p, {}, 'aurora', [], 0);
+  assert.strictEqual(raf.length, 0);
+  assert.match(markup, /&lt;Visitor &quot;&amp;&gt;/);
+  assert.match(markup, /class="hmsubjectdot" cx="20" cy="150" r="5"/);
+  assert.match(markup, /data-subject="__proto__"[\s\S]*href="#i-gear"/);
+  const target = JSON.parse('{"walker":{"x":120,"y":60},"__proto__":{"x":50,"y":80}}');
+  core.renderPanelBody(host, p, target, 'aurora', [], 1);
+  assert.deepStrictEqual(events, ['translate(-100px,90px)', 'translate(-40px,-50px)']);
+  assert.match(markup, /hmsubjectdot" cx="120" cy="60"/);
+  assert.doesNotMatch(host._lastHTML, /transform:translate/);
+  assert.strictEqual(raf.length, 1);
+  raf.shift()();
+  assert.strictEqual(nodes[0].style.transform, 'translate(-100px,90px)', 'release waits for second rAF');
+  raf.shift()();
+  assert.ok(nodes.every(node => node.style.transform === 'translate(0,0)'));
+  core.renderPanelBody(host, p, target, 'aurora', [], 1);
+  assert.strictEqual(writes, 2, 'same-step repaint does not rebuild or restart glides');
+  assert.strictEqual(raf.length, 0);
+  core.renderPanelBody(host, p, target, 'aurora', [], 2, false);
+  assert.strictEqual(writes, 2, 'settle occurs before unchanged-markup skip');
+  assert.ok(nodes.every(node => node.style.transform === 'translate(0,0)' && node.style.transition === 'none'));
+  core.renderPanelBody(host, p, {walker: null, ['__proto__']: null}, 'aurora', [], 3);
+  assert.doesNotMatch(markup, /class="hmsubject"/);
+  assert.deepStrictEqual(plain(host._hmSubjPrev), {});
+  core.renderPanelBody(host, p, target, 'aurora', [], 4);
+  assert.doesNotMatch(markup, /transform:translate/);
+  assert.strictEqual(raf.length, 0, 'reappearing subjects start at the target');
+});
+
+test('homemap subject render: jumps settle pending glides, reduced motion, escaped ids and optional icon', () => {
+  const p = homePanel(), raf = [];
+  p.subjects = [{id: 'x"/><script>', label: '<actor>', x: 20, y: 150}];
+  const host = {querySelector: () => null, querySelectorAll: () => []};
+  const moved = {[p.subjects[0].id]: {x: 100, y: 60}};
+  C.renderPanelBody(host, p, {}, 'aurora', [], 0);
+  const subjectMarkup = host.innerHTML.slice(host.innerHTML.indexOf('<g class="hmsubject"'));
+  assert.doesNotMatch(subjectMarkup, /<use|<script>|<actor>/);
+  assert.match(subjectMarkup, /data-subject="x&quot;\/&gt;&lt;script&gt;"/);
+  C.renderPanelBody(host, p, moved, 'aurora', [], 1, false);
+  assert.doesNotMatch(host.innerHTML, /transform:translate/);
+  const reduced = loadCore({window: {matchMedia: () => ({matches: true})}});
+  reduced.renderPanelBody(host, p, {}, 'aurora', [], 0);
+  reduced.renderPanelBody(host, p, moved, 'aurora', [], 1, true);
+  assert.doesNotMatch(host.innerHTML, /transform:translate/);
+  const css = fs.readFileSync(path.join(ROOT, 'src/style.core.css'), 'utf8');
+  assert.match(css, /\.hmsubject\{[^}]*transition:transform \.7s/);
+  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.rdsubject,\.hmsubject\{transition:none !important;/);
+  const core = loadCore({requestAnimationFrame: fn => raf.push(fn)});
+  const node = {style: {}, getBoundingClientRect(){}};
+  host.querySelectorAll = sel => sel === '.hmsubject[style]' ? [node] : [];
+  core.renderPanelBody(host, p, {}, 'aurora', [], 0, false);
+  core.renderPanelBody(host, p, moved, 'aurora', [], 1, true);
+  node.style.transform = 'translate(-80px,90px)';
+  core.renderPanelBody(host, p, moved, 'aurora', [], 1, false);
+  assert.strictEqual(node.style.transform, 'translate(0,0)');
+  assert.strictEqual(node.style.transition, 'none');
+  while (raf.length) raf.shift()();
+  assert.strictEqual(node.style.transform, 'translate(0,0)');
+});
+
+test('homemap subject validator: each invalid declaration warns at its path', () => {
+  const p = homePanel();
+  for (const subjects of [null, {}, 'bad']){
+    const result = homeWarnings({...p, subjects});
+    assert.strictEqual(result.errors.length, 0);
+    assert.ok(result.warnings.some(w => w.includes('.subjects: expected an array')));
+  }
+  p.subjects = [null, {}, {id: 4, x: 1, y: 2}, {id: '', x: 1, y: 2},
+    {id: 'walker', x: 1, y: 2}, {id: 'walker', x: 3, y: 4}, {id: 'cam1', x: 1, y: 2},
+    {id: 'signals', x: 1, y: 2}, {id: 'badpos', x: Infinity, y: NaN},
+    {id: 'badicon', x: 1, y: 2, icon: 'nope'}];
+  const result = homeWarnings(p);
+  assert.strictEqual(result.errors.length, 0);
+  for (const suffix of ['[0].id: needs', '[1].id: needs', '[2].id: needs', '[3].id: needs',
+    '[5].id: duplicate subject', '[6].id: collides with a device', '[7].id: "signals" is reserved',
+    '[8].x: must be finite', '[8].y: must be finite', '[9].icon: unknown'])
+    assert.ok(result.warnings.some(w => w.includes('.subjects' + suffix)), suffix);
+});
+
+test('homemap subject validator: initial and step patches warn; valid subjects are silent', () => {
+  const p = homePanel();
+  p.subjects = [{id: 'walker', x: 20, y: 150}, {id: '__proto__', x: 10, y: 30, icon: 'gear'}];
+  for (const walker of ['detect', [], {}, {x: 1}, {x: Infinity, y: 1}, {x: 1, y: NaN}, {x: '1', y: 2}]){
+    p.initial = {walker};
+    const result = homeWarnings(p, [{walker}]);
+    assert.strictEqual(result.errors.length, 0);
+    for (const prefix of ['.panels[0].initial', '.steps[0].panels.home'])
+      assert.ok(result.warnings.some(w => w.includes(prefix + '.walker: expected an object with finite x/y or null')));
+  }
+  p.initial = {walker: null};
+  const unknown = homeWarnings(p, [{stranger: {x: 1, y: 2}}]);
+  assert.ok(unknown.warnings.some(w => w.includes('.stranger: undeclared device or subject id')));
+  p.initial = JSON.parse('{"walker":{"x":10,"y":20},"__proto__":null}');
+  assert.deepStrictEqual(plain(homeWarnings(p, [
+    {walker: {x: 120, y: 60}, cam1: 'detect', signals: [{from: 'cam1', to: 'hub'}]},
+    {walker: null}, JSON.parse('{"__proto__":{"x":50,"y":80}}')
+  ])), {errors: [], warnings: []});
 });

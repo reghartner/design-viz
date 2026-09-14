@@ -82,8 +82,23 @@
    980px floor would force a horizontal scrollbar; let the svg scale to fit
    (it collapses to full width below 980px viewport via the grid media query). */
 .boardgrid.haspanels .board svg{min-width:0;}
-.board.board-readable .boardcanvas svg{min-width:1180px;}
-@media print{.board.board-readable .boardcanvas svg{min-width:0;}}
+.diagramcol{container-type:inline-size;}
+.board.board-size-readable .boardcanvas svg{min-width:1180px;}
+.board.board-size-fit .boardcanvas svg,.board.board-size-auto .boardcanvas svg{min-width:0;}
+.board-size{display:flex;flex-wrap:wrap;align-items:center;gap:5px;flex-basis:100%;font:11px 'IBM Plex Mono',monospace;color:var(--dtext);}
+.board-size>span:first-child{margin-right:3px;}
+.board-scroll-hint{display:none;flex-basis:100%;font-size:10px;color:var(--dfaint);}
+.board-overflow .board-scroll-hint{display:block;}
+.board:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+@media screen{
+  @container(max-width:640px){
+    .board.board-size-auto .boardcanvas svg{min-width:1180px;}
+  }
+}
+@media print{
+  .board.board-size-readable .boardcanvas svg{min-width:0;}
+  .board-size{display:none;}
+}
 .lg{position:sticky; left:0; display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:10px 14px;}
 .sk-aurora .lg{background:#0B1220; border-bottom:1px dashed #25364F;}
 .sk-daylight .lg{background:#FBFAF6; border-bottom:1px dashed #E0DCD1;}
@@ -4047,6 +4062,18 @@ button.tr-op{cursor:pointer;}.tr-current{border:2px solid currentColor;padding:6
 .tr-op:focus-visible,.tr-picker select:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 .tr-children{font-size:11px;margin-top:8px;}.tr-children summary{cursor:pointer;font-weight:600;}.tr-children ul{padding-left:18px;}
 @media print{.tr-operations{max-height:none;overflow:visible;}.tr-picker{display:none;}.tr-covered{background:#AAA;print-color-adjust:exact;}}
+
+/* Phone gutters are shared across skins. Keep width for the graph and panel
+   contents instead of nesting desktop-sized page/section margins. */
+@media screen and (max-width:640px){
+  body[class] .docview[class]{padding:16px 8px 28px;}
+  body .docview[class] .doc-sec{padding:12px 8px 14px;margin-top:16px;}
+  body .docview[class] .lg{padding:8px;gap:8px;}
+  body .docview[class] .board-size .mbtn,
+  body .docview[class] .mtoggle .mbtn{min-height:40px;}
+  body .docview[class] .tabbtn{min-height:40px;}
+  body .docview[class] .boardgrid.haspanels>.panelcol{min-width:0;}
+}
 
 /* ---------- URL embed mode (#embed=<section-ref>) ----------
    One section's diagram + panels + step controls, nothing else — for

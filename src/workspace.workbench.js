@@ -17,7 +17,11 @@ function workbenchPreviewSnapshot(page, ctl){
   var sections = workbenchPreviewSections(page), saved = [];
   ((ctl && ctl.sections) || []).forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
-    if (!section || !stepper || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    if (!section || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    var prior = {key:section.key};
+    if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
+    saved.push(prior);
+    if (!stepper) return;
     var steps = section.diagram.steps || [], step = steps[stepper.current().n];
     var id = step && typeof step.id === 'string' && step.id ? step.id : null;
     var signature = JSON.stringify(step);
@@ -25,7 +29,7 @@ function workbenchPreviewSnapshot(page, ctl){
     if (stepper.mode() === 'step' && (id
       ? steps.filter(function(s){ return s && s.id === id; }).length !== 1
       : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
-    saved.push({key:section.key, mode:stepper.mode(), id:id, signature:signature});
+    prior.mode = stepper.mode(); prior.id = id; prior.signature = signature;
   });
   return {title:page && page.title || '', sections:saved};
 }
@@ -34,10 +38,12 @@ function restoreWorkbenchPreview(page, ctl, saved){
   var sections = workbenchPreviewSections(page);
   ctl.sections.forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
-    if (!section || !stepper || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    if (!section || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
     var matches = saved.sections.filter(function(s){ return s.key === section.key; });
     if (matches.length !== 1) return;
     var prior = matches[0];
+    if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
+    if (!stepper || !prior.mode) return;
     if (prior.mode === 'ambient'){
       if (stepper.mode() !== 'ambient') stepper.enterAmbient();
       return;

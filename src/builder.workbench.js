@@ -308,6 +308,27 @@ function builderPathString(path){
     return (i ? '.' : '') + (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(seg) ? seg : JSON.stringify(seg));
   }).join('') : '(whole document)';
 }
+function builderInsertTargetText(raw, sectionIdx){
+  /* the descriptive part of the insert-target label: "section N · heading",
+     prefixed with the tab name when the target section lives inside a tabs
+     block. A blank/whitespace tab label falls back to "tab N". Returns null
+     when the section ordinal has no section. */
+  var rec = specSectionPaths(raw || {})[sectionIdx];
+  if (!rec) return null;
+  var sec = specValueAt(raw, rec.section);
+  var name = sec && typeof sec.heading === 'string' && sec.heading ? ' · ' + sec.heading : '';
+  var tabName = '';
+  var path = rec.section;
+  var ti = path.indexOf('tabs');
+  if (ti >= 0 && typeof path[ti + 1] === 'number'){
+    var tabsArr = specValueAt(raw, path.slice(0, ti + 1));
+    var tab = Array.isArray(tabsArr) ? tabsArr[path[ti + 1]] : null;
+    var raw2 = tab && typeof tab.label === 'string' ? tab.label.trim() : '';
+    var label = raw2 || ('tab ' + (path[ti + 1] + 1));
+    tabName = 'tab “' + label + '” › ';
+  }
+  return 'into ' + tabName + 'section ' + (sectionIdx + 1) + name;
+}
 function builderPositionLine(raw, target){
   /* which slot the selected element occupies among its siblings — only
      the kinds with move buttons get one */
@@ -2316,23 +2337,8 @@ function initWorkbenchBuilder(opts){
   function updateTargetLabel(raw){
     if (!targetLabel) return;
     if (addToStep){ addToStepStatus(); return; } /* armed mode owns the label */
-    var rec = specSectionPaths(raw || {})[insertSection];
-    var sec = rec ? specValueAt(raw, rec.section) : null;
-    var name = sec && sec.heading ? ' · ' + sec.heading : '';
-    /* when the target section lives inside a tabs block, name the tab too —
-       otherwise "section 3" is ambiguous across tabs */
-    var tabName = '';
-    if (rec){
-      var path = rec.section;
-      var ti = path.indexOf('tabs');
-      if (ti >= 0 && typeof path[ti + 1] === 'number'){
-        var tabsArr = specValueAt(raw, path.slice(0, ti + 1));
-        var tab = Array.isArray(tabsArr) ? tabsArr[path[ti + 1]] : null;
-        var label = tab && typeof tab.label === 'string' ? tab.label : ('tab ' + (path[ti + 1] + 1));
-        tabName = 'tab “' + label + '” › ';
-      }
-    }
-    targetLabel.textContent = 'into ' + tabName + 'section ' + (insertSection + 1) + name +
+    var desc = builderInsertTargetText(raw || {}, insertSection);
+    targetLabel.textContent = (desc || 'into section ' + (insertSection + 1)) +
       ' — click a section to retarget';
     markInsertTarget();
   }

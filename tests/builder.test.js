@@ -17,7 +17,7 @@ function loadBuilder(extraGlobals){
     fs.readFileSync(path.join(ROOT, 'src', 'builder.workbench.js'), 'utf8') + '\n' +
     ';__exports = {mermaidToSpec, jsonLocate, jsonContainer, jsonInsertMember, jsonInsertListItemOrCreate,' +
     ' specSectionPaths, specValueAt, starterCountLine, builderTargetPath, builderPathString,' +
-    ' builderPositionLine,' +
+    ' builderPositionLine, builderInsertTargetText,' +
     ' builderUniqueKey, builderFlatRowIds,' +
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
     ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
@@ -2497,4 +2497,30 @@ test('planStackNodes refuses fewer than two, missing/float nodes, and already-st
   }}]}};
   assert.match(B.planStackNodes(JSON.stringify(stacked, null, 2), stacked, 0, ['a', 'b']).error,
     /already one stack/);
+});
+
+/* ---- builderInsertTargetText: the insert-target descriptor ---- */
+
+test('builderInsertTargetText names section, tab, and falls back for blank labels', () => {
+  const spec = {page: {blocks: [
+    {heading: 'First', diagram: {nodes: {a: {}}, rows: [['a']]}},
+    {tabs: [
+      {label: 'Ops', sections: [{heading: 'Runbook'}]},
+      {label: '  ', sections: [{heading: 'Blankish'}]},
+      {sections: [{heading: 'NoLabel'}]}
+    ]}
+  ]}};
+  assert.equal(B.builderInsertTargetText(spec, 0), 'into section 1 · First');
+  assert.equal(B.builderInsertTargetText(spec, 1), 'into tab “Ops” › section 2 · Runbook');
+  /* whitespace-only label falls back to "tab N", not tab “” */
+  assert.equal(B.builderInsertTargetText(spec, 2), 'into tab “tab 2” › section 3 · Blankish');
+  assert.equal(B.builderInsertTargetText(spec, 3), 'into tab “tab 3” › section 4 · NoLabel');
+  assert.equal(B.builderInsertTargetText(spec, 9), null);
+});
+
+test('builderInsertTargetText handles a headingless section and bare shapes', () => {
+  const noHeading = {page: {blocks: [{diagram: {nodes: {a: {}}, rows: [['a']]}}]}};
+  assert.equal(B.builderInsertTargetText(noHeading, 0), 'into section 1');
+  const bare = {nodes: {a: {}}, rows: [['a']]};
+  assert.equal(B.builderInsertTargetText(bare, 0), 'into section 1');
 });

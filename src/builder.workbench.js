@@ -595,6 +595,11 @@ function planSetGroupTitle(text, raw, sectionIdx, key, titleOrNull){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   if (typeof key !== 'string' || !key.trim()) return {error: 'a group needs a key'};
+  /* a non-object groups value ("no declarations" to the validator) must be
+     refused, not object-coerced — copying a string spreads its characters
+     into numbered keys and corrupts the author's value */
+  if (got.d.groups != null && (typeof got.d.groups !== 'object' || Array.isArray(got.d.groups)))
+    return {error: 'diagram.groups is not an object — fix it in the JSON first'};
   return builderRewrite(text, raw, got.path, function(d){
     var groups = Object.assign(Object.create(null), d.groups || {});
     var meta = Object.assign(Object.create(null), groups[key] || {});

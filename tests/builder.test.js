@@ -2420,3 +2420,16 @@ test('buildExportHtml leaves the title alone when the spec has none', () => {
   assert.ok(!out.error);
   assert.ok(out.html.includes('<title>Old Title</title>'));
 });
+
+test('group planners refuse a non-object diagram.groups instead of corrupting it', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {group: 'dev'}, b: {}}, rows: [['a', 'b']],
+    groups: 'occupied'
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  assert.match(B.planSetGroupTitle(text, spec, 0, 'dev', 'Title').error, /not an object/);
+  const setPlan = B.planSetNodeGroup(text, spec, 0, 'b', 'dev');
+  assert.ok(setPlan.error, 'declaring into a string groups value must fail, not corrupt');
+  /* the original string value survives every refused edit */
+  assert.equal(JSON.parse(text).page.blocks[0].diagram.groups, 'occupied');
+});

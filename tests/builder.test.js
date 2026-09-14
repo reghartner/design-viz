@@ -98,6 +98,16 @@ test('planBulkSetField marks and clears delta on two nodes', () => {
   assert.deepStrictEqual(plain(JSON.parse(clear.text)), SPEC);
 });
 
+test('planBulkSetField marks and clears delta on a step target', () => {
+  const targets = [{section: 0, kind: 'step', index: 0}];
+  const plan = B.planBulkSetField(TEXT, targets, 'delta', 'true');
+  assert.ok(!plan.error, plan.error);
+  assert.strictEqual(JSON.parse(plan.text).page.blocks[0].diagram.steps[0].delta, true);
+  const clear = B.planBulkSetField(plan.text, targets, 'delta', null);
+  assert.ok(!clear.error, clear.error);
+  assert.deepStrictEqual(plain(JSON.parse(clear.text)), SPEC);
+});
+
 test('jsonLocate finds nested values and the ranges parse back to them', () => {
   const cases = [
     [['page', 'title'], SPEC.page.title],

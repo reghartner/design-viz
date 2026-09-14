@@ -3780,7 +3780,7 @@ function initWorkbenchBuilder(opts){
     if (form.childNodes.length) guide.appendChild(form);
     var acts = document.createElement('div');
     acts.className = 'iacts';
-    if (kind === 'node' || kind === 'edge'){
+    if (kind === 'node' || kind === 'edge' || kind === 'step'){
       acts.appendChild(actionButton('mark delta', function(){ return applyBulkField('delta', 'true'); }));
       acts.appendChild(actionButton('clear delta', function(){ return applyBulkField('delta', null); }));
     }

@@ -14,6 +14,38 @@ var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zo
 var TABLE_STATUSES = ['neutral','added','changed','removed'];
 var CHECK_STATUSES = ['pending','pass','fail','warn','skip'];
 
+/* Shared, pure parent-link tolerance for layout, validation and the inspector.
+   Inspect all chains before dropping cyclic links so declaration order cannot
+   decide which cycle member becomes the outer box. Incoming links survive. */
+function sanitizedGroupParents(groups, ignored){
+  groups = groups && typeof groups === 'object' ? groups : {};
+  var parents = Object.create(null), cyclic = [];
+  Object.keys(groups).forEach(function(key){
+    var meta = groups[key], reason;
+    if (!meta || !Object.prototype.hasOwnProperty.call(meta, 'parent')) return;
+    var parent = meta.parent;
+    if (typeof parent !== 'string') reason = 'must be a string — parent ignored';
+    else if (parent === key) reason = 'a group cannot contain itself — parent ignored';
+    else if (!Object.prototype.hasOwnProperty.call(groups, parent))
+      reason = 'unknown group "' + parent + '" — parent ignored';
+    if (reason){ if (ignored) ignored(key, reason); }
+    else parents[key] = parent;
+  });
+  Object.keys(parents).forEach(function(key){
+    var seen = Object.create(null), cursor = key;
+    while (cursor !== undefined && !seen[cursor]){
+      seen[cursor] = true;
+      cursor = parents[cursor];
+    }
+    if (cursor === key) cyclic.push(key);
+  });
+  cyclic.forEach(function(key){
+    delete parents[key];
+    if (ignored) ignored(key, 'parent chain loops — parent ignored');
+  });
+  return parents;
+}
+
 /* Never calculate an apparently precise trace breakdown from malformed or
    cyclic data. Partial, structurally sound traces remain inspectable. */
 function tracePanelData(p){
@@ -828,6 +860,9 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.floats[' + fi + '].side: unknown side "' + f.side + '" — using "above" (valid: above, below)');
   });
   var groups = (d.groups && typeof d.groups === 'object') ? d.groups : {};
+  sanitizedGroupParents(groups, function(key, reason){
+    warnings.push(DP + '.groups.' + key + '.parent: ' + reason);
+  });
   Object.keys(groups).forEach(function(key){
     var meta = groups[key];
     if (!meta || !Object.prototype.hasOwnProperty.call(meta, 'icon')) return;

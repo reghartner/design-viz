@@ -839,6 +839,150 @@ test('group bounding box covers member nodes with padding', () => {
   assert.ok(g.y + g.h > L.pos.b.cy + L.pos.b.h / 2);
 });
 
+function houseGroups(){
+  return {
+    groups: {
+      house: {title: 'Home', icon: 'house'},
+      living: {title: 'Living room', parent: 'house'},
+      garage: {title: 'Garage', icon: 'car', parent: 'house'}
+    },
+    nodes: {cam: {title: 'Camera', group: 'living'}, tv: {title: 'TV', group: 'living'},
+      car: {title: 'EV', group: 'garage'}, hub: {title: 'Hub', group: 'house'}},
+    rows: [[['cam', 'tv'], 'car', 'hub']]
+  };
+}
+function nodeRect(p){ return {x: p.cx - p.w / 2, y: p.cy - p.h / 2, w: p.w, h: p.h}; }
+function strictlyContains(outer, inner){
+  assert.ok(outer.x < inner.x && outer.y < inner.y &&
+    outer.x + outer.w > inner.x + inner.w && outer.y + outer.h > inner.y + inner.h,
+    JSON.stringify({outer, inner}));
+}
+
+test('nested house wraps children and direct members with separate title bands', () => {
+  const d = houseGroups(), before = JSON.stringify(d), L = C.layout(d);
+  for (const key of ['living', 'garage']) {
+    strictlyContains(L.groups.house, L.groups[key]);
+    assert.strictEqual(L.groups[key].nestLevel, 1);
+    assert.ok(L.groups[key].y >= L.groups.house.y + 34);
+  }
+  assert.strictEqual(L.groups.house.nestLevel, 0);
+  for (const [id, node] of Object.entries(d.nodes)) strictlyContains(L.groups[node.group], nodeRect(L.pos[id]));
+  assert.strictEqual(JSON.stringify(d), before, 'layout is pure');
+  assert.strictEqual(L.H, L.groups.house.y + L.groups.house.h + 24);
+  assert.deepStrictEqual(plain(C.validate(C.normalize(d))), {errors: [], warnings: []});
+});
+
+test('parents with only descendants get boxes; empty families do not add boxes or headroom', () => {
+  const d = houseGroups();
+  delete d.nodes.hub.group;
+  d.groups.empty = {};
+  d.groups.emptyChild = {parent: 'empty'};
+  d.groups.emptyLeaf = {parent: 'emptyChild'};
+  d.nodes.unplaced = {group: 'emptyLeaf'};
+  const L = C.layout(d);
+  strictlyContains(L.groups.house, L.groups.living);
+  strictlyContains(L.groups.house, L.groups.garage);
+  for (const key of ['empty', 'emptyChild', 'emptyLeaf']) assert.ok(!L.groups[key]);
+  assert.strictEqual(L.rows[0].top, 102);
+});
+
+test('nested headroom adds 34 per ancestor and canvas encloses deep and floating boxes', () => {
+  const flat = {groups: {a: {}, b: {}, c: {}}, nodes: {n: {group: 'c'}}, rows: [['n']]};
+  const top = C.layout(flat).rows[0].top;
+  flat.groups.c.parent = 'b';
+  assert.strictEqual(C.layout(flat).rows[0].top, top + 34);
+  flat.groups.b.parent = 'a';
+  const deep = C.layout(flat);
+  assert.strictEqual(deep.rows[0].top, top + 68);
+  assert.deepStrictEqual(['a', 'b', 'c'].map(k => deep.groups[k].nestLevel), [0, 1, 2]);
+  strictlyContains(deep.groups.a, deep.groups.b);
+  strictlyContains(deep.groups.b, deep.groups.c);
+  assert.strictEqual(deep.groups.a.y, 34);
+  flat.nodes.f = {group: 'c'};
+  flat.floats = [{id: 'f', side: 'below', dy: 100}];
+  const floating = C.layout(flat);
+  strictlyContains(floating.groups.c, nodeRect(floating.pos.f));
+  assert.strictEqual(floating.H, floating.groups.a.y + floating.groups.a.h + 24);
+});
+
+test('flat group geometry stays pinned to the original member-extents formula', () => {
+  const L = C.layout({nodes: {a: {group: 'dev'}, b: {group: 'dev'}, c: {}},
+    rows: [[['a', 'b'], 'c']], groups: {dev: {title: 'Device'}}});
+  assert.deepStrictEqual(plain(L.groups), {dev: {
+    x1: 25, y1: 68, x2: 195, y2: 222, x: 11, y: 34, w: 198, h: 202, nestLevel: 0
+  }});
+  assert.strictEqual(L.rows[0].top, 68);
+  assert.strictEqual(L.H, 262);
+});
+
+test('deep nesting widens the drawable area instead of clipping the outer box', () => {
+  const flatVb = C.layout({nodes: {a: {group: 'dev'}, b: {group: 'dev'}, c: {}},
+    rows: [[['a', 'b'], 'c']], groups: {dev: {}}}).vb;
+  assert.strictEqual(flatVb.x, 0);
+  assert.strictEqual(flatVb.y, 0);
+  const L = C.layout({nodes: {a: {group: 'inner'}, b: {group: 'inner'}, c: {}},
+    rows: [[['a', 'b'], 'c']], groups: {inner: {parent: 'outer'}, outer: {}}});
+  // leftmost stacked card starts at x=25; inner box x=11, outer x=-3 (14px pad per level)
+  assert.strictEqual(L.groups.outer.x, -3);
+  assert.deepStrictEqual(plain(L.vb), {x: -5, y: 0, w: flatVb.w + 5, h: L.H});
+});
+
+test('invalid parent links warn and degrade to the same flat geometry', () => {
+  const base = {groups: {a: {}, b: {}}, nodes: {x: {group: 'a'}, y: {group: 'b'}}, rows: [['x', 'y']]};
+  const expected = plain(C.layout(base));
+  const cases = [
+    ...[null, false, 0, [], {}].map(parent => [parent, 'must be a string — parent ignored']),
+    ['missing', 'unknown group "missing" — parent ignored'],
+    ['toString', 'unknown group "toString" — parent ignored'],
+    ['a', 'a group cannot contain itself — parent ignored']
+  ];
+  for (const [parent, message] of cases) {
+    const d = plain(base);
+    d.groups.a.parent = parent;
+    const result = C.validate(C.normalize(d));
+    assert.deepStrictEqual(plain(result.errors), []);
+    assert.strictEqual(result.warnings.length, 1);
+    assert.ok(result.warnings[0].endsWith('.groups.a.parent: ' + message));
+    assert.deepStrictEqual(plain(C.layout(d)), expected);
+  }
+  base.groups.a.parent = 'b';
+  base.groups.b.parent = 'a';
+  assert.deepStrictEqual(plain(C.layout(base)), expected);
+  const warnings = C.validate(C.normalize(base)).warnings;
+  assert.strictEqual(warnings.length, 2);
+  for (const key of ['a', 'b']) assert.ok(warnings.some(w => w.endsWith('.groups.' + key + '.parent: parent chain loops — parent ignored')));
+});
+
+test('cycle sanitation is order-independent and preserves links entering a longer cycle', () => {
+  const definitions = {a: {parent: 'b'}, b: {parent: 'c'}, c: {parent: 'a'}, tail: {parent: 'a'}};
+  for (const keys of [Object.keys(definitions), Object.keys(definitions).reverse()]) {
+    const d = {groups: Object.fromEntries(keys.map(k => [k, definitions[k]])),
+      nodes: {n: {group: 'tail'}}, rows: [['n']]};
+    const before = JSON.stringify(d), L = C.layout(d);
+    assert.strictEqual(L.groups.a.nestLevel, 0);
+    assert.strictEqual(L.groups.tail.nestLevel, 1);
+    strictlyContains(L.groups.a, L.groups.tail);
+    const warnings = C.validate(C.normalize(d)).warnings;
+    assert.strictEqual(warnings.length, 3);
+    for (const key of ['a', 'b', 'c']) assert.ok(warnings.some(w => w.endsWith('.groups.' + key + '.parent: parent chain loops — parent ignored')));
+    assert.strictEqual(JSON.stringify(d), before);
+  }
+});
+
+test('nested renderer paints outer boxes before children while flat group order is unchanged', () => {
+  const core = loadCore({document: {getElementById(){ return null; }}});
+  const d = houseGroups();
+  const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {}; }};
+  const order = () => {
+    core.renderBoard(host, d, 'test', 'aurora', core.resolveProtocols({}), null);
+    return [...host.html.matchAll(/<g class="grp" data-dv-group="([^"]+)"/g)].map(m => m[1]);
+  };
+  assert.deepStrictEqual(order(), ['house', 'living', 'garage']);
+  delete d.groups.living.parent;
+  delete d.groups.garage.parent;
+  assert.deepStrictEqual(order(), ['living', 'garage', 'house']);
+});
+
 test('group renderer exposes an escaped data-dv-group selection identity', () => {
   let html = '';
   const host = {

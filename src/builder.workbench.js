@@ -688,6 +688,35 @@ function planSetGroupIcon(text, raw, sectionIdx, key, iconOrNull){
   });
 }
 
+function planSetGroupParent(text, raw, sectionIdx, key, parentOrNull){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (typeof key !== 'string' || !key.trim()) return {error: 'a group needs a key'};
+  var shape = builderGroupsShapeError(got.d);
+  if (shape) return shape;
+  if (parentOrNull != null && typeof parentOrNull !== 'string') return {error: 'parent must be text'};
+  return builderRewrite(text, raw, got.path, function(d){
+    var groups = Object.assign(Object.create(null), d.groups || {});
+    var meta = Object.assign(Object.create(null), groups[key] || {});
+    if (parentOrNull == null || parentOrNull.trim() === '') delete meta.parent;
+    else meta.parent = parentOrNull.trim();
+    groups[key] = meta;
+    d.groups = groups;
+  });
+}
+
+function builderGroupParentOptions(groups, key){
+  var parents = sanitizedGroupParents(groups);
+  return Object.keys(groups || {}).filter(function(candidate){
+    var cursor = candidate;
+    while (cursor !== undefined){
+      if (cursor === key) return false;
+      cursor = parents[cursor];
+    }
+    return true;
+  });
+}
+
 function planRenameGroup(text, raw, sectionIdx, oldKey, newKey){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
@@ -708,6 +737,11 @@ function planRenameGroup(text, raw, sectionIdx, oldKey, newKey){
     if (declared){
       var renamed = Object.create(null);
       Object.keys(d.groups).forEach(function(k){ renamed[k === oldKey ? newKey : k] = d.groups[k]; });
+      /* children nested under the old key must follow the rename, or their
+         parent link dangles and the boxes silently flatten */
+      Object.keys(renamed).forEach(function(k){
+        if (renamed[k] && renamed[k].parent === oldKey) renamed[k].parent = newKey;
+      });
       d.groups = renamed;
     }
   });
@@ -719,7 +753,17 @@ function planDeleteGroup(text, raw, sectionIdx, key){
   var shape = builderGroupsShapeError(got.d);
   if (shape) return shape;
   return builderRewrite(text, raw, got.path, function(d){
+    /* promote through the SANITIZED links: a dangling, self, or cyclic
+       parent on the deleted group must not be handed down to children */
+    var promoted = sanitizedGroupParents(d.groups)[key];
     if (d.groups) delete d.groups[key];
+    /* children of the deleted group climb one level: they take its parent,
+       or become top-level when it had none */
+    Object.keys(d.groups || {}).forEach(function(k){
+      if (!d.groups[k] || d.groups[k].parent !== key) return;
+      if (typeof promoted === 'string') d.groups[k].parent = promoted;
+      else delete d.groups[k].parent;
+    });
     Object.keys(d.nodes || {}).forEach(function(id){
       if (d.nodes[id] && d.nodes[id].group === key) delete d.nodes[id].group;
     });
@@ -3378,6 +3422,12 @@ function initWorkbenchBuilder(opts){
           {after: function(){ renderInspector(); }});
       }, null, 'group');
     memberRow.classList.add('groupctl');
+    var parentOptions = builderGroupParentOptions(ctx.diagram && ctx.diagram.groups, t.id);
+    var parentControl = selectControl(parentOptions, parentOptions.indexOf(val.parent) >= 0 ? val.parent : '', function(v){
+      return commitGroup(function(raw){ return planSetGroupParent(src.value, raw, t.section, t.id, v); },
+        {after: function(){ renderInspector(); }});
+    }, true);
+    parentControl.firstChild.textContent = 'top-level';
     return [
       frow('key', groupControl(t.id, function(v){
         return commitGroup(function(raw){ return planRenameGroup(src.value, raw, t.section, t.id, v); },
@@ -3391,6 +3441,7 @@ function initWorkbenchBuilder(opts){
         return commitGroup(function(raw){ return planSetGroupIcon(src.value, raw, t.section, t.id, v); },
           {after: function(){ renderInspector(); }});
       }, true)),
+      frow('parent (nesting)', parentControl),
       memberRow
     ];
   }

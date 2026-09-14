@@ -367,9 +367,28 @@ function layout(spec){
   Object.keys(spec.nodes || {}).forEach(function(id){
     if (spec.nodes[id] && spec.nodes[id].group) hasGroups = true;
   });
+  var parents = sanitizedGroupParents(spec.groups), levels = Object.create(null);
+  function groupLevel(key){
+    if (levels[key] !== undefined) return levels[key];
+    var level = 0, cursor = key;
+    while (parents[cursor] !== undefined){ level++; cursor = parents[cursor]; }
+    levels[key] = level;
+    return level;
+  }
+  var placed = Object.create(null), maxDepth = 1;
+  spec.rows.forEach(function(row){
+    row.forEach(function(slot){
+      (Array.isArray(slot) ? slot : [slot]).forEach(function(id){ placed[id] = true; });
+    });
+  });
+  floats.forEach(function(f){ if (f) placed[f.id] = true; });
+  Object.keys(spec.nodes || {}).forEach(function(id){
+    var g = spec.nodes[id] && spec.nodes[id].group;
+    if (g && placed[id]) maxDepth = Math.max(maxDepth, groupLevel(g) + 1);
+  });
   var top = hasAbove ? 125 : 42;
   if (lanes) top = Math.max(top, 40 + (laneCounts[-1] || 0) * 8);
-  if (hasGroups) top += 26; /* room for a group title above row 0 */
+  if (hasGroups) top += 26 + 34 * (maxDepth - 1); /* one title band per ancestor */
 
   spec.rows.forEach(function(slots, r){
     var maxStack = 1;
@@ -426,7 +445,7 @@ function layout(spec){
   });
 
   /* group bounding boxes over member node positions */
-  var groupBoxes = {};
+  var groupBoxes = Object.create(null);
   Object.keys(spec.nodes || {}).forEach(function(id){
     var g = spec.nodes[id] && spec.nodes[id].group;
     var p = pos[id];
@@ -439,9 +458,23 @@ function layout(spec){
   });
   var GROUP_PAD = 14, GROUP_TITLE = 20;
   Object.keys(groupBoxes).forEach(function(g){
+    var parent = parents[g];
+    while (parent !== undefined){
+      if (!groupBoxes[parent]) groupBoxes[parent] = {x1:Infinity, y1:Infinity, x2:-Infinity, y2:-Infinity};
+      parent = parents[parent];
+    }
+  });
+  Object.keys(groupBoxes).sort(function(a, b){ return groupLevel(b) - groupLevel(a); }).forEach(function(g){
     var b = groupBoxes[g];
     b.x = b.x1 - GROUP_PAD; b.y = b.y1 - GROUP_PAD - GROUP_TITLE;
     b.w = (b.x2 - b.x1) + 2*GROUP_PAD; b.h = (b.y2 - b.y1) + 2*GROUP_PAD + GROUP_TITLE;
+    b.nestLevel = groupLevel(g);
+    var parent = parents[g];
+    if (parent !== undefined){
+      var outer = groupBoxes[parent];
+      outer.x1 = Math.min(outer.x1, b.x); outer.y1 = Math.min(outer.y1, b.y);
+      outer.x2 = Math.max(outer.x2, b.x + b.w); outer.y2 = Math.max(outer.y2, b.y + b.h);
+    }
   });
 
   var H = lastRow.top + lastRow.height + 40;
@@ -449,7 +482,23 @@ function layout(spec){
   floats.forEach(function(f){
     if (f && f.side === 'below' && pos[f.id]) H = Math.max(H, pos[f.id].cy + FLOAT_H/2 + 24);
   });
-  return {pos:pos, rows:rowsMeta, groups:groupBoxes, H: H, routing:lanes ? 'lanes' : undefined};
+  Object.keys(groupBoxes).forEach(function(g){
+    var b = groupBoxes[g];
+    H = Math.max(H, b.y + b.h + 24);
+  });
+  /* deep nesting pads horizontally past the fixed card columns (and above
+     a float member's row) — widen the drawable area instead of clipping.
+     Flat specs keep vb = {0, 0, W, H}, so their markup stays identical. */
+  var vbX = 0, vbY = 0, vbR = W;
+  Object.keys(groupBoxes).forEach(function(g){
+    var b = groupBoxes[g];
+    if (b.x - 2 < vbX) vbX = b.x - 2;
+    if (b.y - 2 < vbY) vbY = b.y - 2;
+    if (b.x + b.w + 2 > vbR) vbR = b.x + b.w + 2;
+  });
+  return {pos:pos, rows:rowsMeta, groups:groupBoxes, H: H,
+          vb:{x:vbX, y:vbY, w:vbR - vbX, h:H - vbY},
+          routing:lanes ? 'lanes' : undefined};
 }
 
 /* Reserved horizontal tracks plus obstacle-free vertical channels. Keep
@@ -1124,7 +1173,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     if (e.ret) anyRet = true;
   });
 
-  var s = '<svg viewBox="0 0 ' + W + ' ' + L.H + '" role="img" aria-label="' + esc(d.title || 'flow diagram') + '" xmlns="' + SVGNS + '">';
+  var vb = L.vb || {x:0, y:0, w:W, h:L.H};
+  var s = '<svg viewBox="' + vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h + '" role="img" aria-label="' + esc(d.title || 'flow diagram') + '" xmlns="' + SVGNS + '">';
   s += '<defs>';
   Object.keys(kindsUsed).forEach(function(k){
     s += '<marker id="' + prefix + '-m-' + k + '" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">' +
@@ -1132,12 +1182,13 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   });
   s += '<pattern id="' + prefix + '-g" width="26" height="26" patternUnits="userSpaceOnUse">' +
        '<circle cx="1.3" cy="1.3" r="1.3" fill="#16233C"/></pattern>';
-  s += '</defs><rect class="dv-board-ground" width="' + W + '" height="' + L.H + '" fill="' + SK.bg + '"/>' +
-       '<rect class="dv-board-grid" width="' + W + '" height="' + L.H + '" fill="url(#' + prefix + '-g)"/>';
+  var groundXY = (vb.x ? ' x="' + vb.x + '"' : '') + (vb.y ? ' y="' + vb.y + '"' : '');
+  s += '</defs><rect class="dv-board-ground"' + groundXY + ' width="' + vb.w + '" height="' + vb.h + '" fill="' + SK.bg + '"/>' +
+       '<rect class="dv-board-grid"' + groundXY + ' width="' + vb.w + '" height="' + vb.h + '" fill="url(#' + prefix + '-g)"/>';
 
   /* containment groups: dashed boundary + title, behind everything */
   var groupDefs = (d.groups && typeof d.groups === 'object') ? d.groups : {};
-  Object.keys(L.groups).forEach(function(g){
+  Object.keys(L.groups).sort(function(a, b){ return L.groups[a].nestLevel - L.groups[b].nestLevel; }).forEach(function(g){
     var b = L.groups[g];
     var meta = groupDefs[g] || {};
     var groupIcon = typeof meta.icon === 'string' ? (ICON_SET.indexOf(meta.icon) >= 0 ? meta.icon : 'gear') : null;

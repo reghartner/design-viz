@@ -22,6 +22,7 @@ function loadBuilder(extraGlobals){
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
     ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
     ' planSetNodeGroup, planBulkSetGroup, planSetGroupTitle, planSetGroupIcon, planRenameGroup, planDeleteGroup,' +
+    ' planSetGroupParent, builderGroupParentOptions,' +
     ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
     ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
     ' planMoveStep, planMoveRow, planMoveGroup, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
@@ -35,7 +36,9 @@ function loadBuilder(extraGlobals){
     ' builderSectionPrefs,' +
     ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes, planStackNodes, builderDeletePlan, planBulkSetField, planBulkDelete, BUILDER_MULTI_KINDS,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
-  const sandbox = {console};
+  const core = {};
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8'), core);
+  const sandbox = {console, sanitizedGroupParents: core.sanitizedGroupParents};
   if (extraGlobals) Object.assign(sandbox, extraGlobals);
   vm.runInNewContext(code, sandbox);
   return sandbox.__exports;
@@ -510,6 +513,67 @@ test('planSetGroupIcon declares missing groups and refuses missing keys', () => 
   const created = B.planSetGroupIcon(JSON.stringify(raw), raw, 0, 'dev', 'house');
   assert.deepStrictEqual(plain(JSON.parse(created.text).page.blocks[0].diagram.groups), {dev: {icon: 'house'}});
   assert.match(B.planSetGroupIcon(GROUPED_TEXT, GROUPED, 0, '', 'house').error, /needs a key/);
+});
+
+test('renaming or deleting a group keeps every child parent link valid', () => {
+  const spec = {nodes: {n: {group: 'child'}}, rows: [['n']],
+    groups: {top: {}, mid: {parent: 'top'}, child: {parent: 'mid'}}};
+  let plan = B.planRenameGroup(JSON.stringify(spec), spec, 0, 'mid', 'middle');
+  assert.ok(!plan.error, plan.error);
+  let g = JSON.parse(plan.text).groups;
+  assert.strictEqual(g.middle.parent, 'top');
+  assert.strictEqual(g.child.parent, 'middle');
+  plan = B.planDeleteGroup(JSON.stringify(spec), spec, 0, 'mid');
+  assert.ok(!plan.error, plan.error);
+  g = JSON.parse(plan.text).groups;
+  assert.strictEqual(g.mid, undefined);
+  assert.strictEqual(g.child.parent, 'top');
+  plan = B.planDeleteGroup(JSON.stringify(spec), spec, 0, 'top');
+  assert.ok(!plan.error, plan.error);
+  g = JSON.parse(plan.text).groups;
+  assert.strictEqual(g.mid.parent, undefined);
+  assert.strictEqual(g.child.parent, 'mid');
+  // a dangling or cyclic parent on the deleted group must not be handed down
+  const broken = {nodes: {n: {group: 'child'}}, rows: [['n']],
+    groups: {bad: {parent: 'missing'}, child: {parent: 'bad'}}};
+  g = JSON.parse(B.planDeleteGroup(JSON.stringify(broken), broken, 0, 'bad').text).groups;
+  assert.strictEqual(g.child.parent, undefined);
+  const looped = {nodes: {n: {group: 'child'}}, rows: [['n']],
+    groups: {x: {parent: 'y'}, y: {parent: 'x'}, child: {parent: 'x'}}};
+  g = JSON.parse(B.planDeleteGroup(JSON.stringify(looped), looped, 0, 'x').text).groups;
+  assert.strictEqual(g.child.parent, undefined);
+  assert.strictEqual(g.y.parent, undefined);
+});
+
+test('builderGroupParentOptions excludes self and descendants over sanitized links', () => {
+  const groups = {a: {}, b: {parent: 'a'}, c: {parent: 'b'}, other: {}};
+  const before = JSON.stringify(groups);
+  assert.deepStrictEqual(plain(B.builderGroupParentOptions(groups, 'a')), ['other']);
+  assert.deepStrictEqual(plain(B.builderGroupParentOptions(groups, 'b')), ['a', 'other']);
+  assert.deepStrictEqual(plain(B.builderGroupParentOptions(groups, 'c')), ['a', 'b', 'other']);
+  assert.deepStrictEqual(plain(B.builderGroupParentOptions(undefined, 'a')), []);
+  assert.strictEqual(JSON.stringify(groups), before);
+  const invalid = {a: {parent: 'b'}, b: {parent: 'a'}, c: {parent: 'a'},
+    unknown: {parent: 'missing'}, self: {parent: 'self'}, bad: {parent: 7}};
+  assert.deepStrictEqual(plain(B.builderGroupParentOptions(invalid, 'a')), ['b', 'unknown', 'self', 'bad']);
+});
+
+test('planSetGroupParent sets, replaces and clears only the parent field', () => {
+  const before = JSON.stringify(GROUPED);
+  const set = B.planSetGroupParent(GROUPED_TEXT, GROUPED, 0, 'dev', 'spare');
+  assert.ok(!set.error, set.error);
+  const raw = JSON.parse(set.text);
+  assert.deepStrictEqual(raw.page.blocks[0].diagram.groups.dev, {title: 'Device', parent: 'spare'});
+  assert.strictEqual(JSON.stringify(GROUPED), before);
+  const replaced = B.planSetGroupParent(set.text, raw, 0, 'dev', 'orphan');
+  assert.strictEqual(JSON.parse(replaced.text).page.blocks[0].diagram.groups.dev.parent, 'orphan');
+  for (const empty of [null, '', ' ']) {
+    const cleared = B.planSetGroupParent(set.text, raw, 0, 'dev', empty);
+    assert.deepStrictEqual(JSON.parse(cleared.text), GROUPED);
+  }
+  assert.match(B.planSetGroupParent(GROUPED_TEXT, GROUPED, 0, '', 'spare').error, /needs a key/);
+  const malformed = {nodes: {a: {}}, rows: [['a']], groups: []};
+  assert.match(B.planSetGroupParent(JSON.stringify(malformed), malformed, 0, 'a', null).error, /not an object/);
 });
 
 test('planRenameGroup moves its declaration and members and refuses collisions', () => {

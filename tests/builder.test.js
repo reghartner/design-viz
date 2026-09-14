@@ -18,13 +18,13 @@ function loadBuilder(extraGlobals){
     ';__exports = {mermaidToSpec, jsonLocate, jsonContainer, jsonInsertMember, jsonInsertListItemOrCreate,' +
     ' specSectionPaths, specValueAt, starterCountLine, builderTargetPath, builderPathString,' +
     ' builderPositionLine, builderInsertTargetText,' +
-    ' builderUniqueKey, builderFlatRowIds,' +
+    ' builderUniqueKey, builderFlatRowIds, builderSlotGapXs,' +
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
     ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
     ' planSetNodeGroup, planBulkSetGroup, planSetGroupTitle, planSetGroupIcon, planRenameGroup, planDeleteGroup,' +
     ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
     ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
-    ' planMoveStep, planMoveRow, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
+    ' planMoveStep, planMoveRow, planMoveGroup, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
@@ -2420,6 +2420,112 @@ test('planMoveRow refuses bad indices and no-op moves', () => {
   assert.match(B.planMoveRow(text, spec, 0, 0, 2).error, /no row slot/);
   assert.match(B.planMoveRow(text, spec, 0, 1, 1).error, /already there/);
   assert.ok(B.planMoveRow(text, spec, 9, 0, 1).error); /* no such section */
+});
+
+/* ---- planMoveGroup: carry group slots while retaining target row identity ---- */
+
+function groupMoveFixture(rows, members = ['a', 'b']){
+  const nodes = Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f', 'u'].map(id =>
+    [id, members.includes(id) ? {group: 'g'} : {}]));
+  return {nodes, rows, floats: [{id: 'f', x: 30, y: 40}], groups: {g: {title: 'Group'}},
+    edges: [{from: 'a', to: 'c'}], steps: [{nodes: ['a', 'b'], text: 'Keep me'}]};
+}
+test('group slot geometry follows serpentine order, including unequal stack widths and single slots', () => {
+  const boxes = [{x1: 20, x2: 100}, {x1: 200, x2: 350}, {x1: 400, x2: 480}];
+  assert.deepStrictEqual(plain(B.builderSlotGapXs(boxes, false)), [12, 150, 375, 488]);
+  assert.deepStrictEqual(plain(B.builderSlotGapXs([...boxes].reverse(), true)), [488, 375, 150, 12]);
+  assert.deepStrictEqual(plain(B.builderSlotGapXs([boxes[0]], true)), [108, 12]);
+  assert.deepStrictEqual(plain(B.builderSlotGapXs([], false)), []);
+});
+function movedGroupRows(spec, drop){
+  const before = JSON.stringify(spec), plan = B.planMoveGroup(before, spec, 0, 'g', drop);
+  assert.ok(!plan.error, plan.error);
+  assert.equal(JSON.stringify(spec), before, 'the input remains immutable');
+  const next = JSON.parse(plan.text);
+  assert.deepStrictEqual({...next, rows: spec.rows}, spec, 'only rows changes');
+  return next.rows;
+}
+
+test('planMoveGroup converts pre-removal slots within a row and clamps the result', () => {
+  const spec = groupMoveFixture([['c', 'a', 'b', 'd', 'e']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 0}), [['a', 'b', 'c', 'd', 'e']]);
+  // slot 4 is the visual gap between d and e; the two lifted slots before it no longer count
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 4}), [['c', 'd', 'a', 'b', 'e']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 99}), [['c', 'd', 'e', 'a', 'b']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: -5}), [['a', 'b', 'c', 'd', 'e']]);
+  // gaps inside or immediately after the contiguous run land it back where it was
+  for (const slot of [1, 2, 3])
+    assert.equal(B.planMoveGroup(JSON.stringify(spec), spec, 0, 'g', {row: 0, slot}).error, 'already there');
+});
+
+test('planMoveGroup gathers a non-contiguous group and can land it at a gap between its own members', () => {
+  const spec = groupMoveFixture([['a', 'b', 'c', 'd']], ['a', 'b', 'd']);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 1}), [['a', 'b', 'd', 'c']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 0, slot: 3}), [['c', 'a', 'b', 'd']]);
+});
+
+test('planMoveGroup inserts into the original target row even when earlier rows disappear', () => {
+  const spec = groupMoveFixture([['a'], ['c', 'b'], ['d', 'e']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 2, slot: 1}), [['c'], ['d', 'a', 'b', 'e']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 1, slot: 1}), [['c', 'a', 'b'], ['d', 'e']]);
+});
+
+test('planMoveGroup creates rows at gaps, accounting for every emptied row above the gap', () => {
+  const spec = groupMoveFixture([['a'], ['c'], ['b'], ['d', 'e']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {gap: 0}), [['a', 'b'], ['c'], ['d', 'e']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {gap: 3}), [['c'], ['a', 'b'], ['d', 'e']]);
+  assert.deepStrictEqual(movedGroupRows(spec, {gap: 4}), [['c'], ['d', 'e'], ['a', 'b']]);
+  assert.deepStrictEqual(movedGroupRows(groupMoveFixture([['c', 'a'], ['d', 'b']]), {gap: 1}),
+    [['c'], ['a', 'b'], ['d']]);
+});
+
+test('planMoveGroup preserves whole stacks and extracts partial stacks as ordered single slots', () => {
+  assert.deepStrictEqual(movedGroupRows(groupMoveFixture([[['b', 'a']], ['c', 'd']]), {row: 1, slot: 1}),
+    [['c', ['b', 'a'], 'd']]);
+  assert.deepStrictEqual(movedGroupRows(groupMoveFixture([[['b', 'c', 'a']], ['d']]), {gap: 2}),
+    [['c'], ['d'], ['b', 'a']]);
+  assert.deepStrictEqual(movedGroupRows(groupMoveFixture([[['a', 'c', 'd', 'b']], ['e']]), {row: 1, slot: 0}),
+    [[['c', 'd']], ['a', 'b', 'e']]);
+  const mixed = groupMoveFixture([['b', ['c', 'a'], ['e']], ['d']], ['a', 'b', 'e', 'f', 'u']);
+  assert.deepStrictEqual(movedGroupRows(mixed, {gap: 2}), [['c'], ['d'], ['b', 'a', ['e']]]);
+});
+
+test('planMoveGroup ignores floated and unplaced members but refuses absent or unplaced groups', () => {
+  const spec = groupMoveFixture([['c', 'a'], ['d']], ['a', 'f', 'u']);
+  assert.deepStrictEqual(movedGroupRows(spec, {row: 1, slot: 1}), [['c'], ['d', 'a']]);
+  for (const members of [['f'], ['u'], ['f', 'u']]){
+    const unplaced = groupMoveFixture([['c', 'd']], members);
+    assert.equal(B.planMoveGroup(JSON.stringify(unplaced), unplaced, 0, 'g', {gap: 0}).error,
+      'group "g" has no nodes placed in rows');
+  }
+  assert.match(B.planMoveGroup(JSON.stringify(spec), spec, 0, 'missing', {gap: 0}).error, /not found/);
+});
+
+test('planMoveGroup refuses unchanged layouts, dropped target rows and invalid destinations', () => {
+  const spec = groupMoveFixture([['a', 'b'], ['c', 'd']]), text = JSON.stringify(spec);
+  for (const drop of [{gap: 0}, {gap: 1}, {row: 0, slot: 99}])
+    assert.equal(B.planMoveGroup(text, spec, 0, 'g', drop).error, 'already there');
+  const within = groupMoveFixture([['c', 'a', 'b', 'd']]);
+  assert.equal(B.planMoveGroup(JSON.stringify(within), within, 0, 'g', {row: 0, slot: 1}).error, 'already there');
+  for (const drop of [null, {}, {gap: -1}, {gap: 3}, {gap: 0.5}, {row: 9, slot: 0}, {row: 0, slot: NaN}])
+    assert.ok(B.planMoveGroup(text, spec, 0, 'g', drop).error);
+  assert.ok(B.planMoveGroup(text, spec, 99, 'g', {gap: 0}).error);
+});
+
+test('planMoveGroup rewrites only the rows slice in a nested section, preserving surrounding bytes', () => {
+  const diagram = groupMoveFixture([['a', 'b'], ['c', 'd']]);
+  const spec = {page: {blocks: [{heading: 'Other', diagram: {nodes: {x: {}}, rows: [['x']]}},
+    {tabs: [{label: 'Tab', sections: [{heading: 'Move', diagram}]}]}]}};
+  const text = JSON.stringify(spec, null, '\t') + '\n';
+  const path = ['page', 'blocks', 1, 'tabs', 0, 'sections', 0, 'diagram', 'rows'];
+  const oldRange = B.jsonLocate(text, path);
+  const plan = B.planMoveGroup(text, spec, 1, 'g', {row: 1, slot: 1});
+  assert.ok(!plan.error, plan.error);
+  const newRange = B.jsonLocate(plan.text, path), next = JSON.parse(plan.text);
+  assert.equal(plan.text.slice(0, newRange.start), text.slice(0, oldRange.start));
+  assert.equal(plan.text.slice(newRange.end), text.slice(oldRange.end));
+  next.page.blocks[1].tabs[0].sections[0].diagram.rows = diagram.rows;
+  assert.deepStrictEqual(next, spec);
 });
 
 /* ---- parseStarterManifest: the hosted starters.json loader ---- */

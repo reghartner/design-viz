@@ -3845,6 +3845,11 @@ function initWorkbenchBuilder(opts){
   }
   /* ---- drag a row grab-handle to move a whole layout row ---- */
   var rowDrag = null;
+  /* rows snapshot per section at handle-injection time — handle indices
+     and board geometry belong to the LAST RENDER, while the textarea can
+     drift without one; a drag against drifted rows would move the wrong
+     row, so it is refused instead (see updateRowDrag / mouseup) */
+  var rowGrabRows = {};
   var SVG_NS = 'http://www.w3.org/2000/svg';
   function cancelRowDrag(){
     if (!rowDrag) return;
@@ -3893,6 +3898,7 @@ function initWorkbenchBuilder(opts){
        workbench-only chrome (this file never runs on published pages).
        Handles are skipped when any row has no drawn nodes: without a
        box for every row there is no reliable drop geometry. */
+    rowGrabRows = {};
     var secList = view.querySelectorAll('.doc-sec[data-dv-section]');
     for (var s = 0; s < secList.length; s++){
       var secEl = secList[s];
@@ -3900,12 +3906,14 @@ function initWorkbenchBuilder(opts){
       for (var o = 0; o < old.length; o++) old[o].parentNode.removeChild(old[o]);
       var anyNode = secEl.querySelector('g.node[data-dv-node]');
       if (!anyNode) continue;
-      var rows = sectionRowsFor(parseInt(secEl.getAttribute('data-dv-section'), 10));
+      var secGi = parseInt(secEl.getAttribute('data-dv-section'), 10);
+      var rows = sectionRowsFor(secGi);
       if (!rows || rows.length < 2) continue;
       var boxes = sectionRowBoxes(secEl, rows);
       var complete = true;
       for (var b = 0; b < boxes.length; b++) if (!boxes[b]) complete = false;
       if (!complete) continue;
+      rowGrabRows[secGi] = JSON.stringify(rows);
       var svg = anyNode.ownerSVGElement;
       for (var r = 0; r < boxes.length; r++){
         var box = boxes[r];
@@ -3940,6 +3948,11 @@ function initWorkbenchBuilder(opts){
     if (!rd.boxes){
       var rows = sectionRowsFor(rd.gi);
       if (!rows || !rows[rd.row]){ cancelRowDrag(); return; }
+      if (JSON.stringify(rows) !== rowGrabRows[rd.gi]){
+        cancelRowDrag();
+        inspectorMessage('the JSON rows changed since the last render — click Render, then drag');
+        return;
+      }
       var boxes = sectionRowBoxes(rd.secEl, rows);
       for (var b = 0; b < boxes.length; b++) if (!boxes[b]){ cancelRowDrag(); return; }
       rd.boxes = boxes;
@@ -4073,6 +4086,12 @@ function initWorkbenchBuilder(opts){
       if (to === rd.row) return;
       var rdParsed = parseEditor();
       if (rdParsed.error){ inspectorMessage(rdParsed.error); return; }
+      var rdRec = specSectionPaths(rdParsed.raw)[rd.gi];
+      var rdD = rdRec ? specValueAt(rdParsed.raw, rdRec.diagram) : null;
+      if (!rdD || JSON.stringify(rdD.rows) !== rowGrabRows[rd.gi]){
+        inspectorMessage('the JSON rows changed since the last render — click Render, then drag');
+        return;
+      }
       var rdPlan = planMoveRow(src.value, rdParsed.raw, rd.gi, rd.row, to);
       if (rdPlan.error){ inspectorMessage(rdPlan.error); return; }
       pushUndo();

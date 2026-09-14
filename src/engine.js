@@ -486,7 +486,19 @@ function layout(spec){
     var b = groupBoxes[g];
     H = Math.max(H, b.y + b.h + 24);
   });
-  return {pos:pos, rows:rowsMeta, groups:groupBoxes, H: H, routing:lanes ? 'lanes' : undefined};
+  /* deep nesting pads horizontally past the fixed card columns (and above
+     a float member's row) — widen the drawable area instead of clipping.
+     Flat specs keep vb = {0, 0, W, H}, so their markup stays identical. */
+  var vbX = 0, vbY = 0, vbR = W;
+  Object.keys(groupBoxes).forEach(function(g){
+    var b = groupBoxes[g];
+    if (b.x - 2 < vbX) vbX = b.x - 2;
+    if (b.y - 2 < vbY) vbY = b.y - 2;
+    if (b.x + b.w + 2 > vbR) vbR = b.x + b.w + 2;
+  });
+  return {pos:pos, rows:rowsMeta, groups:groupBoxes, H: H,
+          vb:{x:vbX, y:vbY, w:vbR - vbX, h:H - vbY},
+          routing:lanes ? 'lanes' : undefined};
 }
 
 /* Reserved horizontal tracks plus obstacle-free vertical channels. Keep
@@ -1161,7 +1173,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     if (e.ret) anyRet = true;
   });
 
-  var s = '<svg viewBox="0 0 ' + W + ' ' + L.H + '" role="img" aria-label="' + esc(d.title || 'flow diagram') + '" xmlns="' + SVGNS + '">';
+  var vb = L.vb || {x:0, y:0, w:W, h:L.H};
+  var s = '<svg viewBox="' + vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h + '" role="img" aria-label="' + esc(d.title || 'flow diagram') + '" xmlns="' + SVGNS + '">';
   s += '<defs>';
   Object.keys(kindsUsed).forEach(function(k){
     s += '<marker id="' + prefix + '-m-' + k + '" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">' +
@@ -1169,8 +1182,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   });
   s += '<pattern id="' + prefix + '-g" width="26" height="26" patternUnits="userSpaceOnUse">' +
        '<circle cx="1.3" cy="1.3" r="1.3" fill="#16233C"/></pattern>';
-  s += '</defs><rect class="dv-board-ground" width="' + W + '" height="' + L.H + '" fill="' + SK.bg + '"/>' +
-       '<rect class="dv-board-grid" width="' + W + '" height="' + L.H + '" fill="url(#' + prefix + '-g)"/>';
+  var groundXY = (vb.x ? ' x="' + vb.x + '"' : '') + (vb.y ? ' y="' + vb.y + '"' : '');
+  s += '</defs><rect class="dv-board-ground"' + groundXY + ' width="' + vb.w + '" height="' + vb.h + '" fill="' + SK.bg + '"/>' +
+       '<rect class="dv-board-grid"' + groundXY + ' width="' + vb.w + '" height="' + vb.h + '" fill="url(#' + prefix + '-g)"/>';
 
   /* containment groups: dashed boundary + title, behind everything */
   var groupDefs = (d.groups && typeof d.groups === 'object') ? d.groups : {};

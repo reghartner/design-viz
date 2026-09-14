@@ -515,6 +515,26 @@ test('planSetGroupIcon declares missing groups and refuses missing keys', () => 
   assert.match(B.planSetGroupIcon(GROUPED_TEXT, GROUPED, 0, '', 'house').error, /needs a key/);
 });
 
+test('renaming or deleting a group keeps every child parent link valid', () => {
+  const spec = {nodes: {n: {group: 'child'}}, rows: [['n']],
+    groups: {top: {}, mid: {parent: 'top'}, child: {parent: 'mid'}}};
+  let plan = B.planRenameGroup(JSON.stringify(spec), spec, 0, 'mid', 'middle');
+  assert.ok(!plan.error, plan.error);
+  let g = JSON.parse(plan.text).groups;
+  assert.strictEqual(g.middle.parent, 'top');
+  assert.strictEqual(g.child.parent, 'middle');
+  plan = B.planDeleteGroup(JSON.stringify(spec), spec, 0, 'mid');
+  assert.ok(!plan.error, plan.error);
+  g = JSON.parse(plan.text).groups;
+  assert.strictEqual(g.mid, undefined);
+  assert.strictEqual(g.child.parent, 'top');
+  plan = B.planDeleteGroup(JSON.stringify(spec), spec, 0, 'top');
+  assert.ok(!plan.error, plan.error);
+  g = JSON.parse(plan.text).groups;
+  assert.strictEqual(g.mid.parent, undefined);
+  assert.strictEqual(g.child.parent, 'mid');
+});
+
 test('builderGroupParentOptions excludes self and descendants over sanitized links', () => {
   const groups = {a: {}, b: {parent: 'a'}, c: {parent: 'b'}, other: {}};
   const before = JSON.stringify(groups);

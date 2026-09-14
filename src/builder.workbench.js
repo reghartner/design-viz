@@ -737,6 +737,11 @@ function planRenameGroup(text, raw, sectionIdx, oldKey, newKey){
     if (declared){
       var renamed = Object.create(null);
       Object.keys(d.groups).forEach(function(k){ renamed[k === oldKey ? newKey : k] = d.groups[k]; });
+      /* children nested under the old key must follow the rename, or their
+         parent link dangles and the boxes silently flatten */
+      Object.keys(renamed).forEach(function(k){
+        if (renamed[k] && renamed[k].parent === oldKey) renamed[k].parent = newKey;
+      });
       d.groups = renamed;
     }
   });
@@ -748,7 +753,15 @@ function planDeleteGroup(text, raw, sectionIdx, key){
   var shape = builderGroupsShapeError(got.d);
   if (shape) return shape;
   return builderRewrite(text, raw, got.path, function(d){
+    var promoted = d.groups && d.groups[key] ? d.groups[key].parent : undefined;
     if (d.groups) delete d.groups[key];
+    /* children of the deleted group climb one level: they take its parent,
+       or become top-level when it had none */
+    Object.keys(d.groups || {}).forEach(function(k){
+      if (!d.groups[k] || d.groups[k].parent !== key) return;
+      if (typeof promoted === 'string') d.groups[k].parent = promoted;
+      else delete d.groups[k].parent;
+    });
     Object.keys(d.nodes || {}).forEach(function(id){
       if (d.nodes[id] && d.nodes[id].group === key) delete d.nodes[id].group;
     });

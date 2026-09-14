@@ -915,6 +915,18 @@ test('flat group geometry stays pinned to the original member-extents formula', 
   assert.strictEqual(L.H, 262);
 });
 
+test('deep nesting widens the drawable area instead of clipping the outer box', () => {
+  const flatVb = C.layout({nodes: {a: {group: 'dev'}, b: {group: 'dev'}, c: {}},
+    rows: [[['a', 'b'], 'c']], groups: {dev: {}}}).vb;
+  assert.strictEqual(flatVb.x, 0);
+  assert.strictEqual(flatVb.y, 0);
+  const L = C.layout({nodes: {a: {group: 'inner'}, b: {group: 'inner'}, c: {}},
+    rows: [[['a', 'b'], 'c']], groups: {inner: {parent: 'outer'}, outer: {}}});
+  // leftmost stacked card starts at x=25; inner box x=11, outer x=-3 (14px pad per level)
+  assert.strictEqual(L.groups.outer.x, -3);
+  assert.deepStrictEqual(plain(L.vb), {x: -5, y: 0, w: flatVb.w + 5, h: L.H});
+});
+
 test('invalid parent links warn and degrade to the same flat geometry', () => {
   const base = {groups: {a: {}, b: {}}, nodes: {x: {group: 'a'}, y: {group: 'b'}}, rows: [['x', 'y']]};
   const expected = plain(C.layout(base));

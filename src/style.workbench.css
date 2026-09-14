@@ -242,6 +242,17 @@ g.node.dv-ghost{opacity:.55; pointer-events:none;}
 g.node.dv-ghost .card{stroke:var(--accent); stroke-width:2;}
 g.node.dv-ghost.dv-ghostback{opacity:.3;}
 
+/* row grab-handles (workbench-only, injected by the builder) + the
+   insertion line that marks where a dragged row will land */
+g.dv-rowgrab{cursor:grab; opacity:.45;}
+g.dv-rowgrab:hover, g.dv-rowgrab.dv-grabbing{opacity:1;}
+g.dv-rowgrab.dv-grabbing{cursor:grabbing;}
+.dv-rowgrabbg{fill:var(--card); stroke:var(--line); stroke-width:1;}
+g.dv-rowgrab:hover .dv-rowgrabbg, g.dv-rowgrab.dv-grabbing .dv-rowgrabbg{stroke:var(--accent);}
+.dv-rowgrabdot{fill:var(--sub);}
+g.dv-rowgrab:hover .dv-rowgrabdot, g.dv-rowgrab.dv-grabbing .dv-rowgrabdot{fill:var(--accent);}
+line.dv-rowline{stroke:var(--accent); stroke-width:3; stroke-linecap:round; pointer-events:none;}
+
 /* members of the selected step, marked on the board (distinct from the
    selection ring: dashed) */
 g.node.dv-instep .card{stroke:var(--accent); stroke-width:2; stroke-dasharray:5 3;}

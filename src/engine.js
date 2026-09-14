@@ -3875,7 +3875,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);
       choice.style.gridColumn = 1; choice.style.gridRow = rowNumber + 1;
       choice.addEventListener('click',function(ev){
-        ev.stopPropagation(); selectPath(path.id,row.start);
+        ev.stopPropagation(); selectPath(path.id,0);
         secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
       });
       line.appendChild(choice); pathButtons.push({button:choice,path:path,row:line});

@@ -9,7 +9,9 @@ opacity in the happy-path color, then steps 3–4 at full strength. Space after
 its ending stays blank. Shared shadows are clickable and keep the alternate
 selected; the current step and keyboard-focused shadow have full opacity.
 Nested alternates inherit each shared beat's earlier path color. Selecting
-the path chip pauses at the fork; clicking a number selects that path and step. The colored chip,
+the path chip pauses at step 1, including the shared lead-in; clicking a number
+selects that path and step. Clicking the selected path chip also returns to
+step 1. The colored chip,
 step count, playback ending, highlighted hops, node tones and panel state all
 follow that path. Chips retain their order when switching.
 

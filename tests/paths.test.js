@@ -171,7 +171,11 @@ test('an alternate running from three to five occupies the same columns and keep
   assert.equal(happy.children[1].getAttribute('aria-current'),'false');
   assert.equal(drop.children[4].getAttribute('aria-current'),'false');
   happy.children[0].fire('click');assert.equal(h.sp.path(),'happy');assert.equal(h.sp.current().n,0);
-  drop.children[0].fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.current().n,2);
+  drop.children[0].fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.current().n,0);
+  assert.equal(h.sp.current().id,'one');assert.equal(drop.children[1].getAttribute('aria-current'),'true');
+  assert.equal(h.paints.at(-1).state,'pending');assert.equal(h.intervals.size,0);
+  drop.children[4].fire('click');assert.equal(h.sp.current().id,'drop');
+  drop.children[0].fire('click');assert.equal(h.sp.current().id,'one','clicking the selected path restarts at its shared first beat');
 });
 
 test('shared shadows end with their own path and use the correct ancestor for nested forks',()=>{

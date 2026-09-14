@@ -560,9 +560,21 @@ function planSetField(text, raw, targetPath, key, valueTextOrNull){
   return r;
 }
 
+function builderGroupsShapeError(d){
+  /* the validator treats a non-object diagram.groups as "no declarations";
+     every mutation planner refuses that shape outright — numeric own keys
+     on strings and arrays would otherwise slip past hasOwnProperty checks
+     and get object-coerced, corrupting the author's value */
+  if (d.groups != null && (typeof d.groups !== 'object' || Array.isArray(d.groups)))
+    return {error: 'diagram.groups is not an object — fix it in the JSON first'};
+  return null;
+}
+
 function planSetNodeGroup(text, raw, sectionIdx, nodeId, keyOrNull){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
+  var shape = builderGroupsShapeError(got.d);
+  if (shape) return shape;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, nodeId))
     return {error: 'node "' + nodeId + '" not found'};
   if (keyOrNull != null && typeof keyOrNull !== 'string') return {error: 'group key must be text'};
@@ -595,11 +607,8 @@ function planSetGroupTitle(text, raw, sectionIdx, key, titleOrNull){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   if (typeof key !== 'string' || !key.trim()) return {error: 'a group needs a key'};
-  /* a non-object groups value ("no declarations" to the validator) must be
-     refused, not object-coerced — copying a string spreads its characters
-     into numbered keys and corrupts the author's value */
-  if (got.d.groups != null && (typeof got.d.groups !== 'object' || Array.isArray(got.d.groups)))
-    return {error: 'diagram.groups is not an object — fix it in the JSON first'};
+  var shape = builderGroupsShapeError(got.d);
+  if (shape) return shape;
   return builderRewrite(text, raw, got.path, function(d){
     var groups = Object.assign(Object.create(null), d.groups || {});
     var meta = Object.assign(Object.create(null), groups[key] || {});
@@ -613,6 +622,8 @@ function planSetGroupTitle(text, raw, sectionIdx, key, titleOrNull){
 function planRenameGroup(text, raw, sectionIdx, oldKey, newKey){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
+  var shape = builderGroupsShapeError(got.d);
+  if (shape) return shape;
   if (typeof newKey !== 'string' || !newKey.trim()) return {error: 'a group needs a key'};
   newKey = newKey.trim();
   if (newKey === oldKey) return {error: 'same key'};
@@ -636,6 +647,8 @@ function planRenameGroup(text, raw, sectionIdx, oldKey, newKey){
 function planDeleteGroup(text, raw, sectionIdx, key){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
+  var shape = builderGroupsShapeError(got.d);
+  if (shape) return shape;
   return builderRewrite(text, raw, got.path, function(d){
     if (d.groups) delete d.groups[key];
     Object.keys(d.nodes || {}).forEach(function(id){

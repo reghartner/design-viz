@@ -2430,6 +2430,19 @@ test('group planners refuse a non-object diagram.groups instead of corrupting it
   assert.match(B.planSetGroupTitle(text, spec, 0, 'dev', 'Title').error, /not an object/);
   const setPlan = B.planSetNodeGroup(text, spec, 0, 'b', 'dev');
   assert.ok(setPlan.error, 'declaring into a string groups value must fail, not corrupt');
-  /* the original string value survives every refused edit */
+  /* numeric own keys on strings/arrays must not slip past the guard */
+  assert.match(B.planRenameGroup(text, spec, 0, '0', 'new').error, /not an object/);
+  assert.match(B.planDeleteGroup(text, spec, 0, '0').error, /not an object/);
+  const arrSpec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {group: '0'}}, rows: [['a']], groups: ['meta']
+  }}]}};
+  const arrText = JSON.stringify(arrSpec, null, 2);
+  assert.match(B.planSetNodeGroup(arrText, arrSpec, 0, 'a', '0').error, /not an object/);
+  assert.match(B.planRenameGroup(arrText, arrSpec, 0, '0', 'x').error, /not an object/);
+  assert.match(B.planDeleteGroup(arrText, arrSpec, 0, '0').error, /not an object/);
+  assert.match(B.planSetGroupTitle(arrText, arrSpec, 0, '0', 'T').error, /not an object/);
+  assert.match(B.planBulkSetGroup(arrText, arrSpec, [{kind: 'node', section: 0, id: 'a'}], 'x').error, /not an object/);
+  /* the original values survive every refused edit */
   assert.equal(JSON.parse(text).page.blocks[0].diagram.groups, 'occupied');
+  assert.deepStrictEqual(JSON.parse(arrText).page.blocks[0].diagram.groups, ['meta']);
 });

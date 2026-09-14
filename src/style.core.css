@@ -73,8 +73,9 @@
   .boardgrid.haspanels > .panelcol{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); align-items:start;}
 }
 
-.board{margin-top:12px; border-radius:12px; overflow-x:auto;
+.board{--dv-board-ground:#0B1220; margin-top:12px; border-radius:12px; overflow-x:auto;
   border:1px solid color-mix(in srgb, var(--acc) 30%, transparent);}
+.sk-daylight .board{--dv-board-ground:#FBFAF6;}
 .board.stepmode{border-bottom-left-radius:0; border-bottom-right-radius:0;}
 .boardcanvas{position:relative;}
 .board svg{display:block; min-width:980px; width:100%; height:auto;}
@@ -115,9 +116,8 @@
 
 /* ---------- board internals, per skin ---------- */
 .edge{fill:none; stroke-linecap:round;}
-.lane-bridge{fill:none;stroke-width:7;stroke-linejoin:round;pointer-events:none;}
-.sk-aurora .lane-bridge{stroke:#0B1220;}
-.sk-daylight .lane-bridge{stroke:#FBFAF6;}
+/* Crossing separators must erase to the actual board ground in every skin. */
+.lane-bridge{fill:none;stroke:var(--dv-board-ground);stroke-width:7;stroke-linejoin:round;pointer-events:none;}
 .edge.main{stroke-width:2.2;}
 .edge.retm{stroke-width:1.9;}
 .halo{fill:none; stroke-width:9; stroke-linecap:round; opacity:.13;}
@@ -125,8 +125,7 @@
 .sk-daylight .dv-protocol-stroke{stroke:var(--dv-daylight);}
 .sk-aurora .dv-protocol-fill{fill:var(--dv-aurora);}
 .sk-daylight .dv-protocol-fill{fill:var(--dv-daylight);}
-.sk-aurora .dv-board-ground{fill:#0B1220;}
-.sk-daylight .dv-board-ground{fill:#FBFAF6;}
+.dv-board-ground{fill:var(--dv-board-ground);}
 .sk-daylight .dv-board-grid, .sk-daylight .halo{display:none;}
 .sk-aurora .pkt{r:4px; filter:drop-shadow(0 0 6px var(--dv-aurora));}
 .sk-daylight .pkt{r:3.4px; filter:none;}
@@ -1184,7 +1183,7 @@ body.sk-blueprint .hmframe{--hm-bg:#031B3A; --hm-line:#94BCD5; --hm-neutral:#94B
   .sec-prose{height:auto !important; opacity:1 !important; overflow:visible !important;}
   .sec-teaser{display:none !important;} /* print expands the prose, so the teaser dupes it */
   .tabpanel[hidden]{display:block !important;}
-  .board{border-color:#CCCCCC; overflow:visible;}
+  .board{--dv-board-ground:#FFFFFF !important; border-color:#CCCCCC; overflow:visible;}
   .board svg{min-width:0;}
   .board svg > rect:first-of-type{fill:#FFFFFF;}
   .board svg > rect[fill^="url"]{display:none;}
@@ -1445,6 +1444,7 @@ body.sk-editorial .boardgrid.haspanels{
   gap:18px;
 }
 body.sk-editorial .board{
+  --dv-board-ground:var(--ed-sheet);
   margin-top:18px;
   border:1px solid var(--ed-rule-strong);
   border-radius:2px;
@@ -1452,7 +1452,6 @@ body.sk-editorial .board{
   box-shadow:none;
 }
 body.sk-editorial .board.stepmode{border-bottom-left-radius:0; border-bottom-right-radius:0;}
-body.sk-editorial .board svg > rect:first-of-type{fill:var(--ed-sheet);}
 body.sk-editorial .board svg > rect:nth-of-type(2){opacity:.075;}
 body.sk-editorial .lg,
 body.sk-editorial .sk-aurora .lg,
@@ -2122,12 +2121,12 @@ body.sk-editorial .errbox{
 
   body.sk-terminal .boardgrid.haspanels{grid-template-columns:minmax(0,1fr) 310px; gap:10px;}
   body.sk-terminal .board{
+    --dv-board-ground:var(--tm-ground);
     margin-top:12px;
     background:var(--tm-ground);
     border:1px solid var(--tm-line);
     border-radius:0;
   }
-  body.sk-terminal .board > svg > rect:first-of-type{fill:var(--tm-ground);}
   body.sk-terminal .board > svg > rect[fill^="url"]{opacity:.34;}
   body.sk-terminal .lg,
   body.sk-terminal .sk-aurora .lg{
@@ -2724,6 +2723,7 @@ body.sk-editorial .errbox{
     gap:16px;
   }
   body.sk-pastel .board {
+    --dv-board-ground:#FAFBFE;
     margin-top:15px;
     background:#FBFCFE;
     border:1px solid #DCE4EF;
@@ -2734,7 +2734,6 @@ body.sk-editorial .errbox{
     border-bottom-left-radius:0;
     border-bottom-right-radius:0;
   }
-  body.sk-pastel .board svg > rect:first-of-type { fill:#FAFBFE; }
   body.sk-pastel .board svg pattern circle { fill:#D9E2F0; opacity:.58; }
   body.sk-pastel .edge,
   body.sk-pastel .lg .li svg { filter:saturate(.70) brightness(.82); }
@@ -3512,13 +3511,13 @@ body.sk-editorial .errbox{
     gap:8px;
   }
   body.sk-blueprint .board{
+    --dv-board-ground:#052956;
     margin-top:8px;
     border:3px double #58BED8;
     border-radius:0;
     background:#052956;
   }
   body.sk-blueprint .board.stepmode{border-radius:0;}
-  body.sk-blueprint .board svg > rect:first-of-type{fill:#052956;}
   body.sk-blueprint .board svg > rect[fill^="url"]{opacity:.7;}
   body.sk-blueprint .lg{
     gap:10px;

@@ -21,7 +21,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 9 | Stable workbench playback while editing | codex/workbench-playback | Open: https://github.com/reghartner/design-viz/pull/58 |
 | 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
 | 11 | Canary and firmware rollout stories | codex/rollout-starters | Open: https://github.com/reghartner/design-viz/pull/60 |
-| 12 | Phone diagram legibility | codex/phone-diagram-legibility | Built; opening focused PR above #60 |
+| 12 | Phone diagram legibility | codex/phone-diagram-legibility | Open: https://github.com/reghartner/design-viz/pull/61 |
 
 ## Validation and evidence
 
@@ -106,6 +106,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   viewport. The trace fixture's existing density warnings remain; no runtime
   errors. Readable boards center when they first overflow, without snapping
   back after user panning. Resize observers dispose with replaced previews.
+  Check PR #61 final CI after this handoff commit. LAN preview remains HTTP 200.
 
 ## Next continuation
 

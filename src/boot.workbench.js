@@ -331,15 +331,45 @@ document.getElementById('copy-contract').addEventListener('click', function(){
   } catch (e){ b.textContent = 'Select manually'; }
 });
 
+function readCookieText(){
+  try { return document.cookie || ''; }
+  catch (ex) { return ''; } /* sandboxed pages may deny cookie reads */
+}
 function currentSkin(page){
   if (activeSkin) return activeSkin;
-  return SKINS[page && page.skin] ? page.skin : 'aurora';
+  /* same precedence as the viewer (boot.flowview.js): a valid dv_skin
+     cookie set by the hosting site beats the spec default, until a skin
+     button (or the host channel below) picks one explicitly */
+  return resolveSkin(readCookieText(), page && page.skin);
 }
 function setSkinButtons(skin){
   SKIN_NAMES.forEach(function(name){
     if (skinBtns[name]) skinBtns[name].setAttribute('aria-pressed', name === skin ? 'true' : 'false');
   });
 }
+/* Host skin channel — same contract as the viewer (boot.flowview.js): an
+   embedding shell posts {type:'dv_skin', skin:<name>} when its navbar theme
+   picker changes, or calls window.dvSetSkin(name) directly. No origin
+   restriction on purpose — the page is a static file served from arbitrary
+   hosts, so the legitimate origin is unknowable at build time; the payload
+   is whitelist-validated and the only immediate effect is a skin class
+   swap. Unlike the skin buttons this never rebuilds the preview — a rebuild
+   would discard an armed ADD TO STEP / connect mode and any form focus —
+   the choice is remembered in activeSkin so every later render uses it. */
+window.dvSkins = SKIN_NAMES.slice();
+window.dvSetSkin = function(name){
+  if (SKIN_NAMES.indexOf(name) < 0) return false;
+  activeSkin = name;
+  setSkinButtons(name);
+  return applySkinClasses(document.body, view, name);
+};
+window.addEventListener('message', function(e){
+  if (e.data && e.data.type === 'dv_skin' &&
+      typeof window.dvSetSkin === 'function' &&
+      SKIN_NAMES.indexOf(e.data.skin) >= 0){
+    window.dvSetSkin(e.data.skin);
+  }
+});
 function showMsgs(v){
   msgs.innerHTML = '';
   function add(cls, label, m){

@@ -18,6 +18,9 @@ a fictional example immediately. Agents use `node tools/trace2spec.js`.
 **Broader design panels:** `table` shows data snapshots, `checks` shows
 authored decisions and invariants, and `budget` compares resource usage with
 explicit limits. Try **starters… → software & IoT** for both domains.
+Try **starters… → retries & circuits** for retry success, deadline admission,
+and circuit recovery; the [recipe](cookbook/retries-and-circuits.md) explains
+how to adapt their authored policies and timing.
 The workbench's **document outline** (⌘/Ctrl K) searches sections, hidden tabs,
 nodes, groups, edges, panels, and steps and opens the matching inspector.
 See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions.

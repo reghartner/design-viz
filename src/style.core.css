@@ -63,7 +63,7 @@
 .boardgrid{display:block;}
 .boardgrid.haspanels{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:12px; align-items:start;}
 .boardgrid.haspanels > .diagramcol{min-width:0;}
-.boardgrid.haspanels > .panelcol{align-self:start;}
+.boardgrid.haspanels > .panelcol{align-self:start;min-width:0;}
 @media (max-width:980px){ .boardgrid.haspanels{grid-template-columns:1fr;} }
 /* The workbench consumes part of a wide viewport with its editor. Measure
    the preview itself so adding panels cannot shrink its board to a thumbnail. */

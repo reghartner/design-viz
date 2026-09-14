@@ -1,5 +1,17 @@
 # Changelog
 
+## Retry and circuit-breaker stories (2026-09-14)
+
+- New **retries & circuits** starter: bounded retry success, rejection of an
+  attempt that cannot fit before a deadline, and local circuit recovery.
+- Offset timing, attempt outcomes, budgets, admission checks and circuit state
+  use existing widgets. All values and outcomes are explicitly fictional.
+- New agent cookbook recipe includes a complete failed-probe example and
+  distinguishes caller timeouts, client backoff, retries, separate requests,
+  local circuit rejections and actual dependency calls.
+- Constrain the panel column's minimum width so wide tables scroll inside
+  their panel instead of widening the phone page.
+
 ## Resizable workbench workspace (2026-09-14)
 
 - Desktop dividers adjust editor width and inspector/JSON height, with pointer

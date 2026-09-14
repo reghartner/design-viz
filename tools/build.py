@@ -21,6 +21,7 @@ STARTERS = [
     ("blank flow", "Three nodes and two hops to make your own.", "starters/minimal.json"),
     ("panel showcase", "Five panels updated across four steps.", "starters/panels-tour.json"),
     ("software & IoT", "Data state, decision checks, and resource budgets across two design stories.", "starters/software-systems.json"),
+    ("retries & circuits", "Bounded retry success, deadline admission, and open/half-open recovery across three scenarios.", "starters/resilience.json"),
     ("Honeycomb trace", "A fictional checkout trace with concurrent spans and a recorded payment error.", "starters/honeycomb-trace.json"),
     ("complex trace", "Shared dependencies, service cycles and concurrent branches in reserved routing lanes.", "starters/complex-trace.json"),
     ("full demo", "The complete Flowview demo page.", "flowview.demo.json"),

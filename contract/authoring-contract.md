@@ -896,7 +896,8 @@ as shadows at 35% opacity, using each beat's earlier path color. Its full-streng
 steps begin at the final shared beat of its longest common prefix with an
 earlier path and end at its own last step; space after the ending stays blank.
 Shared shadows are clickable and become fully opaque when current or keyboard
-focused. No shared prefix means column 1. Clicking a chip selects its fork beat; clicking a number
+focused. No shared prefix means column 1. Clicking a path chip always selects
+step 1 of that path, including its shared lead-in, and pauses playback; clicking a number
 selects that path and step. Rows stay in place when switching. Both routes
 use the same nodes, edges, rows and panels. Path colors identify choices;
 protocol colors retain their meaning on edges.

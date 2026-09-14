@@ -1,5 +1,11 @@
 # Changelog
 
+## Path chips start at step 1 (2026-09-14)
+
+- Clicking any path chip starts its timeline at step 1, including the shared
+  lead-in, and pauses playback. Clicking a numbered step still jumps directly
+  to that position.
+
 ## Shared-step shadows (2026-09-14)
 
 - Alternate path rows show shared steps before the fork at 35% opacity in

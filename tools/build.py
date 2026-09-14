@@ -20,6 +20,8 @@ SRC = ROOT / "src"
 STARTERS = [
     ("blank flow", "Three nodes and two hops to make your own.", "starters/minimal.json"),
     ("panel showcase", "Five panels updated across four steps.", "starters/panels-tour.json"),
+    ("software & IoT", "Data state, decision checks, and resource budgets across two design stories.", "starters/software-systems.json"),
+    ("Honeycomb trace", "A fictional checkout trace with concurrent spans and a recorded payment error.", "starters/honeycomb-trace.json"),
     ("full demo", "The complete Flowview demo page.", "flowview.demo.json"),
 ]
 
@@ -65,7 +67,7 @@ def main() -> int:
         "STYLE_PAGE": read("style.workbench.css").rstrip(),
         "STYLE_CORE": core_css,
         "ICONS": icons,
-        "JS": js_bundle("validator.js", "engine.js", "builder.workbench.js", "boot.workbench.js"),
+        "JS": js_bundle("validator.js", "engine.js", "trace-import.js", "builder.workbench.js", "boot.workbench.js"),
         "STARTERS": json.dumps([
             {"name": name, "desc": desc, "spec": json.loads(read(source))}
             for name, desc, source in STARTERS

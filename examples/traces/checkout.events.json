@@ -1,0 +1,61 @@
+[
+  {
+    "trace.trace_id": "fictional-checkout-001",
+    "trace.span_id": "root",
+    "service.name": "checkout",
+    "name": "POST /orders",
+    "timestamp": "2026-09-13T12:00:00.000Z",
+    "duration_ms": 300,
+    "error": false
+  },
+  {
+    "trace.trace_id": "fictional-checkout-001",
+    "trace.span_id": "cache",
+    "service.name": "checkout",
+    "name": "idempotency lookup",
+    "timestamp": "2026-09-13T12:00:00.010Z",
+    "duration_ms": 5,
+    "error": false,
+    "trace.parent_id": "root"
+  },
+  {
+    "trace.trace_id": "fictional-checkout-001",
+    "trace.span_id": "auth",
+    "service.name": "identity",
+    "name": "authorize",
+    "timestamp": "2026-09-13T12:00:00.020Z",
+    "duration_ms": 40,
+    "error": false,
+    "trace.parent_id": "root"
+  },
+  {
+    "trace.trace_id": "fictional-checkout-001",
+    "trace.span_id": "stock",
+    "service.name": "inventory",
+    "name": "reserve stock",
+    "timestamp": "2026-09-13T12:00:00.030Z",
+    "duration_ms": 100,
+    "error": false,
+    "trace.parent_id": "root"
+  },
+  {
+    "trace.trace_id": "fictional-checkout-001",
+    "trace.span_id": "pay",
+    "service.name": "payments",
+    "name": "authorize payment",
+    "timestamp": "2026-09-13T12:00:00.150Z",
+    "duration_ms": 100,
+    "error": true,
+    "trace.parent_id": "root"
+  },
+  {
+    "trace.trace_id": "fictional-checkout-001",
+    "trace.span_id": "audit",
+    "service.name": "audit",
+    "name": "record failed checkout",
+    "timestamp": "2026-09-13T12:00:00.260Z",
+    "duration_ms": 20,
+    "error": false,
+    "trace.parent_id": "root"
+  }
+]

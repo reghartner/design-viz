@@ -51,7 +51,7 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
      flex-grow can hand the leftover to the textarea; collapsed, the column
      hugs its content under the same cap */
   .workwrap .specbox[open]:has(#sec-source[open]){height:calc(100vh - 24px);}
-  .workwrap .specbox[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
+  .workwrap .specbox[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow-y:auto;}
   .workwrap .specbox > summary, .workwrap .ssec > summary{flex:none;}
   .workwrap .ssec{min-height:0;}
   /* the insert section holds pop-open panes (starter gallery, node/panel
@@ -60,10 +60,10 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
      overflow painted OVER the inspector below. It never shrinks now —
      the inspector and JSON source absorb instead (both scroll inside). */
   .workwrap #sec-insert{flex-shrink:0;}
-  .workwrap #sec-source[open]{flex:1 1 240px; display:flex; flex-direction:column;}
+  .workwrap #sec-source[open]{flex:1 1 240px; min-height:120px; display:flex; flex-direction:column;}
   .workwrap #sec-source[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
-  .workwrap #sec-source[open] #src{flex:1 1 auto; height:auto; min-height:140px; resize:none;}
-  .workwrap #sec-inspect[open]{flex:0 1 auto; display:flex; flex-direction:column;}
+  .workwrap #sec-source[open] #src{flex:1 1 auto; height:auto; min-height:60px; resize:none;}
+  .workwrap #sec-inspect[open]{flex:0 1 auto; min-height:90px; display:flex; flex-direction:column;}
   .workwrap #sec-inspect[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
   .workwrap #sec-inspect[open] .guide{overflow-y:auto;}
   .workwrap .specbox:has(#sec-source:not([open])) #sec-inspect[open]{flex:1 1 auto;}
@@ -72,6 +72,19 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 }
 
 .toolrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:30px 0 12px;}
+.outline-results{max-height:220px; overflow:auto; display:flex; flex-direction:column; gap:3px; margin:6px 0;}
+.outline-item{display:block; text-align:left; border:1px solid transparent; border-radius:5px; padding:6px 8px; color:var(--ink); background:var(--card); cursor:pointer; font:12px/1.4 system-ui,sans-serif;}
+.outline-item span,.outline-item small{display:block; overflow-wrap:anywhere;}
+.outline-item small,.outline-status,#sec-outline summary small{color:var(--sub); font-size:10px;}
+.outline-item:hover,.outline-item:focus-visible{border-color:var(--accent); outline:none; background:var(--codebg);}
+#sec-outline{flex-shrink:0;}
+#outline-search{width:100%; box-sizing:border-box;}
+.tracebox{padding:12px; margin:8px 0; border:1px solid var(--accent); border-radius:8px; max-height:52vh; overflow:auto; flex-shrink:0;}
+.tracebox p{font-size:12px; color:var(--sub); margin:5px 0 10px;}
+.tracebox label{display:block; font-size:12px; margin-top:9px;}
+.tracebox label small{color:var(--sub);}
+.tracebox .fctl{display:block; width:100%; box-sizing:border-box;}
+#trace-feedback{font-size:12px; color:var(--accent); overflow-wrap:anywhere; margin-top:8px;}
 .toolrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
 .skbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
   padding:6px 12px; border-radius:8px; cursor:pointer;}

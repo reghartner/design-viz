@@ -1,5 +1,27 @@
 # Changelog
 
+## Trace import and software design panels (2026-09-14)
+
+- Honeycomb event JSON can be pasted or opened in the workbench and converted
+  into an editable service diagram, timed waterfall, and per-span inspection
+  steps. Custom column mappings, trace selection, source links, completeness
+  warnings, and undoable import are included. `tools/trace2spec.js` shares the
+  same local converter for agent workflows. No account connection is required.
+- Waterfall spans accept `startMs` and `error:true`. Concurrent and nested
+  spans retain their offsets; totals report elapsed extent instead of adding
+  overlapping durations. Existing sequential waterfalls retain their behavior.
+- Three panels broaden the catalog to 23 types: `table` for data snapshots,
+  `checks` for authored decisions, and `budget` for explicit resource limits.
+  Each includes validation, picker templates, setup/patch controls, selective
+  contract documentation, and a software/IoT starter.
+- A searchable document outline (⌘/Ctrl K) finds sections, nodes, groups,
+  edges, panels, and steps across hidden tabs. Preview sizing now uses the
+  available container width; editor sections scroll without covering controls.
+- Added a ranked 20-feature roadmap, trace import guide, software authoring
+  recipe, and fictional trace fixture. Regression validation: 380 Node tests,
+  158 Python tests, and browser checks of import failures, span selection,
+  undo/redo, hidden-tab navigation, and forward/backward panel state.
+
 ## Safety recipes: cross-region failover + event-store replication (2026-09-05)
 
 - Two backend safety scenarios join the atlas as HLD + generated page:

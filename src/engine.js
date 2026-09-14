@@ -1284,21 +1284,28 @@ function legendHTML(kinds, anyRet, skin, protos){
 function waterfallModel(spans, state){
   spans = Array.isArray(spans) ? spans : [];
   state = state || {};
-  var total = 0;
-  spans.forEach(function(s){ total += (s && typeof s.ms === 'number' && s.ms > 0) ? s.ms : 0; });
+  var total = 0, cursor = 0;
+  var timed = spans.some(function(s){ return s && isFiniteNum(s.startMs) && s.startMs >= 0; });
+  var measured = spans.map(function(s){
+    var ms = s && isFiniteNum(s.ms) && s.ms > 0 ? s.ms : 0;
+    var start = s && isFiniteNum(s.startMs) && s.startMs >= 0 ? s.startMs : cursor;
+    cursor = start + ms;
+    total = Math.max(total, cursor);
+    return {ms: ms, start: start};
+  });
   var reveal = (typeof state.reveal === 'number') ? clamp(state.reveal, 0, spans.length) : spans.length;
-  var off = 0, shown = 0, rows = [];
+  var shown = 0, rows = [];
   spans.forEach(function(s, i){
-    var ms = (s && typeof s.ms === 'number' && s.ms > 0) ? s.ms : 0;
+    var ms = measured[i].ms, off = measured[i].start;
     var revealed = i < reveal;
-    if (revealed) shown += ms;
+    if (revealed) shown = Math.max(shown, off + ms);
     rows.push({id: s && s.id, label: (s && (s.label || s.id)) || '', ms: ms,
+               startMs: off, error: !!(s && s.error === true),
                offsetPct: total ? off / total * 100 : 0,
                widthPct: total ? ms / total * 100 : 0,
                revealed: revealed, highlight: !!(s && state.highlight === s.id)});
-    off += ms;
   });
-  return {rows: rows, totalMs: total, shownMs: shown,
+  return {rows: rows, totalMs: total, shownMs: shown, timed: timed,
           totalLabel: state.total != null ? String(state.total) : shown + ' ms'};
 }
 
@@ -2209,6 +2216,102 @@ function contractCardHTML(contract, sectionReference){
 
 var ZF_SEQ = 0;
 
+/* ---------------- software state panels ---------------- */
+function tableModel(panel, state){
+  state = state || {};
+  var columns = softwarePanelItems(panel), seen = Object.create(null);
+  var rows = (Array.isArray(state.rows) ? state.rows : []).slice(0, 12).filter(function(row){
+    if (!panelObject(row) || typeof row.id !== 'string' || !row.id || seen[row.id]) return false;
+    seen[row.id] = true;
+    return true;
+  }).map(function(row){
+    return {id: row.id, status: TABLE_STATUSES.indexOf(row.status) >= 0 ? row.status : 'neutral',
+      cells: columns.map(function(col){
+        if (!panelOwn(row.cells, col.id)) return '—';
+        var v = row.cells[col.id];
+        if (v === null) return 'null';
+        return typeof v === 'object' ? JSON.stringify(v) : String(v);
+      })};
+  });
+  return {columns: columns, rows: rows};
+}
+function checksModel(panel, state){
+  state = state || {};
+  return softwarePanelItems(panel).map(function(check){
+    var result = panelOwn(state.results, check.id) && panelObject(state.results[check.id])
+      ? state.results[check.id] : {};
+    return {id: check.id, label: check.label || check.id,
+      status: CHECK_STATUSES.indexOf(result.status) >= 0 ? result.status : 'pending',
+      detail: result.detail == null ? '' : String(result.detail)};
+  });
+}
+function budgetModel(panel, state){
+  state = state || {};
+  return softwarePanelItems(panel).map(function(metric){
+    var raw = panelOwn(state.values, metric.id) ? state.values[metric.id] : null;
+    var value = isFiniteNum(raw) && raw >= 0 ? raw : null;
+    var max = isFiniteNum(metric.max) && metric.max > 0 ? metric.max : null;
+    var warn = max !== null && isFiniteNum(metric.warn) && metric.warn >= 0 && metric.warn <= max ? metric.warn : null;
+    var status = value === null ? 'unknown' : max === null ? 'unbounded' :
+      value > max ? 'over' : value === max ? 'limit' : warn !== null && value >= warn ? 'warn' : 'ok';
+    return {id: metric.id, label: metric.label || metric.id, unit: metric.unit || '',
+      value: value, max: max, warn: warn, status: status,
+      pct: value !== null && max !== null ? Math.min(value / max, 1) * 100 : 0,
+      remaining: value !== null && max !== null ? max - value : null};
+  });
+}
+function softwarePanelHTML(panel, state){
+  state = state || {};
+  var h = '<div class="swpanel">';
+  if (panel.type === 'table'){
+    var table = tableModel(panel, state);
+    h += '<div class="swtablewrap" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Data state') + '">' +
+      '<table class="swtable"><caption class="swcaption">' + esc(panel.title || 'Data state') + '</caption><thead><tr>';
+    table.columns.forEach(function(col){ h += '<th scope="col">' + esc(col.label || col.id) + '</th>'; });
+    h += '<th scope="col">Change</th></tr></thead><tbody>';
+    table.rows.forEach(function(row){
+      h += '<tr class="swrow-' + row.status + '">';
+      row.cells.forEach(function(cell){ h += '<td>' + esc(cell) + '</td>'; });
+      h += '<td><span class="swbadge sw-' + row.status + '">' +
+        (row.status === 'neutral' ? '—' : row.status) + '</span></td></tr>';
+    });
+    if (!table.rows.length) h += '<tr><td colspan="' + (table.columns.length + 1) + '" class="swempty">No rows at this step</td></tr>';
+    h += '</tbody></table></div>';
+  } else if (panel.type === 'checks'){
+    var checks = checksModel(panel, state), passed = checks.filter(function(c){ return c.status === 'pass'; }).length;
+    h += '<div class="swsummary">' + passed + ' / ' + checks.length + ' passed <span>Authored outcomes</span></div><ul class="swchecks">';
+    checks.forEach(function(check){
+      h += '<li><div class="swcheckhead"><span>' + esc(check.label) + '</span>' +
+        '<span class="swbadge sw-' + check.status + '">' + check.status + '</span></div>' +
+        (check.detail ? '<div class="swdetail">' + esc(check.detail) + '</div>' : '') + '</li>';
+    });
+    h += '</ul>';
+    if (!checks.length) h += '<div class="swempty">No checks declared</div>';
+  } else if (panel.type === 'budget'){
+    var metrics = budgetModel(panel, state);
+    var labels = {unknown:'NO DATA', unbounded:'NO LIMIT', over:'OVER LIMIT', limit:'AT LIMIT', warn:'NEAR LIMIT', ok:'WITHIN LIMIT'};
+    metrics.forEach(function(metric){
+      var tone = metric.status === 'over' ? 'fail' : ['warn','limit'].indexOf(metric.status) >= 0 ? 'warn' :
+        metric.status === 'ok' ? 'pass' : 'pending';
+      h += '<div class="swmetric"><div class="swcheckhead"><span>' + esc(metric.label) + '</span>' +
+        '<span class="swbadge sw-' + tone + '">' + labels[metric.status] + '</span></div>' +
+        '<div class="swmeasure"><strong>' + (metric.value === null ? '—' : esc(String(metric.value))) + '</strong>' +
+        ' / ' + (metric.max === null ? '—' : esc(String(metric.max))) + ' ' + esc(metric.unit) + '</div>';
+      if (metric.value !== null && metric.max !== null){
+        h += '<div class="swtrack" role="img" aria-label="' + esc(metric.label + ': ' + metric.value + ' of ' + metric.max + ' ' + metric.unit + ', ' + labels[metric.status]) + '">' +
+          '<div class="swfill sw-' + tone + '" style="width:' + metric.pct.toFixed(2) + '%"></div>';
+        if (metric.warn !== null) h += '<span class="swthreshold" style="left:' + (metric.warn / metric.max * 100).toFixed(2) + '%" title="Warning at ' + esc(String(metric.warn)) + '"></span>';
+        h += '</div><div class="swdetail">' + esc(String(Number(Math.abs(metric.remaining).toPrecision(6)))) +
+          ' ' + esc(metric.unit) + (metric.remaining < 0 ? ' over budget' : ' remaining') + '</div>';
+      }
+      h += '</div>';
+    });
+    if (!metrics.length) h += '<div class="swempty">No budgets declared</div>';
+  }
+  if (state.note) h += '<div class="swnote">' + esc(String(state.note)) + '</div>';
+  return h + '</div>';
+}
+
 /* ---------------- inspector panel widgets ----------------
    Each widget renders ABSOLUTE state (from foldPanelStates) — no deltas, so
    any step jump is consistent. renderPanelBody rebuilds the widget's DOM.
@@ -2230,7 +2333,9 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
      the following identical step skips the rebuild */
   var hBaseline = null;
   state = state || {};
-  if (type === 'state'){
+  if (['table','checks','budget'].indexOf(type) >= 0){
+    h = softwarePanelHTML(panel, state);
+  } else if (type === 'state'){
     var cur = state.state != null ? String(state.state) : '—';
     pulseSelector = '.pchip.cur';
     pulseChanged = Object.prototype.hasOwnProperty.call(host, '_stateCur') && host._stateCur !== cur;
@@ -2606,15 +2711,16 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var wfNow = wm.rows.map(function(r){ return r.revealed; });
     waterfallEntrants = wfPrev ? wfNow.map(function(on, i){ return on && !wfPrev[i]; }) : null;
     host._wfRevealed = wfNow;
-    h += '<div class="wfall">';
+    h += '<div class="wfall' + (wm.timed ? ' wf-timed' : '') + '">';
     wm.rows.forEach(function(r){
-      h += '<div class="wfrow' + (r.revealed ? ' on' : '') + (r.highlight ? ' hl' : '') + '">' +
+      h += '<div class="wfrow' + (r.revealed ? ' on' : '') + (r.highlight ? ' hl' : '') + (r.error ? ' wf-error' : '') +
+           '" title="' + esc(r.label + ' · start +' + r.startMs + ' ms · duration ' + r.ms + ' ms' + (r.error ? ' · recorded error' : '')) + '">' +
            '<span class="wflabel">' + esc(r.label) + '</span>' +
            '<span class="wftrack"><span class="wfbar" style="margin-left:' + r.offsetPct.toFixed(2) +
-           '%;width:' + Math.max(r.widthPct, 1.2).toFixed(2) + '%"></span></span>' +
-           '<span class="wfms">' + (r.revealed ? esc(String(r.ms)) + ' ms' : '&#8212;') + '</span></div>';
+           '%;width:' + Math.max(r.widthPct, wm.timed ? 0 : 1.2).toFixed(2) + '%"></span></span>' +
+           '<span class="wfms">' + (r.revealed ? (r.error ? '! ' : '') + esc(String(r.ms)) + ' ms' : '&#8212;') + '</span></div>';
     });
-    h += '<div class="wftotal">total <b>' + esc(wm.totalLabel) + '</b></div></div>';
+    h += '<div class="wftotal">' + (wm.timed ? 'elapsed extent ' : 'total ') + '<b>' + esc(wm.totalLabel) + '</b></div></div>';
   } else if (type === 'orbit'){
     var ostates = Array.isArray(panel.states) ? panel.states : [];
     var ocur = state.state != null ? String(state.state) : null;

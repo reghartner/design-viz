@@ -89,6 +89,13 @@ body.sk-daylight{background:#F4F2EC;}
 .boardgrid.haspanels > .diagramcol{min-width:0;}
 .boardgrid.haspanels > .panelcol{align-self:start;}
 @media (max-width:980px){ .boardgrid.haspanels{grid-template-columns:1fr;} }
+/* The workbench consumes part of a wide viewport with its editor. Measure
+   the preview itself so adding panels cannot shrink its board to a thumbnail. */
+.docview{container-type:inline-size;}
+@container (max-width:900px){
+  .boardgrid.haspanels{grid-template-columns:1fr;}
+  .boardgrid.haspanels > .panelcol{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); align-items:start;}
+}
 
 .board{margin-top:12px; border-radius:12px; overflow-x:auto;
   border:1px solid color-mix(in srgb, var(--acc) 30%, transparent);}
@@ -232,6 +239,50 @@ body.sk-daylight{background:#F4F2EC;}
 .sk-daylight .tint-dev{color:#0E9382;}
 
 /* ---------- inspector panels ---------- */
+.swpanel{color:var(--dtext); font:12px/1.5 'IBM Plex Sans',system-ui,sans-serif; overflow-wrap:anywhere;}
+.wf-timed{max-height:350px; overflow:auto;}
+.wf-timed .wflabel{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.wfrow.wf-error .wfbar{background:#DD5A65;}
+.wfrow.wf-error .wfms{font-weight:700; text-decoration:underline dotted;}
+.swtablewrap{overflow:auto; max-height:300px; border:1px solid color-mix(in srgb,var(--dtext) 20%,transparent); border-radius:6px;}
+.swtablewrap:focus-visible{outline:2px solid var(--dink); outline-offset:2px;}
+.swtable{width:100%; border-collapse:collapse; font:11px/1.5 'IBM Plex Mono',monospace; text-align:left;}
+.swtable th,.swtable td{padding:7px 8px; border-bottom:1px solid color-mix(in srgb,var(--dtext) 14%,transparent); vertical-align:top;}
+.swtable th{font-size:10px; color:var(--dink);}
+.swtable td{min-width:45px; max-width:180px;}
+.swtable tr:last-child td{border-bottom:0;}
+.swcaption{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%);}
+.swrow-added{background:color-mix(in srgb,var(--dtext) 5%,transparent);}
+.swrow-changed{background:color-mix(in srgb,var(--dtext) 9%,transparent);}
+.swrow-removed td:not(:last-child){text-decoration:line-through; opacity:.7;}
+.swbadge{display:inline-block; border:1px solid currentColor; border-radius:4px; padding:1px 5px; font:600 9px/1.5 'IBM Plex Mono',monospace; text-transform:uppercase; white-space:nowrap;}
+.sw-pass,.sw-added{color:#5EDAA0;}
+.sw-fail,.sw-removed{color:#FF9494;}
+.sw-warn,.sw-changed{color:#EEC16A;}
+.sw-pending,.sw-skip,.sw-neutral{color:var(--dfaint);}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-pass,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-added{color:#18724C;}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-fail,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-removed{color:#B32938;}
+:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-warn,:is(.sk-daylight,.sk-editorial,.sk-pastel,.sk-blueprint) .sw-changed{color:#865B06;}
+.swsummary,.swcheckhead{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+.swsummary{color:var(--dink); font-weight:600; margin-bottom:8px;}
+.swsummary span{font-size:10px; color:var(--dfaint); font-weight:400;}
+.swchecks{list-style:none; margin:0; padding:0; max-height:300px; overflow:auto;}
+.swchecks li,.swmetric{padding:8px 0; border-bottom:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);}
+.swchecks li:last-child,.swmetric:last-child{border-bottom:0;}
+.swcheckhead>span:first-child{color:var(--dink); font-weight:600;}
+.swdetail,.swnote,.swempty{font-size:11px; color:var(--dfaint); margin-top:4px;}
+.swnote{padding-top:8px; border-top:1px solid color-mix(in srgb,var(--dtext) 14%,transparent);}
+.swmeasure{font:11px/1.6 'IBM Plex Mono',monospace; margin:4px 0 6px;}
+.swmeasure strong{font-size:19px; color:var(--dink);}
+.swtrack{height:7px; border-radius:4px; position:relative; background:color-mix(in srgb,var(--dtext) 12%,transparent);}
+.swfill{height:100%; border-radius:4px; background:currentColor;}
+.swthreshold{position:absolute; top:-3px; height:13px; border-left:1px dashed var(--dink);}
+@media print{
+  .panelcol .pwidget.pt-table,.panelcol .pwidget.pt-checks,.panelcol .pwidget.pt-budget{display:block !important; break-inside:avoid;}
+  .panelcol:has(.pt-table),.panelcol:has(.pt-checks),.panelcol:has(.pt-budget){display:flex !important;}
+  .swtablewrap,.swchecks{max-height:none; overflow:visible;}
+  .swbadge{color:inherit;}
+}
 .panelcol{display:flex; flex-direction:column; gap:10px; margin-top:12px;}
 .pwidget{border-radius:12px; padding:12px 14px;}
 .sk-aurora .pwidget{background:#0B1220; border:1px solid #25364F;}
@@ -4077,7 +4128,94 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget'];
+var TABLE_STATUSES = ['neutral','added','changed','removed'];
+var CHECK_STATUSES = ['pending','pass','fail','warn','skip'];
+
+/* Software panels carry authored snapshots, not executable rules or live
+   telemetry. These helpers are shared with their defensive render models. */
+function panelObject(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
+function panelOwn(obj, key){ return panelObject(obj) && Object.prototype.hasOwnProperty.call(obj, key); }
+function softwarePanelItems(p){
+  var key = p.type === 'table' ? 'columns' : p.type === 'checks' ? 'checks' : 'metrics';
+  var max = p.type === 'table' ? 4 : p.type === 'checks' ? 12 : 6;
+  var seen = Object.create(null);
+  return (Array.isArray(p[key]) ? p[key] : []).slice(0, max).filter(function(item){
+    if (!panelObject(item) || typeof item.id !== 'string' || !item.id || seen[item.id]) return false;
+    seen[item.id] = true;
+    return true;
+  });
+}
+function softwarePanelWarnings(p, path, warnings){
+  var key = p.type === 'table' ? 'columns' : p.type === 'checks' ? 'checks' : 'metrics';
+  var max = p.type === 'table' ? 4 : p.type === 'checks' ? 12 : 6;
+  var seen = Object.create(null);
+  if (!Array.isArray(p[key]) || !p[key].length)
+    warnings.push(path + '.' + key + ': needs 1–' + max + ' entries with unique string ids');
+  else {
+    if (p[key].length > max) warnings.push(path + '.' + key + ': only the first ' + max + ' entries render');
+    p[key].forEach(function(item, i){
+      var at = path + '.' + key + '[' + i + ']';
+      if (!panelObject(item) || typeof item.id !== 'string' || !item.id){
+        warnings.push(at + '.id: needs a non-empty string — entry skipped'); return;
+      }
+      if (seen[item.id]) warnings.push(at + '.id: duplicate id "' + item.id + '" — later entry skipped');
+      seen[item.id] = true;
+      if (p.type === 'budget'){
+        if (!isFiniteNum(item.max) || item.max <= 0)
+          warnings.push(at + '.max: needs a finite positive upper limit — rendered as NO LIMIT');
+        if (item.warn != null && (!isFiniteNum(item.warn) || item.warn < 0 || item.warn > item.max))
+          warnings.push(at + '.warn: expected a number from 0 to max — warning threshold ignored');
+      }
+    });
+  }
+  softwarePanelPatchWarnings(p.initial, path + '.initial', p, warnings);
+}
+function softwarePanelPatchWarnings(state, path, p, warnings){
+  if (state == null) return;
+  if (!panelObject(state)){ warnings.push(path + ': expected a state object — ignored'); return; }
+  var items = softwarePanelItems(p), ids = items.map(function(item){ return item.id; });
+  if (p.type === 'table' && state.rows != null){
+    if (!Array.isArray(state.rows)) warnings.push(path + '.rows: expected an array — rendered empty');
+    else {
+      if (state.rows.length > 12) warnings.push(path + '.rows: only the first 12 rows render');
+      var seen = Object.create(null);
+      state.rows.forEach(function(row, i){
+        var at = path + '.rows[' + i + ']';
+        if (!panelObject(row) || typeof row.id !== 'string' || !row.id){
+          warnings.push(at + '.id: needs a non-empty string — row skipped'); return;
+        }
+        if (seen[row.id]) warnings.push(at + '.id: duplicate row id — later row skipped');
+        seen[row.id] = true;
+        if (!panelObject(row.cells)) warnings.push(at + '.cells: expected an object keyed by column id');
+        else Object.keys(row.cells).forEach(function(id){
+          if (ids.indexOf(id) < 0) warnings.push(at + '.cells.' + id + ': unknown column — ignored');
+          else if (row.cells[id] != null && typeof row.cells[id] === 'object')
+            warnings.push(at + '.cells.' + id + ': use a string, number, boolean, or null — object rendered as JSON');
+        });
+        if (row.status != null && TABLE_STATUSES.indexOf(row.status) < 0)
+          warnings.push(at + '.status: expected ' + TABLE_STATUSES.join('|') + ' — using neutral');
+      });
+    }
+  }
+  var key = p.type === 'checks' ? 'results' : p.type === 'budget' ? 'values' : null;
+  if (key && state[key] != null){
+    if (!panelObject(state[key])) warnings.push(path + '.' + key + ': expected an object keyed by declared id');
+    else Object.keys(state[key]).forEach(function(id){
+      var at = path + '.' + key + '.' + id, v = state[key][id];
+      if (ids.indexOf(id) < 0){ warnings.push(at + ': unknown declared id — ignored'); return; }
+      if (p.type === 'checks' && (!panelObject(v) || (v.status != null && CHECK_STATUSES.indexOf(v.status) < 0)))
+        warnings.push(at + ': expected {status: pending|pass|fail|warn|skip, detail?} — using pending');
+      if (p.type === 'budget' && v !== null && (!isFiniteNum(v) || v < 0))
+        warnings.push(at + ': expected a finite non-negative number or null — rendered as NO DATA');
+    });
+  }
+  if (panelObject(state.enterOnce)){
+    var once = Object.assign({}, state.enterOnce);
+    delete once.enterOnce;
+    softwarePanelPatchWarnings(once, path + '.enterOnce', p, warnings);
+  }
+}
 var SCENE_NAMES = ['person-at-door-night','package-drop','static-noise'];
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
@@ -4739,6 +4877,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (panelIds[p.id]) errors.push(PP + '.id: duplicate panel id "' + p.id + '"');
     panelIds[p.id] = true;
     panelDeclById[p.id] = p;
+    if (['table','checks','budget'].indexOf(p.type) >= 0)
+      softwarePanelWarnings(p, PP, warnings);
     if (p.type === 'inflight'){
       var laneMap = {};
       inflightPanels[p.id] = {decl:p, lanes:laneMap, open:{}};
@@ -4827,6 +4967,12 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(PP + '.scene: unknown scene "' + p.scene + '" — using "static-noise" (valid: ' + SCENE_NAMES.join(' ') + ')');
     if (p.type === 'waterfall' && !(Array.isArray(p.spans) && p.spans.length))
       warnings.push(PP + '.spans: waterfall needs spans:[{id, label, ms}] — panel renders empty');
+    if (p.type === 'waterfall' && Array.isArray(p.spans)) p.spans.forEach(function(span, si){
+      if (!span || !isFiniteNum(span.ms) || span.ms < 0)
+        warnings.push(PP + '.spans[' + si + '].ms: expected a finite non-negative duration');
+      if (span && span.startMs != null && (!isFiniteNum(span.startMs) || span.startMs < 0))
+        warnings.push(PP + '.spans[' + si + '].startMs: expected a finite non-negative offset — using the previous span end');
+    });
     if (p.type === 'orbit' && !(Array.isArray(p.states) && p.states.length))
       warnings.push(PP + '.states: orbit needs states:[...] — panel renders empty');
     if (p.type === 'zoneframe'){
@@ -5036,6 +5182,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (timelinePanels[pid] && patch[pid]){
         timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
+      } else if (['table','checks','budget'].indexOf(panelDeclById[pid].type) >= 0){
+        softwarePanelPatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
       }
     });
     if (st && st.lane && !lanes[st.lane])
@@ -6705,21 +6853,28 @@ function legendHTML(kinds, anyRet, skin, protos){
 function waterfallModel(spans, state){
   spans = Array.isArray(spans) ? spans : [];
   state = state || {};
-  var total = 0;
-  spans.forEach(function(s){ total += (s && typeof s.ms === 'number' && s.ms > 0) ? s.ms : 0; });
+  var total = 0, cursor = 0;
+  var timed = spans.some(function(s){ return s && isFiniteNum(s.startMs) && s.startMs >= 0; });
+  var measured = spans.map(function(s){
+    var ms = s && isFiniteNum(s.ms) && s.ms > 0 ? s.ms : 0;
+    var start = s && isFiniteNum(s.startMs) && s.startMs >= 0 ? s.startMs : cursor;
+    cursor = start + ms;
+    total = Math.max(total, cursor);
+    return {ms: ms, start: start};
+  });
   var reveal = (typeof state.reveal === 'number') ? clamp(state.reveal, 0, spans.length) : spans.length;
-  var off = 0, shown = 0, rows = [];
+  var shown = 0, rows = [];
   spans.forEach(function(s, i){
-    var ms = (s && typeof s.ms === 'number' && s.ms > 0) ? s.ms : 0;
+    var ms = measured[i].ms, off = measured[i].start;
     var revealed = i < reveal;
-    if (revealed) shown += ms;
+    if (revealed) shown = Math.max(shown, off + ms);
     rows.push({id: s && s.id, label: (s && (s.label || s.id)) || '', ms: ms,
+               startMs: off, error: !!(s && s.error === true),
                offsetPct: total ? off / total * 100 : 0,
                widthPct: total ? ms / total * 100 : 0,
                revealed: revealed, highlight: !!(s && state.highlight === s.id)});
-    off += ms;
   });
-  return {rows: rows, totalMs: total, shownMs: shown,
+  return {rows: rows, totalMs: total, shownMs: shown, timed: timed,
           totalLabel: state.total != null ? String(state.total) : shown + ' ms'};
 }
 
@@ -7630,6 +7785,102 @@ function contractCardHTML(contract, sectionReference){
 
 var ZF_SEQ = 0;
 
+/* ---------------- software state panels ---------------- */
+function tableModel(panel, state){
+  state = state || {};
+  var columns = softwarePanelItems(panel), seen = Object.create(null);
+  var rows = (Array.isArray(state.rows) ? state.rows : []).slice(0, 12).filter(function(row){
+    if (!panelObject(row) || typeof row.id !== 'string' || !row.id || seen[row.id]) return false;
+    seen[row.id] = true;
+    return true;
+  }).map(function(row){
+    return {id: row.id, status: TABLE_STATUSES.indexOf(row.status) >= 0 ? row.status : 'neutral',
+      cells: columns.map(function(col){
+        if (!panelOwn(row.cells, col.id)) return '—';
+        var v = row.cells[col.id];
+        if (v === null) return 'null';
+        return typeof v === 'object' ? JSON.stringify(v) : String(v);
+      })};
+  });
+  return {columns: columns, rows: rows};
+}
+function checksModel(panel, state){
+  state = state || {};
+  return softwarePanelItems(panel).map(function(check){
+    var result = panelOwn(state.results, check.id) && panelObject(state.results[check.id])
+      ? state.results[check.id] : {};
+    return {id: check.id, label: check.label || check.id,
+      status: CHECK_STATUSES.indexOf(result.status) >= 0 ? result.status : 'pending',
+      detail: result.detail == null ? '' : String(result.detail)};
+  });
+}
+function budgetModel(panel, state){
+  state = state || {};
+  return softwarePanelItems(panel).map(function(metric){
+    var raw = panelOwn(state.values, metric.id) ? state.values[metric.id] : null;
+    var value = isFiniteNum(raw) && raw >= 0 ? raw : null;
+    var max = isFiniteNum(metric.max) && metric.max > 0 ? metric.max : null;
+    var warn = max !== null && isFiniteNum(metric.warn) && metric.warn >= 0 && metric.warn <= max ? metric.warn : null;
+    var status = value === null ? 'unknown' : max === null ? 'unbounded' :
+      value > max ? 'over' : value === max ? 'limit' : warn !== null && value >= warn ? 'warn' : 'ok';
+    return {id: metric.id, label: metric.label || metric.id, unit: metric.unit || '',
+      value: value, max: max, warn: warn, status: status,
+      pct: value !== null && max !== null ? Math.min(value / max, 1) * 100 : 0,
+      remaining: value !== null && max !== null ? max - value : null};
+  });
+}
+function softwarePanelHTML(panel, state){
+  state = state || {};
+  var h = '<div class="swpanel">';
+  if (panel.type === 'table'){
+    var table = tableModel(panel, state);
+    h += '<div class="swtablewrap" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Data state') + '">' +
+      '<table class="swtable"><caption class="swcaption">' + esc(panel.title || 'Data state') + '</caption><thead><tr>';
+    table.columns.forEach(function(col){ h += '<th scope="col">' + esc(col.label || col.id) + '</th>'; });
+    h += '<th scope="col">Change</th></tr></thead><tbody>';
+    table.rows.forEach(function(row){
+      h += '<tr class="swrow-' + row.status + '">';
+      row.cells.forEach(function(cell){ h += '<td>' + esc(cell) + '</td>'; });
+      h += '<td><span class="swbadge sw-' + row.status + '">' +
+        (row.status === 'neutral' ? '—' : row.status) + '</span></td></tr>';
+    });
+    if (!table.rows.length) h += '<tr><td colspan="' + (table.columns.length + 1) + '" class="swempty">No rows at this step</td></tr>';
+    h += '</tbody></table></div>';
+  } else if (panel.type === 'checks'){
+    var checks = checksModel(panel, state), passed = checks.filter(function(c){ return c.status === 'pass'; }).length;
+    h += '<div class="swsummary">' + passed + ' / ' + checks.length + ' passed <span>Authored outcomes</span></div><ul class="swchecks">';
+    checks.forEach(function(check){
+      h += '<li><div class="swcheckhead"><span>' + esc(check.label) + '</span>' +
+        '<span class="swbadge sw-' + check.status + '">' + check.status + '</span></div>' +
+        (check.detail ? '<div class="swdetail">' + esc(check.detail) + '</div>' : '') + '</li>';
+    });
+    h += '</ul>';
+    if (!checks.length) h += '<div class="swempty">No checks declared</div>';
+  } else if (panel.type === 'budget'){
+    var metrics = budgetModel(panel, state);
+    var labels = {unknown:'NO DATA', unbounded:'NO LIMIT', over:'OVER LIMIT', limit:'AT LIMIT', warn:'NEAR LIMIT', ok:'WITHIN LIMIT'};
+    metrics.forEach(function(metric){
+      var tone = metric.status === 'over' ? 'fail' : ['warn','limit'].indexOf(metric.status) >= 0 ? 'warn' :
+        metric.status === 'ok' ? 'pass' : 'pending';
+      h += '<div class="swmetric"><div class="swcheckhead"><span>' + esc(metric.label) + '</span>' +
+        '<span class="swbadge sw-' + tone + '">' + labels[metric.status] + '</span></div>' +
+        '<div class="swmeasure"><strong>' + (metric.value === null ? '—' : esc(String(metric.value))) + '</strong>' +
+        ' / ' + (metric.max === null ? '—' : esc(String(metric.max))) + ' ' + esc(metric.unit) + '</div>';
+      if (metric.value !== null && metric.max !== null){
+        h += '<div class="swtrack" role="img" aria-label="' + esc(metric.label + ': ' + metric.value + ' of ' + metric.max + ' ' + metric.unit + ', ' + labels[metric.status]) + '">' +
+          '<div class="swfill sw-' + tone + '" style="width:' + metric.pct.toFixed(2) + '%"></div>';
+        if (metric.warn !== null) h += '<span class="swthreshold" style="left:' + (metric.warn / metric.max * 100).toFixed(2) + '%" title="Warning at ' + esc(String(metric.warn)) + '"></span>';
+        h += '</div><div class="swdetail">' + esc(String(Number(Math.abs(metric.remaining).toPrecision(6)))) +
+          ' ' + esc(metric.unit) + (metric.remaining < 0 ? ' over budget' : ' remaining') + '</div>';
+      }
+      h += '</div>';
+    });
+    if (!metrics.length) h += '<div class="swempty">No budgets declared</div>';
+  }
+  if (state.note) h += '<div class="swnote">' + esc(String(state.note)) + '</div>';
+  return h + '</div>';
+}
+
 /* ---------------- inspector panel widgets ----------------
    Each widget renders ABSOLUTE state (from foldPanelStates) — no deltas, so
    any step jump is consistent. renderPanelBody rebuilds the widget's DOM.
@@ -7651,7 +7902,9 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
      the following identical step skips the rebuild */
   var hBaseline = null;
   state = state || {};
-  if (type === 'state'){
+  if (['table','checks','budget'].indexOf(type) >= 0){
+    h = softwarePanelHTML(panel, state);
+  } else if (type === 'state'){
     var cur = state.state != null ? String(state.state) : '—';
     pulseSelector = '.pchip.cur';
     pulseChanged = Object.prototype.hasOwnProperty.call(host, '_stateCur') && host._stateCur !== cur;
@@ -8027,15 +8280,16 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var wfNow = wm.rows.map(function(r){ return r.revealed; });
     waterfallEntrants = wfPrev ? wfNow.map(function(on, i){ return on && !wfPrev[i]; }) : null;
     host._wfRevealed = wfNow;
-    h += '<div class="wfall">';
+    h += '<div class="wfall' + (wm.timed ? ' wf-timed' : '') + '">';
     wm.rows.forEach(function(r){
-      h += '<div class="wfrow' + (r.revealed ? ' on' : '') + (r.highlight ? ' hl' : '') + '">' +
+      h += '<div class="wfrow' + (r.revealed ? ' on' : '') + (r.highlight ? ' hl' : '') + (r.error ? ' wf-error' : '') +
+           '" title="' + esc(r.label + ' · start +' + r.startMs + ' ms · duration ' + r.ms + ' ms' + (r.error ? ' · recorded error' : '')) + '">' +
            '<span class="wflabel">' + esc(r.label) + '</span>' +
            '<span class="wftrack"><span class="wfbar" style="margin-left:' + r.offsetPct.toFixed(2) +
-           '%;width:' + Math.max(r.widthPct, 1.2).toFixed(2) + '%"></span></span>' +
-           '<span class="wfms">' + (r.revealed ? esc(String(r.ms)) + ' ms' : '&#8212;') + '</span></div>';
+           '%;width:' + Math.max(r.widthPct, wm.timed ? 0 : 1.2).toFixed(2) + '%"></span></span>' +
+           '<span class="wfms">' + (r.revealed ? (r.error ? '! ' : '') + esc(String(r.ms)) + ' ms' : '&#8212;') + '</span></div>';
     });
-    h += '<div class="wftotal">total <b>' + esc(wm.totalLabel) + '</b></div></div>';
+    h += '<div class="wftotal">' + (wm.timed ? 'elapsed extent ' : 'total ') + '<b>' + esc(wm.totalLabel) + '</b></div></div>';
   } else if (type === 'orbit'){
     var ostates = Array.isArray(panel.states) ? panel.states : [];
     var ocur = state.state != null ? String(state.state) : null;

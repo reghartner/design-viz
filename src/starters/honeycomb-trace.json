@@ -1,0 +1,552 @@
+{
+  "page": {
+    "title": "Fictional checkout — imported Honeycomb trace",
+    "skin": "aurora",
+    "protocols": {
+      "trace": {
+        "label": "Span parent relationship",
+        "color": "#38BDF8"
+      }
+    },
+    "blocks": [
+      {
+        "heading": "Observed request",
+        "accent": "cyan",
+        "text": [
+          "Imported trace fictional-checkout-001: 6 spans across 5 services; observed extent 300 ms.",
+          "Inspect spans in start-time order. Overlapping bars retain their original offsets; parent spans include child time. The total is elapsed extent, not a sum of durations. Arrows mean span parent relationships, not a verified network protocol.",
+          "This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success."
+        ],
+        "bullets": [],
+        "diagram": {
+          "view": "step",
+          "nodes": {
+            "svc1": {
+              "title": "checkout",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc2": {
+              "title": "identity",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc3": {
+              "title": "inventory",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc4": {
+              "title": "payments",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc5": {
+              "title": "audit",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "svc1",
+              "svc2",
+              "svc3",
+              "svc4",
+              "svc5"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "svc1",
+              "to": "svc2",
+              "kind": "trace"
+            },
+            {
+              "from": "svc1",
+              "to": "svc3",
+              "kind": "trace"
+            },
+            {
+              "from": "svc1",
+              "to": "svc4",
+              "kind": "trace"
+            },
+            {
+              "from": "svc1",
+              "to": "svc5",
+              "kind": "trace"
+            }
+          ],
+          "panels": [
+            {
+              "id": "timing",
+              "type": "waterfall",
+              "title": "Observed span timing",
+              "spans": [
+                {
+                  "id": "root",
+                  "label": "checkout · POST /orders",
+                  "ms": 300,
+                  "startMs": 0,
+                  "error": false
+                },
+                {
+                  "id": "cache",
+                  "label": "checkout · idempotency lookup",
+                  "ms": 5,
+                  "startMs": 10,
+                  "error": false
+                },
+                {
+                  "id": "auth",
+                  "label": "identity · authorize",
+                  "ms": 40,
+                  "startMs": 20,
+                  "error": false
+                },
+                {
+                  "id": "stock",
+                  "label": "inventory · reserve stock",
+                  "ms": 100,
+                  "startMs": 30,
+                  "error": false
+                },
+                {
+                  "id": "pay",
+                  "label": "payments · authorize payment",
+                  "ms": 100,
+                  "startMs": 150,
+                  "error": true
+                },
+                {
+                  "id": "audit",
+                  "label": "audit · record failed checkout",
+                  "ms": 20,
+                  "startMs": 260,
+                  "error": false
+                }
+              ]
+            },
+            {
+              "id": "span",
+              "type": "table",
+              "title": "Selected span",
+              "columns": [
+                {
+                  "id": "field",
+                  "label": "Field"
+                },
+                {
+                  "id": "value",
+                  "label": "Observed value"
+                }
+              ]
+            }
+          ],
+          "steps": [
+            {
+              "id": "root",
+              "nodes": [
+                "svc1"
+              ],
+              "text": "+0 ms · checkout · POST /orders · duration 300 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "root"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "root"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": null
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "checkout"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "POST /orders"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 0
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 300
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "cache",
+              "nodes": [
+                "svc1"
+              ],
+              "text": "+10 ms · checkout · idempotency lookup · duration 5 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "cache"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "cache"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "root"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "checkout"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "idempotency lookup"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 10
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "auth",
+              "nodes": [
+                "svc2"
+              ],
+              "text": "+20 ms · identity · authorize · duration 40 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "auth"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "auth"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "root"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "identity"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "authorize"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 20
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 40
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc2"
+            },
+            {
+              "id": "stock",
+              "nodes": [
+                "svc3"
+              ],
+              "text": "+30 ms · inventory · reserve stock · duration 100 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "stock"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "stock"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "root"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "inventory"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "reserve stock"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 30
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 100
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc3"
+            },
+            {
+              "id": "pay",
+              "nodes": [
+                "svc4"
+              ],
+              "text": "+150 ms · payments · authorize payment · duration 100 ms · recorded error",
+              "panels": {
+                "timing": {
+                  "highlight": "pay"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "pay"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "root"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "payments"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "authorize payment"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 150
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 100
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "recorded error"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc4"
+            },
+            {
+              "id": "audit",
+              "nodes": [
+                "svc5"
+              ],
+              "text": "+260 ms · audit · record failed checkout · duration 20 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "audit"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "audit"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "root"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "audit"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "record failed checkout"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 260
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 20
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc5"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

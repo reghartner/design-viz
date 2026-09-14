@@ -10,7 +10,94 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget'];
+var TABLE_STATUSES = ['neutral','added','changed','removed'];
+var CHECK_STATUSES = ['pending','pass','fail','warn','skip'];
+
+/* Software panels carry authored snapshots, not executable rules or live
+   telemetry. These helpers are shared with their defensive render models. */
+function panelObject(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
+function panelOwn(obj, key){ return panelObject(obj) && Object.prototype.hasOwnProperty.call(obj, key); }
+function softwarePanelItems(p){
+  var key = p.type === 'table' ? 'columns' : p.type === 'checks' ? 'checks' : 'metrics';
+  var max = p.type === 'table' ? 4 : p.type === 'checks' ? 12 : 6;
+  var seen = Object.create(null);
+  return (Array.isArray(p[key]) ? p[key] : []).slice(0, max).filter(function(item){
+    if (!panelObject(item) || typeof item.id !== 'string' || !item.id || seen[item.id]) return false;
+    seen[item.id] = true;
+    return true;
+  });
+}
+function softwarePanelWarnings(p, path, warnings){
+  var key = p.type === 'table' ? 'columns' : p.type === 'checks' ? 'checks' : 'metrics';
+  var max = p.type === 'table' ? 4 : p.type === 'checks' ? 12 : 6;
+  var seen = Object.create(null);
+  if (!Array.isArray(p[key]) || !p[key].length)
+    warnings.push(path + '.' + key + ': needs 1–' + max + ' entries with unique string ids');
+  else {
+    if (p[key].length > max) warnings.push(path + '.' + key + ': only the first ' + max + ' entries render');
+    p[key].forEach(function(item, i){
+      var at = path + '.' + key + '[' + i + ']';
+      if (!panelObject(item) || typeof item.id !== 'string' || !item.id){
+        warnings.push(at + '.id: needs a non-empty string — entry skipped'); return;
+      }
+      if (seen[item.id]) warnings.push(at + '.id: duplicate id "' + item.id + '" — later entry skipped');
+      seen[item.id] = true;
+      if (p.type === 'budget'){
+        if (!isFiniteNum(item.max) || item.max <= 0)
+          warnings.push(at + '.max: needs a finite positive upper limit — rendered as NO LIMIT');
+        if (item.warn != null && (!isFiniteNum(item.warn) || item.warn < 0 || item.warn > item.max))
+          warnings.push(at + '.warn: expected a number from 0 to max — warning threshold ignored');
+      }
+    });
+  }
+  softwarePanelPatchWarnings(p.initial, path + '.initial', p, warnings);
+}
+function softwarePanelPatchWarnings(state, path, p, warnings){
+  if (state == null) return;
+  if (!panelObject(state)){ warnings.push(path + ': expected a state object — ignored'); return; }
+  var items = softwarePanelItems(p), ids = items.map(function(item){ return item.id; });
+  if (p.type === 'table' && state.rows != null){
+    if (!Array.isArray(state.rows)) warnings.push(path + '.rows: expected an array — rendered empty');
+    else {
+      if (state.rows.length > 12) warnings.push(path + '.rows: only the first 12 rows render');
+      var seen = Object.create(null);
+      state.rows.forEach(function(row, i){
+        var at = path + '.rows[' + i + ']';
+        if (!panelObject(row) || typeof row.id !== 'string' || !row.id){
+          warnings.push(at + '.id: needs a non-empty string — row skipped'); return;
+        }
+        if (seen[row.id]) warnings.push(at + '.id: duplicate row id — later row skipped');
+        seen[row.id] = true;
+        if (!panelObject(row.cells)) warnings.push(at + '.cells: expected an object keyed by column id');
+        else Object.keys(row.cells).forEach(function(id){
+          if (ids.indexOf(id) < 0) warnings.push(at + '.cells.' + id + ': unknown column — ignored');
+          else if (row.cells[id] != null && typeof row.cells[id] === 'object')
+            warnings.push(at + '.cells.' + id + ': use a string, number, boolean, or null — object rendered as JSON');
+        });
+        if (row.status != null && TABLE_STATUSES.indexOf(row.status) < 0)
+          warnings.push(at + '.status: expected ' + TABLE_STATUSES.join('|') + ' — using neutral');
+      });
+    }
+  }
+  var key = p.type === 'checks' ? 'results' : p.type === 'budget' ? 'values' : null;
+  if (key && state[key] != null){
+    if (!panelObject(state[key])) warnings.push(path + '.' + key + ': expected an object keyed by declared id');
+    else Object.keys(state[key]).forEach(function(id){
+      var at = path + '.' + key + '.' + id, v = state[key][id];
+      if (ids.indexOf(id) < 0){ warnings.push(at + ': unknown declared id — ignored'); return; }
+      if (p.type === 'checks' && (!panelObject(v) || (v.status != null && CHECK_STATUSES.indexOf(v.status) < 0)))
+        warnings.push(at + ': expected {status: pending|pass|fail|warn|skip, detail?} — using pending');
+      if (p.type === 'budget' && v !== null && (!isFiniteNum(v) || v < 0))
+        warnings.push(at + ': expected a finite non-negative number or null — rendered as NO DATA');
+    });
+  }
+  if (panelObject(state.enterOnce)){
+    var once = Object.assign({}, state.enterOnce);
+    delete once.enterOnce;
+    softwarePanelPatchWarnings(once, path + '.enterOnce', p, warnings);
+  }
+}
 var SCENE_NAMES = ['person-at-door-night','package-drop','static-noise'];
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
@@ -672,6 +759,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (panelIds[p.id]) errors.push(PP + '.id: duplicate panel id "' + p.id + '"');
     panelIds[p.id] = true;
     panelDeclById[p.id] = p;
+    if (['table','checks','budget'].indexOf(p.type) >= 0)
+      softwarePanelWarnings(p, PP, warnings);
     if (p.type === 'inflight'){
       var laneMap = {};
       inflightPanels[p.id] = {decl:p, lanes:laneMap, open:{}};
@@ -760,6 +849,12 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(PP + '.scene: unknown scene "' + p.scene + '" — using "static-noise" (valid: ' + SCENE_NAMES.join(' ') + ')');
     if (p.type === 'waterfall' && !(Array.isArray(p.spans) && p.spans.length))
       warnings.push(PP + '.spans: waterfall needs spans:[{id, label, ms}] — panel renders empty');
+    if (p.type === 'waterfall' && Array.isArray(p.spans)) p.spans.forEach(function(span, si){
+      if (!span || !isFiniteNum(span.ms) || span.ms < 0)
+        warnings.push(PP + '.spans[' + si + '].ms: expected a finite non-negative duration');
+      if (span && span.startMs != null && (!isFiniteNum(span.startMs) || span.startMs < 0))
+        warnings.push(PP + '.spans[' + si + '].startMs: expected a finite non-negative offset — using the previous span end');
+    });
     if (p.type === 'orbit' && !(Array.isArray(p.states) && p.states.length))
       warnings.push(PP + '.states: orbit needs states:[...] — panel renders empty');
     if (p.type === 'zoneframe'){
@@ -969,6 +1064,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (timelinePanels[pid] && patch[pid]){
         timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
+      } else if (['table','checks','budget'].indexOf(panelDeclById[pid].type) >= 0){
+        softwarePanelPatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
       }
     });
     if (st && st.lane && !lanes[st.lane])

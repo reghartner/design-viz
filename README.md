@@ -9,6 +9,19 @@ of the same time-aware data — an ambient always-animating view and a guided st
 
 ## The pipeline
 
+**New: [Honeycomb trace → diagram](docs/trace-import.md).** In the workbench,
+choose **import trace…**, paste or open event JSON, and **Build diagram**.
+The result is a service board, an offset-aware waterfall, and a step for each
+span. No account connection is required. **starters… → Honeycomb trace** opens
+a fictional example immediately. Agents use `node tools/trace2spec.js`.
+
+**Broader design panels:** `table` shows data snapshots, `checks` shows
+authored decisions and invariants, and `budget` compares resource usage with
+explicit limits. Try **starters… → software & IoT** for both domains.
+The workbench's **document outline** (⌘/Ctrl K) searches sections, hidden tabs,
+nodes, groups, edges, panels, and steps and opens the matching inspector.
+See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions.
+
 ```
 design doc (prose / permalinks / mermaid)
         │

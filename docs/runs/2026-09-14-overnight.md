@@ -22,7 +22,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
 | 11 | Canary and firmware rollout stories | codex/rollout-starters | Open: https://github.com/reghartner/design-viz/pull/60 |
 | 12 | Phone diagram legibility | codex/phone-diagram-legibility | Open: https://github.com/reghartner/design-viz/pull/61 |
-| 13 | Explicit diagram node finder | codex/diagram-node-finder | Built; opening focused PR above #61 |
+| 13 | Explicit diagram node finder | codex/diagram-node-finder | Open: https://github.com/reghartner/design-viz/pull/62 |
 
 ## Validation and evidence
 
@@ -33,6 +33,8 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
+  At 07:26 local the existing schedule was aligned to the hour so its final
+  check runs at 08:00 exactly; the original 08:00 UTC-adjusted expiry remains.
 - PRs #50, #51, #52, #53, #54, #55, #56, #57, #58, #59, #60 and #61 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
@@ -117,6 +119,9 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   focusout bug is fixed and regression tested. Navigation marks are separate
   from semantic tones, disappear on focus exit and dispose with old previews.
   No new runtime errors after the fix; the fixture's old density warnings remain.
+  Browser also verified a static routed graph without panels/steps, full long
+  labels and disambiguated duplicate names. Check PR #62 final head CI after
+  this handoff commit.
 
 ## Next continuation
 

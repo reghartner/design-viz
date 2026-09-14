@@ -263,6 +263,17 @@ chips, a VPC around services. Rules:
 
 ### rows — layout by flow order (no coordinates)
 
+Optional `diagram.routing: "lanes"` routes connectors along reserved tracks
+between rows and channels around cards. It spreads ports and scores crossings
+and coincident segments; dense graphs can still cross, with visual breaks at
+intersections. Supports 1–5 unstacked cards per row, no floats or self-loops.
+Unsupported layouts fall back to curves with a warning. Authored edge bends
+are ignored in lanes mode; label offsets remain available. Omit routing or use
+`"curves"` for existing behavior. Honeycomb imports generate dependency rows
+(at most four cards per row), retaining service cycles and all relationships.
+Their row order describes dependencies, not elapsed time. A **Readable size**
+button enlarges the board for horizontal scrolling; **Fit width** restores it.
+
 `rows` is an array of rows; each row is an array of slots **in flow order**.
 The engine computes all positions:
 

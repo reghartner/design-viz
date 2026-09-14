@@ -1,0 +1,2054 @@
+{
+  "page": {
+    "title": "Complex checkout — shared dependencies and service cycles",
+    "skin": "aurora",
+    "protocols": {
+      "trace": {
+        "label": "Span parent relationship",
+        "color": "#38BDF8"
+      }
+    },
+    "blocks": [
+      {
+        "heading": "Observed request",
+        "accent": "cyan",
+        "text": [
+          "Imported trace fictional-complex-checkout: 24 spans across 17 services; observed extent 1000 ms.",
+          "Inspect spans in start-time order. Overlapping bars retain their original offsets; parent spans include child time. The total is elapsed extent, not a sum of durations. Arrows mean span parent relationships, not a verified network protocol.",
+          "This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success."
+        ],
+        "bullets": [],
+        "diagram": {
+          "view": "step",
+          "routing": "lanes",
+          "nodes": {
+            "svc1": {
+              "title": "gateway",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc2": {
+              "title": "checkout",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc3": {
+              "title": "identity",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc4": {
+              "title": "pricing",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc5": {
+              "title": "payments",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc6": {
+              "title": "inventory",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc7": {
+              "title": "cache",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc8": {
+              "title": "risk",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc9": {
+              "title": "ledger",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc10": {
+              "title": "catalog",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc11": {
+              "title": "notifications",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc12": {
+              "title": "rules",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc13": {
+              "title": "warehouse",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc14": {
+              "title": "database",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc15": {
+              "title": "queue",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc16": {
+              "title": "worker",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "svc17": {
+              "title": "mailer",
+              "sub": "observed service",
+              "icon": "server",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "svc1"
+            ],
+            [
+              "svc8",
+              "svc4",
+              "svc2",
+              "svc3"
+            ],
+            [
+              "svc11",
+              "svc5"
+            ],
+            [
+              "svc15",
+              "svc12",
+              "svc6",
+              "svc7"
+            ],
+            [
+              "svc9"
+            ],
+            [
+              "svc16",
+              "svc10",
+              "svc13"
+            ],
+            [
+              "svc14",
+              "svc17"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "svc1",
+              "to": "svc2",
+              "kind": "trace"
+            },
+            {
+              "from": "svc1",
+              "to": "svc3",
+              "kind": "trace"
+            },
+            {
+              "from": "svc1",
+              "to": "svc4",
+              "kind": "trace"
+            },
+            {
+              "from": "svc2",
+              "to": "svc5",
+              "kind": "trace"
+            },
+            {
+              "from": "svc2",
+              "to": "svc6",
+              "kind": "trace"
+            },
+            {
+              "from": "svc3",
+              "to": "svc7",
+              "kind": "trace"
+            },
+            {
+              "from": "svc1",
+              "to": "svc6",
+              "kind": "trace"
+            },
+            {
+              "from": "svc5",
+              "to": "svc8",
+              "kind": "trace"
+            },
+            {
+              "from": "svc5",
+              "to": "svc9",
+              "kind": "trace"
+            },
+            {
+              "from": "svc6",
+              "to": "svc10",
+              "kind": "trace"
+            },
+            {
+              "from": "svc8",
+              "to": "svc2",
+              "kind": "trace"
+            },
+            {
+              "from": "svc4",
+              "to": "svc10",
+              "kind": "trace"
+            },
+            {
+              "from": "svc1",
+              "to": "svc11",
+              "kind": "trace"
+            },
+            {
+              "from": "svc8",
+              "to": "svc12",
+              "kind": "trace"
+            },
+            {
+              "from": "svc6",
+              "to": "svc13",
+              "kind": "trace"
+            },
+            {
+              "from": "svc7",
+              "to": "svc14",
+              "kind": "trace"
+            },
+            {
+              "from": "svc4",
+              "to": "svc12",
+              "kind": "trace"
+            },
+            {
+              "from": "svc6",
+              "to": "svc14",
+              "kind": "trace"
+            },
+            {
+              "from": "svc11",
+              "to": "svc15",
+              "kind": "trace"
+            },
+            {
+              "from": "svc15",
+              "to": "svc16",
+              "kind": "trace"
+            },
+            {
+              "from": "svc16",
+              "to": "svc14",
+              "kind": "trace"
+            },
+            {
+              "from": "svc16",
+              "to": "svc17",
+              "kind": "trace"
+            }
+          ],
+          "panels": [
+            {
+              "id": "timing",
+              "type": "waterfall",
+              "title": "Observed span timing",
+              "spans": [
+                {
+                  "id": "span-1",
+                  "label": "gateway · handle gateway",
+                  "ms": 1000,
+                  "startMs": 0,
+                  "error": false
+                },
+                {
+                  "id": "span-2",
+                  "label": "checkout · handle checkout",
+                  "ms": 600,
+                  "startMs": 100,
+                  "error": false
+                },
+                {
+                  "id": "span-11",
+                  "label": "identity · handle identity",
+                  "ms": 600,
+                  "startMs": 130,
+                  "error": false
+                },
+                {
+                  "id": "span-14",
+                  "label": "pricing · handle pricing",
+                  "ms": 600,
+                  "startMs": 160,
+                  "error": false
+                },
+                {
+                  "id": "span-3",
+                  "label": "payments · handle payments",
+                  "ms": 360,
+                  "startMs": 160,
+                  "error": false
+                },
+                {
+                  "id": "span-8",
+                  "label": "inventory · handle inventory",
+                  "ms": 360,
+                  "startMs": 178,
+                  "error": false
+                },
+                {
+                  "id": "span-12",
+                  "label": "cache · handle cache",
+                  "ms": 360,
+                  "startMs": 190,
+                  "error": false
+                },
+                {
+                  "id": "span-17",
+                  "label": "inventory · handle inventory",
+                  "ms": 600,
+                  "startMs": 190,
+                  "error": false
+                },
+                {
+                  "id": "span-4",
+                  "label": "risk · handle risk",
+                  "ms": 216,
+                  "startMs": 196,
+                  "error": false
+                },
+                {
+                  "id": "span-7",
+                  "label": "ledger · handle ledger",
+                  "ms": 216,
+                  "startMs": 206.8,
+                  "error": false
+                },
+                {
+                  "id": "span-9",
+                  "label": "catalog · handle catalog",
+                  "ms": 216,
+                  "startMs": 214,
+                  "error": false
+                },
+                {
+                  "id": "span-5",
+                  "label": "checkout · handle checkout",
+                  "ms": 129.6,
+                  "startMs": 217.6,
+                  "error": false
+                },
+                {
+                  "id": "span-15",
+                  "label": "catalog · handle catalog",
+                  "ms": 360,
+                  "startMs": 220,
+                  "error": false
+                },
+                {
+                  "id": "span-20",
+                  "label": "notifications · handle notifications",
+                  "ms": 600,
+                  "startMs": 220,
+                  "error": false
+                },
+                {
+                  "id": "span-6",
+                  "label": "rules · handle rules",
+                  "ms": 129.6,
+                  "startMs": 224.08,
+                  "error": false
+                },
+                {
+                  "id": "span-10",
+                  "label": "warehouse · handle warehouse",
+                  "ms": 216,
+                  "startMs": 224.8,
+                  "error": false
+                },
+                {
+                  "id": "span-13",
+                  "label": "database · handle database",
+                  "ms": 216,
+                  "startMs": 226,
+                  "error": false
+                },
+                {
+                  "id": "span-16",
+                  "label": "rules · handle rules",
+                  "ms": 360,
+                  "startMs": 238,
+                  "error": false
+                },
+                {
+                  "id": "span-18",
+                  "label": "database · handle database",
+                  "ms": 360,
+                  "startMs": 250,
+                  "error": false
+                },
+                {
+                  "id": "span-19",
+                  "label": "warehouse · handle warehouse",
+                  "ms": 360,
+                  "startMs": 268,
+                  "error": false
+                },
+                {
+                  "id": "span-21",
+                  "label": "queue · handle queue",
+                  "ms": 360,
+                  "startMs": 280,
+                  "error": false
+                },
+                {
+                  "id": "span-22",
+                  "label": "worker · handle worker",
+                  "ms": 216,
+                  "startMs": 316,
+                  "error": false
+                },
+                {
+                  "id": "span-23",
+                  "label": "database · handle database",
+                  "ms": 129.6,
+                  "startMs": 337.6,
+                  "error": false
+                },
+                {
+                  "id": "span-24",
+                  "label": "mailer · handle mailer",
+                  "ms": 129.6,
+                  "startMs": 344.08,
+                  "error": true
+                }
+              ]
+            },
+            {
+              "id": "span",
+              "type": "table",
+              "title": "Selected span",
+              "columns": [
+                {
+                  "id": "field",
+                  "label": "Field"
+                },
+                {
+                  "id": "value",
+                  "label": "Observed value"
+                }
+              ]
+            }
+          ],
+          "steps": [
+            {
+              "id": "span-1",
+              "nodes": [
+                "svc1"
+              ],
+              "text": "+0 ms · gateway · handle gateway · duration 1000 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-1"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-1"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": null
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "gateway"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle gateway"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 0
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 1000
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "span-2",
+              "nodes": [
+                "svc2"
+              ],
+              "text": "+100 ms · checkout · handle checkout · duration 600 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-2"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-2"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-1"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "checkout"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle checkout"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 100
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 600
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc2"
+            },
+            {
+              "id": "span-11",
+              "nodes": [
+                "svc3"
+              ],
+              "text": "+130 ms · identity · handle identity · duration 600 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-11"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-11"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-1"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "identity"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle identity"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 130
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 600
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc3"
+            },
+            {
+              "id": "span-14",
+              "nodes": [
+                "svc4"
+              ],
+              "text": "+160 ms · pricing · handle pricing · duration 600 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-14"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-14"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-1"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "pricing"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle pricing"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 160
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 600
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc4"
+            },
+            {
+              "id": "span-3",
+              "nodes": [
+                "svc5"
+              ],
+              "text": "+160 ms · payments · handle payments · duration 360 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-3"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-3"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-2"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "payments"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle payments"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 160
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 360
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc2->svc5"
+            },
+            {
+              "id": "span-8",
+              "nodes": [
+                "svc6"
+              ],
+              "text": "+178 ms · inventory · handle inventory · duration 360 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-8"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-8"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-2"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "inventory"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle inventory"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 178
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 360
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc2->svc6"
+            },
+            {
+              "id": "span-12",
+              "nodes": [
+                "svc7"
+              ],
+              "text": "+190 ms · cache · handle cache · duration 360 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-12"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-12"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-11"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "cache"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle cache"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 190
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 360
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc3->svc7"
+            },
+            {
+              "id": "span-17",
+              "nodes": [
+                "svc6"
+              ],
+              "text": "+190 ms · inventory · handle inventory · duration 600 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-17"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-17"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-1"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "inventory"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle inventory"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 190
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 600
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc6"
+            },
+            {
+              "id": "span-4",
+              "nodes": [
+                "svc8"
+              ],
+              "text": "+196 ms · risk · handle risk · duration 216 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-4"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-4"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-3"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "risk"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle risk"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 196
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 216
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc5->svc8"
+            },
+            {
+              "id": "span-7",
+              "nodes": [
+                "svc9"
+              ],
+              "text": "+206.8 ms · ledger · handle ledger · duration 216 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-7"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-7"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-3"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "ledger"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle ledger"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 206.8
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 216
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc5->svc9"
+            },
+            {
+              "id": "span-9",
+              "nodes": [
+                "svc10"
+              ],
+              "text": "+214 ms · catalog · handle catalog · duration 216 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-9"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-9"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-8"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "catalog"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle catalog"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 214
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 216
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc6->svc10"
+            },
+            {
+              "id": "span-5",
+              "nodes": [
+                "svc2"
+              ],
+              "text": "+217.6 ms · checkout · handle checkout · duration 129.6 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-5"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-5"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-4"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "checkout"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle checkout"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 217.6
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 129.6
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc8->svc2"
+            },
+            {
+              "id": "span-15",
+              "nodes": [
+                "svc10"
+              ],
+              "text": "+220 ms · catalog · handle catalog · duration 360 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-15"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-15"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-14"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "catalog"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle catalog"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 220
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 360
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc4->svc10"
+            },
+            {
+              "id": "span-20",
+              "nodes": [
+                "svc11"
+              ],
+              "text": "+220 ms · notifications · handle notifications · duration 600 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-20"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-20"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-1"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "notifications"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle notifications"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 220
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 600
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc1->svc11"
+            },
+            {
+              "id": "span-6",
+              "nodes": [
+                "svc12"
+              ],
+              "text": "+224.08 ms · rules · handle rules · duration 129.6 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-6"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-6"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-4"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "rules"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle rules"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 224.08
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 129.6
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc8->svc12"
+            },
+            {
+              "id": "span-10",
+              "nodes": [
+                "svc13"
+              ],
+              "text": "+224.8 ms · warehouse · handle warehouse · duration 216 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-10"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-10"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-8"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "warehouse"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle warehouse"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 224.8
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 216
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc6->svc13"
+            },
+            {
+              "id": "span-13",
+              "nodes": [
+                "svc14"
+              ],
+              "text": "+226 ms · database · handle database · duration 216 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-13"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-13"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-12"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "database"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle database"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 226
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 216
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc7->svc14"
+            },
+            {
+              "id": "span-16",
+              "nodes": [
+                "svc12"
+              ],
+              "text": "+238 ms · rules · handle rules · duration 360 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-16"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-16"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-14"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "rules"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle rules"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 238
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 360
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc4->svc12"
+            },
+            {
+              "id": "span-18",
+              "nodes": [
+                "svc14"
+              ],
+              "text": "+250 ms · database · handle database · duration 360 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-18"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-18"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-17"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "database"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle database"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 250
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 360
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc6->svc14"
+            },
+            {
+              "id": "span-19",
+              "nodes": [
+                "svc13"
+              ],
+              "text": "+268 ms · warehouse · handle warehouse · duration 360 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-19"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-19"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-17"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "warehouse"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle warehouse"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 268
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 360
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc6->svc13"
+            },
+            {
+              "id": "span-21",
+              "nodes": [
+                "svc15"
+              ],
+              "text": "+280 ms · queue · handle queue · duration 360 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-21"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-21"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-20"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "queue"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle queue"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 280
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 360
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc11->svc15"
+            },
+            {
+              "id": "span-22",
+              "nodes": [
+                "svc16"
+              ],
+              "text": "+316 ms · worker · handle worker · duration 216 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-22"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-22"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-21"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "worker"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle worker"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 316
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 216
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc15->svc16"
+            },
+            {
+              "id": "span-23",
+              "nodes": [
+                "svc14"
+              ],
+              "text": "+337.6 ms · database · handle database · duration 129.6 ms",
+              "panels": {
+                "timing": {
+                  "highlight": "span-23"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-23"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-22"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "database"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle database"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 337.6
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 129.6
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "not flagged"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc16->svc14"
+            },
+            {
+              "id": "span-24",
+              "nodes": [
+                "svc17"
+              ],
+              "text": "+344.08 ms · mailer · handle mailer · duration 129.6 ms · recorded error",
+              "panels": {
+                "timing": {
+                  "highlight": "span-24"
+                },
+                "span": {
+                  "rows": [
+                    {
+                      "id": "span_id",
+                      "cells": {
+                        "field": "span_id",
+                        "value": "span-24"
+                      }
+                    },
+                    {
+                      "id": "parent_id",
+                      "cells": {
+                        "field": "parent_id",
+                        "value": "span-22"
+                      }
+                    },
+                    {
+                      "id": "service",
+                      "cells": {
+                        "field": "service",
+                        "value": "mailer"
+                      }
+                    },
+                    {
+                      "id": "operation",
+                      "cells": {
+                        "field": "operation",
+                        "value": "handle mailer"
+                      }
+                    },
+                    {
+                      "id": "start_ms",
+                      "cells": {
+                        "field": "start_ms",
+                        "value": 344.08
+                      }
+                    },
+                    {
+                      "id": "duration_ms",
+                      "cells": {
+                        "field": "duration_ms",
+                        "value": 129.6
+                      }
+                    },
+                    {
+                      "id": "error",
+                      "cells": {
+                        "field": "error",
+                        "value": "recorded error"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "svc16->svc17"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

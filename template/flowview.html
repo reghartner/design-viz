@@ -106,6 +106,8 @@ body.sk-daylight{background:#F4F2EC;}
    980px floor would force a horizontal scrollbar; let the svg scale to fit
    (it collapses to full width below 980px viewport via the grid media query). */
 .boardgrid.haspanels .board svg{min-width:0;}
+.board.board-readable .boardcanvas svg{min-width:1180px;}
+@media print{.board.board-readable .boardcanvas svg{min-width:0;}}
 .lg{position:sticky; left:0; display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:10px 14px;}
 .sk-aurora .lg{background:#0B1220; border-bottom:1px dashed #25364F;}
 .sk-daylight .lg{background:#FBFAF6; border-bottom:1px dashed #E0DCD1;}
@@ -122,6 +124,9 @@ body.sk-daylight{background:#F4F2EC;}
 
 /* ---------- board internals, per skin ---------- */
 .edge{fill:none; stroke-linecap:round;}
+.lane-bridge{fill:none;stroke-width:7;stroke-linejoin:round;pointer-events:none;}
+.sk-aurora .lane-bridge{stroke:#0B1220;}
+.sk-daylight .lane-bridge{stroke:#FBFAF6;}
 .edge.main{stroke-width:2.2;}
 .edge.retm{stroke-width:1.9;}
 .halo{fill:none; stroke-width:9; stroke-linecap:round; opacity:.13;}
@@ -4805,6 +4810,15 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
   if (!d.nodes || typeof d.nodes !== 'object'){ errors.push(DP + '.nodes: required — map of node id to {title, sub, icon, tint}'); return; }
   if (!Array.isArray(d.rows) || d.rows.length === 0){ errors.push(DP + '.rows: required — array of rows, each an array of node ids (nested array = stack)'); return; }
+  if (d.routing != null && d.routing !== 'lanes' && d.routing !== 'curves')
+    warnings.push(DP + '.routing: expected "lanes" or "curves" — using curves');
+  if (d.routing === 'lanes'){
+    if ((d.floats || []).length || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
+        (d.edges || []).some(function(e){ return e.from === e.to; }))
+      warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no floats or self-loops — using curves');
+    else if ((d.edges || []).some(function(e){ return e.bend; }))
+      warnings.push(DP + '.routing: lanes computes its own routes; authored edge bends are ignored');
+  }
 
   var placed = {};
   d.rows.forEach(function(slots, r){
@@ -5927,6 +5941,9 @@ function applyStepNodeFocus(nodeEls, step, edgeIds){
 /* ---------------- layout + geometry (per diagram) ---------------- */
 function layout(spec){
   var pos = {}, rowsMeta = [];
+  var lanes = spec.routing === 'lanes' && laneRoutingSupported(spec);
+  var laneCounts = {};
+  if (lanes) laneEndpoints(spec).forEach(function(p){ laneCounts[p.gap] = (laneCounts[p.gap] || 0) + 1; });
   var floats = spec.floats || [];
   var hasAbove = floats.some(function(f){ return f && f.side !== 'below'; });
   var hasGroups = false;
@@ -5934,6 +5951,7 @@ function layout(spec){
     if (spec.nodes[id] && spec.nodes[id].group) hasGroups = true;
   });
   var top = hasAbove ? 125 : 42;
+  if (lanes) top = Math.max(top, 40 + (laneCounts[-1] || 0) * 8);
   if (hasGroups) top += 26; /* room for a group title above row 0 */
 
   spec.rows.forEach(function(slots, r){
@@ -5961,7 +5979,7 @@ function layout(spec){
       }
     });
     rowsMeta.push({top:top, center:center, height:rowH, slots:slots, k:k});
-    top += rowH + ROW_GAP;
+    top += rowH + (lanes ? Math.max(ROW_GAP, 40 + (laneCounts[r] || 0) * 8) : ROW_GAP);
   });
 
   /* floats: anchor each at the mean x of its connected nodes, then spread the
@@ -6010,10 +6028,107 @@ function layout(spec){
   });
 
   var H = lastRow.top + lastRow.height + 40;
+  if (lanes) H += (laneCounts[rowsMeta.length - 1] || 0) * 8;
   floats.forEach(function(f){
     if (f && f.side === 'below' && pos[f.id]) H = Math.max(H, pos[f.id].cy + FLOAT_H/2 + 24);
   });
-  return {pos:pos, rows:rowsMeta, groups:groupBoxes, H: H};
+  return {pos:pos, rows:rowsMeta, groups:groupBoxes, H: H, routing:lanes ? 'lanes' : undefined};
+}
+
+/* Reserved horizontal tracks plus obstacle-free vertical channels. Keep
+   this opt-in: authored stacks, floats and self-loops retain classic curves. */
+function laneRoutingSupported(d){
+  return !(d.floats || []).length && d.rows.every(function(row){
+    return row.length > 0 && row.length <= 5 && row.every(function(id){ return typeof id === 'string'; });
+  }) && !(d.edges || []).some(function(e){ return e.from === e.to; });
+}
+function laneEndpoints(d){
+  var rowOf = new Map(), endpoints = [];
+  d.rows.forEach(function(row,r){ row.forEach(function(id){ rowOf.set(id,r); }); });
+  (d.edges || []).forEach(function(e,i){
+    var a = rowOf.get(e.from), b = rowOf.get(e.to);
+    if (a == null || b == null) return;
+    endpoints.push({edge:i, end:'from', id:e.from, other:e.to, side:b>a ? 1 : -1, gap:b>a ? a : a-1});
+    endpoints.push({edge:i, end:'to', id:e.to, other:e.from, side:b<a ? 1 : -1, gap:b<a ? b : b-1});
+  });
+  return endpoints;
+}
+function laneSegments(points){
+  var out = [];
+  for (var i=1; i<points.length; i++) if (points[i].x !== points[i-1].x || points[i].y !== points[i-1].y)
+    out.push({a:points[i-1], b:points[i]});
+  return out;
+}
+function laneSegmentHits(s, p, margin){
+  var x1=p.cx-p.w/2-margin, x2=p.cx+p.w/2+margin;
+  var y1=p.cy-p.h/2-margin, y2=p.cy+p.h/2+margin;
+  return s.a.x === s.b.x ? s.a.x>x1 && s.a.x<x2 && Math.max(s.a.y,s.b.y)>y1 && Math.min(s.a.y,s.b.y)<y2 :
+    s.a.y>y1 && s.a.y<y2 && Math.max(s.a.x,s.b.x)>x1 && Math.min(s.a.x,s.b.x)<x2;
+}
+function laneConflict(a,b){
+  var av=a.a.x===a.b.x, bv=b.a.x===b.b.x;
+  if (av === bv){
+    var axis=av?'y':'x', fixed=av?'x':'y';
+    if (Math.abs(a.a[fixed]-b.a[fixed]) > 2) return 0;
+    return Math.max(0, Math.min(Math.max(a.a[axis],a.b[axis]),Math.max(b.a[axis],b.b[axis])) -
+      Math.max(Math.min(a.a[axis],a.b[axis]),Math.min(b.a[axis],b.b[axis]))) * 1000;
+  }
+  var v=av?a:b, h=av?b:a;
+  return v.a.x>Math.min(h.a.x,h.b.x) && v.a.x<Math.max(h.a.x,h.b.x) &&
+    h.a.y>Math.min(v.a.y,v.b.y) && h.a.y<Math.max(v.a.y,v.b.y) ? 250 : 0;
+}
+function laneRoutes(d,L){
+  var endpoints=laneEndpoints(d), faces=new Map(), gaps=new Map(), ends=[];
+  endpoints.forEach(function(p){
+    var key=p.id+':'+p.side;
+    if (!faces.has(key)) faces.set(key,[]); faces.get(key).push(p);
+    if (!gaps.has(p.gap)) gaps.set(p.gap,[]); gaps.get(p.gap).push(p);
+    (ends[p.edge] || (ends[p.edge]={}))[p.end]=p;
+  });
+  faces.forEach(function(items){
+    items.sort(function(a,b){ return L.pos[a.other].cx-L.pos[b.other].cx || a.edge-b.edge; });
+    items.forEach(function(p,i){
+      var n=L.pos[p.id]; p.x=n.cx+(items.length===1 ? 0 : (i/(items.length-1)-.5)*(n.w-40));
+      p.y=n.cy+p.side*n.h/2;
+    });
+  });
+  gaps.forEach(function(items,gap){
+    var lo=gap<0 ? 0 : L.rows[gap].top+L.rows[gap].height;
+    var hi=gap+1>=L.rows.length ? L.H : L.rows[gap+1].top;
+    items.sort(function(a,b){ return a.x-b.x || a.edge-b.edge || (a.end<b.end?-1:1); });
+    items.forEach(function(p,i){ p.rail=lo+20+(i+.5)*(hi-lo-40)/items.length; });
+  });
+  var used=[], routes=[];
+  (d.edges || []).forEach(function(e,i){
+    if (!ends[i]){ routes.push({}); return; }
+    var a=ends[i].from, b=ends[i].to, best=null, bestScore=Infinity;
+    var xs=[a.x,b.x,(a.x+b.x)/2];
+    for (var x=12; x<W-8; x+=8) xs.push(x);
+    function consider(points){
+      var segs=laneSegments(points), score=0;
+      for (var si=0; si<segs.length; si++){
+        var s=segs[si];
+        // End stubs may touch their own card; every other segment must clear it.
+        var blocked=Object.keys(L.pos).some(function(id){
+          if ((si===0 && id===e.from) || (si===segs.length-1 && id===e.to)) return false;
+          return laneSegmentHits(s,L.pos[id],3);
+        });
+        if (blocked) return;
+        score+=Math.abs(s.a.x-s.b.x)+Math.abs(s.a.y-s.b.y)+15;
+        for (var ui=0; ui<used.length; ui++) score+=laneConflict(s,used[ui]);
+        if (score>=bestScore) return;
+      }
+      bestScore=score; best=points;
+    }
+    if (a.gap===b.gap) consider([{x:a.x,y:a.y},{x:a.x,y:a.rail},{x:b.x,y:a.rail},{x:b.x,y:b.y}]);
+    xs.forEach(function(x){ consider([{x:a.x,y:a.y},{x:a.x,y:a.rail},{x:x,y:a.rail},
+      {x:x,y:b.rail},{x:b.x,y:b.rail},{x:b.x,y:b.y}]); });
+    // Outer channels are always clear for supported rows; never silently draw through a card.
+    if (!best) throw new Error('No clear lane for '+e.from+' → '+e.to);
+    used=used.concat(laneSegments(best));
+    routes.push({path:best.map(function(p,j){ return (j?'L ':'M ')+p.x+' '+p.y; }).join(' '), points:best});
+  });
+  return routes;
 }
 
 /* spread 1-D center positions at least minGap apart inside [lo, hi]; keeps
@@ -6096,6 +6211,7 @@ function edgeAutoAdjust(edges, L){
 }
 
 function isWrap(e, L){
+  if (L.routing === 'lanes') return false;
   var a = L.pos[e.from], b = L.pos[e.to];
   return a && b && !a.float && !b.float && b.row === a.row + 1 &&
          a.flow === L.rows[a.row].k - 1 && b.flow === 0;
@@ -6107,6 +6223,7 @@ function isWrap(e, L){
 var STRAIGHT_TOL = 40, NEAR_TOL = 96;
 
 function edgePath(e, L, adj){
+  if (adj && adj.path) return adj.path;
   var a = L.pos[e.from], b = L.pos[e.to];
   adj = adj || {fromDx:0, fromDy:0, toDx:0, toDy:0, bend:0};
   var bend = (typeof e.bend === 'number' && e.bend) ? e.bend : (adj.bend || 0);
@@ -6219,9 +6336,8 @@ function samplePathD(d){
   }
   var t;
   if (d.indexOf(' C ') < 0){
-    for (t = 0; t <= 1.0001; t += 0.04){
-      pts.push({x: nums[0] + (nums[2] - nums[0]) * t, y: nums[1] + (nums[3] - nums[1]) * t});
-    }
+    for (var li=2; li<nums.length; li+=2) for (t = 0; t <= 1.0001; t += 0.04)
+      pts.push({x: nums[li-2] + (nums[li] - nums[li-2]) * t, y: nums[li-1] + (nums[li+1] - nums[li-1]) * t});
     return pts;
   }
   var start = {x: nums[0], y: nums[1]};
@@ -6583,8 +6699,8 @@ var SCENES = {
 function renderBoard(el, d, prefix, skin, protos, backlinks){
   var SK = SKINS[skinBase(skin)];
   var L = layout(d);
-  var ADJ = edgeAutoAdjust(d.edges || [], L);
-  resolveEdgeAvoidance(d.edges || [], L, ADJ);   /* offsets first, then avoidance */
+  var ADJ = L.routing === 'lanes' ? laneRoutes(d,L) : edgeAutoAdjust(d.edges || [], L);
+  if (L.routing !== 'lanes') resolveEdgeAvoidance(d.edges || [], L, ADJ);
   var kindsUsed = {}, anyRet = false;
   (d.edges || []).forEach(function(e){
     kindsUsed[protos[e.kind] ? e.kind : 'int'] = true;
@@ -6625,6 +6741,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     var id = prefix + '-e' + i;
     var k = protos[e.kind] ? e.kind : 'int';
     edgeIds[e.from + '->' + e.to] = {domId:id, e:e, kind:k, idx:i};
+    if (L.routing === 'lanes') s += '<path class="lane-bridge" stroke="'+SK.bg+'" d="'+edgePath(e,L,ADJ[i])+'"/>';
     s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + (e.delta === true ? ' dvd' : '') + '"' +
          ' data-dv-edge="' + i + '"' +
          fragmentAttrs(e) + ' style="' + protocolColorStyle(protos, k) +
@@ -6642,15 +6759,17 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
     var x = p.cx - p.w/2, y = p.cy - p.h/2;
     var nodeTitle = n.title || id;
+    var shownTitle = L.routing === 'lanes' && Array.from(nodeTitle).length > 13 ? Array.from(nodeTitle).slice(0,12).join('')+'…' : nodeTitle;
     var siblingPages = typeof n.title === 'string' &&
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
     var hasNodeLink = n.link && typeof n.link === 'string';
     var backlinkX = p.w - (hasNodeLink ? 38 : 15);
     s += '<g class="node tint-' + tint + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
+         (L.routing === 'lanes' ? '<title>'+esc(nodeTitle)+'</title>' : '') +
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
          '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
-         '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(nodeTitle) + '</text>' +
+         '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(shownTitle) + '</text>' +
          '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>' +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(n.link) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
@@ -9302,6 +9421,16 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
   var board = renderBoard(bwrap, d, prefix, skin, protos, backlinks);
   lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
+  if (d.routing === 'lanes'){
+    var sizeBtn=document.createElement('button'); sizeBtn.className='mbtn'; sizeBtn.type='button';
+    sizeBtn.textContent='READABLE SIZE'; sizeBtn.setAttribute('aria-pressed','false');
+    sizeBtn.title='Enlarge cards; scroll horizontally to explore the graph';
+    sizeBtn.addEventListener('click',function(){
+      var on=boardDiv.classList.toggle('board-readable');
+      sizeBtn.setAttribute('aria-pressed',String(on)); sizeBtn.textContent=on?'FIT WIDTH':'READABLE SIZE';
+    });
+    lg.appendChild(sizeBtn);
+  }
 
   var view = VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient';
   var hasSteps = (d.steps || []).length > 0;

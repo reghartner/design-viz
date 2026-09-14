@@ -69,9 +69,9 @@ class BuildTests(unittest.TestCase):
         self.assertIsNotNone(match)
         starters = json.loads(match.group(1))
         self.assertEqual([entry["name"] for entry in starters],
-                         ["blank flow", "panel showcase", "software & IoT", "Honeycomb trace", "full demo"])
+                         ["blank flow", "panel showcase", "software & IoT", "Honeycomb trace", "complex trace", "full demo"])
         for entry, source in zip(starters, ["starters/minimal.json", "starters/panels-tour.json",
-                                          "starters/software-systems.json", "starters/honeycomb-trace.json",
+                                          "starters/software-systems.json", "starters/honeycomb-trace.json", "starters/complex-trace.json",
                                           "flowview.demo.json"]):
             self.assertTrue(entry["desc"])
             self.assertEqual(entry["spec"], json.loads((ROOT / "src" / source).read_text()))

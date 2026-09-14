@@ -22,6 +22,7 @@ STARTERS = [
     ("panel showcase", "Five panels updated across four steps.", "starters/panels-tour.json"),
     ("software & IoT", "Data state, decision checks, and resource budgets across two design stories.", "starters/software-systems.json"),
     ("Honeycomb trace", "A fictional checkout trace with concurrent spans and a recorded payment error.", "starters/honeycomb-trace.json"),
+    ("complex trace", "Shared dependencies, service cycles and concurrent branches in reserved routing lanes.", "starters/complex-trace.json"),
     ("full demo", "The complete Flowview demo page.", "flowview.demo.json"),
 ]
 

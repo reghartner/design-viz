@@ -71,10 +71,35 @@ review the generated spec before sharing it.
 
 Duplicate span IDs, cycles, missing required fields, ambiguous trace selection,
 and invalid timing fail before replacing the editor. Initial bounds are 200
-spans and 10 services per diagram, 10,000 input events, and 10 MB input in the
+spans and 30 services per diagram, 10,000 input events, and 10 MB input in the
 workbench. Larger traces are refused with guidance to focus the export; there
 is no silent truncation. Direct OTLP `resourceSpans` envelopes are not supported
 yet; export Honeycomb events or flatten to the documented field shape.
+
+## Complex service layouts
+
+Imports place upstream services before their downstream dependencies. Service
+cycles are grouped at the same dependency level; large levels wrap into rows
+of at most four cards. Neighbour ordering reduces avoidable crossings. The
+result is ordinary `rows` data you can edit, with `routing: "lanes"` enabled.
+Row position represents dependency order, not timestamp order or duration.
+
+Lane routing spreads attachment ports, reserves horizontal tracks between
+rows, and chooses vertical channels that clear every card. Tracks expand the
+row gaps when needed. Routes prefer shorter paths with fewer crossings and
+coincident segments; a background break separates remaining crossings.
+Dense or non-planar graphs can still cross. Numbered coins and authored edge
+labels can still crowd a dense view. Step selection highlights the relevant
+relationship; the complete graph remains available for context.
+
+Choose **starters… → complex trace** for a fictional request with shared
+dependencies and a service cycle. Long service labels are abbreviated on
+cards, with the complete name in the card tooltip and span details.
+
+`routing: "curves"` (or omitting routing) restores the existing renderer.
+Lane routing supports one to five unstacked cards per row, without floats or
+self-loops. Unsupported edited layouts fall back to curves with a validation
+warning. Lane routing ignores authored edge bends; label offsets still work.
 
 ## Agent workflow
 

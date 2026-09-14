@@ -145,6 +145,19 @@ test('panel boards keep the step bar in the diagram cell before the top-aligned 
   });
 });
 
+test('a centerpiece keeps its map and timeline together before the optional flow on all viewport widths', () => {
+  const local = loadCore({document:{createElement:layoutNode}});
+  const section = layoutNode('section'), layout = local.createBoardGrid(section, true, {id:'home'});
+  const map = layoutNode('div'), controls = layoutNode('div'), board = layoutNode('div');
+  layout.primaryHost.appendChild(map); layout.controlsHost.appendChild(controls); layout.diagramHost.appendChild(board);
+  assert.equal(layout.controlsHost, layout.primaryHost);
+  assert.deepEqual(section.children.map(c=>c.tag), ['div', 'details']);
+  assert.equal(section.children[1].children[0].textContent, 'Data flow');
+  assert.equal(section.children[1].open, undefined, 'flow starts collapsed');
+  assert.deepEqual(layout.primaryHost.children, [layout.modesHost, map, controls]);
+  assert.equal(layout.diagramHost.parentNode, section.children[1]);
+});
+
 test('boards without panels retain the original grid and section-sibling step bar structure', () => {
   const local = loadCore({document:{createElement:layoutNode}});
   const section = layoutNode('section');
@@ -4287,7 +4300,11 @@ test('homemap render: per-camera sweeps, transition ripples, staggered signals a
   assert.doesNotMatch(host._lastHTML, /hmripple|hmsig|hmglow/);
   host.innerHTML = 'SENTINEL';
   C.renderPanelBody(host, p, states[2], 'aurora', states, 2);
-  assert.strictEqual(host.innerHTML, 'SENTINEL');
+  assert.doesNotMatch(host.innerHTML, /class="hmlink"/);
+  assert.notStrictEqual(host.innerHTML, 'SENTINEL', 'leaving a signal step removes its static route');
+  host.innerHTML = 'SENTINEL';
+  C.renderPanelBody(host, p, states[2], 'aurora', states, 2);
+  assert.strictEqual(host.innerHTML, 'SENTINEL', 'unchanged signal-free snapshots still preserve animations');
   C.renderPanelBody(host, p, states[1], 'aurora', states, 3);
   assert.match(host.innerHTML, /class="hmsig"/);
   assert.doesNotMatch(host.innerHTML, /hmripple|hmglow/);

@@ -673,7 +673,14 @@ perspectives" of one timeline). Types:
   path map, multi-zone room presence, or approach-before-camera-wake
   sequencing — pair with `pir` when the argument is a binary cone trip
   instead of distance.
-- `homemap` — a 320×180 top-down home with independently patched devices:
+- `homemap` — a 320×180 top-down home with independently patched devices.
+  Set `diagram.primaryPanel` to this panel's id (for example `"home"`) to
+  make it the centerpiece: a large map, playback directly underneath, other
+  panels alongside or below, and a collapsed **Data flow** disclosure below.
+  This optional presentation works with any declared panel; missing/unknown
+  ids retain the normal layout. Renaming or deleting a panel in the workbench
+  updates the reference. No schema-version opt-in is required.
+  Example panel:
   `{"id":"home","type":"homemap","outline":{"w":300,"h":164},
   "devices":[{"id":"cam","kind":"camera","label":"Porch cam",
   "x":46,"y":40,"facing":35,"spread":80,"range":70},
@@ -687,11 +694,16 @@ perspectives" of one timeline). Types:
   `scan` (default), `sleep`, `detect`, `rec` (sweep stays live and a red recording light blinks), `off`; entry `closed` (default),
   `open`, `alert`; sensor `ok` (default), `warn`, `alert`, `off`; hub
   `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`. Sensors accept an `icon` from the shared
-  icon set (default/fallback `gear`). Every device has a marker and label.
+  icon set (default/fallback `gear`). Every device has a marker, label, and
+  visible state text. Optional `rooms:[{label,x,y,w,h}]` adds named rectangular
+  areas behind the devices. Room coordinates use the same frame; rectangles
+  must have positive size and fit inside 320×180, otherwise they warn and are
+  ignored. Rooms are presentation boundaries, not simulated physical walls.
   Patch DEVICE IDS directly: `{"cam":"detect","signals":[{"from":"cam",
   "to":"hub"}]}`. Device states carry across steps; `signals` belongs
-  only to its authored step and never carries. It fires one-shot dots
-  between declared endpoints, staggered by 250ms, on animated step paints.
+  only to its authored step and never carries. Static dashed direction arrows
+  remain visible on paused step jumps and with reduced motion. Animated step
+  paints add looping packets between declared endpoints, staggered by 250ms.
   Ambient mode uses `initial`, with scanning/detecting camera sweeps and
   no signal dots. Camera transitions into `detect` and entry transitions
   into `alert` ripple once; a hub entering `rx` briefly glows. Reduced
@@ -712,6 +724,12 @@ perspectives" of one timeline). Types:
   on animated steps, with their label and optional icon. Reappearing after
   hiding starts at the new position without a glide; reduced motion disables
   glides. Invalid subject declarations warn and are ignored.
+  The workbench's **Home at this step** editor appears for every homemap even
+  without a patch. It reads the selected path's inherited state, writes only
+  the changed field, supports device state selectors, subject drag/tap placement
+  and coordinates, hide/show/inherit, and device-to-device signals. Resetting
+  to Inherit removes that field from this step. Shared source steps affect
+  every path that references them. See [the editing guide](../docs/homemap-workbench.md).
 - `signal` — link health for 1–6 named radio/wired links:
   `{"id":"net","type":"signal","links":[{"id":"wifi","label":"WiFi",
   "transport":"wifi"},{"id":"cell","label":"Cellular","transport":

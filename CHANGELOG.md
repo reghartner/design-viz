@@ -1,5 +1,19 @@
 # Changelog
 
+## Homemap as the centerpiece (2026-09-14)
+
+- `diagram.primaryPanel` gives a chosen panel the main space, keeps playback
+  beneath it, and places the supporting flow in a disclosure below. Panel
+  rename/delete updates this reference; existing layouts keep their defaults.
+- Homemaps gain room outlines, visible device states, and static signal arrows
+  that remain readable while paused or with reduced motion.
+- Every homemap now has a step inspector with inherited device states, subject
+  drag/tap placement, coordinates, hide/show/inherit, and signal controls.
+  Sparse edits follow the selected path and support undo. Manual path/step
+  transport keeps the inspector synchronized.
+- Added a home-story starter with happy and internet-outage paths. See
+  [Homemap editing](docs/homemap-workbench.md).
+
 ## Lane edge backgrounds follow the skin (2026-09-14)
 
 - Fixed thick dark lines behind lane-routed edges in Pastel. The stroke that

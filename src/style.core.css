@@ -4141,3 +4141,29 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .comm-status[hidden] {display:none}
 @media(prefers-reduced-motion:reduce){.comm-packet{display:none !important}}
 @media print{.comm-failure{display:none !important}.stepmode .comm-hidden{opacity:1 !important}}
+
+/* A featured panel owns the timeline; the flow remains available below. */
+body .docview .boardgrid.haspanels.panel-first{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}
+body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-template-columns:minmax(0,1fr);}
+.primary-panel{min-width:0;}
+.primary-modes{display:flex;justify-content:flex-end;margin:8px 0;}
+.primary-modes:empty{display:none;}
+.primary-panel>.pwidget{margin-top:0;}
+.primary-panel .hmframe{max-height:70vh;}
+.primary-panel>.termbar{margin-top:0;}
+.secondary-flow{margin-top:16px;border-top:1px solid var(--dfaint);padding-top:8px;}
+.secondary-flow>summary{cursor:pointer;color:var(--dtext);font:600 12px 'IBM Plex Mono',monospace;padding:10px 0;}
+.secondary-flow>summary:focus-visible{outline:2px solid var(--acc);outline-offset:3px;}
+.hmroom{fill:var(--hm-line);fill-opacity:.035;stroke:var(--hm-line);stroke-width:.7;stroke-dasharray:3 2;}
+.hmroomlabel{font:500 7px 'IBM Plex Mono',monospace;fill:var(--hm-label);}
+.hmstatus{font:500 7px 'IBM Plex Mono',monospace;fill:currentColor;}
+.hmlink{fill:none;stroke:var(--hm-accent);stroke-width:1;stroke-dasharray:3 3;opacity:.7;}
+.hmlinktip{stroke-dasharray:none;}
+@container (max-width:1000px){body .docview .boardgrid.haspanels.panel-first{grid-template-columns:minmax(0,1fr);}}
+@media(max-width:980px){body .docview .boardgrid.haspanels.panel-first{grid-template-columns:minmax(0,1fr);}}
+@media print{
+  body .docview .boardgrid.haspanels.panel-first{display:block;}
+  .primary-panel>.pwidget{display:block !important;break-inside:avoid;}
+  .primary-modes,.secondary-flow>summary{display:none !important;}
+  .primary-panel .hmframe{max-height:none;}
+}

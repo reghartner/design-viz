@@ -3074,7 +3074,9 @@ test('builderInsertTargetText handles a headingless section and bare shapes', ()
 
 test('homemap setup and dynamic patch fields follow declared devices', () => {
   assert.deepStrictEqual(plain(B.PANEL_SETUP_FIELDS.homemap), [
-    ['outline', 'json'], ['devices', 'rows', {cols: [
+    ['outline', 'json'], ['rooms', 'rows', {cols: [
+      {k:'label'}, {k:'x', kind:'num', req:true}, {k:'y', kind:'num', req:true},
+      {k:'w', kind:'num', req:true}, {k:'h', kind:'num', req:true}]}], ['devices', 'rows', {cols: [
       {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
       {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
       {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'}

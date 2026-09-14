@@ -1,0 +1,487 @@
+{
+  "page": {
+    "title": "Replica positions and read-your-writes",
+    "skin": "aurora",
+    "blocks": [
+      {
+        "heading": "One session read across three copies",
+        "accent": "cyan",
+        "text": [
+          "Fictional software walkthrough. Positions, availability, lag, durability acknowledgments and read outcomes are authored observations and policy choices, not proof of a running system."
+        ],
+        "bullets": [
+          "Each position means records applied within the named history. The reference is this session\u2019s minimum read token, not an elected leader or a derived quorum.",
+          "The ruler compares only matching sequence identities. Gaps are record counts; reported milliseconds are separate observations, never estimated from those gaps.",
+          "Per-replica observation labels can differ. The panel preserves offline and unknown states instead of silently treating a matching position as healthy."
+        ],
+        "diagram": {
+          "view": "step",
+          "routing": "lanes",
+          "nodes": {
+            "api": {
+              "title": "Read router",
+              "icon": "gear"
+            },
+            "primary": {
+              "title": "Primary",
+              "icon": "db",
+              "tint": "data"
+            },
+            "sync": {
+              "title": "Sync follower",
+              "icon": "db",
+              "tint": "data"
+            },
+            "remote": {
+              "title": "Remote copy",
+              "icon": "db",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "api",
+              "primary"
+            ],
+            [
+              "sync",
+              "remote"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "api",
+              "to": "primary",
+              "kind": "int",
+              "label": "write / read"
+            },
+            {
+              "from": "primary",
+              "to": "sync",
+              "kind": "int",
+              "label": "sync copy"
+            },
+            {
+              "from": "primary",
+              "to": "remote",
+              "kind": "int",
+              "label": "async copy"
+            },
+            {
+              "from": "api",
+              "to": "sync",
+              "kind": "int",
+              "label": "eligible read"
+            },
+            {
+              "from": "api",
+              "to": "remote",
+              "kind": "int",
+              "label": "read candidate"
+            }
+          ],
+          "panels": [
+            {
+              "id": "positions",
+              "type": "replicas",
+              "title": "Applied positions vs session token",
+              "unit": "records",
+              "replicas": [
+                {
+                  "id": "primary",
+                  "label": "Primary"
+                },
+                {
+                  "id": "sync",
+                  "label": "Sync follower"
+                },
+                {
+                  "id": "remote",
+                  "label": "Remote copy"
+                }
+              ],
+              "initial": {
+                "reference": {
+                  "series": "orders/applied/history-a",
+                  "position": 104
+                },
+                "replicas": {
+                  "primary": {
+                    "position": 104,
+                    "series": "orders/applied/history-a",
+                    "role": "primary",
+                    "status": "online",
+                    "lagMs": 0,
+                    "observedAt": "example t=0 ms"
+                  },
+                  "sync": {
+                    "position": 104,
+                    "series": "orders/applied/history-a",
+                    "role": "sync follower",
+                    "status": "online",
+                    "lagMs": 12,
+                    "observedAt": "example t=0 ms"
+                  },
+                  "remote": {
+                    "position": 101,
+                    "series": "orders/applied/history-a",
+                    "role": "async follower",
+                    "status": "online",
+                    "lagMs": 2400,
+                    "observedAt": "example t=0 ms"
+                  }
+                },
+                "note": "Reference 104 is the session minimum, not a computed commit index. All observations are fictional."
+              }
+            },
+            {
+              "id": "policy",
+              "type": "checks",
+              "title": "Authored routing decisions",
+              "checks": [
+                {
+                  "id": "commit",
+                  "label": "Write acknowledged under policy"
+                },
+                {
+                  "id": "read",
+                  "label": "Chosen read permitted"
+                }
+              ]
+            },
+            {
+              "id": "request",
+              "type": "table",
+              "title": "Session read",
+              "columns": [
+                {
+                  "id": "field",
+                  "label": "Field"
+                },
+                {
+                  "id": "value",
+                  "label": "Value"
+                }
+              ],
+              "initial": {
+                "rows": [
+                  {
+                    "id": "minimum",
+                    "cells": {
+                      "field": "Session minimum",
+                      "value": 104
+                    }
+                  },
+                  {
+                    "id": "target",
+                    "cells": {
+                      "field": "Read target",
+                      "value": "undecided"
+                    }
+                  },
+                  {
+                    "id": "outcome",
+                    "cells": {
+                      "field": "Outcome",
+                      "value": "pending"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "steps": [
+            {
+              "text": "A write was acknowledged under the example primary-plus-sync durability policy. The session requires applied position 104. Remote copy is only at 101, so the read router rejects that candidate.",
+              "nodes": [
+                "api",
+                "remote"
+              ],
+              "panels": {
+                "policy": {
+                  "results": {
+                    "commit": {
+                      "status": "pass",
+                      "detail": "Authored policy: primary + sync durably acknowledged write 104"
+                    },
+                    "read": {
+                      "status": "fail",
+                      "detail": "Remote 101 is below required 104; do not serve this session read"
+                    }
+                  }
+                },
+                "request": {
+                  "rows": [
+                    {
+                      "id": "minimum",
+                      "cells": {
+                        "field": "Session minimum",
+                        "value": 104
+                      }
+                    },
+                    {
+                      "id": "target",
+                      "cells": {
+                        "field": "Read target",
+                        "value": "remote candidate"
+                      }
+                    },
+                    {
+                      "id": "outcome",
+                      "cells": {
+                        "field": "Outcome",
+                        "value": "not served"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "text": "The router serves the read from the online sync follower at applied position 104. This result is an authored policy outcome; position equality alone does not establish read safety.",
+              "edge": "api->sync",
+              "panels": {
+                "policy": {
+                  "results": {
+                    "commit": {
+                      "status": "pass",
+                      "detail": "Authored policy: primary + sync durably acknowledged write 104"
+                    },
+                    "read": {
+                      "status": "pass",
+                      "detail": "Same history, applied through 104, online; example routing policy permits the read"
+                    }
+                  }
+                },
+                "request": {
+                  "rows": [
+                    {
+                      "id": "minimum",
+                      "cells": {
+                        "field": "Session minimum",
+                        "value": 104
+                      }
+                    },
+                    {
+                      "id": "target",
+                      "cells": {
+                        "field": "Read target",
+                        "value": "sync follower"
+                      }
+                    },
+                    {
+                      "id": "outcome",
+                      "cells": {
+                        "field": "Outcome",
+                        "value": "served version 104"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "text": "The remote copy reports applied position 104. Its independently supplied lag measurement is still 18 ms; equality does not force that value to zero.",
+              "nodes": [
+                "remote"
+              ],
+              "panels": {
+                "positions": {
+                  "replicas": {
+                    "primary": {
+                      "position": 104,
+                      "series": "orders/applied/history-a",
+                      "role": "primary",
+                      "status": "online",
+                      "lagMs": 0,
+                      "observedAt": "example t=0 ms"
+                    },
+                    "sync": {
+                      "position": 104,
+                      "series": "orders/applied/history-a",
+                      "role": "sync follower",
+                      "status": "online",
+                      "lagMs": 12,
+                      "observedAt": "example t=0 ms"
+                    },
+                    "remote": {
+                      "position": 104,
+                      "series": "orders/applied/history-a",
+                      "role": "async follower",
+                      "status": "online",
+                      "lagMs": 18,
+                      "observedAt": "example t=2400 ms"
+                    }
+                  }
+                },
+                "policy": {
+                  "results": {
+                    "commit": {
+                      "status": "pass",
+                      "detail": "Authored policy: primary + sync durably acknowledged write 104"
+                    },
+                    "read": {
+                      "status": "skip",
+                      "detail": "No new read at this step"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "text": "The sync follower is now offline. Its last known applied position remains 104, but the router rejects it as a new read target. The matching marker is not a health check.",
+              "nodes": [
+                "api",
+                "sync"
+              ],
+              "tone": {
+                "sync": "alert"
+              },
+              "panels": {
+                "positions": {
+                  "replicas": {
+                    "primary": {
+                      "position": 104,
+                      "series": "orders/applied/history-a",
+                      "role": "primary",
+                      "status": "online",
+                      "lagMs": 0,
+                      "observedAt": "example t=0 ms"
+                    },
+                    "sync": {
+                      "position": 104,
+                      "series": "orders/applied/history-a",
+                      "role": "sync follower",
+                      "status": "offline",
+                      "lagMs": 12,
+                      "observedAt": "position at t=0; reported offline at example t=2500 ms"
+                    },
+                    "remote": {
+                      "position": 104,
+                      "series": "orders/applied/history-a",
+                      "role": "async follower",
+                      "status": "online",
+                      "lagMs": 18,
+                      "observedAt": "example t=2400 ms"
+                    }
+                  }
+                },
+                "policy": {
+                  "results": {
+                    "commit": {
+                      "status": "pass",
+                      "detail": "Authored policy: primary + sync durably acknowledged write 104"
+                    },
+                    "read": {
+                      "status": "fail",
+                      "detail": "Offline replica is not an eligible target"
+                    }
+                  }
+                },
+                "request": {
+                  "rows": [
+                    {
+                      "id": "minimum",
+                      "cells": {
+                        "field": "Session minimum",
+                        "value": 104
+                      }
+                    },
+                    {
+                      "id": "target",
+                      "cells": {
+                        "field": "Read target",
+                        "value": "sync candidate"
+                      }
+                    },
+                    {
+                      "id": "outcome",
+                      "cells": {
+                        "field": "Outcome",
+                        "value": "not served"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "text": "The rebuilt remote copy reports position 2 in a different history. The ruler omits its comparison with history A. Do not subtract these positions or infer a catch-up duration.",
+              "nodes": [
+                "remote"
+              ],
+              "panels": {
+                "positions": {
+                  "replicas": {
+                    "primary": {
+                      "position": 104,
+                      "series": "orders/applied/history-a",
+                      "role": "primary",
+                      "status": "online",
+                      "lagMs": 0,
+                      "observedAt": "example t=0 ms"
+                    },
+                    "sync": {
+                      "position": 104,
+                      "series": "orders/applied/history-a",
+                      "role": "sync follower",
+                      "status": "offline",
+                      "lagMs": 12,
+                      "observedAt": "position at t=0; reported offline at example t=2500 ms"
+                    },
+                    "remote": {
+                      "position": 2,
+                      "series": "orders/applied/history-b",
+                      "role": "rebuilt copy",
+                      "status": "unknown",
+                      "lagMs": null,
+                      "observedAt": "example t=3000 ms"
+                    }
+                  },
+                  "note": "Different history: position 2 is not 102 records behind reference 104. An explicit mapping would be needed."
+                },
+                "policy": {
+                  "results": {
+                    "commit": {
+                      "status": "pass",
+                      "detail": "Authored policy: primary + sync durably acknowledged write 104"
+                    },
+                    "read": {
+                      "status": "skip",
+                      "detail": "A cross-history comparison and current availability are unknown"
+                    }
+                  }
+                },
+                "request": {
+                  "rows": [
+                    {
+                      "id": "minimum",
+                      "cells": {
+                        "field": "Session minimum",
+                        "value": 104
+                      }
+                    },
+                    {
+                      "id": "target",
+                      "cells": {
+                        "field": "Read target",
+                        "value": "none"
+                      }
+                    },
+                    {
+                      "id": "outcome",
+                      "cells": {
+                        "field": "Outcome",
+                        "value": "comparison unavailable"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

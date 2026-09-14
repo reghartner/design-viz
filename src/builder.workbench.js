@@ -984,6 +984,11 @@ var NODE_PRESETS = [
 ];
 
 var PANEL_TEMPLATES = {
+  replicas:  {title:'Replica positions',unit:'records',replicas:[{id:'primary',label:'Primary'},{id:'follower',label:'Follower'}],
+              initial:{reference:{series:'example/log-a',position:104},replicas:{
+                primary:{series:'example/log-a',position:104,role:'primary',status:'online',lagMs:0,observedAt:'example t=0'},
+                follower:{series:'example/log-a',position:101,role:'follower',status:'online',lagMs:null,observedAt:'example t=0'}},
+                note:'Fictional positions. Replace with evidence; report lag independently.'}},
   trace:     {title:'Inside the service',spans:[
               {id:'request',service:'api',name:'handle request',startMs:0,ms:100},
               {id:'parse',parentId:'request',service:'api',name:'parse input',startMs:5,ms:20},
@@ -1995,6 +2000,7 @@ function builderEffectivePanelStates(d, stepIndex){
              and an optional max; unknown keys on existing items survive edits
      objf  — one fixed-shape object edited inline (timeline cadence) */
 var PANEL_SETUP_FIELDS = {
+  replicas:  [['unit','text'],['replicas','rows',{cols:[{k:'id',req:true},{k:'label'}],max:8}],['initial','json']],
   trace:     [['spans','json'],['initial','json']],
   table:     [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 4}], ['initial', 'json']],
   checks:    [['checks', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 12}], ['initial', 'json']],
@@ -2043,6 +2049,7 @@ var PANEL_SETUP_FIELDS = {
 
 /* Dynamic-key types are expanded from their declarations by panelPatchFields. */
 var PANEL_PATCH_FIELDS = {
+  replicas:  [['reference','json'],['replicas','json'],['note','text']],
   trace:     [['selected','text']],
   table:     [['rows', 'jsonArr'], ['note', 'text']],
   checks:    [['results', 'json'], ['note', 'text']],

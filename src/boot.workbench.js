@@ -210,6 +210,8 @@ var CONTRACT = [
   '    "edges":  [{"from":"<id>", "to":"<id>", "kind":"https|int|mqtt",',
   '                "ret":false, "label":"<short label>", "revealAt":1, "hideAt":3}],',
   '    "panels": [                              // optional synchronized inspector panels',
+  '      {"id":"copies", "type":"replicas", "replicas":[{"id":"remote","label":"Remote"}]}',
+  '                                     // patch reference:{series,position} and replicas:{remote:{series,position,status,lagMs}}; same-sequence comparisons only',
   '      {"id":"inside", "type":"trace", "spans":[{"id":"request","service":"api","name":"handle","startMs":0,"ms":100}]}',
   '                                     // patch {"selected":"request"}; inclusive / union of direct children / uncovered wall time (not CPU)',
   '      {"id":"data", "type":"table", "columns":[{"id":"key","label":"Field"},{"id":"value","label":"Value"}]}',

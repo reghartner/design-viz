@@ -21,6 +21,10 @@ explicit limits. Try **starters… → software & IoT** for both domains.
 Try **starters… → retries & circuits** for retry success, deadline admission,
 and circuit recovery; the [recipe](cookbook/retries-and-circuits.md) explains
 how to adapt their authored policies and timing.
+The **replica positions** starter compares applied positions against a session
+token while keeping reported lag, offline state and unrelated histories
+distinct. Its [recipe](cookbook/replica-positions.md) also covers device/cloud
+configuration copies.
 The workbench's **document outline** (⌘/Ctrl K) searches sections, hidden tabs,
 nodes, groups, edges, panels, and steps and opens the matching inspector.
 See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions.

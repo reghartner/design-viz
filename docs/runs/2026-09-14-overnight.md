@@ -22,6 +22,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
 | 11 | Canary and firmware rollout stories | codex/rollout-starters | Open: https://github.com/reghartner/design-viz/pull/60 |
 | 12 | Phone diagram legibility | codex/phone-diagram-legibility | Open: https://github.com/reghartner/design-viz/pull/61 |
+| 13 | Explicit diagram node finder | codex/diagram-node-finder | Built; opening focused PR above #61 |
 
 ## Validation and evidence
 
@@ -32,7 +33,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51, #52, #53, #54, #55, #56, #57, #58, #59 and #60 passed all GitHub checks.
+- PRs #50, #51, #52, #53, #54, #55, #56, #57, #58, #59, #60 and #61 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -106,12 +107,21 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   viewport. The trace fixture's existing density warnings remain; no runtime
   errors. Readable boards center when they first overflow, without snapping
   back after user panning. Resize observers dispose with replaced previews.
-  Check PR #61 final CI after this handoff commit. LAN preview remains HTTP 200.
+  PR #61 final head passed all checks. LAN preview remains HTTP 200.
+- Node finder: six focused tests plus the full Node and 158 Python suites pass.
+  Full rendered names remain available, duplicate names get IDs, and Show node
+  navigates explicitly without changing step membership, tones or authored
+  data. Browser checked an offscreen service in all six phone skins, Fit width,
+  desktop split workspace, published and embedded traces, explicit playback
+  pause and Escape focus recovery. A browser-discovered synchronous SVG
+  focusout bug is fixed and regression tested. Navigation marks are separate
+  from semantic tones, disappear on focus exit and dispose with old previews.
+  No new runtime errors after the fix; the fixture's old density warnings remain.
 
 ## Next continuation
 
-Start from the current `codex/phone-diagram-legibility` branch, inspect checks
-and working-tree changes, and create the next focused branch. Do not recreate
+Start from the current `codex/diagram-node-finder` branch, inspect checks
+and working-tree changes. Do not recreate
 the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
 stories, numeric replica positions and stable paused playback are built.
 The workbench now disposes old steppers, starts paused and preserves unique
@@ -122,11 +132,11 @@ promotion, traffic rollback and firmware trial/confirmation stories are built.
 Phone diagram legibility is now built: Auto uses readable sizing on narrow
 diagram columns, with explicit Fit width and Readable, reduced gutters across
 skins, keyboard panning and retained view choices through normal edits.
-The next useful slice is a bounded polish/verification pass on complex trace
-exploration (for example navigating a selected service into view without
-disturbing a user's pan), only if it fits before the morning cutoff. Otherwise
-verify the complete PR stack and prepare the morning report with the phone
-URL, ranked roadmap and key limitations. All PRs stay open; do not merge.
+Explicit node navigation is now built. At the final 08:00 check, do not start
+another feature. Verify the complete PR stack and phone URL, then provide the
+morning report with the ranked roadmap and key limitations. All PRs stay open;
+do not merge. The current branch contains the cumulative stack. No original
+checkout or unrelated PR #49 files were modified.
 Avoid claiming zero crossings in arbitrary graphs. Keep native text editing
 usable. Shared scenario definitions and
 trace/HLD mapping remain larger design work, not quick schema shortcuts.

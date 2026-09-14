@@ -90,6 +90,16 @@
 .board-scroll-hint{display:none;flex-basis:100%;font-size:10px;color:var(--dfaint);}
 .board-overflow .board-scroll-hint{display:block;}
 .board:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+.board-find{display:flex;flex-wrap:wrap;gap:6px;align-items:end;flex-basis:100%;min-width:0;color:var(--dtext);font:11px 'IBM Plex Mono',monospace;}
+.board-find label{display:grid;gap:4px;flex:1 1 140px;min-width:0;}
+.board-find select{width:100%;min-width:0;box-sizing:border-box;padding:6px;border:1px solid currentColor;border-radius:5px;background:transparent;color:inherit;font:inherit;}
+.board-find option{color:#182334;background:#F8FAFC;}
+.board-find-status{flex-basis:100%;font-size:10px;overflow-wrap:anywhere;}
+.board-find-status:empty{display:none;}
+.board-find .mbtn:disabled{opacity:.45;cursor:default;}
+.board-find select:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
+.board-find-ring{fill:none;stroke:var(--acc);stroke-width:2;stroke-dasharray:5 3;pointer-events:none;}
+body .docview .board.stepmode .node:has(.board-find-ring){opacity:1;transition:none;}
 @media screen{
   @container(max-width:640px){
     .board.board-size-auto .boardcanvas svg{min-width:1180px;}
@@ -97,7 +107,7 @@
 }
 @media print{
   .board.board-size-readable .boardcanvas svg{min-width:0;}
-  .board-size{display:none;}
+  .board-size,.board-find,.board-find-ring{display:none;}
 }
 .lg{position:sticky; left:0; display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:10px 14px;}
 .sk-aurora .lg{background:#0B1220; border-bottom:1px dashed #25364F;}
@@ -4070,6 +4080,8 @@ button.tr-op{cursor:pointer;}.tr-current{border:2px solid currentColor;padding:6
   body .docview[class] .doc-sec{padding:12px 8px 14px;margin-top:16px;}
   body .docview[class] .lg{padding:8px;gap:8px;}
   body .docview[class] .board-size .mbtn,
+  body .docview[class] .board-find .mbtn,
+  body .docview[class] .board-find select,
   body .docview[class] .mtoggle .mbtn{min-height:40px;}
   body .docview[class] .tabbtn{min-height:40px;}
   body .docview[class] .boardgrid.haspanels>.panelcol{min-width:0;}

@@ -153,6 +153,17 @@ section retains its view choice through normal edits and skin changes. A
 rebuilt board starts with a fresh pan position; reload resets its choice to
 Auto. Printed diagrams fit the page and omit the view controls.
 
+For a long trace, use **Find node** in the diagram legend, choose a full node
+name, then press **Show node**. Only rendered nodes are listed; duplicate
+names include their node IDs. Choosing a name does not pan until you press
+Show. The action pauses playback and scrolls the named card into view at your
+current scale, without changing the selected span, step, authored node tones,
+or inspector selection. A dashed outline identifies the navigation target;
+it does not mark that node as active in the story. The card receives keyboard
+focus. **Escape** returns to the picker, and leaving the card removes the
+outline. The picker resets when the preview is rebuilt. These controls work
+in published and embedded diagrams too and are omitted from print.
+
 `routing: "curves"` (or omitting routing) restores the existing renderer.
 Lane routing supports one to five unstacked cards per row, without floats or
 self-loops. Unsupported edited layouts fall back to curves with a validation

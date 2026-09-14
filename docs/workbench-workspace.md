@@ -60,3 +60,9 @@ as preview playback, even for diagrams without steps. It survives normal
 edits, Render and skin changes, independently of whether a step can be matched.
 It is not saved in JSON, drafts, undo or local storage; reloading resets to
 Auto. See [trace viewing](trace-import.md) for sizing and pan behavior.
+
+The routed diagram's **Find node** picker keeps full names, including labels
+abbreviated on cards. **Show node** pauses playback and moves keyboard focus
+to that card without selecting a different story beat or inspector object.
+Escape returns to the picker. The navigation outline disappears when focus
+leaves the card; its authored tone and active-step membership stay unchanged.

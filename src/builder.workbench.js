@@ -963,6 +963,67 @@ function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
   return r;
 }
 
+function planMoveGroup(text, raw, sectionIdx, groupKey, drop){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var nodes = got.d.nodes || {}, members = Object.create(null);
+  Object.keys(nodes).forEach(function(id){
+    if (nodes[id] && nodes[id].group === groupKey) members[id] = true;
+  });
+  if (!Object.keys(members).length) return {error: 'group "' + groupKey + '" not found'};
+  var rows = got.d.rows;
+  if (!builderFlatRowIds(rows).some(function(id){ return members[id]; }))
+    return {error: 'group "' + groupKey + '" has no nodes placed in rows'};
+  var inRow = drop && Object.prototype.hasOwnProperty.call(drop, 'row');
+  if (!drop || (inRow ? (!Number.isInteger(drop.row) || !rows[drop.row] || !Number.isInteger(drop.slot)) :
+      (!Number.isInteger(drop.gap) || drop.gap < 0 || drop.gap > rows.length)))
+    return {error: 'no row slot there'};
+  return builderRewrite(text, raw, got.path.concat(['rows']), function(copy){
+    var run = [], kept = [], target = null, droppedAbove = 0;
+    copy.forEach(function(row, r){
+      var remaining = [];
+      row.forEach(function(slot){
+        if (!Array.isArray(slot)){
+          if (members[slot]) run.push(slot);
+          else remaining.push(slot);
+          return;
+        }
+        var extracted = slot.filter(function(id){ return members[id]; });
+        if (!extracted.length){ remaining.push(slot); return; }
+        if (extracted.length === slot.length){ run.push(slot); return; }
+        var leftover = slot.filter(function(id){ return !members[id]; });
+        remaining.push(leftover.length === 1 ? leftover[0] : leftover);
+        extracted.forEach(function(id){ run.push(id); });
+      });
+      if (remaining.length){
+        kept.push(remaining);
+        if (inRow && r === drop.row) target = remaining;
+      } else if (!inRow && r < drop.gap) droppedAbove++;
+    });
+    if (inRow){
+      /* Keep the pre-removal row's identity, but clamp its slot against
+         the surviving row. A wholly lifted target row is a no-op. */
+      if (!target) return {error: 'already there'};
+      var slotIdx = Math.max(0, Math.min(drop.slot, target.length));
+      run.forEach(function(slot, i){ target.splice(slotIdx + i, 0, slot); });
+    } else kept.splice(drop.gap - droppedAbove, 0, run);
+    if (JSON.stringify(kept) === JSON.stringify(rows)) return {error: 'already there'};
+    copy.splice(0, copy.length);
+    kept.forEach(function(row){ copy.push(row); });
+  });
+}
+
+function builderSlotGapXs(boxes, reversed){
+  /* Slot order follows the engine's serpentine rows, so "before" is on
+     the right for a reversed row. Boxes already union stacked cards. */
+  if (!boxes.length) return [];
+  var xs = [reversed ? boxes[0].x2 + 8 : boxes[0].x1 - 8];
+  for (var i = 1; i < boxes.length; i++)
+    xs.push(reversed ? (boxes[i - 1].x1 + boxes[i].x2) / 2 : (boxes[i - 1].x2 + boxes[i].x1) / 2);
+  xs.push(reversed ? boxes[boxes.length - 1].x1 - 8 : boxes[boxes.length - 1].x2 + 8);
+  return xs;
+}
+
 function planDeleteSection(text, raw, sectionIdx){
   var rec = specSectionPaths(raw)[sectionIdx];
   if (!rec) return {error: 'no such section'};
@@ -4721,7 +4782,7 @@ function initWorkbenchBuilder(opts){
 
   /* ---- drag an edge label to set its labelDx/labelDy nudges;
           drag a node card onto another to swap their layout slots ---- */
-  var drag = null, nodeDrag = null, suppressClick = false;
+  var drag = null, nodeDrag = null, groupDrag = null, suppressClick = false;
   /* one cancellation path for the node drag: Escape, and every observed
      re-render (which detaches the dragged elements), both land here */
   function cancelNodeDrag(){
@@ -4731,6 +4792,15 @@ function initWorkbenchBuilder(opts){
     if (nd.el && nd.el.classList) nd.el.classList.remove('dv-dragsrc');
     if (nd.target && nd.target.classList) nd.target.classList.remove('dv-droptgt');
     dropNodeDragGhosts(nd);
+  }
+  function cancelGroupDrag(){
+    if (!groupDrag) return;
+    var gd = groupDrag;
+    groupDrag = null;
+    for (var i = 0; i < gd.memberEls.length; i++)
+      gd.memberEls[i].classList.remove('dv-dragsrc');
+    gd.el.classList.remove('dv-grabbing');
+    if (gd.line && gd.line.parentNode) gd.line.parentNode.removeChild(gd.line);
   }
   function nodeTranslateXY(el){
     var m = /translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/.exec(el.getAttribute('transform') || '');
@@ -4875,12 +4945,13 @@ function initWorkbenchBuilder(opts){
       if (!anyNode) continue;
       var secGi = parseInt(secEl.getAttribute('data-dv-section'), 10);
       var rows = sectionRowsFor(secGi);
-      if (!rows || rows.length < 2) continue;
+      if (!rows) continue;
+      rowGrabRows[secGi] = JSON.stringify(rows); /* also guard single-row group drags */
+      if (rows.length < 2) continue;
       var boxes = sectionRowBoxes(secEl, rows);
       var complete = true;
       for (var b = 0; b < boxes.length; b++) if (!boxes[b]) complete = false;
       if (!complete) continue;
-      rowGrabRows[secGi] = JSON.stringify(rows);
       var svg = anyNode.ownerSVGElement;
       for (var r = 0; r < boxes.length; r++){
         var box = boxes[r];
@@ -4969,6 +5040,88 @@ function initWorkbenchBuilder(opts){
     rd.line.setAttribute('y1', String(gapYs[gap]));
     rd.line.setAttribute('y2', String(gapYs[gap]));
   }
+  function updateGroupDrag(ev){
+    var gd = groupDrag;
+    if (!gd || !gd.moved) return;
+    gd.pick = null;
+    if (gd.line) gd.line.setAttribute('visibility', 'hidden');
+    if (!gd.rows){
+      var parsed = parseEditor();
+      if (parsed.error){ cancelGroupDrag(); inspectorMessage(parsed.error); return; }
+      var got = builderDiagram(src.value, parsed.raw, gd.gi);
+      if (got.error){ cancelGroupDrag(); inspectorMessage(got.error); return; }
+      if (JSON.stringify(got.d.rows) !== gd.rowsJSON || gd.rowsJSON !== gd.renderRowsJSON){
+        cancelGroupDrag();
+        inspectorMessage('the JSON rows changed since the last render — click Render, then drag');
+        return;
+      }
+      gd.rows = got.d.rows;
+      gd.raw = parsed.raw;
+      gd.text = src.value;
+      gd.members = Object.create(null);
+      Object.keys(got.d.nodes || {}).forEach(function(id){
+        if (got.d.nodes[id] && got.d.nodes[id].group === gd.key){
+          gd.members[id] = true;
+          var el = gd.secEl.querySelector('g.node[data-dv-node="' + cssQuote(id) + '"]');
+          if (el){ el.classList.add('dv-dragsrc'); gd.memberEls.push(el); }
+        }
+      });
+      gd.el.classList.add('dv-grabbing');
+    }
+    var boxes = sectionRowBoxes(gd.secEl, gd.rows);
+    if (!boxes.length){ cancelGroupDrag(); return; }
+    for (var b = 0; b < boxes.length; b++) if (!boxes[b]){ cancelGroupDrag(); return; }
+    var ctm = gd.svg.getScreenCTM();
+    if (!ctm) return;
+    var inv;
+    try { inv = ctm.inverse(); } catch (ex){ return; }
+    var pt = svgPointAt(gd.svg, inv, ev.clientX, ev.clientY);
+    if (!isFinite(pt.x) || !isFinite(pt.y)) return;
+    var row = -1;
+    for (var r = 0; r < boxes.length; r++){
+      if (pt.y >= boxes[r].y1 - 6 && pt.y <= boxes[r].y2 + 6){ row = r; break; }
+    }
+    var pick, x1, x2, y1, y2;
+    if (row >= 0){
+      /* Treat each slot as a little row to union every card in a stack. */
+      var slots = gd.rows[row];
+      var slotBoxes = sectionRowBoxes(gd.secEl, slots.map(function(slot){ return [slot]; }));
+      for (var s = 0; s < slotBoxes.length; s++) if (!slotBoxes[s]){ cancelGroupDrag(); return; }
+      var gapXs = builderSlotGapXs(slotBoxes, row % 2 === 1);
+      var slot = 0;
+      for (var j = 1; j < gapXs.length; j++)
+        if (Math.abs(pt.x - gapXs[j]) < Math.abs(pt.x - gapXs[slot])) slot = j;
+      /* A gap inside a carried run is not a destination. Keep the line
+         hidden there, just as row dragging hides its source gaps. */
+      if (slot > 0 && slot < slots.length &&
+          builderFlatRowIds([[slots[slot - 1], slots[slot]]]).every(function(id){ return gd.members[id]; })) return;
+      pick = {row: row, slot: slot};
+      x1 = x2 = gapXs[slot]; y1 = boxes[row].y1 - 6; y2 = boxes[row].y2 + 6;
+    } else {
+      var gapYs = [boxes[0].y1 - 8];
+      for (var k = 1; k < boxes.length; k++) gapYs.push((boxes[k - 1].y2 + boxes[k].y1) / 2);
+      gapYs.push(boxes[boxes.length - 1].y2 + 8);
+      var gap = 0;
+      for (var g = 1; g < gapYs.length; g++)
+        if (Math.abs(pt.y - gapYs[g]) < Math.abs(pt.y - gapYs[gap])) gap = g;
+      pick = {gap: gap};
+      x1 = Infinity; x2 = -Infinity;
+      boxes.forEach(function(box){ x1 = Math.min(x1, box.x1); x2 = Math.max(x2, box.x2); });
+      y1 = y2 = gapYs[gap];
+    }
+    /* The planner is also the no-op oracle, including whole-row removals
+       and non-contiguous groups. Only a real destination gets a line. */
+    if (planMoveGroup(gd.text, gd.raw, gd.gi, gd.key, pick).error) return;
+    gd.pick = pick;
+    if (!gd.line){
+      gd.line = document.createElementNS(SVG_NS, 'line');
+      gd.svg.appendChild(gd.line);
+    }
+    gd.line.setAttribute('class', row >= 0 ? 'dv-slotline' : 'dv-rowline');
+    gd.line.setAttribute('visibility', 'visible');
+    gd.line.setAttribute('x1', String(x1)); gd.line.setAttribute('x2', String(x2));
+    gd.line.setAttribute('y1', String(y1)); gd.line.setAttribute('y2', String(y2));
+  }
   view.addEventListener('mousedown', function(ev){
     if (ev.button !== 0 || connect) return;
     if (!ev.target.closest) return;
@@ -4995,6 +5148,20 @@ function initWorkbenchBuilder(opts){
                     gi: parseInt(ndSec.getAttribute('data-dv-section'), 10),
                     x0: ev.clientX, y0: ev.clientY, moved: false, target: null};
         ev.preventDefault(); /* no text selection while dragging */
+      }
+      return;
+    }
+    var groupEl = ev.target.closest('g.grp[data-dv-group]');
+    if (groupEl && !nodeEl && !addToStep){
+      var gdSec = groupEl.closest('.doc-sec');
+      var gdSvg = groupEl.ownerSVGElement;
+      if (gdSec && gdSec.hasAttribute('data-dv-section') && gdSvg && gdSvg.getScreenCTM){
+        var gdGi = parseInt(gdSec.getAttribute('data-dv-section'), 10);
+        groupDrag = {el: groupEl, secEl: gdSec, svg: gdSvg, gi: gdGi,
+                     key: groupEl.getAttribute('data-dv-group'),
+                     rowsJSON: JSON.stringify(sectionRowsFor(gdGi)), renderRowsJSON: rowGrabRows[gdGi],
+                     x0: ev.clientX, y0: ev.clientY, moved: false, pick: null, line: null, memberEls: []};
+        ev.preventDefault();
       }
       return;
     }
@@ -5032,6 +5199,12 @@ function initWorkbenchBuilder(opts){
       if (tgt) tgt.classList.add('dv-droptgt');
       nodeDrag.target = tgt;
       updateNodeDragGhost(ev);
+      return;
+    }
+    if (groupDrag){
+      var gdx = ev.clientX - groupDrag.x0, gdy = ev.clientY - groupDrag.y0;
+      if (gdx * gdx + gdy * gdy > 25) groupDrag.moved = true;
+      if (groupDrag.moved) updateGroupDrag(ev);
       return;
     }
     if (!drag) return;
@@ -5092,6 +5265,37 @@ function initWorkbenchBuilder(opts){
       autosaveDraft();
       currentTarget = {section: nd.gi, kind: 'node', id: nd.id};
       insertSection = nd.gi;
+      rehighlight();
+      renderInspector();
+      return;
+    }
+    if (groupDrag){
+      var gd = groupDrag;
+      cancelGroupDrag();
+      if (!gd.moved) return;
+      suppressClick = true;
+      setTimeout(function(){ suppressClick = false; }, 0);
+      var gdParsed = parseEditor();
+      if (gdParsed.error){ inspectorMessage(gdParsed.error); return; }
+      var gdRec = specSectionPaths(gdParsed.raw)[gd.gi];
+      var gdD = gdRec ? specValueAt(gdParsed.raw, gdRec.diagram) : null;
+      if (!gdD || JSON.stringify(gdD.rows) !== gd.rowsJSON){
+        inspectorMessage('the JSON rows changed since the last render — click Render, then drag');
+        return;
+      }
+      if (!gd.pick) return;
+      var gdPlan = planMoveGroup(src.value, gdParsed.raw, gd.gi, gd.key, gd.pick);
+      if (gdPlan.error){
+        if (gdPlan.error !== 'already there') inspectorMessage(gdPlan.error);
+        return;
+      }
+      pushUndo();
+      clearMultiSelect();
+      src.value = gdPlan.text;
+      render();
+      autosaveDraft();
+      currentTarget = {section: gd.gi, kind: 'group', id: gd.key};
+      insertSection = gd.gi;
       rehighlight();
       renderInspector();
       return;
@@ -5162,6 +5366,7 @@ function initWorkbenchBuilder(opts){
      stale arming is cancelled. */
   new MutationObserver(function(){
     cancelNodeDrag(); /* the dragged elements just got detached */
+    cancelGroupDrag();
     cancelRowDrag();  /* row handles and the drop line got detached too */
     hideDiff(); /* the diff panel's jump targets got detached too */
     if (!multiSurvive && multiSel.length){
@@ -5188,6 +5393,7 @@ function initWorkbenchBuilder(opts){
     if (ev.key === 'Escape'){
       if (rowDrag){ cancelRowDrag(); return; }
       if (nodeDrag){ cancelNodeDrag(); return; }
+      if (groupDrag){ cancelGroupDrag(); return; }
       if (importBox && !importBox.hidden){ importBox.hidden = true; if (importBtn) importBtn.focus(); return; }
       if (diffbox && !diffbox.hidden){ hideDiff(); diffBtn.focus(); return; }
       if (gallery && !gallery.hidden){ closeGallery(); startersBtn.focus(); return; }

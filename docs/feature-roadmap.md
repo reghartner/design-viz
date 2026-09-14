@@ -66,8 +66,6 @@ The effective-state inspector is built in [#54](https://github.com/reghartner/de
    Routed boards now support automatic readable sizing on narrow columns,
    explicit Fit width / Readable choices, keyboard panning and tighter phone
    gutters; sizing choices survive normal preview rebuilds.
-   Find node / Show node locates cards by full name without changing the story
-   beat, with explicit navigation and keyboard return to the picker.
 5. **Safer structural edits:** preview reference changes for node/panel renames
    and deletions; add shortcuts for existing history without intercepting
    normal text-editor undo. Preserve native typing history.

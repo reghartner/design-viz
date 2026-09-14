@@ -4003,84 +4003,6 @@ function createBoardSizeControl(board, legend, label){
     destroy:function(){ destroyed = true; if (observer) observer.disconnect(); }};
 }
 
-/* Explicit navigation does not change step focus, semantic tones or the spec.
-   Keep full authored names in the picker even when cards abbreviate them. */
-function createBoardNodeFinder(boardDiv, legend, nodeEls, nodes, pause){
-  var ids = Object.keys(nodes || {}).filter(function(id){
-    return Object.prototype.hasOwnProperty.call(nodeEls, id) && nodeEls[id];
-  });
-  if (!ids.length) return null;
-  var titles = new Map(), labels = new Map();
-  ids.forEach(function(id){
-    var label = String(nodes[id].title || id); labels.set(id, label);
-    titles.set(label, (titles.get(label) || 0) + 1);
-  });
-  var wrap = document.createElement('div'); wrap.className = 'board-find';
-  var label = document.createElement('label'); label.textContent = 'Find node';
-  var select = document.createElement('select'); select.setAttribute('aria-label', 'Find node in diagram');
-  var placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a node…';
-  select.appendChild(placeholder);
-  ids.forEach(function(id){
-    var option = document.createElement('option'); option.value = id;
-    option.textContent = labels.get(id) + (titles.get(labels.get(id)) > 1 ? ' · ' + id : '');
-    select.appendChild(option);
-  });
-  label.appendChild(select); wrap.appendChild(label);
-  var show = document.createElement('button'); show.type = 'button'; show.className = 'mbtn';
-  show.textContent = 'Show node'; show.disabled = true; wrap.appendChild(show);
-  var status = document.createElement('span'); status.className = 'board-find-status';
-  status.setAttribute('role', 'status'); wrap.appendChild(status); legend.appendChild(wrap);
-  var located = null, ring = null, priorAttrs = null, destroyed = false;
-  function clearMark(){
-    var oldNode = located, oldRing = ring, oldAttrs = priorAttrs;
-    /* Removing tabindex from the focused SVG group can fire focusout
-       synchronously. Clear ownership before restoring its attributes. */
-    ring = null; located = null; priorAttrs = null;
-    if (oldRing && oldRing.parentNode) oldRing.parentNode.removeChild(oldRing);
-    if (oldNode){
-      Object.keys(oldAttrs).forEach(function(attr){
-        if (oldAttrs[attr] === null) oldNode.removeAttribute(attr);
-        else oldNode.setAttribute(attr, oldAttrs[attr]);
-      });
-    }
-  }
-  select.addEventListener('change', function(){
-    if (destroyed) return;
-    show.disabled = !labels.has(select.value); status.textContent = '';
-  });
-  show.addEventListener('click', function(){
-    if (destroyed || !labels.has(select.value)) return;
-    var target = nodeEls[select.value], card = target.querySelector('.card');
-    if (!card || !card.getClientRects().length){ status.textContent = 'Node is not visible in this view.'; return; }
-    if (pause) pause();
-    clearMark(); located = target; priorAttrs = {};
-    ['tabindex', 'role', 'aria-label'].forEach(function(attr){ priorAttrs[attr] = target.getAttribute(attr); });
-    /* Separate navigation outline: never overwrite the card's semantic tone. */
-    ring = document.createElementNS(SVGNS, 'rect'); ring.setAttribute('class', 'board-find-ring');
-    ring.setAttribute('x', '-4'); ring.setAttribute('y', '-4');
-    ring.setAttribute('width', String(Number(card.getAttribute('width')) + 8));
-    ring.setAttribute('height', String(Number(card.getAttribute('height')) + 8));
-    ring.setAttribute('rx', '15'); ring.setAttribute('aria-hidden', 'true');
-    target.appendChild(ring);
-    target.setAttribute('tabindex', '-1'); target.setAttribute('role', 'group');
-    target.setAttribute('aria-label', labels.get(select.value) + ' node. Escape returns to Find node.');
-    target.focus({preventScroll:true});
-    card.scrollIntoView({block:'center', inline:'center', behavior:'instant'});
-    status.textContent = 'Showing ' + labels.get(select.value) + '. Escape returns to Find node.';
-  });
-  function returnToFinder(event){
-    if (destroyed || event.key !== 'Escape' || event.target !== located) return;
-    event.preventDefault(); event.stopPropagation(); clearMark(); select.focus();
-  }
-  function leaveNode(event){ if (event.target === located) clearMark(); }
-  boardDiv.addEventListener('keydown', returnToFinder);
-  boardDiv.addEventListener('focusout', leaveNode);
-  return {destroy:function(){
-    destroyed = true; clearMark(); boardDiv.removeEventListener('keydown', returnToFinder);
-    boardDiv.removeEventListener('focusout', leaveNode);
-  }};
-}
-
 function buildSection(container, sec, gi, sectionReference, protos, skin, lanes, backlinks, onChange, onProseChange, options){
   var accRaw = sec.accent;
   var acc = isHex(accRaw) ? accRaw : (ACCENTS[accRaw] || ACCENTS[ACCENT_CYCLE[gi % ACCENT_CYCLE.length]]);
@@ -4099,7 +4021,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     intro.defaultCollapsed, onProseChange,
     typeof window !== 'undefined' ? window : null, intro.sectionLabel,
     box.querySelector('.sec-teaser')) : null;
-  var result = {sectionEl:box, stepper:null, boardSize:null, nodeFinder:null,
+  var result = {sectionEl:box, stepper:null, boardSize:null,
                 prose:prose,
                 contractCard:box.querySelector('.ctcard'),
                 contractRows:Array.prototype.slice.call(box.querySelectorAll('.ctrow'))};
@@ -4132,8 +4054,6 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
   if (d.routing === 'lanes'){
     result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
-    result.nodeFinder = createBoardNodeFinder(boardDiv, lg, board.nodeEls, d.nodes,
-      function(){ if (result.stepper) result.stepper.pause(); });
   }
 
   var view = VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient';
@@ -4251,7 +4171,6 @@ function renderPage(view, page, skin, backlinks, options){
     ctl.destroyed = true;
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
     ctl.sections.forEach(function(rec){ if (rec.boardSize) rec.boardSize.destroy(); });
-    ctl.sections.forEach(function(rec){ if (rec.nodeFinder) rec.nodeFinder.destroy(); });
     ctl.onChange = null;
   };
   function changed(target){
@@ -4276,8 +4195,7 @@ function renderPage(view, page, skin, backlinks, options){
         }
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
-               sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize,
-               nodeFinder:built.nodeFinder, prose:built.prose,
+               sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                contractCard:built.contractCard, contractRows:built.contractRows};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);

@@ -1,5 +1,20 @@
 # Overnight build — September 14, 2026
 
+## Review decision
+
+Chuck approved merging the retained stack and requested removal of the Find
+node dropdown. The finder, Show node action and associated navigation code
+were removed in preparation for merging; the trace service picker and Auto / Fit width /
+Readable controls remain. PR #62 carries this handoff and updates the panel
+count after integration.
+Merge order is #50 through #62. The stack is rebased onto main 976725c,
+preserving the workbench callouts, delta markers, group icons, phone branding
+and Homemap panel already merged there. Conflict resolution keeps both
+Homemap's ambient initial state and trace navigation behavior. Chuck also
+authorized the merge hook's documented human-approved override after its
+default path rejected the merge command. The original overnight evidence
+and open-PR statuses below record the build before this review decision.
+
 Chuck authorized focused PRs, stacked or independent, through tonight. First
 priority: smart layouts for complex Honeycomb traces and service-internal time.
 The overnight continuation ends at 08:00 America/New_York (12:00 UTC).
@@ -22,7 +37,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
 | 11 | Canary and firmware rollout stories | codex/rollout-starters | Open: https://github.com/reghartner/design-viz/pull/60 |
 | 12 | Phone diagram legibility | codex/phone-diagram-legibility | Open: https://github.com/reghartner/design-viz/pull/61 |
-| 13 | Explicit diagram node finder | codex/diagram-node-finder | Open: https://github.com/reghartner/design-viz/pull/62 |
+| 13 | Reviewed handoff; node finder removed | codex/diagram-node-finder | Open: https://github.com/reghartner/design-viz/pull/62 |
 
 ## Validation and evidence
 

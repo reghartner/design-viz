@@ -1,16 +1,5 @@
 # Changelog
 
-## Diagram node finder (2026-09-14)
-
-- Find rendered nodes by full name on routed diagrams; duplicate names show
-  their IDs. Show node pauses playback and brings the card into view without
-  changing the step, source or inspector selection. Selecting a name alone
-  does not pan.
-- A separate navigation outline and keyboard focus identify the found card.
-  Escape returns to the picker. Focus cleanup handles synchronous SVG blur
-  events and disposes with rebuilt previews. Phone controls are 40 pixels high;
-  standalone and embed views support the same navigation, and print omits it.
-
 ## Phone diagram legibility (2026-09-14)
 
 - Routed diagrams now offer Auto, Fit width and Readable views. Narrow columns

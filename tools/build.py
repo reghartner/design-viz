@@ -18,6 +18,7 @@ SRC = ROOT / "src"
 
 # Reuse the canonical demo so its gallery entry cannot drift.
 STARTERS = [
+    ("home story", "A large home scene with rooms, a visitor, local signals, and an internet outage alternate.", "starters/homemap-story.json"),
     ("alternate paths", "One shared command diagram: happy path or a dropped signal after step 3.", "starters/alternate-paths.json"),
     ("blank flow", "Three nodes and two hops to make your own.", "starters/minimal.json"),
     ("panel showcase", "Five panels updated across four steps.", "starters/panels-tour.json"),

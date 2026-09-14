@@ -189,3 +189,15 @@ test('workbench replacement destroys the old controller before rendering paused 
   assert.deepEqual(calls,['destroy','tab 1']);
   assert.equal(next.sections[0].stepper.current().n,1);
 });
+
+test('data flow disclosure stays open across scene edits without writing viewing state to the spec',()=>{
+  const h=previewHarness(), before=pageFixture(), old=h.controller(before,1,'step');
+  diagramOf(before).primaryPanel='p'; old.sections[0].flowDisclosure={open:true};
+  const saved=h.context.workbenchPreviewSnapshot(before,old), after=copy(before);
+  diagramOf(after).steps[1].text='Edited scene'; const source=JSON.stringify(after);
+  const next=h.controller(after,0,'ambient'); next.sections[0].flowDisclosure={open:false};
+  h.context.restoreWorkbenchPreview(after,next,saved);
+  assert.equal(next.sections[0].flowDisclosure.open,true); assert.equal(JSON.stringify(after),source);
+  after.title='Different story'; next.sections[0].flowDisclosure.open=false;
+  h.context.restoreWorkbenchPreview(after,next,saved); assert.equal(next.sections[0].flowDisclosure.open,false);
+});

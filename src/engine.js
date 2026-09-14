@@ -3310,6 +3310,22 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       var o = hm.outline;
       var s = '<svg class="hmframe" viewBox="0 0 320 180" role="img" aria-label="' + esc(panel.title || 'Home device map') + '">';
       s += '<rect class="hmoutline" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="9"/>';
+      homemapRooms(panel).forEach(function(room){
+        s += '<rect class="hmroom" x="' + room.x + '" y="' + room.y + '" width="' + room.w + '" height="' + room.h + '" rx="2"/>' +
+          '<text class="hmroomlabel" x="' + (room.x + 5) + '" y="' + (room.y + 10) + '">' + esc(room.label || '') + '</text>';
+      });
+      /* Direction remains readable while paused and under reduced motion.
+         Animated packets remain the existing adjacent-step overlay. */
+      if (typeof stepIdx === 'number' && stepIdx >= 0) hm.signals.forEach(function(sig){
+        var dx = sig.toXY.x - sig.fromXY.x, dy = sig.toXY.y - sig.fromXY.y;
+        var length = Math.sqrt(dx * dx + dy * dy); if (length < 24) return;
+        var ux = dx / length, uy = dy / length;
+        var x = sig.toXY.x - ux * 13, y = sig.toXY.y - uy * 13;
+        s += '<g class="hmlink"><title>' + esc(sig.from + ' → ' + sig.to) + '</title>' +
+          '<path d="M' + (sig.fromXY.x + ux * 12) + ' ' + (sig.fromXY.y + uy * 12) + ' L' + x + ' ' + y + '"/>' +
+          '<path class="hmlinktip" d="M' + (x - ux * 5 - uy * 3) + ' ' + (y - uy * 5 + ux * 3) +
+          ' L' + x + ' ' + y + ' L' + (x - ux * 5 + uy * 3) + ' ' + (y - uy * 5 - ux * 3) + '"/></g>';
+      });
       /* Wedges below all markers, so one camera cannot obscure another. */
       hm.devices.forEach(function(d){
         if (d.kind !== 'camera' || ['scan', 'detect', 'rec'].indexOf(d.state) < 0) return;
@@ -3349,7 +3365,9 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
         if (d.kind === 'sensor') s += '<use class="hmicon" href="#i-' + esc(d.icon) + '" x="' +
           (d.x + 7) + '" y="' + (d.y - 7) + '" width="14" height="14"/>';
         s += '<text class="hmlbl" x="' + d.x + '" y="' + Math.min(177, d.y + 18) +
-          '" text-anchor="middle">' + esc(d.label) + '</text></g>';
+          '" text-anchor="middle">' + esc(d.label) + '</text>';
+        s += '<text class="hmstatus" x="' + d.x + '" y="' + (d.y > 146 ? d.y - 13 : d.y + 28) +
+          '" text-anchor="middle">' + esc(d.state) + '</text></g>';
       });
       hm.subjects.forEach(function(sub){
         if (sub.hidden) return;
@@ -3755,7 +3773,7 @@ function panelOrder(panels){
   return fixed.concat(growing);
 }
 
-function buildPanels(asideEl, d, skin){
+function buildPanels(asideEl, d, skin, primaryHost){
   var folded = foldPanelStates(d);
   var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
   var hosts = {};
@@ -3773,7 +3791,7 @@ function buildPanels(asideEl, d, skin){
     var body = document.createElement('div');
     body.className = 'pbody';
     card.appendChild(body);
-    asideEl.appendChild(card);
+    (primaryHost && p.id === d.primaryPanel ? primaryHost : asideEl).appendChild(card);
     hosts[p.id] = {panel: p, body: body};
     /* Homemap ambient state precedes step zero; other widgets keep their
        established first-folded-step preview. */
@@ -4150,11 +4168,29 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
 }
 
 /* ---------------- section + page renderers ---------------- */
-function createBoardGrid(sectionEl, hasPanels){
+function createBoardGrid(sectionEl, hasPanels, primaryPanel){
   var grid = document.createElement('div');
   grid.className = 'boardgrid' + (hasPanels ? ' haspanels' : '');
   sectionEl.appendChild(grid);
   if (!hasPanels) return {grid:grid, diagramHost:grid, controlsHost:sectionEl, diagramCol:null};
+
+  if (primaryPanel){
+    grid.className += ' panel-first';
+    var primary = document.createElement('div'); primary.className = 'primary-panel';
+    grid.appendChild(primary);
+    var modes = document.createElement('div'); modes.className = 'primary-modes';
+    primary.appendChild(modes);
+    var flow = document.createElement('details'); flow.className = 'secondary-flow';
+    var summary = document.createElement('summary'); summary.textContent = 'Data flow';
+    flow.appendChild(summary);
+    /* Keep the secondary board outside the widget grid and in DOM order
+       after the map and its playback controls, including on phones. */
+    sectionEl.appendChild(flow);
+    var flowCol = document.createElement('div'); flowCol.className = 'diagramcol';
+    flow.appendChild(flowCol);
+    return {grid:grid, diagramHost:flowCol, controlsHost:primary, diagramCol:flowCol,
+      primaryHost:primary, modesHost:modes, flowDisclosure:flow};
+  }
 
   var diagramCol = document.createElement('div');
   diagramCol.className = 'diagramcol';
@@ -4359,7 +4395,9 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var prefix = 'fs' + gi;
   var hasPanels = Array.isArray(d.panels) && d.panels.length > 0;
 
-  var boardLayout = createBoardGrid(box, hasPanels);
+  var primaryPanel = hasPanels && typeof d.primaryPanel === 'string' && d.panels.find(function(p){ return p && p.id === d.primaryPanel; });
+  var boardLayout = createBoardGrid(box, hasPanels, primaryPanel);
+  result.flowDisclosure = boardLayout.flowDisclosure;
   var grid = boardLayout.grid;
 
   var boardDiv = document.createElement('div');
@@ -4375,7 +4413,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     var aside = document.createElement('div');
     aside.className = 'panelcol';
     grid.appendChild(aside);
-    panelCtl = buildPanels(aside, activeDiagram, skin);
+    panelCtl = buildPanels(aside, activeDiagram, skin, boardLayout.primaryHost);
+    if (primaryPanel && d.panels.length === 1) aside.hidden = true;
   }
 
   var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks);
@@ -4402,7 +4441,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   if (!hasSteps || view === 'ambient-only'){
     if (btnDelta){
       var deltaTog = document.createElement('span'); deltaTog.className = 'mtoggle';
-      deltaTog.appendChild(btnDelta); lg.appendChild(deltaTog);
+      deltaTog.appendChild(btnDelta); (boardLayout.modesHost || lg).appendChild(deltaTog);
     }
     return result;
   }
@@ -4412,7 +4451,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var btnAmb = document.createElement('button'); btnAmb.className = 'mbtn'; btnAmb.textContent = 'AMBIENT';
   var btnStep = document.createElement('button'); btnStep.className = 'mbtn'; btnStep.textContent = 'STEP';
   btnAmb.setAttribute('aria-pressed', 'true'); btnStep.setAttribute('aria-pressed', 'false');
-  tog.appendChild(btnAmb); tog.appendChild(btnStep); lg.appendChild(tog);
+  tog.appendChild(btnAmb); tog.appendChild(btnStep); (boardLayout.modesHost || lg).appendChild(tog);
   if (btnDelta) tog.appendChild(btnDelta);
 
   /* termbar */
@@ -4468,6 +4507,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     return renderBoard(bwrap, next, prefix, skin, protos, backlinks);
   }}));
   stepper.copyButton = copyStep;
+  if (boardLayout.primaryHost) stepper.scrollTargetEl = boardLayout.primaryHost;
 
   if (view === 'step') stepper.enterStep(true); /* host may disable automatic playback */
   result.stepper = stepper;
@@ -4536,6 +4576,7 @@ function renderPage(view, page, skin, backlinks, options){
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
+               flowDisclosure:built.flowDisclosure,
                contractCard:built.contractCard, contractRows:built.contractRows};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);

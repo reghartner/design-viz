@@ -519,7 +519,23 @@ function homemapPatchWarnings(obj, path, declaration, warnings){
     }
   });
 }
+function homemapRooms(panel, path, warnings){
+  var rooms = panel.rooms;
+  if (rooms == null) return [];
+  if (!Array.isArray(rooms)){
+    if (warnings) warnings.push(path + '.rooms: expected an array of {label, x, y, w, h} — ignored');
+    return [];
+  }
+  return rooms.filter(function(r, i){
+    var valid = r && ['x','y','w','h'].every(function(k){ return isFiniteNum(r[k]); }) &&
+      r.x >= 0 && r.y >= 0 && r.w > 0 && r.h > 0 && r.x + r.w <= 320 && r.y + r.h <= 180;
+    if (!valid && warnings) warnings.push(path + '.rooms[' + i + ']: use a positive rectangle inside the 320×180 map — ignored');
+    return valid;
+  });
+}
+
 function homemapDeclarationWarnings(panel, path, warnings){
+  homemapRooms(panel, path, warnings);
   var devices = Object.create(null), seen = Object.create(null);
   if (!(Array.isArray(panel.devices) && panel.devices.length))
     warnings.push(path + '.devices: homemap needs a devices array — rendering a placeholder');
@@ -937,6 +953,9 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!d) return;
   var DP = P + '.diagram';
   validatePaths(d, DP, errors);
+  if (d.primaryPanel != null && (typeof d.primaryPanel !== 'string' ||
+      !(Array.isArray(d.panels) && d.panels.some(function(p){ return p && p.id === d.primaryPanel; }))))
+    warnings.push(DP + '.primaryPanel: must name an existing panel — using the standard flow layout');
   if (d.view && VIEW_SET.indexOf(d.view) < 0)
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
   if (!d.nodes || typeof d.nodes !== 'object'){ errors.push(DP + '.nodes: required — map of node id to {title, sub, icon, tint}'); return; }

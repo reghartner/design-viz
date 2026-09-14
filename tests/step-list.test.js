@@ -135,6 +135,16 @@ test('duplicate and append each apply once, select their result, and preserve or
   assert.equal(e['steps-later'].disabled,true);
 });
 
+test('a move pulses the selected row so the reorder is visible, and the pulse clears on its timer',()=>{
+  const h=harness(),e=h.e; h.select(1);
+  e['steps-later'].fire('click');
+  assert.equal(h.target.index,2);
+  const selected=e['steps-list'].querySelector('[aria-current="step"]');
+  assert.equal(selected.className,'story-step story-moved');
+  h.flushTimers();
+  assert.equal(selected.className,'story-step');
+});
+
 test('source typing immediately disables stale controls and held row callbacks cannot edit changed JSON',()=>{
   const h=harness(),e=h.e; h.select(1);
   const held=e['steps-list'].children[1], original=h.src.value;

@@ -177,7 +177,13 @@ function initWorkbenchStepList(opts){
     if (!opts.apply(plan, section)) return;
     search.value = ''; refresh();
     var selected = list.querySelector('[aria-current="step"]');
-    if (selected) selected.scrollIntoView({block:'nearest'});
+    if (selected){
+      selected.scrollIntoView({block:'nearest'});
+      /* a moved row's text looks identical in its new slot — pulse it so
+         the click visibly landed */
+      selected.className = 'story-step story-moved';
+      setTimeout(function(){ selected.className = 'story-step'; }, 900);
+    }
     if (!buttons[name].disabled) buttons[name].focus(); else if (selected) selected.focus();
   }); });
   opts.src.addEventListener('input', function(){ invalidate(); });

@@ -3136,6 +3136,9 @@ function initWorkbenchBuilder(opts){
     applyStepMarkers();
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
+    /* the story list indexes the editor text; every applied plan changes
+       that text, so re-sync or its rows and highlight go stale */
+    if (stepList) stepList.sync();
     if (plan.start != null) scrollTextareaTo(plan.start);
     return true;
   }
@@ -4303,8 +4306,8 @@ function initWorkbenchBuilder(opts){
               flashPositionLine();
             }});
         };
-        acts.appendChild(actionButton('↑ earlier', function(){ moveSection(-1); }));
-        acts.appendChild(actionButton('↓ later', function(){ moveSection(1); }));
+        acts.appendChild(actionButton('↑ move up', function(){ moveSection(-1); }));
+        acts.appendChild(actionButton('↓ move down', function(){ moveSection(1); }));
       }
       if (t.kind === 'tab'){
         acts.appendChild(actionButton('+ tab', function(){
@@ -4314,11 +4317,11 @@ function initWorkbenchBuilder(opts){
               renderInspector();
             }});
         }));
-        acts.appendChild(actionButton('← earlier', function(){
+        acts.appendChild(actionButton('← move left', function(){
           commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, -1); },
             {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
-        acts.appendChild(actionButton('→ later', function(){
+        acts.appendChild(actionButton('→ move right', function(){
           commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, 1); },
             {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
@@ -4339,11 +4342,11 @@ function initWorkbenchBuilder(opts){
           commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index); },
             {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
-        acts.appendChild(actionButton('↑ earlier', function(){
+        acts.appendChild(actionButton('↑ move up', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
-        acts.appendChild(actionButton('↓ later', function(){
+        acts.appendChild(actionButton('↓ move down', function(){
           commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));

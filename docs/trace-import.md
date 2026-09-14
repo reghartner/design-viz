@@ -19,7 +19,13 @@ It does not fetch trace URLs or connect to an account.
    conversion never visits it.
 4. Expand **Custom field names** if the dataset uses alternate column names.
    For example, `{"service":"app.service","timestamp":"start_time"}`.
-5. Choose **Build diagram**. Invalid input keeps the existing spec intact;
+5. Choose **Preview trace**. Review source/selection counts, extent, completeness
+   warnings and subtree sizes. Preview leaves the existing document intact.
+6. To focus, search for a span and choose its row, or set **Import scope** to
+   a subtree/service and enter an exact ID/name. A focus includes all exported
+   descendants. Re-preview after editing inputs or scope; stale previews cannot
+   be built. **Clear focus** returns to all source spans while the export is loaded.
+7. Choose **Build diagram**. Invalid input keeps the existing spec intact;
    a successful import replaces it in one builder undo step. Use the numbered
    step chips to inspect each span, edit the story, then save/export normally.
 
@@ -76,11 +82,42 @@ review the generated spec before sharing it.
   that the trace is complete.
 
 Duplicate span IDs, cycles, missing required fields, ambiguous trace selection,
-and invalid timing fail before replacing the editor. Initial bounds are 200
-spans and 30 services per diagram, 10,000 input events, and 10 MB input in the
-workbench. Larger traces are refused with guidance to focus the export; there
-is no silent truncation. Direct OTLP `resourceSpans` envelopes are not supported
+and invalid timing fail before replacing the editor. Preview accepts up to
+10,000 input events; a built diagram is bounded to 200 selected spans and 30
+selected services. The workbench accepts at most 10 MB. Larger selections stay
+previewable and require a narrower explicit focus; there is no silent
+truncation. Direct OTLP `resourceSpans` envelopes are not supported
 yet; export Honeycomb events or flatten to the documented field shape.
+
+## Focus without losing timing context
+
+A subtree includes its root span and every exported descendant. A service
+focus includes every span attributed to that service and every descendant,
+including other services. This preserves all exported direct children of
+every included span, so focusing does not inflate its uncovered time by
+discarding child intervals. A service that contains most of the trace may
+still exceed the diagram limit; choose a narrower subtree in that case.
+
+Search examines the full selected-trace export by span ID, service, operation
+and recorded error, using all typed words. It shows at most 25 matching rows
+with the total match count and each subtree's span count. Service-name
+autocomplete suggests the first 100 services; exact names beyond those
+suggestions still work. Long ancestor breadcrumbs show the nearest eight
+ancestors and indicate omitted earlier ancestors.
+
+Focused diagrams retain original span/parent IDs and stable source-derived
+service IDs. Parents outside the focus are reported, not reparented or drawn
+as invented service nodes. All offsets are rebased to the earliest included
+span; durations and relative timing remain unchanged. `start_ms` in the details
+is the view offset; `trace_start_ms` retains the offset in the source export.
+Visible bullets disclose the timing origin and omitted counts. The generated
+`page.traceImport` metadata records the focus, included/source counts, boundary
+span count, view offset and bounded ancestor breadcrumbs.
+
+The import form retains the raw input in memory so **Clear focus** can restore
+the selection. Raw input and omitted spans are not copied into the saved spec
+or autosaved draft. After a reload, reopen the original export to broaden a
+saved focused diagram. Source completeness warnings still apply to every focus.
 
 ## Complex service layouts
 
@@ -135,12 +172,23 @@ node tools/trace2spec.js events.json -o request.spec.json \
   --trace-id TRACE_ID --source-url 'https://ui.honeycomb.io/your-trace'
 node tools/validate.js request.spec.json
 python3 tools/page_build.py request.spec.json --root ./visualizations
+
+# Inspect a large export before building; stdout is a bounded JSON summary.
+node tools/trace2spec.js events.json --preview
+node tools/trace2spec.js events.json --root-span SPAN_ID --preview
+node tools/trace2spec.js events.json --root-span SPAN_ID -o focused.spec.json
+node tools/trace2spec.js events.json --service 'payments' -o payments.spec.json
 ```
 
 `--title` overrides the page title; `--fields mapping.json` accepts the same
 field-name overrides as the workbench. Without `-o`, strict spec JSON goes to
 stdout; import warnings and statistics go to stderr. The CLI and workbench
 execute the same pure converter, `src/trace-import.js`.
+
+`--root-span` and `--service` are mutually exclusive. `--preview` emits source
+and selection counts, focus metadata, warnings and `canBuild`; an oversized
+selection is a successful analysis with `canBuild:false`. Invalid inputs still
+fail. Preview refuses `-o` to avoid overwriting a spec with summary data.
 
 When enriching a trace, keep observation and explanation distinguishable.
 Do not infer a retry just because two spans share a name, call the longest
@@ -152,8 +200,8 @@ completeness warnings before converting observations into design claims.
 
 1. Map spans/services onto nodes in an existing HLD and report unexpected or
    unobserved paths; an unobserved path is not proof that it is unused.
-2. Add subtree selection and service grouping for large traces, with explicit
-   counts and breadcrumbs for folded spans.
+2. Add focused exploration of an already imported diagram, with explicit
+   boundary context and original-source recovery when broadening a saved view.
 3. Add a Honeycomb account adapter. Honeycomb documents a hosted MCP
    `get_trace` tool, which is a promising agent path for URL-based imports.
    No such connector is installed or used by this implementation.

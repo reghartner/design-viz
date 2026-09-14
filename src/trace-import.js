@@ -60,7 +60,30 @@ function traceRows(ids, edges){
   return rows.map(function(row,i){ return i%2 ? row.reverse() : row; });
 }
 
-function traceToSpec(input, options){
+function traceSpanStats(spans, traceId){
+  var extent=0, services=new Set();
+  spans.forEach(function(s){ services.add(s.service); extent=Math.max(extent,s.startMs+s.ms); });
+  return {traceId:traceId,spans:spans.length,services:services.size,elapsedMs:Math.round(extent*1000)/1000};
+}
+
+function traceSubtreeSizes(spans){
+  var sizes=new Map(), pending=new Map(), parents=new Map(), queue=[];
+  spans.forEach(function(s){ sizes.set(s.id,1); pending.set(s.id,0); parents.set(s.id,s.parentId); });
+  spans.forEach(function(s){ if (pending.has(s.parentId)) pending.set(s.parentId,pending.get(s.parentId)+1); });
+  pending.forEach(function(count,id){ if (!count) queue.push(id); });
+  for (var i=0;i<queue.length;i++){
+    var id=queue[i], parent=parents.get(id);
+    if (!sizes.has(parent)) continue;
+    sizes.set(parent,sizes.get(parent)+sizes.get(id));
+    pending.set(parent,pending.get(parent)-1); if (!pending.get(parent)) queue.push(parent);
+  }
+  return sizes;
+}
+
+/* Analyze first, without building any board or silently trimming the source.
+   Every focused span retains all exported descendants, so filtering cannot
+   remove an included span's direct children from its timing calculation. */
+function tracePreview(input, options){
   options = options || {};
   var warnings = [], own = function(o, k){ return o && Object.prototype.hasOwnProperty.call(o, k); };
   var object = function(o){ return !!o && typeof o === 'object' && !Array.isArray(o); };
@@ -123,7 +146,6 @@ function traceToSpec(input, options){
   if (!selected) selected = Array.from(traceIds)[0];
   candidates = candidates.filter(function(c){ return c.traceId === selected; });
   if (!candidates.length) throw new Error('No spans found for the selected trace.');
-  if (candidates.length > 200) throw new Error('This trace has ' + candidates.length + ' spans; the first version supports up to 200. Export a focused subtree (nothing was truncated).');
   if (ignored) warnings.push(ignored + ' non-span annotation(s) excluded.');
   if (traceIds.size > 1) warnings.push('Imported only trace ' + selected + '; other traces excluded.');
   var spans = candidates.map(function(c){
@@ -145,12 +167,16 @@ function traceToSpec(input, options){
     if (byId.has(s.id)) throw new Error('Duplicate span ID: ' + s.id);
     byId.set(s.id, s);
   });
+  var checked = new Set();
   spans.forEach(function(s){
+    if (checked.has(s.id)) return;
     var seen = new Set([s.id]), parent = s.parentId;
     while (parent && byId.has(parent)){
       if (seen.has(parent)) throw new Error('Parent cycle at span ' + s.id);
+      if (checked.has(parent)) break;
       seen.add(parent); parent = byId.get(parent).parentId;
     }
+    seen.forEach(function(id){ checked.add(id); });
   });
   spans.sort(function(a, b){ return a.time - b.time || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
   var start = spans[0].time, round = function(n){ return Math.round(n * 1000) / 1000; };
@@ -167,9 +193,54 @@ function traceToSpec(input, options){
     return parent && (s.time < parent.time || s.time + s.ms > parent.time + parent.ms + 0.001);
   });
   if (skew.length) warnings.push(skew.length + ' child span(s) extend outside their parent interval (async work or clock skew); original timing retained.');
+  var sourceSpans=spans, sourceStats=traceSpanStats(spans,selected), focus=null;
+  var rootId=options.rootSpanId, service=options.service;
+  if (rootId != null && (typeof rootId!=='string' || !rootId.trim())) throw new Error('Subtree focus needs a non-empty span ID.');
+  if (service != null && (typeof service!=='string' || !service.trim())) throw new Error('Service focus needs a non-empty service name.');
+  if (rootId != null && service != null) throw new Error('Choose either a subtree or a service focus, not both.');
+  if (rootId != null || service != null){
+    var seeds=rootId != null ? spans.filter(function(s){ return s.id===rootId; }) : spans.filter(function(s){ return s.service===service; });
+    if (!seeds.length) throw new Error(rootId != null ? 'No span matches subtree ID: '+rootId : 'No spans match service: '+service);
+    var children=new Map(), included=new Set(), queue=seeds.slice();
+    spans.forEach(function(s){ if (!children.has(s.parentId)) children.set(s.parentId,[]); children.get(s.parentId).push(s); });
+    for (var qi=0; qi<queue.length; qi++){
+      var s=queue[qi]; if (included.has(s.id)) continue;
+      included.add(s.id); (children.get(s.id)||[]).forEach(function(c){ queue.push(c); });
+    }
+    spans=spans.filter(function(s){ return included.has(s.id); });
+    var offset=spans[0].startMs, boundary=spans.filter(function(s){ return s.parentId && byId.has(s.parentId) && !included.has(s.parentId); });
+    var ancestors=[], parent=rootId != null ? byId.get(rootId).parentId : null;
+    while (parent && byId.has(parent)){
+      var ancestor=byId.get(parent); ancestors.push({id:ancestor.id,service:ancestor.service,name:ancestor.name}); parent=ancestor.parentId;
+    }
+    ancestors.reverse();
+    focus={kind:rootId != null?'subtree':'service',value:rootId != null?rootId:service,
+      omittedSpans:sourceSpans.length-spans.length,boundarySpans:boundary.length,viewOffsetMs:offset,
+      ancestors:ancestors.slice(-8),omittedAncestors:Math.max(0,ancestors.length-8)};
+    warnings=warnings.map(function(w){ return 'Source export: '+w; });
+    warnings.unshift('Focused '+focus.kind+' '+focus.value+': '+spans.length+' of '+sourceSpans.length+' source spans included; '+focus.omittedSpans+' omitted. All exported descendants of included spans are retained.');
+    if (boundary.length) warnings.push(boundary.length+' included span(s) have parents outside this focus. Original parent IDs are retained; no replacement parent or service arrow was invented.');
+    warnings.push('Timing origin is +'+offset+' ms from the earliest source span. Durations and relative timing are unchanged.');
+    spans=spans.map(function(s){ return Object.assign({},s,{traceStartMs:s.startMs,startMs:round(s.startMs-offset)}); });
+  }
+  var stats=traceSpanStats(spans,selected);
+  if (focus) focus.omittedServices=sourceStats.services-stats.services;
+  var blocked=stats.spans>200 ? 'This selection has '+stats.spans+' spans; diagrams support up to 200. Choose a narrower subtree or service (nothing was truncated).' :
+    stats.services>30 ? 'This selection spans '+stats.services+' services; choose a focus with at most 30 services (nothing was truncated).' : null;
+  return {spans:spans,sourceSpans:sourceSpans,sourceStats:sourceStats,stats:stats,traceId:selected,source:source,
+    roots:roots,warnings:warnings,focus:focus,canBuild:!blocked,blocked:blocked,subtreeSizes:traceSubtreeSizes(sourceSpans)};
+}
+
+function traceToSpec(input, options){
+  options=options||{};
+  var plan=tracePreview(input,options);
+  if (!plan.canBuild) throw new Error(plan.blocked);
+  var spans=plan.spans, warnings=plan.warnings, source=plan.source, selected=plan.traceId, roots=plan.roots;
+  var byId=new Map(), allServices=new Map();
+  spans.forEach(function(s){ byId.set(s.id,s); });
+  plan.sourceSpans.forEach(function(s){ if (!allServices.has(s.service)) allServices.set(s.service,'svc'+(allServices.size+1)); });
   var services = new Map();
-  spans.forEach(function(s){ if (!services.has(s.service)) services.set(s.service, 'svc' + (services.size + 1)); });
-  if (services.size > 30) throw new Error('This trace spans ' + services.size + ' services; focus the export to at most 30 services for a readable board.');
+  spans.forEach(function(s){ if (!services.has(s.service)) services.set(s.service,allServices.get(s.service)); });
   var nodes = {}, ids = [], edges = [], pairs = new Set();
   services.forEach(function(id, service){
     ids.push(id); nodes[id] = {title: service, sub: 'observed service', icon: 'server', tint: 'cmd'};
@@ -181,7 +252,7 @@ function traceToSpec(input, options){
     var from = services.get(parent.service), to = services.get(s.service), key = from + '->' + to;
     if (!pairs.has(key)){ pairs.add(key); edges.push({from: from, to: to, kind: 'trace'}); }
   });
-  var elapsed = round(Math.max.apply(null, spans.map(function(s){ return s.startMs + s.ms; })));
+  var elapsed = plan.stats.elapsedMs;
   var timing = {id: 'timing', type: 'waterfall', title: 'Observed span timing',
     spans: spans.map(function(s){ return {id: s.id, label: s.service + ' · ' + s.name, ms: s.ms, startMs: s.startMs, error: s.error}; })};
   var details = {id: 'span', type: 'table', title: 'Selected span', columns: [{id: 'field', label: 'Field'}, {id: 'value', label: 'Observed value'}]};
@@ -191,6 +262,7 @@ function traceToSpec(input, options){
   var steps = spans.map(function(s){
     var facts = [['span_id', s.id], ['parent_id', s.parentId], ['service', s.service], ['operation', s.name],
       ['start_ms', s.startMs], ['duration_ms', s.ms], ['error', s.error ? 'recorded error' : 'not flagged']];
+    if (plan.focus) facts.splice(5,0,['trace_start_ms',s.traceStartMs]);
     var st = {id: s.id, nodes: [services.get(s.service)],
       text: '+' + s.startMs + ' ms · ' + s.service + ' · ' + s.name + ' · duration ' + s.ms + ' ms' + (s.error ? ' · recorded error' : ''),
       panels: {timing: {highlight: s.id}, internal:{selected:s.id}, span: {rows: facts.map(function(f){ return {id: f[0], cells: {field: f[0], value: f[1]}}; })}}};
@@ -206,7 +278,12 @@ function traceToSpec(input, options){
     'This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success.'],
     bullets: warnings.slice(), diagram: {view: 'step', routing: 'lanes', nodes: nodes, rows: rows, edges: edges, panels: [timing, internal, details], steps: steps}};
   if (source) section.source = source;
-  return {spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'aurora',
+  var result={spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'aurora',
     protocols: edges.length ? {trace: {label: 'Span parent relationship', color: '#38BDF8'}} : {}, blocks: [section]}},
-    warnings: warnings, stats: {traceId: selected, spans: spans.length, services: services.size, elapsedMs: elapsed}};
+    warnings: warnings, stats: plan.stats};
+  if (plan.focus){
+    result.spec.page.traceImport={traceId:selected,sourceSpans:plan.sourceStats.spans,includedSpans:spans.length,focus:plan.focus};
+    section.heading='Observed request · '+plan.focus.kind+' '+plan.focus.value;
+  }
+  return result;
 }

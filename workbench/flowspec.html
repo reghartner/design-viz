@@ -90,6 +90,13 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .tracebox label small{color:var(--sub);}
 .tracebox .fctl{display:block; width:100%; box-sizing:border-box;}
 #trace-feedback{font-size:12px; color:var(--accent); overflow-wrap:anywhere; margin-top:8px;}
+.tracebox label[hidden]{display:none;}
+.tracebox select.fctl{font:inherit;padding:6px;}
+#trace-preview-box{border-top:1px solid var(--line);margin-top:10px;padding-top:8px;overflow-wrap:anywhere;}
+#trace-summary{font-weight:600;}#trace-warnings{padding-left:18px;font-size:11px;color:var(--sub);}
+#trace-search-results{max-height:220px;overflow:auto;display:grid;gap:5px;}
+.trace-result{display:grid;gap:3px;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;}
+.trace-result small{font-size:10px;color:var(--sub);}
 .toolrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
 .skbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
   padding:6px 12px; border-radius:8px; cursor:pointer;}
@@ -4549,7 +4556,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
       <div class="diffbox" id="diffbox" hidden></div>
       <div class="tracebox" id="tracebox" hidden>
         <b>Honeycomb trace → diagram</b>
-        <p>Paste event JSON or open an export. Conversion runs locally. The imported spec replaces the editor in one undo step.</p>
+        <p>Paste event JSON or open an export, preview its size, then choose all exported spans or a focused branch. Conversion runs locally. Build diagram replaces the editor in one undo step.</p>
         <button class="bbtn" id="trace-open">open trace JSON…</button>
         <input type="file" id="trace-file" accept=".json,application/json" hidden>
         <label>Trace events<textarea class="fctl" id="trace-text" rows="5" spellcheck="false" placeholder='[{"trace.trace_id":"…", "trace.span_id":"…", "duration_ms":20, …}]'></textarea></label>
@@ -4559,8 +4566,21 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
           <p>Default fields: trace.trace_id, trace.span_id, trace.parent_id, service.name, name, timestamp, duration_ms, error. Override only the fields that differ. Time is ISO with timezone or Unix seconds; duration is milliseconds.</p>
           <textarea class="fctl" id="trace-fields" rows="3" aria-label="Trace field mapping" placeholder='{"service":"app.service", "timestamp":"time"}'></textarea>
         </details>
+        <label>Import scope<select class="fctl" id="trace-scope"><option value="all">All exported spans</option><option value="subtree">One span and its descendants</option><option value="service">One service and its descendants</option></select></label>
+        <label id="trace-root-label" hidden>Root span ID<input class="fctl" id="trace-root" type="text" placeholder="Exact span ID, or choose a search result below"></label>
+        <label id="trace-service-label" hidden>Service name<input class="fctl" id="trace-service" type="text" list="trace-services" placeholder="Exact service name"></label>
+        <datalist id="trace-services"></datalist>
+        <p>Focus keeps exported descendants so included spans retain child timing. Parent IDs at the boundary remain unchanged.</p>
+        <div class="specrow"><button class="bbtn" id="trace-preview">Preview trace</button><button class="bbtn" id="trace-clear-focus" hidden>Clear focus</button></div>
         <div id="trace-feedback" role="status"></div>
-        <div class="specrow"><button class="rbtn" id="trace-convert">Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
+        <div id="trace-preview-box" hidden>
+          <p id="trace-summary"></p><p id="trace-breadcrumbs"></p>
+          <ul id="trace-warnings"></ul>
+          <label>Find a span<input class="fctl" id="trace-search" type="search" placeholder="Span ID, operation, service, or recorded error"></label>
+          <p id="trace-search-count"></p>
+          <div id="trace-search-results" aria-label="Trace subtree choices"></div>
+        </div>
+        <div class="specrow"><button class="rbtn" id="trace-convert" disabled>Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
       </div>
       <details class="ssec" id="sec-outline">
         <summary>document outline <small>⌘/Ctrl K</small></summary>
@@ -10950,7 +10970,30 @@ function traceRows(ids, edges){
   return rows.map(function(row,i){ return i%2 ? row.reverse() : row; });
 }
 
-function traceToSpec(input, options){
+function traceSpanStats(spans, traceId){
+  var extent=0, services=new Set();
+  spans.forEach(function(s){ services.add(s.service); extent=Math.max(extent,s.startMs+s.ms); });
+  return {traceId:traceId,spans:spans.length,services:services.size,elapsedMs:Math.round(extent*1000)/1000};
+}
+
+function traceSubtreeSizes(spans){
+  var sizes=new Map(), pending=new Map(), parents=new Map(), queue=[];
+  spans.forEach(function(s){ sizes.set(s.id,1); pending.set(s.id,0); parents.set(s.id,s.parentId); });
+  spans.forEach(function(s){ if (pending.has(s.parentId)) pending.set(s.parentId,pending.get(s.parentId)+1); });
+  pending.forEach(function(count,id){ if (!count) queue.push(id); });
+  for (var i=0;i<queue.length;i++){
+    var id=queue[i], parent=parents.get(id);
+    if (!sizes.has(parent)) continue;
+    sizes.set(parent,sizes.get(parent)+sizes.get(id));
+    pending.set(parent,pending.get(parent)-1); if (!pending.get(parent)) queue.push(parent);
+  }
+  return sizes;
+}
+
+/* Analyze first, without building any board or silently trimming the source.
+   Every focused span retains all exported descendants, so filtering cannot
+   remove an included span's direct children from its timing calculation. */
+function tracePreview(input, options){
   options = options || {};
   var warnings = [], own = function(o, k){ return o && Object.prototype.hasOwnProperty.call(o, k); };
   var object = function(o){ return !!o && typeof o === 'object' && !Array.isArray(o); };
@@ -11013,7 +11056,6 @@ function traceToSpec(input, options){
   if (!selected) selected = Array.from(traceIds)[0];
   candidates = candidates.filter(function(c){ return c.traceId === selected; });
   if (!candidates.length) throw new Error('No spans found for the selected trace.');
-  if (candidates.length > 200) throw new Error('This trace has ' + candidates.length + ' spans; the first version supports up to 200. Export a focused subtree (nothing was truncated).');
   if (ignored) warnings.push(ignored + ' non-span annotation(s) excluded.');
   if (traceIds.size > 1) warnings.push('Imported only trace ' + selected + '; other traces excluded.');
   var spans = candidates.map(function(c){
@@ -11035,12 +11077,16 @@ function traceToSpec(input, options){
     if (byId.has(s.id)) throw new Error('Duplicate span ID: ' + s.id);
     byId.set(s.id, s);
   });
+  var checked = new Set();
   spans.forEach(function(s){
+    if (checked.has(s.id)) return;
     var seen = new Set([s.id]), parent = s.parentId;
     while (parent && byId.has(parent)){
       if (seen.has(parent)) throw new Error('Parent cycle at span ' + s.id);
+      if (checked.has(parent)) break;
       seen.add(parent); parent = byId.get(parent).parentId;
     }
+    seen.forEach(function(id){ checked.add(id); });
   });
   spans.sort(function(a, b){ return a.time - b.time || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
   var start = spans[0].time, round = function(n){ return Math.round(n * 1000) / 1000; };
@@ -11057,9 +11103,54 @@ function traceToSpec(input, options){
     return parent && (s.time < parent.time || s.time + s.ms > parent.time + parent.ms + 0.001);
   });
   if (skew.length) warnings.push(skew.length + ' child span(s) extend outside their parent interval (async work or clock skew); original timing retained.');
+  var sourceSpans=spans, sourceStats=traceSpanStats(spans,selected), focus=null;
+  var rootId=options.rootSpanId, service=options.service;
+  if (rootId != null && (typeof rootId!=='string' || !rootId.trim())) throw new Error('Subtree focus needs a non-empty span ID.');
+  if (service != null && (typeof service!=='string' || !service.trim())) throw new Error('Service focus needs a non-empty service name.');
+  if (rootId != null && service != null) throw new Error('Choose either a subtree or a service focus, not both.');
+  if (rootId != null || service != null){
+    var seeds=rootId != null ? spans.filter(function(s){ return s.id===rootId; }) : spans.filter(function(s){ return s.service===service; });
+    if (!seeds.length) throw new Error(rootId != null ? 'No span matches subtree ID: '+rootId : 'No spans match service: '+service);
+    var children=new Map(), included=new Set(), queue=seeds.slice();
+    spans.forEach(function(s){ if (!children.has(s.parentId)) children.set(s.parentId,[]); children.get(s.parentId).push(s); });
+    for (var qi=0; qi<queue.length; qi++){
+      var s=queue[qi]; if (included.has(s.id)) continue;
+      included.add(s.id); (children.get(s.id)||[]).forEach(function(c){ queue.push(c); });
+    }
+    spans=spans.filter(function(s){ return included.has(s.id); });
+    var offset=spans[0].startMs, boundary=spans.filter(function(s){ return s.parentId && byId.has(s.parentId) && !included.has(s.parentId); });
+    var ancestors=[], parent=rootId != null ? byId.get(rootId).parentId : null;
+    while (parent && byId.has(parent)){
+      var ancestor=byId.get(parent); ancestors.push({id:ancestor.id,service:ancestor.service,name:ancestor.name}); parent=ancestor.parentId;
+    }
+    ancestors.reverse();
+    focus={kind:rootId != null?'subtree':'service',value:rootId != null?rootId:service,
+      omittedSpans:sourceSpans.length-spans.length,boundarySpans:boundary.length,viewOffsetMs:offset,
+      ancestors:ancestors.slice(-8),omittedAncestors:Math.max(0,ancestors.length-8)};
+    warnings=warnings.map(function(w){ return 'Source export: '+w; });
+    warnings.unshift('Focused '+focus.kind+' '+focus.value+': '+spans.length+' of '+sourceSpans.length+' source spans included; '+focus.omittedSpans+' omitted. All exported descendants of included spans are retained.');
+    if (boundary.length) warnings.push(boundary.length+' included span(s) have parents outside this focus. Original parent IDs are retained; no replacement parent or service arrow was invented.');
+    warnings.push('Timing origin is +'+offset+' ms from the earliest source span. Durations and relative timing are unchanged.');
+    spans=spans.map(function(s){ return Object.assign({},s,{traceStartMs:s.startMs,startMs:round(s.startMs-offset)}); });
+  }
+  var stats=traceSpanStats(spans,selected);
+  if (focus) focus.omittedServices=sourceStats.services-stats.services;
+  var blocked=stats.spans>200 ? 'This selection has '+stats.spans+' spans; diagrams support up to 200. Choose a narrower subtree or service (nothing was truncated).' :
+    stats.services>30 ? 'This selection spans '+stats.services+' services; choose a focus with at most 30 services (nothing was truncated).' : null;
+  return {spans:spans,sourceSpans:sourceSpans,sourceStats:sourceStats,stats:stats,traceId:selected,source:source,
+    roots:roots,warnings:warnings,focus:focus,canBuild:!blocked,blocked:blocked,subtreeSizes:traceSubtreeSizes(sourceSpans)};
+}
+
+function traceToSpec(input, options){
+  options=options||{};
+  var plan=tracePreview(input,options);
+  if (!plan.canBuild) throw new Error(plan.blocked);
+  var spans=plan.spans, warnings=plan.warnings, source=plan.source, selected=plan.traceId, roots=plan.roots;
+  var byId=new Map(), allServices=new Map();
+  spans.forEach(function(s){ byId.set(s.id,s); });
+  plan.sourceSpans.forEach(function(s){ if (!allServices.has(s.service)) allServices.set(s.service,'svc'+(allServices.size+1)); });
   var services = new Map();
-  spans.forEach(function(s){ if (!services.has(s.service)) services.set(s.service, 'svc' + (services.size + 1)); });
-  if (services.size > 30) throw new Error('This trace spans ' + services.size + ' services; focus the export to at most 30 services for a readable board.');
+  spans.forEach(function(s){ if (!services.has(s.service)) services.set(s.service,allServices.get(s.service)); });
   var nodes = {}, ids = [], edges = [], pairs = new Set();
   services.forEach(function(id, service){
     ids.push(id); nodes[id] = {title: service, sub: 'observed service', icon: 'server', tint: 'cmd'};
@@ -11071,7 +11162,7 @@ function traceToSpec(input, options){
     var from = services.get(parent.service), to = services.get(s.service), key = from + '->' + to;
     if (!pairs.has(key)){ pairs.add(key); edges.push({from: from, to: to, kind: 'trace'}); }
   });
-  var elapsed = round(Math.max.apply(null, spans.map(function(s){ return s.startMs + s.ms; })));
+  var elapsed = plan.stats.elapsedMs;
   var timing = {id: 'timing', type: 'waterfall', title: 'Observed span timing',
     spans: spans.map(function(s){ return {id: s.id, label: s.service + ' · ' + s.name, ms: s.ms, startMs: s.startMs, error: s.error}; })};
   var details = {id: 'span', type: 'table', title: 'Selected span', columns: [{id: 'field', label: 'Field'}, {id: 'value', label: 'Observed value'}]};
@@ -11081,6 +11172,7 @@ function traceToSpec(input, options){
   var steps = spans.map(function(s){
     var facts = [['span_id', s.id], ['parent_id', s.parentId], ['service', s.service], ['operation', s.name],
       ['start_ms', s.startMs], ['duration_ms', s.ms], ['error', s.error ? 'recorded error' : 'not flagged']];
+    if (plan.focus) facts.splice(5,0,['trace_start_ms',s.traceStartMs]);
     var st = {id: s.id, nodes: [services.get(s.service)],
       text: '+' + s.startMs + ' ms · ' + s.service + ' · ' + s.name + ' · duration ' + s.ms + ' ms' + (s.error ? ' · recorded error' : ''),
       panels: {timing: {highlight: s.id}, internal:{selected:s.id}, span: {rows: facts.map(function(f){ return {id: f[0], cells: {field: f[0], value: f[1]}}; })}}};
@@ -11096,9 +11188,14 @@ function traceToSpec(input, options){
     'This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success.'],
     bullets: warnings.slice(), diagram: {view: 'step', routing: 'lanes', nodes: nodes, rows: rows, edges: edges, panels: [timing, internal, details], steps: steps}};
   if (source) section.source = source;
-  return {spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'aurora',
+  var result={spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'aurora',
     protocols: edges.length ? {trace: {label: 'Span parent relationship', color: '#38BDF8'}} : {}, blocks: [section]}},
-    warnings: warnings, stats: {traceId: selected, spans: spans.length, services: services.size, elapsedMs: elapsed}};
+    warnings: warnings, stats: plan.stats};
+  if (plan.focus){
+    result.spec.page.traceImport={traceId:selected,sourceSpans:plan.sourceStats.spans,includedSpans:spans.length,focus:plan.focus};
+    section.heading='Observed request · '+plan.focus.kind+' '+plan.focus.value;
+  }
+  return result;
 }
 /* ---- src/builder.workbench.js ---- */
 /* builder.workbench.js — workbench builder: click a rendered element to jump
@@ -13843,6 +13940,84 @@ function initWorkbenchBuilder(opts){
     var traceText = document.getElementById('trace-text');
     var traceFeedback = document.getElementById('trace-feedback');
     var traceFile = document.getElementById('trace-file');
+    var traceScope = document.getElementById('trace-scope'), traceRoot = document.getElementById('trace-root');
+    var traceService = document.getElementById('trace-service'), traceBuild = document.getElementById('trace-convert');
+    var tracePreviewBox = document.getElementById('trace-preview-box'), traceSearch = document.getElementById('trace-search');
+    var traceAnalysis = null, traceSnapshot = null, traceFileVersion = 0, traceReading = false;
+    function traceOptions(){
+      var mapping = document.getElementById('trace-fields').value.trim();
+      return {traceId:document.getElementById('trace-id').value.trim() || undefined,
+        sourceUrl:document.getElementById('trace-url').value.trim(),fields:mapping ? JSON.parse(mapping) : undefined,
+        rootSpanId:traceScope.value==='subtree' ? traceRoot.value : undefined,
+        service:traceScope.value==='service' ? traceService.value : undefined};
+    }
+    function traceFingerprint(){
+      return JSON.stringify([traceText.value,document.getElementById('trace-id').value,document.getElementById('trace-url').value,
+        document.getElementById('trace-fields').value,traceScope.value,traceRoot.value,traceService.value]);
+    }
+    function updateTraceScope(){
+      document.getElementById('trace-root-label').hidden=traceScope.value!=='subtree';
+      document.getElementById('trace-service-label').hidden=traceScope.value!=='service';
+      document.getElementById('trace-clear-focus').hidden=traceScope.value==='all';
+    }
+    function invalidateTrace(){
+      traceAnalysis=null; traceSnapshot=null; traceBuild.disabled=true; tracePreviewBox.hidden=true;
+      traceFeedback.textContent='Preview the current input and scope before building.';
+    }
+    function renderTraceSearch(){
+      var results=document.getElementById('trace-search-results'); results.textContent='';
+      if (!traceAnalysis) return;
+      var terms=traceSearch.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      var matches=traceAnalysis.sourceSpans.filter(function(s){
+        var text=(s.id+' '+s.service+' '+s.name+(s.error?' recorded error':'')).toLowerCase();
+        return terms.every(function(term){ return text.indexOf(term)>=0; });
+      });
+      document.getElementById('trace-search-count').textContent=matches.length+' matching span(s); showing '+Math.min(25,matches.length)+'. Choose a row to preview that subtree.';
+      matches.slice(0,25).forEach(function(s){
+        var button=document.createElement('button'); button.type='button'; button.className='bbtn trace-result';
+        button.setAttribute('aria-label','Focus subtree at '+s.id);
+        var title=document.createElement('span'); title.textContent=s.service+' · '+s.name+(s.error?' · ERROR':'');
+        var detail=document.createElement('small'); detail.textContent=s.id+' · +'+s.startMs+' ms · '+s.ms+' ms duration · '+traceAnalysis.subtreeSizes.get(s.id)+' span(s) in subtree';
+        button.appendChild(title); button.appendChild(detail);
+        button.addEventListener('click',function(){
+          traceScope.value='subtree'; traceRoot.value=s.id; updateTraceScope(); previewTrace();
+          document.getElementById('trace-preview').focus();
+        });
+        results.appendChild(button);
+      });
+    }
+    function previewTrace(){
+      invalidateTrace();
+      try {
+        if (traceReading) throw new Error('The trace file is still loading. Preview it when loading finishes.');
+        if (traceText.value.length>10*1024*1024) throw new Error('Use a trace export smaller than 10 MB.');
+        traceAnalysis=tracePreview(traceText.value,traceOptions()); traceSnapshot=traceFingerprint();
+      } catch(ex){ traceFeedback.textContent=ex.message; return; }
+      var a=traceAnalysis, stats=a.stats, original=a.sourceStats;
+      document.getElementById('trace-summary').textContent='Source export: '+original.spans+' spans · '+original.services+' services · '+original.elapsedMs+' ms. Selection: '+stats.spans+' spans · '+stats.services+' services · '+stats.elapsedMs+' ms; '+(original.spans-stats.spans)+' spans omitted.';
+      var breadcrumbs=document.getElementById('trace-breadcrumbs'); breadcrumbs.textContent='';
+      if (a.focus && a.focus.kind==='subtree') breadcrumbs.textContent='Branch: '+(a.focus.omittedAncestors ? '… → ' : '')+
+        a.focus.ancestors.map(function(s){ return s.service+' / '+s.name+' ['+s.id+']'; }).concat([a.focus.value]).join(' → ');
+      var warnings=document.getElementById('trace-warnings'); warnings.textContent='';
+      a.warnings.forEach(function(w){ var li=document.createElement('li'); li.textContent=w; warnings.appendChild(li); });
+      var names=new Map(); a.sourceSpans.forEach(function(s){ names.set(s.service,(names.get(s.service)||0)+1); });
+      var suggestions=document.getElementById('trace-services'); suggestions.textContent='';
+      Array.from(names.keys()).slice(0,100).forEach(function(name){
+        var option=document.createElement('option'); option.value=name; option.label=names.get(name)+' own span(s)'; suggestions.appendChild(option);
+      });
+      tracePreviewBox.hidden=false; traceBuild.disabled=!a.canBuild;
+      traceFeedback.textContent=a.blocked || 'Ready to build. The current document has not changed.';
+      renderTraceSearch();
+    }
+    ['trace-text','trace-id','trace-url','trace-fields','trace-root','trace-service'].forEach(function(id){
+      document.getElementById(id).addEventListener('input',function(){ if (id==='trace-text'){ traceFileVersion++; traceReading=false; } invalidateTrace(); });
+    });
+    traceScope.addEventListener('change',function(){ updateTraceScope(); invalidateTrace(); });
+    traceSearch.addEventListener('input',renderTraceSearch);
+    document.getElementById('trace-preview').addEventListener('click',previewTrace);
+    document.getElementById('trace-clear-focus').addEventListener('click',function(){
+      traceScope.value='all'; traceRoot.value=''; traceService.value=''; updateTraceScope(); previewTrace();
+    });
     function closeTrace(){ traceBox.hidden = true; traceBtn.setAttribute('aria-expanded', 'false'); traceBtn.focus(); }
     traceBtn.addEventListener('click', function(){
       traceBox.hidden = !traceBox.hidden;
@@ -13855,19 +14030,20 @@ function initWorkbenchBuilder(opts){
     traceFile.addEventListener('change', function(){
       var file = traceFile.files[0];
       if (!file) return;
+      var version=++traceFileVersion; traceReading=false; invalidateTrace();
       if (file.size > 10 * 1024 * 1024){ traceFeedback.textContent = 'Use a trace export smaller than 10 MB.'; traceFile.value = ''; return; }
       var reader = new FileReader();
-      reader.onload = function(){ traceText.value = String(reader.result); traceFeedback.textContent = 'Loaded ' + file.name; };
-      reader.onerror = function(){ traceFeedback.textContent = 'Could not read the trace file.'; };
+      traceReading=true; traceFeedback.textContent='Loading '+file.name+'…';
+      reader.onload = function(){ if (version!==traceFileVersion) return; traceReading=false; traceText.value = String(reader.result); invalidateTrace(); traceFeedback.textContent = 'Loaded ' + file.name + '. Preview to inspect the export.'; };
+      reader.onerror = function(){ if (version===traceFileVersion){ traceReading=false; traceFeedback.textContent = 'Could not read the trace file.'; } };
       reader.readAsText(file); traceFile.value = '';
     });
     document.getElementById('trace-convert').addEventListener('click', function(){
       var result;
       try {
+        if (!traceSnapshot || traceSnapshot!==traceFingerprint() || !traceAnalysis || !traceAnalysis.canBuild){ invalidateTrace(); return; }
         if (traceText.value.length > 10 * 1024 * 1024) throw new Error('Use a trace export smaller than 10 MB.');
-        var mapping = document.getElementById('trace-fields').value.trim();
-        result = traceToSpec(traceText.value, {traceId: document.getElementById('trace-id').value.trim() || undefined,
-          sourceUrl: document.getElementById('trace-url').value.trim(), fields: mapping ? JSON.parse(mapping) : undefined});
+        result = traceToSpec(traceText.value, traceOptions());
         var verdict = validate(normalize(result.spec));
         if (verdict.errors.length) throw new Error(verdict.errors.join('\n'));
       } catch (ex){ traceFeedback.textContent = ex.message; return; }

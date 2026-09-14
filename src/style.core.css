@@ -4123,3 +4123,19 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .termbar.has-paths .stepline {flex-basis:100%}
 .termbar.has-paths .tbtn:disabled {opacity:.3;cursor:default}
 @media(max-width:640px){.path-matrix{grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),34px)}.path-matrix .path-chip{max-width:140px;min-height:34px}.termbar.has-paths .path-row .schip{width:34px;height:34px}}
+
+/* No full-edge arrow or successful packet is shown for a failed attempt. */
+.comm-failure,.comm-status {--comm-color:#fb923c;color:var(--comm-color)}
+.sk-daylight .comm-failure,.sk-daylight .comm-status,
+.sk-editorial .comm-failure,.sk-editorial .comm-status,
+.sk-pastel .comm-failure,.sk-pastel .comm-status {--comm-color:#a44205}
+.stepmode .comm-hidden {opacity:0 !important;animation:none !important;pointer-events:none}
+.comm-segment {fill:none;stroke:var(--comm-color);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.comm-after,.comm-blocked .comm-before {stroke:var(--dfaint,#7e93b8);stroke-dasharray:4 6;opacity:.4}
+.comm-break {fill:none;stroke:var(--comm-color);stroke-width:3;stroke-linecap:round}
+.stepmode .comm-label {opacity:1;fill:var(--dink)}
+.comm-packet {fill:var(--comm-color) !important;filter:drop-shadow(0 0 4px var(--comm-color)) !important}
+.comm-status {display:block;font-weight:600;font-size:11px;margin-top:7px}
+.comm-status[hidden] {display:none}
+@media(prefers-reduced-motion:reduce){.comm-packet{display:none !important}}
+@media print{.comm-failure{display:none !important}.stepmode .comm-hidden{opacity:1 !important}}

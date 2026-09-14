@@ -1,5 +1,18 @@
 # Changelog
 
+## Failed communications (2026-09-14)
+
+- Steps can mark existing edges as dropped in transit or not sent with
+  `failures`. A dropped packet stops at an orange break and fades; a blocked
+  send has a stop marker and no packet. Static markers and caption text keep
+  the outcomes readable with reduced motion.
+- Failed hops suppress successful delivery and automatic receiver focus,
+  while other fan-out branches can deliver. Effects clear on step/path
+  changes and Ambient. The alternate-path starter now shows the radio break.
+- Per-hop Delivery controls and Add failed communication support source
+  editing, undo, and node/edge reference cascades. See
+  [Failed communications](docs/failed-communications.md).
+
 ## Alternate execution paths (2026-09-14)
 
 - Added `diagram.paths`: named, colored sequences referencing shared steps.

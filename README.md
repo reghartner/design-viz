@@ -14,6 +14,10 @@ outcomes on one diagram. Colored path rows align their step numbers beneath the 
 and panel state follow the selected sequence and stop at its own ending.
 Try **starters… → alternate paths**, or fork a beat in **story steps**.
 
+**[Failed communications](docs/failed-communications.md):** show a packet
+dropped in transit or a communication that was never sent, using broken
+edges on the same diagram. Choose an outcome with each step's **Delivery** control.
+
 **New: [Honeycomb trace → diagram](docs/trace-import.md).** In the workbench,
 choose **import trace…**, paste or open event JSON, and **Build diagram**.
 The result is a service board, an offset-aware waterfall, and a step for each

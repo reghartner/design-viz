@@ -38,7 +38,7 @@ function loadBuilder(extraGlobals){
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const core = {};
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8'), core);
-  const sandbox = {console, sanitizedGroupParents: core.sanitizedGroupParents};
+  const sandbox = {console, sanitizedGroupParents: core.sanitizedGroupParents, stepFailures: core.stepFailures};
   if (extraGlobals) Object.assign(sandbox, extraGlobals);
   vm.runInNewContext(code, sandbox);
   return sandbox.__exports;

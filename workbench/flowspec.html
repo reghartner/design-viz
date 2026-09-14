@@ -14248,6 +14248,31 @@ function planStepCommunication(text,raw,sectionIdx,stepIdx,key,outcome){
   });
 }
 
+var STEP_TONE_TOKENS = ['alert', 'warn', 'ok', 'dim', 'base'];
+function planStepTone(text, raw, sectionIdx, stepIdx, nodeId, tokenOrNull){
+  var got = builderStepAt(raw, sectionIdx, stepIdx);
+  if (!got) return {error: 'step not found — reselect and try again'};
+  if (!(got.d.nodes && Object.prototype.hasOwnProperty.call(got.d.nodes, nodeId)))
+    return {error: 'no node "' + nodeId + '" in this diagram'};
+  if (tokenOrNull != null && STEP_TONE_TOKENS.indexOf(tokenOrNull) < 0)
+    return {error: 'tone must be one of ' + STEP_TONE_TOKENS.join(', ')};
+  return builderRewrite(text, raw, got.path, function(st){
+    var tone = Object.create(null);
+    /* tolerant read (not stepTonePatch: that helper lives in the validator
+       bundle, and this file is unit-tested standalone) */
+    var cur = (st.tone && typeof st.tone === 'object' && !Array.isArray(st.tone)) ? st.tone : {};
+    Object.keys(cur).forEach(function(k){ tone[k] = cur[k]; });
+    if (tokenOrNull == null) delete tone[nodeId];
+    else tone[nodeId] = tokenOrNull;
+    var keys = Object.keys(tone);
+    if (keys.length){
+      var plainTone = {};
+      keys.forEach(function(k){ plainTone[k] = tone[k]; });
+      st.tone = plainTone;
+    } else delete st.tone;
+  });
+}
+
 function planStepToggleNode(text, raw, sectionIdx, stepIdx, nodeId){
   var got = builderStepAt(raw, sectionIdx, stepIdx);
   if (!got) return {error: 'step not found — reselect and try again'};
@@ -14714,6 +14739,7 @@ var BUILDER_GUIDES = {
       ['text', 'caption shown in the step bar'],
       ['lane', 'lane pill on the caption line — declare colors in page.lanes'],
       ['nodes', 'node ids to light directly (allows an edgeless step)'],
+      ['tone', 'node-color claims: {"gateway": "alert"} — alert warn ok dim; base (or null) clears; folds forward across steps'],
       ['panels', 'sparse widget patches: {"<panel id>": {..only what changed..}}'],
       ['link', 'permalink URL — source ↗ on the caption line']
     ]
@@ -15874,6 +15900,53 @@ function initWorkbenchBuilder(opts){
     rows.push(chipRow('nodes',
       (Array.isArray(val.nodes) ? val.nodes : []).map(function(n){ return {key: n, label: n}; }),
       'none', toggled(planStepToggleNode)));
+
+    /* ---- per-node tone patches: this step's node-color claims ---- */
+    var toneMap = (val.tone && typeof val.tone === 'object' && !Array.isArray(val.tone)) ? val.tone : {};
+    function toneSelect(id){
+      var input = document.createElement('select'); input.className = 'fctl';
+      [['', '(no patch)'],
+       ['alert', 'alert — failed / danger (red)'],
+       ['warn', 'warn — at risk / degraded (amber)'],
+       ['ok', 'ok — healthy / recovered (green)'],
+       ['dim', 'dim — inactive / de-emphasized'],
+       ['base', 'base — clear an inherited tone']].forEach(function(pair){
+        var option = document.createElement('option');
+        option.value = pair[0]; option.textContent = pair[1];
+        input.appendChild(option);
+      });
+      var cur = toneMap[id];
+      if (cur === null) input.value = 'base'; /* JSON null clears like base */
+      else if (typeof cur === 'string' && STEP_TONE_TOKENS.indexOf(cur) >= 0) input.value = cur;
+      else if (typeof cur === 'string'){
+        var extra = document.createElement('option');
+        extra.value = cur; extra.textContent = cur + ' (unknown)';
+        input.appendChild(extra); input.value = cur;
+      } else input.value = '';
+      input.addEventListener('change', function(){
+        commitCascade(function(raw){
+          return planStepTone(src.value, raw, t.section, t.index, id, input.value === '' ? null : input.value);
+        }, {after: function(){ renderInspector(); }});
+      });
+      return input;
+    }
+    Object.keys(toneMap).forEach(function(id){ rows.push(frow('tone · ' + id, toneSelect(id))); });
+    var addTone = document.createElement('select'); addTone.className = 'fctl';
+    var tonePh = document.createElement('option'); tonePh.value = ''; tonePh.textContent = 'Choose a node…';
+    addTone.appendChild(tonePh);
+    Object.keys((ctx.diagram && ctx.diagram.nodes) || {}).forEach(function(id){
+      if (Object.prototype.hasOwnProperty.call(toneMap, id)) return;
+      var option = document.createElement('option'); option.value = id; option.textContent = id;
+      addTone.appendChild(option);
+    });
+    addTone.disabled = addTone.children.length < 2;
+    addTone.addEventListener('change', function(){
+      if (!addTone.value) return;
+      commitCascade(function(raw){
+        return planStepTone(src.value, raw, t.section, t.index, addTone.value, 'alert');
+      }, {after: function(){ renderInspector(); }});
+    });
+    rows.push(frow('Add node tone', addTone));
     var pids = Object.keys(val.panels || {});
     rows.push(chipRow('panels',
       pids.map(function(pid){ return {key: pid, label: pid}; }),

@@ -31,7 +31,7 @@ function loadBuilder(extraGlobals){
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
     ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts, parseStarterManifest, buildExportHtml,' +
     ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE, planAddTabs, BUILDER_TABS_TEMPLATE,' +
-    ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
+    ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch, planStepTone,' +
     ' PANEL_SETUP_FIELDS, PANEL_PATCH_FIELDS, patchSummaryLine, panelPatchFields, patchFieldsCollect, SCENE_TOKENS,' +
     ' builderSectionPrefs,' +
     ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes, planStackNodes, builderDeletePlan, planBulkSetField, planBulkDelete, BUILDER_MULTI_KINDS,' +
@@ -3129,4 +3129,37 @@ test('homemap subject patch fields accept positions and explicit null', () => {
   subjects.push(null, {}, {id: 5, x: 1, y: 2}, {...subjects[0]}, {id: 'cam', x: 1, y: 2},
     {id: 'signals', x: 1, y: 2}, {id: 'bad', x: Infinity, y: 2});
   assert.deepStrictEqual(plain(B.panelPatchFields(decl)), plain(fields));
+});
+
+test('planStepTone sets, changes, and clears per-node tone patches on a step', () => {
+  const spec = {nodes: {gw: {}, db: {}}, rows: [['gw', 'db']],
+    steps: [{text: 'boom', edge: 'gw->db'}], edges: [{from: 'gw', to: 'db'}]};
+  let plan = B.planStepTone(JSON.stringify(spec), spec, 0, 0, 'gw', 'alert');
+  assert.ok(!plan.error, plan.error);
+  let next = JSON.parse(plan.text);
+  assert.deepStrictEqual(next.steps[0].tone, {gw: 'alert'});
+  plan = B.planStepTone(plan.text, next, 0, 0, 'db', 'dim');
+  next = JSON.parse(plan.text);
+  assert.deepStrictEqual(next.steps[0].tone, {gw: 'alert', db: 'dim'});
+  plan = B.planStepTone(plan.text, next, 0, 0, 'gw', 'base');
+  next = JSON.parse(plan.text);
+  assert.strictEqual(next.steps[0].tone.gw, 'base');
+  plan = B.planStepTone(plan.text, next, 0, 0, 'gw', null);
+  next = JSON.parse(plan.text);
+  assert.deepStrictEqual(next.steps[0].tone, {db: 'dim'});
+  plan = B.planStepTone(plan.text, next, 0, 0, 'db', null);
+  next = JSON.parse(plan.text);
+  assert.strictEqual(next.steps[0].tone, undefined);
+  assert.ok(B.planStepTone(JSON.stringify(spec), spec, 0, 0, 'nope', 'alert').error);
+  assert.ok(B.planStepTone(JSON.stringify(spec), spec, 0, 0, 'gw', 'purple').error);
+  assert.ok(B.planStepTone(JSON.stringify(spec), spec, 0, 9, 'gw', 'alert').error);
+});
+
+test('planStepTone tolerates a null-valued existing tone entry and preserves it for other nodes', () => {
+  const spec = {nodes: {gw: {}, db: {}}, rows: [['gw', 'db']],
+    steps: [{text: 'x', nodes: ['gw'], tone: {gw: null}}]};
+  const plan = B.planStepTone(JSON.stringify(spec), spec, 0, 0, 'db', 'warn');
+  assert.ok(!plan.error, plan.error);
+  const next = JSON.parse(plan.text);
+  assert.deepStrictEqual(next.steps[0].tone, {gw: null, db: 'warn'});
 });

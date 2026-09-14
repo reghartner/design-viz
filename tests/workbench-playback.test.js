@@ -71,6 +71,23 @@ test('standalone retains autoplay, manual navigation pauses, and reduced motion 
   assert.equal(quiet.intervals.size,0);
 });
 
+test('step picks tween like the arrows; restore jumps and the autoplay wrap stay settled',()=>{
+  const h=stepperHarness({autoplay:false}), s=h.stepper;
+  s.enterStep(false);
+  assert.equal(h.paints.at(-1).tween,false,'first paint is settled');
+  s.jumpSource(2);
+  assert.deepEqual({index:h.paints.at(-1).index,tween:h.paints.at(-1).tween},{index:2,tween:true},
+    'a distant step pick animates');
+  s.jump(0);
+  assert.equal(h.paints.at(-1).tween,false,'the restore/deep-link path stays settled');
+  h.term.btnPlay.fire('click');
+  h.tick();
+  assert.deepEqual({index:h.paints.at(-1).index,tween:h.paints.at(-1).tween},{index:1,tween:true});
+  h.tick(); h.tick();
+  assert.deepEqual({index:h.paints.at(-1).index,tween:h.paints.at(-1).tween},{index:0,tween:false},
+    'the autoplay wrap back to step 0 is a settled jump');
+});
+
 test('pause never repaints a focused panel and a queued old tick cannot advance it',()=>{
   const h=stepperHarness({autoplay:false});
   h.stepper.enterStep(false); h.term.btnPlay.fire('click');

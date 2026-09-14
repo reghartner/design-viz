@@ -260,12 +260,13 @@ test('derived backlink popover supports the complete keyboard focus walk-through
   assert.strictEqual(pop.hidden, true);
 });
 
-test('step tween decision: only adjacent forward/back narrative steps animate', () => {
+test('step tween decision: any move between two painted steps animates', () => {
   assert.strictEqual(C.shouldTweenStep(2, 3, false, true), true);
   assert.strictEqual(C.shouldTweenStep(3, 2, false, true), true);
   assert.strictEqual(C.shouldTweenStep(2, 2, false, true), false, 'same step is not a transition');
-  assert.strictEqual(C.shouldTweenStep(1, 4, false, true), false, 'distant jump is immediate');
-  assert.strictEqual(C.shouldTweenStep(4, 0, false, true), false, 'autoplay wrap is a jump');
+  assert.strictEqual(C.shouldTweenStep(1, 4, false, true), true, 'a distant step pick animates too');
+  assert.strictEqual(C.shouldTweenStep(4, 0, false, false), false,
+    'the autoplay wrap suppresses the narrative path at its call site');
   assert.strictEqual(C.shouldTweenStep(null, 0, false, true), false, 'first paint is immediate');
   assert.strictEqual(C.shouldTweenStep(0.5, 1, false, true), false, 'indices must be valid integers');
 });

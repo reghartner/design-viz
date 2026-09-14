@@ -2866,6 +2866,7 @@ function initWorkbenchBuilder(opts){
   }
   var selectedEl = null;
   var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
+  var inspectorScrollKey = null; /* target of the last-rendered inspector form */
   var invalidateEffectiveState = null;
   var insertSection = 0;    /* zero-based ordinal of the section inserts target */
   var undoStack = [];
@@ -4877,6 +4878,13 @@ function initWorkbenchBuilder(opts){
     hideDiff();
     if (!guide || !currentTarget) return;
     var t = currentTarget;
+    /* wiping the content clamps the .guide scroll box to the top, so a
+       form refresh after a control commit jumped the inspector. Keep the
+       scroll position when re-rendering the SAME element; a new
+       selection still starts at the top. */
+    var targetKey = JSON.stringify([t.kind, t.section, t.id, t.index, t.block, t.tab]);
+    var keepScroll = targetKey === inspectorScrollKey ? guide.scrollTop : null;
+    inspectorScrollKey = targetKey;
     revealInspector();
     guide.hidden = false;
     guide.innerHTML = '';
@@ -5052,6 +5060,7 @@ function initWorkbenchBuilder(opts){
       help.appendChild(tok);
     }
     guide.appendChild(help);
+    if (keepScroll != null) guide.scrollTop = keepScroll;
   }
 
   /* ================= selection ================= */

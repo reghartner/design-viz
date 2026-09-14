@@ -4,7 +4,7 @@
 
 var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
 var LEFT_X = 110, RIGHT_X = 885;
-var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone'];
+var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car'];
 var TINT_SET = ['cmd','auth','data','mqtt','dev'];
 /* Per-step node state is semantic narrative state, never an authored color.
    `base` is the explicit clearing token; null clears too. */
@@ -522,6 +522,14 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.floats[' + fi + '].side: unknown side "' + f.side + '" — using "above" (valid: above, below)');
   });
   var groups = (d.groups && typeof d.groups === 'object') ? d.groups : {};
+  Object.keys(groups).forEach(function(key){
+    var meta = groups[key];
+    if (!meta || !Object.prototype.hasOwnProperty.call(meta, 'icon')) return;
+    if (typeof meta.icon !== 'string')
+      warnings.push(DP + '.groups.' + key + '.icon: must be a string — icon ignored');
+    else if (ICON_SET.indexOf(meta.icon) < 0)
+      warnings.push(DP + '.groups.' + key + '.icon: unknown icon "' + meta.icon + '" — using "gear" (valid: ' + ICON_SET.join(' ') + ')');
+  });
   Object.keys(d.nodes).forEach(function(id){
     if (!placed[id]) warnings.push(DP + '.nodes.' + id + ': defined but not placed in rows or floats — it will not be drawn');
     var n = d.nodes[id] || {};

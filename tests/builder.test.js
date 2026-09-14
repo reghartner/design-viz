@@ -21,7 +21,7 @@ function loadBuilder(extraGlobals){
     ' builderUniqueKey, builderFlatRowIds,' +
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
     ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
-    ' planSetNodeGroup, planBulkSetGroup, planSetGroupTitle, planRenameGroup, planDeleteGroup,' +
+    ' planSetNodeGroup, planBulkSetGroup, planSetGroupTitle, planSetGroupIcon, planRenameGroup, planDeleteGroup,' +
     ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
     ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
     ' planMoveStep, planMoveRow, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
@@ -482,6 +482,34 @@ test('planSetGroupTitle edits declarations, blank-removes title, and tolerates u
   const d = JSON.parse(declared.text).page.blocks[0].diagram;
   assert.strictEqual(d.groups.orphan.title, 'Orphaned');
   assert.strictEqual(d.nodes.c.group, 'orphan');
+});
+
+test('planSetGroupIcon sets, replaces, and removes icons while preserving group metadata', () => {
+  const before = JSON.stringify(GROUPED);
+  const set = B.planSetGroupIcon(GROUPED_TEXT, GROUPED, 0, 'dev', 'house');
+  assert.ok(!set.error, set.error);
+  const raw = JSON.parse(set.text);
+  assert.deepStrictEqual(plain(raw.page.blocks[0].diagram.groups.dev), {title: 'Device', icon: 'house'});
+  assert.deepStrictEqual(plain(raw.page.blocks[0].diagram.groups.spare), {title: 'Spare'});
+  const replaced = B.planSetGroupIcon(set.text, raw, 0, 'dev', 'camera');
+  assert.strictEqual(JSON.parse(replaced.text).page.blocks[0].diagram.groups.dev.icon, 'camera');
+  for (const empty of [null, '', ' ']) {
+    const removed = B.planSetGroupIcon(set.text, raw, 0, 'dev', empty);
+    assert.deepStrictEqual(plain(JSON.parse(removed.text).page.blocks[0].diagram.groups.dev), {title: 'Device'});
+  }
+  assert.strictEqual(JSON.stringify(GROUPED), before, 'input is not mutated');
+});
+
+test('planSetGroupIcon declares missing groups and refuses missing keys', () => {
+  const declared = B.planSetGroupIcon(GROUPED_TEXT, GROUPED, 0, 'orphan', 'house');
+  const d = JSON.parse(declared.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(plain(d.groups.orphan), {icon: 'house'});
+  assert.strictEqual(d.nodes.c.group, 'orphan');
+  const raw = JSON.parse(GROUPED_TEXT);
+  delete raw.page.blocks[0].diagram.groups;
+  const created = B.planSetGroupIcon(JSON.stringify(raw), raw, 0, 'dev', 'house');
+  assert.deepStrictEqual(plain(JSON.parse(created.text).page.blocks[0].diagram.groups), {dev: {icon: 'house'}});
+  assert.match(B.planSetGroupIcon(GROUPED_TEXT, GROUPED, 0, '', 'house').error, /needs a key/);
 });
 
 test('planRenameGroup moves its declaration and members and refuses collisions', () => {
@@ -2463,6 +2491,7 @@ test('group planners refuse a non-object diagram.groups instead of corrupting it
   }}]}};
   const text = JSON.stringify(spec, null, 2);
   assert.match(B.planSetGroupTitle(text, spec, 0, 'dev', 'Title').error, /not an object/);
+  assert.match(B.planSetGroupIcon(text, spec, 0, 'dev', 'house').error, /not an object/);
   const setPlan = B.planSetNodeGroup(text, spec, 0, 'b', 'dev');
   assert.ok(setPlan.error, 'declaring into a string groups value must fail, not corrupt');
   /* numeric own keys on strings/arrays must not slip past the guard */
@@ -2476,6 +2505,7 @@ test('group planners refuse a non-object diagram.groups instead of corrupting it
   assert.match(B.planRenameGroup(arrText, arrSpec, 0, '0', 'x').error, /not an object/);
   assert.match(B.planDeleteGroup(arrText, arrSpec, 0, '0').error, /not an object/);
   assert.match(B.planSetGroupTitle(arrText, arrSpec, 0, '0', 'T').error, /not an object/);
+  assert.match(B.planSetGroupIcon(arrText, arrSpec, 0, '0', null).error, /not an object/);
   assert.match(B.planBulkSetGroup(arrText, arrSpec, [{kind: 'node', section: 0, id: 'a'}], 'x').error, /not an object/);
   /* the original values survive every refused edit */
   assert.equal(JSON.parse(text).page.blocks[0].diagram.groups, 'occupied');

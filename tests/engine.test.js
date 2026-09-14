@@ -28,7 +28,7 @@ function loadCore(overrides = {}){
     ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection, parseClock, formatClock, timelineModel, timelineLanesModel,' +
     ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
     ' sectionHasProse, sectionIntroHTML, setProseCollapsed, createProseController, TONE_SET,' +
-    ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES};';
+    ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES, ICON_SET};';
   const sandbox = {console, URL, ...overrides};
   vm.runInNewContext(code, sandbox);
   return sandbox.__exports;
@@ -851,6 +851,68 @@ test('group renderer exposes an escaped data-dv-group selection identity', () =>
     {nodes: {a: {group: key}}, rows: [['a']], groups: {[key]: {title: 'Odd'}}, edges: [], steps: []},
     'test', 'aurora', core.resolveProtocols({}), null);
   assert.match(html, /<g class="grp" data-dv-group="odd&quot;&amp;&lt;">/);
+});
+
+test('every registered icon has exactly one sprite symbol', () => {
+  const sprite = fs.readFileSync(path.join(ROOT, 'src', 'icons.svg'), 'utf8');
+  const ids = [...sprite.matchAll(/<symbol id="i-([^"]+)"/g)].map(m => m[1]);
+  for (const icon of C.ICON_SET) {
+    assert.strictEqual(ids.filter(id => id === icon).length, 1, icon);
+  }
+});
+
+test('group icon validation warns for unknown strings and non-strings, including falsey values', () => {
+  const warningsFor = meta => {
+    const result = C.validate(C.normalize({nodes: {a: {group: 'home'}}, rows: [['a']], groups: {home: meta}}));
+    assert.strictEqual(result.errors.length, 0);
+    return result.warnings.filter(w => w.includes('.groups.home.icon:'));
+  };
+  for (const icon of ['missing', '']) {
+    const warnings = warningsFor({icon});
+    assert.strictEqual(warnings.length, 1);
+    assert.ok(warnings[0].endsWith('.groups.home.icon: unknown icon "' + icon + '" — using "gear" (valid: ' + C.ICON_SET.join(' ') + ')'));
+  }
+  for (const icon of [null, 0, 42, false, [], {}, ['house']]) {
+    const warnings = warningsFor({icon});
+    assert.strictEqual(warnings.length, 1);
+    assert.match(warnings[0], /must be a string — icon ignored/);
+  }
+  assert.strictEqual(warningsFor({title: 'Home'}).length, 0);
+  for (const icon of C.ICON_SET) assert.strictEqual(warningsFor({icon}).length, 0, icon);
+});
+
+test('group icons render before shifted titles; omitted and non-string icons preserve original markup', () => {
+  const core = loadCore({document: {getElementById(){ return null; }}});
+  const d = {nodes: {a: {group: 'home'}}, rows: [['a']], groups: {home: {title: 'Home & devices'}}};
+  const b = core.layout(d).groups.home;
+  const render = meta => {
+    d.groups.home = meta;
+    const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {}; }};
+    core.renderBoard(host, d, 'test', 'aurora', core.resolveProtocols({}), null);
+    return host.html.match(/<g class="grp"[^>]*>.*?<\/g>/)[0];
+  };
+  const before = '<g class="grp" data-dv-group="home"><rect class="grpbox" x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="14"/>';
+  const title = x => '<text class="grptitle" x="' + x + '" y="' + (b.y + 16) + '">Home &amp; devices</text></g>';
+  assert.strictEqual(render({title: 'Home & devices'}), before + title(b.x + 14));
+  for (const icon of [null, false, 0, {}, ['house']]) {
+    assert.strictEqual(render({title: 'Home & devices', icon}), before + title(b.x + 14));
+  }
+  for (const icon of [...C.ICON_SET, '', 'bad"<icon>']) {
+    const expected = C.ICON_SET.includes(icon) ? icon : 'gear';
+    const use = '<use href="#i-' + expected + '" class="grpicon" x="' + (b.x + 12) + '" y="' + (b.y + 5) + '" width="14" height="14" aria-hidden="true"/>';
+    assert.strictEqual(render({title: 'Home & devices', icon}), before + use + title(b.x + 32));
+  }
+});
+
+test('six IoT glyphs validate and render on nodes', () => {
+  const core = loadCore({document: {getElementById(){ return null; }}});
+  for (const icon of ['house', 'camera', 'doorbell', 'lock', 'bulb', 'car']) {
+    const d = {nodes: {a: {icon}}, rows: [['a']]};
+    assert.strictEqual(core.validate(core.normalize(d)).warnings.filter(w => w.includes('.icon:')).length, 0);
+    const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {}; }};
+    core.renderBoard(host, d, 'test', 'aurora', core.resolveProtocols({}), null);
+    assert.ok(host.html.includes('href="#i-' + icon + '"'), icon);
+  }
 });
 
 /* ---------------- panel-state folding ---------------- */

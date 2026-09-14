@@ -123,7 +123,9 @@
 .sk-daylight .grpbox{stroke:#C9C2B2; fill:rgba(73,86,201,.03);}
 .grptitle{font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.1em; text-transform:uppercase;}
 .sk-aurora .grptitle{fill:#5E7396;}
+.sk-aurora .grpicon{color:#5E7396;}
 .sk-daylight .grptitle{fill:#8A8474;}
+.sk-daylight .grpicon{color:#8A8474;}
 
 /* permalink + derived sibling affordances — zero footprint when absent */
 .nlink,.nbackref{cursor:pointer;}
@@ -929,7 +931,7 @@ rect.tlfuture{opacity:.18;}
 .stepmode .lbl{opacity:var(--dv-dim, .35);}
 .stepmode .lbl.lit{opacity:1;}
 .stepmode .coin:not(.lit){opacity:var(--dv-dim, .4);}
-.stepmode .grpbox, .stepmode .grptitle{opacity:.55;}
+.stepmode .grpbox, .stepmode .grptitle, .stepmode .grpicon{opacity:.55;}
 .sk-aurora .stepmode .node.lit .card{stroke:#3E9FC4;}
 .sk-aurora .stepmode .coin.lit circle{stroke:#8AE8FF;}
 .sk-daylight .stepmode .node.lit .card{stroke:#4956C9;}
@@ -1038,6 +1040,7 @@ rect.tlfuture{opacity:.18;}
   .sk-aurora .coin text, .sk-daylight .coin text{fill:#333333;}
   .sk-aurora .grpbox, .sk-daylight .grpbox{stroke:#999999; fill:none;}
   .sk-aurora .grptitle, .sk-daylight .grptitle{fill:#666666;}
+  .sk-aurora .grpicon, .sk-daylight .grpicon{color:#666666;}
   .edge{animation:none !important;}
   .pkt, .halo{display:none !important;}
   /* per-step panel state is ambiguous on paper, so widgets are hidden — EXCEPT
@@ -1342,6 +1345,8 @@ body.sk-editorial .sk-aurora .grpbox,
 body.sk-editorial .sk-daylight .grpbox{stroke:#AEA392; fill:rgba(14,91,86,.025);}
 body.sk-editorial .sk-aurora .grptitle,
 body.sk-editorial .sk-daylight .grptitle{fill:#6F6B62;}
+body.sk-editorial .sk-aurora .grpicon,
+body.sk-editorial .sk-daylight .grpicon{color:#6F6B62;}
 body.sk-editorial .sk-aurora .card,
 body.sk-editorial .sk-daylight .card{
   fill:#FFFDF8;
@@ -2016,6 +2021,7 @@ body.sk-editorial .errbox{
   body.sk-terminal .sk-aurora .lbl{fill:var(--tm-text); font-size:10px;}
   body.sk-terminal .sk-aurora .grpbox{fill:#07100C; stroke:var(--tm-line); stroke-width:1;}
   body.sk-terminal .sk-aurora .grptitle{fill:var(--tm-muted); letter-spacing:.15em;}
+  body.sk-terminal .sk-aurora .grpicon{color:var(--tm-muted);}
   body.sk-terminal .sk-aurora .coin circle{fill:var(--tm-ground); stroke:var(--tm-good); stroke-width:1;}
   body.sk-terminal .sk-aurora .coin text{fill:var(--tm-good);}
   body.sk-terminal .sk-aurora .stepmode .node.lit .card{stroke:var(--tm-good);}
@@ -2598,6 +2604,8 @@ body.sk-editorial .errbox{
   }
   body.sk-pastel .sk-aurora .grptitle,
   body.sk-pastel .sk-daylight .grptitle { fill:#75839A; }
+  body.sk-pastel .sk-aurora .grpicon,
+  body.sk-pastel .sk-daylight .grpicon { color:#75839A; }
   body.sk-pastel .card,
   body.sk-pastel .sk-aurora .card,
   body.sk-pastel .sk-daylight .card {
@@ -3356,6 +3364,7 @@ body.sk-editorial .errbox{
   body.sk-blueprint .grpbox{rx:2px;stroke-dasharray:5 4;}
   body.sk-blueprint .docview .grpbox{stroke:#5DAAC2;fill:rgba(77,210,239,.025);}
   body.sk-blueprint .docview .grptitle{fill:#8FBED4;letter-spacing:.12em;}
+  body.sk-blueprint .docview .grpicon{color:#8FBED4;}
   body.sk-blueprint .docview .card{fill:#08366D;stroke:#A6E7F3;stroke-width:1.15;rx:2px;filter:none;}
   body.sk-blueprint .docview .t1{
     fill:#FFFFFF;

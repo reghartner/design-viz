@@ -1,5 +1,20 @@
 # Overnight build — September 14, 2026
 
+## Review decision
+
+Chuck approved merging the retained stack and requested removal of the Find
+node dropdown. The finder, Show node action and associated navigation code
+were removed in preparation for merging; the trace service picker and Auto / Fit width /
+Readable controls remain. PR #62 carries this handoff and updates the panel
+count after integration.
+Merge order is #50 through #62. The stack is rebased onto main 976725c,
+preserving the workbench callouts, delta markers, group icons, phone branding
+and Homemap panel already merged there. Conflict resolution keeps both
+Homemap's ambient initial state and trace navigation behavior. Chuck also
+authorized the merge hook's documented human-approved override after its
+default path rejected the merge command. The original overnight evidence
+and open-PR statuses below record the build before this review decision.
+
 Chuck authorized focused PRs, stacked or independent, through tonight. First
 priority: smart layouts for complex Honeycomb traces and service-internal time.
 The overnight continuation ends at 08:00 America/New_York (12:00 UTC).
@@ -22,6 +37,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
 | 11 | Canary and firmware rollout stories | codex/rollout-starters | Open: https://github.com/reghartner/design-viz/pull/60 |
 | 12 | Phone diagram legibility | codex/phone-diagram-legibility | Open: https://github.com/reghartner/design-viz/pull/61 |
+| 13 | Reviewed handoff; node finder removed | codex/diagram-node-finder | Open: https://github.com/reghartner/design-viz/pull/62 |
 
 ## Validation and evidence
 
@@ -32,7 +48,9 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51, #52, #53, #54, #55, #56, #57, #58, #59 and #60 passed all GitHub checks.
+  At 07:26 local the existing schedule was aligned to the hour so its final
+  check runs at 08:00 exactly; the original 08:00 UTC-adjusted expiry remains.
+- PRs #50–#62 passed all GitHub checks, verified again at 08:00 local.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -106,30 +124,41 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   viewport. The trace fixture's existing density warnings remain; no runtime
   errors. Readable boards center when they first overflow, without snapping
   back after user panning. Resize observers dispose with replaced previews.
-  Check PR #61 final CI after this handoff commit. LAN preview remains HTTP 200.
+  PR #61 final head passed all checks. LAN preview remains HTTP 200.
+- Node finder: six focused tests plus the full Node and 158 Python suites pass.
+  Full rendered names remain available, duplicate names get IDs, and Show node
+  navigates explicitly without changing step membership, tones or authored
+  data. Browser checked an offscreen service in all six phone skins, Fit width,
+  desktop split workspace, published and embedded traces, explicit playback
+  pause and Escape focus recovery. A browser-discovered synchronous SVG
+  focusout bug is fixed and regression tested. Navigation marks are separate
+  from semantic tones, disappear on focus exit and dispose with old previews.
+  No new runtime errors after the fix; the fixture's old density warnings remain.
+  Browser also verified a static routed graph without panels/steps, full long
+  labels and disambiguated duplicate names. PR #62 head c2cd884 passed all
+  GitHub checks before the final documentation handoff.
 
-## Next continuation
+## Morning handoff — complete at 08:00 local
 
-Start from the current `codex/phone-diagram-legibility` branch, inspect checks
-and working-tree changes, and create the next focused branch. Do not recreate
-the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
-stories, numeric replica positions and stable paused playback are built.
-The workbench now disposes old steppers, starts paused and preserves unique
-preview positions through ordinary edits; standalone autoplay is unchanged.
-The compact step-list editor is now built, including search, bounded paging,
-duplicate, append, earlier/later, history and stale-source protection. Canary
-promotion, traffic rollback and firmware trial/confirmation stories are built.
-Phone diagram legibility is now built: Auto uses readable sizing on narrow
-diagram columns, with explicit Fit width and Readable, reduced gutters across
-skins, keyboard panning and retained view choices through normal edits.
-The next useful slice is a bounded polish/verification pass on complex trace
-exploration (for example navigating a selected service into view without
-disturbing a user's pan), only if it fits before the morning cutoff. Otherwise
-verify the complete PR stack and prepare the morning report with the phone
-URL, ranked roadmap and key limitations. All PRs stay open; do not merge.
-Avoid claiming zero crossings in arbitrary graphs. Keep native text editing
-usable. Shared scenario definitions and
-trace/HLD mapping remain larger design work, not quick schema shortcuts.
+The overnight build is finished. Thirteen focused PRs remain open, stacked in
+review order #50 → #62. The current `codex/diagram-node-finder` branch contains
+the cumulative result. All 39 GitHub checks were green at the morning audit;
+no product changes followed that audit. No PR was merged. The original
+checkout and unrelated PR #49 were left untouched.
+
+Both the workbench URL above and the direct complex-trace demo returned HTTP
+200 at 08:00. The preview servers remain available on port 8765. Direct demo:
+`http://192.168.1.242:8765/template/flowview.html?spec=../src/starters/complex-trace.json`.
+These LAN links require the same network as the host. The browser viewport
+was restored to normal after testing. The overnight automation is finished.
+
+The [ranked roadmap](../feature-roadmap.md) records built slices and remaining
+ideas. The larger next decisions are shared scenario definitions and explicit
+trace-to-HLD mapping. Import currently accepts pasted/exported JSON rather
+than a Honeycomb account connection. Preview accepts up to 10,000 spans;
+an individual diagram is bounded to 200 spans and 30 services, with explicit
+focus and omission counts. Dense graphs can still cross; uncovered span time
+does not establish CPU time, waiting, or a bottleneck.
 
 ## Design commitments
 

@@ -21,6 +21,7 @@ function workbenchPreviewSnapshot(page, ctl){
     var prior = {key:section.key};
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
+    if (rec.presentation){ prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId; }
     saved.push(prior);
     if (!stepper) return;
     if (stepper.path) prior.path = stepper.path();
@@ -47,6 +48,8 @@ function restoreWorkbenchPreview(page, ctl, saved){
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
       rec.flowDisclosure.open = prior.flowOpen;
+    if (rec.presentation && prior.focusPanel === rec.presentation.panelId && prior.primaryPanel === section.diagram.primaryPanel)
+      rec.presentation.setMode(prior.focusMode);
     if (!stepper || !prior.mode) return;
     if (prior.path && stepper.selectPath && !stepper.selectPath(prior.path)) return;
     if (prior.mode === 'ambient'){

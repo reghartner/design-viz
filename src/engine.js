@@ -3823,7 +3823,7 @@ function panelOrder(panels){
   return fixed.concat(growing);
 }
 
-function buildPanels(asideEl, d, skin, primaryHost){
+function buildPanels(asideEl, d, skin, primaryHost, primaryId){
   var folded = foldPanelStates(d);
   var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
   var hosts = {};
@@ -3841,7 +3841,7 @@ function buildPanels(asideEl, d, skin, primaryHost){
     var body = document.createElement('div');
     body.className = 'pbody';
     card.appendChild(body);
-    (primaryHost && p.id === d.primaryPanel ? primaryHost : asideEl).appendChild(card);
+    (primaryHost && p.id === (primaryId || d.primaryPanel) ? primaryHost : asideEl).appendChild(card);
     hosts[p.id] = {panel: p, body: body};
     /* Homemap ambient state precedes step zero; other widgets keep their
        established first-folded-step preview. */
@@ -4222,7 +4222,20 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
 }
 
 /* ---------------- section + page renderers ---------------- */
+function diagramFocusPanel(d){
+  var panels = Array.isArray(d.panels) ? d.panels : [];
+  return panels.find(function(p){return p && typeof p.id === 'string' && p.id && p.id === d.primaryPanel;}) ||
+    panels.find(function(p){return p && typeof p.id === 'string' && p.id && p.type === 'homemap';}) || null;
+}
 function createBoardGrid(sectionEl, hasPanels, primaryPanel){
+  var toolbar, choices, modes;
+  if (hasPanels && primaryPanel){
+    toolbar = document.createElement('div'); toolbar.className = 'diagram-views';
+    choices = document.createElement('div'); choices.className = 'diagram-view-choice';
+    toolbar.appendChild(choices);
+    modes = document.createElement('div'); modes.className = 'primary-modes';
+    toolbar.appendChild(modes); sectionEl.appendChild(toolbar);
+  }
   var grid = document.createElement('div');
   grid.className = 'boardgrid' + (hasPanels ? ' haspanels' : '');
   sectionEl.appendChild(grid);
@@ -4232,8 +4245,6 @@ function createBoardGrid(sectionEl, hasPanels, primaryPanel){
     grid.className += ' panel-first';
     var primary = document.createElement('div'); primary.className = 'primary-panel';
     grid.appendChild(primary);
-    var modes = document.createElement('div'); modes.className = 'primary-modes';
-    primary.appendChild(modes);
     var flow = document.createElement('details'); flow.className = 'secondary-flow';
     var summary = document.createElement('summary'); summary.textContent = 'Data flow';
     flow.appendChild(summary);
@@ -4243,13 +4254,50 @@ function createBoardGrid(sectionEl, hasPanels, primaryPanel){
     var flowCol = document.createElement('div'); flowCol.className = 'diagramcol';
     flow.appendChild(flowCol);
     return {grid:grid, diagramHost:flowCol, controlsHost:primary, diagramCol:flowCol,
-      primaryHost:primary, modesHost:modes, flowDisclosure:flow};
+      primaryHost:primary, modesHost:modes, flowDisclosure:flow, viewChoicesHost:choices};
   }
 
   var diagramCol = document.createElement('div');
   diagramCol.className = 'diagramcol';
   grid.appendChild(diagramCol);
   return {grid:grid, diagramHost:diagramCol, controlsHost:diagramCol, diagramCol:diagramCol};
+}
+
+/* Reader-only layout: move existing elements, preserving widget state, the
+   selected path/step, running playback, and board sizing. Never re-render. */
+function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
+  var group = layout.viewChoicesHost, buttons = {}, mode = null, destroyed = false;
+  group.setAttribute('role','group'); group.setAttribute('aria-label','View focus');
+  function setMode(value){
+    if (destroyed || ['panel','flow'].indexOf(value) < 0 || value === mode) return;
+    mode = value;
+    var home = value === 'panel';
+    if (home){
+      layout.flowDisclosure.appendChild(layout.diagramCol);
+      layout.grid.appendChild(aside);
+      if (bar) layout.primaryHost.appendChild(bar);
+    } else {
+      layout.grid.insertBefore(layout.diagramCol, layout.primaryHost);
+      if (bar) layout.diagramCol.appendChild(bar);
+      layout.primaryHost.appendChild(aside);
+    }
+    layout.grid.classList.toggle('panel-first',home);
+    layout.grid.classList.toggle('flow-first',!home);
+    layout.flowDisclosure.hidden = !home;
+    buttons.panel.setAttribute('aria-pressed',String(home));
+    buttons.flow.setAttribute('aria-pressed',String(!home));
+    if (changed) changed(home ? layout.primaryHost : layout.diagramCol);
+  }
+  [['panel',panel.type === 'homemap' ? 'Home' : panel.title || 'Panel'],['flow','Data flow']].forEach(function(choice){
+    var button = document.createElement('button'); button.type = 'button'; button.className = 'mbtn';
+    button.textContent = choice[1]; button.setAttribute('data-view-focus',choice[0]);
+    button.title = 'Make ' + choice[1] + ' the main view';
+    button.addEventListener('click',function(){setMode(choice[0]);});
+    buttons[choice[0]] = button; group.appendChild(button);
+  });
+  setMode(initial);
+  return {panelId:panel.id, mode:function(){return mode;}, setMode:setMode,
+    destroy:function(){destroyed = true;}};
 }
 
 function sectionHasProse(sec){
@@ -4449,7 +4497,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var prefix = 'fs' + gi;
   var hasPanels = Array.isArray(d.panels) && d.panels.length > 0;
 
-  var primaryPanel = hasPanels && typeof d.primaryPanel === 'string' && d.panels.find(function(p){ return p && p.id === d.primaryPanel; });
+  var primaryPanel = diagramFocusPanel(d);
   var boardLayout = createBoardGrid(box, hasPanels, primaryPanel);
   result.flowDisclosure = boardLayout.flowDisclosure;
   var grid = boardLayout.grid;
@@ -4467,7 +4515,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     var aside = document.createElement('div');
     aside.className = 'panelcol';
     grid.appendChild(aside);
-    panelCtl = buildPanels(aside, activeDiagram, skin, boardLayout.primaryHost);
+    panelCtl = buildPanels(aside, activeDiagram, skin, boardLayout.primaryHost, primaryPanel && primaryPanel.id);
     if (primaryPanel && d.panels.length === 1) aside.hidden = true;
   }
 
@@ -4481,6 +4529,13 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var hasSteps = (d.steps || []).length > 0;
   var hasDelta = diagramHasDelta(d);
   var btnDelta = null, bar = null;
+  function addFocusControl(){
+    if (!primaryPanel) return;
+    result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
+      d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', function(host){
+        if (result.stepper) result.stepper.scrollTargetEl = host;
+      });
+  }
   if (hasDelta){
     btnDelta = document.createElement('button');
     btnDelta.className = 'mbtn dbtn'; btnDelta.textContent = 'Δ ONLY';
@@ -4497,6 +4552,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       var deltaTog = document.createElement('span'); deltaTog.className = 'mtoggle';
       deltaTog.appendChild(btnDelta); (boardLayout.modesHost || lg).appendChild(deltaTog);
     }
+    addFocusControl();
     return result;
   }
 
@@ -4561,10 +4617,9 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     return renderBoard(bwrap, next, prefix, skin, protos, backlinks);
   }}));
   stepper.copyButton = copyStep;
-  if (boardLayout.primaryHost) stepper.scrollTargetEl = boardLayout.primaryHost;
-
   if (view === 'step') stepper.enterStep(true); /* host may disable automatic playback */
   result.stepper = stepper;
+  addFocusControl();
   return result;
 }
 
@@ -4604,7 +4659,10 @@ function renderPage(view, page, skin, backlinks, options){
   ctl.destroy = function(){
     ctl.destroyed = true;
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
-    ctl.sections.forEach(function(rec){ if (rec.boardSize) rec.boardSize.destroy(); });
+    ctl.sections.forEach(function(rec){
+      if (rec.boardSize) rec.boardSize.destroy();
+      if (rec.presentation) rec.presentation.destroy();
+    });
     ctl.onChange = null;
   };
   function changed(target){
@@ -4630,7 +4688,7 @@ function renderPage(view, page, skin, backlinks, options){
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
-               flowDisclosure:built.flowDisclosure,
+               flowDisclosure:built.flowDisclosure, presentation:built.presentation,
                contractCard:built.contractCard, contractRows:built.contractRows};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);

@@ -680,6 +680,13 @@ perspectives" of one timeline). Types:
   This optional presentation works with any declared panel; missing/unknown
   ids retain the normal layout. Renaming or deleting a panel in the workbench
   updates the reference. No schema-version opt-in is required.
+  Published pages and the workbench offer **Home / Data flow** to switch the
+  main view live while retaining the selected path, step, widget state, and
+  playback. This control also appears for a sidebar homemap without
+  `primaryPanel`; it uses the first homemap. An explicit centerpiece takes
+  precedence (other widget types use their title instead of Home). The spec
+  sets the opening layout; switching does not mutate it. The timeline follows
+  the main view, and secondary panels stack below it on narrow screens.
   Example panel:
   `{"id":"home","type":"homemap","outline":{"w":300,"h":164},
   "devices":[{"id":"cam","kind":"camera","label":"Porch cam",

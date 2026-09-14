@@ -1,5 +1,16 @@
 # Changelog
 
+## Live Home / Data flow views (2026-09-14)
+
+- Readers can switch between a large home map and a large service diagram on
+  published pages and in the workbench. One timeline follows the main view;
+  selected paths, steps, widget state, playback, and board sizing stay intact.
+- Existing sidebar homemaps get the switch automatically. `primaryPanel`
+  chooses the opening layout; reader switches do not edit the spec. Workbench
+  edits and skin changes retain the current focus, while an authored change to
+  the default takes precedence. Explicit centerpieces of other panel types
+  support the same switch using their title.
+
 ## Alternate branch boundary (2026-09-14)
 
 - Fixed an off-by-one that colored the last shared step as the first alternate

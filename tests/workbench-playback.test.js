@@ -10,8 +10,10 @@ const copy = value => JSON.parse(JSON.stringify(value));
 function element(){
   const attrs = {}, events = {}, classes = new Set();
   return {attrs, events, style:{}, children:[],
-    classList:{add:k=>classes.add(k), remove:k=>classes.delete(k), contains:k=>classes.has(k)},
-    appendChild(el){ this.children.push(el); el.parentNode=this; return el; },
+    classList:{add:k=>classes.add(k), remove:k=>classes.delete(k), contains:k=>classes.has(k),
+      toggle(k,on){if(on) classes.add(k);else classes.delete(k);}},
+    appendChild(el){ if(el.parentNode) el.parentNode.removeChild(el); this.children.push(el); el.parentNode=this; return el; },
+    insertBefore(el,before){ if(el.parentNode) el.parentNode.removeChild(el); this.children.splice(this.children.indexOf(before),0,el); el.parentNode=this; return el; },
     removeChild(el){ this.children=this.children.filter(child=>child!==el); el.parentNode=null; },
     setAttribute(k,v){ attrs[k]=String(v); }, getAttribute:k=>attrs[k] ?? null,
     querySelectorAll(){ return []; }, getBoundingClientRect(){ return {left:0,top:0,width:100,height:20}; },
@@ -45,7 +47,7 @@ function stepperHarness(options, reducedMotion=false){
     {id:'third',text:'Third'}]};
   const stepper=context.attachStepper(sec,boardDiv,term,diagram,'fs0',board,{},
     {setStep:(index,tween)=>paints.push({index,tween})},null,options);
-  return {context,stepper,term,intervals,timeouts,paints,animation,
+  return {context,stepper,term,intervals,timeouts,paints,animation,boardDiv,
     tick(){ for(const fn of [...intervals.values()]) fn(); }};
 }
 
@@ -217,4 +219,64 @@ test('data flow disclosure stays open across scene edits without writing viewing
   assert.equal(next.sections[0].flowDisclosure.open,true); assert.equal(JSON.stringify(after),source);
   after.title='Different story'; next.sections[0].flowDisclosure.open=false;
   h.context.restoreWorkbenchPreview(after,next,saved); assert.equal(next.sections[0].flowDisclosure.open,false);
+});
+
+test('switching live focus moves one board, panel and transport without repainting or interrupting playback',()=>{
+  const h=stepperHarness({autoplay:false}), c=h.context, section=element(), panel={id:'home',type:'homemap'};
+  const layout=c.createBoardGrid(section,true,panel), aside=element(), map=element();
+  layout.primaryHost.appendChild(map);layout.grid.appendChild(aside);
+  layout.diagramHost.appendChild(h.boardDiv);layout.controlsHost.appendChild(h.term.bar);
+  const focus=c.createDiagramFocusControl(layout,panel,aside,h.term.bar,'panel',host=>h.stepper.scrollTargetEl=host);
+  h.stepper.enterStep(false);h.stepper.jumpSource(1);h.term.btnPlay.fire('click');
+  const paints=h.paints.length,timers=[...h.intervals.keys()],pending=[...h.timeouts.keys()];
+  layout.flowDisclosure.open=true;
+  const [homeButton,flowButton]=layout.viewChoicesHost.children;
+  flowButton.fire('click');
+  assert.equal(focus.mode(),'flow');assert.equal(flowButton.attrs['aria-pressed'],'true');
+  assert.deepEqual(layout.grid.children,[layout.diagramCol,layout.primaryHost]);
+  assert.deepEqual(layout.diagramCol.children,[h.boardDiv,h.term.bar]);
+  assert.deepEqual(layout.primaryHost.children,[map,aside]);
+  assert.equal(layout.flowDisclosure.hidden,true);
+  assert.equal(h.stepper.scrollTargetEl,layout.diagramCol);
+  assert.equal(h.stepper.current().id,'second');assert.equal(h.stepper.mode(),'step');
+  assert.equal(h.paints.length,paints);assert.deepEqual([...h.intervals.keys()],timers);assert.deepEqual([...h.timeouts.keys()],pending);
+  homeButton.fire('click');
+  assert.deepEqual(layout.grid.children,[layout.primaryHost,aside]);
+  assert.deepEqual(layout.primaryHost.children,[map,h.term.bar]);
+  assert.equal(layout.diagramCol.parentNode,layout.flowDisclosure);
+  assert.equal(layout.flowDisclosure.open,true,'the optional disclosure remembers its state');
+  assert.equal(layout.flowDisclosure.hidden,false);assert.equal(h.stepper.scrollTargetEl,layout.primaryHost);
+  h.tick();assert.equal(h.stepper.current().id,'third','the same playback clock keeps advancing');
+  focus.destroy();flowButton.fire('click');assert.equal(focus.mode(),'panel');
+});
+
+test('live focus works without steps and chooses an explicit centerpiece before the first homemap',()=>{
+  const h=stepperHarness(),c=h.context;
+  const home={id:'home',type:'homemap'},other={id:'status',type:'state',title:'Status'};
+  const d={panels:[other,home]},before=JSON.stringify(d);
+  assert.equal(c.diagramFocusPanel(d),home);assert.equal(JSON.stringify(d),before);
+  assert.equal(c.diagramFocusPanel({...d,primaryPanel:'status'}),other);
+  assert.equal(c.diagramFocusPanel({...d,primaryPanel:'missing'}),home);
+  assert.equal(c.diagramFocusPanel({panels:[other]}),null);assert.equal(c.diagramFocusPanel({}),null);
+  const layout=c.createBoardGrid(element(),true,home),aside=element();layout.grid.appendChild(aside);
+  const focus=c.createDiagramFocusControl(layout,home,aside,null,'flow');
+  assert.equal(focus.mode(),'flow');focus.setMode('panel');focus.setMode('invalid');
+  assert.equal(focus.mode(),'panel');assert.equal(layout.primaryHost.parentNode,layout.grid);
+});
+
+test('live view focus survives edits but authored presentation changes and different panels take precedence',()=>{
+  function presentation(panelId,initial){let value=initial;return {panelId,mode:()=>value,setMode:next=>{value=next;}};}
+  const h=previewHarness(),before=pageFixture(),old=h.controller(before,1,'step');
+  diagramOf(before).primaryPanel='p';old.sections[0].flowDisclosure={open:false};
+  old.sections[0].presentation=presentation('p','flow');
+  const saved=h.context.workbenchPreviewSnapshot(before,old),after=copy(before);
+  diagramOf(after).steps[1].text='Edited while viewing the flow';const source=JSON.stringify(after);
+  const next=h.controller(after,0,'ambient');next.sections[0].flowDisclosure={open:false};
+  next.sections[0].presentation=presentation('p','panel');h.context.restoreWorkbenchPreview(after,next,saved);
+  assert.equal(next.sections[0].presentation.mode(),'flow');assert.equal(next.sections[0].stepper.current().n,1);
+  assert.equal(JSON.stringify(after),source);
+  next.sections[0].presentation=presentation('different','panel');h.context.restoreWorkbenchPreview(after,next,saved);
+  assert.equal(next.sections[0].presentation.mode(),'panel');
+  delete diagramOf(after).primaryPanel;next.sections[0].presentation=presentation('p','panel');
+  h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(next.sections[0].presentation.mode(),'panel');
 });

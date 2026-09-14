@@ -4162,7 +4162,12 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 @media(prefers-reduced-motion:reduce){.comm-packet{display:none !important}}
 @media print{.comm-failure{display:none !important}.stepmode .comm-hidden{opacity:1 !important}}
 
-/* A featured panel owns the timeline; the flow remains available below. */
+/* Readers can give the same scene or flow the main space. */
+.diagram-views{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin:8px 0 12px;}
+.diagram-view-choice{display:flex;gap:4px;max-width:100%;padding:3px;border:1px solid var(--dfaint);border-radius:10px;}
+.diagram-view-choice .mbtn{min-width:0;min-height:34px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.diagram-views .primary-modes{margin:0 0 0 auto;}
+@media(max-width:640px){.diagram-view-choice .mbtn{min-height:40px;}}
 body .docview .boardgrid.haspanels.panel-first{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}
 body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-template-columns:minmax(0,1fr);}
 .primary-panel{min-width:0;}
@@ -4171,6 +4176,8 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
 .primary-panel>.pwidget{margin-top:0;}
 .primary-panel .hmframe{max-height:70vh;}
 .primary-panel>.termbar{margin-top:0;}
+.flow-first>.primary-panel>.panelcol{margin-top:12px;}
+.flow-first>.primary-panel>.panelcol[hidden],.secondary-flow[hidden]{display:none !important;}
 .secondary-flow{margin-top:16px;border-top:1px solid var(--dfaint);padding-top:8px;}
 .secondary-flow>summary{cursor:pointer;color:var(--dtext);font:600 12px 'IBM Plex Mono',monospace;padding:10px 0;}
 .secondary-flow>summary:focus-visible{outline:2px solid var(--acc);outline-offset:3px;}
@@ -4203,6 +4210,6 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
 @media print{
   body .docview .boardgrid.haspanels.panel-first{display:block;}
   .primary-panel>.pwidget{display:block !important;break-inside:avoid;}
-  .primary-modes,.secondary-flow>summary{display:none !important;}
+  .diagram-views,.primary-modes,.secondary-flow>summary{display:none !important;}
   .primary-panel .hmframe{max-height:none;}
 }

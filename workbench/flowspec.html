@@ -7641,7 +7641,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     if (keys.length && !(keys[0] in stepByEdge) && edgeIds[keys[0]]) stepByEdge[keys[0]] = i + 1;
   });
 
-  var coinRects = [], deltaRects = [], labelEls = [];
+  var coinRects = [], deltaRects = [], labelEls = [], pendingLabelBadges = [];
   function deltaBadge(parent, x, y, w, h){
     var badge = document.createElementNS(SVGNS, 'polygon');
     badge.setAttribute('class', 'dvdelta');
@@ -7686,15 +7686,21 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       lt.textContent = e.label;
       markFragmentElement(lt, e);
       svg.appendChild(lt);
-      labelEls.push({el: lt, fixed: !!(e.labelDx || e.labelDy)});
+      labelEls.push({el: lt, fixed: !!(e.labelDx || e.labelDy), badge: e.delta === true});
       info.labelEl = lt; /* stepper lights the label together with its edge */
     }
     if (e.delta === true){
-      /* Left of the coin and below the label, including author-lowered labels
-         that the collision pass deliberately leaves fixed. */
-      var badgeY = e.label ? Math.max(mid.y - 6, ly + 4) : mid.y - 6;
-      var badge = deltaBadge(svg, mid.x - (stepN ? 25 : 16), badgeY, 11, 9);
-      markFragmentElement(badge, e);
+      if (e.label){
+        /* labeled edges wear the badge at the label's top-right; created
+           after the collision pass so it sits on the label's FINAL position
+           (author labelDx/labelDy nudges included — a committed label drag
+           re-renders the board, which re-places the badge) */
+        pendingLabelBadges.push({e: e, lbl: lt});
+      } else {
+        /* no label: left of the coin, near the midpoint */
+        var badge = deltaBadge(svg, mid.x - (stepN ? 25 : 16), mid.y - 6, 11, 9);
+        markFragmentElement(badge, e);
+      }
     }
   });
 
@@ -7724,7 +7730,11 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       var b;
       try { b = le.el.getBBox(); } catch (ex) { b = null; }
       if (!b || !b.width) return {x: 0, y: 0, w: 0, h: 0, fixed: true};
-      return {x: b.x, y: b.y, w: b.width, h: b.height, fixed: le.fixed};
+      var r = {x: b.x, y: b.y, w: b.width, h: b.height, fixed: le.fixed};
+      /* a delta-marked label carries a badge at its top-right — reserve
+         that room so neighboring labels dodge the badge too */
+      if (le.badge){ r.y -= 9; r.h += 9; r.w += 12; }
+      return r;
     });
     var nudges = resolveLabelCollisions(rects, obstacles);
     labelEls.forEach(function(le, i){
@@ -7734,6 +7744,20 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       le.el.setAttribute('y', parseFloat(le.el.getAttribute('y')) + n.dy);
     });
   })();
+
+  /* badges for labeled delta edges — after the collision pass, at each
+     label's settled top-right corner */
+  pendingLabelBadges.forEach(function(pb){
+    var b;
+    try { b = pb.lbl.getBBox(); } catch (ex){ b = null; }
+    var badge = (b && b.width) ?
+      deltaBadge(svg, b.x + b.width + 3, b.y - 6, 9, 8) :
+      /* hidden-context fallback (a section inside an inactive tab measures
+         as zero): sit just above-right of the label's anchor point */
+      deltaBadge(svg, parseFloat(pb.lbl.getAttribute('x')) + 4,
+                 parseFloat(pb.lbl.getAttribute('y')) - 18, 9, 8);
+    markFragmentElement(badge, pb.e);
+  });
 
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));

@@ -807,13 +807,23 @@ body.sk-blueprint .hmframe{--hm-bg:#031B3A; --hm-line:#94BCD5; --hm-neutral:#94B
 .hmoutline{fill:none; stroke:var(--hm-line); stroke-width:1.2;}
 .hmdev{color:var(--hm-neutral);}
 .hmdev.hm-ok{color:var(--hm-ok);}
-.hmdev.hm-scan,.hmdev.hm-open,.hmdev.hm-rx{color:var(--hm-accent);}
+.hmdev.hm-scan,.hmdev.hm-open,.hmdev.hm-rx,.hmdev.hm-tx,.hmdev.hm-rec{color:var(--hm-accent);}
 .hmdev.hm-warn{color:var(--hm-warn);}
 .hmdev.hm-detect,.hmdev.hm-alert{color:var(--hm-alert);}
 .hmdev.hm-sleep .hmmarker{opacity:.45;}
 .hmdev.hm-off .hmmarker,.hmdev.hm-off .hmicon{opacity:.2;}
 .hmmarker{fill:currentColor; stroke:var(--hm-bg); stroke-width:1.2;}
+.hmsubject{color:var(--hm-accent); transition:transform .7s cubic-bezier(.4,0,.2,1);}
+.hmsubjectdot{fill:var(--hm-bg); stroke:currentColor; stroke-width:2;}
 .hmhubring,.hmentry{fill:none; stroke:currentColor; stroke-width:1.1;}
+/* hub tx: two staggered waves loop for as long as the state holds */
+.hmtxring{fill:none; stroke:currentColor; stroke-width:1.4; animation:hmtxwave 1.4s ease-out infinite;}
+.hmtxring.hmtxring2{animation-delay:.7s;}
+@keyframes hmtxwave{from{r:8; opacity:.9;} to{r:24; opacity:0;}}
+/* camera rec: blinking recording light; under reduced motion it stays
+   solid so the state is still readable */
+.hmrecdot{fill:var(--hm-alert); animation:hmrecblink 1.1s steps(1) infinite;}
+@keyframes hmrecblink{0%{opacity:1;} 55%{opacity:.15;} 100%{opacity:1;}}
 .hmentry{stroke-linejoin:round;}
 .hm-open .hmentry{stroke-dasharray:9 3;}
 .hmicon{fill:none; stroke:currentColor; stroke-width:1.5;}
@@ -824,10 +834,14 @@ body.sk-blueprint .hmframe{--hm-bg:#031B3A; --hm-line:#94BCD5; --hm-neutral:#94B
 .hmripple,.hmglow{fill:none; stroke:currentColor; stroke-width:2; animation:pirripple 1s ease-out both;}
 .hmglow{stroke-width:5;}
 .hmsig{fill:var(--hm-accent); visibility:hidden; transform-box:view-box;
-  animation:hmsignal .75s linear forwards;}
+  animation:hmsignal 1.6s linear infinite;}
+/* travel for 45% of the cycle (~.72s, the old one-shot speed), then rest
+   hidden — repeating while the step stays painted, so the relay is visible
+   whenever the reader looks */
 @keyframes hmsignal{
   0%{visibility:visible; opacity:1; transform:translate(var(--hx1),var(--hy1));}
-  99%{visibility:visible; opacity:1;}
+  44%{visibility:visible; opacity:1;}
+  45%{visibility:hidden; opacity:0; transform:translate(var(--hx2),var(--hy2));}
   100%{visibility:hidden; opacity:0; transform:translate(var(--hx2),var(--hy2));}
 }
 
@@ -1173,8 +1187,9 @@ body.sk-blueprint .hmframe{--hm-bg:#031B3A; --hm-line:#94BCD5; --hm-neutral:#94B
   .btzone.z-crit, .btdot.cur.z-crit{animation:none !important;}
   .bfmark.on, .bfcell.s-uploading{animation:none !important;}
   .rdsweep, .rdripple, .rdstatusbg{animation:none !important;}
-  .hmsweep,.hmripple,.hmglow,.hmsig{animation:none !important; display:none !important;}
-  .rdsubject{transition:none !important;}
+  .hmsweep,.hmripple,.hmglow,.hmsig,.hmtxring{animation:none !important; display:none !important;}
+  .hmrecdot{animation:none !important;}
+  .rdsubject,.hmsubject{transition:none !important;}
   .sgrow.s-retrying .sgbar.on, .sgrow.s-jammed .sgstate{animation:none !important;}
   .prosechev{transition:none !important;}
 }
@@ -4651,15 +4666,47 @@ function tileStateWarnings(obj, path, decl, warnings){
    First token is the fallback. Only signals is reserved: this panel has its
    own fold so log/mark/enterOnce remain ordinary device ids. */
 var HOMEMAP_STATES = {
-  camera: ['scan', 'sleep', 'detect', 'off'], entry: ['closed', 'open', 'alert'],
-  sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'alert']
+  camera: ['scan', 'sleep', 'detect', 'rec', 'off'], entry: ['closed', 'open', 'alert'],
+  sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'tx', 'alert']
 };
 function homemapDeviceValid(d){
   return d && typeof d.id === 'string' && d.id !== '' && d.id !== 'signals' &&
     typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(HOMEMAP_STATES, d.kind) &&
     isFiniteNum(d.x) && isFiniteNum(d.y);
 }
-function homemapPatchWarnings(obj, path, devices, warnings){
+function homemapSubjectPosition(v){
+  return v && typeof v === 'object' && !Array.isArray(v) && isFiniteNum(v.x) && isFiniteNum(v.y);
+}
+/* Shared declaration filtering keeps model, fold and warnings in agreement. */
+function homemapSubjects(panel, path, warnings){
+  var devices = Object.create(null), seen = Object.create(null), subjects = [];
+  function warn(message){ if (warnings) warnings.push(path + message); }
+  (Array.isArray(panel.devices) ? panel.devices : []).forEach(function(d){
+    if (d && typeof d.id === 'string') devices[d.id] = true;
+  });
+  if (panel.subjects !== undefined && !Array.isArray(panel.subjects))
+    warn('.subjects: expected an array — ignored');
+  (Array.isArray(panel.subjects) ? panel.subjects : []).forEach(function(sub, i){
+    var sp = '.subjects[' + i + ']', valid = true;
+    if (!sub || typeof sub.id !== 'string' || !sub.id){
+      warn(sp + '.id: needs a nonempty string — subject ignored');
+      return;
+    }
+    if (seen[sub.id]){ warn(sp + '.id: duplicate subject id "' + sub.id + '" — duplicate ignored'); valid = false; }
+    seen[sub.id] = true;
+    if (devices[sub.id]){ warn(sp + '.id: collides with a device id — subject ignored'); valid = false; }
+    if (sub.id === 'signals'){ warn(sp + '.id: "signals" is reserved — subject ignored'); valid = false; }
+    ['x', 'y'].forEach(function(k){
+      if (!isFiniteNum(sub[k])){ warn(sp + '.' + k + ': must be finite — subject ignored'); valid = false; }
+    });
+    if (sub.icon !== undefined && ICON_SET.indexOf(sub.icon) < 0)
+      warn(sp + '.icon: unknown icon "' + sub.icon + '" — using "gear"');
+    if (valid) subjects.push(sub);
+  });
+  return subjects;
+}
+function homemapPatchWarnings(obj, path, declaration, warnings){
+  var devices = declaration.devices, subjects = declaration.subjects;
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
   Object.keys(obj).forEach(function(k){
     if (k === 'signals'){
@@ -4673,8 +4720,11 @@ function homemapPatchWarnings(obj, path, devices, warnings){
             !devices[sig.from] || !devices[sig.to])
           warnings.push(path + '.signals[' + i + ']: needs from/to referencing declared device ids — entry ignored');
       });
+    } else if (subjects[k]){
+      if (obj[k] !== null && !homemapSubjectPosition(obj[k]))
+        warnings.push(path + '.' + k + ': expected an object with finite x/y or null — subject patch ignored');
     } else if (!devices[k]){
-      warnings.push(path + '.' + k + ': undeclared device id — state ignored');
+      warnings.push(path + '.' + k + ': undeclared device or subject id — patch ignored');
     } else {
       var vocab = HOMEMAP_STATES[devices[k].kind];
       if (vocab.indexOf(obj[k]) < 0)
@@ -4710,8 +4760,11 @@ function homemapDeclarationWarnings(panel, path, warnings){
       warnings.push(dp + '.icon: unknown icon "' + d.icon + '" — using "gear"');
     if (!duplicate && homemapDeviceValid(d)) devices[d.id] = d;
   });
-  homemapPatchWarnings(panel.initial, path + '.initial', devices, warnings);
-  return devices;
+  var subjects = Object.create(null);
+  homemapSubjects(panel, path, warnings).forEach(function(sub){ subjects[sub.id] = sub; });
+  var declaration = {devices: devices, subjects: subjects};
+  homemapPatchWarnings(panel.initial, path + '.initial', declaration, warnings);
+  return declaration;
 }
 
 /* radar per-step patch checks shared by initial and step patches */
@@ -5611,12 +5664,17 @@ function foldPhoneStates(panel, steps){
   return states;
 }
 
-/* Carry device states, but attach signals only to their authored step. */
+/* Carry device states and subject positions; signals belong only to their authored step. */
 function foldHomemapStates(panel, steps){
-  var carried = Object.create(null), states = [];
+  var carried = Object.create(null), states = [], subjects = Object.create(null);
+  homemapSubjects(panel).forEach(function(sub){ subjects[sub.id] = sub; });
   function apply(patch){
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return;
-    Object.keys(patch).forEach(function(k){ if (k !== 'signals') carried[k] = patch[k]; });
+    Object.keys(patch).forEach(function(k){
+      if (k === 'signals') return;
+      if (subjects[k] && patch[k] !== null && !homemapSubjectPosition(patch[k])) return;
+      carried[k] = patch[k];
+    });
   }
   function snapshot(signals){
     var snap = Object.create(null);
@@ -7625,6 +7683,13 @@ function homemapModel(panel, state){
       range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70};
     byId[d.id] = item; devices.push(item);
   });
+  var subjects = homemapSubjects(panel).map(function(sub){
+    var value = Object.prototype.hasOwnProperty.call(state, sub.id) ? state[sub.id] : undefined;
+    var position = homemapSubjectPosition(value) ? value : sub;
+    return {id: sub.id, label: String(sub.label != null ? sub.label : sub.id),
+      icon: sub.icon === undefined ? null : (ICON_SET.indexOf(sub.icon) >= 0 ? sub.icon : 'gear'),
+      x: clamp(position.x, 0, 320), y: clamp(position.y, 0, 180), hidden: value === null};
+  });
   var signals = [];
   (Array.isArray(state.signals) ? state.signals : []).forEach(function(sig){
     if (!sig || Array.isArray(sig) || typeof sig.from !== 'string' || typeof sig.to !== 'string') return;
@@ -7632,7 +7697,7 @@ function homemapModel(panel, state){
     if (from && to) signals.push({from: sig.from, to: sig.to,
       fromXY: {x: from.x, y: from.y}, toXY: {x: to.x, y: to.y}});
   });
-  return {outline: {x: (320 - w) / 2, y: (180 - h) / 2, w: w, h: h}, devices: devices, signals: signals};
+  return {outline: {x: (320 - w) / 2, y: (180 - h) / 2, w: w, h: h}, devices: devices, subjects: subjects, signals: signals};
 }
 
 function radarModel(panel, state){
@@ -9017,6 +9082,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       }
     });
     host._hmStates = hmNow;
+    var hmSubjPrev = host._hmSubjPrev || Object.create(null), hmSubjNow = Object.create(null);
+    var hmMoved = Object.create(null), hmHasMoved = false;
+    hm.subjects.forEach(function(sub){
+      if (sub.hidden) return;
+      var prev = hmSubjPrev[sub.id];
+      hmSubjNow[sub.id] = {x: sub.x, y: sub.y};
+      if (animate && prev && (prev.x !== sub.x || prev.y !== sub.y)){
+        hmMoved[sub.id] = true; hmHasMoved = true;
+      }
+    });
+    /* Hidden/removed subjects lose their previous position before reappearing. */
+    host._hmSubjPrev = hmSubjNow;
     var hmSignals = animate && typeof stepIdx === 'number' && stepIdx >= 0 ? hm.signals : [];
     var buildHomemap = function(transient){
       var o = hm.outline;
@@ -9024,7 +9101,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       s += '<rect class="hmoutline" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="9"/>';
       /* Wedges below all markers, so one camera cannot obscure another. */
       hm.devices.forEach(function(d){
-        if (d.kind !== 'camera' || ['scan', 'detect'].indexOf(d.state) < 0) return;
+        if (d.kind !== 'camera' || ['scan', 'detect', 'rec'].indexOf(d.state) < 0) return;
         var a1 = (d.facing - d.spread / 2) * Math.PI / 180;
         var a2 = (d.facing + d.spread / 2) * Math.PI / 180;
         var mid = d.facing * Math.PI / 180;
@@ -9046,6 +9123,15 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
           '" cx="' + d.x + '" cy="' + d.y + '" r="6"/>';
         s += '<circle class="hmmarker" cx="' + d.x + '" cy="' + d.y + '" r="' + (d.kind === 'hub' ? 7 : 4) + '"/>';
         if (d.kind === 'hub') s += '<circle class="hmhubring" cx="' + d.x + '" cy="' + d.y + '" r="10"/>';
+        /* tx: steady looping broadcast waves — part of the baseline, so an
+           unchanged step repaint leaves the animation running */
+        if (d.kind === 'hub' && d.state === 'tx')
+          s += '<circle class="hmtxring" cx="' + d.x + '" cy="' + d.y + '" r="8"/>' +
+               '<circle class="hmtxring hmtxring2" cx="' + d.x + '" cy="' + d.y + '" r="8"/>';
+        /* rec: the classic blinking recording light beside the camera dot —
+           steady markup, so the blink survives unchanged step repaints */
+        if (d.kind === 'camera' && d.state === 'rec')
+          s += '<circle class="hmrecdot" cx="' + (d.x + 7) + '" cy="' + (d.y - 7) + '" r="2.5"/>';
         if (d.kind === 'entry') s += '<path class="hmentry" d="M' + (d.x - 7) + ' ' + (d.y - 7) +
           ' v14 h14 v-14 Z M' + (d.x + 7) + ' ' + (d.y + 7) +
           (d.state === 'open' ? ' l7 -10' : ' v-14') + '"/>';
@@ -9053,6 +9139,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
           (d.x + 7) + '" y="' + (d.y - 7) + '" width="14" height="14"/>';
         s += '<text class="hmlbl" x="' + d.x + '" y="' + Math.min(177, d.y + 18) +
           '" text-anchor="middle">' + esc(d.label) + '</text></g>';
+      });
+      hm.subjects.forEach(function(sub){
+        if (sub.hidden) return;
+        var prev = hmSubjPrev[sub.id];
+        s += '<g class="hmsubject" data-subject="' + esc(sub.id) + '"' +
+          ((transient && hmMoved[sub.id]) ? ' style="transform:translate(' + (prev.x - sub.x) +
+            'px,' + (prev.y - sub.y) + 'px)"' : '') + '>';
+        s += '<circle class="hmsubjectdot" cx="' + sub.x + '" cy="' + sub.y + '" r="5"/>';
+        if (sub.icon) s += '<use class="hmicon" href="#i-' + esc(sub.icon) + '" x="' +
+          (sub.x + 8) + '" y="' + (sub.y - 7) + '" width="14" height="14"/>';
+        s += '<text class="hmlbl" x="' + sub.x + '" y="' + Math.min(177, sub.y + 18) +
+          '" text-anchor="middle">' + esc(sub.label) + '</text></g>';
       });
       if (!hm.devices.length) s += '<text class="hmlbl" x="160" y="94" text-anchor="middle">No devices configured</text>';
       if (transient) hmSignals.forEach(function(sig, i){
@@ -9062,7 +9160,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       return s + '</svg>';
     };
     h += buildHomemap(true);
-    hBaseline = (hmHasFresh || hmSignals.length) ? buildHomemap(false) : null;
+    hBaseline = (hmHasFresh || hmHasMoved || hmSignals.length) ? buildHomemap(false) : null;
   } else if (type === 'radar'){
     var rm2 = radarModel(panel, state);
     var ridx = typeof stepIdx === 'number' ? stepIdx : 0;
@@ -9260,6 +9358,13 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     else if (type === 'gauge') settleLevel('.gaugefill', pct, '.gaugeval', v);
     var subjectEl = host.querySelector(type === 'pir' ? '.pirsubject' : (type === 'radar' ? '.rdsubject' : '.dv-no-subject'));
     if (subjectEl) subjectEl.style.transform = 'translate(0,0)';
+    if (type === 'homemap' && typeof host.querySelectorAll === 'function'){
+      var hmSettle = host.querySelectorAll('.hmsubject[style]');
+      for (var hs = 0; hs < hmSettle.length; hs++){
+        hmSettle[hs].style.transition = 'none';
+        hmSettle[hs].style.transform = 'translate(0,0)';
+      }
+    }
     if (type === 'inflight' && inflightFramesNow && typeof host.querySelectorAll === 'function'){
       var settleBars = host.querySelectorAll('.ifbar');
       inflightFramesNow.forEach(function(frame, i){
@@ -9297,16 +9402,20 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
   host._lastHTML = (hBaseline != null) ? hBaseline : h;
   if (!surgical) host.innerHTML = h;
 
-  /* pir + radar: release the subject's offset transform on the next frame so
-     it glides (CSS transition) from the previous step's position to the new */
-  if ((type === 'pir' || type === 'radar') && animate){
-    var glideEl = host.querySelector(type === 'pir' ? '.pirsubject[style]' : '.rdsubject[style]');
-    if (glideEl){
-      /* force the offset position into a painted frame first, or the release
-         coalesces into the insertion paint and the transition never runs */
-      void glideEl.getBoundingClientRect();
+  /* Release each subject offset after a painted frame to start its glide. */
+  if ((type === 'pir' || type === 'radar' || type === 'homemap') && animate){
+    var glideEls = [];
+    if (type === 'homemap'){
+      if (typeof host.querySelectorAll === 'function') glideEls = host.querySelectorAll('.hmsubject[style]');
+    } else {
+      var glideEl = host.querySelector(type === 'pir' ? '.pirsubject[style]' : '.rdsubject[style]');
+      if (glideEl) glideEls = [glideEl];
+    }
+    if (glideEls.length){
+      /* Force offsets into layout before the double-rAF release. */
+      for (var ge = 0; ge < glideEls.length; ge++) void glideEls[ge].getBoundingClientRect();
       requestAnimationFrame(function(){ requestAnimationFrame(function(){
-        glideEl.style.transform = 'translate(0,0)';
+        for (var gi = 0; gi < glideEls.length; gi++) glideEls[gi].style.transform = 'translate(0,0)';
       }); });
     }
   }

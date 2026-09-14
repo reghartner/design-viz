@@ -3078,12 +3078,14 @@ test('homemap setup and dynamic patch fields follow declared devices', () => {
       {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
       {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
       {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'}
-    ], max: 12}], ['initial', 'json']
+    ], max: 12}], ['subjects', 'rows', {cols: [
+      {k: 'id', req: true}, {k: 'label'}, {k: 'x', kind: 'num', req: true},
+      {k: 'y', kind: 'num', req: true}, {k: 'icon'}], max: 6}], ['initial', 'json']
   ]);
   const decl = {type: 'homemap', devices: ['camera', 'entry', 'sensor', 'hub'].map((kind, i) => ({id: 'd' + i, kind, x: 20, y: 40}))};
   assert.deepStrictEqual(plain(B.panelPatchFields(decl)), [
-    ['d0', 'enum', ['sleep', 'scan', 'detect', 'off']], ['d1', 'enum', ['closed', 'open', 'alert']],
-    ['d2', 'enum', ['ok', 'warn', 'alert', 'off']], ['d3', 'enum', ['idle', 'rx', 'alert']], ['signals', 'jsonArr']
+    ['d0', 'enum', ['sleep', 'scan', 'detect', 'rec', 'off']], ['d1', 'enum', ['closed', 'open', 'alert']],
+    ['d2', 'enum', ['ok', 'warn', 'alert', 'off']], ['d3', 'enum', ['idle', 'rx', 'tx', 'alert']], ['signals', 'jsonArr']
   ]);
   decl.devices.push(null, {}, {...decl.devices[0]}, {id: 'signals', kind: 'camera', x: 1, y: 2},
     {id: 'bad', kind: 'dragon', x: 1, y: 2}, {id: 'nan', kind: 'camera', x: NaN, y: 1});
@@ -3097,6 +3099,7 @@ test('homemap palette starter inserts all device kinds without warnings', () => 
   assert.strictEqual(p.type, 'homemap');
   assert.deepStrictEqual(p.devices.map(d => d.kind).sort(), ['camera', 'camera', 'entry', 'hub', 'sensor']);
   assert.ok(p.devices.find(d => d.kind === 'sensor').label);
+  assert.deepStrictEqual(p.subjects, [{id: 'walker', label: 'Visitor', x: 20, y: 150}]);
   const result = V.validate(V.normalize(spec));
   assert.strictEqual(result.errors.length, 0);
   assert.strictEqual(result.warnings.length, 0);
@@ -3109,4 +3112,21 @@ test('un-floating a node that is malformed into both rows and floats only remove
   const next = JSON.parse(plan.text);
   assert.deepStrictEqual(next.rows, [['a', 'x']]);
   assert.strictEqual(next.floats, undefined);
+});
+
+test('homemap subject patch fields accept positions and explicit null', () => {
+  const subjects = [{id: 'walker', x: 20, y: 150}, {id: '__proto__', x: 5, y: 6}];
+  const decl = {type: 'homemap', devices: [{id: 'cam', kind: 'camera', x: 1, y: 2}], subjects};
+  const fields = B.panelPatchFields(decl);
+  assert.deepStrictEqual(plain(fields.slice(1)), [
+    ['walker', 'json', {nullable: true}], ['__proto__', 'json', {nullable: true}], ['signals', 'jsonArr']
+  ]);
+  for (const raw of ['{"x":120,"y":60}', 'null'])
+    assert.deepStrictEqual(plain(B.patchFieldsCollect(fields, {walker: raw}).item), {walker: JSON.parse(raw)});
+  for (const raw of ['[]', 'false', '2', '"scan"'])
+    assert.ok(B.patchFieldsCollect(fields, {walker: raw}).error);
+  assert.ok(B.patchFieldsCollect([['normal', 'json']], {normal: 'null'}).error);
+  subjects.push(null, {}, {id: 5, x: 1, y: 2}, {...subjects[0]}, {id: 'cam', x: 1, y: 2},
+    {id: 'signals', x: 1, y: 2}, {id: 'bad', x: Infinity, y: 2});
+  assert.deepStrictEqual(plain(B.panelPatchFields(decl)), plain(fields));
 });

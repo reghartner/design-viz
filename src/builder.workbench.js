@@ -1226,6 +1226,7 @@ var PANEL_TEMPLATES = {
               {id: 'door', kind: 'entry', label: 'Front door', x: 160, y: 158},
               {id: 'attic', kind: 'sensor', label: 'Attic temp', icon: 'thermo', x: 46, y: 132},
               {id: 'hub', kind: 'hub', label: 'Hub', x: 160, y: 92}],
+              subjects: [{id: 'walker', label: 'Visitor', x: 20, y: 150}],
               initial: {cam1: 'scan', cam2: 'sleep', door: 'closed', attic: 'ok', hub: 'idle'}},
   signal:    {title: 'Links', links: [{id: 'up', label: 'uplink', transport: 'wifi'}]},
   tiles:     {title: 'Fleet', tiles: [{id: 't1', label: 'UNIT 1'}, {id: 't2', label: 'UNIT 2'}]},
@@ -2231,7 +2232,9 @@ var PANEL_SETUP_FIELDS = {
                 {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
                 {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
                 {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'}],
-              max: 12}], ['initial', 'json']],
+              max: 12}], ['subjects', 'rows', {cols: [
+                {k: 'id', req: true}, {k: 'label'}, {k: 'x', kind: 'num', req: true},
+                {k: 'y', kind: 'num', req: true}, {k: 'icon'}], max: 6}], ['initial', 'json']],
   signal:    [['links', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'},
                 {k: 'transport', kind: 'enum',
                  options: ['wifi', 'subghz', 'thread', 'zigbee', 'zwave', 'cellular', 'poe', 'ethernet', 'ble']}],
@@ -2303,15 +2306,23 @@ function panelPatchFields(decl){
   var states = Array.isArray(decl.states) ? decl.states.map(String) : [];
   var stateField = states.length ? ['state', 'enum', states] : ['state', 'text'];
   if (decl.type === 'homemap'){
-    var vocab = {camera: ['sleep', 'scan', 'detect', 'off'], entry: ['closed', 'open', 'alert'],
-      sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'alert']};
+    var vocab = {camera: ['sleep', 'scan', 'detect', 'rec', 'off'], entry: ['closed', 'open', 'alert'],
+      sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'tx', 'alert']};
     var seen = Object.create(null);
-    return (Array.isArray(decl.devices) ? decl.devices : []).filter(function(d){
+    var fields = (Array.isArray(decl.devices) ? decl.devices : []).filter(function(d){
       if (!d || typeof d.id !== 'string' || !d.id || seen[d.id]) return false;
       seen[d.id] = true;
       return d.id !== 'signals' && typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(vocab, d.kind) &&
         typeof d.x === 'number' && isFinite(d.x) && typeof d.y === 'number' && isFinite(d.y);
-    }).map(function(d){ return [d.id, 'enum', vocab[d.kind]]; }).concat([['signals', 'jsonArr']]);
+    }).map(function(d){ return [d.id, 'enum', vocab[d.kind]]; });
+    (Array.isArray(decl.subjects) ? decl.subjects : []).forEach(function(sub){
+      if (!sub || typeof sub.id !== 'string' || !sub.id || seen[sub.id]) return;
+      seen[sub.id] = true;
+      if (sub.id === 'signals' || typeof sub.x !== 'number' || !isFinite(sub.x) ||
+          typeof sub.y !== 'number' || !isFinite(sub.y)) return;
+      fields.push([sub.id, 'json', {nullable: true}]);
+    });
+    return fields.concat([['signals', 'jsonArr']]);
   }
   if (decl.type === 'state') return [stateField];
   if (decl.type === 'orbit') return [stateField, ['via', 'text']];
@@ -2335,7 +2346,7 @@ function patchFieldsCollect(fields, values){
   var item = Object.create(null);
   for (var i = 0; i < fields.length; i++){
     var f = fields[i], key = f[0], kind = f[1], extra = f[2];
-    var raw = values[key] == null ? '' : String(values[key]);
+    var raw = !Object.prototype.hasOwnProperty.call(values, key) || values[key] == null ? '' : String(values[key]);
     if (kind !== 'enum') raw = raw.trim();
     if (raw === '') continue;
     var value = raw;
@@ -2357,8 +2368,9 @@ function patchFieldsCollect(fields, values){
       try { value = JSON.parse(raw); }
       catch (ex){ return {error: key + ': not valid JSON (' + ex.message + ')'}; }
       if (kind === 'jsonArr' && !Array.isArray(value)) return {error: key + ' is a JSON array — [ ... ]'};
-      if (kind === 'json' && (!value || typeof value !== 'object' || Array.isArray(value)))
-        return {error: key + ' is a JSON object — { ... }'};
+      if (kind === 'json' && !(value === null && extra && extra.nullable) &&
+          (!value || typeof value !== 'object' || Array.isArray(value)))
+        return {error: key + ' is a JSON object' + (extra && extra.nullable ? ' or null' : '') + ' — { ... }'};
     }
     item[key] = value;
   }

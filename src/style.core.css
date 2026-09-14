@@ -782,13 +782,23 @@ body.sk-blueprint .hmframe{--hm-bg:#031B3A; --hm-line:#94BCD5; --hm-neutral:#94B
 .hmoutline{fill:none; stroke:var(--hm-line); stroke-width:1.2;}
 .hmdev{color:var(--hm-neutral);}
 .hmdev.hm-ok{color:var(--hm-ok);}
-.hmdev.hm-scan,.hmdev.hm-open,.hmdev.hm-rx{color:var(--hm-accent);}
+.hmdev.hm-scan,.hmdev.hm-open,.hmdev.hm-rx,.hmdev.hm-tx,.hmdev.hm-rec{color:var(--hm-accent);}
 .hmdev.hm-warn{color:var(--hm-warn);}
 .hmdev.hm-detect,.hmdev.hm-alert{color:var(--hm-alert);}
 .hmdev.hm-sleep .hmmarker{opacity:.45;}
 .hmdev.hm-off .hmmarker,.hmdev.hm-off .hmicon{opacity:.2;}
 .hmmarker{fill:currentColor; stroke:var(--hm-bg); stroke-width:1.2;}
+.hmsubject{color:var(--hm-accent); transition:transform .7s cubic-bezier(.4,0,.2,1);}
+.hmsubjectdot{fill:var(--hm-bg); stroke:currentColor; stroke-width:2;}
 .hmhubring,.hmentry{fill:none; stroke:currentColor; stroke-width:1.1;}
+/* hub tx: two staggered waves loop for as long as the state holds */
+.hmtxring{fill:none; stroke:currentColor; stroke-width:1.4; animation:hmtxwave 1.4s ease-out infinite;}
+.hmtxring.hmtxring2{animation-delay:.7s;}
+@keyframes hmtxwave{from{r:8; opacity:.9;} to{r:24; opacity:0;}}
+/* camera rec: blinking recording light; under reduced motion it stays
+   solid so the state is still readable */
+.hmrecdot{fill:var(--hm-alert); animation:hmrecblink 1.1s steps(1) infinite;}
+@keyframes hmrecblink{0%{opacity:1;} 55%{opacity:.15;} 100%{opacity:1;}}
 .hmentry{stroke-linejoin:round;}
 .hm-open .hmentry{stroke-dasharray:9 3;}
 .hmicon{fill:none; stroke:currentColor; stroke-width:1.5;}
@@ -799,10 +809,14 @@ body.sk-blueprint .hmframe{--hm-bg:#031B3A; --hm-line:#94BCD5; --hm-neutral:#94B
 .hmripple,.hmglow{fill:none; stroke:currentColor; stroke-width:2; animation:pirripple 1s ease-out both;}
 .hmglow{stroke-width:5;}
 .hmsig{fill:var(--hm-accent); visibility:hidden; transform-box:view-box;
-  animation:hmsignal .75s linear forwards;}
+  animation:hmsignal 1.6s linear infinite;}
+/* travel for 45% of the cycle (~.72s, the old one-shot speed), then rest
+   hidden — repeating while the step stays painted, so the relay is visible
+   whenever the reader looks */
 @keyframes hmsignal{
   0%{visibility:visible; opacity:1; transform:translate(var(--hx1),var(--hy1));}
-  99%{visibility:visible; opacity:1;}
+  44%{visibility:visible; opacity:1;}
+  45%{visibility:hidden; opacity:0; transform:translate(var(--hx2),var(--hy2));}
   100%{visibility:hidden; opacity:0; transform:translate(var(--hx2),var(--hy2));}
 }
 
@@ -1148,8 +1162,9 @@ body.sk-blueprint .hmframe{--hm-bg:#031B3A; --hm-line:#94BCD5; --hm-neutral:#94B
   .btzone.z-crit, .btdot.cur.z-crit{animation:none !important;}
   .bfmark.on, .bfcell.s-uploading{animation:none !important;}
   .rdsweep, .rdripple, .rdstatusbg{animation:none !important;}
-  .hmsweep,.hmripple,.hmglow,.hmsig{animation:none !important; display:none !important;}
-  .rdsubject{transition:none !important;}
+  .hmsweep,.hmripple,.hmglow,.hmsig,.hmtxring{animation:none !important; display:none !important;}
+  .hmrecdot{animation:none !important;}
+  .rdsubject,.hmsubject{transition:none !important;}
   .sgrow.s-retrying .sgbar.on, .sgrow.s-jammed .sgstate{animation:none !important;}
   .prosechev{transition:none !important;}
 }

@@ -1807,6 +1807,13 @@ function homemapModel(panel, state){
       range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70};
     byId[d.id] = item; devices.push(item);
   });
+  var subjects = homemapSubjects(panel).map(function(sub){
+    var value = Object.prototype.hasOwnProperty.call(state, sub.id) ? state[sub.id] : undefined;
+    var position = homemapSubjectPosition(value) ? value : sub;
+    return {id: sub.id, label: String(sub.label != null ? sub.label : sub.id),
+      icon: sub.icon === undefined ? null : (ICON_SET.indexOf(sub.icon) >= 0 ? sub.icon : 'gear'),
+      x: clamp(position.x, 0, 320), y: clamp(position.y, 0, 180), hidden: value === null};
+  });
   var signals = [];
   (Array.isArray(state.signals) ? state.signals : []).forEach(function(sig){
     if (!sig || Array.isArray(sig) || typeof sig.from !== 'string' || typeof sig.to !== 'string') return;
@@ -1814,7 +1821,7 @@ function homemapModel(panel, state){
     if (from && to) signals.push({from: sig.from, to: sig.to,
       fromXY: {x: from.x, y: from.y}, toXY: {x: to.x, y: to.y}});
   });
-  return {outline: {x: (320 - w) / 2, y: (180 - h) / 2, w: w, h: h}, devices: devices, signals: signals};
+  return {outline: {x: (320 - w) / 2, y: (180 - h) / 2, w: w, h: h}, devices: devices, subjects: subjects, signals: signals};
 }
 
 function radarModel(panel, state){
@@ -3199,6 +3206,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       }
     });
     host._hmStates = hmNow;
+    var hmSubjPrev = host._hmSubjPrev || Object.create(null), hmSubjNow = Object.create(null);
+    var hmMoved = Object.create(null), hmHasMoved = false;
+    hm.subjects.forEach(function(sub){
+      if (sub.hidden) return;
+      var prev = hmSubjPrev[sub.id];
+      hmSubjNow[sub.id] = {x: sub.x, y: sub.y};
+      if (animate && prev && (prev.x !== sub.x || prev.y !== sub.y)){
+        hmMoved[sub.id] = true; hmHasMoved = true;
+      }
+    });
+    /* Hidden/removed subjects lose their previous position before reappearing. */
+    host._hmSubjPrev = hmSubjNow;
     var hmSignals = animate && typeof stepIdx === 'number' && stepIdx >= 0 ? hm.signals : [];
     var buildHomemap = function(transient){
       var o = hm.outline;
@@ -3206,7 +3225,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       s += '<rect class="hmoutline" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="9"/>';
       /* Wedges below all markers, so one camera cannot obscure another. */
       hm.devices.forEach(function(d){
-        if (d.kind !== 'camera' || ['scan', 'detect'].indexOf(d.state) < 0) return;
+        if (d.kind !== 'camera' || ['scan', 'detect', 'rec'].indexOf(d.state) < 0) return;
         var a1 = (d.facing - d.spread / 2) * Math.PI / 180;
         var a2 = (d.facing + d.spread / 2) * Math.PI / 180;
         var mid = d.facing * Math.PI / 180;
@@ -3228,6 +3247,15 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
           '" cx="' + d.x + '" cy="' + d.y + '" r="6"/>';
         s += '<circle class="hmmarker" cx="' + d.x + '" cy="' + d.y + '" r="' + (d.kind === 'hub' ? 7 : 4) + '"/>';
         if (d.kind === 'hub') s += '<circle class="hmhubring" cx="' + d.x + '" cy="' + d.y + '" r="10"/>';
+        /* tx: steady looping broadcast waves — part of the baseline, so an
+           unchanged step repaint leaves the animation running */
+        if (d.kind === 'hub' && d.state === 'tx')
+          s += '<circle class="hmtxring" cx="' + d.x + '" cy="' + d.y + '" r="8"/>' +
+               '<circle class="hmtxring hmtxring2" cx="' + d.x + '" cy="' + d.y + '" r="8"/>';
+        /* rec: the classic blinking recording light beside the camera dot —
+           steady markup, so the blink survives unchanged step repaints */
+        if (d.kind === 'camera' && d.state === 'rec')
+          s += '<circle class="hmrecdot" cx="' + (d.x + 7) + '" cy="' + (d.y - 7) + '" r="2.5"/>';
         if (d.kind === 'entry') s += '<path class="hmentry" d="M' + (d.x - 7) + ' ' + (d.y - 7) +
           ' v14 h14 v-14 Z M' + (d.x + 7) + ' ' + (d.y + 7) +
           (d.state === 'open' ? ' l7 -10' : ' v-14') + '"/>';
@@ -3235,6 +3263,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
           (d.x + 7) + '" y="' + (d.y - 7) + '" width="14" height="14"/>';
         s += '<text class="hmlbl" x="' + d.x + '" y="' + Math.min(177, d.y + 18) +
           '" text-anchor="middle">' + esc(d.label) + '</text></g>';
+      });
+      hm.subjects.forEach(function(sub){
+        if (sub.hidden) return;
+        var prev = hmSubjPrev[sub.id];
+        s += '<g class="hmsubject" data-subject="' + esc(sub.id) + '"' +
+          ((transient && hmMoved[sub.id]) ? ' style="transform:translate(' + (prev.x - sub.x) +
+            'px,' + (prev.y - sub.y) + 'px)"' : '') + '>';
+        s += '<circle class="hmsubjectdot" cx="' + sub.x + '" cy="' + sub.y + '" r="5"/>';
+        if (sub.icon) s += '<use class="hmicon" href="#i-' + esc(sub.icon) + '" x="' +
+          (sub.x + 8) + '" y="' + (sub.y - 7) + '" width="14" height="14"/>';
+        s += '<text class="hmlbl" x="' + sub.x + '" y="' + Math.min(177, sub.y + 18) +
+          '" text-anchor="middle">' + esc(sub.label) + '</text></g>';
       });
       if (!hm.devices.length) s += '<text class="hmlbl" x="160" y="94" text-anchor="middle">No devices configured</text>';
       if (transient) hmSignals.forEach(function(sig, i){
@@ -3244,7 +3284,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       return s + '</svg>';
     };
     h += buildHomemap(true);
-    hBaseline = (hmHasFresh || hmSignals.length) ? buildHomemap(false) : null;
+    hBaseline = (hmHasFresh || hmHasMoved || hmSignals.length) ? buildHomemap(false) : null;
   } else if (type === 'radar'){
     var rm2 = radarModel(panel, state);
     var ridx = typeof stepIdx === 'number' ? stepIdx : 0;
@@ -3442,6 +3482,13 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     else if (type === 'gauge') settleLevel('.gaugefill', pct, '.gaugeval', v);
     var subjectEl = host.querySelector(type === 'pir' ? '.pirsubject' : (type === 'radar' ? '.rdsubject' : '.dv-no-subject'));
     if (subjectEl) subjectEl.style.transform = 'translate(0,0)';
+    if (type === 'homemap' && typeof host.querySelectorAll === 'function'){
+      var hmSettle = host.querySelectorAll('.hmsubject[style]');
+      for (var hs = 0; hs < hmSettle.length; hs++){
+        hmSettle[hs].style.transition = 'none';
+        hmSettle[hs].style.transform = 'translate(0,0)';
+      }
+    }
     if (type === 'inflight' && inflightFramesNow && typeof host.querySelectorAll === 'function'){
       var settleBars = host.querySelectorAll('.ifbar');
       inflightFramesNow.forEach(function(frame, i){
@@ -3479,16 +3526,20 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
   host._lastHTML = (hBaseline != null) ? hBaseline : h;
   if (!surgical) host.innerHTML = h;
 
-  /* pir + radar: release the subject's offset transform on the next frame so
-     it glides (CSS transition) from the previous step's position to the new */
-  if ((type === 'pir' || type === 'radar') && animate){
-    var glideEl = host.querySelector(type === 'pir' ? '.pirsubject[style]' : '.rdsubject[style]');
-    if (glideEl){
-      /* force the offset position into a painted frame first, or the release
-         coalesces into the insertion paint and the transition never runs */
-      void glideEl.getBoundingClientRect();
+  /* Release each subject offset after a painted frame to start its glide. */
+  if ((type === 'pir' || type === 'radar' || type === 'homemap') && animate){
+    var glideEls = [];
+    if (type === 'homemap'){
+      if (typeof host.querySelectorAll === 'function') glideEls = host.querySelectorAll('.hmsubject[style]');
+    } else {
+      var glideEl = host.querySelector(type === 'pir' ? '.pirsubject[style]' : '.rdsubject[style]');
+      if (glideEl) glideEls = [glideEl];
+    }
+    if (glideEls.length){
+      /* Force offsets into layout before the double-rAF release. */
+      for (var ge = 0; ge < glideEls.length; ge++) void glideEls[ge].getBoundingClientRect();
       requestAnimationFrame(function(){ requestAnimationFrame(function(){
-        glideEl.style.transform = 'translate(0,0)';
+        for (var gi = 0; gi < glideEls.length; gi++) glideEls[gi].style.transform = 'translate(0,0)';
       }); });
     }
   }

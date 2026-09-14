@@ -13,8 +13,10 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 1 | Trace import, software panels and outline | codex/trace-import-foundation | Open: https://github.com/reghartner/design-viz/pull/50 |
 | 2 | Dependency-aware trace rows, crossing reduction and routing | codex/trace-smart-layout | Open: https://github.com/reghartner/design-viz/pull/51 |
 | 3 | Internal spans and inclusive / child-covered / uncovered timing | codex/trace-service-time | Open: https://github.com/reghartner/design-viz/pull/52 |
-| 4 | Large trace focus by service/subtree and import preview | codex/trace-import-focus | Built; opening PR, stacked on #52 |
-| 5 | Effective step-state inspector and inheritance provenance | TBD | Next workbench improvement if time permits |
+| 4 | Large trace focus by service/subtree and import preview | codex/trace-import-focus | Open: https://github.com/reghartner/design-viz/pull/53 |
+| 5 | Effective step-state inspector and inheritance provenance | codex/effective-state-inspector | Open: https://github.com/reghartner/design-viz/pull/54 |
+| 6 | Resizable workbench workspace / focused editing | TBD | Next bounded usability improvement |
+| 7 | Retry/timeout and circuit-breaker story | TBD | Reuse existing panels; add a focused software recipe/starter |
 
 ## Validation and evidence
 
@@ -25,7 +27,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51 and #52 passed all GitHub checks.
+- PRs #50, #51, #52 and #53 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -37,17 +39,23 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   overwrite protection. Browser verified a 1,000-span preview without document
   mutation, one-span import, undo, clear-focus recovery, service descendants,
   invalid focus, stale-preview disabling and retained original offsets.
+- Effective-state inspector: full Node suite and 158 Python tests passed,
+  with 13 focused regressions for normal and specialized reducers, exact source
+  paths, transient values, non-finite input and hidden-tab paths. Browser
+  verified inherited/unpatched panels, transient overrides, exact selection,
+  unchanged undo history, immediate stale-value clearing and read-only JSON.
 
 ## Next continuation
 
-Start from the current `codex/trace-service-time` branch, inspect checks and
-working-tree changes, and create the next focused branch. Do not recreate the
-three PRs above. Suggested next slice: import preview plus explicit service or
-subtree focus before replacing the document. Preserve a route back to the full
-trace and show omitted-span counts; selecting one service should not silently
-reparent spans or claim complete coverage. Larger input support should be
-bounded, tested and avoid rendering hundreds of step chips at once. Then add
-the effective-state inspector to explain inherited values while editing steps.
+Start from the current `codex/effective-state-inspector` branch, inspect checks
+and working-tree changes, and create the next focused branch. Do not recreate
+the completed PRs above. The source/inspector/preview workspace could use
+resizable proportions and focused editing: long state histories currently
+share a small vertical inspector with JSON source. Keep phone layouts usable
+and retain native text editing. Next, broaden the software examples with an
+explicit retry/timeout/circuit-breaker story using existing panels, with honest
+authored timing and outcomes. Only add another widget when it expresses
+something the existing catalog cannot clearly represent.
 
 ## Design commitments
 

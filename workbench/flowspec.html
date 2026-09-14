@@ -97,6 +97,17 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 #trace-search-results{max-height:220px;overflow:auto;display:grid;gap:5px;}
 .trace-result{display:grid;gap:3px;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;}
 .trace-result small{font-size:10px;color:var(--sub);}
+.effective-state{border:1px solid var(--line);border-radius:7px;margin-top:12px;padding:9px;font-size:12px;}
+.effective-state>summary{font-weight:600;cursor:pointer;}
+.effective-note{font-size:11px;color:var(--sub);line-height:1.5;margin:8px 0;}
+.effective-panel{border-top:1px solid var(--line);margin-top:9px;padding-top:7px;}
+.effective-panel>summary,.effective-json>summary{cursor:pointer;overflow-wrap:anywhere;}
+.effective-heading{display:flex;gap:6px;flex-wrap:wrap;align-items:baseline;}
+.effective-origin{font-size:10px;color:var(--sub);}.effective-origin[data-origin="transient"]{color:var(--accent);font-weight:600;}
+.effective-field{margin:9px 0;padding:7px;border:1px solid var(--line);border-radius:5px;}
+.effective-field pre{font:11px/1.45 'IBM Plex Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:150px;overflow:auto;margin:6px 0;}
+.effective-source{font-size:10px;margin:2px 4px 2px 0;max-width:100%;overflow-wrap:anywhere;white-space:normal;}
+.effective-json{margin-top:9px;}.effective-json textarea{box-sizing:border-box;width:100%;font:11px/1.45 'IBM Plex Mono',monospace;}
 .toolrow .lab{font:600 11px 'IBM Plex Mono',monospace; letter-spacing:.1em; color:var(--sub);}
 .skbtn{background:var(--card); border:1px solid var(--line); color:var(--sub); font:600 11px 'IBM Plex Mono',monospace;
   padding:6px 12px; border-radius:8px; cursor:pointer;}
@@ -13106,6 +13117,74 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
   });
 }
 
+/* Values always come from the engine's fold. Provenance describes authored
+   assignments or operation inputs; it never implements a second reducer. */
+function builderEffectivePanelStates(d, stepIndex){
+  if (!d || !Array.isArray(d.steps) || !Number.isInteger(stepIndex) || stepIndex<0 || stepIndex>=d.steps.length)
+    return {error:'Select an existing step to inspect its effective state.'};
+  var panels=Array.isArray(d.panels)?d.panels:[], seen=new Set(), folded;
+  if (panels.some(function(p){ if (!p || typeof p.id!=='string' || !p.id || seen.has(p.id)) return true; seen.add(p.id); return false; }))
+    return {error:'Use unique non-empty string panel IDs; fix missing or duplicate IDs before inspecting effective state.'};
+  try { folded=foldPanelStates(d); } catch(ex){ return {error:'Unable to fold panel state. Fix the diagram validation errors first.'}; }
+  try {
+    panels.forEach(function(p){ JSON.stringify((folded[p.id]||[])[stepIndex],function(key,value){
+      if (typeof value==='number' && !Number.isFinite(value)) throw new Error('non-finite');
+      return value;
+    }); });
+  } catch(ex){ return {error:'Effective state contains non-finite or unsupported values. Fix validation errors before inspecting its JSON.'}; }
+  var own=function(o,k){ return o!=null && Object.prototype.hasOwnProperty.call(o,k); };
+  return {panels:panels.map(function(p,pi){
+    var snapshot=(folded[p.id]||[])[stepIndex]||{};
+    function input(i,key,once){
+      var patchKey=i==null?null:(d.steps[i].panels && typeof d.steps[i].panels==='object' && !Array.isArray(d.steps[i].panels)?'panels':'patch');
+      var path=i==null?['panels',pi,'initial']:['steps',i,patchKey,p.id];
+      if (once) path.push('enterOnce'); path.push(key);
+      return {step:i,key:key,path:path,label:(i==null?'Initial':('Step '+(i+1)))+(once?' · enterOnce':'')+' · '+key};
+    }
+    function history(keys,includeInitial,label){
+      var inputs=[];
+      if (includeInitial) keys.forEach(function(key){ if (own(p.initial,key)) inputs.push(input(null,key,false)); });
+      for (var i=0;i<=stepIndex;i++){
+        var patch=(stepPanelPatch(d.steps[i])||{})[p.id];
+        keys.forEach(function(key){ if (own(patch,key)) inputs.push(input(i,key,false)); });
+      }
+      return {kind:inputs.length?'history':'engine',label:inputs.length?label:'Engine default',inputs:inputs};
+    }
+    function assignment(key,accept,allowOnce,preserveInitial){
+      var source=own(p.initial,key) && (preserveInitial||!accept||accept(p.initial[key]))?input(null,key,false):null;
+      for(var i=0;i<=stepIndex;i++){
+        var patch=(stepPanelPatch(d.steps[i])||{})[p.id];
+        if (own(patch,key) && (!accept||accept(patch[key]))) source=input(i,key,false);
+      }
+      var current=(stepPanelPatch(d.steps[stepIndex])||{})[p.id];
+      if (allowOnce && own(current && current.enterOnce,key))
+        return {kind:'transient',label:'This step only · enterOnce',inputs:[input(stepIndex,key,true)]};
+      return source?{kind:source.step==null?'initial':source.step===stepIndex?'step':'inherited',
+        label:source.step==null?'Initial state':source.step===stepIndex?'Set at this step':'Inherited from step '+(source.step+1),inputs:[source]}:
+        {kind:'engine',label:'Engine default',inputs:[]};
+    }
+    function origin(key){
+      if (p.type==='inflight'){
+        if (key==='bars') return history(['start','end','mark'],false,'Computed start/end/mark history');
+        return {kind:'engine',label:key==='currentStep'?'Engine · current step':'Engine · total steps',inputs:[]};
+      }
+      if (p.type==='phone'){
+        if (key==='notifications') return history(['notify','clear'],true,'Computed notification history');
+        if (key==='clock') return assignment(key,function(v){ return typeof v==='string'; },false);
+        return {kind:'engine',label:'Engine · presentation metadata',inputs:[]};
+      }
+      if (key==='log') return history(['log'],true,'Accumulated log history');
+      if (p.type==='timeline' && (key==='events'||key==='miss')) return history([key],true,'Accumulated '+key+' history');
+      var current=(stepPanelPatch(d.steps[stepIndex])||{})[p.id];
+      if (own(current && current.enterOnce,key)) return assignment(key,null,true);
+      if (key==='mark'||key==='cells') return history(['cells','mark'],true,'Computed cells/mark history');
+      return assignment(key,p.type==='timeline' && key==='now'?function(v){ return parseClock(v)!=null; }:null,true,true);
+    }
+    return {id:p.id,type:p.type,title:p.title||p.id,index:pi,state:snapshot,
+      fields:Object.keys(snapshot).sort().map(function(key){ return {key:key,value:snapshot[key],origin:origin(key)}; })};
+  })};
+}
+
 /* ---------------- panel setup fields ----------------
    One row of typed controls per setup field of each widget type.
    Kinds: text | num | csv (comma-separated string list) | scene (token
@@ -13206,6 +13285,8 @@ var PANEL_PATCH_FIELDS = {
   timeline:  [['now', 'clock'], ['events', 'jsonArr'], ['miss', 'jsonArr']]
 };
 var OPEN_PATCH_EDITORS = new Set();
+var OPEN_EFFECTIVE_STATE = false;
+var OPEN_EFFECTIVE_PANELS = new Set();
 
 function patchSummaryLine(patchObj){
   var keys = Object.keys(patchObj || {}).slice(0, 2);
@@ -13572,6 +13653,7 @@ function initWorkbenchBuilder(opts){
   }
   var selectedEl = null;
   var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
+  var invalidateEffectiveState = null;
   var insertSection = 0;    /* zero-based ordinal of the section inserts target */
   var undoStack = [];
 
@@ -13706,6 +13788,7 @@ function initWorkbenchBuilder(opts){
   }
   var draftTimer = null;
   src.addEventListener('input', function(){
+    if (invalidateEffectiveState) invalidateEffectiveState();
     importedText = null;
     hideDiff();
     if (draftTimer) clearTimeout(draftTimer);
@@ -14534,7 +14617,74 @@ function initWorkbenchBuilder(opts){
       var decl = Array.isArray(declarations) ? declarations.filter(function(p){ return p && p.id === pid; })[0] : null;
       rows.push(panelPatchControl(pid, val.panels[pid], decl, t));
     });
+    if (declarations.length) rows.push(effectiveStateControl(t));
     return rows;
+  }
+
+  function effectiveStateControl(target){
+    var outer=document.createElement('details'); outer.className='effective-state'; outer.open=OPEN_EFFECTIVE_STATE;
+    var summary=document.createElement('summary'); summary.textContent='Effective state · all panels'; outer.appendChild(summary);
+    var note=document.createElement('p'); note.className='effective-note'; outer.appendChild(note);
+    var refresh=document.createElement('button'); refresh.type='button'; refresh.className='bbtn'; refresh.textContent='Refresh effective state'; outer.appendChild(refresh);
+    var body=document.createElement('div'); body.className='effective-body'; outer.appendChild(body);
+    var indexedText=null, populated=false;
+    function stale(){
+      indexedText=null; populated=false; body.textContent='';
+      note.textContent='Source changed. Refresh to inspect the current JSON at this step; Render updates the board.';
+    }
+    invalidateEffectiveState=stale;
+    function sourceButton(source,base){
+      var button=document.createElement('button'); button.type='button'; button.className='bbtn effective-source';
+      button.textContent=source.label; button.title=builderPathString(base.concat(source.path));
+      button.addEventListener('click',function(){
+        if (src.value!==indexedText){ stale(); return; }
+        var loc=jsonLocate(src.value,base.concat(source.path));
+        if (loc) selectRange(loc,true);
+      });
+      return button;
+    }
+    function populate(){
+      var parsed=parseEditor(), refs=parsed.error?[]:specSectionPaths(parsed.raw), rec=refs[target.section];
+      body.textContent=''; indexedText=src.value; populated=true;
+      if (parsed.error || !rec){ note.textContent='Fix the JSON source before inspecting effective state.'; return; }
+      var d=specValueAt(parsed.raw,rec.diagram), model=builderEffectivePanelStates(d,target.index);
+      if (model.error){ note.textContent=model.error; return; }
+      var st=d.steps[target.index];
+      note.textContent='Step '+(target.index+1)+(st && st.id?' · '+st.id:'')+': folded state sent to each widget, including panels without a patch here. Widget-specific defaults may still apply. Values are read-only; source buttons select the authored JSON. Computed fields list input history, including superseded or ignored inputs.';
+      model.panels.forEach(function(p){
+        var box=document.createElement('details'); box.className='effective-panel'; box.open=OPEN_EFFECTIVE_PANELS.has(p.id);
+        box.addEventListener('toggle',function(ev){
+          if (ev.target!==box || !guide.contains(box)) return;
+          if (box.open) OPEN_EFFECTIVE_PANELS.add(p.id); else OPEN_EFFECTIVE_PANELS.delete(p.id);
+        });
+        var label=document.createElement('summary'); label.textContent=p.id+' · '+p.type+' · '+p.fields.length+' fields'; box.appendChild(label);
+        p.fields.forEach(function(field){
+          var row=document.createElement('div'); row.className='effective-field'; row.setAttribute('data-effective-field',field.key);
+          var heading=document.createElement('div'); heading.className='effective-heading';
+          var name=document.createElement('code'); name.textContent=field.key; heading.appendChild(name);
+          var origin=document.createElement('span'); origin.className='effective-origin'; origin.setAttribute('data-origin',field.origin.kind); origin.textContent=field.origin.label; heading.appendChild(origin); row.appendChild(heading);
+          var value=document.createElement('pre'); value.textContent=JSON.stringify(field.value,null,2); row.appendChild(value);
+          var history=field.origin.inputs;
+          if (history.length>12){ var count=document.createElement('small'); count.textContent='Showing the latest 12 of '+history.length+' input locations.'; row.appendChild(count); }
+          history.slice(-12).forEach(function(source){ row.appendChild(sourceButton(source,rec.diagram)); });
+          box.appendChild(row);
+        });
+        var raw=document.createElement('details'); raw.className='effective-json';
+        var rawLabel=document.createElement('summary'); rawLabel.textContent='Folded JSON'; raw.appendChild(rawLabel);
+        var area=document.createElement('textarea'); area.className='fctl'; area.readOnly=true; area.rows=6; area.value=JSON.stringify(p.state,null,2); area.setAttribute('aria-label','Effective JSON for '+p.id); raw.appendChild(area);
+        var select=document.createElement('button'); select.type='button'; select.className='bbtn'; select.textContent='Select JSON';
+        select.addEventListener('click',function(){ if (src.value!==indexedText){ stale(); return; } area.focus(); area.select(); }); raw.appendChild(select);
+        box.appendChild(raw); body.appendChild(box);
+      });
+    }
+    refresh.addEventListener('click',populate);
+    outer.addEventListener('toggle',function(ev){
+      if (ev.target!==outer || !guide.contains(outer)) return;
+      OPEN_EFFECTIVE_STATE=outer.open;
+      if (outer.open && (!populated || indexedText!==src.value)) populate();
+    });
+    if (outer.open) populate();
+    return outer;
   }
   function panelPatchControl(pid, patch, decl, target){
     var det = document.createElement('details');
@@ -15228,6 +15378,7 @@ function initWorkbenchBuilder(opts){
   }
 
   function renderInspector(){
+    invalidateEffectiveState=null;
     hideDiff();
     if (!guide || !currentTarget) return;
     var t = currentTarget;

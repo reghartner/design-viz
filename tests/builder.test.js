@@ -73,6 +73,41 @@ const SPEC = {
 };
 const TEXT = JSON.stringify(SPEC, null, 2);
 
+test('planSetField sets and removes the optional node delta marker', () => {
+  const target = B.builderTargetPath(SPEC, {section: 0, kind: 'node', id: 'a'});
+  const set = B.planSetField(TEXT, SPEC, target, 'delta', 'true');
+  assert.ok(!set.error, set.error);
+  const marked = JSON.parse(set.text);
+  assert.strictEqual(marked.page.blocks[0].diagram.nodes.a.delta, true);
+  const clear = B.planSetField(set.text, marked, target, 'delta', null);
+  assert.ok(!clear.error, clear.error);
+  assert.ok(!('delta' in JSON.parse(clear.text).page.blocks[0].diagram.nodes.a));
+  assert.deepStrictEqual(plain(JSON.parse(clear.text)), SPEC);
+});
+
+test('planBulkSetField marks and clears delta on two nodes', () => {
+  const targets = ['a', 'b'].map(id => ({section: 0, kind: 'node', id}));
+  const plan = B.planBulkSetField(TEXT, targets, 'delta', 'true');
+  assert.ok(!plan.error, plan.error);
+  assert.strictEqual(plan.count, 2);
+  const nodes = JSON.parse(plan.text).page.blocks[0].diagram.nodes;
+  assert.strictEqual(nodes.a.delta, true);
+  assert.strictEqual(nodes.b.delta, true);
+  const clear = B.planBulkSetField(plan.text, targets, 'delta', null);
+  assert.ok(!clear.error, clear.error);
+  assert.deepStrictEqual(plain(JSON.parse(clear.text)), SPEC);
+});
+
+test('planBulkSetField marks and clears delta on a step target', () => {
+  const targets = [{section: 0, kind: 'step', index: 0}];
+  const plan = B.planBulkSetField(TEXT, targets, 'delta', 'true');
+  assert.ok(!plan.error, plan.error);
+  assert.strictEqual(JSON.parse(plan.text).page.blocks[0].diagram.steps[0].delta, true);
+  const clear = B.planBulkSetField(plan.text, targets, 'delta', null);
+  assert.ok(!clear.error, clear.error);
+  assert.deepStrictEqual(plain(JSON.parse(clear.text)), SPEC);
+});
+
 test('jsonLocate finds nested values and the ranges parse back to them', () => {
   const cases = [
     [['page', 'title'], SPEC.page.title],

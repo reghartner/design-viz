@@ -15,7 +15,7 @@ function loadCore(overrides = {}){
   const code =
     fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
     fs.readFileSync(path.join(ROOT, 'src', 'engine.js'), 'utf8') + '\n' +
-    ';__exports = {validate, normalize, blocksOf, resolveProtocols, resolveLanes,' +
+    ';__exports = {validate, normalize, blocksOf, resolveProtocols, resolveLanes, diagramHasDelta,' +
     ' kindColor, stepKeys, stepTonePatch, foldPanelStates, foldNodeTones, layout, isWrap, edgePath, renderBoard, SKINS,' +
     ' BUILTIN_PROTOCOLS, SCENES, spreadPositions, resolveLabelCollisions,' +
     ' edgeAutoAdjust, parseHash, buildHash, isValidLinkBase, composeLinkURL, slugify, sectionSlugify, sectionReferences, oneBasedIndex, tabIndexOf, tabReference,' +
@@ -34,6 +34,41 @@ function loadCore(overrides = {}){
   return sandbox.__exports;
 }
 const C = loadCore();
+
+test('diagramHasDelta detects only strict boolean marks on declared nodes, edges, or steps', () => {
+  assert.strictEqual(C.diagramHasDelta({}), false);
+  assert.strictEqual(C.diagramHasDelta({nodes: {a: {}}, edges: [{}], steps: [{}]}), false);
+  ['nodes', 'edges', 'steps'].forEach(kind => {
+    [true, false, 'yes', 1, null, undefined].forEach(delta => {
+      const d = {[kind]: kind === 'nodes' ? {unplaced: {delta}} : [{delta}]};
+      assert.strictEqual(C.diagramHasDelta(d), delta === true, kind + ': ' + delta);
+    });
+  });
+  assert.strictEqual(C.diagramHasDelta({nodes: {a: null}, edges: [null], steps: [null]}), false);
+});
+
+test('validator warns on non-boolean delta fields without rejecting the diagram', () => {
+  const paths = ['nodes.a', 'edges[0]', 'steps[0]'];
+  ['yes', 1, null, {}, []].forEach(delta => {
+    const result = C.validate(C.normalize({
+      nodes: {a: {delta}, b: {}}, rows: [['a', 'b']],
+      edges: [{from: 'a', to: 'b', delta}], steps: [{edge: 'a->b', delta}]
+    }));
+    assert.strictEqual(result.errors.length, 0);
+    const warnings = Array.from(result.warnings).filter(w => w.includes('.delta:'));
+    assert.strictEqual(warnings.length, 3);
+    paths.forEach(p => assert.ok(warnings.some(w =>
+      w.endsWith('.' + p + '.delta: must be true or false — ignored')), p));
+  });
+  [{}, {delta: true}, {delta: false}].forEach(mark => {
+    const result = C.validate(C.normalize({
+      nodes: {a: {...mark}, b: {}}, rows: [['a', 'b']],
+      edges: [{from: 'a', to: 'b', ...mark}], steps: [{edge: 'a->b', ...mark}]
+    }));
+    assert.strictEqual(result.errors.length, 0);
+    assert.strictEqual(result.warnings.length, 0);
+  });
+});
 
 function layoutNode(tag){
   return {

@@ -7,6 +7,14 @@ var SVGNS = 'http://www.w3.org/2000/svg';
 var RM = (typeof window !== 'undefined' && window.matchMedia)
   ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
 
+function diagramHasDelta(d){
+  d = d || {};
+  return Object.keys(d.nodes || {}).some(function(id){
+    return d.nodes[id] && d.nodes[id].delta === true;
+  }) || (d.edges || []).some(function(e){ return e && e.delta === true; }) ||
+    (d.steps || []).some(function(st){ return st && st.delta === true; });
+}
+
 /* ---------------- host-driven skin interface ---------------- */
 function resolveSkin(cookieText, specSkin){
   var cookieSkin = null;
@@ -1038,7 +1046,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   s += '<g>';
   (d.edges || []).forEach(function(e, i){
     var k = protos[e.kind] ? e.kind : 'int';
-    s += '<path class="halo dv-protocol-stroke" data-dv-edge="' + i + '"' + fragmentAttrs(e) +
+    s += '<path class="halo dv-protocol-stroke' + (e.delta === true ? ' dvd' : '') + '" data-dv-edge="' + i + '"' + fragmentAttrs(e) +
          ' style="' + protocolColorStyle(protos, k) + '" stroke="' +
          kindColor(protos, k, skinBase(skin)) + '" d="' + edgePath(e, L, ADJ[i]) + '"/>';
   });
@@ -1046,7 +1054,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     var id = prefix + '-e' + i;
     var k = protos[e.kind] ? e.kind : 'int';
     edgeIds[e.from + '->' + e.to] = {domId:id, e:e, kind:k, idx:i};
-    s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + '"' +
+    s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + (e.delta === true ? ' dvd' : '') + '"' +
          ' data-dv-edge="' + i + '"' +
          fragmentAttrs(e) + ' style="' + protocolColorStyle(protos, k) +
          '" stroke="' + kindColor(protos, k, skinBase(skin)) +
@@ -1067,7 +1075,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
     var hasNodeLink = n.link && typeof n.link === 'string';
     var backlinkX = p.w - (hasNodeLink ? 38 : 15);
-    s += '<g class="node tint-' + tint + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
+    s += '<g class="node tint-' + tint + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
          '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
@@ -1081,6 +1089,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
            '<g class="nbackref" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Other pages containing ' + esc(nodeTitle) + '">' +
            '<circle cx="' + backlinkX + '" cy="14" r="9" fill="transparent"/>' +
            '<text x="' + backlinkX + '" y="18" text-anchor="middle">&#8599;</text></g>' : '') +
+         (n.delta === true ? '<polygon class="dvdelta" points="-3,-4 8,-4 2.5,-13" aria-hidden="true"/>' : '') +
          '</g>';
   });
   s += '</svg>';
@@ -1100,7 +1109,16 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     if (keys.length && !(keys[0] in stepByEdge) && edgeIds[keys[0]]) stepByEdge[keys[0]] = i + 1;
   });
 
-  var coinRects = [], labelEls = [];
+  var coinRects = [], deltaRects = [], labelEls = [];
+  function deltaBadge(parent, x, y, w, h){
+    var badge = document.createElementNS(SVGNS, 'polygon');
+    badge.setAttribute('class', 'dvdelta');
+    badge.setAttribute('aria-hidden', 'true');
+    badge.setAttribute('points', x + ',' + (y + h) + ' ' + (x + w) + ',' + (y + h) + ' ' + (x + w/2) + ',' + y);
+    parent.appendChild(badge);
+    deltaRects.push({x:x - 1, y:y - 1, w:w + 2, h:h + 2});
+    return badge;
+  }
   (d.edges || []).forEach(function(e){
     var info = edgeIds[e.from + '->' + e.to];
     var path = document.getElementById(info.domId);
@@ -1111,7 +1129,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
 
     if (stepN){
       var g = document.createElementNS(SVGNS, 'g');
-      g.setAttribute('class', 'coin');
+      var stepDelta = d.steps[stepN - 1].delta === true;
+      g.setAttribute('class', 'coin' + (stepDelta ? ' dvd' : ''));
       g.setAttribute('id', prefix + '-coin-' + stepN);
       g.setAttribute('data-dv-step', String(stepN - 1));
       markFragmentElement(g, e);
@@ -1121,6 +1140,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 3.5); t.setAttribute('text-anchor', 'middle');
       t.textContent = stepN;
       g.appendChild(c); g.appendChild(t); svg.appendChild(g);
+      if (stepDelta) deltaBadge(g, mid.x + 5, mid.y - 14, 8, 7);
       coinRects.push({x: mid.x - 11, y: mid.y - 11, w: 22, h: 22});
     }
     if (e.label){
@@ -1128,7 +1148,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       var anchor = 'middle';
       if (wrap){ anchor = 'end'; lx = mid.x - 18 + (e.labelDx || 0); ly = mid.y - 4 + (e.labelDy || 0); }
       var lt = document.createElementNS(SVGNS, 'text');
-      lt.setAttribute('class', 'lbl'); lt.setAttribute('x', lx); lt.setAttribute('y', ly);
+      lt.setAttribute('class', 'lbl' + (e.delta === true ? ' dvd' : '')); lt.setAttribute('x', lx); lt.setAttribute('y', ly);
       lt.setAttribute('text-anchor', anchor);
       lt.setAttribute('data-dv-edge', String(info.idx));
       lt.textContent = e.label;
@@ -1136,6 +1156,13 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       svg.appendChild(lt);
       labelEls.push({el: lt, fixed: !!(e.labelDx || e.labelDy)});
       info.labelEl = lt; /* stepper lights the label together with its edge */
+    }
+    if (e.delta === true){
+      /* Left of the coin and below the label, including author-lowered labels
+         that the collision pass deliberately leaves fixed. */
+      var badgeY = e.label ? Math.max(mid.y - 6, ly + 4) : mid.y - 6;
+      var badge = deltaBadge(svg, mid.x - (stepN ? 25 : 16), badgeY, 11, 9);
+      markFragmentElement(badge, e);
     }
   });
 
@@ -1147,8 +1174,11 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     Object.keys(d.nodes).forEach(function(id){
       var p = L.pos[id];
       if (p) obstacles.push({x: p.cx - p.w/2 - 2, y: p.cy - p.h/2 - 2, w: p.w + 4, h: p.h + 4});
+      if (p && d.nodes[id] && d.nodes[id].delta === true)
+        obstacles.push({x:p.cx - p.w/2 - 4, y:p.cy - p.h/2 - 14, w:13, h:11});
     });
     coinRects.forEach(function(r){ obstacles.push(r); });
+    deltaRects.forEach(function(r){ obstacles.push(r); });
     (d.edges || []).forEach(function(e){
       var info = edgeIds[e.from + '->' + e.to];
       var path = document.getElementById(info.domId);
@@ -1176,7 +1206,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));
     var dot = document.createElementNS(SVGNS, 'circle');
-    dot.setAttribute('class', cls + ' dv-protocol-fill');
+    dot.setAttribute('class', cls + ' dv-protocol-fill' + (info.e.delta === true ? ' dvd' : ''));
     dot.setAttribute('r', SK.glow ? 4 : 3.4);
     dot.setAttribute('fill', col);
     dot.setAttribute('style', protocolColorStyle(protos, info.kind));
@@ -3082,6 +3112,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   var steps = (d.steps || []).map(function(st){
     return {keys: stepKeys(st).filter(function(k){ return board.edgeIds[k]; }),
             nodes: stepNodes(st),
+            delta: !!(st && st.delta === true),
             id: (st && typeof st.id === 'string') ? st.id : null,
             lane: (st && typeof st.lane === 'string') ? st.lane : null,
             packets: (st && Array.isArray(st.packets)) ? st.packets : null,
@@ -3101,7 +3132,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   for (var k = 0; k < N; k++){
     (function(idx){
       var b = document.createElement('button');
-      b.className = 'schip';
+      b.className = 'schip' + (steps[idx].delta ? ' dvd' : '');
       b.textContent = idx + 1;
       b.setAttribute('aria-label', 'Go to step ' + (idx + 1));
       b.addEventListener('click', function(){ stopAuto(); setStep(idx); });
@@ -3470,7 +3501,26 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
   var view = VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient';
   var hasSteps = (d.steps || []).length > 0;
-  if (!hasSteps || view === 'ambient-only') return result;
+  var hasDelta = diagramHasDelta(d);
+  var btnDelta = null, bar = null;
+  if (hasDelta){
+    btnDelta = document.createElement('button');
+    btnDelta.className = 'mbtn dbtn'; btnDelta.textContent = 'Δ ONLY';
+    btnDelta.setAttribute('aria-pressed', 'false');
+    btnDelta.addEventListener('click', function(){
+      var on = btnDelta.getAttribute('aria-pressed') !== 'true';
+      boardDiv.classList.toggle('dv-deltaonly', on);
+      if (bar) bar.classList.toggle('dv-deltaonly', on);
+      btnDelta.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  if (!hasSteps || view === 'ambient-only'){
+    if (btnDelta){
+      var deltaTog = document.createElement('span'); deltaTog.className = 'mtoggle';
+      deltaTog.appendChild(btnDelta); lg.appendChild(deltaTog);
+    }
+    return result;
+  }
 
   /* mode toggle in the legend bar */
   var tog = document.createElement('span'); tog.className = 'mtoggle';
@@ -3478,9 +3528,10 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var btnStep = document.createElement('button'); btnStep.className = 'mbtn'; btnStep.textContent = 'STEP';
   btnAmb.setAttribute('aria-pressed', 'true'); btnStep.setAttribute('aria-pressed', 'false');
   tog.appendChild(btnAmb); tog.appendChild(btnStep); lg.appendChild(tog);
+  if (btnDelta) tog.appendChild(btnDelta);
 
   /* termbar */
-  var bar = document.createElement('div');
+  bar = document.createElement('div');
   bar.className = 'termbar'; bar.hidden = true;
   var btnPrev = document.createElement('button'); btnPrev.className = 'tbtn'; btnPrev.innerHTML = '&#8249;'; btnPrev.setAttribute('aria-label', 'Previous step');
   var btnPlay = document.createElement('button'); btnPlay.className = 'tbtn'; btnPlay.innerHTML = '&#9654;'; btnPlay.setAttribute('aria-label', 'Play');

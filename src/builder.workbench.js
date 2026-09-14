@@ -791,6 +791,14 @@ function builderRetargetStepKeys(steps, oldKey, newKey){
                          .filter(function(k){ return typeof k === 'string'; });
       if (!st.edges.length) delete st.edges;
     }
+    if (st.failures && typeof st.failures === 'object' && !Array.isArray(st.failures)){
+      var failures = Object.create(null);
+      Object.keys(st.failures).forEach(function(key){
+        var next = key === oldKey ? newKey : key;
+        if (next) failures[next] = st.failures[key];
+      });
+      if (Object.keys(failures).length) st.failures = failures; else delete st.failures;
+    }
   });
 }
 
@@ -2025,6 +2033,7 @@ function builderStepHops(st){
   if (Array.isArray(st.edges)) st.edges.forEach(function(k){
     if (typeof k === 'string' && out.indexOf(k) < 0) out.push(k);
   });
+  Object.keys(stepFailures(st)).forEach(function(key){if (out.indexOf(key) < 0) out.push(key);});
   return out;
 }
 
@@ -2048,13 +2057,35 @@ function planStepToggleHop(text, raw, sectionIdx, stepIdx, key){
   }
   var next = has ? hops.filter(function(k){ return k !== key; }) : hops.concat([key]);
   var r = builderRewrite(text, raw, got.path, function(st){
+    var failures = stepFailures(st);
+    if (has) delete failures[key];
+    if (has && Array.isArray(st.packets)) st.packets = st.packets.filter(function(pk){return pk.edge !== key;});
+    var delivered = next.filter(function(k){return !Object.prototype.hasOwnProperty.call(failures,k);});
     delete st.edge; delete st.edges;
-    if (next.length === 1) st.edge = next[0];
-    else if (next.length > 1) st.edges = next;
+    if (delivered.length === 1) st.edge = delivered[0];
+    else if (delivered.length > 1) st.edges = delivered;
+    if (Object.keys(failures).length) st.failures = failures; else delete st.failures;
   });
   if (r.error) return r;
   r.added = !has;
   return r;
+}
+
+function planStepCommunication(text,raw,sectionIdx,stepIdx,key,outcome){
+  var got = builderStepAt(raw,sectionIdx,stepIdx);
+  if (!got) return {error:'Select a step first.'};
+  if (['delivered','dropped','blocked'].indexOf(outcome) < 0) return {error:'Choose delivered, dropped or blocked.'};
+  if (!(got.d.edges || []).some(function(e){return e && builderEdgeKey(e) === key;})) return {error:'Choose an existing edge.'};
+  return builderRewrite(text,raw,got.path,function(st){
+    var failures = stepFailures(st), delivered = builderStepHops(st).filter(function(k){
+      return k !== key && !Object.prototype.hasOwnProperty.call(failures,k);
+    });
+    if (outcome === 'delivered'){ delete failures[key]; delivered.push(key); }
+    else failures[key] = outcome;
+    delete st.edge; delete st.edges;
+    if (delivered.length === 1) st.edge = delivered[0]; else if (delivered.length > 1) st.edges = delivered;
+    if (Object.keys(failures).length) st.failures = failures; else delete st.failures;
+  });
 }
 
 function planStepToggleNode(text, raw, sectionIdx, stepIdx, nodeId){
@@ -2508,6 +2539,7 @@ var BUILDER_GUIDES = {
     how: 'Edit the selected JSON, then click Render. The same steps array drives the ambient packet schedule, the numbered coins, and the click-through.',
     fields: [
       ['edge', '"from->to" — the hop this step fires (or edges: [..] for hops that fire together)'],
+      ['failures', 'edge outcomes: {"from->to":"dropped"}; use dropped for lost in transit or blocked for never sent'],
       ['text', 'caption shown in the step bar'],
       ['lane', 'lane pill on the caption line — declare colors in page.lanes'],
       ['nodes', 'node ids to light directly (allows an edgeless step)'],
@@ -3631,6 +3663,33 @@ function initWorkbenchBuilder(opts){
     rows.push(chipRow('hops',
       builderStepHops(val).map(function(k){ return {key: k, label: k}; }),
       'none — edgeless step', toggled(planStepToggleHop)));
+    var failures = stepFailures(val);
+    function outcomeSelect(key){
+      var input = document.createElement('select'); input.className = 'fctl';
+      [['delivered','Delivered'],['dropped','Dropped in transit'],['blocked','Not sent']].forEach(function(pair){
+        var option = document.createElement('option'); option.value = pair[0]; option.textContent = pair[1]; input.appendChild(option);
+      });
+      input.value = failures[key] || 'delivered';
+      input.addEventListener('change',function(){
+        commitCascade(function(raw){return planStepCommunication(src.value,raw,t.section,t.index,key,input.value);},
+          {after:function(){renderInspector();}});
+      });
+      return input;
+    }
+    builderStepHops(val).forEach(function(key){rows.push(frow('Delivery · ' + key,outcomeSelect(key)));});
+    var addFailure = document.createElement('select'); addFailure.className = 'fctl';
+    var placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose an edge…'; addFailure.appendChild(placeholder);
+    (ctx.diagram.edges || []).forEach(function(edge){
+      var key = builderEdgeKey(edge); if (builderStepHops(val).indexOf(key) >= 0) return;
+      var option = document.createElement('option'); option.value = key; option.textContent = key; addFailure.appendChild(option);
+    });
+    addFailure.disabled = addFailure.children.length < 2;
+    addFailure.addEventListener('change',function(){
+      if (!addFailure.value) return;
+      commitCascade(function(raw){return planStepCommunication(src.value,raw,t.section,t.index,addFailure.value,'dropped');},
+        {after:function(){renderInspector();}});
+    });
+    rows.push(frow('Add failed communication',addFailure));
     rows.push(chipRow('nodes',
       (Array.isArray(val.nodes) ? val.nodes : []).map(function(n){ return {key: n, label: n}; }),
       'none', toggled(planStepToggleNode)));

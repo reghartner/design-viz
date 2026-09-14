@@ -639,6 +639,18 @@ function stepKeys(st){
   if (st.edge) return [st.edge];
   return [];
 }
+var COMM_FAILURE_MODES = ['dropped','blocked'];
+function stepFailures(st){
+  var raw = st && st.failures, out = Object.create(null);
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) Object.keys(raw).forEach(function(key){
+    if (COMM_FAILURE_MODES.indexOf(raw[key]) >= 0) out[key] = raw[key];
+  });
+  return out;
+}
+function stepDeliveredKeys(st){
+  var failures = stepFailures(st);
+  return stepKeys(st).filter(function(key){return !Object.prototype.hasOwnProperty.call(failures,key);});
+}
 function stepNodes(st){
   return (st && Array.isArray(st.nodes)) ? st.nodes : [];
 }
@@ -1215,6 +1227,15 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (st && Object.prototype.hasOwnProperty.call(st, 'delta') && typeof st.delta !== 'boolean')
       warnings.push(DP + '.steps[' + ti + '].delta: must be true or false — ignored');
     var keys = stepKeys(st);
+    var failures = stepFailures(st);
+    if (st && st.failures != null){
+      var FP = DP + '.steps[' + ti + '].failures';
+      if (typeof st.failures !== 'object' || Array.isArray(st.failures)) errors.push(FP + ': expected an object mapping edge keys to dropped or blocked');
+      else Object.keys(st.failures).forEach(function(key){
+        if (!Object.prototype.hasOwnProperty.call(edgeKeys,key)) errors.push(FP + ': unknown edge \"' + key + '\" (format from->to)');
+        if (COMM_FAILURE_MODES.indexOf(st.failures[key]) < 0) errors.push(FP + '.' + key + ': expected dropped or blocked');
+      });
+    }
     var nds = stepNodes(st);
     var patch = stepPanelPatch(st);
     var tonePatch = stepTonePatch(st);
@@ -1226,7 +1247,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(DP + '.steps[' + ti + '].id: duplicate step id "' + st.id + '" — deep links resolve to the first');
       else stepIds[st.id] = true;
     }
-    if (!keys.length && !nds.length && !patch && !tonePatch)
+    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch)
       warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, or panels, or tone — give it something to show');
     keys.forEach(function(k){
       if (!edgeKeys[k]) warnings.push(DP + '.steps[' + ti + ']: "' + k + '" matches no edge (format "from->to") — skipped');
@@ -1644,7 +1665,7 @@ function lintDiagram(d, DP, usedKinds, warnings){
 
   var firstEdgeAt = {};
   (d.steps || []).forEach(function(st, ti){
-    var k = stepKeys(st)[0];
+    var k = stepDeliveredKeys(st)[0];
     if (!k) return;
     if (firstEdgeAt[k] != null)
       warnings.push(DP + '.steps[' + ti + ']: shares first edge "' + k + '" with steps[' +

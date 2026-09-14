@@ -61,7 +61,7 @@ This is an additive contract-1 feature; no schema version switch is needed.
     {"id": "queue", "nodes": ["api"], "text": "Queue command"},
     {"id": "deliver", "edge": "api->device", "text": "Device receives command"},
     {"id": "apply", "nodes": ["device"], "text": "Device applies command"},
-    {"id": "lost", "nodes": ["api"], "tone": {"device": "dim"}, "text": "Signal lost before delivery"}
+    {"id": "lost", "failures": {"api->device": "dropped"}, "tone": {"device": "dim"}, "text": "Signal lost before delivery"}
   ],
   "paths": [
     {"id": "happy", "label": "Happy path", "color": "#38bdf8", "steps": ["accept", "auth", "queue", "deliver", "apply"]},

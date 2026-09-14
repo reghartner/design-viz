@@ -336,7 +336,7 @@ function applyNodeTones(nodeEls, tones, pulseIds){
 }
 
 /* Step focus and semantic tone deliberately travel through separate paths.
-   Only explicit step nodes and endpoints of active edges receive `lit`. */
+   Failed communications focus their source; delivered hops focus both ends. */
 function applyStepNodeFocus(nodeEls, step, edgeIds){
   nodeEls = nodeEls || {};
   step = step || {};
@@ -348,10 +348,92 @@ function applyStepNodeFocus(nodeEls, step, edgeIds){
     focused[info.e.from] = true;
     focused[info.e.to] = true;
   });
+  Object.keys(step.failures || {}).forEach(function(key){
+    var info = edgeIds[key];
+    if (info && info.e) focused[info.e.from] = true;
+  });
   (step.nodes || []).forEach(function(id){ focused[id] = true; });
   Object.keys(focused).forEach(function(id){
     var node = nodeEls[id];
     if (node && node.classList && !node.classList.contains('lit')) node.classList.add('lit');
+  });
+}
+
+/* Failed communications are local to one beat, never carried like state. */
+function communicationFailureText(diagram,failures){
+  return Object.keys(failures || {}).map(function(key){
+    var edge = (diagram.edges || []).find(function(e){return e.from + '->' + e.to === key;});
+    if (!edge) return '';
+    var nodes = diagram.nodes || {};
+    return (failures[key] === 'blocked' ? 'Not sent: ' : 'Dropped: ') +
+      ((nodes[edge.from] || {}).title || edge.from) + ' → ' + ((nodes[edge.to] || {}).title || edge.to);
+  }).filter(Boolean).join(' · ');
+}
+function communicationBreak(length,mode){
+  var stop = mode === 'blocked' ? Math.min(24,length * .25) : length * .55;
+  var gap = Math.min(10,stop * .65,(length - stop) * .65);
+  return {stop:stop, before:stop - gap, after:stop + gap};
+}
+function communicationSegment(path,from,to){
+  var parts = [], count = Math.max(1,Math.ceil((to - from) / 6));
+  for (var i = 0; i <= count; i++){
+    var p = path.getPointAtLength(from + (to - from) * i / count);
+    parts.push((i ? 'L' : 'M') + p.x.toFixed(2) + ' ' + p.y.toFixed(2));
+  }
+  return parts.join(' ');
+}
+function clearCommunicationFailures(board){
+  (board.failureEffects || []).forEach(function(effect){
+    effect.hidden.forEach(function(el){el.classList.remove('comm-hidden');});
+    if (effect.label) effect.label.classList.remove('comm-label');
+    if (effect.group.parentNode) effect.group.parentNode.removeChild(effect.group);
+  });
+  board.failureEffects = [];
+}
+function settleCommunicationFailures(board){
+  (board.failureEffects || []).forEach(function(effect){
+    if (effect.packet && effect.packet.parentNode) effect.packet.parentNode.removeChild(effect.packet);
+  });
+}
+function showCommunicationFailures(board,failures,animate){
+  Object.keys(failures || {}).forEach(function(key){
+    var info = board.edgeIds[key], path = info && info.pathEl;
+    if (!path || path.classList.contains('dv-fragment-hidden')) return;
+    var length = path.getTotalLength();
+    if (!Number.isFinite(length) || length <= 0) return;
+    var mode = failures[key], split = communicationBreak(length,mode), point = path.getPointAtLength(split.stop);
+    function svgEl(tag,attrs,parent){
+      var el = document.createElementNS(SVGNS,tag);
+      Object.keys(attrs).forEach(function(k){el.setAttribute(k,attrs[k]);});
+      if (parent) parent.appendChild(el);
+      return el;
+    }
+    var label = (mode === 'blocked' ? 'Not sent: ' : 'Dropped in transit: ') + info.e.from + ' → ' + info.e.to;
+    var group = svgEl('g',{'class':'comm-failure comm-' + mode,'data-dv-edge':info.idx,'role':'img','aria-label':label},board.svg);
+    svgEl('title',{},group).textContent = label;
+    svgEl('path',{'class':'comm-segment comm-before',d:communicationSegment(path,0,split.before)},group);
+    svgEl('path',{'class':'comm-segment comm-after',d:communicationSegment(path,split.after,length)},group);
+    var marker = svgEl('g',{'class':'comm-break',transform:'translate(' + point.x + ' ' + point.y + ')'},group);
+    if (mode === 'blocked'){
+      svgEl('circle',{r:8},marker);
+      svgEl('path',{d:'M-5 0H5'},marker);
+    } else svgEl('path',{d:'M-6 -6L6 6M-6 6L6 -6'},marker);
+    var hidden = [path,info.haloEl,info.coinEl].filter(Boolean);
+    hidden.forEach(function(el){el.classList.add('comm-hidden');});
+    if (info.labelEl) info.labelEl.classList.add('comm-label');
+    var effect = {group:group,hidden:hidden,label:info.labelEl,packet:null};
+    (board.failureEffects || (board.failureEffects = [])).push(effect);
+    if (mode !== 'dropped' || !animate) return;
+    var packet = svgEl('circle',{'class':'pkt comm-packet',r:4.5},group);
+    var motion = svgEl('animateMotion',{dur:'1.35s',begin:'indefinite',fill:'freeze',calcMode:'linear',
+      keyPoints:'0;' + (split.stop / length) + ';' + (split.stop / length),keyTimes:'0;0.7;1'},packet);
+    svgEl('mpath',{href:'#' + info.domId},motion);
+    var fade = svgEl('animate',{attributeName:'opacity',values:'1;1;0',keyTimes:'0;0.8;1',dur:'1.35s',begin:'indefinite',fill:'freeze'},packet);
+    effect.packet = packet;
+    try { motion.beginElement(); fade.beginElement(); } catch (ex){
+      /* The static break remains useful when SMIL is unavailable. */
+      group.removeChild(packet); effect.packet = null;
+    }
   });
 }
 
@@ -1266,7 +1348,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   /* measured pass: labels, coins, ambient loop dots, manual step dots */
   var stepByEdge = {};
   (d.steps || []).forEach(function(st, i){
-    var keys = stepKeys(st);
+    var keys = stepDeliveredKeys(st);
     if (keys.length && !(keys[0] in stepByEdge) && edgeIds[keys[0]]) stepByEdge[keys[0]] = i + 1;
   });
 
@@ -1283,6 +1365,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   (d.edges || []).forEach(function(e){
     var info = edgeIds[e.from + '->' + e.to];
     var path = document.getElementById(info.domId);
+    info.pathEl = path;
+    info.haloEl = svg.querySelector('path.halo[data-dv-edge=\"' + info.idx + '\"]');
     var len = path.getTotalLength();
     var mid = path.getPointAtLength(len * 0.5);
     var wrap = isWrap(e, L);
@@ -1300,7 +1384,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       var t = document.createElementNS(SVGNS, 'text');
       t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 3.5); t.setAttribute('text-anchor', 'middle');
       t.textContent = stepN;
-      g.appendChild(c); g.appendChild(t); svg.appendChild(g);
+      g.appendChild(c); g.appendChild(t); svg.appendChild(g); info.coinEl = g;
       if (stepDelta) deltaBadge(g, mid.x + 5, mid.y - 14, 8, 7);
       coinRects.push({x: mid.x - 11, y: mid.y - 11, w: 22, h: 22});
     }
@@ -1414,7 +1498,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
 
   /* ambient loop dots: every edge of every step, staggered */
   (d.steps || []).forEach(function(st, i){
-    stepKeys(st).forEach(function(k, j){
+    stepDeliveredKeys(st).forEach(function(k, j){
       var info = edgeIds[k];
       if (!info) return;
       var path = document.getElementById(info.domId);
@@ -1428,7 +1512,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   /* manual step dots: one per unique step edge, fired by the stepper */
   var manualDone = {};
   (d.steps || []).forEach(function(st){
-    stepKeys(st).forEach(function(k){
+    stepDeliveredKeys(st).forEach(function(k){
       var info = edgeIds[k];
       if (!info || manualDone[k]) return;
       manualDone[k] = true;
@@ -3673,7 +3757,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   d = diagramForPath(source, selectedPath.id);
   var toneStates = foldNodeTones(d);
   function playbackSteps(diagram){ return (diagram.steps || []).map(function(st){
-    return {keys: stepKeys(st).filter(function(k){ return board.edgeIds[k]; }),
+    return {keys: stepDeliveredKeys(st).filter(function(k){ return board.edgeIds[k]; }),
+            failures: stepFailures(st),
             nodes: stepNodes(st),
             delta: !!(st && st.delta === true),
             id: (st && typeof st.id === 'string') ? st.id : null,
@@ -3759,6 +3844,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   paintChips();
 
   function clearLit(){
+    clearCommunicationFailures(board);
     pending.forEach(function(t){ clearTimeout(t); });
     pending = [];
     var lit = svg.querySelectorAll('.lit'), j;
@@ -3808,6 +3894,10 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       termbar.lanePill.style.borderColor = lm.color;
     }
     stepText.textContent = s.text;
+    if (termbar.failureStatus){
+      var failures = communicationFailureText(source,s.failures);
+      termbar.failureStatus.textContent = failures; termbar.failureStatus.hidden = !failures;
+    }
     if (termbar.stepIdEl){
       termbar.stepIdEl.textContent = s.id || '';
       termbar.stepIdEl.hidden = !s.id;
@@ -3838,10 +3928,11 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       if (info.labelEl) info.labelEl.classList.add('lit');
     });
     applyStepNodeFocus(board.nodeEls, s, board.edgeIds);
+    showCommunicationFailures(board,s.failures,!RM);
     /* ordered packet chain: explicit packets list, else edges in step order */
     if (s.packets){
       s.packets.forEach(function(pk){
-        fireDot(pk.edge, Math.max(0, (pk.delay || 0) * 1000));
+        if (!Object.prototype.hasOwnProperty.call(s.failures,pk.edge)) fireDot(pk.edge, Math.max(0, (pk.delay || 0) * 1000));
       });
     } else {
       s.keys.forEach(function(key, j){ fireDot(key, j * 450); });
@@ -3892,6 +3983,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     return true;
   }
   function settleCurrentStep(){
+    settleCommunicationFailures(board);
     pending.forEach(function(t){ clearTimeout(t); });
     pending = [];
     var dots = svg.querySelectorAll('.cpkt');
@@ -4274,6 +4366,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
   var line = document.createElement('div'); line.className = 'stepline';
   var stepN = document.createElement('b'); var stepText = document.createElement('span');
+  var failureStatus = document.createElement('span'); failureStatus.className = 'comm-status'; failureStatus.hidden = true;
+  failureStatus.setAttribute('aria-label','Communication failures');
   var lanePill = document.createElement('span');
   lanePill.className = 'lanepill'; lanePill.hidden = true;
   var stepIdEl = document.createElement('span');
@@ -4286,6 +4380,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   copyStep.innerHTML = COPY_ICON; copyStep.title = 'Copy link';
   copyStep.setAttribute('aria-label', 'Copy link to this diagram step');
   line.appendChild(stepN); line.appendChild(lanePill); line.appendChild(stepText);
+  line.appendChild(failureStatus);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
   bar.appendChild(btnPrev); bar.appendChild(btnPlay); bar.appendChild(btnNext);
   bar.appendChild(chips); bar.appendChild(line);
@@ -4298,7 +4393,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     ol.innerHTML = '';
     (diagram.steps || []).forEach(function(st){
       var li = document.createElement('li');
-      li.textContent = (st && st.lane ? '[' + st.lane + '] ' : '') + ((st && st.text) || '');
+      li.textContent = (st && st.lane ? '[' + st.lane + '] ' : '') + ((st && st.text) || '') +
+        (Object.keys(stepFailures(st)).length ? ' [' + communicationFailureText(diagram,stepFailures(st)) + ']' : '');
       ol.appendChild(li);
     });
   }
@@ -4306,7 +4402,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.appendChild(ol);
 
   var stepper = attachStepper(box, boardDiv, {
-    bar:bar, chips:chips, stepN:stepN, stepText:stepText, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
+    bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
     printSteps(next);

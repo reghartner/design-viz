@@ -807,6 +807,21 @@ An ordered array walking the flow. Each step:
   `edges`: an array of such keys for hops that happen together (a fan-out, a
   request+response round trip). Multi-edge steps fire their packets in list
   order, staggered — a two-hop delivery reads as two hops.
+- `failures` — optional map of existing edge keys to communication outcomes:
+  `{"broker->device":"dropped","api->worker":"blocked"}`. `dropped` means a
+  send was attempted but never arrived: a packet stops at an orange break
+  and fades. `blocked` means **not sent**: a stop marker appears near the
+  source and no packet launches. Both keep a static marker with reduced
+  motion, and add a text description beneath the caption. The source is
+  focused; the destination is only focused if named in `nodes` or reached
+  by another successful hop. The failure overrides `edge`/`edges` and
+  explicit `packets` on the same key. Other hops can still deliver.
+  This effect is **current-step only**, with no carry-forward; author it
+  again to retain the broken edge on another beat. Ambient and printed
+  diagrams show base topology; printed step captions include the failure.
+  A failures-only step is valid. Unknown keys or modes are errors. Use
+  this for known non-delivery, not a received request that returned an
+  application error. See [Failed communications](../docs/failed-communications.md).
 - `nodes` — optional array of node ids to light directly. A step may be
   **edgeless** (no `edge`/`edges` at all): a device booting, a state change
   with no message. Give it `nodes`, `tone`, and/or `panels`.

@@ -3937,7 +3937,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var path = row.path, line = document.createElement('div'); line.className = 'path-row';
       line.setAttribute('role','group');
       line.setAttribute('aria-label',path.label + ', steps 1 through ' + (row.end + 1) +
-        (row.start ? ', shared steps before fork at ' + (row.start + 1) : ''));
+        (row.start > row.end ? ', all steps shared' : row.start ? ', shared steps before fork at ' + (row.start + 1) : ''));
       line.setAttribute('data-path-row',path.id); line.style.setProperty('--path-color',path.color);
       var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
       choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);

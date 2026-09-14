@@ -6206,7 +6206,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   Object.keys(L.groups).forEach(function(g){
     var b = L.groups[g];
     var meta = groupDefs[g] || {};
-    s += '<g class="grp"><rect class="grpbox" x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="14"/>' +
+    s += '<g class="grp" data-dv-group="' + esc(g) + '"><rect class="grpbox" x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" rx="14"/>' +
          '<text class="grptitle" x="' + (b.x + 14) + '" y="' + (b.y + 16) + '">' + esc(meta.title || g) + '</text></g>';
   });
 

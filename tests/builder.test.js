@@ -21,6 +21,7 @@ function loadBuilder(extraGlobals){
     ' builderUniqueKey, builderFlatRowIds,' +
     ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
     ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
+    ' planSetNodeGroup, planBulkSetGroup, planSetGroupTitle, planRenameGroup, planDeleteGroup,' +
     ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
     ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
     ' planMoveStep, planMoveRow, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
@@ -165,6 +166,11 @@ test('builderTargetPath maps every selectable kind, including the bare-diagram p
     ['page', 'blocks', 1, 'tabs', 0, 'sections', 0, 'diagram', 'panels', 0]);
   assert.deepStrictEqual(plain(B.builderTargetPath(SPEC, {section: 2, kind: 'section'})),
     ['page', 'blocks', 1, 'tabs', 1, 'sections', 0]);
+  const grouped = JSON.parse(JSON.stringify(SPEC));
+  grouped.page.blocks[0].diagram.groups = {dev: {title: 'Device'}};
+  assert.deepStrictEqual(plain(B.builderTargetPath(grouped, {section: 0, kind: 'group', id: 'dev'})),
+    ['page', 'blocks', 0, 'diagram', 'groups', 'dev']);
+  assert.strictEqual(B.builderTargetPath(grouped, {section: 0, kind: 'group', id: 'undeclared'}), null);
   const bare = {nodes: {a: {}}, rows: [['a']]};
   assert.deepStrictEqual(plain(B.builderTargetPath(bare, {section: 0, kind: 'node', id: 'a'})), ['nodes', 'a']);
   assert.strictEqual(B.builderTargetPath(SPEC, {section: 9, kind: 'node', id: 'a'}), null);
@@ -296,9 +302,10 @@ test('every insert result and every guide entry stays render-ready', () => {
     JSON.parse(plan.text);
     assert.ok(plan.end > plan.start);
   }
-  for (const kind of ['node', 'edge', 'step', 'panel', 'section']){
+  for (const kind of ['group', 'node', 'edge', 'step', 'panel', 'section']){
     const g = B.BUILDER_GUIDES[kind];
-    assert.ok(g.title && g.how && g.fields.length >= 4, kind + ' guide is filled in');
+    assert.ok(g.title && g.how && g.fields.length >= (kind === 'group' ? 3 : 4),
+      kind + ' guide is filled in');
   }
 });
 
@@ -368,6 +375,116 @@ test('jsonSetField replaces, inserts, and removes one field surgically', () => {
   assert.strictEqual(noop.text, TEXT);
   /* the rest of the document is untouched by a surgical edit */
   assert.ok(rep.text.includes('"Second tab"'));
+});
+
+const GROUPED = {
+  page: {blocks: [{heading: 'Groups', diagram: {
+    nodes: {
+      a: {title: 'A', group: 'dev'},
+      b: {title: 'B', group: 'dev'},
+      c: {title: 'C', group: 'orphan'},
+      d: {title: 'D'}
+    },
+    rows: [['a', 'b', 'c', 'd']],
+    groups: {dev: {title: 'Device'}, spare: {title: 'Spare'}}
+  }}]}
+};
+const GROUPED_TEXT = JSON.stringify(GROUPED, null, 2);
+
+test('planSetNodeGroup sets and blank-removes a node group while auto-declaring once', () => {
+  const plan = B.planSetNodeGroup(RICH_TEXT, RICH, 0, 'a', 'api');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.strictEqual(d.nodes.a.group, 'api');
+  assert.deepStrictEqual(plain(d.groups), {api: {}});
+
+  const groupLoc = B.jsonLocate(plan.text, ['page', 'blocks', 0, 'diagram', 'groups']);
+  const groupMembers = B.jsonContainer(plan.text, groupLoc.start).members;
+  assert.strictEqual(groupMembers.filter(m => m.key === 'api').length, 1,
+    'the declaration is inserted exactly once');
+
+  const cleared = B.planSetNodeGroup(plan.text, JSON.parse(plan.text), 0, 'a', '  ');
+  const clearedDiagram = JSON.parse(cleared.text).page.blocks[0].diagram;
+  assert.ok(!('group' in clearedDiagram.nodes.a));
+  assert.deepStrictEqual(plain(clearedDiagram.groups), {api: {}}, 'blank leaves the declaration in place');
+  assert.match(B.planSetNodeGroup(RICH_TEXT, RICH, 0, 'missing', 'api').error, /not found/);
+});
+
+test('planBulkSetGroup assigns every selected node, declares once, and blank-removes all memberships', () => {
+  const spec = bulkSpec();
+  const text = JSON.stringify(spec, null, 2);
+  const targets = [
+    {section: 0, kind: 'node', id: 'a'},
+    {section: 0, kind: 'node', id: 'c'}
+  ];
+  const plan = B.planBulkSetGroup(text, spec, targets, 'workers');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.strictEqual(d.nodes.a.group, 'workers');
+  assert.strictEqual(d.nodes.c.group, 'workers');
+  assert.ok(!('group' in d.nodes.b), 'unselected node is untouched');
+  assert.deepStrictEqual(plain(d.groups), {workers: {}});
+  assert.strictEqual(plan.count, 2);
+
+  const groupLoc = B.jsonLocate(plan.text, ['page', 'blocks', 0, 'diagram', 'groups']);
+  assert.strictEqual(B.jsonContainer(plan.text, groupLoc.start).members.filter(m => m.key === 'workers').length, 1);
+
+  const cleared = B.planBulkSetGroup(plan.text, JSON.parse(plan.text), targets, null);
+  const clearedDiagram = JSON.parse(cleared.text).page.blocks[0].diagram;
+  assert.ok(!('group' in clearedDiagram.nodes.a) && !('group' in clearedDiagram.nodes.c));
+  assert.deepStrictEqual(plain(clearedDiagram.groups), {workers: {}});
+  assert.match(B.planBulkSetGroup(text, spec, [{section: 0, kind: 'edge', index: 0}], 'x').error,
+    /only contain nodes/);
+});
+
+test('planSetGroupTitle edits declarations, blank-removes title, and tolerates undeclared groups', () => {
+  const titled = B.planSetGroupTitle(GROUPED_TEXT, GROUPED, 0, 'dev', 'Platform');
+  assert.strictEqual(JSON.parse(titled.text).page.blocks[0].diagram.groups.dev.title, 'Platform');
+  const cleared = B.planSetGroupTitle(titled.text, JSON.parse(titled.text), 0, 'dev', ' ');
+  assert.deepStrictEqual(plain(JSON.parse(cleared.text).page.blocks[0].diagram.groups.dev), {});
+
+  const declared = B.planSetGroupTitle(GROUPED_TEXT, GROUPED, 0, 'orphan', 'Orphaned');
+  const d = JSON.parse(declared.text).page.blocks[0].diagram;
+  assert.strictEqual(d.groups.orphan.title, 'Orphaned');
+  assert.strictEqual(d.nodes.c.group, 'orphan');
+});
+
+test('planRenameGroup moves its declaration and members and refuses collisions', () => {
+  const renamed = B.planRenameGroup(GROUPED_TEXT, GROUPED, 0, 'dev', 'platform');
+  assert.ok(!renamed.error, renamed.error);
+  const d = JSON.parse(renamed.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(plain(d.groups), {platform: {title: 'Device'}, spare: {title: 'Spare'}});
+  assert.strictEqual(d.nodes.a.group, 'platform');
+  assert.strictEqual(d.nodes.b.group, 'platform');
+  assert.strictEqual(d.nodes.c.group, 'orphan');
+  assert.match(B.planRenameGroup(GROUPED_TEXT, GROUPED, 0, 'dev', 'spare').error, /already taken/);
+  assert.match(B.planRenameGroup(GROUPED_TEXT, GROUPED, 0, 'dev', ' ').error, /needs a key/);
+});
+
+test('planRenameGroup and planDeleteGroup work for undeclared groups', () => {
+  const renamed = B.planRenameGroup(GROUPED_TEXT, GROUPED, 0, 'orphan', 'loose');
+  const rd = JSON.parse(renamed.text).page.blocks[0].diagram;
+  assert.strictEqual(rd.nodes.c.group, 'loose');
+  assert.ok(!Object.prototype.hasOwnProperty.call(rd.groups, 'loose'),
+    'renaming an undeclared group does not invent a declaration');
+
+  const deleted = B.planDeleteGroup(GROUPED_TEXT, GROUPED, 0, 'orphan');
+  const dd = JSON.parse(deleted.text).page.blocks[0].diagram;
+  assert.ok(!('group' in dd.nodes.c));
+  assert.deepStrictEqual(plain(dd.groups), plain(GROUPED.page.blocks[0].diagram.groups));
+});
+
+test('planDeleteGroup removes its declaration and strips every member reference', () => {
+  const plan = B.planDeleteGroup(GROUPED_TEXT, GROUPED, 0, 'dev');
+  assert.ok(!plan.error, plan.error);
+  const d = JSON.parse(plan.text).page.blocks[0].diagram;
+  assert.deepStrictEqual(plain(d.groups), {spare: {title: 'Spare'}});
+  assert.ok(!('group' in d.nodes.a) && !('group' in d.nodes.b));
+  assert.strictEqual(d.nodes.c.group, 'orphan');
+
+  const routed = B.builderDeletePlan(GROUPED_TEXT, GROUPED,
+    {section: 0, kind: 'group', id: 'dev'});
+  assert.deepStrictEqual(plain(JSON.parse(routed.text)), plain(JSON.parse(plan.text)));
 });
 
 test('planSetEdgeEndpoint retargets the edge AND every step reference to its old key', () => {
@@ -2302,4 +2419,30 @@ test('buildExportHtml leaves the title alone when the spec has none', () => {
   const out = B.buildExportHtml(miniTemplate(), '{"nodes": {"a": {}}, "rows": [["a"]]}');
   assert.ok(!out.error);
   assert.ok(out.html.includes('<title>Old Title</title>'));
+});
+
+test('group planners refuse a non-object diagram.groups instead of corrupting it', () => {
+  const spec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {group: 'dev'}, b: {}}, rows: [['a', 'b']],
+    groups: 'occupied'
+  }}]}};
+  const text = JSON.stringify(spec, null, 2);
+  assert.match(B.planSetGroupTitle(text, spec, 0, 'dev', 'Title').error, /not an object/);
+  const setPlan = B.planSetNodeGroup(text, spec, 0, 'b', 'dev');
+  assert.ok(setPlan.error, 'declaring into a string groups value must fail, not corrupt');
+  /* numeric own keys on strings/arrays must not slip past the guard */
+  assert.match(B.planRenameGroup(text, spec, 0, '0', 'new').error, /not an object/);
+  assert.match(B.planDeleteGroup(text, spec, 0, '0').error, /not an object/);
+  const arrSpec = {page: {blocks: [{heading: 'H', diagram: {
+    nodes: {a: {group: '0'}}, rows: [['a']], groups: ['meta']
+  }}]}};
+  const arrText = JSON.stringify(arrSpec, null, 2);
+  assert.match(B.planSetNodeGroup(arrText, arrSpec, 0, 'a', '0').error, /not an object/);
+  assert.match(B.planRenameGroup(arrText, arrSpec, 0, '0', 'x').error, /not an object/);
+  assert.match(B.planDeleteGroup(arrText, arrSpec, 0, '0').error, /not an object/);
+  assert.match(B.planSetGroupTitle(arrText, arrSpec, 0, '0', 'T').error, /not an object/);
+  assert.match(B.planBulkSetGroup(arrText, arrSpec, [{kind: 'node', section: 0, id: 'a'}], 'x').error, /not an object/);
+  /* the original values survive every refused edit */
+  assert.equal(JSON.parse(text).page.blocks[0].diagram.groups, 'occupied');
+  assert.deepStrictEqual(JSON.parse(arrText).page.blocks[0].diagram.groups, ['meta']);
 });

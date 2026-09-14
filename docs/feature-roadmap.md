@@ -21,7 +21,7 @@ September 14 update: the trace work is split into [import and panels (#50)](http
 [dependency rows and lane routing (#51)](https://github.com/reghartner/design-viz/pull/51),
 and [service-internal timing (#52)](https://github.com/reghartner/design-viz/pull/52).
 Large-trace preview and focus are built in [#53](https://github.com/reghartner/design-viz/pull/53).
-The effective-state inspector is the next PR in this stack.
+The effective-state inspector is built in [#54](https://github.com/reghartner/design-viz/pull/54).
 
 | Rank | Feature | What it explains / representative use cases | Approach and scope | Effort | Status |
 |---|---|---|---|---|---|

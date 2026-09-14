@@ -14,7 +14,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 2 | Dependency-aware trace rows, crossing reduction and routing | codex/trace-smart-layout | Open: https://github.com/reghartner/design-viz/pull/51 |
 | 3 | Internal spans and inclusive / child-covered / uncovered timing | codex/trace-service-time | Open: https://github.com/reghartner/design-viz/pull/52 |
 | 4 | Large trace focus by service/subtree and import preview | codex/trace-import-focus | Open: https://github.com/reghartner/design-viz/pull/53 |
-| 5 | Effective step-state inspector and inheritance provenance | codex/effective-state-inspector | Built; opening PR, stacked on #53 |
+| 5 | Effective step-state inspector and inheritance provenance | codex/effective-state-inspector | Open: https://github.com/reghartner/design-viz/pull/54 |
 | 6 | Resizable workbench workspace / focused editing | TBD | Next bounded usability improvement |
 | 7 | Retry/timeout and circuit-breaker story | TBD | Reuse existing panels; add a focused software recipe/starter |
 
@@ -39,6 +39,11 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   overwrite protection. Browser verified a 1,000-span preview without document
   mutation, one-span import, undo, clear-focus recovery, service descendants,
   invalid focus, stale-preview disabling and retained original offsets.
+- Effective-state inspector: full Node suite and 158 Python tests passed,
+  with 13 focused regressions for normal and specialized reducers, exact source
+  paths, transient values, non-finite input and hidden-tab paths. Browser
+  verified inherited/unpatched panels, transient overrides, exact selection,
+  unchanged undo history, immediate stale-value clearing and read-only JSON.
 
 ## Next continuation
 

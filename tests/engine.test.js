@@ -23,7 +23,7 @@ function loadCore(overrides = {}){
     ' waterfallModel, orbitPositions, zoneModel, xrayModel, pirModel, thermoModel, batteryModel, bufferModel, radarModel, pointInPoly, signalModel, tilesModel, lintPage, CONTRACT_VERSION,' +
     ' queueModel, queuePanelHTML, contractCardHTML, inlineMarkup, generatedFromHTML, bulletsHTML, renderPanelBody, panelOrder,' +
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
-    ' foldPhoneStates, phoneModel, phonePanelHTML, PANEL_TYPES,' +
+    ' foldPhoneStates, phoneBrand, phoneModel, phonePanelHTML, PANEL_TYPES,' +
     ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
     ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection, parseClock, formatClock, timelineModel, timelineLanesModel,' +
     ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
@@ -34,6 +34,7 @@ function loadCore(overrides = {}){
   return sandbox.__exports;
 }
 const C = loadCore();
+function plain(value){ return JSON.parse(JSON.stringify(value)); }
 
 test('diagramHasDelta detects only strict boolean marks on declared nodes, edges, or steps', () => {
   assert.strictEqual(C.diagramHasDelta({}), false);
@@ -1026,6 +1027,89 @@ test('inflight validator: declaration limits, unknown lanes, restarts, empty end
   assert.ok(!w.some(x => x.includes('unknown panel type')), w.join('; '));
 });
 
+test('phone brand sanitizer accepts only plain objects and surviving fields', () => {
+  class Brand { constructor(){ this.app = 'Ring'; } }
+  for (const brand of [undefined, null, false, 42, 'Ring', [], new Date(), new Brand(), {}, {unknown: 'x'}]){
+    assert.strictEqual(C.phoneBrand({brand}), null);
+  }
+  assert.strictEqual(C.phoneBrand(), null);
+  assert.strictEqual(C.phoneBrand({}), null);
+  assert.deepStrictEqual(plain(C.phoneBrand({brand: Object.assign(Object.create(null), {app: 'Ring'})})), {app: 'Ring'});
+  const brand = Object.freeze({app: 'Ring', logo: 'ABCD', accent: '#abc', bg: '#A1B2C3', fg: '#123456', extra: 'ignored'});
+  assert.deepStrictEqual(plain(C.phoneBrand({brand})), {app: 'Ring', logo: 'ABCD', accent: '#abc', bg: '#A1B2C3', fg: '#123456'});
+  for (const value of ['red', '#12345', 'url(x)', '#1D6EF2;background:url(x)', 'rgb(1,2,3)', 'var(--x)', '#1234', '#12345678', '#abc\n', ' #abc', '#ggg', null, 123, {toString: () => '#abc'}]){
+    for (const field of ['accent', 'bg', 'fg']){
+      assert.deepStrictEqual(plain(C.phoneBrand({brand: {[field]: value, app: 'Ring'}})), {app: 'Ring'});
+    }
+  }
+  for (const logo of ['', 'ABCDE', 42, null]) assert.strictEqual(C.phoneBrand({brand: {logo}}), null);
+  for (const app of [42, null, {}, []]) assert.strictEqual(C.phoneBrand({brand: {app}}), null);
+  assert.deepStrictEqual(plain(C.phoneBrand({brand: {app: ''}})), {app: ''});
+});
+
+test('unbranded phone markup remains byte-identical to the original renderer', () => {
+  const states = [{notifications: []}, {clock: '9:41', notifications: [{app: 'Ring', title: 'Motion', text: 'Front door'}]}];
+  const expected = [
+    "<div class=\"phoneframe\" role=\"img\" aria-label=\"Phone with no notifications\"><span class=\"phonespeaker\" aria-hidden=\"true\"></span><div class=\"phonestatus\"><span class=\"phoneclock\"></span><span class=\"phoneglyphs\" aria-hidden=\"true\"><span class=\"phonesignal\"><i></i><i></i><i></i></span><span class=\"phonebattery\"><i></i></span></span></div><div class=\"phonecards\"><div class=\"phoneempty\">no notifications</div></div><span class=\"phonehome\" aria-hidden=\"true\"></span></div>",
+    "<div class=\"phoneframe\" role=\"img\" aria-label=\"Phone with 1 unread notification\"><span class=\"phonespeaker\" aria-hidden=\"true\"></span><div class=\"phonestatus\"><span class=\"phoneclock\">9:41</span><span class=\"phoneglyphs\" aria-hidden=\"true\"><span class=\"phonesignal\"><i></i><i></i><i></i></span><span class=\"phonebattery\"><i></i></span></span></div><span class=\"phonebadge\" aria-hidden=\"true\">1</span><div class=\"phonecards\"><div class=\"phonecard fresh\"><div class=\"phoneapp\" title=\"Ring\">Ring</div><div class=\"phonetitle\" title=\"Motion\">Motion</div><div class=\"phonetext\" title=\"Front door\">Front door</div></div></div><span class=\"phonehome\" aria-hidden=\"true\"></span></div>"
+];
+  states.forEach((state, i) => {
+    for (const panel of [{}, {brand: {}}, {brand: {accent: 'red', logo: 'ABCDE', app: 42}}]){
+      const html = C.phonePanelHTML(panel, state, true);
+      assert.strictEqual(html, expected[i]);
+      assert.ok(!html.includes('phonebrand') && !html.includes('style="--'));
+    }
+  });
+});
+
+test('phone brand markup escapes text and only interpolates validated colors', () => {
+  const state = {clock: '9:41', notifications: [{app: 'Ring'}, {app: 'Ring'}]};
+  const brand = {app: 'Ring <b>"&', logo: '<&"', accent: '#1D6EF2', bg: '#0B1B2B', fg: '#EAF2FF'};
+  const h = C.phonePanelHTML({brand}, state, true);
+  assert.ok(h.includes('style="--phacc:#1D6EF2;--phbg:#0B1B2B;--phfg:#EAF2FF"'), h);
+  assert.ok(h.includes('<div class="phonebrand"><span class="phonelogo" aria-hidden="true">&lt;&amp;&quot;</span><span class="phonebrandname">Ring &lt;b&gt;&quot;&amp;</span></div>'), h);
+  assert.ok(h.includes('aria-label="Ring &lt;b&gt;&quot;&amp; phone with 2 unread notifications"'), h);
+  assert.ok(h.indexOf('class="phonebrand"') > h.indexOf('class="phonestatus"'));
+  assert.ok(h.indexOf('class="phonebrand"') < h.indexOf('class="phonecards"'));
+  assert.ok(!h.includes('<b>'));
+  const partial = C.phonePanelHTML({brand: {accent: 'red', bg: '#abc', fg: 'url(x)', logo: 'ABCDE'}}, state);
+  assert.ok(partial.includes('style="--phbg:#abc"'), partial);
+  assert.ok(!partial.includes('phonebrand') && !partial.includes('--phacc') && !partial.includes('--phfg'));
+  const appOnly = C.phonePanelHTML({brand: {app: 'Ring'}}, {notifications: []});
+  assert.ok(appOnly.includes('aria-label="Ring phone with no notifications"'));
+  assert.ok(!appOnly.includes('phonelogo') && !appOnly.includes('style="--'));
+  const logoOnly = C.phonePanelHTML({brand: {logo: 'R'}}, state);
+  assert.ok(logoOnly.includes('phonelogo') && !logoOnly.includes('phonebrandname'));
+});
+
+test('phone brand validator warns per field, accepts valid brands, and rejects step branding', () => {
+  const check = (panel, patch = {}) => C.validate(C.normalize({nodes: {a: {}}, rows: [['a']],
+    panels: [{id: 'ph', type: 'phone', ...panel}], steps: [{nodes: ['a'], panels: {ph: patch}}]}));
+  for (const brand of [null, [], 'Ring', 42, new Date()]){
+    const result = check({brand});
+    assert.deepStrictEqual(plain(result.errors), []);
+    assert.ok(result.warnings.some(w => w.endsWith('.panels[0].brand: must be a plain object — ignored')), result.warnings.join('; '));
+  }
+  for (const field of ['accent', 'bg', 'fg']){
+    for (const value of ['red', '#12345', 'url(x)', '#1D6EF2;background:url(x)', '#abc\n', null, 123]){
+      const result = check({brand: {[field]: value}});
+      assert.deepStrictEqual(plain(result.errors), []);
+      assert.ok(result.warnings.some(w => w.endsWith('.brand.' + field + ': must be #RGB or #RRGGBB hex — ignored')), result.warnings.join('; '));
+    }
+  }
+  for (const logo of ['', 'ABCDE', null, 42]){
+    assert.ok(check({brand: {logo}}).warnings.some(w => w.endsWith('.brand.logo: must be a string of 1-4 characters — ignored')));
+  }
+  assert.ok(check({brand: {app: 42}}).warnings.some(w => w.endsWith('.brand.app: must be a string — ignored')));
+  for (const panel of [{}, {brand: {}}, {brand: {app: ''}}, {brand: {app: 'Ring', logo: 'ABCD', accent: '#abc', bg: '#A1B2C3', fg: '#fff'}}]){
+    assert.deepStrictEqual(plain(check(panel)), {errors: [], warnings: []});
+  }
+  assert.ok(check({}, {brand: {app: 'Other'}}).warnings.some(w => w.includes('.panels.ph.brand: not a phone field — ignored')));
+  const panel = {id: 'ph', type: 'phone', brand: {app: 'Ring'}};
+  const model = C.phoneModel(panel, [{panels: {ph: {brand: {app: 'Other'}, notify: {app: 'Ring'}}}}], 0);
+  assert.ok(C.phonePanelHTML(panel, model).includes('aria-label="Ring phone with 1 unread notification"'));
+});
+
 test('phone fold accumulates object and array pushes newest-first, then clears', () => {
   const panel = {id: 'resident', type: 'phone', initial: {clock: '9:41'}};
   const steps = [
@@ -1225,6 +1309,15 @@ test('phone styles cover base/overlay skins, reduced motion, and static print', 
    'body.sk-pastel .sk-aurora .phoneframe', 'body.sk-pastel .sk-daylight .phoneframe',
    'body.sk-blueprint .sk-aurora .phoneframe', 'body.sk-blueprint .sk-daylight .phoneframe'].forEach(selector => {
     assert.ok(css.includes(selector), selector);
+    const frame = declarationsFor(selector);
+    assert.match(frame.color, /^var\(--phfg, .+\)$/);
+    assert.match(frame.background, /^var\(--phbg, .+\)$/);
+    const prefix = selector.slice(0, -'phoneframe'.length);
+    assert.match(declarationsFor(prefix + 'phoneapp').color, /^var\(--phacc, .+\)$/);
+    assert.match(declarationsFor(prefix + 'phonebadge').background, /^var\(--phacc, .+\)$/);
+    assert.match(declarationsFor(prefix + 'phonelogo').background, /^var\(--phacc, .+\)$/);
+    assert.strictEqual(declarationsFor(prefix + 'phonecard.fresh')['border-color'],
+      'var(--phacc, ' + declarationsFor(prefix + 'phonecard')['border-color'] + ')');
   });
   ['.sk-aurora .phonecard', '.sk-daylight .phonecard',
    'body.sk-editorial .sk-aurora .phonecard', 'body.sk-terminal .sk-aurora .phonecard',

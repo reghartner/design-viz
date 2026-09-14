@@ -1926,6 +1926,22 @@ function inflightBarFrames(model){
 /* phone widget: a generic handset lock screen backed by the absolute unread
    stack produced by foldPhoneStates. The model keeps the full count for the
    computed badge while exposing only the three cards that can fit. */
+function phoneBrand(panel){
+  var brand = panel && panel.brand;
+  if (!phoneBrandIsPlainObject(brand)) return null;
+  var out = {};
+  if (typeof brand.app === 'string') out.app = brand.app;
+  if (typeof brand.logo === 'string' && brand.logo.length >= 1 && brand.logo.length <= 4)
+    out.logo = brand.logo;
+  /* These values enter an inline style: accept only literal hex colors. */
+  ['accent', 'bg', 'fg'].forEach(function(k){
+    if (typeof brand[k] === 'string' && (brand[k].length === 4 || brand[k].length === 7) &&
+        /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k]))
+      out[k] = brand[k];
+  });
+  return Object.keys(out).length ? out : null;
+}
+
 function phoneModel(panelOrState, stepsOrState, currentStep){
   var state;
   /* Public fold form: phoneModel(panel, diagramSteps, targetIndex). This is
@@ -1962,13 +1978,26 @@ function phoneModel(panelOrState, stepsOrState, currentStep){
 function phonePanelHTML(panel, state, fresh){
   panel = panel || {};
   var m = phoneModel(panel, state);
+  var brand = phoneBrand(panel);
+  var styles = [];
+  if (brand){
+    if (brand.accent) styles.push('--phacc:' + brand.accent);
+    if (brand.bg) styles.push('--phbg:' + brand.bg);
+    if (brand.fg) styles.push('--phfg:' + brand.fg);
+  }
   var label = m.count ? 'Phone with ' + m.count + ' unread notification' + (m.count === 1 ? '' : 's') :
     'Phone with no notifications';
-  var h = '<div class="phoneframe" role="img" aria-label="' + esc(label) + '">' +
+  if (brand && brand.app) label = brand.app + ' phone' + label.slice(5);
+  var h = '<div class="phoneframe"' + (styles.length ? ' style="' + styles.join(';') + '"' : '') +
+    ' role="img" aria-label="' + esc(label) + '">' +
     '<span class="phonespeaker" aria-hidden="true"></span>' +
     '<div class="phonestatus"><span class="phoneclock">' + esc(m.clock) + '</span>' +
     '<span class="phoneglyphs" aria-hidden="true"><span class="phonesignal"><i></i><i></i><i></i></span>' +
     '<span class="phonebattery"><i></i></span></span></div>';
+  if (brand && (brand.app || brand.logo))
+    h += '<div class="phonebrand">' +
+      (brand.logo ? '<span class="phonelogo" aria-hidden="true">' + esc(brand.logo) + '</span>' : '') +
+      (brand.app ? '<span class="phonebrandname">' + esc(brand.app) + '</span>' : '') + '</div>';
   if (m.count)
     h += '<span class="phonebadge" aria-hidden="true">' + m.badge + '</span>';
   h += '<div class="phonecards">';

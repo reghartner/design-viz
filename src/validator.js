@@ -238,8 +238,37 @@ function queueContextWarnings(obj, path, warnings){
   });
 }
 
-/* phone patches are operations, not ordinary shallow-carried fields. Keep
-   their accepted shape in one validator used for both initial and steps. */
+/* Shared with the phone renderer; also accepts plain objects from another realm. */
+function phoneBrandIsPlainObject(obj){
+  if (!obj || Object.prototype.toString.call(obj) !== '[object Object]') return false;
+  var proto = Object.getPrototypeOf(obj);
+  return proto === null || (Object.prototype.hasOwnProperty.call(proto, 'constructor') &&
+    typeof proto.constructor === 'function' &&
+    Function.prototype.toString.call(proto.constructor) === Function.prototype.toString.call(Object));
+}
+
+function phoneBrandWarnings(panel, path, warnings){
+  if (!Object.prototype.hasOwnProperty.call(panel, 'brand')) return;
+  var brand = panel.brand;
+  path += '.brand';
+  if (!phoneBrandIsPlainObject(brand)){
+    warnings.push(path + ': must be a plain object — ignored');
+    return;
+  }
+  ['accent', 'bg', 'fg'].forEach(function(k){
+    if (Object.prototype.hasOwnProperty.call(brand, k) &&
+        (typeof brand[k] !== 'string' || (brand[k].length !== 4 && brand[k].length !== 7) ||
+         !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k])))
+      warnings.push(path + '.' + k + ': must be #RGB or #RRGGBB hex — ignored');
+  });
+  if (Object.prototype.hasOwnProperty.call(brand, 'logo') &&
+      (typeof brand.logo !== 'string' || brand.logo.length < 1 || brand.logo.length > 4))
+    warnings.push(path + '.logo: must be a string of 1-4 characters — ignored');
+  if (Object.prototype.hasOwnProperty.call(brand, 'app') && typeof brand.app !== 'string')
+    warnings.push(path + '.app: must be a string — ignored');
+}
+
+/* Phone patches are operations, validated for both initial and steps. */
 function phonePatchWarnings(obj, path, warnings){
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
   Object.keys(obj).forEach(function(k){
@@ -604,6 +633,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     }
     if (p.type === 'phone'){
       phonePanels[p.id] = true;
+      phoneBrandWarnings(p, PP, warnings);
       phonePatchWarnings(p.initial, PP + '.initial', warnings);
     }
     if (p.type === 'timeline'){

@@ -688,6 +688,11 @@ body.sk-aurora.sk-blueprint{
 .phonespeaker{position:absolute;top:9px;left:50%;width:36px;height:4px;transform:translateX(-50%);border-radius:999px;}
 .phonestatus{position:absolute;top:16px;left:13px;right:13px;display:flex;align-items:center;justify-content:space-between;
   height:11px;font-size:8px;font-weight:700;}
+.phonebrand{display:flex;align-items:center;gap:5px;min-width:0;padding:3px 18px 0 0;}
+.phonelogo{flex:0 0 18px;height:18px;border-radius:4px;text-align:center;font-size:6px;font-weight:800;line-height:18px;
+  color:#FFFFFF;background:var(--phacc, #4956C9);}
+.phonebrandname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;
+  color:var(--phfg, inherit);}
 .phoneclock{max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .phoneglyphs{display:flex;align-items:flex-end;gap:5px;}
 .phonesignal{display:flex;align-items:flex-end;gap:1px;height:8px;}
@@ -709,22 +714,26 @@ body.sk-aurora.sk-blueprint{
 .phoneoverflow{text-align:center;font-size:8px;font-weight:700;letter-spacing:.04em;}
 .phoneempty{margin:auto;text-align:center;font-size:8px;letter-spacing:.05em;text-transform:uppercase;opacity:.58;}
 .phonehome{position:absolute;bottom:8px;left:50%;width:42px;height:3px;transform:translateX(-50%);border-radius:999px;}
-.sk-aurora .phoneframe{color:#D9E4F2;background:#09111E;border-color:#718099;box-shadow:inset 0 0 0 2px #16233A;}
+.sk-aurora .phoneframe{color:var(--phfg, #D9E4F2);background:var(--phbg, #09111E);border-color:#718099;box-shadow:inset 0 0 0 2px #16233A;}
 .sk-aurora .phonespeaker,.sk-aurora .phonehome{background:#718099;}
 .sk-aurora .phonesignal i{background:#C7D3E3;}
 .sk-aurora .phonebattery{color:#C7D3E3;border-color:#C7D3E3;}
 .sk-aurora .phonecard{color:#DCE7F5;background:rgba(43,58,79,.92);border-color:#3A4B64;box-shadow:0 4px 12px rgba(0,0,0,.2);}
-.sk-aurora .phoneapp,.sk-aurora .phoneoverflow{color:#8AE8FF;}
+.sk-aurora .phonecard.fresh{border-color:var(--phacc, #3A4B64);}
+.sk-aurora .phoneapp,.sk-aurora .phoneoverflow{color:var(--phacc, #8AE8FF);}
 .sk-aurora .phonetext{color:#B7C4D5;}
-.sk-aurora .phonebadge{color:#07121D;background:#8AE8FF;}
-.sk-daylight .phoneframe{color:#282B33;background:#F2F0EA;border-color:#777B84;box-shadow:inset 0 0 0 2px #FFFFFF;}
+.sk-aurora .phonebadge{color:#07121D;background:var(--phacc, #8AE8FF);}
+.sk-aurora .phonelogo{color:#07121D;background:var(--phacc, #8AE8FF);}
+.sk-daylight .phoneframe{color:var(--phfg, #282B33);background:var(--phbg, #F2F0EA);border-color:#777B84;box-shadow:inset 0 0 0 2px #FFFFFF;}
 .sk-daylight .phonespeaker,.sk-daylight .phonehome{background:#777B84;}
 .sk-daylight .phonesignal i{background:#4E535D;}
 .sk-daylight .phonebattery{color:#4E535D;border-color:#4E535D;}
 .sk-daylight .phonecard{color:#272A32;background:rgba(255,255,255,.94);border-color:#D6D2C8;box-shadow:0 4px 12px rgba(45,42,35,.1);}
-.sk-daylight .phoneapp,.sk-daylight .phoneoverflow{color:#4956C9;}
+.sk-daylight .phonecard.fresh{border-color:var(--phacc, #D6D2C8);}
+.sk-daylight .phoneapp,.sk-daylight .phoneoverflow{color:var(--phacc, #4956C9);}
 .sk-daylight .phonetext{color:#5F626B;}
-.sk-daylight .phonebadge{color:#FFFFFF;background:#4956C9;}
+.sk-daylight .phonebadge{color:#FFFFFF;background:var(--phacc, #4956C9);}
+.sk-daylight .phonelogo{color:#FFFFFF;background:var(--phacc, #4956C9);}
 
 /* screen widget (viewfinder) */
 .screenbox{position:relative; border-radius:8px; overflow:hidden; aspect-ratio:16/9; background:#05080B;}
@@ -2079,7 +2088,7 @@ body.sk-editorial .sk-daylight .qside-out{color:var(--ed-warn);}
 
 body.sk-editorial .sk-aurora .phoneframe,
 body.sk-editorial .sk-daylight .phoneframe{
-  color:var(--ed-ink);background:var(--ed-paper);border-color:var(--ed-ink);
+  color:var(--phfg, var(--ed-ink));background:var(--phbg, var(--ed-paper));border-color:var(--ed-ink);
   border-radius:18px;box-shadow:inset 0 0 0 2px #FFFDF8;
 }
 body.sk-editorial .sk-aurora .phonespeaker,
@@ -2094,14 +2103,18 @@ body.sk-editorial .sk-aurora .phonecard,
 body.sk-editorial .sk-daylight .phonecard{
   color:var(--ed-ink);background:#FFFDF8;border-color:var(--ed-rule);border-radius:2px;box-shadow:none;
 }
+body.sk-editorial .sk-aurora .phonecard.fresh,
+body.sk-editorial .sk-daylight .phonecard.fresh{border-color:var(--phacc, var(--ed-rule));}
 body.sk-editorial .sk-aurora .phoneapp,
 body.sk-editorial .sk-daylight .phoneapp,
 body.sk-editorial .sk-aurora .phoneoverflow,
-body.sk-editorial .sk-daylight .phoneoverflow{color:var(--ed-accent);}
+body.sk-editorial .sk-daylight .phoneoverflow{color:var(--phacc, var(--ed-accent));}
 body.sk-editorial .sk-aurora .phonetext,
 body.sk-editorial .sk-daylight .phonetext{color:var(--ed-muted);}
 body.sk-editorial .sk-aurora .phonebadge,
-body.sk-editorial .sk-daylight .phonebadge{color:#FFFDF8;background:var(--ed-accent-deep);}
+body.sk-editorial .sk-daylight .phonebadge{color:#FFFDF8;background:var(--phacc, var(--ed-accent-deep));}
+body.sk-editorial .sk-aurora .phonelogo,
+body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, var(--ed-accent-deep));}
 
 body.sk-editorial .ctcard,
 body.sk-editorial .sk-aurora .ctcard,
@@ -2662,7 +2675,7 @@ body.sk-editorial .errbox{
 
   body.sk-terminal .sk-aurora .phoneframe,
   body.sk-terminal .sk-daylight .phoneframe{
-    color:var(--tm-ink);background:var(--tm-ground);border-color:var(--tm-line);
+    color:var(--phfg, var(--tm-ink));background:var(--phbg, var(--tm-ground));border-color:var(--tm-line);
     border-radius:0;box-shadow:inset 0 0 0 1px var(--tm-line-dim) !important;
   }
   body.sk-terminal .sk-aurora .phonespeaker,
@@ -2677,14 +2690,18 @@ body.sk-editorial .errbox{
   body.sk-terminal .sk-daylight .phonecard{
     color:var(--tm-ink);background:var(--tm-raised);border-color:var(--tm-line);border-radius:0;box-shadow:none;
   }
+  body.sk-terminal .sk-aurora .phonecard.fresh,
+  body.sk-terminal .sk-daylight .phonecard.fresh{border-color:var(--phacc, var(--tm-line));}
   body.sk-terminal .sk-aurora .phoneapp,
   body.sk-terminal .sk-daylight .phoneapp,
   body.sk-terminal .sk-aurora .phoneoverflow,
-  body.sk-terminal .sk-daylight .phoneoverflow{color:var(--tm-good);}
+  body.sk-terminal .sk-daylight .phoneoverflow{color:var(--phacc, var(--tm-good));}
   body.sk-terminal .sk-aurora .phonetext,
   body.sk-terminal .sk-daylight .phonetext{color:var(--tm-muted);}
   body.sk-terminal .sk-aurora .phonebadge,
-  body.sk-terminal .sk-daylight .phonebadge{color:var(--tm-ground);background:var(--tm-alert);border-radius:0;}
+  body.sk-terminal .sk-daylight .phonebadge{color:var(--tm-ground);background:var(--phacc, var(--tm-alert));border-radius:0;}
+  body.sk-terminal .sk-aurora .phonelogo,
+  body.sk-terminal .sk-daylight .phonelogo{color:var(--tm-ground);background:var(--phacc, var(--tm-alert));}
 
   body.sk-terminal .rdring,
   body.sk-terminal .rdedge{stroke:var(--tm-line);}
@@ -3386,7 +3403,7 @@ body.sk-editorial .errbox{
 
   body.sk-pastel .sk-aurora .phoneframe,
   body.sk-pastel .sk-daylight .phoneframe{
-    color:#2D3B54;background:#F3F5FB;border-color:#9AA6DE;
+    color:var(--phfg, #2D3B54);background:var(--phbg, #F3F5FB);border-color:#9AA6DE;
     border-radius:27px;box-shadow:inset 0 0 0 2px #FFFFFF,0 7px 18px rgba(82,99,185,.1);
   }
   body.sk-pastel .sk-aurora .phonespeaker,
@@ -3401,14 +3418,18 @@ body.sk-editorial .errbox{
   body.sk-pastel .sk-daylight .phonecard{
     color:#2D3B54;background:#FFFFFF;border-color:#E0E6EF;border-radius:12px;box-shadow:0 3px 9px rgba(82,99,185,.09);
   }
+  body.sk-pastel .sk-aurora .phonecard.fresh,
+  body.sk-pastel .sk-daylight .phonecard.fresh{border-color:var(--phacc, #E0E6EF);}
   body.sk-pastel .sk-aurora .phoneapp,
   body.sk-pastel .sk-daylight .phoneapp,
   body.sk-pastel .sk-aurora .phoneoverflow,
-  body.sk-pastel .sk-daylight .phoneoverflow{color:#5263B9;}
+  body.sk-pastel .sk-daylight .phoneoverflow{color:var(--phacc, #5263B9);}
   body.sk-pastel .sk-aurora .phonetext,
   body.sk-pastel .sk-daylight .phonetext{color:#6C788C;}
   body.sk-pastel .sk-aurora .phonebadge,
-  body.sk-pastel .sk-daylight .phonebadge{color:#FFFFFF;background:#D36370;}
+  body.sk-pastel .sk-daylight .phonebadge{color:#FFFFFF;background:var(--phacc, #D36370);}
+  body.sk-pastel .sk-aurora .phonelogo,
+  body.sk-pastel .sk-daylight .phonelogo{color:#FFFFFF;background:var(--phacc, #D36370);}
 
   body.sk-pastel .tltile,
   body.sk-pastel .sk-aurora .tltile,
@@ -3971,7 +3992,7 @@ body.sk-editorial .errbox{
 
   body.sk-blueprint .sk-aurora .phoneframe,
   body.sk-blueprint .sk-daylight .phoneframe{
-    color:#FFFFFF;background:#031E40;border-color:#63C7DF;border-radius:0;
+    color:var(--phfg, #FFFFFF);background:var(--phbg, #031E40);border-color:#63C7DF;border-radius:0;
     box-shadow:inset 0 0 0 2px #052956;
   }
   body.sk-blueprint .sk-aurora .phonespeaker,
@@ -3986,14 +4007,18 @@ body.sk-editorial .errbox{
   body.sk-blueprint .sk-daylight .phonecard{
     color:#FFFFFF;background:#052956;border-color:#347B9A;border-radius:0;box-shadow:none;
   }
+  body.sk-blueprint .sk-aurora .phonecard.fresh,
+  body.sk-blueprint .sk-daylight .phonecard.fresh{border-color:var(--phacc, #347B9A);}
   body.sk-blueprint .sk-aurora .phoneapp,
   body.sk-blueprint .sk-daylight .phoneapp,
   body.sk-blueprint .sk-aurora .phoneoverflow,
-  body.sk-blueprint .sk-daylight .phoneoverflow{color:#58E7FF;}
+  body.sk-blueprint .sk-daylight .phoneoverflow{color:var(--phacc, #58E7FF);}
   body.sk-blueprint .sk-aurora .phonetext,
   body.sk-blueprint .sk-daylight .phonetext{color:#A9CCDD;}
   body.sk-blueprint .sk-aurora .phonebadge,
-  body.sk-blueprint .sk-daylight .phonebadge{color:#052956;background:#FFD166;border-radius:0;}
+  body.sk-blueprint .sk-daylight .phonebadge{color:#052956;background:var(--phacc, #FFD166);border-radius:0;}
+  body.sk-blueprint .sk-aurora .phonelogo,
+  body.sk-blueprint .sk-daylight .phonelogo{color:#052956;background:var(--phacc, #FFD166);}
 
   body.sk-blueprint .tlgrid{grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:5px;}
   body.sk-blueprint .tltile{gap:2px;padding:5px 6px;border-radius:0;}
@@ -4732,8 +4757,37 @@ function queueContextWarnings(obj, path, warnings){
   });
 }
 
-/* phone patches are operations, not ordinary shallow-carried fields. Keep
-   their accepted shape in one validator used for both initial and steps. */
+/* Shared with the phone renderer; also accepts plain objects from another realm. */
+function phoneBrandIsPlainObject(obj){
+  if (!obj || Object.prototype.toString.call(obj) !== '[object Object]') return false;
+  var proto = Object.getPrototypeOf(obj);
+  return proto === null || (Object.prototype.hasOwnProperty.call(proto, 'constructor') &&
+    typeof proto.constructor === 'function' &&
+    Function.prototype.toString.call(proto.constructor) === Function.prototype.toString.call(Object));
+}
+
+function phoneBrandWarnings(panel, path, warnings){
+  if (!Object.prototype.hasOwnProperty.call(panel, 'brand')) return;
+  var brand = panel.brand;
+  path += '.brand';
+  if (!phoneBrandIsPlainObject(brand)){
+    warnings.push(path + ': must be a plain object — ignored');
+    return;
+  }
+  ['accent', 'bg', 'fg'].forEach(function(k){
+    if (Object.prototype.hasOwnProperty.call(brand, k) &&
+        (typeof brand[k] !== 'string' || (brand[k].length !== 4 && brand[k].length !== 7) ||
+         !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k])))
+      warnings.push(path + '.' + k + ': must be #RGB or #RRGGBB hex — ignored');
+  });
+  if (Object.prototype.hasOwnProperty.call(brand, 'logo') &&
+      (typeof brand.logo !== 'string' || brand.logo.length < 1 || brand.logo.length > 4))
+    warnings.push(path + '.logo: must be a string of 1-4 characters — ignored');
+  if (Object.prototype.hasOwnProperty.call(brand, 'app') && typeof brand.app !== 'string')
+    warnings.push(path + '.app: must be a string — ignored');
+}
+
+/* Phone patches are operations, validated for both initial and steps. */
 function phonePatchWarnings(obj, path, warnings){
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
   Object.keys(obj).forEach(function(k){
@@ -5098,6 +5152,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     }
     if (p.type === 'phone'){
       phonePanels[p.id] = true;
+      phoneBrandWarnings(p, PP, warnings);
       phonePatchWarnings(p.initial, PP + '.initial', warnings);
     }
     if (p.type === 'timeline'){
@@ -7646,6 +7701,22 @@ function inflightBarFrames(model){
 /* phone widget: a generic handset lock screen backed by the absolute unread
    stack produced by foldPhoneStates. The model keeps the full count for the
    computed badge while exposing only the three cards that can fit. */
+function phoneBrand(panel){
+  var brand = panel && panel.brand;
+  if (!phoneBrandIsPlainObject(brand)) return null;
+  var out = {};
+  if (typeof brand.app === 'string') out.app = brand.app;
+  if (typeof brand.logo === 'string' && brand.logo.length >= 1 && brand.logo.length <= 4)
+    out.logo = brand.logo;
+  /* These values enter an inline style: accept only literal hex colors. */
+  ['accent', 'bg', 'fg'].forEach(function(k){
+    if (typeof brand[k] === 'string' && (brand[k].length === 4 || brand[k].length === 7) &&
+        /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k]))
+      out[k] = brand[k];
+  });
+  return Object.keys(out).length ? out : null;
+}
+
 function phoneModel(panelOrState, stepsOrState, currentStep){
   var state;
   /* Public fold form: phoneModel(panel, diagramSteps, targetIndex). This is
@@ -7682,13 +7753,26 @@ function phoneModel(panelOrState, stepsOrState, currentStep){
 function phonePanelHTML(panel, state, fresh){
   panel = panel || {};
   var m = phoneModel(panel, state);
+  var brand = phoneBrand(panel);
+  var styles = [];
+  if (brand){
+    if (brand.accent) styles.push('--phacc:' + brand.accent);
+    if (brand.bg) styles.push('--phbg:' + brand.bg);
+    if (brand.fg) styles.push('--phfg:' + brand.fg);
+  }
   var label = m.count ? 'Phone with ' + m.count + ' unread notification' + (m.count === 1 ? '' : 's') :
     'Phone with no notifications';
-  var h = '<div class="phoneframe" role="img" aria-label="' + esc(label) + '">' +
+  if (brand && brand.app) label = brand.app + ' phone' + label.slice(5);
+  var h = '<div class="phoneframe"' + (styles.length ? ' style="' + styles.join(';') + '"' : '') +
+    ' role="img" aria-label="' + esc(label) + '">' +
     '<span class="phonespeaker" aria-hidden="true"></span>' +
     '<div class="phonestatus"><span class="phoneclock">' + esc(m.clock) + '</span>' +
     '<span class="phoneglyphs" aria-hidden="true"><span class="phonesignal"><i></i><i></i><i></i></span>' +
     '<span class="phonebattery"><i></i></span></span></div>';
+  if (brand && (brand.app || brand.logo))
+    h += '<div class="phonebrand">' +
+      (brand.logo ? '<span class="phonelogo" aria-hidden="true">' + esc(brand.logo) + '</span>' : '') +
+      (brand.app ? '<span class="phonebrandname">' + esc(brand.app) + '</span>' : '') + '</div>';
   if (m.count)
     h += '<span class="phonebadge" aria-hidden="true">' + m.badge + '</span>';
   h += '<div class="phonecards">';
@@ -11861,7 +11945,8 @@ var PANEL_SETUP_FIELDS = {
   tiles:     [['tiles', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 12}],
               ['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
   inflight:  [['lanes', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}]}], ['initial', 'json']],
-  phone:     [['initial', 'json']],
+  phone:     [['brand', 'objf', {cols: [{k: 'app'}, {k: 'logo'}, {k: 'accent'}, {k: 'bg'}, {k: 'fg'}]}],
+              ['initial', 'json']],
   timeline:  [['span', 'clock'],
               ['cadence', 'objf', {cols: [{k: 'every', kind: 'clock', req: true}, {k: 'label'}]}],
               ['lanes', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'},

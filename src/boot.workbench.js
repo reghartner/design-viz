@@ -391,3 +391,4 @@ go(false);
 initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); },
   starters: STARTERS, renderedText: function(){ return lastRenderedText; },
   ctl: function(){ return lastCtl; }});
+initWorkbenchWorkspace();

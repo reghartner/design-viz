@@ -1,5 +1,15 @@
 # Changelog
 
+## Homemap visual polish (2026-09-14)
+
+- Device icons, state badges, softly raised room walls, and people avatars make
+  the home easier to read. Rooms reflect alerts, warnings, and visible occupants.
+- Activity halos breathe, doors swing, signal paths flow, and moving subjects
+  leave short fading trails. Unchanged repaints preserve running effects;
+  immediate renders settle at their final state.
+- All six skins use their own palette. Reduced motion, print, and the placement
+  editor stay steady. Existing homemap specs receive the treatment automatically.
+
 ## Homemap as the centerpiece (2026-09-14)
 
 - `diagram.primaryPanel` gives a chosen panel the main space, keeps playback

@@ -118,3 +118,69 @@ test('room geometry is bounded and labels are escaped before SVG rendering', () 
   const host = {querySelector:()=>null}; C.renderPanelBody(host, panel, {}, 'pastel');
   assert.match(host.innerHTML, /&lt;script&gt;bad/); assert.doesNotMatch(host.innerHTML, /<script>/);
 });
+
+test('room lighting prioritizes device alerts, then warnings, then visible occupants', () => {
+  const panel = diagram(fixture()).panels[0];
+  panel.rooms = [{x:0,y:0,w:320,h:180}];
+  const tone = state => C.homemapRoomModel(panel, C.homemapModel(panel, state))[0].tone;
+  assert.equal(tone({}), 'occupied');
+  assert.equal(tone({visitor:null}), 'quiet');
+  assert.equal(tone({motion:'warn'}), 'warn');
+  assert.equal(tone({motion:'warn',hub:'alert'}), 'alert');
+  assert.equal(tone({cam:'detect'}), 'alert');
+  assert.equal(tone({cam:'rec',hub:'tx',visitor:null}), 'quiet', 'ordinary activity is not an alarm');
+  const before = JSON.stringify(panel);
+  tone({motion:'alert'});
+  assert.equal(JSON.stringify(panel), before, 'lighting cannot write back device states');
+});
+
+test('room lighting assigns shared boundaries once, includes frame edges, and ignores invalid rooms', () => {
+  const panel = {devices:[], subjects:[{id:'person',x:160,y:90}], rooms:[
+    {x:0,y:0,w:160,h:90}, {x:160,y:0,w:160,h:90},
+    {x:0,y:90,w:160,h:90}, {x:160,y:90,w:160,h:90},
+    {x:0,y:0,w:400,h:180}, null
+  ]};
+  const tones = state => plain(C.homemapRoomModel(panel, C.homemapModel(panel, state)).map(r=>r.tone));
+  assert.deepEqual(tones({}), ['quiet','quiet','quiet','occupied']);
+  assert.deepEqual(tones({person:{x:320,y:180}}), ['quiet','quiet','quiet','occupied']);
+  assert.deepEqual(tones({person:{x:0,y:0}}), ['occupied','quiet','quiet','quiet']);
+  assert.deepEqual(tones({person:null}), ['quiet','quiet','quiet','quiet']);
+});
+
+test('doors animate only between physical open/closed states and keep a stable final baseline', () => {
+  const panel = diagram(fixture()).panels[0], host = {querySelector:()=>null};
+  const draw = (state, animate=true) => C.renderPanelBody(host, panel, {door:state}, 'pastel', [], 0, animate);
+  draw('open');
+  assert.doesNotMatch(host.innerHTML, /hmdoor-opening|hmdoor-closing/);
+  draw('closed');
+  assert.match(host.innerHTML, /hmdoor-closing/);
+  assert.doesNotMatch(host._lastHTML, /hmdoor-opening|hmdoor-closing/);
+  host.innerHTML = 'UNCHANGED'; draw('closed');
+  assert.equal(host.innerHTML, 'UNCHANGED');
+  draw('alert');
+  assert.doesNotMatch(host.innerHTML, /hmdoor-opening|hmdoor-closing/, 'closed to alert stays physically closed');
+  draw('open'); assert.match(host.innerHTML, /hmdoor-opening/);
+  draw('closed', false); assert.doesNotMatch(host.innerHTML, /hmdoor-opening|hmdoor-closing/);
+  const oldMotion = C.RM; C.RM = true;
+  try {
+    draw('open');
+    assert.match(host.innerHTML, /hm-entry hm-open/);
+    assert.doesNotMatch(host.innerHTML, /hmdoor-opening|hmdoor-closing/);
+  } finally { C.RM = oldMotion; }
+});
+
+test('subject trails connect only visible animated moves and never survive hiding or immediate renders', () => {
+  const panel = diagram(fixture()).panels[0], host = {querySelector:()=>null};
+  const draw = (value, animate=true) => C.renderPanelBody(host, panel, {visitor:value}, 'pastel', [], 0, animate);
+  draw({x:20,y:30}); assert.doesNotMatch(host.innerHTML, /class="hmtrail"/);
+  draw({x:80,y:90}); assert.match(host.innerHTML, /class="hmtrail" d="M20 30 L80 90"/);
+  assert.doesNotMatch(host._lastHTML, /class="hmtrail"/);
+  draw(null); assert.doesNotMatch(host.innerHTML, /hmtrail|data-subject=/);
+  draw({x:100,y:120}); assert.doesNotMatch(host.innerHTML, /class="hmtrail"/);
+  draw({x:150,y:120}, false); assert.doesNotMatch(host.innerHTML, /class="hmtrail"/);
+  const oldMotion = C.RM; C.RM = true;
+  try {
+    draw({x:200,y:120}); assert.doesNotMatch(host.innerHTML, /class="hmtrail"/);
+    assert.match(host.innerHTML, /class="hmsubjectdot" cx="200" cy="120"/);
+  } finally { C.RM = oldMotion; }
+});

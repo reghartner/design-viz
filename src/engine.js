@@ -1913,6 +1913,23 @@ function homemapModel(panel, state){
   return {outline: {x: (320 - w) / 2, y: (180 - h) / 2, w: w, h: h}, devices: devices, subjects: subjects, signals: signals};
 }
 
+/* Room lighting is a view of the authored scene, not a simulated sensor or
+   containment rule. The highest visible device state wins, then occupancy. */
+function homemapRoomModel(panel, model){
+  return homemapRooms(panel).map(function(room){
+    function inside(item){
+      return item.x >= room.x && item.y >= room.y &&
+        (item.x < room.x + room.w || (item.x === 320 && room.x + room.w === 320)) &&
+        (item.y < room.y + room.h || (item.y === 180 && room.y + room.h === 180));
+    }
+    var devices = model.devices.filter(inside);
+    var occupied = model.subjects.some(function(s){ return !s.hidden && inside(s); });
+    var tone = devices.some(function(d){ return d.state === 'alert' || d.state === 'detect'; }) ? 'alert' :
+      devices.some(function(d){ return d.state === 'warn'; }) ? 'warn' : occupied ? 'occupied' : 'quiet';
+    return {room:room, tone:tone};
+  });
+}
+
 function radarModel(panel, state){
   panel = panel || {}; state = state || {};
   function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
@@ -3285,12 +3302,17 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
   } else if (type === 'homemap'){
     var hm = homemapModel(panel, state);
     var hmPrev = host._hmStates || Object.create(null), hmNow = Object.create(null);
-    var hmFresh = Object.create(null), hmHasFresh = false;
+    var hmFresh = Object.create(null), hmHasFresh = false, hmDoors = Object.create(null);
     hm.devices.forEach(function(d){
       hmNow[d.id] = d.state;
+      if (animate && d.kind === 'entry' && hmPrev[d.id] !== undefined &&
+          ((d.state === 'open') !== (hmPrev[d.id] === 'open'))){
+        hmDoors[d.id] = d.state === 'open' ? 'opening' : 'closing'; hmHasFresh = true;
+      }
       if (animate && hmPrev[d.id] !== undefined && hmPrev[d.id] !== d.state &&
           ((d.kind === 'camera' && d.state === 'detect') ||
-           (d.kind === 'entry' && d.state === 'alert') || (d.kind === 'hub' && d.state === 'rx'))){
+           (d.kind === 'entry' && d.state === 'alert') || (d.kind === 'hub' && d.state === 'rx') ||
+           (d.kind === 'sensor' && ['warn','alert'].indexOf(d.state) >= 0))){
         hmFresh[d.id] = true; hmHasFresh = true;
       }
     });
@@ -3311,20 +3333,30 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var buildHomemap = function(transient){
       var o = hm.outline;
       var s = '<svg class="hmframe" viewBox="0 0 320 180" role="img" aria-label="' + esc(panel.title || 'Home device map') + '">';
+      s += '<rect class="hmfoundation" x="' + o.x + '" y="' + (o.y + 2) + '" width="' + o.w + '" height="' + o.h + '" rx="9"/>';
       s += '<rect class="hmoutline" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="9"/>';
-      homemapRooms(panel).forEach(function(room){
+      homemapRoomModel(panel, hm).forEach(function(space){
+        var room = space.room;
+        s += '<g class="hmspace hm-room-' + space.tone + '">';
         s += '<rect class="hmroom" x="' + room.x + '" y="' + room.y + '" width="' + room.w + '" height="' + room.h + '" rx="2"/>' +
-          '<text class="hmroomlabel" x="' + (room.x + 5) + '" y="' + (room.y + 10) + '">' + esc(room.label || '') + '</text>';
+          '<path class="hmroomwall" d="M' + (room.x + 2) + ' ' + (room.y + room.h - 2) + ' V' + (room.y + 2) + ' H' + (room.x + room.w - 2) + '"/>' +
+          '<text class="hmroomlabel" x="' + (room.x + 6) + '" y="' + (room.y + 11) + '">' + esc(room.label || '') + '</text></g>';
+      });
+      if (transient && hmHasMoved) hm.subjects.forEach(function(sub){
+        if (!hmMoved[sub.id]) return;
+        var prev = hmSubjPrev[sub.id];
+        s += '<path class="hmtrail" d="M' + prev.x + ' ' + prev.y + ' L' + sub.x + ' ' + sub.y + '"/>';
       });
       /* Direction remains readable while paused and under reduced motion.
-         Animated packets remain the existing adjacent-step overlay. */
+         Animated step paints add traveling packets over the route. */
       if (typeof stepIdx === 'number' && stepIdx >= 0) hm.signals.forEach(function(sig){
         var dx = sig.toXY.x - sig.fromXY.x, dy = sig.toXY.y - sig.fromXY.y;
         var length = Math.sqrt(dx * dx + dy * dy); if (length < 24) return;
         var ux = dx / length, uy = dy / length;
         var x = sig.toXY.x - ux * 13, y = sig.toXY.y - uy * 13;
         s += '<g class="hmlink"><title>' + esc(sig.from + ' → ' + sig.to) + '</title>' +
-          '<path d="M' + (sig.fromXY.x + ux * 12) + ' ' + (sig.fromXY.y + uy * 12) + ' L' + x + ' ' + y + '"/>' +
+          '<path class="hmlinkglow" d="M' + (sig.fromXY.x + ux * 12) + ' ' + (sig.fromXY.y + uy * 12) + ' L' + x + ' ' + y + '"/>' +
+          '<path class="hmlinkroute" d="M' + (sig.fromXY.x + ux * 12) + ' ' + (sig.fromXY.y + uy * 12) + ' L' + x + ' ' + y + '"/>' +
           '<path class="hmlinktip" d="M' + (x - ux * 5 - uy * 3) + ' ' + (y - uy * 5 + ux * 3) +
           ' L' + x + ' ' + y + ' L' + (x - ux * 5 + uy * 3) + ' ' + (y - uy * 5 - ux * 3) + '"/></g>';
       });
@@ -3348,9 +3380,10 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       hm.devices.forEach(function(d){
         s += '<g class="hmdev hm-' + esc(d.kind) + ' hm-' + esc(d.state) + '" data-device="' + esc(d.id) + '">' +
           '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>';
+        s += '<circle class="hmdevice-aura" cx="' + d.x + '" cy="' + d.y + '" r="13"/>';
         if (transient && hmFresh[d.id]) s += '<circle class="' + (d.kind === 'hub' ? 'hmglow' : 'hmripple') +
           '" cx="' + d.x + '" cy="' + d.y + '" r="6"/>';
-        s += '<circle class="hmmarker" cx="' + d.x + '" cy="' + d.y + '" r="' + (d.kind === 'hub' ? 7 : 4) + '"/>';
+        s += '<circle class="hmmarker" cx="' + d.x + '" cy="' + d.y + '" r="8.5"/>';
         if (d.kind === 'hub') s += '<circle class="hmhubring" cx="' + d.x + '" cy="' + d.y + '" r="10"/>';
         /* tx: steady looping broadcast waves — part of the baseline, so an
            unchanged step repaint leaves the animation running */
@@ -3361,14 +3394,22 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
            steady markup, so the blink survives unchanged step repaints */
         if (d.kind === 'camera' && d.state === 'rec')
           s += '<circle class="hmrecdot" cx="' + (d.x + 7) + '" cy="' + (d.y - 7) + '" r="2.5"/>';
-        if (d.kind === 'entry') s += '<path class="hmentry" d="M' + (d.x - 7) + ' ' + (d.y - 7) +
-          ' v14 h14 v-14 Z M' + (d.x + 7) + ' ' + (d.y + 7) +
-          (d.state === 'open' ? ' l7 -10' : ' v-14') + '"/>';
-        if (d.kind === 'sensor') s += '<use class="hmicon" href="#i-' + esc(d.icon) + '" x="' +
-          (d.x + 7) + '" y="' + (d.y - 7) + '" width="14" height="14"/>';
-        s += '<text class="hmlbl" x="' + d.x + '" y="' + Math.min(177, d.y + 18) +
+        if (d.kind === 'entry'){
+          s += '<path class="hmentry" d="M' + (d.x - 3.5) + ' ' + (d.y + 5) + ' v-10 h7 v10"/>';
+          s += '<path class="hmdoorleaf' + (transient && hmDoors[d.id] ? ' hmdoor-' + hmDoors[d.id] : '') + '" style="transform-origin:' + (d.x - 3.5) + 'px ' + (d.y + 5) +
+            'px" d="M' + (d.x - 3.5) + ' ' + (d.y + 5) + ' h7"/>';
+        } else {
+          var deviceIcon = d.kind === 'camera' ? 'camera' : d.kind === 'hub' ? 'router' : d.icon;
+          s += '<use class="hmicon hmdeviceglyph" href="#i-' + esc(deviceIcon) + '" x="' +
+            (d.x - 6) + '" y="' + (d.y - 6) + '" width="12" height="12"/>';
+        }
+        var labelY = d.y > 139 ? d.y - 25 : d.y + 20;
+        var labelX = clamp(d.x, 28, 292), statusW = d.state.length * 4.3 + 10;
+        s += '<text class="hmlbl" x="' + labelX + '" y="' + labelY +
           '" text-anchor="middle">' + esc(d.label) + '</text>';
-        s += '<text class="hmstatus" x="' + d.x + '" y="' + (d.y > 146 ? d.y - 13 : d.y + 28) +
+        s += '<rect class="hmstatus-bg" x="' + (labelX - statusW / 2) + '" y="' + (labelY + 3) +
+          '" width="' + statusW + '" height="11" rx="5.5"/>';
+        s += '<text class="hmstatus" x="' + labelX + '" y="' + (labelY + 11) +
           '" text-anchor="middle">' + esc(d.state) + '</text></g>';
       });
       hm.subjects.forEach(function(sub){
@@ -3377,10 +3418,13 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
         s += '<g class="hmsubject" data-subject="' + esc(sub.id) + '"' +
           ((transient && hmMoved[sub.id]) ? ' style="transform:translate(' + (prev.x - sub.x) +
             'px,' + (prev.y - sub.y) + 'px)"' : '') + '>';
-        s += '<circle class="hmsubjectdot" cx="' + sub.x + '" cy="' + sub.y + '" r="5"/>';
-        if (sub.icon) s += '<use class="hmicon" href="#i-' + esc(sub.icon) + '" x="' +
-          (sub.x + 8) + '" y="' + (sub.y - 7) + '" width="14" height="14"/>';
-        s += '<text class="hmlbl" x="' + sub.x + '" y="' + Math.min(177, sub.y + 18) +
+        s += '<ellipse class="hmactor-shadow" cx="' + sub.x + '" cy="' + (sub.y + 9) + '" rx="7" ry="2.2"/>';
+        s += '<circle class="hmsubjectdot" cx="' + sub.x + '" cy="' + sub.y + '" r="7"/>';
+        if (sub.icon) s += '<use class="hmactor-icon" href="#i-' + esc(sub.icon) + '" x="' +
+          (sub.x - 5) + '" y="' + (sub.y - 5) + '" width="10" height="10"/>';
+        else s += '<circle class="hmactor-icon" cx="' + sub.x + '" cy="' + (sub.y - 2.2) + '" r="1.8"/>' +
+          '<path class="hmactor-icon" d="M' + (sub.x - 3.4) + ' ' + (sub.y + 4) + ' v-1 a3.4 3.4 0 0 1 6.8 0 v1 Z"/>';
+        s += '<text class="hmlbl hmactor-label" x="' + clamp(sub.x, 24, 296) + '" y="' + (sub.y > 146 ? sub.y - 12 : sub.y + 19) +
           '" text-anchor="middle">' + esc(sub.label) + '</text></g>';
       });
       if (!hm.devices.length) s += '<text class="hmlbl" x="160" y="94" text-anchor="middle">No devices configured</text>';
@@ -3565,14 +3609,14 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (host._pulseTimer){ clearTimeout(host._pulseTimer); host._pulseTimer = null; }
     host._ifEpoch = (host._ifEpoch || 0) + 1;
     if (typeof host.querySelectorAll === 'function'){
-      var transientEls = host.querySelectorAll('.dv-chip-pulse,.dv-bar-enter,.pirghost,.pirtrail,.pirripple,.rdripple,.hmripple,.hmglow,.hmsig');
+      var transientEls = host.querySelectorAll('.dv-chip-pulse,.dv-bar-enter,.pirghost,.pirtrail,.pirripple,.rdripple,.hmripple,.hmglow,.hmsig,.hmtrail');
       for (var te = transientEls.length - 1; te >= 0; te--){
         var transientEl = transientEls[te];
         if (transientEl.classList){
           transientEl.classList.remove('dv-chip-pulse');
           transientEl.classList.remove('dv-bar-enter');
         }
-        if (/^(pirghost|pirtrail|pirripple|rdripple|hmripple|hmglow|hmsig)$/.test(transientEl.getAttribute('class') || '') &&
+        if (/^(pirghost|pirtrail|pirripple|rdripple|hmripple|hmglow|hmsig|hmtrail)$/.test(transientEl.getAttribute('class') || '') &&
             transientEl.parentNode) transientEl.parentNode.removeChild(transientEl);
       }
       var freshEls = host.querySelectorAll('.fresh');
@@ -3590,6 +3634,10 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var subjectEl = host.querySelector(type === 'pir' ? '.pirsubject' : (type === 'radar' ? '.rdsubject' : '.dv-no-subject'));
     if (subjectEl) subjectEl.style.transform = 'translate(0,0)';
     if (type === 'homemap' && typeof host.querySelectorAll === 'function'){
+      var hmLeaves = host.querySelectorAll('.hmdoor-opening,.hmdoor-closing');
+      for (var hl = 0; hl < hmLeaves.length; hl++){
+        hmLeaves[hl].classList.remove('hmdoor-opening'); hmLeaves[hl].classList.remove('hmdoor-closing');
+      }
       var hmSettle = host.querySelectorAll('.hmsubject[style]');
       for (var hs = 0; hs < hmSettle.length; hs++){
         hmSettle[hs].style.transition = 'none';

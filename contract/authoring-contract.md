@@ -699,6 +699,10 @@ perspectives" of one timeline). Types:
   areas behind the devices. Room coordinates use the same frame; rectangles
   must have positive size and fit inside 320×180, otherwise they warn and are
   ignored. Rooms are presentation boundaries, not simulated physical walls.
+  Their lighting reflects contained devices/visible subjects: `alert`/`detect`
+  takes priority over `warn`, then occupancy, then quiet. This appearance does
+  not change any device state. Shared room boundaries belong to the room on
+  the right/bottom; the outer frame edges are inclusive.
   Patch DEVICE IDS directly: `{"cam":"detect","signals":[{"from":"cam",
   "to":"hub"}]}`. Device states carry across steps; `signals` belongs
   only to its authored step and never carries. Static dashed direction arrows
@@ -706,8 +710,11 @@ perspectives" of one timeline). Types:
   paints add looping packets between declared endpoints, staggered by 250ms.
   Ambient mode uses `initial`, with scanning/detecting camera sweeps and
   no signal dots. Camera transitions into `detect` and entry transitions
-  into `alert` ripple once; a hub entering `rx` briefly glows. Reduced
-  motion suppresses sweeps, ripples, glows, and signal dots. Invalid kinds,
+  into `alert` and sensors entering `warn`/`alert` ripple once; a hub entering
+  `rx` briefly glows. Entry devices swing between open and closed; active
+  devices have breathing halos and local signal paths have flowing dashes.
+  Reduced motion and print suppress all motion while keeping final device
+  states, room tints, and signal direction readable. Invalid kinds,
   non-finite positions, and duplicate ids are ignored; unknown states use
   the kind default with a warning. `signals` is the sole reserved device
   id. Unlike the general folding rules below, homemap treats `log`, `mark`,
@@ -715,13 +722,13 @@ perspectives" of one timeline). Types:
   actors: `[{"id":"walker","label":"Visitor","icon":"gear","x":20,"y":150}]`.
   Each subject needs a unique nonempty id distinct from device ids and
   `signals`, plus finite starting `x`/`y` in the same 320×180 frame (clamped
-  to its bounds). Labels default to the id; omit `icon` for a plain ring dot,
+  to its bounds). Labels default to the id; omit `icon` for a person avatar,
   or use a shared icon token (unknown icons warn and fall back to `gear`).
   `initial` and step patches address subject ids with objects:
   `{"walker":{"x":120,"y":60}}`; `{"walker":null}` hides the subject.
   Positions and hidden state carry across steps; invalid subject patches
   warn and are ignored. Visible subjects glide from the previous position
-  on animated steps, with their label and optional icon. Reappearing after
+  on animated steps, with their label, optional icon, and a short fading trail. Reappearing after
   hiding starts at the new position without a glide; reduced motion disables
   glides. Invalid subject declarations warn and are ignored.
   The workbench's **Home at this step** editor appears for every homemap even

@@ -750,8 +750,8 @@ rect.tlfuture{opacity:.18;}
 .rdsweep line{stroke:#38E1FF; stroke-width:1.2; opacity:.28; stroke-linecap:round;}
 .rdsweep{transform-box:view-box; animation:pirsweep 3.2s ease-in-out infinite alternate;}
 .rdsensor{fill:#38E1FF; filter:drop-shadow(0 0 4px rgba(56,225,255,.85));}
-.rdtrack{fill:none; stroke:#5E7396; stroke-width:1.2; stroke-dasharray:2 4;}
-.rdtrackdot{fill:#5E7396;}
+.rdtrack,.hmtrack{fill:none; stroke:#5E7396; stroke-width:1.2; stroke-dasharray:2 4;}
+.rdtrackdot,.hmtrackdot{fill:#5E7396;}
 .rdsubject{stroke:#0A0F14; stroke-width:1.5; transition:transform .7s cubic-bezier(.4,0,.2,1);}
 .rdsubject.clear{fill:#94A3B8;}
 .rdsubject.alert{fill:#FFB454; filter:drop-shadow(0 0 5px rgba(255,180,84,.9));}
@@ -1713,8 +1713,8 @@ body.sk-editorial .rdzone{fill:rgba(93,103,99,.05); stroke:#8B8F88;}
 body.sk-editorial .rdzone.occ{fill:rgba(14,91,86,.12); stroke:var(--ed-accent);}
 body.sk-editorial .rdzlbl{fill:#696E69;}
 body.sk-editorial .rdzlbl.occ{fill:var(--ed-accent-deep);}
-body.sk-editorial .rdtrack{stroke:#6F7975;}
-body.sk-editorial .rdtrackdot{fill:#6F7975;}
+body.sk-editorial .rdtrack,body.sk-editorial .hmtrack{stroke:#6F7975;}
+body.sk-editorial .rdtrackdot,body.sk-editorial .hmtrackdot{fill:#6F7975;}
 body.sk-editorial .rdsubject{stroke:#EFE8DC;}
 
 body.sk-editorial .sk-aurora .thline,
@@ -2304,7 +2304,7 @@ body.sk-editorial .errbox{
   body.sk-terminal .rdbg{fill:var(--tm-ground);}
   body.sk-terminal .pirground{fill:var(--tm-raised);}
   body.sk-terminal .pirpath,
-  body.sk-terminal .rdtrack{stroke:var(--tm-line);}
+  body.sk-terminal .rdtrack,body.sk-terminal .hmtrack{stroke:var(--tm-line);}
   body.sk-terminal .pircone.clear{fill:rgba(116,135,126,.08); stroke:var(--tm-muted);}
   body.sk-terminal .pircone.tripped{fill:rgba(255,107,94,.13); stroke:var(--tm-alert);}
   body.sk-terminal .pirsensor,
@@ -2468,7 +2468,7 @@ body.sk-editorial .errbox{
   body.sk-terminal .rdzone.occ{fill:rgba(94,235,154,.09); stroke:var(--tm-good);}
   body.sk-terminal .rdzlbl{fill:var(--tm-muted);}
   body.sk-terminal .rdzlbl.occ{fill:var(--tm-good);}
-  body.sk-terminal .rdtrackdot{fill:var(--tm-muted);}
+  body.sk-terminal .rdtrackdot,body.sk-terminal .hmtrackdot{fill:var(--tm-muted);}
 
   body.sk-terminal .tlgrid{gap:5px;}
   body.sk-terminal .tltile,
@@ -3008,8 +3008,8 @@ body.sk-editorial .errbox{
   body.sk-pastel .rdzone.occ { fill:rgba(130,203,224,.15); stroke:#82CBE0; }
   body.sk-pastel .rdzlbl { fill:#7F94AD; }
   body.sk-pastel .rdzlbl.occ { fill:#B8E5F1; }
-  body.sk-pastel .rdtrack { stroke:#7F94AD; }
-  body.sk-pastel .rdtrackdot { fill:#7F94AD; }
+  body.sk-pastel .rdtrack, body.sk-pastel .hmtrack { stroke:#7F94AD; }
+  body.sk-pastel .rdtrackdot, body.sk-pastel .hmtrackdot { fill:#7F94AD; }
 
   body.sk-pastel .thzone,
   body.sk-pastel .btzone { border-radius:999px; padding:4px 9px; }
@@ -3683,8 +3683,8 @@ body.sk-editorial .errbox{
   body.sk-blueprint .rdzone.occ{fill:rgba(88,231,255,.14);stroke:#58E7FF;}
   body.sk-blueprint .rdzlbl{fill:#86B3CA;}
   body.sk-blueprint .rdzlbl.occ{fill:#D8FAFF;}
-  body.sk-blueprint .docview .rdtrack{fill:none;stroke:#91BDD1;}
-  body.sk-blueprint .docview .rdtrackdot{fill:#91BDD1;}
+  body.sk-blueprint .docview .rdtrack,body.sk-blueprint .docview .hmtrack{fill:none;stroke:#91BDD1;}
+  body.sk-blueprint .docview .rdtrackdot,body.sk-blueprint .docview .hmtrackdot{fill:#91BDD1;}
 
   body.sk-blueprint .thhead,body.sk-blueprint .bthead{margin-bottom:6px;}
   body.sk-blueprint .thval,body.sk-blueprint .btval{font-size:20px;line-height:1;}

@@ -4473,6 +4473,40 @@ test('homemap subject render: several glides release together and unchanged pain
   assert.strictEqual(raf.length, 0, 'reappearing subjects start at the target');
 });
 
+test('homemap subject render: dotted track from folded history, deduped, broken at hidden steps', () => {
+  const p = homePanel();
+  p.subjects = [{id: 'walker', label: 'Visitor', x: 20, y: 150}, {id: '__proto__', x: 10, y: 30}];
+  const states = [
+    {},
+    {walker: {x: 120, y: 60}},
+    {walker: {x: 120, y: 60}},
+    {walker: null},
+    {walker: {x: 240, y: 50}}
+  ];
+  const host = {innerHTML: '', querySelector: () => null, querySelectorAll: () => []};
+  C.renderPanelBody(host, p, states[4], 'aurora', states, 4);
+  assert.ok(host.innerHTML.includes('<polyline class="hmtrack" points="20,150 120,60"'),
+    'trail connects the walker positions before the hidden step');
+  assert.strictEqual([...host.innerHTML.matchAll(/hmtrackdot/g)].length, 4,
+    'three walker dots (parked step deduped, hidden step adds none) plus one parked-subject dot');
+  assert.strictEqual([...host.innerHTML.matchAll(/<polyline class="hmtrack"/g)].length, 1,
+    'the hidden step breaks the trail and a parked subject draws no line');
+  assert.ok(host.innerHTML.includes('hmtrackdot" cx="240" cy="50"'));
+  assert.ok(host.innerHTML.includes('hmtrackdot" cx="10" cy="30"'));
+  const host2 = {innerHTML: '', querySelector: () => null, querySelectorAll: () => []};
+  C.renderPanelBody(host2, p, states[1], 'aurora', states, 1);
+  assert.ok(host2.innerHTML.includes('<polyline class="hmtrack" points="20,150 120,60"'),
+    'track reveals only up to the current step');
+  assert.doesNotMatch(host2.innerHTML, /cx="240"/);
+  host2.innerHTML = 'SENTINEL';
+  C.renderPanelBody(host2, p, states[2], 'aurora', states, 2);
+  assert.strictEqual(host2.innerHTML, 'SENTINEL',
+    'parked step keeps identical markup and skips the rebuild');
+  const css = fs.readFileSync(path.join(ROOT, 'src/style.core.css'), 'utf8');
+  assert.match(css, /\.rdtrack,\.hmtrack\{/);
+  assert.match(css, /\.rdtrackdot,\.hmtrackdot\{/);
+});
+
 test('homemap subject render: jumps settle pending glides, reduced motion, escaped ids and optional icon', () => {
   const p = homePanel(), raf = [];
   p.subjects = [{id: 'x"/><script>', label: '<actor>', x: 20, y: 150}];

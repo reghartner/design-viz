@@ -709,7 +709,10 @@ perspectives" of one timeline). Types:
   `{"walker":{"x":120,"y":60}}`; `{"walker":null}` hides the subject.
   Positions and hidden state carry across steps; invalid subject patches
   warn and are ignored. Visible subjects glide from the previous position
-  on animated steps, with their label and optional icon. Reappearing after
+  on animated steps, with their label and optional icon. Each subject's
+  positions across steps draw an engine-derived dotted track, like the
+  `radar` subject's (revealed up to the current step; a hidden step breaks
+  it; a parked subject adds nothing). Reappearing after
   hiding starts at the new position without a glide; reduced motion disables
   glides. Invalid subject declarations warn and are ignored.
 - `signal` — link health for 1–6 named radio/wired links:

@@ -3305,6 +3305,28 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     });
     /* Hidden/removed subjects lose their previous position before reappearing. */
     host._hmSubjPrev = hmSubjNow;
+    /* track: each subject's positions across the folded steps up to the
+       current one — engine-derived like radar's, so any step jump redraws
+       it consistently; a hidden step breaks the trail. Dedupe parked
+       positions so unchanged steps keep identical markup (rebuild skip). */
+    var hmTracks = [];
+    if (Array.isArray(states)){
+      var hmIdx = typeof stepIdx === 'number' ? stepIdx : 0;
+      var hmTrackById = Object.create(null);
+      hm.subjects.forEach(function(sub){ hmTrackById[sub.id] = []; hmTracks.push(hmTrackById[sub.id]); });
+      for (var hti = 0; hti <= Math.min(hmIdx, states.length - 1); hti++){
+        homemapModel(panel, states[hti]).subjects.forEach(function(hsub){
+          var track = hmTrackById[hsub.id];
+          if (!track) return;
+          var last = track.length ? track[track.length - 1] : undefined;
+          if (hsub.hidden){
+            if (last !== null && track.length) track.push(null);
+          } else if (!(last && last[0] === hsub.x && last[1] === hsub.y)){
+            track.push([hsub.x, hsub.y]);
+          }
+        });
+      }
+    }
     var hmSignals = animate && typeof stepIdx === 'number' && stepIdx >= 0 ? hm.signals : [];
     var buildHomemap = function(transient){
       var o = hm.outline;
@@ -3350,6 +3372,21 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
           (d.x + 7) + '" y="' + (d.y - 7) + '" width="14" height="14"/>';
         s += '<text class="hmlbl" x="' + d.x + '" y="' + Math.min(177, d.y + 18) +
           '" text-anchor="middle">' + esc(d.label) + '</text></g>';
+      });
+      /* track dots + connecting segments per subject (broken at hidden
+         steps) — under the live subject markers, like radar's */
+      hmTracks.forEach(function(track){
+        var seg = [];
+        var flushSeg = function(){
+          if (seg.length > 1) s += '<polyline class="hmtrack" points="' + seg.join(' ') + '"/>';
+          seg = [];
+        };
+        track.forEach(function(p){
+          if (!p){ flushSeg(); return; }
+          seg.push(p[0] + ',' + p[1]);
+          s += '<circle class="hmtrackdot" cx="' + p[0] + '" cy="' + p[1] + '" r="2"/>';
+        });
+        flushSeg();
       });
       hm.subjects.forEach(function(sub){
         if (sub.hidden) return;

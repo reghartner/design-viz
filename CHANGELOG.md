@@ -1,5 +1,11 @@
 # Changelog
 
+## Lane edge backgrounds follow the skin (2026-09-14)
+
+- Fixed thick dark lines behind lane-routed edges in Pastel. The stroke that
+  separates crossings now shares the diagram background color across all
+  six skins and print, including when switching skins without rebuilding.
+
 ## Path chips start at step 1 (2026-09-14)
 
 - Clicking any path chip starts its timeline at step 1, including the shared

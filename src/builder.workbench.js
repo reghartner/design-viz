@@ -3961,20 +3961,39 @@ function initWorkbenchBuilder(opts){
       return b;
     }
     function buildRow(base){
+      /* 5+ columns cannot share one flex line — the inputs shrink into
+         unreadable slivers. Wide shapes render each item as a card of
+         LABELED inputs in a wrapping grid instead. */
+      var wide = (shape.cols || []).length > 4;
       var line = document.createElement('div');
-      line.className = 'rowline';
+      line.className = wide ? 'rowline rowcard' : 'rowline';
       var ref = {base: base, inputs: {}};
       (shape.cols || []).forEach(function(col){
         var input = colInput(col, base ? base[col.k] : null);
         wireCommit(input, commitRows);
         ref.inputs[col.k] = input;
-        line.appendChild(input);
+        if (wide){
+          var cell = document.createElement('label');
+          cell.className = 'rowcell';
+          var cap = document.createElement('span');
+          cap.className = 'rowk';
+          cap.textContent = col.k + (col.req ? ' *' : '');
+          cell.appendChild(cap);
+          cell.appendChild(input);
+          line.appendChild(cell);
+        } else line.appendChild(input);
       });
-      line.appendChild(smallButton('↑', 'move this item up', function(){ moveRow(ref, -1); }));
-      line.appendChild(smallButton('↓', 'move this item down', function(){ moveRow(ref, 1); }));
+      var acts = line;
+      if (wide){
+        acts = document.createElement('div');
+        acts.className = 'rowcardacts';
+        line.appendChild(acts);
+      }
+      acts.appendChild(smallButton('↑', 'move this item up', function(){ moveRow(ref, -1); }));
+      acts.appendChild(smallButton('↓', 'move this item down', function(){ moveRow(ref, 1); }));
       /* commit first; only a SUCCESSFUL commit removes the line (via the
          form refresh) — a failed one must leave form and JSON agreeing */
-      line.appendChild(smallButton('✕', 'remove this item', function(){
+      acts.appendChild(smallButton('✕', 'remove this item', function(){
         commitRows(rowRefs.filter(function(r){ return r !== ref; }));
       }));
       rowRefs.push(ref);

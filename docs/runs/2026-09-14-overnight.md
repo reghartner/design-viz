@@ -13,7 +13,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 1 | Trace import, software panels and outline | codex/trace-import-foundation | Open: https://github.com/reghartner/design-viz/pull/50 |
 | 2 | Dependency-aware trace rows, crossing reduction and routing | codex/trace-smart-layout | Open: https://github.com/reghartner/design-viz/pull/51 |
 | 3 | Internal spans and inclusive / child-covered / uncovered timing | codex/trace-service-time | Open: https://github.com/reghartner/design-viz/pull/52 |
-| 4 | Large trace focus by service/subtree and import preview | TBD | Follow core trace readability |
+| 4 | Large trace focus by service/subtree and import preview | codex/trace-import-focus | Built; opening PR, stacked on #52 |
 | 5 | Effective step-state inspector and inheritance provenance | TBD | Next workbench improvement if time permits |
 
 ## Validation and evidence
@@ -25,13 +25,18 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50 and #51 passed all GitHub checks. PR #52 passed the full local Node
-  suite, all 158 Python tests, and browser verification; CI runs on the PR.
+- PRs #50, #51 and #52 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
   readable-size/fit controls, operation/service selection, synchronized
   waterfall and details, backward jumps, retained focus and light/dark styles.
+- Focus import: full Node suite and all 158 Python tests passed. Twelve new
+  tests cover deep 10,000-span analysis, descendant retention, unchanged child
+  coverage, stable identities, boundaries, malformed exports, CLI summary and
+  overwrite protection. Browser verified a 1,000-span preview without document
+  mutation, one-span import, undo, clear-focus recovery, service descendants,
+  invalid focus, stale-preview disabling and retained original offsets.
 
 ## Next continuation
 

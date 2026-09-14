@@ -2740,6 +2740,84 @@ function initWorkbenchBuilder(opts){
     var traceText = document.getElementById('trace-text');
     var traceFeedback = document.getElementById('trace-feedback');
     var traceFile = document.getElementById('trace-file');
+    var traceScope = document.getElementById('trace-scope'), traceRoot = document.getElementById('trace-root');
+    var traceService = document.getElementById('trace-service'), traceBuild = document.getElementById('trace-convert');
+    var tracePreviewBox = document.getElementById('trace-preview-box'), traceSearch = document.getElementById('trace-search');
+    var traceAnalysis = null, traceSnapshot = null, traceFileVersion = 0, traceReading = false;
+    function traceOptions(){
+      var mapping = document.getElementById('trace-fields').value.trim();
+      return {traceId:document.getElementById('trace-id').value.trim() || undefined,
+        sourceUrl:document.getElementById('trace-url').value.trim(),fields:mapping ? JSON.parse(mapping) : undefined,
+        rootSpanId:traceScope.value==='subtree' ? traceRoot.value : undefined,
+        service:traceScope.value==='service' ? traceService.value : undefined};
+    }
+    function traceFingerprint(){
+      return JSON.stringify([traceText.value,document.getElementById('trace-id').value,document.getElementById('trace-url').value,
+        document.getElementById('trace-fields').value,traceScope.value,traceRoot.value,traceService.value]);
+    }
+    function updateTraceScope(){
+      document.getElementById('trace-root-label').hidden=traceScope.value!=='subtree';
+      document.getElementById('trace-service-label').hidden=traceScope.value!=='service';
+      document.getElementById('trace-clear-focus').hidden=traceScope.value==='all';
+    }
+    function invalidateTrace(){
+      traceAnalysis=null; traceSnapshot=null; traceBuild.disabled=true; tracePreviewBox.hidden=true;
+      traceFeedback.textContent='Preview the current input and scope before building.';
+    }
+    function renderTraceSearch(){
+      var results=document.getElementById('trace-search-results'); results.textContent='';
+      if (!traceAnalysis) return;
+      var terms=traceSearch.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+      var matches=traceAnalysis.sourceSpans.filter(function(s){
+        var text=(s.id+' '+s.service+' '+s.name+(s.error?' recorded error':'')).toLowerCase();
+        return terms.every(function(term){ return text.indexOf(term)>=0; });
+      });
+      document.getElementById('trace-search-count').textContent=matches.length+' matching span(s); showing '+Math.min(25,matches.length)+'. Choose a row to preview that subtree.';
+      matches.slice(0,25).forEach(function(s){
+        var button=document.createElement('button'); button.type='button'; button.className='bbtn trace-result';
+        button.setAttribute('aria-label','Focus subtree at '+s.id);
+        var title=document.createElement('span'); title.textContent=s.service+' · '+s.name+(s.error?' · ERROR':'');
+        var detail=document.createElement('small'); detail.textContent=s.id+' · +'+s.startMs+' ms · '+s.ms+' ms duration · '+traceAnalysis.subtreeSizes.get(s.id)+' span(s) in subtree';
+        button.appendChild(title); button.appendChild(detail);
+        button.addEventListener('click',function(){
+          traceScope.value='subtree'; traceRoot.value=s.id; updateTraceScope(); previewTrace();
+          document.getElementById('trace-preview').focus();
+        });
+        results.appendChild(button);
+      });
+    }
+    function previewTrace(){
+      invalidateTrace();
+      try {
+        if (traceReading) throw new Error('The trace file is still loading. Preview it when loading finishes.');
+        if (traceText.value.length>10*1024*1024) throw new Error('Use a trace export smaller than 10 MB.');
+        traceAnalysis=tracePreview(traceText.value,traceOptions()); traceSnapshot=traceFingerprint();
+      } catch(ex){ traceFeedback.textContent=ex.message; return; }
+      var a=traceAnalysis, stats=a.stats, original=a.sourceStats;
+      document.getElementById('trace-summary').textContent='Source export: '+original.spans+' spans · '+original.services+' services · '+original.elapsedMs+' ms. Selection: '+stats.spans+' spans · '+stats.services+' services · '+stats.elapsedMs+' ms; '+(original.spans-stats.spans)+' spans omitted.';
+      var breadcrumbs=document.getElementById('trace-breadcrumbs'); breadcrumbs.textContent='';
+      if (a.focus && a.focus.kind==='subtree') breadcrumbs.textContent='Branch: '+(a.focus.omittedAncestors ? '… → ' : '')+
+        a.focus.ancestors.map(function(s){ return s.service+' / '+s.name+' ['+s.id+']'; }).concat([a.focus.value]).join(' → ');
+      var warnings=document.getElementById('trace-warnings'); warnings.textContent='';
+      a.warnings.forEach(function(w){ var li=document.createElement('li'); li.textContent=w; warnings.appendChild(li); });
+      var names=new Map(); a.sourceSpans.forEach(function(s){ names.set(s.service,(names.get(s.service)||0)+1); });
+      var suggestions=document.getElementById('trace-services'); suggestions.textContent='';
+      Array.from(names.keys()).slice(0,100).forEach(function(name){
+        var option=document.createElement('option'); option.value=name; option.label=names.get(name)+' own span(s)'; suggestions.appendChild(option);
+      });
+      tracePreviewBox.hidden=false; traceBuild.disabled=!a.canBuild;
+      traceFeedback.textContent=a.blocked || 'Ready to build. The current document has not changed.';
+      renderTraceSearch();
+    }
+    ['trace-text','trace-id','trace-url','trace-fields','trace-root','trace-service'].forEach(function(id){
+      document.getElementById(id).addEventListener('input',function(){ if (id==='trace-text'){ traceFileVersion++; traceReading=false; } invalidateTrace(); });
+    });
+    traceScope.addEventListener('change',function(){ updateTraceScope(); invalidateTrace(); });
+    traceSearch.addEventListener('input',renderTraceSearch);
+    document.getElementById('trace-preview').addEventListener('click',previewTrace);
+    document.getElementById('trace-clear-focus').addEventListener('click',function(){
+      traceScope.value='all'; traceRoot.value=''; traceService.value=''; updateTraceScope(); previewTrace();
+    });
     function closeTrace(){ traceBox.hidden = true; traceBtn.setAttribute('aria-expanded', 'false'); traceBtn.focus(); }
     traceBtn.addEventListener('click', function(){
       traceBox.hidden = !traceBox.hidden;
@@ -2752,19 +2830,20 @@ function initWorkbenchBuilder(opts){
     traceFile.addEventListener('change', function(){
       var file = traceFile.files[0];
       if (!file) return;
+      var version=++traceFileVersion; traceReading=false; invalidateTrace();
       if (file.size > 10 * 1024 * 1024){ traceFeedback.textContent = 'Use a trace export smaller than 10 MB.'; traceFile.value = ''; return; }
       var reader = new FileReader();
-      reader.onload = function(){ traceText.value = String(reader.result); traceFeedback.textContent = 'Loaded ' + file.name; };
-      reader.onerror = function(){ traceFeedback.textContent = 'Could not read the trace file.'; };
+      traceReading=true; traceFeedback.textContent='Loading '+file.name+'…';
+      reader.onload = function(){ if (version!==traceFileVersion) return; traceReading=false; traceText.value = String(reader.result); invalidateTrace(); traceFeedback.textContent = 'Loaded ' + file.name + '. Preview to inspect the export.'; };
+      reader.onerror = function(){ if (version===traceFileVersion){ traceReading=false; traceFeedback.textContent = 'Could not read the trace file.'; } };
       reader.readAsText(file); traceFile.value = '';
     });
     document.getElementById('trace-convert').addEventListener('click', function(){
       var result;
       try {
+        if (!traceSnapshot || traceSnapshot!==traceFingerprint() || !traceAnalysis || !traceAnalysis.canBuild){ invalidateTrace(); return; }
         if (traceText.value.length > 10 * 1024 * 1024) throw new Error('Use a trace export smaller than 10 MB.');
-        var mapping = document.getElementById('trace-fields').value.trim();
-        result = traceToSpec(traceText.value, {traceId: document.getElementById('trace-id').value.trim() || undefined,
-          sourceUrl: document.getElementById('trace-url').value.trim(), fields: mapping ? JSON.parse(mapping) : undefined});
+        result = traceToSpec(traceText.value, traceOptions());
         var verdict = validate(normalize(result.spec));
         if (verdict.errors.length) throw new Error(verdict.errors.join('\n'));
       } catch (ex){ traceFeedback.textContent = ex.message; return; }

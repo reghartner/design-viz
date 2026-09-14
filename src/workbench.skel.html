@@ -80,7 +80,7 @@
       <div class="diffbox" id="diffbox" hidden></div>
       <div class="tracebox" id="tracebox" hidden>
         <b>Honeycomb trace → diagram</b>
-        <p>Paste event JSON or open an export. Conversion runs locally. The imported spec replaces the editor in one undo step.</p>
+        <p>Paste event JSON or open an export, preview its size, then choose all exported spans or a focused branch. Conversion runs locally. Build diagram replaces the editor in one undo step.</p>
         <button class="bbtn" id="trace-open">open trace JSON…</button>
         <input type="file" id="trace-file" accept=".json,application/json" hidden>
         <label>Trace events<textarea class="fctl" id="trace-text" rows="5" spellcheck="false" placeholder='[{"trace.trace_id":"…", "trace.span_id":"…", "duration_ms":20, …}]'></textarea></label>
@@ -90,8 +90,21 @@
           <p>Default fields: trace.trace_id, trace.span_id, trace.parent_id, service.name, name, timestamp, duration_ms, error. Override only the fields that differ. Time is ISO with timezone or Unix seconds; duration is milliseconds.</p>
           <textarea class="fctl" id="trace-fields" rows="3" aria-label="Trace field mapping" placeholder='{"service":"app.service", "timestamp":"time"}'></textarea>
         </details>
+        <label>Import scope<select class="fctl" id="trace-scope"><option value="all">All exported spans</option><option value="subtree">One span and its descendants</option><option value="service">One service and its descendants</option></select></label>
+        <label id="trace-root-label" hidden>Root span ID<input class="fctl" id="trace-root" type="text" placeholder="Exact span ID, or choose a search result below"></label>
+        <label id="trace-service-label" hidden>Service name<input class="fctl" id="trace-service" type="text" list="trace-services" placeholder="Exact service name"></label>
+        <datalist id="trace-services"></datalist>
+        <p>Focus keeps exported descendants so included spans retain child timing. Parent IDs at the boundary remain unchanged.</p>
+        <div class="specrow"><button class="bbtn" id="trace-preview">Preview trace</button><button class="bbtn" id="trace-clear-focus" hidden>Clear focus</button></div>
         <div id="trace-feedback" role="status"></div>
-        <div class="specrow"><button class="rbtn" id="trace-convert">Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
+        <div id="trace-preview-box" hidden>
+          <p id="trace-summary"></p><p id="trace-breadcrumbs"></p>
+          <ul id="trace-warnings"></ul>
+          <label>Find a span<input class="fctl" id="trace-search" type="search" placeholder="Span ID, operation, service, or recorded error"></label>
+          <p id="trace-search-count"></p>
+          <div id="trace-search-results" aria-label="Trace subtree choices"></div>
+        </div>
+        <div class="specrow"><button class="rbtn" id="trace-convert" disabled>Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
       </div>
       <details class="ssec" id="sec-outline">
         <summary>document outline <small>⌘/Ctrl K</small></summary>

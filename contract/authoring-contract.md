@@ -474,6 +474,13 @@ perspectives" of one timeline). Types:
   Invalid/duplicate/cyclic span data refuses timing calculations. Missing
   parents and out-of-parent intervals remain inspectable with visible notices.
   Clipping affects coverage only; original timing rows remain unchanged.
+  Focused imports also record `page.traceImport` provenance: trace ID,
+  source/included span counts, focus kind/value, omitted counts, boundary spans,
+  view timing offset and bounded ancestor breadcrumbs. Its visible section
+  bullets explain the same cut. Focus retains every exported descendant of
+  included spans; see [the trace import guide](../docs/trace-import.md) for
+  local preview, focus and source recovery. Omitted spans are not embedded in
+  the saved spec; this metadata does not assert source completeness.
 - `waterfall` — latency spans on one shared scale (a timing budget):
   `{"id":"lat","type":"waterfall","title":"Latency budget",
   "spans":[{"id":"irq","label":"IRQ + wake","ms":70}, ...],

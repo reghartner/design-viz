@@ -1,5 +1,17 @@
 # Changelog
 
+## Trace preview and focused import (2026-09-14)
+
+- Preview up to 10,000 trace events before replacing the workbench document.
+  Search bounded span results with subtree sizes; focus a subtree or a service
+  plus its descendants. Selections above 200 spans / 30 services remain
+  previewable and need a narrower focus, with no silent trimming.
+- Focus preserves child timing, original parent IDs and stable service IDs.
+  Counts, boundary cuts, ancestor breadcrumbs and the rebased timing origin
+  remain explicit. Clear focus returns to the loaded source export.
+- The CLI shares preview/focus logic through `--preview`, `--root-span` and
+  `--service`. Stale previews and pending file reads cannot replace a document.
+
 ## Inside-service timing (2026-09-14)
 
 - The new `trace` panel shows inclusive duration, child-covered time and the

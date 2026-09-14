@@ -261,6 +261,26 @@ chips, a VPC around services. Rules:
 - An edge between two members of the same stack column draws as a straight
   vertical interconnect (an interrupt line between chips).
 
+Set a group's `parent` to another declared group key to nest it inside that
+group. The outer box wraps its direct member nodes and child boxes; each box
+keeps its own dashed border, title, and optional icon. A node names only its
+innermost group. Keep members of one nested family adjacent in rows: the same
+bounding-box rule applies at every level.
+
+```json
+"groups": {
+  "house":  {"title": "Home", "icon": "house"},
+  "living": {"title": "Living room", "parent": "house"},
+  "garage": {"title": "Garage", "icon": "car", "parent": "house"}
+},
+"nodes": {
+  "cam": {"title": "Camera", "group": "living"},
+  "tv":  {"title": "TV",     "group": "living"},
+  "car": {"title": "EV",     "group": "garage"},
+  "hub": {"title": "Hub",    "group": "house"}
+}
+```
+
 ### rows — layout by flow order (no coordinates)
 
 Optional `diagram.routing: "lanes"` routes connectors along reserved tracks

@@ -20,7 +20,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 8 | Replication / consistency view | codex/replica-positions | Open: https://github.com/reghartner/design-viz/pull/57 |
 | 9 | Stable workbench playback while editing | codex/workbench-playback | Open: https://github.com/reghartner/design-viz/pull/58 |
 | 10 | Step-list navigation and editing | codex/workbench-step-list | Open: https://github.com/reghartner/design-viz/pull/59 |
-| 11 | Canary and firmware rollout stories | codex/rollout-starters | Built; opening focused PR after final checks |
+| 11 | Canary and firmware rollout stories | codex/rollout-starters | Open: https://github.com/reghartner/design-viz/pull/60 |
 | 12 | Phone diagram legibility | TBD | Reduce wasted nested spacing; make wide routed boards readable with an explicit fit control |
 
 ## Validation and evidence
@@ -94,7 +94,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   NO DATA, retained rollback evidence at zero configured traffic, missing boot
   reports, mixed canary outcomes, backward jumps, light/dark and 390-pixel
   containment. Tables scroll within their panels. No console errors; LAN
-  preview returns HTTP 200. Check the final PR CI after the handoff commit.
+  preview returns HTTP 200. Check PR #60 final CI after the handoff commit.
 
 ## Next continuation
 

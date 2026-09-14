@@ -1733,7 +1733,7 @@ test('mermaidToSpec converts the cumulus HLD and validates skeletons with zero e
 });
 
 /* Minimal event DOM: exercise the real import/history/mode handlers without a browser. */
-function importHarness(){
+function importHarness(ctl){
   const elements = {}, listeners = {}, doc = {activeElement: null};
   function element(tag = 'div', id = ''){
     const attrs = {}, handlers = {};
@@ -1806,7 +1806,7 @@ function importHarness(){
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/validator.js'), 'utf8') + '\n' +
     fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8'), sandbox);
   let renders = 0;
-  sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, render(){
+  sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, ctl:()=>ctl, render(){
     renders++;
     elements.msgs.innerHTML = '';
     const finding = element('li'); finding.textContent = 'existing validator warning';
@@ -1815,6 +1815,19 @@ function importHarness(){
   return {elements, doc, element, saved, get renders(){ return renders; },
     click(id){ return elements[id].fire('click'); }};
 }
+
+test('editing source or focusing an inspector pauses every preview without rendering or changing history', () => {
+  const pauses=[0,0], ctl={sections:[{stepper:{pause(){ pauses[0]++; }}},
+    {stepper:null},{stepper:{pause(){ pauses[1]++; }}}]};
+  const h=importHarness(ctl), before=h.elements.src.value;
+  h.elements.src.fire('focusin');
+  h.elements.guide.appendChild(h.element('input')).fire('focusin');
+  h.elements.src.fire('input');
+  assert.deepStrictEqual(pauses,[3,3]);
+  assert.strictEqual(h.elements.src.value,before);
+  assert.strictEqual(h.renders,0);
+  assert.strictEqual(h.elements['undo-builder'].disabled,true);
+});
 
 test('Mermaid import UI opens focuses cancels and preserves editor and history on failure', () => {
   const h = importHarness(), e = h.elements;

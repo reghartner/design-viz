@@ -1,5 +1,19 @@
 # Workbench space and focus
 
+Click-through previews start paused. Use **Play** to run a story; switching
+tabs, selecting an element, or focusing the inspector or JSON source pauses
+playback. Selecting the already displayed step also pauses it. Pausing does
+not replace panel contents or disturb a focused control.
+
+Render, skin changes and inspector edits dispose the previous playback before
+building a paused preview. Within the same page title, a unique section with
+the same heading, tab label, node IDs and default view retains its preview mode
+and current beat. Steps match by a unique `id`, or by their complete unchanged
+content when they have no ID. Removed or ambiguous matches keep the rendered
+default; changed node sets or default views reset too. Selected-step edits use
+the builder's existing selection tracking. No playback state enters the JSON,
+undo history or saved layout. Standalone published pages retain autoplay.
+
 Use **Focus workspace** above the skin controls to hide the introduction and
 reference material. On a desktop, the preview scrolls beside a viewport-sized
 editor. **Exit focus** returns to the normal page and its previous scroll

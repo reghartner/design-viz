@@ -18,7 +18,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 | 6 | Resizable workbench workspace / focused editing | codex/resizable-workspace | Open: https://github.com/reghartner/design-viz/pull/55 |
 | 7 | Retry/timeout and circuit-breaker stories | codex/resilience-starter | Open: https://github.com/reghartner/design-viz/pull/56 |
 | 8 | Replication / consistency view | codex/replica-positions | Open: https://github.com/reghartner/design-viz/pull/57 |
-| 9 | Stable workbench playback while editing | TBD | Stop re-rendered boards from unexpectedly restarting autoplay |
+| 9 | Stable workbench playback while editing | codex/workbench-playback | Built; opening the focused PR after final checks |
 | 10 | Step-list navigation and editing | TBD | Compact steps, jump, duplicate and reorder using existing planners |
 
 ## Validation and evidence
@@ -30,7 +30,7 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
 - Phone preview: `http://192.168.1.242:8765/workbench/flowspec.html`.
   A separate localhost server uses the same port and worktree.
 - Overnight heartbeat: `design-viz-overnight-build`, hourly through the cutoff.
-- PRs #50, #51, #52, #53, #54, #55 and #56 passed all GitHub checks.
+- PRs #50, #51, #52, #53, #54, #55, #56 and #57 passed all GitHub checks.
 - Added 7 layout tests (including seeded dense graphs and exact card-clearance
   checks) and 13 timing tests (including an independent interval oracle).
 - Browser verified a 17-service/24-span trace, 22 routed relationships,
@@ -65,18 +65,24 @@ worktree. Preserve user edits and the unrelated control-callouts PR #49.
   offline equality, unrelated histories, backward jumps, light/dark, 390-pixel
   containment, picker insert/undo, unit edit/undo and keyboard row scrolling.
   Starter and cookbook validate clean; 25 widget types now have contract and
-  inspector coverage. Check PR #57 final CI before claiming it green.
+  inspector coverage. PR #57 passed all GitHub checks.
+- Stable playback: 10 new regressions cover explicit Play, standalone/reduced
+  motion behavior, pause without repaint, interval generation guards, disposal
+  of packet/caption callbacks, unique step matching, ambiguous/reset cases,
+  independent tab modes and builder editing focus. Full Node and 158 Python
+  suites pass. Browser verified retained step through skin/edit/undo, explicit
+  playback advancement, JSON focus stopping advancement, and circuit tab
+  return at the same paused step. Check the final PR CI before claiming green.
 
 ## Next continuation
 
-Start from the current `codex/replica-positions` branch, inspect checks
+Start from the current `codex/workbench-playback` branch, inspect checks
 and working-tree changes, and create the next focused branch. Do not recreate
 the completed PRs above. Workspace resizing/focus and retry/deadline/circuit
-stories and numeric replica positions are built. Browser checks exposed an
-editing issue: re-rendering after skin changes or inspector edits can restart
-autoplay, replacing a focused panel while the user edits. Address stable
-workbench playback next without changing standalone presentation behavior.
-A compact step-list editor follows: use existing selection, duplicate and
+stories, numeric replica positions and stable paused playback are built.
+The workbench now disposes old steppers, starts paused and preserves unique
+preview positions through ordinary edits; standalone autoplay is unchanged.
+Build a compact step-list editor next: use existing selection, duplicate and
 reorder planners. Keep phone
 layouts and native text editing usable. Shared scenario definitions and
 trace/HLD mapping remain larger design work, not quick schema shortcuts.

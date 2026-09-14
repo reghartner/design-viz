@@ -27,7 +27,9 @@
   its definition and edit it in an inspector form: field controls, id renames that rewrite every
   reference, deletes that prune references, duplication, step reordering, undo. <b>+ edge</b>
   draws a hop by clicking source then target; <b>dragging an edge label</b> commits its
-  labelDx/labelDy nudge. Esc clears; Delete removes the selection.</p>
+  labelDx/labelDy nudge. Esc clears; Delete removes the selection.
+  Click-through previews start paused; use <b>Play</b> to run them. Selecting an element or
+  editing pauses playback, and ordinary edits keep your current step when it can be matched.</p>
 </header>
 
 <main>
@@ -208,7 +210,7 @@
         <ul>
           <li>No collision detection — crowded corridors need <code>bend</code>/<code>labelDy</code> nudges</li>
           <li>Hidden tabs stop painting, but SMIL clocks keep running — ambient dots are mid-path when a tab is revealed (harmless for loops)</li>
-          <li>Switching tabs pauses a running click-through; it resumes from the same step when the tab returns</li>
+          <li>Switching tabs pauses a click-through. In this workbench, use Play to resume from the same step.</li>
           <li>Two floats in one gap overlap; 3+ rows collide corridor labels; stack&#8594;stack edges unsupported</li>
           <li>Group members must be placed adjacently (one stack column works best); the boundary is a bounding box, not a layout constraint</li>
         </ul>

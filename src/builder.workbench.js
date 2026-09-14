@@ -3027,6 +3027,15 @@ function initWorkbenchBuilder(opts){
     ctl.sections.forEach(function(s){ if (!rec && s.number === sectionOrdinal + 1) rec = s; });
     return rec ? rec.stepper : null;
   }
+  function pausePreview(){
+    var ctl = opts.ctl ? opts.ctl() : null;
+    ((ctl && ctl.sections) || []).forEach(function(rec){
+      if (rec.stepper && rec.stepper.pause) rec.stepper.pause();
+    });
+  }
+  src.addEventListener('focusin', pausePreview);
+  src.addEventListener('input', pausePreview);
+  if (guide) guide.addEventListener('focusin', pausePreview);
   function syncBoardToSelectedStep(){
     /* selecting a step means SEEING that step: put the board in step
        view at that index — and keep it there across the builder's own
@@ -3036,6 +3045,7 @@ function initWorkbenchBuilder(opts){
     if (!t || t.kind !== 'step') return;
     var stepper = stepperFor(t.section);
     if (!stepper) return;
+    if (stepper.pause) stepper.pause();
     if (stepper.mode() !== 'step') stepper.enterStep(false);
     if (stepper.current().n !== t.index) stepper.jump(t.index);
   }
@@ -4421,6 +4431,7 @@ function initWorkbenchBuilder(opts){
   }
 
   function selectTarget(target, focusEditor){
+    pausePreview();
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     currentTarget = {section: target.section, kind: target.kind,
@@ -4903,6 +4914,7 @@ function initWorkbenchBuilder(opts){
   view.addEventListener('mousedown', function(ev){
     if (ev.button !== 0 || connect) return;
     if (!ev.target.closest) return;
+    if (targetFromEvent(ev)) pausePreview();
     var grabEl = ev.target.closest('g.dv-rowgrab');
     if (grabEl && !addToStep){
       var grabSec = grabEl.closest('.doc-sec');
@@ -5067,6 +5079,7 @@ function initWorkbenchBuilder(opts){
   view.addEventListener('click', function(ev){
     if (suppressClick){ suppressClick = false; return; }
     var target = targetFromEvent(ev);
+    if (target) pausePreview();
     if (addToStep){
       handleAddToStepClick(target);
       return;

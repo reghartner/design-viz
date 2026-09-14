@@ -1,4 +1,66 @@
-/* Workbench layout only. Preferences never enter the spec or undo history. */
+/* Preview position and layout never enter the spec or undo history. */
+function workbenchPreviewSections(page){
+  var sections = [];
+  if (!page) return sections;
+  function add(sec, tab){
+    var d = sec.diagram || {};
+    sections.push({diagram:d, key:JSON.stringify([tab, sec.heading || '',
+      Object.keys(d.nodes || {}).sort(), VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient'])});
+  }
+  blocksOf(page).forEach(function(block){
+    if (block.type === 'section') add(block.sec, null);
+    else block.tabs.forEach(function(tab){ tab.sections.forEach(function(sec){ add(sec, tab.label); }); });
+  });
+  return sections;
+}
+function workbenchPreviewSnapshot(page, ctl){
+  var sections = workbenchPreviewSections(page), saved = [];
+  ((ctl && ctl.sections) || []).forEach(function(rec){
+    var section = sections[rec.number - 1], stepper = rec.stepper;
+    if (!section || !stepper || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    var steps = section.diagram.steps || [], step = steps[stepper.current().n];
+    var id = step && typeof step.id === 'string' && step.id ? step.id : null;
+    var signature = JSON.stringify(step);
+    /* No positional fallback: repeated identities must not restore a different beat. */
+    if (stepper.mode() === 'step' && (id
+      ? steps.filter(function(s){ return s && s.id === id; }).length !== 1
+      : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
+    saved.push({key:section.key, mode:stepper.mode(), id:id, signature:signature});
+  });
+  return {title:page && page.title || '', sections:saved};
+}
+function restoreWorkbenchPreview(page, ctl, saved){
+  if (!saved || (page.title || '') !== saved.title) return;
+  var sections = workbenchPreviewSections(page);
+  ctl.sections.forEach(function(rec){
+    var section = sections[rec.number - 1], stepper = rec.stepper;
+    if (!section || !stepper || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
+    var matches = saved.sections.filter(function(s){ return s.key === section.key; });
+    if (matches.length !== 1) return;
+    var prior = matches[0];
+    if (prior.mode === 'ambient'){
+      if (stepper.mode() !== 'ambient') stepper.enterAmbient();
+      return;
+    }
+    var indices = [];
+    (section.diagram.steps || []).forEach(function(step, i){
+      if (prior.id ? step && step.id === prior.id : JSON.stringify(step) === prior.signature) indices.push(i);
+    });
+    if (indices.length !== 1) return;
+    if (stepper.mode() !== 'step') stepper.enterStep(false);
+    if (stepper.current().n !== indices[0]) stepper.jump(indices[0]);
+  });
+}
+function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl){
+  var tabs = activeTabReferences(previousCtl);
+  var saved = workbenchPreviewSnapshot(previousPage, previousCtl);
+  if (previousCtl) previousCtl.destroy();
+  var ctl = renderPage(view, page, skin, null, {autoplay:false});
+  restoreActiveTabs(ctl, tabs);
+  restoreWorkbenchPreview(page, ctl, saved);
+  return ctl;
+}
+
 function workspacePrefs(raw){
   var prefs = {editor:440, inspector:40}, value;
   try { value = JSON.parse(raw); } catch (ex){ return prefs; }

@@ -3,21 +3,22 @@
   --bg:#EFF1F4; --ink:#1B2027; --sub:#5A6473; --line:#D9DCE2;
   --accent:#0B8FA9; --card:#FFFFFF; --codebg:#F4F2EC; --codeink:#3A3E33;
   --selglow:rgba(11,143,169,.30);
-  --accent-ink:#FFFFFF; /* readable text on an --accent fill */
+  /* dark ink on an --accent fill: 4.9:1 on the light-theme teal, 9.4:1 on
+     the dark-theme cyan — both clear WCAG AA for small bold text (white
+     text on the light teal is only 3.8:1, so it is not used) */
+  --accent-ink:#08131C;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
     --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
     --selglow:rgba(67,200,224,.32);
-    --accent-ink:#08131C; /* the dark accent is light — use dark ink on it */
   }
 }
 :root[data-theme="dark"]{
   --bg:#0F1217; --ink:#E7EBF1; --sub:#8D97A7; --line:#262C36;
   --accent:#43C8E0; --card:#151A21; --codebg:#12161C; --codeink:#B9C2CE;
   --selglow:rgba(67,200,224,.32);
-  --accent-ink:#08131C;
 }
 
 body{background:var(--bg); color:var(--ink); font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif;}

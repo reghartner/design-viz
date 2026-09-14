@@ -891,10 +891,12 @@ Use paths `{"id":"happy","label":"Happy path","steps":["accept","auth","queue","
 and `{"id":"drop","label":"Dropped signal","color":"#fb923c","steps":["accept","auth","queue","lost"]}`.
 Below the transport controls, each path has a colored chip on the left and
 a row of steps on the right. Step numbers align in shared columns. The
-primary row shows all its steps; an alternate begins at the final shared
-beat of its longest common prefix with an earlier path and ends at its own
-last step, leaving blank space before and after. No shared prefix means
-column 1. Clicking a chip selects its starting beat; clicking a number
+primary row shows all its steps. An alternate shows its earlier shared beats
+as shadows at 35% opacity, using each beat's earlier path color. Its full-strength
+steps begin at the final shared beat of its longest common prefix with an
+earlier path and end at its own last step; space after the ending stays blank.
+Shared shadows are clickable and become fully opaque when current or keyboard
+focused. No shared prefix means column 1. Clicking a chip selects its fork beat; clicking a number
 selects that path and step. Rows stay in place when switching. Both routes
 use the same nodes, edges, rows and panels. Path colors identify choices;
 protocol colors retain their meaning on edges.

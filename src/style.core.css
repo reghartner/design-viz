@@ -4120,6 +4120,9 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .path-matrix .path-chip {justify-self:start;max-width:180px;min-height:32px;box-sizing:border-box}
 .termbar.has-paths .path-row .schip {width:32px;height:32px;margin:0;border-color:color-mix(in srgb,var(--path-color) 45%,transparent)}
 .termbar.has-paths .path-row .schip[aria-current="true"] {border-color:var(--path-color);box-shadow:0 0 0 1px var(--path-color);color:var(--dink)}
+.termbar.has-paths .path-row .schip.shared-step-shadow {opacity:.35}
+.termbar.has-paths .path-row .schip.shared-step-shadow[aria-current="true"] {opacity:1}
+.termbar.has-paths .path-row .schip.shared-step-shadow:focus-visible {opacity:1 !important}
 .termbar.has-paths .stepline {flex-basis:100%}
 .termbar.has-paths .tbtn:disabled {opacity:.3;cursor:default}
 @media(max-width:640px){.path-matrix{grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),34px)}.path-matrix .path-chip{max-width:140px;min-height:34px}.termbar.has-paths .path-row .schip{width:34px;height:34px}}

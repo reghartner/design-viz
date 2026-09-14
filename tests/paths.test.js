@@ -156,15 +156,34 @@ test('an alternate running from three to five occupies the same columns and keep
   const d=fixture();d.paths[1].steps.push('five');const h=harness(d);
   const matrix=h.term.chips.children[0],happy=matrix.children[0],drop=matrix.children[1];
   assert.equal(happy.children[0].textContent,'Happy path');assert.equal(drop.children[0].textContent,'Dropped signal');
-  assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[3,4,5]);
-  assert.deepEqual(drop.children.slice(1).map(b=>b.style.gridColumn),happy.children.slice(3).map(b=>b.style.gridColumn));
+  assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4,5]);
+  assert.deepEqual(drop.children.slice(1).map(b=>b.style.gridColumn),happy.children.slice(1).map(b=>b.style.gridColumn));
+  assert.deepEqual(drop.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,false,false,false]);
+  assert.equal(drop.children[1].style['--path-color'],d.paths[0].color);
+  assert.match(drop.children[1].getAttribute('aria-label'),/shared with Happy path/);
   assert.equal(matrix.style['--path-step-count'],5);
-  drop.children[2].fire('click');
+  drop.children[4].fire('click');
   assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.current().id,'drop');
-  assert.equal(h.term.chips.children[0],matrix);assert.equal(drop.children[2].getAttribute('aria-current'),'true');
+  assert.equal(h.term.chips.children[0],matrix);assert.equal(drop.children[4].getAttribute('aria-current'),'true');
   assert.equal(drop.children[0].getAttribute('aria-pressed'),'true');assert.equal(happy.children[0].getAttribute('aria-pressed'),'false');
-  h.sp.jump(0);assert.equal(happy.children[1].getAttribute('aria-current'),'true');
-  assert.equal(drop.children[2].getAttribute('aria-current'),'false');
+  drop.children[1].fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.current().id,'one');
+  assert.equal(drop.children[1].getAttribute('aria-current'),'true');
+  assert.equal(happy.children[1].getAttribute('aria-current'),'false');
+  assert.equal(drop.children[4].getAttribute('aria-current'),'false');
   happy.children[0].fire('click');assert.equal(h.sp.path(),'happy');assert.equal(h.sp.current().n,0);
   drop.children[0].fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.current().n,2);
+});
+
+test('shared shadows end with their own path and use the correct ancestor for nested forks',()=>{
+  const d=fixture();d.paths.push({id:'nested',label:'Retry',steps:['one','two','three','drop','five']},
+    {id:'separate',steps:['drop']});
+  const h=harness(d),rows=h.term.chips.children[0].children,drop=rows[1],nested=rows[2],separate=rows[3];
+  assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4],'no ghost after the failure ending');
+  assert.deepEqual(nested.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,false,false]);
+  assert.equal(nested.children[1].style['--path-color'],d.paths[0].color);
+  assert.equal(separate.children.length,2);assert.equal(separate.children[1].className,'schip');
+  d.paths.push({id:'nested-again',steps:['one','two','three','drop','five','four']});
+  const deep=harness(d).term.chips.children[0].children[4];
+  assert.equal(deep.children[4].style['--path-color'],d.paths[1].color);
+  assert.match(deep.children[4].getAttribute('aria-label'),/shared with Dropped signal/);
 });

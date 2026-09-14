@@ -1,5 +1,12 @@
 # Changelog
 
+## Shared-step shadows (2026-09-14)
+
+- Alternate path rows show shared steps before the fork at 35% opacity in
+  their earlier path's color. Shadows remain clickable within that alternate;
+  current and keyboard-focused steps use full opacity. Columns after a path
+  ends stay empty.
+
 ## Failed communications (2026-09-14)
 
 - Steps can mark existing edges as dropped in transit or not sent with

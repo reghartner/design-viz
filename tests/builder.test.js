@@ -27,7 +27,7 @@ function loadBuilder(extraGlobals){
     ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
     ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
     ' NODE_PRESETS, PANEL_TEMPLATES,' +
-    ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts, parseStarterManifest,' +
+    ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts, parseStarterManifest, buildExportHtml,' +
     ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE, planAddTabs, BUILDER_TABS_TEMPLATE,' +
     ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch,' +
     ' PANEL_SETUP_FIELDS, PANEL_PATCH_FIELDS, patchSummaryLine, panelPatchFields, patchFieldsCollect, SCENE_TOKENS,' +
@@ -2253,4 +2253,53 @@ test('parseStarterManifest reports invalid JSON and wrong top-level shape', () =
   assert.match(B.parseStarterManifest('{nope').error, /not valid JSON/);
   assert.match(B.parseStarterManifest('42').error, /must be an array/);
   assert.match(B.parseStarterManifest('{"other": 1}').error, /must be an array/);
+});
+
+/* ---- buildExportHtml: the client-side page injector ---- */
+
+const TPL_OPEN = '<scr' + 'ipt type="application/json" id="flowspec">';
+const TPL_CLOSE = '</scr' + 'ipt>';
+function miniTemplate(){
+  return ['<!doctype html>', '<title>Old Title</title>',
+          TPL_OPEN, '{"old": true}', TPL_CLOSE, '<main></main>'].join('\n');
+}
+
+test('buildExportHtml swaps the spec block and retitles the page', () => {
+  const spec = JSON.stringify({page: {title: 'Cats & <Dogs>', blocks: []}});
+  const out = B.buildExportHtml(miniTemplate(), spec);
+  assert.ok(!out.error);
+  assert.ok(out.html.includes(TPL_OPEN + '\n' + spec + '\n' + TPL_CLOSE));
+  assert.ok(!out.html.includes('"old"'));
+  assert.ok(out.html.includes('<title>Cats &amp; &lt;Dogs&gt;</title>'));
+});
+
+test('buildExportHtml refuses bad templates and bad specs', () => {
+  const spec = '{"page": {"title": "T"}}';
+  assert.match(B.buildExportHtml('<main>no block</main>', spec).error, /exactly one flowspec/);
+  const twice = miniTemplate() + '\n' + miniTemplate();
+  assert.match(B.buildExportHtml(twice, spec).error, /found 2/);
+  assert.match(B.buildExportHtml(miniTemplate(), '{nope').error, /not valid JSON/);
+  assert.match(B.buildExportHtml(miniTemplate(), '{"a": "x</scr' + 'ipt>"}').error, /escape it/);
+  /* HTML tag names are case-insensitive — an uppercase close must be caught too */
+  assert.match(B.buildExportHtml(miniTemplate(), '{"a": "x</SCR' + 'IPT><img>"}').error, /escape it/);
+  assert.match(B.buildExportHtml(miniTemplate(), '{"a": "x</ScR' + 'iPt>"}').error, /escape it/);
+  /* a prose mention of the opener mid-line is NOT a block (line-anchored) */
+  const prose = miniTemplate().replace('<main></main>', '<p>about ' + TPL_OPEN + ' tags</p>');
+  const out = B.buildExportHtml(prose, spec);
+  assert.ok(!out.error);
+});
+
+test('buildExportHtml accepts a CRLF template', () => {
+  const crlf = miniTemplate().replace(/\n/g, '\r\n');
+  const spec = '{"page": {"title": "T"}}';
+  const out = B.buildExportHtml(crlf, spec);
+  assert.ok(!out.error, out.error);
+  assert.ok(out.html.includes(spec));
+  assert.ok(out.html.includes('<title>T</title>'));
+});
+
+test('buildExportHtml leaves the title alone when the spec has none', () => {
+  const out = B.buildExportHtml(miniTemplate(), '{"nodes": {"a": {}}, "rows": [["a"]]}');
+  assert.ok(!out.error);
+  assert.ok(out.html.includes('<title>Old Title</title>'));
 });

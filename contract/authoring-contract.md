@@ -451,6 +451,29 @@ perspectives" of one timeline). Types:
   `package-drop` plays a delivery (courier walks in carrying a box, the
   package lands, the courier leaves; reduced motion shows the delivered
   package only).
+- `trace` — observed service internals and wall-time coverage:
+  `{"id":"inside","type":"trace","title":"Inside the service",
+  "spans":[{"id":"request","service":"api","name":"handle request",
+  "startMs":0,"ms":100},{"id":"parse","parentId":"request",
+  "service":"api","name":"parse input","startMs":5,"ms":20}],
+  "initial":{"selected":"request"}}`. Accepts 1–200 spans with unique
+  string IDs, required `service` and `name`, finite non-negative `startMs`
+  and `ms`, optional `parentId` and `error:true`. All offsets share an origin.
+  Patch `{"selected":"<span id>"}` to inspect a span; sparse selection and
+  `enterOnce` use normal panel folding. A missing/null selection defaults to
+  the earliest span; an unknown ID shows **Timing unavailable**.
+  The selected span shows inclusive duration, the union of clipped direct-child
+  intervals (child-covered time), and the uncovered remainder. Do not label
+  that remainder CPU time: it can include local work, waiting, or missing
+  instrumentation. The service's coverage is also a union, not the sum of
+  nested span durations. Internal rows preserve their offsets, IDs, parent
+  relationships and recorded errors; direct children distinguish same-service
+  operations from other services. When steps select spans, the service picker
+  and operation buttons navigate to the first corresponding step and update
+  the board and other panels. An unselectable authored row remains read-only.
+  Invalid/duplicate/cyclic span data refuses timing calculations. Missing
+  parents and out-of-parent intervals remain inspectable with visible notices.
+  Clipping affects coverage only; original timing rows remain unchanged.
 - `waterfall` — latency spans on one shared scale (a timing budget):
   `{"id":"lat","type":"waterfall","title":"Latency budget",
   "spans":[{"id":"irq","label":"IRQ + wake","ms":70}, ...],

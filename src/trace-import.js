@@ -185,12 +185,15 @@ function traceToSpec(input, options){
   var timing = {id: 'timing', type: 'waterfall', title: 'Observed span timing',
     spans: spans.map(function(s){ return {id: s.id, label: s.service + ' · ' + s.name, ms: s.ms, startMs: s.startMs, error: s.error}; })};
   var details = {id: 'span', type: 'table', title: 'Selected span', columns: [{id: 'field', label: 'Field'}, {id: 'value', label: 'Observed value'}]};
+  var internal = {id:'internal',type:'trace',title:'Inside the service',spans:spans.map(function(s){
+    return {id:s.id,parentId:s.parentId,service:s.service,name:s.name,startMs:s.startMs,ms:s.ms,error:s.error};
+  })};
   var steps = spans.map(function(s){
     var facts = [['span_id', s.id], ['parent_id', s.parentId], ['service', s.service], ['operation', s.name],
       ['start_ms', s.startMs], ['duration_ms', s.ms], ['error', s.error ? 'recorded error' : 'not flagged']];
     var st = {id: s.id, nodes: [services.get(s.service)],
       text: '+' + s.startMs + ' ms · ' + s.service + ' · ' + s.name + ' · duration ' + s.ms + ' ms' + (s.error ? ' · recorded error' : ''),
-      panels: {timing: {highlight: s.id}, span: {rows: facts.map(function(f){ return {id: f[0], cells: {field: f[0], value: f[1]}}; })}}};
+      panels: {timing: {highlight: s.id}, internal:{selected:s.id}, span: {rows: facts.map(function(f){ return {id: f[0], cells: {field: f[0], value: f[1]}}; })}}};
     var parent = byId.get(s.parentId);
     if (parent && parent.service !== s.service) st.edge = services.get(parent.service) + '->' + services.get(s.service);
     if (source) st.link = source;
@@ -201,7 +204,7 @@ function traceToSpec(input, options){
     'Imported trace ' + selected + ': ' + spans.length + ' spans across ' + services.size + ' services; observed extent ' + elapsed + ' ms.',
     'Inspect spans in start-time order. Overlapping bars retain their original offsets; parent spans include child time. The total is elapsed extent, not a sum of durations. Arrows mean span parent relationships, not a verified network protocol.',
     'This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success.'],
-    bullets: warnings.slice(), diagram: {view: 'step', routing: 'lanes', nodes: nodes, rows: rows, edges: edges, panels: [timing, details], steps: steps}};
+    bullets: warnings.slice(), diagram: {view: 'step', routing: 'lanes', nodes: nodes, rows: rows, edges: edges, panels: [timing, internal, details], steps: steps}};
   if (source) section.source = source;
   return {spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'aurora',
     protocols: edges.length ? {trace: {label: 'Span parent relationship', color: '#38BDF8'}} : {}, blocks: [section]}},

@@ -137,6 +137,67 @@
               ]
             },
             {
+              "id": "internal",
+              "type": "trace",
+              "title": "Inside the service",
+              "spans": [
+                {
+                  "id": "root",
+                  "parentId": null,
+                  "service": "checkout",
+                  "name": "POST /orders",
+                  "startMs": 0,
+                  "ms": 300,
+                  "error": false
+                },
+                {
+                  "id": "cache",
+                  "parentId": "root",
+                  "service": "checkout",
+                  "name": "idempotency lookup",
+                  "startMs": 10,
+                  "ms": 5,
+                  "error": false
+                },
+                {
+                  "id": "auth",
+                  "parentId": "root",
+                  "service": "identity",
+                  "name": "authorize",
+                  "startMs": 20,
+                  "ms": 40,
+                  "error": false
+                },
+                {
+                  "id": "stock",
+                  "parentId": "root",
+                  "service": "inventory",
+                  "name": "reserve stock",
+                  "startMs": 30,
+                  "ms": 100,
+                  "error": false
+                },
+                {
+                  "id": "pay",
+                  "parentId": "root",
+                  "service": "payments",
+                  "name": "authorize payment",
+                  "startMs": 150,
+                  "ms": 100,
+                  "error": true
+                },
+                {
+                  "id": "audit",
+                  "parentId": "root",
+                  "service": "audit",
+                  "name": "record failed checkout",
+                  "startMs": 260,
+                  "ms": 20,
+                  "error": false
+                }
+              ]
+            },
+            {
               "id": "span",
               "type": "table",
               "title": "Selected span",
@@ -162,6 +223,9 @@
               "panels": {
                 "timing": {
                   "highlight": "root"
+                },
+                "internal": {
+                  "selected": "root"
                 },
                 "span": {
                   "rows": [
@@ -228,6 +292,9 @@
                 "timing": {
                   "highlight": "cache"
                 },
+                "internal": {
+                  "selected": "cache"
+                },
                 "span": {
                   "rows": [
                     {
@@ -292,6 +359,9 @@
               "panels": {
                 "timing": {
                   "highlight": "auth"
+                },
+                "internal": {
+                  "selected": "auth"
                 },
                 "span": {
                   "rows": [
@@ -359,6 +429,9 @@
                 "timing": {
                   "highlight": "stock"
                 },
+                "internal": {
+                  "selected": "stock"
+                },
                 "span": {
                   "rows": [
                     {
@@ -425,6 +498,9 @@
                 "timing": {
                   "highlight": "pay"
                 },
+                "internal": {
+                  "selected": "pay"
+                },
                 "span": {
                   "rows": [
                     {
@@ -490,6 +566,9 @@
               "panels": {
                 "timing": {
                   "highlight": "audit"
+                },
+                "internal": {
+                  "selected": "audit"
                 },
                 "span": {
                   "rows": [

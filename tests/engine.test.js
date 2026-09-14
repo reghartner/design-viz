@@ -16,7 +16,7 @@ function loadCore(overrides = {}){
     fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
     fs.readFileSync(path.join(ROOT, 'src', 'engine.js'), 'utf8') + '\n' +
     ';__exports = {validate, normalize, blocksOf, resolveProtocols, resolveLanes,' +
-    ' kindColor, stepKeys, stepTonePatch, foldPanelStates, foldNodeTones, layout, isWrap, edgePath, SKINS,' +
+    ' kindColor, stepKeys, stepTonePatch, foldPanelStates, foldNodeTones, layout, isWrap, edgePath, renderBoard, SKINS,' +
     ' BUILTIN_PROTOCOLS, SCENES, spreadPositions, resolveLabelCollisions,' +
     ' edgeAutoAdjust, parseHash, buildHash, isValidLinkBase, composeLinkURL, slugify, sectionSlugify, sectionReferences, oneBasedIndex, tabIndexOf, tabReference,' +
     ' stepIndexOf, stepReference, resolveHashTarget, rectsOverlap, overlapArea,' +
@@ -801,6 +801,21 @@ test('group bounding box covers member nodes with padding', () => {
   assert.ok(g.y < L.pos.a.cy - L.pos.a.h / 2);
   assert.ok(g.x + g.w > L.pos.b.cx + L.pos.b.w / 2);
   assert.ok(g.y + g.h > L.pos.b.cy + L.pos.b.h / 2);
+});
+
+test('group renderer exposes an escaped data-dv-group selection identity', () => {
+  let html = '';
+  const host = {
+    firstChild: null,
+    set innerHTML(value){ html = value; this.firstChild = {}; },
+    get innerHTML(){ return html; }
+  };
+  const core = loadCore({document: {getElementById(){ return null; }}});
+  const key = 'odd"&<';
+  core.renderBoard(host,
+    {nodes: {a: {group: key}}, rows: [['a']], groups: {[key]: {title: 'Odd'}}, edges: [], steps: []},
+    'test', 'aurora', core.resolveProtocols({}), null);
+  assert.match(html, /<g class="grp" data-dv-group="odd&quot;&amp;&lt;">/);
 });
 
 /* ---------------- panel-state folding ---------------- */

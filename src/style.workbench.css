@@ -198,7 +198,7 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .ihelp[open] summary{margin-bottom:4px;}
 
 /* builder: selection highlight on the rendered page (svg + widget cards) */
-.docview .node, .docview .edge, .docview .halo, .docview .coin,
+.docview .grp, .docview .node, .docview .edge, .docview .halo, .docview .coin,
 .docview .pwidget, .docview .sec-text[data-dv-para],
 .docview .sec-bullets li[data-dv-bullet], .docview .ctrow{cursor:pointer;}
 .docview text.lbl{cursor:grab;} /* drag nudges labelDx/labelDy; click selects */
@@ -206,14 +206,14 @@ textarea.fctl{resize:vertical; min-height:44px;}
    its stroke, so a selected element cannot be mistaken for a lit step node
    (solid teal) or a step member (thin static dashes) */
 @keyframes dvselants{to{stroke-dashoffset:-24;}}
-g.node.dv-sel .card{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
+.grp.dv-sel .grpbox, g.node.dv-sel .card{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
   animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
 path.edge.dv-sel{stroke-width:4; filter:drop-shadow(0 0 4px var(--accent));}
 text.lbl.dv-sel{fill:var(--accent); paint-order:stroke; stroke:var(--selglow); stroke-width:3px;}
 g.coin.dv-sel circle{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 5;
   animation:dvselants .9s linear infinite; filter:drop-shadow(0 0 5px var(--selglow));}
 @media (prefers-reduced-motion: reduce){
-  g.node.dv-sel .card, g.coin.dv-sel circle{animation:none;}
+  .grp.dv-sel .grpbox, g.node.dv-sel .card, g.coin.dv-sel circle{animation:none;}
   .guide .gpos.gposflash{animation:none; background:var(--selglow);}
 }
 .pwidget.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
@@ -234,6 +234,7 @@ tr.ctrow.dv-sel{outline:2px dashed var(--accent); outline-offset:-1px;}
 .mx{background:none; border:0; border-left:1px solid var(--line); color:var(--sub);
   font:700 11px 'IBM Plex Mono',monospace; padding:3px 6px; cursor:pointer;}
 .mx:hover{color:#C0392B;}
+.groupctl .mx:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
 
 /* node drag-to-swap: dashed source, accent-ringed drop target, and a
    see-through ghost that follows the cursor — snapping into the target's

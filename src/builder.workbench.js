@@ -285,6 +285,11 @@ function builderTargetPath(raw, target){
   if (target.kind === 'section') return rec.section;
   var d = rec.diagram;
   if (target.kind === 'node') return d.concat(['nodes', target.id]);
+  if (target.kind === 'group'){
+    var groups = specValueAt(raw, d.concat(['groups']));
+    return groups && Object.prototype.hasOwnProperty.call(groups, target.id)
+      ? d.concat(['groups', target.id]) : null;
+  }
   if (target.kind === 'edge') return d.concat(['edges', target.index]);
   if (target.kind === 'step') return d.concat(['steps', target.index]);
   if (target.kind === 'panel') return d.concat(['panels', target.index]);
@@ -553,6 +558,85 @@ function planSetField(text, raw, targetPath, key, valueTextOrNull){
   var r = jsonSetField(text, targetPath, key, valueTextOrNull);
   if (!r) return {error: 'could not edit the editor text'};
   return r;
+}
+
+function planSetNodeGroup(text, raw, sectionIdx, nodeId, keyOrNull){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, nodeId))
+    return {error: 'node "' + nodeId + '" not found'};
+  if (keyOrNull != null && typeof keyOrNull !== 'string') return {error: 'group key must be text'};
+  var key = keyOrNull == null ? null : keyOrNull.trim() || null;
+  var plan = planSetField(text, raw, got.path.concat(['nodes', nodeId]), 'group',
+                          key == null ? null : JSON.stringify(key));
+  if (plan.error || key == null) return plan;
+  var groups = got.d.groups;
+  if (groups && Object.prototype.hasOwnProperty.call(groups, key)) return plan;
+  var r = groups ? jsonSetField(plan.text, got.path.concat(['groups']), key, '{}')
+                 : jsonSetField(plan.text, got.path, 'groups', '{' + JSON.stringify(key) + ': {}}');
+  return r || {error: 'could not declare group'};
+}
+
+function planBulkSetGroup(text, raw, targets, keyOrNull){
+  var cur = text;
+  for (var i = 0; i < targets.length; i++){
+    try { raw = JSON.parse(cur); }
+    catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
+    var t = targets[i];
+    if (t.kind !== 'node') return {error: 'groups can only contain nodes'};
+    var plan = planSetNodeGroup(cur, raw, t.section, t.id, keyOrNull);
+    if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
+    cur = plan.text;
+  }
+  return {text: cur, count: targets.length};
+}
+
+function planSetGroupTitle(text, raw, sectionIdx, key, titleOrNull){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (typeof key !== 'string' || !key.trim()) return {error: 'a group needs a key'};
+  return builderRewrite(text, raw, got.path, function(d){
+    var groups = Object.assign(Object.create(null), d.groups || {});
+    var meta = Object.assign(Object.create(null), groups[key] || {});
+    if (titleOrNull == null || titleOrNull.trim() === '') delete meta.title;
+    else meta.title = titleOrNull.trim();
+    groups[key] = meta;
+    d.groups = groups;
+  });
+}
+
+function planRenameGroup(text, raw, sectionIdx, oldKey, newKey){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (typeof newKey !== 'string' || !newKey.trim()) return {error: 'a group needs a key'};
+  newKey = newKey.trim();
+  if (newKey === oldKey) return {error: 'same key'};
+  var groups = got.d.groups || {}, nodes = got.d.nodes || {};
+  var declared = Object.prototype.hasOwnProperty.call(groups, oldKey);
+  var members = Object.keys(nodes).filter(function(id){ return nodes[id] && nodes[id].group === oldKey; });
+  if (!declared && !members.length) return {error: 'group "' + oldKey + '" not found'};
+  if (Object.prototype.hasOwnProperty.call(groups, newKey) || Object.keys(nodes).some(function(id){
+    return nodes[id] && nodes[id].group === newKey;
+  })) return {error: 'group "' + newKey + '" is already taken'};
+  return builderRewrite(text, raw, got.path, function(d){
+    members.forEach(function(id){ d.nodes[id].group = newKey; });
+    if (declared){
+      var renamed = Object.create(null);
+      Object.keys(d.groups).forEach(function(k){ renamed[k === oldKey ? newKey : k] = d.groups[k]; });
+      d.groups = renamed;
+    }
+  });
+}
+
+function planDeleteGroup(text, raw, sectionIdx, key){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  return builderRewrite(text, raw, got.path, function(d){
+    if (d.groups) delete d.groups[key];
+    Object.keys(d.nodes || {}).forEach(function(id){
+      if (d.nodes[id] && d.nodes[id].group === key) delete d.nodes[id].group;
+    });
+  });
 }
 
 function builderEdgeKey(e){ return ((e && e.from) || '') + '->' + ((e && e.to) || ''); }
@@ -1511,6 +1595,7 @@ var BUILDER_MULTI_KINDS = ['node', 'edge', 'step', 'panel', 'bullet', 'crow'];
 
 function builderDeletePlan(text, raw, t){
   if (t.kind === 'tab') return planDeleteTab(text, raw, t.block, t.tab);
+  if (t.kind === 'group') return planDeleteGroup(text, raw, t.section, t.id);
   if (t.kind === 'node') return planDeleteNode(text, raw, t.section, t.id);
   if (t.kind === 'edge') return planDeleteEdge(text, raw, t.section, t.index);
   if (t.kind === 'step') return planDeleteStep(text, raw, t.section, t.index);
@@ -1912,6 +1997,15 @@ function objFieldsCollect(shape, base, values){
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
+  group: {
+    title: 'Group — a containment boundary',
+    how: 'Select nodes and set their group to create a boundary. Select its boundary to edit or delete it.',
+    fields: [
+      ['key', 'rename the declaration and every member reference'],
+      ['title', 'boundary label — empty falls back to the key'],
+      ['members', 'remove individual nodes with ×; deleting the group keeps its nodes']
+    ]
+  },
   node: {
     title: 'Node — one service card',
     how: 'Edit the selected JSON, then click Render. A node renders only if its id appears in rows (or floats).',
@@ -2496,6 +2590,7 @@ function initWorkbenchBuilder(opts){
       return (chipsBox && chipsBox.children[t.index]) || null;
     }
     var sel = t.kind === 'node' ? '[data-dv-node="' + cssQuote(t.id) + '"]' :
+              t.kind === 'group' ? '.grp[data-dv-group="' + cssQuote(t.id) + '"]' :
               t.kind === 'edge' ? 'path.edge[data-dv-edge="' + t.index + '"]' :
               t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
               t.kind === 'bullet' ? '[data-dv-bullet="' + t.index + '"]' :
@@ -2645,13 +2740,13 @@ function initWorkbenchBuilder(opts){
     row.appendChild(lab); row.appendChild(control);
     return row;
   }
-  function commitOnChange(input, getCommitValue, commit){
+  function commitOnChange(input, getCommitValue, commit, commitUnchanged){
     /* a commit returning false (validation or plan error) resets the
        remembered value so re-entering ANY value — the original included —
        fires again instead of being swallowed as "unchanged" */
     var last = input.value;
     var fire = function(){
-      if (input.value === last) return;
+      if (input.value === last && !commitUnchanged) return;
       last = input.value;
       var ok = commit(getCommitValue ? getCommitValue(input.value) : input.value);
       if (ok === false) last = null;
@@ -2673,7 +2768,7 @@ function initWorkbenchBuilder(opts){
       var trimmed = v.trim();
       if (!trimmed && opts && opts.required){ formError(opts.required); return false; }
       return commit(trimmed === '' ? null : trimmed);
-    });
+    }, opts && opts.commitUnchanged);
     return input;
   }
   function numberControl(value, commit){
@@ -2742,6 +2837,59 @@ function initWorkbenchBuilder(opts){
     document.body.appendChild(dl);
   }
 
+  function ensureGroupDatalist(diagrams){
+    var dl = document.getElementById('group-keys');
+    if (!dl){
+      dl = document.createElement('datalist'); dl.id = 'group-keys';
+      document.body.appendChild(dl);
+    }
+    dl.innerHTML = '';
+    var seen = Object.create(null);
+    diagrams.forEach(function(d){
+      Object.keys((d && d.groups) || {}).forEach(function(key){
+        if (seen[key]) return;
+        seen[key] = true;
+        var op = document.createElement('option');
+        op.value = key; dl.appendChild(op);
+      });
+    });
+  }
+  function commitGroup(planFor, opt){
+    if (addToStep){
+      formError('finish ADD TO STEP first (DONE or Esc) — this control is paused while the mode is armed');
+      return false;
+    }
+    return commitCascade(planFor, opt);
+  }
+  function groupControl(value, commit, opts){
+    var input = textControl(value, commit, Object.assign({list: 'group-keys'}, opts || {}));
+    input.classList.add('groupctl');
+    return input;
+  }
+  function groupForm(val, ctx){
+    var t = currentTarget;
+    var members = Object.keys((ctx.diagram && ctx.diagram.nodes) || {}).filter(function(id){
+      return ctx.diagram.nodes[id] && ctx.diagram.nodes[id].group === t.id;
+    });
+    var memberRow = chipRow('members', members.map(function(id){ return {key: id, label: id}; }),
+      'no members — select nodes and set their group', function(id){
+        return commitGroup(function(raw){ return planSetNodeGroup(src.value, raw, t.section, id, null); },
+          {after: function(){ renderInspector(); }});
+      }, null, 'group');
+    memberRow.classList.add('groupctl');
+    return [
+      frow('key', groupControl(t.id, function(v){
+        return commitGroup(function(raw){ return planRenameGroup(src.value, raw, t.section, t.id, v); },
+          {after: function(){ t.id = v.trim(); renderInspector(); }});
+      }, {required: 'a group needs a key'})),
+      frow('title', groupControl(val.title, function(v){
+        return commitGroup(function(raw){ return planSetGroupTitle(src.value, raw, t.section, t.id, v); },
+          {after: function(){ renderInspector(); }});
+      }, {list: null})),
+      memberRow
+    ];
+  }
+
   function protocolKinds(page){
     var kinds = ['https', 'int', 'mqtt'];
     Object.keys((page && page.protocols) || {}).forEach(function(k){
@@ -2753,6 +2901,7 @@ function initWorkbenchBuilder(opts){
   /* ---- per-kind form builders; each returns an array of DOM rows ---- */
   function nodeForm(val, ctx){
     var t = currentTarget;
+    ensureGroupDatalist([ctx.diagram]);
     return [
       frow('id', textControl(t.id, function(v){
         if (v == null){ formError('a node needs an id'); return false; }
@@ -2761,6 +2910,10 @@ function initWorkbenchBuilder(opts){
           {after: function(){ t.id = v; renderInspector(); }});
       }, {required: 'a node needs an id'})),
       frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); })),
+      frow('group', groupControl(val.group, function(v){
+        return commitGroup(function(raw){ return planSetNodeGroup(src.value, raw, t.section, t.id, v); },
+          {after: function(){ ensureGroupDatalist([builderDiagram(src.value, JSON.parse(src.value), t.section).d]); }});
+      })),
       frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
       frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
@@ -2789,7 +2942,7 @@ function initWorkbenchBuilder(opts){
       frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
     ];
   }
-  function chipRow(labelText, items, emptyText, onRemove, onBody){
+  function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){
     var box = document.createElement('span');
     box.className = 'fctl mchips';
     if (!items.length){
@@ -2808,8 +2961,8 @@ function initWorkbenchBuilder(opts){
       else lab.tabIndex = -1;
       var x = document.createElement('button');
       x.type = 'button'; x.className = 'mx';
-      x.textContent = '\u00d7'; x.title = 'remove from this step';
-      x.setAttribute('aria-label', 'remove ' + it.label + ' from this step');
+      x.textContent = '\u00d7'; x.title = 'remove from this ' + (ownerKind || 'step');
+      x.setAttribute('aria-label', 'remove ' + it.label + ' from this ' + (ownerKind || 'step'));
       x.addEventListener('click', function(){ onRemove(it.key); });
       chip.appendChild(lab); chip.appendChild(x);
       box.appendChild(chip);
@@ -3345,6 +3498,10 @@ function initWorkbenchBuilder(opts){
   function deleteCurrent(){
     var t = currentTarget;
     if (!t) return;
+    if (t.kind === 'group' && addToStep){
+      formError('finish ADD TO STEP first (DONE or Esc) — delete is paused while the mode is armed');
+      return;
+    }
     commitCascade(function(raw){ return deletePlanFor(t, raw); },
       {after: function(){
         currentTarget = null; setSelected(null);
@@ -3478,6 +3635,20 @@ function initWorkbenchBuilder(opts){
     /* every control writes the SAME value to every selected element;
        an empty value removes the field from all of them */
     if (kind === 'node'){
+      var parsed = parseEditor();
+      var values = [], diagrams = [];
+      if (!parsed.error) multiSel.forEach(function(t){
+        var got = builderDiagram(src.value, parsed.raw, t.section);
+        if (!got.error){
+          diagrams.push(got.d);
+          values.push(((got.d.nodes || {})[t.id] || {}).group || '');
+        }
+      });
+      ensureGroupDatalist(diagrams);
+      var mixed = values.some(function(v){ return v !== values[0]; });
+      form.appendChild(frow('group', groupControl(mixed ? null : values[0], function(v){
+        return commitGroup(function(raw){ return planBulkSetGroup(src.value, raw, multiSel, v); });
+      }, {placeholder: mixed ? 'mixed — empty removes' : 'group key — empty removes', commitUnchanged: mixed})));
       form.appendChild(frow('tint', selectControl(['cmd', 'auth', 'data', 'mqtt', 'dev'], null, function(v){
         return applyBulkField('tint', v == null ? null : JSON.stringify(v));
       }, true)));
@@ -3544,12 +3715,12 @@ function initWorkbenchBuilder(opts){
 
     if (parsed.error){
       formError(parsed.error + ' — fix it to edit this element');
-    } else if (!loc){
+    } else if (!loc && !(t.kind === 'group' && !builderDiagram(src.value, parsed.raw, t.section).error)){
       formError('definition not found in the editor text — the render and the editor may be out of sync (click Render)');
     } else if (t.kind === 'section' && path.length === 0){
       formError('bare diagram — wrap it as {"page": {"blocks": [ ... ]}} to edit heading and accent');
     } else {
-      var val = specValueAt(parsed.raw, path);
+      var val = path ? specValueAt(parsed.raw, path) : {};
       if (val == null) val = {};
       var rec = specSectionPaths(parsed.raw)[t.section];
       var ctx = {
@@ -3560,6 +3731,7 @@ function initWorkbenchBuilder(opts){
       form.className = 'iform';
       if (t.kind === 'tab') ensureAccentDatalist();
       var rows =
+        t.kind === 'group' ? groupForm(val, ctx) :
         t.kind === 'node' ? nodeForm(val, ctx) :
         t.kind === 'edge' ? edgeForm(val, ctx) :
         t.kind === 'step' ? stepForm(val, ctx) :
@@ -3653,7 +3825,7 @@ function initWorkbenchBuilder(opts){
         }));
       }
       if (!armedHere)
-        acts.appendChild(actionButton('delete ' + t.kind, deleteCurrent, 'bdanger'));
+        acts.appendChild(actionButton('delete ' + t.kind, deleteCurrent, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       guide.appendChild(acts);
     }
 
@@ -3747,10 +3919,14 @@ function initWorkbenchBuilder(opts){
       var edgeEl = secEl.querySelector('path.edge[data-dv-edge="' + edgeIdx + '"]') || el;
       return {section: gi, kind: 'edge', index: edgeIdx, el: edgeEl};
     }
+    var groupEl = ev.target.closest('g.grp[data-dv-group]');
+    if (groupEl && secEl.contains(groupEl))
+      return {section: gi, kind: 'group', id: groupEl.getAttribute('data-dv-group'), el: groupEl};
     return {section: gi, kind: 'section', el: secEl};
   }
 
   function selectTarget(target, focusEditor){
+    if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     currentTarget = {section: target.section, kind: target.kind,
                      id: target.id, index: target.index,
@@ -3778,7 +3954,7 @@ function initWorkbenchBuilder(opts){
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
-    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, .patchedit .fctl';
+    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
        step, re-render from outside the mode, or leave the page state

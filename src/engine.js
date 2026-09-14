@@ -3833,12 +3833,17 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   function paintChips(){
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
     chipButtons = []; pathButtons = [];
-    function appendStep(parent,path,idx,rowNumber){
+    function appendStep(parent,path,idx,rowNumber,sharedWith){
       var step = source.steps[path.indices[idx]], b = document.createElement('button');
-      b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '');
+      b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '') + (sharedWith ? ' shared-step-shadow' : '');
       b.textContent = idx + 1;
       b.setAttribute('data-step-source',path.indices[idx]);
-      b.setAttribute('aria-label','Go to step ' + (idx + 1) + (paths.length > 1 ? ' on ' + path.label : ''));
+      b.setAttribute('aria-label','Go to step ' + (idx + 1) + (paths.length > 1 ? ' on ' + path.label : '') +
+        (sharedWith ? ', shared with ' + sharedWith.label : ''));
+      if (sharedWith){
+        b.title = 'Shared with ' + sharedWith.label;
+        b.style.setProperty('--path-color',sharedWith.color);
+      }
       if (paths.length > 1){
         b.setAttribute('data-step-path',path.id);
         b.style.gridColumn = idx + 2; b.style.gridRow = rowNumber + 1;
@@ -3863,7 +3868,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     pathStepRows(paths).forEach(function(row,rowNumber){
       var path = row.path, line = document.createElement('div'); line.className = 'path-row';
       line.setAttribute('role','group');
-      line.setAttribute('aria-label',path.label + ', steps ' + (row.start + 1) + ' through ' + (row.end + 1));
+      line.setAttribute('aria-label',path.label + ', steps 1 through ' + (row.end + 1) +
+        (row.start ? ', shared steps before fork at ' + (row.start + 1) : ''));
       line.setAttribute('data-path-row',path.id); line.style.setProperty('--path-color',path.color);
       var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
       choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);
@@ -3873,7 +3879,14 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
         secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
       });
       line.appendChild(choice); pathButtons.push({button:choice,path:path,row:line});
-      for (var i = row.start; i <= row.end; i++) appendStep(line,path,i,rowNumber);
+      for (var i = 0; i <= row.end; i++){
+        /* Copy only real shared beats. Nested forks inherit each beat's
+           earliest matching path color, including another alternate. */
+        var sharedWith = i < row.start ? paths.slice(0,rowNumber).find(function(prior){
+          return prior.indices[i] === path.indices[i];
+        }) : null;
+        appendStep(line,path,i,rowNumber,sharedWith);
+      }
       matrix.appendChild(line);
     });
     chipsBox.appendChild(matrix);
@@ -3885,11 +3898,6 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       choice.row.setAttribute('data-selected',String(active));
     });
     var active = chipButtons.find(function(chip){return chip.path.id === selectedPath.id && chip.index === cur;});
-    /* Before a fork the active beat is displayed on its shared ancestor row. */
-    if (!active) active = chipButtons.slice().reverse().find(function(chip){
-      return paths.indexOf(chip.path) < paths.indexOf(selectedPath) && chip.index === cur &&
-        chip.path.indices[cur] === selectedPath.indices[cur];
-    });
     chipButtons.forEach(function(chip){chip.button.setAttribute('aria-current',String(chip === active));});
   }
   paintChips();

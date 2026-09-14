@@ -4,9 +4,12 @@ Use **starters… → alternate paths** in the workbench for a six-step happy
 path and a four-step **Dropped signal** path on the same command diagram.
 The transport controls stay at the upper left. Below them, each path has a
 colored chip on the left and a row of aligned step numbers on the right. Both
-paths share steps 1–3, so the alternate row begins in column 3 and ends in
-column 4, with blank space on either side. Selecting its chip pauses at the
-fork; clicking a number selects that path and step. The colored chip,
+paths share steps 1–3. The alternate row shows steps 1–2 as shadows at 35%
+opacity in the happy-path color, then steps 3–4 at full strength. Space after
+its ending stays blank. Shared shadows are clickable and keep the alternate
+selected; the current step and keyboard-focused shadow have full opacity.
+Nested alternates inherit each shared beat's earlier path color. Selecting
+the path chip pauses at the fork; clicking a number selects that path and step. The colored chip,
 step count, playback ending, highlighted hops, node tones and panel state all
 follow that path. Chips retain their order when switching.
 

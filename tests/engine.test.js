@@ -4297,7 +4297,10 @@ test('homemap render: per-camera sweeps, transition ripples, staggered signals a
   assert.match(host.innerHTML, /class="hmglow"/);
   assert.match(host.innerHTML, /hm-camera hm-detect/);
   assert.match(host.innerHTML, /animation-delay:0.25s/);
-  assert.match(host.innerHTML, /--hx1:160px;--hy1:92px;--hx2:160px;--hy2:158px/);
+  const signal = host.innerHTML.match(/--hx1:160px;--hy1:([\d.]+)px;--hx2:160px;--hy2:([\d.]+)px/);
+  assert.ok(signal);
+  assert.ok(Math.abs(Number(signal[1]) - 110.4) < 1e-8);
+  assert.ok(Math.abs(Number(signal[2]) - 189.6) < 1e-8);
   assert.doesNotMatch(host._lastHTML, /hmripple|hmsig|hmglow/);
   host.innerHTML = 'SENTINEL';
   C.renderPanelBody(host, p, states[2], 'aurora', states, 2);
@@ -4474,12 +4477,12 @@ test('homemap subject render: several glides release together and unchanged pain
   assert.match(markup, /data-subject="__proto__"[\s\S]*href="#i-gear"/);
   const target = JSON.parse('{"walker":{"x":120,"y":60},"__proto__":{"x":50,"y":80}}');
   core.renderPanelBody(host, p, target, 'aurora', [], 1);
-  assert.deepStrictEqual(events, ['translate(-100px,90px)', 'translate(-40px,-50px)']);
+  assert.deepStrictEqual(events, ['translate(-100px,108px)', 'translate(-40px,-60px)']);
   assert.match(markup, /hmsubjectdot" cx="120" cy="60"/);
   assert.doesNotMatch(host._lastHTML, /transform:translate/);
   assert.strictEqual(raf.length, 1);
   raf.shift()();
-  assert.strictEqual(nodes[0].style.transform, 'translate(-100px,90px)', 'release waits for second rAF');
+  assert.strictEqual(nodes[0].style.transform, 'translate(-100px,108px)', 'release waits for second rAF');
   raf.shift()();
   assert.ok(nodes.every(node => node.style.transform === 'translate(0,0)'));
   core.renderPanelBody(host, p, target, 'aurora', [], 1);

@@ -260,7 +260,7 @@ test('subject trails connect only visible animated moves and never survive hidin
   const panel = diagram(fixture()).panels[0], host = {querySelector:()=>null};
   const draw = (value, animate=true) => C.renderPanelBody(host, panel, {visitor:value}, 'pastel', [], 0, animate);
   draw({x:20,y:30}); assert.doesNotMatch(host.innerHTML, /class="hmtrail"/);
-  draw({x:80,y:90}); assert.match(host.innerHTML, /class="hmtrail" d="M20 30 L80 90"/);
+  draw({x:80,y:90}); assert.match(host.innerHTML, /class="hmtrail" d="M20 36 L80 108"/);
   assert.doesNotMatch(host._lastHTML, /class="hmtrail"/);
   draw(null); assert.doesNotMatch(host.innerHTML, /hmtrail|data-subject=/);
   draw({x:100,y:120}); assert.doesNotMatch(host.innerHTML, /class="hmtrail"/);
@@ -270,4 +270,24 @@ test('subject trails connect only visible animated moves and never survive hidin
     draw({x:200,y:120}); assert.doesNotMatch(host.innerHTML, /class="hmtrail"/);
     assert.match(host.innerHTML, /class="hmsubjectdot" cx="200" cy="120"/);
   } finally { C.RM = oldMotion; }
+});
+
+test('taller Home display preserves spec coordinates and inversely maps placement without stretching markers', () => {
+  const spec = fixture(), panel = diagram(spec).panels[0], before = JSON.stringify(spec);
+  const host = {querySelector:()=>null};
+  C.renderPanelBody(host, panel, {}, 'pastel', [], 0, false);
+  assert.match(host.innerHTML, /viewBox="0 0 320 216"/);
+  assert.match(host.innerHTML, /data-device="door" transform="translate\(0 18\.000\)"/);
+  assert.match(host.innerHTML, /class="hmmarker" cx="102" cy="90" r="8\.5"/);
+  assert.match(host.innerHTML, /transform="translate\(0 26\.000\)"><g class="hmsubject" data-subject="visitor"/);
+  assert.equal(JSON.stringify(spec), before, 'display projection never rewrites authored geometry');
+  for (const [display, expected] of [
+    [{x:0,y:0},{x:0,y:0}], [{x:102,y:108},{x:102,y:90}],
+    [{x:35,y:156},{x:35,y:130}], [{x:320,y:216},{x:320,y:180}],
+    [{x:-20,y:-10},{x:0,y:0}], [{x:350,y:260},{x:320,y:180}]
+  ]) assert.deepEqual(plain(C.homemapPointFromDisplay(display)),expected);
+  const moved = C.planHomemapLayoutPosition(JSON.stringify(spec),spec,0,'home','device','door',C.homemapPointFromDisplay({x:120,y:144}));
+  assert.ok(!moved.error,moved.error);
+  const door = diagram(JSON.parse(moved.text)).panels[0].devices.find(d=>d.id==='door');
+  assert.deepEqual({x:door.x,y:door.y},{x:120,y:120}, 'drag destination stays in the original authoring frame');
 });

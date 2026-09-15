@@ -7,6 +7,8 @@ a different diagram or schema version.
 
 This fictional home story places a visitor, shows a detection, then opens
 the door. Geometry is illustration in a 320×180 frame, not physical units.
+The taller rendered tile automatically maps that geometry; keep spec positions
+in 320×180 and let the editor convert drag/tap placement back into that frame.
 
 ```json
 {

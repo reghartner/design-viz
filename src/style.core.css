@@ -476,8 +476,8 @@
 /* Doorbell perspective: runners recede down the path, then turn along the
    sidewalk. Finite tracks leave an empty porch without replaying the event.
    Base poses are mid-run stills for print and reduced motion. */
-.screenbox .doorbell-runner{--runner-shirt:#E4A06B;--runner-sleeve:#BB7554;--runner-delay:0s;transform-origin:0 0;transform:translate(143px,125px) scale(.78);}
-.screenbox .doorbell-runner-second{--runner-shirt:#6ABCB3;--runner-sleeve:#448C91;--runner-delay:.42s;transform:translate(186px,135px) scale(.88);}
+.screenbox .doorbell-runner{--runner-shirt:#F2A14F;--runner-sleeve:#CE753B;--runner-delay:0s;transform-origin:0 0;transform:translate(143px,125px) scale(.78);}
+.screenbox .doorbell-runner-second{--runner-shirt:#58B8DB;--runner-sleeve:#367FB5;--runner-delay:.42s;transform:translate(186px,135px) scale(.88);}
 .screenbox .doorbell-leg{transform-origin:0 -27px;transform:rotate(-12deg) scaleY(.65);}
 .screenbox .doorbell-leg-back{transform:rotate(12deg);}
 .screenbox .doorbell-arm{transform-origin:8px -46px;transform:rotate(-18deg);}
@@ -546,7 +546,7 @@
 .ovl{position:absolute; font:700 10.5px 'IBM Plex Mono',monospace; letter-spacing:.08em;}
 .offlabel{inset:0; display:flex; align-items:center; justify-content:center; color:#2E3A46;}
 .livechip{top:8px; left:8px; color:#0B1220; background:#4ADE80; padding:2px 7px; border-radius:4px;}
-.recchip{top:8px; left:8px; color:#FF6B5E; display:flex; align-items:center; gap:5px;}
+.recchip{top:8px; left:8px; color:#FFB0A6; background:rgba(8,20,35,.8); padding:3px 6px; border-radius:5px; display:flex; align-items:center; gap:5px;}
 .recdot{width:8px; height:8px; border-radius:50%; background:#FF3B30; animation:recblink 1s steps(1) infinite;}
 @keyframes recblink{50%{opacity:.15;}}
 .banner{left:0; right:0; bottom:0; text-align:center; padding:5px 0; color:#0B1220; background:#FFB454;}

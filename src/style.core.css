@@ -4290,6 +4290,21 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
 .hmroomwall{fill:none;stroke:var(--hm-surface);stroke-width:1.2;opacity:.7;}
 .hmroomlabel{font:600 5.4px 'IBM Plex Sans',system-ui,sans-serif;letter-spacing:.45px;fill:var(--hm-label);opacity:.85;}
 .hm-room-occupied .hmroom,.hm-room-alert .hmroom,.hm-room-warn .hmroom{fill:color-mix(in srgb,var(--hm-room-color) 13%,var(--hm-surface));}
+.hm-outdoor .hmroom{fill:color-mix(in srgb,var(--hm-ok) 12%,var(--hm-bg));stroke:color-mix(in srgb,var(--hm-ok) 35%,var(--hm-bg));stroke-dasharray:3 2;}
+.hm-outdoor.hm-room-occupied .hmroom,.hm-outdoor.hm-room-alert .hmroom,.hm-outdoor.hm-room-warn .hmroom{fill:color-mix(in srgb,var(--hm-room-color) 17%,color-mix(in srgb,var(--hm-ok) 10%,var(--hm-bg)));}
+.hm-outdoor .hmroomlabel{fill:var(--hm-ok);font-weight:700;letter-spacing:.7px;}
+.hm-door-threshold{fill:none;stroke:var(--hm-surface);stroke-width:7;}
+.hm-door-hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke;}
+.hm-door-arc{fill:none;stroke:currentColor;stroke-width:.7;stroke-dasharray:2 2;opacity:.5;pointer-events:none;}
+.hm-door-jamb{fill:none;stroke:var(--hm-line);stroke-width:2.4;}
+.hm-door-hinge,.hm-door-handle{fill:currentColor;}
+.hm-floor-leaf{transform-box:view-box;transform-origin:0 0;}
+.hm-floor-leaf>path{fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;}
+.hm-open .hm-floor-leaf{transform:rotate(var(--hm-door-angle));}
+.hm-floor-opening{animation:hmflooropen .65s cubic-bezier(.2,.7,.2,1) both;}
+.hm-floor-closing{animation:hmfloorclose .65s cubic-bezier(.2,.7,.2,1) both;}
+@keyframes hmflooropen{from{transform:rotate(0);}to{transform:rotate(var(--hm-door-angle));}}
+@keyframes hmfloorclose{from{transform:rotate(var(--hm-door-angle));}to{transform:rotate(0);}}
 .hmlink{fill:none;stroke:var(--hm-accent);stroke-width:1;stroke-dasharray:3 3;opacity:.7;}
 .hmlinktip{stroke-dasharray:none;stroke-linecap:round;stroke-linejoin:round;}
 .hmlinkglow{stroke-width:4;stroke-dasharray:none;opacity:.13;}

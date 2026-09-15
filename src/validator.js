@@ -539,12 +539,18 @@ function homemapRooms(panel, path, warnings){
     var valid = r && ['x','y','w','h'].every(function(k){ return isFiniteNum(r[k]); }) &&
       r.x >= 0 && r.y >= 0 && r.w > 0 && r.h > 0 && r.x + r.w <= 320 && r.y + r.h <= 180;
     if (!valid && warnings) warnings.push(path + '.rooms[' + i + ']: use a positive rectangle inside the 320×180 map — ignored');
+    if (valid && r.kind !== undefined && ['room','outdoor'].indexOf(r.kind) < 0 && warnings)
+      warnings.push(path + '.rooms[' + i + '].kind: use room or outdoor — using room');
     return valid;
   });
 }
 
 function homemapDeclarationWarnings(panel, path, warnings){
   homemapRooms(panel, path, warnings);
+  ['x','y'].forEach(function(k){
+    if (panel.outline && panel.outline[k] !== undefined && !isFiniteNum(panel.outline[k]))
+      warnings.push(path + '.outline.' + k + ': must be finite — centering this axis');
+  });
   if (panel.showSubjectLabels !== undefined && typeof panel.showSubjectLabels !== 'boolean')
     warnings.push(path + '.showSubjectLabels: expected a boolean — subject labels stay hidden');
   var devices = Object.create(null), seen = Object.create(null);
@@ -569,6 +575,15 @@ function homemapDeclarationWarnings(panel, path, warnings){
       if (d[k] !== undefined && !isFiniteNum(d[k]))
         warnings.push(dp + '.' + k + ': must be finite — default used');
     });
+    if (d.display !== undefined && (['marker','door'].indexOf(d.display) < 0 || (d.display === 'door' && d.kind !== 'entry')))
+      warnings.push(dp + '.display: use marker, or door for an entry device — using marker');
+    if (d.kind === 'entry' && d.display === 'door'){
+      ['facing','doorWidth'].forEach(function(k){
+        if (d[k] !== undefined && !isFiniteNum(d[k])) warnings.push(dp + '.' + k + ': must be finite — default used');
+      });
+      if (d.doorSwing !== undefined && (!isFiniteNum(d.doorSwing) || Math.abs(d.doorSwing) < 15 || Math.abs(d.doorSwing) > 135))
+        warnings.push(dp + '.doorSwing: use an angle from -135 to -15 or 15 to 135 — using 90');
+    }
     if (d.kind === 'sensor' && d.icon !== undefined && ICON_SET.indexOf(d.icon) < 0)
       warnings.push(dp + '.icon: unknown icon "' + d.icon + '" — using "gear"');
     if (!duplicate && homemapDeviceValid(d)) devices[d.id] = d;

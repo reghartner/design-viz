@@ -1,0 +1,63 @@
+{
+  "page": {
+    "title": "Around the whole home",
+    "skin": "pastel",
+    "sections": [{
+      "heading": "From the perimeter to the front door",
+      "text": ["A fictional home sits inside its grounds. Outdoor cameras and perimeter sensors watch the approach; indoor smoke, leak, and motion sensors keep their own state. Follow a visitor from the driveway to the front door."],
+      "diagram": {
+        "view": "step",
+        "primaryPanel": "home",
+        "nodes": {
+          "sensors": {"title": "Sensor array", "sub": "perimeter + indoors", "icon": "antenna", "tint": "dev"},
+          "cameras": {"title": "Outdoor cameras", "sub": "drive · garden · porch", "icon": "camera", "tint": "dev"},
+          "hub": {"title": "Home hub", "sub": "local event handling", "icon": "house"},
+          "cloud": {"title": "Event service", "sub": "notification delivery", "icon": "cloud"},
+          "phone": {"title": "Resident", "sub": "mobile alert", "icon": "phone"}
+        },
+        "rows": [["sensors", "cameras", "hub", "cloud", "phone"]],
+        "edges": [
+          {"from": "sensors", "to": "hub", "kind": "mqtt", "label": "sensor report"},
+          {"from": "cameras", "to": "hub", "kind": "mqtt", "label": "person"},
+          {"from": "hub", "to": "cloud", "kind": "https", "label": "event"},
+          {"from": "cloud", "to": "phone", "kind": "https", "label": "alert"}
+        ],
+        "panels": [{
+          "id": "home", "type": "homemap", "title": "The house and its grounds",
+          "outline": {"x": 77, "y": 38, "w": 166, "h": 105},
+          "rooms": [
+            {"label": "OUTSIDE · GARDEN & DRIVEWAY", "kind": "outdoor", "x": 4, "y": 4, "w": 312, "h": 172},
+            {"label": "LIVING", "x": 80, "y": 41, "w": 80, "h": 51},
+            {"label": "KITCHEN", "x": 160, "y": 41, "w": 80, "h": 51},
+            {"label": "ENTRY", "x": 80, "y": 92, "w": 80, "h": 48},
+            {"label": "UTILITY", "x": 160, "y": 92, "w": 80, "h": 48}
+          ],
+          "devices": [
+            {"id": "drive-cam", "kind": "camera", "label": "Drive cam", "x": 28, "y": 44, "facing": 90, "spread": 42, "range": 70},
+            {"id": "garden-cam", "kind": "camera", "label": "Garden cam", "x": 286, "y": 34, "facing": 95, "spread": 36, "range": 52},
+            {"id": "porch-cam", "kind": "camera", "label": "Porch cam", "x": 268, "y": 157, "facing": 178, "spread": 10, "range": 150},
+            {"id": "drive-motion", "kind": "sensor", "label": "Drive motion", "x": 29, "y": 125, "icon": "antenna"},
+            {"id": "gate", "kind": "sensor", "label": "Gate contact", "x": 287, "y": 107, "icon": "lock"},
+            {"id": "pir", "kind": "sensor", "label": "Living motion", "x": 121, "y": 64, "icon": "antenna"},
+            {"id": "smoke", "kind": "sensor", "label": "Smoke", "x": 196, "y": 64, "icon": "thermo"},
+            {"id": "leak", "kind": "sensor", "label": "Leak", "x": 212, "y": 117, "icon": "thermo"},
+            {"id": "hub", "kind": "hub", "label": "Home hub", "x": 174, "y": 111},
+            {"id": "front-door", "kind": "entry", "display": "door", "label": "Front door", "x": 109, "y": 143, "facing": 0, "doorWidth": 25, "doorSwing": -90},
+            {"id": "back-door", "kind": "entry", "display": "door", "label": "Back door", "x": 184, "y": 38, "facing": 0, "doorWidth": 23, "doorSwing": 90}
+          ],
+          "subjects": [{"id": "visitor", "label": "Visitor", "x": 29, "y": 156}],
+          "initial": {"drive-cam": "scan", "garden-cam": "scan", "porch-cam": "scan", "drive-motion": "ok", "gate": "ok", "pir": "ok", "smoke": "ok", "leak": "ok", "hub": "idle", "front-door": "closed", "back-door": "closed", "visitor": null}
+        }],
+        "steps": [
+          {"id": "quiet", "nodes": ["sensors", "cameras"], "text": "Quiet at home. Outdoor cameras scan the grounds; indoor sensors are normal and both doors are closed."},
+          {"id": "drive", "edge": "sensors->hub", "text": "A visitor enters the driveway. The motion sensor reports activity to the local hub.", "panels": {"home": {"visitor": {"x": 33, "y": 146}, "drive-motion": "warn", "drive-cam": "detect", "hub": "rx", "signals": [{"from": "drive-motion", "to": "hub"}]}}},
+          {"id": "porch", "edge": "cameras->hub", "text": "The visitor reaches the porch. The porch camera detects the person and starts recording; the garden camera keeps scanning.", "panels": {"home": {"visitor": {"x": 124, "y": 164}, "drive-cam": "scan", "drive-motion": "ok", "porch-cam": "rec", "signals": [{"from": "porch-cam", "to": "hub"}]}}},
+          {"id": "upload", "edge": "hub->cloud", "text": "The hub uploads the visitor event. Smoke and leak sensors remain normal; an outdoor event does not imply an indoor alarm.", "panels": {"home": {"hub": "tx"}}},
+          {"id": "notify", "edge": "cloud->phone", "text": "The resident receives the visitor alert. The front door is still closed.", "panels": {"home": {"hub": "idle"}}},
+          {"id": "welcome", "nodes": ["hub"], "text": "The resident opens the front door and welcomes the visitor inside. The entry door swings inward; the back door stays closed.", "panels": {"home": {"front-door": "open", "visitor": {"x": 130, "y": 116}}}},
+          {"id": "closed", "nodes": ["sensors"], "text": "The front door closes behind the visitor. Outdoor monitoring continues independently of the people inside.", "panels": {"home": {"front-door": "closed", "porch-cam": "scan"}}}
+        ]
+      }
+    }]
+  }
+}

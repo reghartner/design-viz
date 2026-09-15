@@ -139,6 +139,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Copy/share steps across paths, continue a happy ending, or detach a shared step | `docs/workbench-step-reuse.md` |
 | Open a step view paused or playing; clarify Play / Pause state | `contract/authoring-contract.md` → `view` and `autoplay` |
 | A large home map, live Home / Data flow switching, or per-step placement | `cookbook/home-story.md`, `docs/homemap-workbench.md` |
+| Outside grounds, a centered whole house, a porch/entry split, or doors in walls | `cookbook/outdoor-home.md`, `docs/homemap-workbench.md` |
 | Camera recording before an event, color clips, doorbell runners, fire, or delivery | `cookbook/camera-events.md` plus `tools/widget_doc.py screen` |
 | Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
 | A crowded editor, resizing, focus, or diagram fit controls | `docs/workbench-workspace.md` |
@@ -167,6 +168,17 @@ In the workbench, **Edit layout** on a homemap opens shared size/room/device
 settings from either view. Ambient map clicks select this layout inspector;
 step markers select per-step controls unless the layout is already selected.
 Use **Edit shared home layout** / **Edit home at current step** to switch scope.
+The shared inspector has its own drag map, available without steps: drag rooms,
+devices, doors and starting subjects; use the House grip to move the outline
+and square corners to resize it or rooms. Faded subjects stay initially hidden.
+These edits preserve all per-step overrides; numeric fields remain available.
+For outside scenes use room `kind:"outdoor"` and position the house with
+`outline:{x,y,w,h}` (omitted x/y centers). For architectural doors use entry
+`display:"door"`, hinge x/y, `facing`, `doorWidth`, and signed `doorSwing`;
+ordinary `open`/`closed`/`alert` patches control the leaf on each path. Existing
+entry markers remain unchanged. These are presentation geometry, so explicitly
+author subject movement and sensor states. The outdoor recipe includes both
+starter layouts; do not invent a separate doors array or schema version.
 
 ## 3 — The conversation: agree on what to draw
 

@@ -4315,6 +4315,21 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
 .hmroomwall{fill:none;stroke:var(--hm-surface);stroke-width:1.2;opacity:.7;}
 .hmroomlabel{font:600 5.4px 'IBM Plex Sans',system-ui,sans-serif;letter-spacing:.45px;fill:var(--hm-label);opacity:.85;}
 .hm-room-occupied .hmroom,.hm-room-alert .hmroom,.hm-room-warn .hmroom{fill:color-mix(in srgb,var(--hm-room-color) 13%,var(--hm-surface));}
+.hm-outdoor .hmroom{fill:color-mix(in srgb,var(--hm-ok) 12%,var(--hm-bg));stroke:color-mix(in srgb,var(--hm-ok) 35%,var(--hm-bg));stroke-dasharray:3 2;}
+.hm-outdoor.hm-room-occupied .hmroom,.hm-outdoor.hm-room-alert .hmroom,.hm-outdoor.hm-room-warn .hmroom{fill:color-mix(in srgb,var(--hm-room-color) 17%,color-mix(in srgb,var(--hm-ok) 10%,var(--hm-bg)));}
+.hm-outdoor .hmroomlabel{fill:var(--hm-ok);font-weight:700;letter-spacing:.7px;}
+.hm-door-threshold{fill:none;stroke:var(--hm-surface);stroke-width:7;}
+.hm-door-hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke;}
+.hm-door-arc{fill:none;stroke:currentColor;stroke-width:.7;stroke-dasharray:2 2;opacity:.5;pointer-events:none;}
+.hm-door-jamb{fill:none;stroke:var(--hm-line);stroke-width:2.4;}
+.hm-door-hinge,.hm-door-handle{fill:currentColor;}
+.hm-floor-leaf{transform-box:view-box;transform-origin:0 0;}
+.hm-floor-leaf>path{fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;}
+.hm-open .hm-floor-leaf{transform:rotate(var(--hm-door-angle));}
+.hm-floor-opening{animation:hmflooropen .65s cubic-bezier(.2,.7,.2,1) both;}
+.hm-floor-closing{animation:hmfloorclose .65s cubic-bezier(.2,.7,.2,1) both;}
+@keyframes hmflooropen{from{transform:rotate(0);}to{transform:rotate(var(--hm-door-angle));}}
+@keyframes hmfloorclose{from{transform:rotate(var(--hm-door-angle));}to{transform:rotate(0);}}
 .hmlink{fill:none;stroke:var(--hm-accent);stroke-width:1;stroke-dasharray:3 3;opacity:.7;}
 .hmlinktip{stroke-dasharray:none;stroke-linecap:round;stroke-linejoin:round;}
 .hmlinkglow{stroke-width:4;stroke-dasharray:none;opacity:.13;}
@@ -4968,12 +4983,18 @@ function homemapRooms(panel, path, warnings){
     var valid = r && ['x','y','w','h'].every(function(k){ return isFiniteNum(r[k]); }) &&
       r.x >= 0 && r.y >= 0 && r.w > 0 && r.h > 0 && r.x + r.w <= 320 && r.y + r.h <= 180;
     if (!valid && warnings) warnings.push(path + '.rooms[' + i + ']: use a positive rectangle inside the 320×180 map — ignored');
+    if (valid && r.kind !== undefined && ['room','outdoor'].indexOf(r.kind) < 0 && warnings)
+      warnings.push(path + '.rooms[' + i + '].kind: use room or outdoor — using room');
     return valid;
   });
 }
 
 function homemapDeclarationWarnings(panel, path, warnings){
   homemapRooms(panel, path, warnings);
+  ['x','y'].forEach(function(k){
+    if (panel.outline && panel.outline[k] !== undefined && !isFiniteNum(panel.outline[k]))
+      warnings.push(path + '.outline.' + k + ': must be finite — centering this axis');
+  });
   if (panel.showSubjectLabels !== undefined && typeof panel.showSubjectLabels !== 'boolean')
     warnings.push(path + '.showSubjectLabels: expected a boolean — subject labels stay hidden');
   var devices = Object.create(null), seen = Object.create(null);
@@ -4998,6 +5019,15 @@ function homemapDeclarationWarnings(panel, path, warnings){
       if (d[k] !== undefined && !isFiniteNum(d[k]))
         warnings.push(dp + '.' + k + ': must be finite — default used');
     });
+    if (d.display !== undefined && (['marker','door'].indexOf(d.display) < 0 || (d.display === 'door' && d.kind !== 'entry')))
+      warnings.push(dp + '.display: use marker, or door for an entry device — using marker');
+    if (d.kind === 'entry' && d.display === 'door'){
+      ['facing','doorWidth'].forEach(function(k){
+        if (d[k] !== undefined && !isFiniteNum(d[k])) warnings.push(dp + '.' + k + ': must be finite — default used');
+      });
+      if (d.doorSwing !== undefined && (!isFiniteNum(d.doorSwing) || Math.abs(d.doorSwing) < 15 || Math.abs(d.doorSwing) > 135))
+        warnings.push(dp + '.doorSwing: use an angle from -135 to -15 or 15 to 135 — using 90');
+    }
     if (d.kind === 'sensor' && d.icon !== undefined && ICON_SET.indexOf(d.icon) < 0)
       warnings.push(dp + '.icon: unknown icon "' + d.icon + '" — using "gear"');
     if (!duplicate && homemapDeviceValid(d)) devices[d.id] = d;
@@ -8265,6 +8295,8 @@ function homemapModel(panel, state){
   var box = panel.outline || {};
   var w = fin(box.w) != null ? clamp(box.w, 20, 320) : 300;
   var h = fin(box.h) != null ? clamp(box.h, 20, 180) : 160;
+  var ox = fin(box.x) != null ? clamp(box.x, 0, 320 - w) : (320 - w) / 2;
+  var oy = fin(box.y) != null ? clamp(box.y, 0, 180 - h) : (180 - h) / 2;
   var byId = Object.create(null), seen = Object.create(null), devices = [];
   (Array.isArray(panel.devices) ? panel.devices : []).forEach(function(d){
     if (!d || typeof d.id !== 'string' || seen[d.id]) return;
@@ -8272,13 +8304,19 @@ function homemapModel(panel, state){
     if (!homemapDeviceValid(d)) return;
     var vocab = HOMEMAP_STATES[d.kind];
     var x = clamp(d.x, 0, 320), y = clamp(d.y, 0, 180);
-    var facing = fin(d.facing) != null ? d.facing : Math.atan2(90 - y, 160 - x) * 180 / Math.PI;
+    var floorDoor = d.kind === 'entry' && d.display === 'door';
+    var facing = fin(d.facing) != null ? d.facing : floorDoor ? 0 : Math.atan2(90 - y, 160 - x) * 180 / Math.PI;
     var item = {id: d.id, kind: d.kind, label: String(d.label != null ? d.label : d.id),
       x: x, y: y, state: Object.prototype.hasOwnProperty.call(state, d.id) && vocab.indexOf(state[d.id]) >= 0 ? state[d.id] : vocab[0],
       icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
       facing: ((facing % 360) + 360) % 360,
       spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
       range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70};
+    if (floorDoor){
+      item.display = 'door';
+      item.doorWidth = fin(d.doorWidth) != null ? clamp(d.doorWidth, 8, 48) : 24;
+      item.doorSwing = fin(d.doorSwing) != null && Math.abs(d.doorSwing) >= 15 && Math.abs(d.doorSwing) <= 135 ? d.doorSwing : 90;
+    }
     byId[d.id] = item; devices.push(item);
   });
   var subjects = homemapSubjects(panel).map(function(sub){
@@ -8295,7 +8333,7 @@ function homemapModel(panel, state){
     if (from && to) signals.push({from: sig.from, to: sig.to,
       fromXY: {x: from.x, y: from.y}, toXY: {x: to.x, y: to.y}});
   });
-  return {outline: {x: (320 - w) / 2, y: (180 - h) / 2, w: w, h: h}, devices: devices, subjects: subjects, signals: signals};
+  return {outline: {x: ox, y: oy, w: w, h: h}, devices: devices, subjects: subjects, signals: signals};
 }
 
 /* Room lighting is a view of the authored scene, not a simulated sensor or
@@ -8303,6 +8341,9 @@ function homemapModel(panel, state){
 function homemapRoomModel(panel, model){
   return homemapRooms(panel).map(function(room){
     function inside(item){
+      var house = model.outline;
+      if (room.kind === 'outdoor' && item.x > house.x && item.x < house.x + house.w &&
+          item.y > house.y && item.y < house.y + house.h) return false;
       return item.x >= room.x && item.y >= room.y &&
         (item.x < room.x + room.w || (item.x === 320 && room.x + room.w === 320)) &&
         (item.y < room.y + room.h || (item.y === 180 && room.y + room.h === 180));
@@ -8313,6 +8354,27 @@ function homemapRoomModel(panel, model){
       devices.some(function(d){ return d.state === 'warn'; }) ? 'warn' : occupied ? 'occupied' : 'quiet';
     return {room:room, tone:tone};
   });
+}
+
+function homemapDoorHTML(d, transition, outline){
+  var w = d.doorWidth, angle = d.doorSwing * Math.PI / 180;
+  var endX = (w * Math.cos(angle)).toFixed(3), endY = (w * Math.sin(angle)).toFixed(3);
+  var body = '<g class="hmdev hm-entry hm-' + esc(d.state) + ' hm-floor-door" data-device="' + esc(d.id) + '">' +
+    '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>' +
+    '<g transform="translate(' + d.x + ' ' + (d.y * HOMEMAP_Y_SCALE) + ') scale(1 ' + HOMEMAP_Y_SCALE + ') rotate(' + d.facing + ')">' +
+    '<path class="hm-door-threshold" d="M-1 0 H' + (w + 1) + '"/>' +
+    '<path class="hm-door-hit" d="M0 0 H' + w + ' M' + w + ' 0 A' + w + ' ' + w + ' 0 0 ' + (d.doorSwing > 0 ? 1 : 0) + ' ' + endX + ' ' + endY + '"/>' +
+    '<path class="hm-door-arc" d="M' + w + ' 0 A' + w + ' ' + w + ' 0 0 ' + (d.doorSwing > 0 ? 1 : 0) + ' ' + endX + ' ' + endY + '"/>' +
+    '<g class="hm-floor-leaf' + (transition ? ' hm-floor-' + transition : '') + '" style="--hm-door-angle:' + d.doorSwing + 'deg">' +
+    '<path d="M0 0 H' + w + '"/><circle class="hm-door-handle" cx="' + (w - 4) + '" cy="-2" r="1"/></g>' +
+    '<path class="hm-door-jamb" d="M0 -3 V3 M' + w + ' -3 V3"/><circle class="hm-door-hinge" r="1.8"/></g>';
+  var labelX = d.x, labelY = d.y > 139 ? d.y * HOMEMAP_Y_SCALE - 14 : d.y * HOMEMAP_Y_SCALE + 16;
+  var direction = d.facing * Math.PI / 180;
+  if (outline && Math.abs(Math.cos(direction)) > .7){
+    labelX += w * Math.cos(direction) / 2;
+    labelY = (d.y + w * Math.sin(direction) / 2) * HOMEMAP_Y_SCALE + (d.y < outline.y + outline.h / 2 ? -14 : 14);
+  }
+  return body + '<text class="hmlbl" x="' + clamp(labelX, 28, 292) + '" y="' + clamp(labelY, 10, HOMEMAP_DISPLAY_HEIGHT - 5) + '" text-anchor="middle">' + esc(d.label) + '</text></g>';
 }
 
 function radarModel(panel, state){
@@ -9721,15 +9783,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       var o = hm.outline;
       var sy = HOMEMAP_Y_SCALE;
       var s = '<svg class="hmframe" viewBox="0 0 320 ' + HOMEMAP_DISPLAY_HEIGHT + '" role="img" aria-label="' + esc(panel.title || 'Home device map') + '">';
+      var spaces = homemapRoomModel(panel, hm);
+      function drawSpace(space){
+        var room = space.room, outdoor = room.kind === 'outdoor';
+        s += '<g class="hmspace hm-room-' + space.tone + (outdoor ? ' hm-outdoor' : '') + '" data-home-room="' + panel.rooms.indexOf(room) + '">';
+        s += '<rect class="hmroom" x="' + room.x + '" y="' + (room.y * sy) + '" width="' + room.w + '" height="' + (room.h * sy) + '" rx="2"/>';
+        if (!outdoor) s += '<path class="hmroomwall" d="M' + (room.x + 2) + ' ' + ((room.y + room.h) * sy - 2) + ' V' + (room.y * sy + 2) + ' H' + (room.x + room.w - 2) + '"/>';
+        s += '<text class="hmroomlabel" x="' + (room.x + 6) + '" y="' + (room.y * sy + 10) + '">' + esc(room.label || '') + '</text></g>';
+      }
+      spaces.filter(function(space){return space.room.kind === 'outdoor';}).forEach(drawSpace);
       s += '<rect class="hmfoundation" x="' + o.x + '" y="' + (o.y * sy + 2) + '" width="' + o.w + '" height="' + (o.h * sy) + '" rx="9"/>';
       s += '<rect class="hmoutline" x="' + o.x + '" y="' + (o.y * sy) + '" width="' + o.w + '" height="' + (o.h * sy) + '" rx="9"/>';
-      homemapRoomModel(panel, hm).forEach(function(space){
-        var room = space.room;
-        s += '<g class="hmspace hm-room-' + space.tone + '" data-home-room="' + panel.rooms.indexOf(room) + '">';
-        s += '<rect class="hmroom" x="' + room.x + '" y="' + (room.y * sy) + '" width="' + room.w + '" height="' + (room.h * sy) + '" rx="2"/>' +
-          '<path class="hmroomwall" d="M' + (room.x + 2) + ' ' + ((room.y + room.h) * sy - 2) + ' V' + (room.y * sy + 2) + ' H' + (room.x + room.w - 2) + '"/>' +
-          '<text class="hmroomlabel" x="' + (room.x + 6) + '" y="' + (room.y * sy + 10) + '">' + esc(room.label || '') + '</text></g>';
-      });
+      spaces.filter(function(space){return space.room.kind !== 'outdoor';}).forEach(drawSpace);
       if (transient && hmHasMoved) hm.subjects.forEach(function(sub){
         if (!hmMoved[sub.id]) return;
         var prev = hmSubjPrev[sub.id];
@@ -9767,6 +9832,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
         s += '</g>';
       });
       hm.devices.forEach(function(d){
+        if (d.display === 'door'){ s += homemapDoorHTML(d, transient ? hmDoors[d.id] : null, hm.outline); return; }
         s += '<g class="hmdev hm-' + esc(d.kind) + ' hm-' + esc(d.state) + '" data-device="' + esc(d.id) + '" transform="translate(0 ' + (d.y * (sy - 1)).toFixed(3) + ')">' +
           '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>';
         s += '<circle class="hmdevice-aura" cx="' + d.x + '" cy="' + d.y + '" r="13"/>';

@@ -100,7 +100,10 @@ function harness(raw=fixture()){
   ui=c.initWorkbenchStepList({src,view:elements.view,renderedText:()=>rendered,selection:()=>target,locked:()=>locked,
     path:()=>activePath,selectPath(section,id){activePath=id;target=null;},
     inspect(){ inspections.push(target); },
-    configure(plan){ history.push(src.value); src.value=plan.text; rendered=src.value; return true; },
+    configure(plan,section){
+      if(target && target.section!==section) target=null;
+      history.push(src.value); src.value=plan.text; rendered=src.value; return true;
+    },
     navigate(entry){ navigation.push(entry); target=entry.target; ui.sync(); },
     apply(plan,section){ history.push(src.value); src.value=plan.text; rendered=src.value;
       if(plan.pathId) activePath=plan.pathId;
@@ -135,6 +138,16 @@ test('playback settings refuse stale source and locked edits, and ambient-only d
   h.lock(false);h.src.value+=' ';auto.checked=true;auto.fire('change');assert.equal(h.history.length,0);assert.equal(auto.checked,false);
   h.render();opening.value='ambient-only';opening.fire('change');assert.equal(auto.disabled,true);
   opening.value='step';opening.fire('change');assert.equal(auto.disabled,false);
+});
+
+test('playback settings stay on the chosen section when the last inspected step belongs elsewhere',()=>{
+  const raw=fixture();raw.page.blocks[0].diagram={nodes:{n:{}},rows:[['n']],steps:[{text:'Introduction'}]};
+  const h=harness(raw);h.select(1);
+  h.e['steps-section'].value='0';h.e['steps-section'].fire('change');
+  h.e['steps-autoplay'].checked=true;h.e['steps-autoplay'].fire('change');
+  assert.equal(h.e['steps-section'].value,'0');assert.equal(h.target,null);
+  const saved=JSON.parse(h.src.value);
+  assert.equal(saved.page.blocks[0].diagram.autoplay,true);assert.equal(dOf(saved).autoplay,undefined);
 });
 
 test('Inspect requires a current selected step and refuses stale source or unfinished builder actions',()=>{

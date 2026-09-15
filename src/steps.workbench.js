@@ -53,7 +53,7 @@ function initWorkbenchStepList(opts){
     if (!ready() || !chosen){ playbackSettings(); return; }
     var plan = planSetField(indexedText, raw, chosen.path, key, JSON.stringify(value));
     if (plan.error){ status.textContent = plan.error; playbackSettings(); return; }
-    if (opts.configure && opts.configure(plan)) refresh(); else playbackSettings();
+    if (opts.configure && opts.configure(plan, chosen.section)) refresh(); else playbackSettings();
   }
   if (autoplayInput) autoplayInput.addEventListener('change', function(){ configurePlayback('autoplay', autoplayInput.checked); });
   if (openingView) openingView.addEventListener('change', function(){ configurePlayback('view', openingView.value); });

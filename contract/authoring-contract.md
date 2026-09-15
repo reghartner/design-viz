@@ -495,21 +495,27 @@ perspectives" of one timeline). Types:
 - `screen` — a camera viewfinder: `{"id":"cam","type":"screen",
   "scene":"person-at-door-night","initial":{"mode":"off"}}`. Patched via
   `{"mode":"off|boot|live|rec|save", "banner":"<save-banner text>"}`. Stock
-  scenes: `person-at-door-night`, `person-through-door`, `package-drop`,
-  `kitchen-fire`, `static-noise`. `rec` shows
+  scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`,
+  `doorbell-runners`, `package-drop`, `kitchen-fire`, `static-noise`. `rec` shows
   a blinking REC dot; `save` shows the banner. Scenes
   animate while shown: `person-at-door-night` walks a figure in;
   `package-drop` plays a delivery (courier walks in carrying a box, the
   package lands, the courier leaves; reduced motion shows the delivered
   package only). `person-through-door` plays a 6.8-second entry: a person
   approaches, the door swings open, they cross the threshold, and it closes.
+  `doorbell-run-away` shows one person sprinting away from a wide-angle doorbell
+  camera, shrinking down the front path and turning along the sidewalk.
+  `doorbell-runners` shows two people in different colors, with staggered
+  strides, splitting left and right at the sidewalk. Both are one-shot clips
+  lasting about eight seconds; the porch stays empty afterward. Reduced motion
+  and print show a mid-run still. The Screen scene picker previews both clips.
   `kitchen-fire` loops layered flames, rising smoke, embers, and reflected
   light around a stove. These are simulated SVG clips, with no video assets
   or external requests. Reduced motion and print hold a readable still of
   the entry or fire. LIVE → REC → SAVE preserves the same clip's animation;
   returning from OFF/BOOT restarts it. A different scene replaces the clip.
   Scene timing is independent of recording: patch `scenePlayback:"waiting"`
-  to show the quiet setting before an event (empty doorway, no delivered
+  to show the quiet setting before an event (empty doorway or porch, no delivered
   package, or a kitchen without fire/smoke). Set `mode:"rec"` in that same
   step or earlier; the REC indicator runs while the scene waits. In a later
   step, patch only `scenePlayback:"playing"` to start the clip while recording

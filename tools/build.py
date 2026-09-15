@@ -21,7 +21,7 @@ STARTERS = [
     ("home story", "A large home scene with rooms, a visitor, local signals, and an internet outage alternate.", "starters/homemap-story.json"),
     ("alternate paths", "One shared command diagram: happy path or a dropped signal after step 3.", "starters/alternate-paths.json"),
     ("blank flow", "Three nodes and two hops to make your own.", "starters/minimal.json"),
-    ("screen clips", "Record an empty doorway or quiet kitchen, then trigger the event in a later step.", "starters/screen-clips.json"),
+    ("screen clips", "Doorbell runners, a visitor, or a kitchen fire: start recording, then trigger the event.", "starters/screen-clips.json"),
     ("panel showcase", "Five panels updated across four steps.", "starters/panels-tour.json"),
     ("software & IoT", "Data state, decision checks, and resource budgets across two design stories.", "starters/software-systems.json"),
     ("retries & circuits", "Bounded retry success, deadline admission, and open/half-open recovery across three scenarios.", "starters/resilience.json"),

@@ -1209,14 +1209,72 @@ function resolveHashTarget(st, manifest){
 }
 
 /* ---------------- stock scenes for the screen widget ---------------- */
+function doorbellRunScene(pair){
+  /* Fixed artwork shared by the two stock clips. Local coordinates put each
+     runner's feet at the origin, so distance scales the whole stride/shadow.
+     No SVG IDs: multiple doorbells can play independently on the same page. */
+  function runner(second){
+    return '<g class="doorbell-runner' + (second ? ' doorbell-runner-second' : '') + '">' +
+      '<ellipse cx="0" cy="1" rx="13" ry="3" fill="#152B30" opacity=".28"/>' +
+      '<g class="doorbell-bounce" stroke-linecap="round" stroke-linejoin="round">' +
+      '<g fill="none" stroke="#243D50" stroke-width="6">' +
+      '<path class="doorbell-leg doorbell-leg-back" d="M-4-27L-10-14L-5-2"/>' +
+      '<path class="doorbell-leg" d="M4-27L11-16L7-3"/>' +
+      '</g><g fill="none" stroke="var(--runner-sleeve)" stroke-width="6">' +
+      '<path class="doorbell-arm doorbell-arm-back" d="M-8-46L-16-34L-20-42"/>' +
+      '<path class="doorbell-arm" d="M8-46L17-35L21-42"/>' +
+      '</g><path d="M-8-49Q0-53 8-49L10-28Q0-24-10-28Z" fill="var(--runner-shirt)"/>' +
+      '<path d="M-6-49Q0-38 6-49" fill="var(--runner-sleeve)"/>' +
+      '<path d="M0-40V-30" stroke="var(--runner-sleeve)" stroke-width="1.2" opacity=".55"/>' +
+      '<path d="M-7-29Q0-26 7-29" fill="none" stroke="var(--runner-sleeve)" stroke-width="2"/>' +
+      '<path d="M0-54V-51" stroke="#C49070" stroke-width="6"/>' +
+      '<circle cx="0" cy="-61" r="8" fill="#D7A27E"/>' +
+      '<path d="M-8-60Q-10-72 0-72Q10-71 8-60L5-55H-5Z" fill="#293237"/>' +
+      '</g></g>';
+  }
+  return '<svg viewBox="0 0 320 180" class="scene scene-doorbell" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#8FAEB8"/>' +
+    '<path d="M24 54Q72 49 112 55T226 53T306 51V85H24Z" fill="#587D75"/>' +
+    '<path d="M43 61L84 35L127 60Z" fill="#365564"/>' +
+    '<path d="M51 60H118V84H51Z" fill="#D0C4AC"/>' +
+    '<path d="M62 66H76V77H62ZM91 65H106V78H91Z" fill="#557580"/>' +
+    '<path d="M68 66V77M98 65V78" stroke="#DDE0CF" stroke-width="1.4"/>' +
+    '<path d="M206 63L244 38L281 63Z" fill="#43606A"/>' +
+    '<path d="M213 62H274V84H213Z" fill="#B4C0B0"/>' +
+    '<path d="M225 68H239V79H225ZM249 68H263V79H249Z" fill="#527784"/>' +
+    '<path d="M31 82Q160 76 290 82V98Q160 92 31 98Z" fill="#516570"/>' +
+    '<path d="M40 87Q160 81 280 87" fill="none" stroke="#D2CCAD" stroke-width="1" stroke-dasharray="16 18" opacity=".65"/>' +
+    '<path d="M22 99Q160 91 300 99L315 149H5Z" fill="#73947C"/>' +
+    '<path d="M23 97Q160 89 297 97L299 103Q160 94 21 103Z" fill="#B8B8A6"/>' +
+    '<path d="M156 99H184L219 148H106Z" fill="#C9C7B2"/>' +
+    '<path d="M145 114H195M128 134H210" fill="none" stroke="#A1AA98" stroke-width="1"/>' +
+    '<path d="M0 148Q160 136 320 148V180H0Z" fill="#AA9B83"/>' +
+    '<path d="M0 158Q160 146 320 158M64 145L41 180M248 145L273 180" fill="none" stroke="#D6C8AF" stroke-width="1.5" opacity=".65"/>' +
+    '<path d="M101 171Q158 167 215 171L222 180H94Z" fill="#615E50"/>' +
+    '<path d="M42 134L38 93M43 112L54 101" fill="none" stroke="#5D7360" stroke-width="4"/>' +
+    '<g fill="#466F60"><ellipse cx="36" cy="88" rx="20" ry="16"/><ellipse cx="52" cy="98" rx="17" ry="13"/>' +
+    '<ellipse cx="279" cy="117" rx="25" ry="14"/><ellipse cx="290" cy="104" rx="20" ry="16"/></g>' +
+    runner(false) + (pair ? runner(true) : '') +
+    /* Door-frame edges and bowed porch roof suggest the wide doorbell lens. */
+    '<path d="M0 0H320V13Q160-2 0 13Z" fill="#273D44"/>' +
+    '<path d="M0 0H15Q24 89 14 180H0ZM320 0H305Q297 90 308 180H320Z" fill="#3E575A"/>' +
+    '<path d="M9 18Q17 90 9 166M312 19Q306 90 314 166" fill="none" stroke="#80958A" stroke-width="2" opacity=".55"/>' +
+    '<path d="M0 0H45Q3 15 0 49ZM320 0H275Q317 15 320 49ZM0 180V139Q6 171 41 180ZM320 180V139Q314 171 279 180Z" fill="#11272F" opacity=".25"/>' +
+    '<text x="293" y="171" text-anchor="end" fill="#F4EEDC" opacity=".85" font-family="monospace" font-size="5" letter-spacing="1">FRONT DOOR · DEMO</text>' +
+    '</svg>';
+}
 var SCENE_LABELS = {
   'person-at-door-night': 'Visitor at night',
   'person-through-door': 'Person walking through a door',
+  'doorbell-run-away': 'Doorbell: person running away',
+  'doorbell-runners': 'Doorbell: two people running away',
   'package-drop': 'Package delivery',
   'kitchen-fire': 'Kitchen fire',
   'static-noise': 'Static noise'
 };
 var SCENES = {
+  'doorbell-run-away': doorbellRunScene(false),
+  'doorbell-runners': doorbellRunScene(true),
   'person-at-door-night':
     '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
     '<rect width="320" height="180" fill="#0A0F14"/>' +

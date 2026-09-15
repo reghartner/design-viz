@@ -4,6 +4,248 @@
     "skin": "pastel",
     "sections": [
       {
+        "heading": "Running from the doorbell",
+        "text": [
+          "A wide-angle view looking out from the front door. Step 3 records the empty porch; step 4 starts the run. Return to 3, then 4, to replay."
+        ],
+        "diagram": {
+          "primaryPanel": "camera-view",
+          "view": "step",
+          "nodes": {
+            "camera": {
+              "title": "Doorbell",
+              "icon": "doorbell",
+              "tint": "dev"
+            },
+            "detector": {
+              "title": "Person detector",
+              "icon": "chip",
+              "tint": "mqtt"
+            },
+            "phone": {
+              "title": "Phone",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "detector",
+              "phone"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "detector",
+              "kind": "int",
+              "label": "frames"
+            },
+            {
+              "from": "detector",
+              "to": "phone",
+              "kind": "https",
+              "label": "event"
+            }
+          ],
+          "panels": [
+            {
+              "id": "camera-view",
+              "type": "screen",
+              "title": "Front door camera",
+              "scene": "doorbell-run-away",
+              "initial": {
+                "mode": "off",
+                "scenePlayback": "waiting"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "standby",
+              "nodes": [
+                "camera"
+              ],
+              "text": "Camera in standby. The event has not happened yet.",
+              "panels": {
+                "camera-view": {
+                  "mode": "off",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "live",
+              "edge": "camera->detector",
+              "text": "Live frames show the quiet setting before the event.",
+              "panels": {
+                "camera-view": {
+                  "mode": "live"
+                }
+              }
+            },
+            {
+              "id": "record",
+              "text": "Recording has begun. The scene is still quiet.",
+              "panels": {
+                "camera-view": {
+                  "mode": "rec"
+                }
+              },
+              "nodes": [
+                "camera"
+              ]
+            },
+            {
+              "id": "event",
+              "edge": "detector->phone",
+              "text": "A person sprints away from the porch, down the path, and out along the sidewalk. The doorbell is already recording.",
+              "panels": {
+                "camera-view": {
+                  "scenePlayback": "playing"
+                }
+              }
+            },
+            {
+              "id": "save",
+              "nodes": [
+                "camera",
+                "phone"
+              ],
+              "text": "Keep the clip with the event for later review.",
+              "panels": {
+                "camera-view": {
+                  "mode": "save",
+                  "banner": "EVENT CLIP SAVED"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "heading": "Two people running away",
+        "text": [
+          "A wide-angle view looking out from the front door. Step 3 records the empty porch; step 4 starts the run. Return to 3, then 4, to replay."
+        ],
+        "diagram": {
+          "primaryPanel": "camera-view",
+          "view": "step",
+          "nodes": {
+            "camera": {
+              "title": "Doorbell",
+              "icon": "doorbell",
+              "tint": "dev"
+            },
+            "detector": {
+              "title": "Person detector",
+              "icon": "chip",
+              "tint": "mqtt"
+            },
+            "phone": {
+              "title": "Phone",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "detector",
+              "phone"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "detector",
+              "kind": "int",
+              "label": "frames"
+            },
+            {
+              "from": "detector",
+              "to": "phone",
+              "kind": "https",
+              "label": "event"
+            }
+          ],
+          "panels": [
+            {
+              "id": "camera-view",
+              "type": "screen",
+              "title": "Front door camera",
+              "scene": "doorbell-runners",
+              "initial": {
+                "mode": "off",
+                "scenePlayback": "waiting"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "standby",
+              "nodes": [
+                "camera"
+              ],
+              "text": "Camera in standby. The event has not happened yet.",
+              "panels": {
+                "camera-view": {
+                  "mode": "off",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "live",
+              "edge": "camera->detector",
+              "text": "Live frames show the quiet setting before the event.",
+              "panels": {
+                "camera-view": {
+                  "mode": "live"
+                }
+              }
+            },
+            {
+              "id": "record",
+              "text": "Recording has begun. The scene is still quiet.",
+              "panels": {
+                "camera-view": {
+                  "mode": "rec"
+                }
+              },
+              "nodes": [
+                "camera"
+              ]
+            },
+            {
+              "id": "event",
+              "edge": "detector->phone",
+              "text": "Two people run from the porch, then split in opposite directions along the sidewalk. The doorbell captures the whole event.",
+              "panels": {
+                "camera-view": {
+                  "scenePlayback": "playing"
+                }
+              }
+            },
+            {
+              "id": "save",
+              "nodes": [
+                "camera",
+                "phone"
+              ],
+              "text": "Keep the clip with the event for later review.",
+              "panels": {
+                "camera-view": {
+                  "mode": "save",
+                  "banner": "EVENT CLIP SAVED"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
         "heading": "Someone comes home",
         "text": [
           "Step 2 shows the quiet scene. Step 3 begins recording; step 4 triggers the event while REC stays on. Return to step 3, then 4, to replay the event."

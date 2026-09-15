@@ -1,0 +1,58 @@
+{
+  "page": {
+    "title": "Outside, inside, and the front door",
+    "skin": "pastel",
+    "sections": [{
+      "heading": "At the threshold",
+      "text": ["A fictional doorbell story, with the porch outside on the left and the entry inside on the right. Follow the visitor through the door, or choose Leave outside to keep the door closed and leave a parcel on the porch."],
+      "diagram": {
+        "view": "step", "primaryPanel": "home",
+        "nodes": {
+          "doorbell": {"title": "Doorbell", "sub": "porch camera", "icon": "doorbell", "tint": "dev"},
+          "hub": {"title": "Home hub", "sub": "local events", "icon": "house"},
+          "phone": {"title": "Resident", "sub": "visitor notification", "icon": "phone"},
+          "door": {"title": "Front door", "sub": "physical entry", "icon": "lock", "tint": "dev"}
+        },
+        "rows": [["doorbell", "hub", "phone", "door"]],
+        "edges": [
+          {"from": "doorbell", "to": "hub", "kind": "mqtt", "label": "person detected"},
+          {"from": "hub", "to": "phone", "kind": "https", "label": "visitor alert"},
+          {"from": "door", "to": "hub", "kind": "mqtt", "label": "door contact"}
+        ],
+        "panels": [{
+          "id": "home", "type": "homemap", "title": "Across the front door",
+          "outline": {"x": 164, "y": 10, "w": 150, "h": 160},
+          "rooms": [
+            {"label": "OUTSIDE · FRONT PORCH", "kind": "outdoor", "x": 6, "y": 10, "w": 151, "h": 160},
+            {"label": "INSIDE · ENTRY", "x": 167, "y": 13, "w": 144, "h": 154}
+          ],
+          "devices": [
+            {"id": "cam", "kind": "camera", "label": "Doorbell cam", "x": 133, "y": 44, "facing": 145, "spread": 55, "range": 95},
+            {"id": "front-door", "kind": "entry", "display": "door", "label": "Front door", "x": 164, "y": 108, "facing": 270, "doorWidth": 30, "doorSwing": 90},
+            {"id": "hub", "kind": "hub", "label": "Home hub", "x": 267, "y": 54},
+            {"id": "inside-motion", "kind": "sensor", "label": "Entry motion", "x": 267, "y": 139, "icon": "antenna"}
+          ],
+          "subjects": [
+            {"id": "visitor", "label": "Visitor", "x": 34, "y": 133},
+            {"id": "parcel", "label": "Parcel", "icon": "package", "x": 119, "y": 126}
+          ],
+          "initial": {"cam": "scan", "front-door": "closed", "hub": "idle", "inside-motion": "ok", "visitor": null, "parcel": null}
+        }],
+        "steps": [
+          {"id": "quiet", "nodes": ["doorbell", "door"], "text": "An empty porch. The front door separates outside from inside and remains closed."},
+          {"id": "approach", "edge": "doorbell->hub", "text": "A visitor approaches on the porch. The doorbell detects the person and reports to the hub.", "panels": {"home": {"visitor": {"x": 84, "y": 105}, "cam": "detect", "hub": "rx", "signals": [{"from": "cam", "to": "hub"}]}}},
+          {"id": "notify", "edge": "hub->phone", "text": "The resident receives the notification while the visitor waits outside. Recording begins; the door is still closed.", "panels": {"home": {"visitor": {"x": 128, "y": 92}, "cam": "rec", "hub": "tx"}}},
+          {"id": "open", "nodes": ["door"], "text": "The resident opens the front door inward. The visitor waits on the outside of the threshold.", "panels": {"home": {"front-door": "open", "hub": "idle"}}},
+          {"id": "cross", "nodes": ["door", "hub"], "text": "The visitor crosses the open threshold into the entry. The indoor motion sensor now reports activity.", "panels": {"home": {"visitor": {"x": 219, "y": 94}, "inside-motion": "warn", "hub": "rx", "signals": [{"from": "inside-motion", "to": "hub"}]}}},
+          {"id": "close", "edge": "door->hub", "text": "The door closes behind the visitor and the contact reports closed. The porch is outside; the visitor is now inside.", "panels": {"home": {"front-door": "closed", "cam": "scan", "inside-motion": "ok", "hub": "idle", "signals": [{"from": "front-door", "to": "hub"}]}}},
+          {"id": "wait", "nodes": ["phone", "door"], "text": "The resident asks for the parcel to be left outside. The front door never opens and the indoor motion sensor stays quiet.", "panels": {"home": {"front-door": "closed", "hub": "idle"}}},
+          {"id": "leave", "nodes": ["doorbell"], "text": "The visitor leaves a parcel on the porch and departs. The camera records outside; the door remains closed.", "panels": {"home": {"visitor": null, "parcel": {"x": 119, "y": 126}}}}
+        ],
+        "paths": [
+          {"id": "welcome", "label": "Welcome in", "color": "#278A52", "steps": ["quiet", "approach", "notify", "open", "cross", "close"]},
+          {"id": "leave-outside", "label": "Leave outside", "color": "#B7791F", "steps": ["quiet", "approach", "notify", "wait", "leave"]}
+        ]
+      }
+    }]
+  }
+}

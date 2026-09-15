@@ -755,23 +755,48 @@ perspectives" of one timeline). Types:
   {"id":"door","kind":"entry","label":"Front door","x":160,"y":158},
   {"id":"hub","kind":"hub","label":"Hub","x":160,"y":92}],
   "initial":{"cam":"scan","door":"closed","hub":"idle"}}`.
-  The centered rounded outline defaults to 300×160; device coordinates are
-  frame pixels (x right, y down). Camera `facing` is degrees clockwise from
+  The rounded outline defaults to 300×160. Optional `outline.x` and `outline.y`
+  position its top-left corner; each omitted axis centers independently. Size
+  clamps to w:20–320 and h:20–180, and position clamps to keep the house in the
+  frame. Non-finite x/y warns and centers that axis. Resizing the outline does
+  not move rooms or devices. Device coordinates are frame pixels (x right, y down).
+  Camera `facing` is degrees clockwise from
   +x and defaults toward frame center; `spread` defaults to 80 (clamped
   10–180), `range` to 70 (clamped 20–160). Kinds and states: camera
   `scan` (default), `sleep`, `detect`, `rec` (sweep stays live and a red recording light blinks), `off`; entry `closed` (default),
   `open`, `alert`; sensor `ok` (default), `warn`, `alert`, `off`; hub
   `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`. Sensors accept an `icon` from the shared
-  icon set (default/fallback `gear`). Every device has a marker and label;
+  icon set (default/fallback `gear`). Devices have a marker and label;
   state is conveyed by its appearance and animation, with name/state text in
   its hover title instead of a visible state chip. Optional `rooms:[{label,x,y,w,h}]` adds named rectangular
   areas behind the devices. Room coordinates use the same frame; rectangles
   must have positive size and fit inside 320×180, otherwise they warn and are
-  ignored. Rooms are presentation boundaries, not simulated physical walls.
+  ignored. Optional room `kind:"outdoor"` draws a green area with a dashed
+  boundary beneath the house outline; omitted/`"room"` draws an indoor room
+  above it. Outdoor areas can span the whole plot, including behind the house.
+  Objects strictly inside the house outline do not tint outdoor areas; objects
+  on its exterior threshold still count outside. Unknown kinds warn and render
+  as rooms. Rooms are presentation boundaries, not simulated physical walls.
   Their lighting reflects contained devices/visible subjects: `alert`/`detect`
   takes priority over `warn`, then occupancy, then quiet. This appearance does
   not change any device state. Shared room boundaries belong to the room on
   the right/bottom; the outer frame edges are inclusive.
+  For a floor-plan door, declare an entry device with `display:"door"`.
+  Its x/y is the hinge; `facing` is the closed leaf direction, clockwise from
+  +x (default 0). `doorWidth` defaults to 24 (clamped 8–48). `doorSwing`
+  defaults to 90; signed angles from -135 to -15 or 15 to 135 are accepted,
+  with positive clockwise. Invalid/non-finite swing warns and uses 90.
+  Example: `{"id":"front-door","kind":"entry","display":"door",
+  "x":164,"y":108,"facing":270,"doorWidth":30,"doorSwing":90}`.
+  This places a vertical closed door that swings inward to the right. The
+  renderer draws the wall opening, jambs, hinge, leaf, handle and swing arc;
+  place the hinge on the desired outline/room wall. Patch its ID to `open`,
+  `closed`, or `alert` using ordinary entry states (`alert` stays physically
+  closed). Geometry is shared across all paths; state follows the selected
+  path. Omitted/`"marker"` display preserves the existing entry icon. `door`
+  on other device kinds warns and uses a marker. Door geometry scales with
+  the taller floor plan while labels stay upright. Doors do not simulate
+  collisions, locks, or camera occlusion; author subject movement explicitly.
   Patch DEVICE IDS directly: `{"cam":"detect","signals":[{"from":"cam",
   "to":"hub"}]}`. Device states carry across steps; `signals` belongs
   only to its authored step and never carries. Static dashed direction arrows

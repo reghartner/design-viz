@@ -1,6 +1,8 @@
 # Homemap stories in the workbench
 
 Start with **starters… → home story** for a visitor-at-the-door scene with an internet-outage alternate.
+For the grounds around a house, choose **whole home & outdoors**. For a porch
+and entry separated by a working door, choose **across the front door**.
 
 ## Make the map the centerpiece
 
@@ -27,8 +29,10 @@ over the current reading preference.
 ## Edit the shared layout
 
 Use **Edit layout** in the map header from either ambient or step view. The
-inspector opens the homemap panel's shared settings, including numeric **outline
-w/h** size fields, the **rooms** table, **devices**, and starting **subjects**.
+inspector opens the homemap panel's shared settings, including the **outline**
+fields **Width**, **Height**, **Left (auto)** and **Top (auto)**, the **rooms**
+table, **devices**, and starting **subjects**. Outline fields use large inputs
+in two columns. Press Enter, Tab, or click away to save; each edit can be undone.
 These settings apply to every step and path. In ambient mode, clicking a room,
 device, or person also selects this layout inspector. Once it is selected, map
 clicks keep that context until you select a step or **Edit home at current step**.
@@ -37,11 +41,54 @@ The step inspector also has **Edit shared home layout**, so you can move directl
 between a beat's animation/state controls and the shared floor plan. Selecting
 the layout does not change the chosen path, step, or view.
 
+The **Shared layout · drag to arrange** map works without a step or timeline.
+Drag a room border/label, device, door, or person to move it. Drag the **House**
+grip to move the outline; square bottom-right corners resize the house and
+rooms. Each completed drag is one undo action; Escape or pointer cancellation
+restores the previous geometry. Rooms and the outline move independently of
+their contents. Coordinate tables remain available for keyboard editing.
+
+This map shows initial device states and starting subject positions. Subjects
+that start hidden appear faded only in the layout editor, so they can still be
+positioned. Moving one preserves its hidden state. If a subject has an explicit
+initial position, its declaration and initial coordinates move together.
+Existing per-step position overrides remain unchanged.
+
 Room rectangles are optional: use the homemap panel's **rooms** table to add
 labels and x/y/w/h values inside the 320×180 frame. Devices and people use that
 same coordinate space at every display size. Device states use icons, color, and
 animation instead of text chips; hover a device to read its name and current state.
 Static signal arrows remain visible while paused or with reduced motion.
+
+### Include outside and place the house
+
+In **rooms**, set **kind → outdoor** for a yard, driveway, garden, or porch.
+Outdoor rectangles use a green dashed treatment and sit beneath the house.
+You can cover the whole 320×180 plot with one outdoor rectangle, then use a
+smaller centered house, or place a narrow house on the right for a half-outside
+view. Normal rooms use **kind → room** or leave kind blank.
+
+**Width/Height** change the house outline only (20–320 wide, 20–180 tall).
+**Left/Top** set its top-left position; leave either blank to center that axis.
+The renderer keeps the house inside the frame. Rooms, devices, and subjects
+keep their own coordinates when you resize or move the outline. An indoor
+person or sensor does not tint the outdoor area behind the house.
+
+### Add doors to walls
+
+Add a **devices** row with **kind → entry** and **display → door**. Set x/y
+at the hinge on an outline or room wall. **facing** points along the closed
+leaf: 0 right, 90 down, 180 left, 270 up. **doorWidth** sets its length (default
+24; 8–48). **doorSwing** sets its opening angle (default 90; positive clockwise,
+negative counterclockwise, magnitude 15–135). For the left wall of a house,
+facing 270 with swing 90 opens inward to the right.
+
+Select a step and change the door's state to **open**, **closed**, or **alert**.
+The leaf swings on open/closed transitions, and the arc shows its opening side.
+Alert colors the closed door. Drag the door or label in the placement map to
+move its hinge, just like another device. Leave display blank or choose
+**marker** to retain the small entry icon used by existing specs. Doors and
+room boundaries are visual; move visitors explicitly in their step patches.
 
 The Home tile uses a taller display with more vertical space between items and
 smaller device/room labels. Devices and people keep their original proportions.

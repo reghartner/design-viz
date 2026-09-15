@@ -2059,6 +2059,8 @@ function homemapModel(panel, state){
   var box = panel.outline || {};
   var w = fin(box.w) != null ? clamp(box.w, 20, 320) : 300;
   var h = fin(box.h) != null ? clamp(box.h, 20, 180) : 160;
+  var ox = fin(box.x) != null ? clamp(box.x, 0, 320 - w) : (320 - w) / 2;
+  var oy = fin(box.y) != null ? clamp(box.y, 0, 180 - h) : (180 - h) / 2;
   var byId = Object.create(null), seen = Object.create(null), devices = [];
   (Array.isArray(panel.devices) ? panel.devices : []).forEach(function(d){
     if (!d || typeof d.id !== 'string' || seen[d.id]) return;
@@ -2066,13 +2068,19 @@ function homemapModel(panel, state){
     if (!homemapDeviceValid(d)) return;
     var vocab = HOMEMAP_STATES[d.kind];
     var x = clamp(d.x, 0, 320), y = clamp(d.y, 0, 180);
-    var facing = fin(d.facing) != null ? d.facing : Math.atan2(90 - y, 160 - x) * 180 / Math.PI;
+    var floorDoor = d.kind === 'entry' && d.display === 'door';
+    var facing = fin(d.facing) != null ? d.facing : floorDoor ? 0 : Math.atan2(90 - y, 160 - x) * 180 / Math.PI;
     var item = {id: d.id, kind: d.kind, label: String(d.label != null ? d.label : d.id),
       x: x, y: y, state: Object.prototype.hasOwnProperty.call(state, d.id) && vocab.indexOf(state[d.id]) >= 0 ? state[d.id] : vocab[0],
       icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
       facing: ((facing % 360) + 360) % 360,
       spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
       range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70};
+    if (floorDoor){
+      item.display = 'door';
+      item.doorWidth = fin(d.doorWidth) != null ? clamp(d.doorWidth, 8, 48) : 24;
+      item.doorSwing = fin(d.doorSwing) != null && Math.abs(d.doorSwing) >= 15 && Math.abs(d.doorSwing) <= 135 ? d.doorSwing : 90;
+    }
     byId[d.id] = item; devices.push(item);
   });
   var subjects = homemapSubjects(panel).map(function(sub){
@@ -2089,7 +2097,7 @@ function homemapModel(panel, state){
     if (from && to) signals.push({from: sig.from, to: sig.to,
       fromXY: {x: from.x, y: from.y}, toXY: {x: to.x, y: to.y}});
   });
-  return {outline: {x: (320 - w) / 2, y: (180 - h) / 2, w: w, h: h}, devices: devices, subjects: subjects, signals: signals};
+  return {outline: {x: ox, y: oy, w: w, h: h}, devices: devices, subjects: subjects, signals: signals};
 }
 
 /* Room lighting is a view of the authored scene, not a simulated sensor or
@@ -2097,6 +2105,9 @@ function homemapModel(panel, state){
 function homemapRoomModel(panel, model){
   return homemapRooms(panel).map(function(room){
     function inside(item){
+      var house = model.outline;
+      if (room.kind === 'outdoor' && item.x > house.x && item.x < house.x + house.w &&
+          item.y > house.y && item.y < house.y + house.h) return false;
       return item.x >= room.x && item.y >= room.y &&
         (item.x < room.x + room.w || (item.x === 320 && room.x + room.w === 320)) &&
         (item.y < room.y + room.h || (item.y === 180 && room.y + room.h === 180));
@@ -2107,6 +2118,27 @@ function homemapRoomModel(panel, model){
       devices.some(function(d){ return d.state === 'warn'; }) ? 'warn' : occupied ? 'occupied' : 'quiet';
     return {room:room, tone:tone};
   });
+}
+
+function homemapDoorHTML(d, transition, outline){
+  var w = d.doorWidth, angle = d.doorSwing * Math.PI / 180;
+  var endX = (w * Math.cos(angle)).toFixed(3), endY = (w * Math.sin(angle)).toFixed(3);
+  var body = '<g class="hmdev hm-entry hm-' + esc(d.state) + ' hm-floor-door" data-device="' + esc(d.id) + '">' +
+    '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>' +
+    '<g transform="translate(' + d.x + ' ' + (d.y * HOMEMAP_Y_SCALE) + ') scale(1 ' + HOMEMAP_Y_SCALE + ') rotate(' + d.facing + ')">' +
+    '<path class="hm-door-threshold" d="M-1 0 H' + (w + 1) + '"/>' +
+    '<path class="hm-door-hit" d="M0 0 H' + w + ' M' + w + ' 0 A' + w + ' ' + w + ' 0 0 ' + (d.doorSwing > 0 ? 1 : 0) + ' ' + endX + ' ' + endY + '"/>' +
+    '<path class="hm-door-arc" d="M' + w + ' 0 A' + w + ' ' + w + ' 0 0 ' + (d.doorSwing > 0 ? 1 : 0) + ' ' + endX + ' ' + endY + '"/>' +
+    '<g class="hm-floor-leaf' + (transition ? ' hm-floor-' + transition : '') + '" style="--hm-door-angle:' + d.doorSwing + 'deg">' +
+    '<path d="M0 0 H' + w + '"/><circle class="hm-door-handle" cx="' + (w - 4) + '" cy="-2" r="1"/></g>' +
+    '<path class="hm-door-jamb" d="M0 -3 V3 M' + w + ' -3 V3"/><circle class="hm-door-hinge" r="1.8"/></g>';
+  var labelX = d.x, labelY = d.y > 139 ? d.y * HOMEMAP_Y_SCALE - 14 : d.y * HOMEMAP_Y_SCALE + 16;
+  var direction = d.facing * Math.PI / 180;
+  if (outline && Math.abs(Math.cos(direction)) > .7){
+    labelX += w * Math.cos(direction) / 2;
+    labelY = (d.y + w * Math.sin(direction) / 2) * HOMEMAP_Y_SCALE + (d.y < outline.y + outline.h / 2 ? -14 : 14);
+  }
+  return body + '<text class="hmlbl" x="' + clamp(labelX, 28, 292) + '" y="' + clamp(labelY, 10, HOMEMAP_DISPLAY_HEIGHT - 5) + '" text-anchor="middle">' + esc(d.label) + '</text></g>';
 }
 
 function radarModel(panel, state){
@@ -3515,15 +3547,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       var o = hm.outline;
       var sy = HOMEMAP_Y_SCALE;
       var s = '<svg class="hmframe" viewBox="0 0 320 ' + HOMEMAP_DISPLAY_HEIGHT + '" role="img" aria-label="' + esc(panel.title || 'Home device map') + '">';
+      var spaces = homemapRoomModel(panel, hm);
+      function drawSpace(space){
+        var room = space.room, outdoor = room.kind === 'outdoor';
+        s += '<g class="hmspace hm-room-' + space.tone + (outdoor ? ' hm-outdoor' : '') + '" data-home-room="' + panel.rooms.indexOf(room) + '">';
+        s += '<rect class="hmroom" x="' + room.x + '" y="' + (room.y * sy) + '" width="' + room.w + '" height="' + (room.h * sy) + '" rx="2"/>';
+        if (!outdoor) s += '<path class="hmroomwall" d="M' + (room.x + 2) + ' ' + ((room.y + room.h) * sy - 2) + ' V' + (room.y * sy + 2) + ' H' + (room.x + room.w - 2) + '"/>';
+        s += '<text class="hmroomlabel" x="' + (room.x + 6) + '" y="' + (room.y * sy + 10) + '">' + esc(room.label || '') + '</text></g>';
+      }
+      spaces.filter(function(space){return space.room.kind === 'outdoor';}).forEach(drawSpace);
       s += '<rect class="hmfoundation" x="' + o.x + '" y="' + (o.y * sy + 2) + '" width="' + o.w + '" height="' + (o.h * sy) + '" rx="9"/>';
       s += '<rect class="hmoutline" x="' + o.x + '" y="' + (o.y * sy) + '" width="' + o.w + '" height="' + (o.h * sy) + '" rx="9"/>';
-      homemapRoomModel(panel, hm).forEach(function(space){
-        var room = space.room;
-        s += '<g class="hmspace hm-room-' + space.tone + '" data-home-room="' + panel.rooms.indexOf(room) + '">';
-        s += '<rect class="hmroom" x="' + room.x + '" y="' + (room.y * sy) + '" width="' + room.w + '" height="' + (room.h * sy) + '" rx="2"/>' +
-          '<path class="hmroomwall" d="M' + (room.x + 2) + ' ' + ((room.y + room.h) * sy - 2) + ' V' + (room.y * sy + 2) + ' H' + (room.x + room.w - 2) + '"/>' +
-          '<text class="hmroomlabel" x="' + (room.x + 6) + '" y="' + (room.y * sy + 10) + '">' + esc(room.label || '') + '</text></g>';
-      });
+      spaces.filter(function(space){return space.room.kind !== 'outdoor';}).forEach(drawSpace);
       if (transient && hmHasMoved) hm.subjects.forEach(function(sub){
         if (!hmMoved[sub.id]) return;
         var prev = hmSubjPrev[sub.id];
@@ -3561,6 +3596,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
         s += '</g>';
       });
       hm.devices.forEach(function(d){
+        if (d.display === 'door'){ s += homemapDoorHTML(d, transient ? hmDoors[d.id] : null, hm.outline); return; }
         s += '<g class="hmdev hm-' + esc(d.kind) + ' hm-' + esc(d.state) + '" data-device="' + esc(d.id) + '" transform="translate(0 ' + (d.y * (sy - 1)).toFixed(3) + ')">' +
           '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>';
         s += '<circle class="hmdevice-aura" cx="' + d.x + '" cy="' + d.y + '" r="13"/>';

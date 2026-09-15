@@ -451,7 +451,9 @@ section.doc-sec.dv-inserttarget::before{content:"insert target"; position:absolu
 .docview .stepline{cursor:pointer;} /* click selects the current step */
 .docview .home-layout-title{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .docview .home-layout-button{font:600 11px 'IBM Plex Sans',sans-serif;text-transform:none;letter-spacing:normal;min-height:30px;margin-left:auto;}
-.rowline .obj-field{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px;font-size:11px;}
+.rowline.obj-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start;}
+.rowline .obj-field{display:flex;min-width:0;flex-direction:column;gap:5px;font-size:12px;}
+.rowline .obj-field .fctl{flex:none;width:100%;min-height:36px;box-sizing:border-box;font-size:14px;}
 @media print{.home-layout-button{display:none !important;}}
 .playback-settings{padding:8px;border:1px solid var(--line);border-radius:6px;}
 .playback-settings summary{cursor:pointer;font-weight:600;}
@@ -559,6 +561,11 @@ body.sk-aurora.sk-blueprint{
 .home-edit-map.moving,.home-edit-map.moving *{cursor:grabbing;}
 .home-edit-map.placing,.home-edit-map.placing *{cursor:crosshair;touch-action:none;}
 .home-edit-map .hmframe *{animation:none !important;}
+.home-layout-map .hmoutline{cursor:grab;pointer-events:stroke;touch-action:none;}
+.home-layout-map .home-resize-handle{fill:var(--hm-surface);stroke:var(--hm-accent);stroke-width:1;cursor:nwse-resize;touch-action:none;}
+.home-outline-grip{fill:var(--hm-surface);stroke:var(--hm-accent);stroke-width:.7;cursor:grab;touch-action:none;}
+.home-outline-grip-label{font:600 4.5px system-ui,sans-serif;fill:var(--hm-accent);pointer-events:none;}
+.home-start-hidden{opacity:.4;}
 .home-xy{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .home-xy .frow{display:flex;align-items:center;gap:8px;}
 .home-xy .fctl{min-width:0;width:100%;}

@@ -2269,14 +2269,22 @@ function builderHomemapStep(d, stepIndex, panelId, pathId){
     model:homemapModel(panel, state), before:homemapModel(panel, localIndex ? states[localIndex - 1] : initial)};
 }
 
-/* Devices and room rectangles belong to the shared layout. Moving them never
-   writes a step patch or moves a room's occupants. */
+/* Shared geometry edits never write step patches or move room occupants. */
 function planHomemapLayoutPosition(text, raw, sectionIdx, panelId, kind, key, point){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   var panels = got.d.panels || [], pi = panels.findIndex(function(p){ return p && p.id === panelId && p.type === 'homemap'; });
   if (pi < 0) return {error:'Homemap not found — reselect and try again.'};
   var panel = panels[pi], index = -1, item, list;
+  var panelPath = got.path.concat(['panels', pi]);
+  if (kind === 'outline'){
+    if (!homemapSubjectPosition(point)) return {error:'Choose a finite house position.'};
+    item = Object.assign({}, panel.outline, homemapModel(panel).outline, point);
+    if (!homemapSubjectPosition(item) || !isFiniteNum(item.w) || !isFiniteNum(item.h) ||
+        item.w < 20 || item.h < 20 || item.x < 0 || item.y < 0 || item.x + item.w > 320 || item.y + item.h > 180)
+      return {error:'Keep the house inside the frame, at least 20×20.'};
+    return planSetField(text, raw, panelPath, 'outline', JSON.stringify(item));
+  }
   if (kind === 'device'){
     list = 'devices';
     if (homemapModel(panel).devices.some(function(d){ return d.id === key; }))
@@ -2284,14 +2292,44 @@ function planHomemapLayoutPosition(text, raw, sectionIdx, panelId, kind, key, po
   } else if (kind === 'room'){
     list = 'rooms';
     if (Number.isInteger(key) && Array.isArray(panel.rooms) && homemapRooms(panel).indexOf(panel.rooms[key]) >= 0) index = key;
+  } else if (kind === 'subject'){
+    list = 'subjects';
+    if (homemapSubjects(panel).some(function(s){return s.id === key;}))
+      index = panel.subjects.findIndex(function(s){return s && s.id === key;});
   }
-  if (index < 0) return {error:'Choose an existing device or room.'};
+  if (index < 0) return {error:'Choose an existing device, room, or subject.'};
   item = panel[list][index];
-  var maxX = 320 - (kind === 'room' ? item.w : 0), maxY = 180 - (kind === 'room' ? item.h : 0);
+  var resize = kind === 'room' && point && (point.w !== undefined || point.h !== undefined);
+  var w = resize ? point.w : item.w, h = resize ? point.h : item.h;
+  if (resize && (!isFiniteNum(w) || !isFiniteNum(h) || w <= 0 || h <= 0)) return {error:'Rooms need a positive width and height.'};
+  var maxX = 320 - (kind === 'room' ? w : 0), maxY = 180 - (kind === 'room' ? h : 0);
   if (!homemapSubjectPosition(point) || point.x < 0 || point.y < 0 || point.x > maxX || point.y > maxY)
     return {error:'Keep the whole item inside the 320×180 map.'};
-  return planSetFields(text, raw, got.path.concat(['panels', pi, list, index]),
-    [['x', JSON.stringify(point.x)], ['y', JSON.stringify(point.y)]]);
+  var fields = [['x', JSON.stringify(point.x)], ['y', JSON.stringify(point.y)]];
+  if (resize) fields.push(['w', JSON.stringify(w)], ['h', JSON.stringify(h)]);
+  var plan = planSetFields(text, raw, panelPath.concat([list, index]), fields);
+  if (!plan.error && kind === 'subject' && panel.initial && homemapSubjectPosition(panel.initial[key]))
+    return planSetFields(plan.text, JSON.parse(plan.text), panelPath.concat(['initial', key]), fields);
+  return plan;
+}
+
+function builderHomemapLayoutDrag(item, start, at, resize, minimum){
+  var dx = at.x - start.x, dy = at.y - start.y;
+  if (resize) return {x:item.x, y:item.y,
+    w:clamp(Math.round(item.w + dx), minimum || 1, 320 - item.x),
+    h:clamp(Math.round(item.h + dy), minimum || 1, 180 - item.y)};
+  return {x:clamp(Math.round(item.x + dx), 0, 320 - (item.w || 0)),
+    y:clamp(Math.round(item.y + dy), 0, 180 - (item.h || 0))};
+}
+
+function builderHomemapLayoutScene(panel){
+  var state = Object.assign(Object.create(null), panel.initial || {}), hidden = [];
+  var model = homemapModel(panel, state);
+  model.subjects.forEach(function(s){
+    if (s.hidden) hidden.push(s.id);
+    state[s.id] = {x:s.x, y:s.y}; /* hidden subjects still have draggable starting positions */
+  });
+  return {state:state, model:homemapModel(panel, state), hidden:hidden};
 }
 
 function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, value){
@@ -2468,12 +2506,16 @@ var PANEL_SETUP_FIELDS = {
   radar:     [['sensor', 'json'], ['facing', 'num'], ['spread', 'num'], ['range', 'num'],
               ['threshold', 'num'], ['rings', 'jsonAny'], ['scale', 'json'],
               ['zones', 'jsonArr'], ['initial', 'json']],
-  homemap:   [['outline', 'objf', {cols:[{k:'w',kind:'num',label:'Width'}, {k:'h',kind:'num',label:'Height'}]}], ['rooms', 'rows', {cols: [
-                {k:'label'}, {k:'x', kind:'num', req:true}, {k:'y', kind:'num', req:true},
+  homemap:   [['outline', 'objf', {cols:[{k:'w',kind:'num',label:'Width'}, {k:'h',kind:'num',label:'Height'},
+                {k:'x',kind:'num',label:'Left (auto)'}, {k:'y',kind:'num',label:'Top (auto)'}],
+                hint:'Floor plan: width 20–320, height 20–180. Blank left/top centers the house. Rooms and devices keep their coordinates. Press Enter or leave a field to save.'}], ['rooms', 'rows', {cols: [
+                {k:'label'}, {k:'kind',kind:'enum',options:['room','outdoor']}, {k:'x', kind:'num', req:true}, {k:'y', kind:'num', req:true},
                 {k:'w', kind:'num', req:true}, {k:'h', kind:'num', req:true}]}], ['devices', 'rows', {cols: [
                 {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
+                {k: 'display', kind: 'enum', options: ['marker', 'door']},
                 {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
-                {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'}],
+                {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'},
+                {k: 'doorWidth', kind: 'num'}, {k: 'doorSwing', kind: 'num'}],
               max: 12}], ['subjects', 'rows', {cols: [
                 {k: 'id', req: true}, {k: 'label'}, {k: 'x', kind: 'num', req: true},
                 {k: 'y', kind: 'num', req: true}, {k: 'icon'}], max: 6}], ['initial', 'json']],
@@ -4058,6 +4100,101 @@ function initWorkbenchBuilder(opts){
     return rows;
   }
 
+  function homemapLayoutControl(panel, target){
+    var box = document.createElement('fieldset'); box.className = 'home-edit';
+    var legend = document.createElement('legend'); legend.textContent = 'Shared layout · drag to arrange'; box.appendChild(legend);
+    var hint = document.createElement('p'); hint.className = 'home-note';
+    hint.textContent = 'Drag rooms, devices, doors, or people. Drag the House grip to move the outline; drag square corners to resize it or a room. Faded people start hidden. Changes apply across all paths; step overrides stay intact. Escape cancels.';
+    box.appendChild(hint);
+    var map = document.createElement('div'); map.className = 'home-edit-map home-layout-map sk-daylight'; map.tabIndex = 0;
+    map.setAttribute('aria-label', 'Shared home layout placement map'); box.appendChild(map);
+    var scene = builderHomemapLayoutScene(panel), indexedText = src.value, moving = null;
+    function mark(svg, kind, key, x, y, resize){
+      var rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('class', resize ? 'home-resize-handle' : 'home-outline-grip');
+      rect.setAttribute('x', x - (resize ? 3 : 12)); rect.setAttribute('y', y * HOMEMAP_Y_SCALE - (resize ? 3 : 5));
+      rect.setAttribute('width', resize ? 6 : 24); rect.setAttribute('height', resize ? 6 : 10); rect.setAttribute('rx','1');
+      rect.setAttribute(kind === 'outline' ? 'data-home-outline' : 'data-home-room', key);
+      if (resize) rect.setAttribute('data-home-resize','');
+      var title = document.createElementNS('http://www.w3.org/2000/svg','title');
+      title.textContent = (resize ? 'Resize ' : 'Move ') + (kind === 'outline' ? 'house outline' : (panel.rooms[key].label || 'room'));
+      rect.appendChild(title); svg.appendChild(rect);
+      if (!resize){
+        var label = document.createElementNS('http://www.w3.org/2000/svg','text');
+        label.setAttribute('class','home-outline-grip-label'); label.setAttribute('x',x); label.setAttribute('y',y * HOMEMAP_Y_SCALE + 1.7);
+        label.setAttribute('text-anchor','middle'); label.textContent='↔ House'; svg.appendChild(label);
+      }
+    }
+    function paint(move){
+      var preview = panel, state = scene.state;
+      if (move){
+        preview = Object.assign({}, panel);
+        if (move.kind === 'outline') preview.outline = Object.assign({}, scene.model.outline, move.point);
+        else {
+          var list = move.kind === 'device' ? 'devices' : move.kind === 'room' ? 'rooms' : 'subjects';
+          preview[list] = panel[list].map(function(item,i){ return i === move.index ? Object.assign({},item,move.point) : item; });
+          if (move.kind === 'subject'){state = Object.assign(Object.create(null),state); state[move.key] = move.point;}
+        }
+      }
+      /* Decorations are editor-only and change as the outline/rooms move. */
+      map._lastHTML = null;
+      renderPanelBody(map, preview, state, 'daylight', [], -1, false);
+      var svg = map.querySelector('svg.hmframe'); if (!svg) return;
+      var outline = homemapModel(preview).outline;
+      svg.querySelector('.hmoutline').setAttribute('data-home-outline','');
+      homemapRooms(preview).forEach(function(r){mark(svg,'room',preview.rooms.indexOf(r),r.x+r.w,r.y+r.h,true);});
+      mark(svg,'outline','',outline.x+outline.w,outline.y+outline.h,true);
+      mark(svg,'outline','',outline.x+outline.w/2,Math.max(5,outline.y-5),false);
+      Array.prototype.forEach.call(svg.querySelectorAll('[data-subject]'),function(el){
+        if (scene.hidden.indexOf(el.getAttribute('data-subject')) >= 0) el.classList.add('home-start-hidden');
+      });
+    }
+    function eventPoint(ev){
+      var svg=map.querySelector('svg'), matrix=svg && svg.getScreenCTM(); if (!matrix) return null;
+      var point=svg.createSVGPoint(); point.x=ev.clientX; point.y=ev.clientY;
+      return homemapPointFromDisplay(point.matrixTransform(matrix.inverse()));
+    }
+    function cancel(){
+      if (!moving) return;
+      var id=moving.pointer; moving=null; map.classList.remove('moving'); paint(null);
+      if (map.hasPointerCapture(id)) map.releasePointerCapture(id);
+    }
+    map.addEventListener('pointerdown',function(ev){
+      if (ev.button !== 0) return;
+      var el=ev.target.closest('[data-device],[data-subject],[data-home-room],[data-home-outline]'); if (!el) return;
+      var kind, key, item, index;
+      if (el.hasAttribute('data-home-outline')){kind='outline';key='';item=scene.model.outline;}
+      else if (el.hasAttribute('data-home-room')){kind='room';key=index=Number(el.getAttribute('data-home-room'));item=panel.rooms[index];}
+      else {
+        kind=el.hasAttribute('data-device') ? 'device' : 'subject';key=el.getAttribute('data-'+kind);
+        var list=kind === 'device' ? 'devices' : 'subjects';
+        item=scene.model[list].find(function(d){return d.id === key;});
+        index=panel[list].findIndex(function(d){return d && d.id === key;});
+      }
+      var start=eventPoint(ev);if (!item || !start) return;
+      ev.preventDefault();map.focus({preventScroll:true});map.setPointerCapture(ev.pointerId);
+      moving={kind:kind,key:key,item:item,index:index,start:start,pointer:ev.pointerId,resize:el.hasAttribute('data-home-resize'),changed:false};
+      map.classList.add('moving');
+    });
+    map.addEventListener('pointermove',function(ev){
+      if (!moving || ev.pointerId !== moving.pointer) return;
+      var at=eventPoint(ev);if (!at) return;
+      moving.point=builderHomemapLayoutDrag(moving.item,moving.start,at,moving.resize,moving.kind === 'outline' ? 20 : 1);
+      moving.changed=Object.keys(moving.point).some(function(k){return moving.point[k] !== moving.item[k];});paint(moving);
+    });
+    map.addEventListener('pointerup',function(ev){
+      if (!moving || ev.pointerId !== moving.pointer) return;
+      var done=moving;cancel();if (!done.changed) return;
+      if (src.value !== indexedText){formError('The source changed. Reselect this home before moving its layout.');return;}
+      if (addToStep){formError('Finish ADD TO STEP before editing the layout.');return;}
+      commitCascade(function(raw){return planHomemapLayoutPosition(src.value,raw,target.section,panel.id,done.kind,done.key,done.point);},
+        {after:function(){renderInspector();}});
+    });
+    map.addEventListener('pointercancel',cancel);map.addEventListener('lostpointercapture',cancel);
+    map.addEventListener('keydown',function(ev){if (ev.key === 'Escape' && moving){ev.preventDefault();ev.stopPropagation();cancel();}});
+    paint(null);return box;
+  }
+
   function homemapStepControl(diagram, panel, target){
     var box = document.createElement('fieldset'); box.className = 'home-edit';
     var title = document.createElement('legend'); title.textContent = (panel.title || panel.id) + ' · at this step'; box.appendChild(title);
@@ -4508,6 +4645,7 @@ function initWorkbenchBuilder(opts){
       if (fire() === false) last = null;
     };
     input.addEventListener('change', go);
+    input.addEventListener('blur', go);
     input.addEventListener('keydown', function(ev){
       if (ev.key === 'Enter' && input.tagName !== 'TEXTAREA'){ ev.preventDefault(); go(); }
     });
@@ -4664,7 +4802,7 @@ function initWorkbenchBuilder(opts){
     var wrap = document.createElement('div');
     wrap.className = 'rowsedit';
     var line = document.createElement('div');
-    line.className = 'rowline';
+    line.className = 'rowline' + ((shape.cols || []).some(function(col){return col.label;}) ? ' obj-fields' : '');
     var base = (cur && typeof cur === 'object' && !Array.isArray(cur)) ? cur : {};
     var inputs = {};
     function commitObj(){
@@ -4679,6 +4817,7 @@ function initWorkbenchBuilder(opts){
     }
     (shape.cols || []).forEach(function(col){
       var input = colInput(col, base[col.k]);
+      if (col.kind === 'num') input.inputMode = 'decimal';
       wireCommit(input, commitObj);
       inputs[col.k] = input;
       if (col.label){
@@ -4687,6 +4826,9 @@ function initWorkbenchBuilder(opts){
       } else line.appendChild(input);
     });
     wrap.appendChild(line);
+    if (shape.hint){
+      var hint=document.createElement('p'); hint.className='fnote'; hint.textContent=shape.hint; wrap.appendChild(hint);
+    }
     wrap.appendChild(rawJsonFallback(key, cur, 'json'));
     return wrap;
   }
@@ -4770,6 +4912,7 @@ function initWorkbenchBuilder(opts){
         var current = stepperFor(t.section); if (!current) return;
         selectTarget({section:t.section, kind:'step', index:current.sourceIndex()}, false);
       }); rows.push(editStep);
+      rows.push(homemapLayoutControl(val,t));
     }
     return rows.concat(panelSetupRows(val));
   }

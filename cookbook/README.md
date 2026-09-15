@@ -26,6 +26,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | a Confluence-ready export or JSON to paste into the Flowview macro | [Confluence handoff](../docs/confluence.md) |
 | happy and failure outcomes on one diagram, shared steps, or a dropped/blocked communication | [alternate-paths.md](alternate-paths.md) |
 | a large home map, live Home / Data flow switching, device states, or draggable placement | [home-story.md](home-story.md) |
+| outdoor cameras/sensors around a house, a porch/entry split, or doors in walls | [outdoor-home.md](outdoor-home.md) |
 | a color camera clip, doorbell runners, or recording before the visible event | [camera-events.md](camera-events.md) |
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |
 | retry attempts, backoff, deadline admission, or circuit recovery | `retries-and-circuits.md` |

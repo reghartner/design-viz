@@ -58,6 +58,157 @@ test('numeric outline controls keep unknown fields, allow defaults, and reject i
   assert.deepEqual(plain(C.objFieldsCollect(shape,base,{w:'',h:'150'}).obj),{h:150,future:'keep'});
   assert.equal(C.objFieldsCollect(shape,base,{w:'',h:''}).obj,null);
   assert.ok(C.objFieldsCollect(shape,base,{w:'wide',h:'150'}).error);
+  assert.deepEqual(plain(C.objFieldsCollect(shape,base,{w:'150',h:'160',x:'164',y:'10'}).obj),{w:150,h:160,x:164,y:10,future:'keep'});
+});
+
+test('typed controls save on leaving a field and avoid duplicate undo entries after Enter or change',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'../src/builder.workbench.js'),'utf8');
+  const wire=vm.runInContext('(' + source.slice(source.indexOf('function wireCommit('),source.indexOf('function rowsFieldControl(')).trim() + ')',C);
+  const events={},input={value:'300',tagName:'INPUT',addEventListener:(name,fn)=>events[name]=fn};
+  const saved=[];wire(input,()=>{if(input.value==='invalid') return false;saved.push(input.value);});
+  input.value='260';events.blur();assert.deepEqual(saved,['260']);
+  events.change();assert.deepEqual(saved,['260']);
+  input.value='240';events.keydown({key:'Enter',preventDefault(){}});events.change();events.blur();
+  assert.deepEqual(saved,['260','240']);
+  input.value='invalid';events.blur();input.value='240';events.blur();
+  assert.deepEqual(saved,['260','240','240'],'a rejected value must not prevent restoring the previous value');
+});
+
+const outdoorFixture = name => JSON.parse(fs.readFileSync(path.join(__dirname,'../src/starters/' + name + '.json'),'utf8'));
+
+test('outdoor starters validate and the threshold paths keep door and occupancy state independent',()=>{
+  for(const name of ['whole-home-outdoors','front-door-threshold']){
+    const spec=outdoorFixture(name),result=C.validate(C.normalize(spec));
+    assert.deepEqual(plain(result.errors),[],name);assert.deepEqual(plain(result.warnings),[],name);
+    const d=diagram(spec);assert.equal(d.primaryPanel,'home');
+    assert.ok(d.panels[0].rooms.some(r=>r.kind==='outdoor'));
+    assert.ok(d.panels[0].devices.some(d=>d.display==='door'));
+  }
+  const d=diagram(outdoorFixture('front-door-threshold'));
+  const state=(id,path)=>C.builderHomemapStep(d,d.steps.findIndex(s=>s.id===id),'home',path);
+  const door=s=>s.model.devices.find(d=>d.id==='front-door').state;
+  assert.equal(door(state('notify','welcome')),'closed');
+  assert.equal(door(state('open','welcome')),'open');
+  assert.equal(door(state('cross','welcome')),'open');
+  assert.equal(door(state('close','welcome')),'closed');
+  assert.equal(door(state('wait','leave-outside')),'closed');
+  assert.equal(door(state('leave','leave-outside')),'closed');
+  const visitor=s=>s.model.subjects.find(s=>s.id==='visitor');
+  assert.ok(visitor(state('cross','welcome')).x>164);
+  assert.ok(visitor(state('wait','leave-outside')).x<164);
+  assert.equal(visitor(state('leave','leave-outside')).hidden,true);
+  assert.equal(state('leave','leave-outside').model.subjects.find(s=>s.id==='parcel').hidden,false);
+});
+
+test('positioned outlines clamp to the frame and omitted or invalid axes remain centered',()=>{
+  const model=outline=>plain(C.homemapModel({outline},{}).outline);
+  assert.deepEqual(model({w:150,h:160,x:164,y:10}),{w:150,h:160,x:164,y:10});
+  assert.deepEqual(model({w:150,h:160,x:-30,y:300}),{w:150,h:160,x:0,y:20});
+  assert.deepEqual(model({w:150,h:160,x:Infinity,y:NaN}),{w:150,h:160,x:85,y:10});
+  assert.deepEqual(model({w:150,h:160,y:0}),{w:150,h:160,x:85,y:0});
+  assert.deepEqual(model({w:400,h:400,x:100,y:100}),{w:320,h:180,x:0,y:0});
+});
+
+test('shared layout works without steps and moves or resizes the house and rooms without moving contents',()=>{
+  const spec=outdoorFixture('front-door-threshold'),d=diagram(spec);
+  delete d.steps;delete d.paths;d.view='ambient-only';
+  const original=JSON.stringify(spec),panel=d.panels[0];panel.outline.extra='keep';
+  const edit=(kind,key,point)=>{
+    const result=C.planHomemapLayoutPosition(JSON.stringify(spec),spec,0,'home',kind,key,point);
+    assert.ok(!result.error,result.error);return diagram(JSON.parse(result.text)).panels[0];
+  };
+  const moved=edit('outline','',{x:140,y:15});
+  assert.deepEqual(moved.outline,{...panel.outline,x:140,y:15});
+  assert.deepEqual(moved.rooms,panel.rooms);assert.deepEqual(moved.devices,panel.devices);
+  const resized=edit('room',0,{x:6,y:10,w:130,h:140});
+  assert.deepEqual(resized.rooms[0],{...panel.rooms[0],w:130,h:140});
+  assert.deepEqual(resized.devices,panel.devices);assert.deepEqual(resized.subjects,panel.subjects);
+  delete panel.outline;
+  assert.deepEqual(edit('outline','',{x:0,y:0,w:280,h:150}).outline,{x:0,y:0,w:280,h:150});
+  for(const [kind,key,point] of [['outline','',null],['outline','',{x:200,y:0,w:300,h:160}],
+    ['outline','',{x:0,y:0,w:5,h:160}],['room',0,{x:6,y:10,w:0,h:100}],
+    ['room',0,{x:6,y:10,w:200,h:180}],['room',0,{x:6,y:10,w:Infinity,h:100}]])
+    assert.ok(C.planHomemapLayoutPosition(original,spec,0,'home',kind,key,point).error);
+});
+
+test('shared subject placement updates initial coordinates while preserving hidden state and every step override',()=>{
+  for(const initial of [undefined,null,{x:42,y:50,extra:'keep'}]){
+    const spec=outdoorFixture('front-door-threshold'),panel=diagram(spec).panels[0];
+    if(initial===undefined) delete panel.initial.visitor;else panel.initial.visitor=initial;
+    const before=JSON.stringify(spec),scene=C.builderHomemapLayoutScene(panel);
+    assert.equal(scene.model.subjects[0].hidden,false);
+    assert.equal(scene.hidden.includes('visitor'),initial===null);
+    assert.equal(scene.model.subjects[0].x,initial && initial.x || panel.subjects[0].x);
+    const result=C.planHomemapLayoutPosition(before,spec,0,'home','subject','visitor',{x:80,y:90});
+    assert.ok(!result.error,result.error);
+    const next=diagram(JSON.parse(result.text));
+    assert.deepEqual(next.steps,diagram(spec).steps);assert.deepEqual(next.paths,diagram(spec).paths);
+    assert.deepEqual(next.panels[0].subjects[0],{...panel.subjects[0],x:80,y:90});
+    assert.deepEqual(next.panels[0].initial.visitor,initial && {...initial,x:80,y:90});
+    assert.equal(JSON.stringify(spec),before,'preview and planner preserve the source');
+  }
+});
+
+test('shared drag geometry clamps full rooms and house sizes, and uses the original pointer offset',()=>{
+  const drag=(item,at,resize=false,min=1)=>plain(C.builderHomemapLayoutDrag(item,{x:100,y:100},at,resize,min));
+  assert.deepEqual(drag({x:164,y:108},{x:86,y:110}),{x:150,y:118});
+  assert.deepEqual(drag({x:80,y:40,w:160,h:100},{x:300,y:300}),{x:160,y:80});
+  assert.deepEqual(drag({x:80,y:40,w:160,h:100},{x:-20,y:-20}),{x:0,y:0});
+  assert.deepEqual(drag({x:164,y:10,w:150,h:160},{x:500,y:500},true,20),{x:164,y:10,w:156,h:170});
+  assert.deepEqual(drag({x:164,y:10,w:150,h:160},{x:-500,y:-500},true,20),{x:164,y:10,w:20,h:20});
+  assert.deepEqual(drag({x:167,y:13,w:144,h:154},{x:-500,y:-500},true),{x:167,y:13,w:1,h:1});
+});
+
+test('outdoor lighting excludes people and devices inside the house, and grounds paint beneath it',()=>{
+  const panel={type:'homemap',outline:{x:80,y:40,w:160,h:100},
+    rooms:[{label:'INSIDE',x:82,y:42,w:156,h:96},{label:'OUTSIDE',kind:'outdoor',x:0,y:0,w:320,h:180}],
+    devices:[{id:'inside',kind:'sensor',x:160,y:60},{id:'outside',kind:'camera',x:20,y:30}],
+    subjects:[{id:'visitor',x:120,y:90}]};
+  const tones=state=>plain(C.homemapRoomModel(panel,C.homemapModel(panel,state)).map(r=>r.tone));
+  assert.deepEqual(tones({inside:'alert'}),['alert','quiet']);
+  assert.deepEqual(tones({outside:'detect'}),['occupied','alert']);
+  assert.deepEqual(tones({visitor:{x:30,y:80}}),['quiet','occupied']);
+  assert.deepEqual(tones({visitor:{x:80,y:80}}),['quiet','occupied'],'the exterior threshold belongs outside');
+  const host={querySelector:()=>null};C.renderPanelBody(host,panel,{},'pastel',[],0,false);
+  assert.ok(host.innerHTML.indexOf('data-home-room="1"')<host.innerHTML.indexOf('class="hmoutline"'));
+  assert.ok(host.innerHTML.indexOf('data-home-room="0"')>host.innerHTML.indexOf('class="hmoutline"'));
+});
+
+test('architectural doors bound geometry, keep legacy entry markers, and escape labels and IDs',()=>{
+  const panel={type:'homemap',devices:[{id:'door',kind:'entry',display:'door',x:164,y:108,facing:-90,doorWidth:100,doorSwing:-90}]};
+  let d=C.homemapModel(panel,{door:'open'}).devices[0];
+  assert.equal(d.facing,270);assert.equal(d.doorWidth,48);assert.equal(d.doorSwing,-90);
+  panel.devices[0].doorWidth=NaN;panel.devices[0].doorSwing='90';panel.devices[0].facing=Infinity;
+  d=C.homemapModel(panel,{}).devices[0];assert.equal(d.doorWidth,24);assert.equal(d.doorSwing,90);assert.equal(d.facing,0);
+  panel.devices[0].doorWidth=-1;panel.devices[0].doorSwing=0;
+  d=C.homemapModel(panel,{}).devices[0];assert.equal(d.doorWidth,8);assert.equal(d.doorSwing,90);
+  const warnings=[];C.homemapDeclarationWarnings(panel,'home',warnings);assert.ok(warnings.some(w=>w.includes('doorSwing')));
+  panel.devices[0].label='<door & "guest">';panel.devices[0].id='door" onload="bad';
+  const host={querySelector:()=>null};C.renderPanelBody(host,panel,{},'pastel',[],0,false);
+  assert.match(host.innerHTML,/hm-floor-door/);assert.match(host.innerHTML,/&lt;door &amp; &quot;guest&quot;&gt;/);
+  assert.doesNotMatch(host.innerHTML,/ onload="bad|NaN|Infinity/);
+  delete panel.devices[0].display;C.renderPanelBody(host,panel,{},'pastel',[],0,false);
+  assert.doesNotMatch(host.innerHTML,/hm-floor-door/);assert.match(host.innerHTML,/class="hmentry"/);
+  panel.devices[0].kind='sensor';panel.devices[0].display='door';
+  assert.equal(C.homemapModel(panel,{}).devices[0].display,undefined);
+});
+
+test('wall doors swing between open and closed, retain final poses without motion, and move as devices',()=>{
+  const spec=outdoorFixture('front-door-threshold'),d=diagram(spec),panel=d.panels[0],host={querySelector:()=>null};
+  const draw=(state,animate=true)=>C.renderPanelBody(host,panel,{'front-door':state},'pastel',[],0,animate);
+  draw('open');assert.doesNotMatch(host.innerHTML,/hm-floor-opening|hm-floor-closing/);
+  assert.match(host.innerHTML,/hm-entry hm-open hm-floor-door/);
+  draw('closed');assert.match(host.innerHTML,/hm-floor-closing/);
+  assert.doesNotMatch(host._lastHTML,/hm-floor-closing/);
+  draw('alert');assert.doesNotMatch(host.innerHTML,/hm-floor-closing|hm-floor-opening/);
+  draw('open');assert.match(host.innerHTML,/hm-floor-opening/);
+  draw('closed',false);assert.doesNotMatch(host.innerHTML,/hm-floor-closing/);
+  const old=C.RM;C.RM=true;
+  try{draw('open');assert.match(host.innerHTML,/hm-entry hm-open/);assert.doesNotMatch(host.innerHTML,/hm-floor-opening/);}finally{C.RM=old;}
+  const moved=C.planHomemapLayoutPosition(JSON.stringify(spec),spec,0,'home','device','front-door',{x:165,y:110});
+  assert.ok(!moved.error,moved.error);
+  const next=diagram(JSON.parse(moved.text)).panels[0].devices.find(d=>d.id==='front-door');
+  assert.deepEqual(next,{...panel.devices.find(d=>d.id==='front-door'),x:165,y:110});
 });
 
 function edit(spec, step, key, value, pid = 'home'){
@@ -237,7 +388,7 @@ test('room layout moves preserve dimensions, occupants, and original indices thr
 
 test('layout moves reject invalid identities and coordinates and support nested pages and special IDs', () => {
   const spec = fixture(), source = JSON.stringify(spec);
-  for (const [kind, key, point] of [['device','missing',{x:1,y:1}], ['subject','visitor',{x:1,y:1}],
+  for (const [kind, key, point] of [['device','missing',{x:1,y:1}], ['subject','missing',{x:1,y:1}],
     ['room',-1,{x:1,y:1}], ['room','0',{x:1,y:1}], ['room',0,{x:320,y:180}],
     ['device','cam',{x:321,y:1}], ['device','cam',{x:-1,y:1}], ['device','cam',{x:0,y:181}],
     ['device','cam',{x:Infinity,y:1}], ['device','cam',{x:'20',y:1}], ['device','cam',null]])

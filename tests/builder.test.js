@@ -3074,12 +3074,13 @@ test('builderInsertTargetText handles a headingless section and bare shapes', ()
 
 test('homemap setup and dynamic patch fields follow declared devices', () => {
   assert.deepStrictEqual(plain(B.PANEL_SETUP_FIELDS.homemap), [
-    ['outline', 'objf', {cols:[{k:'w',kind:'num',label:'Width'}, {k:'h',kind:'num',label:'Height'}]}], ['rooms', 'rows', {cols: [
-      {k:'label'}, {k:'x', kind:'num', req:true}, {k:'y', kind:'num', req:true},
+    ['outline', 'objf', {cols:[{k:'w',kind:'num',label:'Width'}, {k:'h',kind:'num',label:'Height'}, {k:'x',kind:'num',label:'Left (auto)'}, {k:'y',kind:'num',label:'Top (auto)'}], hint:'Floor plan: width 20–320, height 20–180. Blank left/top centers the house. Rooms and devices keep their coordinates. Press Enter or leave a field to save.'}], ['rooms', 'rows', {cols: [
+      {k:'label'}, {k:'kind',kind:'enum',options:['room','outdoor']}, {k:'x', kind:'num', req:true}, {k:'y', kind:'num', req:true},
       {k:'w', kind:'num', req:true}, {k:'h', kind:'num', req:true}]}], ['devices', 'rows', {cols: [
       {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
+      {k: 'display', kind: 'enum', options: ['marker', 'door']},
       {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
-      {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'}
+      {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'}, {k: 'doorWidth', kind: 'num'}, {k: 'doorSwing', kind: 'num'}
     ], max: 12}], ['subjects', 'rows', {cols: [
       {k: 'id', req: true}, {k: 'label'}, {k: 'x', kind: 'num', req: true},
       {k: 'y', kind: 'num', req: true}, {k: 'icon'}], max: 6}], ['initial', 'json']

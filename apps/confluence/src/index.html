@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Flowview for Confluence</title>
+  <link rel="stylesheet" href="./app.css">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <!-- ICONS -->
+  <p class="preview-notice" id="preview-notice" hidden></p>
+  <main>
+    <p id="app-status" class="app-status" role="status">Loading Flowview…</p>
+    <section class="configuration" id="configuration" hidden aria-label="Import a Flowview diagram">
+      <h1>Import a Flowview diagram</h1>
+      <p>Create and edit your design in the Flowview workbench. Use <strong>Export for Confluence</strong> or <strong>Copy JSON for Confluence</strong>, then import it here.</p>
+      <label class="file-label" for="spec-file">Choose JSON file</label>
+      <input id="spec-file" type="file" accept=".json,application/json">
+      <label for="spec-input">Or paste Confluence JSON</label>
+      <textarea id="spec-input" spellcheck="false" placeholder="Paste the JSON copied from the workbench"></textarea>
+      <p class="help">The saved macro contains a snapshot. To update it, import a new export. Supported snapshot size: 128 KiB.</p>
+      <div class="options">
+        <label for="section">Content<select id="section"><option value="all">Entire spec</option></select></label>
+        <label for="focus">Starting view<select id="focus"><option value="spec">As authored</option><option value="home">Home</option><option value="data">Data flow</option></select></label>
+        <label for="skin">Skin<select id="skin"><option value="spec">As authored</option></select></label>
+      </div>
+      <div class="actions">
+        <button type="button" id="validate">Preview</button>
+        <button type="button" id="save" class="primary" disabled>Save snapshot</button>
+        <button type="button" id="cancel">Cancel</button>
+      </div>
+      <p id="import-status" role="status"></p>
+    </section>
+    <div id="docview" class="docview" aria-label="Flowview diagram"></div>
+  </main>
+</body>
+</html>

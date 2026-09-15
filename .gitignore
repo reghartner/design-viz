@@ -8,3 +8,6 @@ __pycache__/
 # local-only by design and never committed
 /CLAUDE.md
 /docs/agents/
+node_modules/
+/apps/confluence/static/
+/apps/confluence/preview/

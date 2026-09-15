@@ -133,6 +133,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 
 | The source or operator needs… | Read |
 |---|---|
+| Confluence-ready JSON or an exported file for the Forge viewer | `docs/confluence.md`; company deployment agents also read `docs/confluence-integration.md` |
 | Happy and failure outcomes on the SAME diagram; aligned alternate timelines | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
 | A send that never arrives, or a communication that is never sent | `docs/failed-communications.md` (also demonstrated in the alternate-path recipe) |
 | Copy/share steps across paths, continue a happy ending, or detach a shared step | `docs/workbench-step-reuse.md` |
@@ -141,6 +142,14 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
 | A crowded editor, resizing, focus, or diagram fit controls | `docs/workbench-workspace.md` |
 | Database/payload state, checks, budgets, retry/circuit behavior, replicas, or rollout decisions | Matching recipes in `cookbook/README.md` and the corresponding widget docs |
+
+For a Confluence handoff, author and validate the same spec outside Confluence.
+Use `node <VIZ>/tools/confluence-export.js <spec.json> -o <OUT>/<name>.confluence.json`
+or the workbench's **Export for Confluence** / **Copy JSON for Confluence** buttons.
+This is ordinary compact spec JSON, not HTML, ADF or wiki markup; all authored
+content is retained. The macro imports a snapshot and presentation settings only.
+Do not move the editor into Confluence or add direct publishing. The company-side
+agent handles Forge registration, installation and actual Confluence validation.
 
 Paths, failed communications, centerpiece views, scene-event controls, and
 fit controls need no schema-version flag. An old self-contained HTML page

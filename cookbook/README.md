@@ -23,6 +23,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 
 | You were asked for… | Recipe |
 |---|---|
+| a Confluence-ready export or JSON to paste into the Flowview macro | [Confluence handoff](../docs/confluence.md) |
 | happy and failure outcomes on one diagram, shared steps, or a dropped/blocked communication | [alternate-paths.md](alternate-paths.md) |
 | a large home map, live Home / Data flow switching, device states, or draggable placement | [home-story.md](home-story.md) |
 | a color camera clip, doorbell runners, or recording before the visible event | [camera-events.md](camera-events.md) |

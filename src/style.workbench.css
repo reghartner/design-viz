@@ -61,6 +61,10 @@ body.workspace-focus .workwrap{max-width:none;}
 #editor-steps .story-list{max-height:none;overflow:visible;}
 .editor-file-tools{flex:none;gap:6px !important;}
 .editor-file-tools .msgs{flex-basis:100%;margin:0;}
+.confluence-handoff{flex-basis:100%;min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px;}
+.confluence-handoff label{font-size:12px;font-weight:600;}
+.confluence-handoff textarea{box-sizing:border-box;width:100%;height:110px;margin-top:6px;resize:vertical;font:11px monospace;}
+.confluence-handoff p{font-size:12px;margin:8px 0;}
 @media (max-width:1180px){.workwrap{padding:0 12px;}.workspace-tools{padding:8px 12px;}}
 @media (min-width:800px){
   .workwrap{display:grid;grid-template-columns:minmax(0,1fr) 24px var(--workspace-editor,440px);align-items:start;}

@@ -67,6 +67,10 @@ body.workspace-focus .workwrap{max-width:none;}
 #editor-steps .story-list{max-height:none;overflow:visible;}
 .editor-file-tools{flex:none;gap:6px !important;}
 .editor-file-tools .msgs{flex-basis:100%;margin:0;}
+.confluence-handoff{flex-basis:100%;min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px;}
+.confluence-handoff label{font-size:12px;font-weight:600;}
+.confluence-handoff textarea{box-sizing:border-box;width:100%;height:110px;margin-top:6px;resize:vertical;font:11px monospace;}
+.confluence-handoff p{font-size:12px;margin:8px 0;}
 @media (max-width:1180px){.workwrap{padding:0 12px;}.workspace-tools{padding:8px 12px;}}
 @media (min-width:800px){
   .workwrap{display:grid;grid-template-columns:minmax(0,1fr) 24px var(--workspace-editor,440px);align-items:start;}
@@ -5073,8 +5077,16 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
         <button class="bbtn" id="file-open">open&#8230;</button>
         <button class="bbtn" id="file-save">save</button>
         <button class="bbtn" id="file-export" title="write the spec JSON and the published page HTML into a folder you pick">export&#8230;</button>
+        <button class="bbtn" id="confluence-export">Export for Confluence</button>
+        <button class="bbtn" id="confluence-copy">Copy JSON for Confluence</button>
         <button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">diff</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
+        <div id="confluence-handoff" class="confluence-handoff" hidden>
+          <label for="confluence-json">Confluence JSON</label>
+          <textarea id="confluence-json" readonly spellcheck="false"></textarea>
+          <p id="confluence-status" role="status"></p>
+          <button class="bbtn" id="confluence-close">Close</button>
+        </div>
         <ul class="msgs" id="msgs"></ul>
       </div>
     </details>
@@ -12757,6 +12769,78 @@ function traceToSpec(input, options){
   }
   return result;
 }
+/* ---- src/confluence.js ---- */
+/* Manual Confluence handoff. Shared by the workbench, Forge viewer and CLI.
+   This is ordinary spec JSON, never HTML, ADF or a direct publishing request. */
+var CONFLUENCE_MAX_BYTES = 128 * 1024; /* Our supported snapshot size, not a Forge platform quota. */
+var CONFLUENCE_INPUT_BYTES = 2 * 1024 * 1024;
+function confluenceByteLength(text){ return new TextEncoder().encode(text).length; }
+function buildConfluenceExport(text){
+  if (typeof text !== 'string' || !text.trim()) return {error:'Choose a JSON file or paste a page spec.'};
+  if (confluenceByteLength(text) > CONFLUENCE_INPUT_BYTES) return {error:'Input is larger than 2 MiB. Export a smaller spec from the workbench.'};
+  try {
+    var raw = JSON.parse(text), page = normalize(raw);
+    var result = validate(page);
+    if (result.errors.length) return {error:result.errors.join('\n')};
+    var compact = JSON.stringify(raw), bytes = confluenceByteLength(compact);
+    if (bytes > CONFLUENCE_MAX_BYTES)
+      return {error:'This spec is ' + Math.ceil(bytes / 1024) + ' KiB. Confluence snapshots currently support up to 128 KiB; split the story into smaller specs.'};
+    var title = typeof page.title === 'string' ? page.title : '';
+    var slug = title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,100);
+    return {text:compact, bytes:bytes, name:(slug || 'flowspec') + '.confluence.json', page:page, warnings:result.warnings};
+  } catch (ex){ return {error:'Could not read the spec: ' + ex.message}; }
+}
+function confluenceSections(page){
+  var out = [];
+  blocksOf(page).forEach(function(block){
+    function add(sec, tab){
+      out.push({id:String(out.length + 1), label:(tab ? tab + ' / ' : '') + (sec.heading || 'Section ' + (out.length + 1)), section:sec});
+    }
+    if (block.type === 'section') add(block.sec);
+    else block.tabs.forEach(function(tab){ tab.sections.forEach(function(sec){ add(sec,tab.label); }); });
+  });
+  return out;
+}
+function buildConfluenceConfig(text, values){
+  var exported = buildConfluenceExport(text);
+  if (exported.error) return exported;
+  values = values || {};
+  var section = values.section || 'all', focus = values.focus || 'spec', skin = values.skin || 'spec';
+  if (section !== 'all' && !confluenceSections(exported.page).some(function(s){return s.id === section;}))
+    return {error:'The selected section is missing. Choose a section from the imported spec.'};
+  if (['spec','home','data'].indexOf(focus) < 0) return {error:'Choose a supported starting view.'};
+  if (skin !== 'spec' && SKIN_NAMES.indexOf(skin) < 0) return {error:'Choose a supported skin.'};
+  return {config:{specJson:exported.text, section:section, focus:focus, skin:skin}, exported:exported};
+}
+function confluenceDisplayPage(page, config){
+  var display = JSON.parse(JSON.stringify(page));
+  if (config.section !== 'all'){
+    var selected = confluenceSections(display).find(function(s){return s.id === config.section;});
+    if (!selected) throw new Error('The selected section no longer exists.');
+    display.blocks = [selected.section]; delete display.sections;
+  }
+  confluenceSections(display).forEach(function(s){
+    var d = s.section.diagram;
+    if (!d) return;
+    if (config.focus === 'data') delete d.primaryPanel;
+    if (config.focus === 'home'){
+      var homes = (d.panels || []).filter(function(p){return p.type === 'homemap';});
+      var home = homes.find(function(p){return p.id === d.primaryPanel;}) || homes[0];
+      if (home) d.primaryPanel = home.id;
+    }
+  });
+  if (config.skin !== 'spec') display.skin = config.skin;
+  return display;
+}
+function confluenceSourceUrl(href, siteUrl){
+  if (typeof href !== 'string' || !href.trim()) return null;
+  try {
+    /* Relative repository files are not Confluence pages. Only resolve /wiki/ links. */
+    if (!/^https?:\/\//i.test(href) && !/^\/wiki\//.test(href)) return null;
+    var url = new URL(href, siteUrl);
+    return ['https:','http:'].indexOf(url.protocol) >= 0 ? url.href : null;
+  } catch (ex){ return null; }
+}
 /* ---- src/builder.workbench.js ---- */
 /* builder.workbench.js — workbench builder: click a rendered element to jump
    to its definition in the spec editor (with per-element authoring guidance),
@@ -15943,6 +16027,50 @@ function initWorkbenchBuilder(opts){
       return w.write(contents).then(function(){ return w.close(); });
     });
   }
+  /* Manual handoff: download and clipboard share exactly the same snapshot.
+     Keep a selectable fallback for phones/LAN HTTP without Clipboard API. */
+  var confluenceBox = document.getElementById('confluence-handoff');
+  var confluenceText = document.getElementById('confluence-json');
+  var confluenceStatus = document.getElementById('confluence-status');
+  var confluenceCopy = document.getElementById('confluence-copy');
+  var confluenceExport = document.getElementById('confluence-export');
+  var confluenceClose = document.getElementById('confluence-close');
+  var confluenceCopyRun = 0;
+  function confluenceHandoff(copy){
+    var run = ++confluenceCopyRun, built = buildConfluenceExport(src.value);
+    if (built.error){
+      if (confluenceBox) confluenceBox.hidden = true;
+      inspectorMessage('Confluence export: ' + built.error); return;
+    }
+    if (confluenceBox && confluenceText && confluenceStatus){
+      confluenceBox.hidden = false; confluenceText.value = built.text;
+      confluenceStatus.textContent = 'Import this file or paste this JSON in the Flowview macro configuration.';
+    }
+    if (!copy){ downloadTextFile(built.name,built.text,'application/json'); return; }
+    function result(ok){
+      if (run !== confluenceCopyRun || !confluenceStatus) return;
+      confluenceStatus.textContent = ok ? 'Copied. Paste into the Flowview macro configuration in Confluence.' :
+        'Automatic copy is unavailable. Select and copy the JSON below, or use Export for Confluence.';
+    }
+    function fallback(){
+      var ok = false;
+      if (run !== confluenceCopyRun) return;
+      if (confluenceText){ confluenceText.focus(); confluenceText.select();
+        try { ok = document.execCommand('copy'); } catch (ex){}
+      }
+      result(ok);
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText)
+        navigator.clipboard.writeText(built.text).then(function(){result(true);},fallback);
+      else fallback();
+    } catch (ex){ fallback(); }
+  }
+  if (confluenceExport) confluenceExport.addEventListener('click',function(){confluenceHandoff(false);});
+  if (confluenceCopy) confluenceCopy.addEventListener('click',function(){confluenceHandoff(true);});
+  if (confluenceClose) confluenceClose.addEventListener('click',function(){
+    confluenceCopyRun++; confluenceBox.hidden = true; confluenceCopy.focus();
+  });
   var exportBtn = document.getElementById('file-export');
   if (exportBtn) exportBtn.addEventListener('click', function(){
     var parsed = parseEditor();

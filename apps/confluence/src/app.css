@@ -1,7 +1,7 @@
 /* Forge's iframe is content-sized. Avoid vh-based Home sizing feedback. */
 html,body{margin:0;min-width:0;background:transparent;font-family:'IBM Plex Sans',system-ui,sans-serif;}
 [hidden]{display:none !important;}
-body .docview{box-sizing:border-box;width:100%;max-width:none;padding:12px;}
+body[class] .docview[class]{box-sizing:border-box;width:100%;max-width:none;padding:12px;}
 body .primary-panel .hmframe{max-height:560px;}
 .docview .copychip,.docview .embedchip{display:none;}
 .docview a[aria-disabled="true"]{cursor:default;opacity:.6;}
@@ -24,4 +24,4 @@ body .primary-panel .hmframe{max-height:560px;}
 #import-status{white-space:pre-wrap;}
 .error{color:#ae2a19 !important;}
 .preview-notice{margin:0;padding:8px 14px;background:#fff7d6;color:#533f04;font-size:12px;}
-@media(max-width:500px){.configuration{padding:16px;}body .docview{padding:6px;}}
+@media(max-width:500px){.configuration{padding:16px;}body[class] .docview[class]{padding:6px;}}

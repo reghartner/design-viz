@@ -130,6 +130,14 @@
         <button class="bbtn editor-inspect-selection" id="steps-inspect" type="button" disabled>Inspect selected step</button>
         <div class="story-tools">
           <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
+          <details class="playback-settings">
+            <summary>Playback settings</summary>
+            <label>Open diagram in<select class="fctl" id="steps-opening-view" aria-label="Open diagram in">
+              <option value="ambient">Ambient view</option><option value="step">Step view</option><option value="ambient-only">Ambient only</option>
+            </select></label>
+            <label class="playback-setting-check"><input type="checkbox" id="steps-autoplay"> Autoplay when opened</label>
+            <p class="fnote">Applies to this section and all its paths when entering step view. Off by default; plays every 3 seconds when on. The editor preview always starts paused.</p>
+          </details>
           <div id="steps-path-tools" hidden>
             <label>Path<select class="fctl" id="steps-path" aria-label="Story path"></select></label>
             <label>Path label<input class="fctl" id="steps-path-label" aria-label="Path label"></label>
@@ -225,6 +233,7 @@
       <tr><td>sections[n]</td><td><code>{heading?, accent?, source?, text?, bullets?, contract?, diagram?}</code></td><td>One bounding box. <code>accent</code>: <code>green blue violet amber pink cyan red slate</code> or a hex; defaults cycle. <code>text</code> is a paragraph or list of paragraphs. <code>source</code>: optional permalink (HLD section) — renders a small "source&#8599;" chip beside the heading, new tab.</td></tr>
       <tr><td>sections[n].contract</td><td><code>{title?, source?, fields:[{k, v?, g?, hot?, link?, delta?, revealAt?, hideAt?}], note?}</code></td><td>Message-contract card: a compact "on the wire" field table. <code>delta</code> is <code>added|removed|changed</code>; reveal indices bind the row to this section's diagram steps. Optional <code>source</code> chip on the card title and footer <code>note</code>.</td></tr>
       <tr><td>diagram.view</td><td><code>"ambient" | "step" | "ambient-only"</code></td><td>How the board opens. <code>ambient</code> (default): live view with an AMBIENT/STEP toggle when <code>steps</code> exist. <code>step</code>: opens as the click-through at step 1. <code>ambient-only</code>: no toggle — for boards without a meaningful sequence. One diagram spec always drives both flavors.</td></tr>
+      <tr><td>diagram.autoplay</td><td>boolean</td><td>Defaults to <code>false</code>: step view opens paused. Set <code>true</code> to advance every 3 seconds when step view opens. Workbench and Confluence configuration previews stay paused; reduced motion disables automatic steps. No schema-version change needed.</td></tr>
       <tr><td>diagram.nodes</td><td><code>{id: {title?, sub?, icon?, tint?, group?, link?}}</code></td><td>Service cards. <code>icon</code> from the fixed set below (default <code>gear</code>); <code>tint</code> colors the icon chip (default <code>cmd</code>). <code>group</code>: containment-boundary membership. <code>link</code>: optional permalink — a small clickable &#8599; on the card corner, new tab.</td></tr>
       <tr><td>diagram.groups</td><td><code>{groupId: {title?}}</code></td><td>Declares containment boundaries: a dashed titled box drawn around all member nodes (a device holding two chips). Put members in one stack column; an edge between stack members draws as a vertical interconnect.</td></tr>
       <tr><td>diagram.rows</td><td><code>[[slot, ...], ...]</code></td><td>Flow-ordered slots per row. A slot is a node id, or an <b>array of ids = a stack</b> (fan-out targets in one column). Even rows lay left&#8594;right, odd rows right&#8594;left — the serpentine. The wrap edge between rows is detected automatically.</td></tr>

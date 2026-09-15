@@ -40,7 +40,10 @@ After the company installs the Forge app:
 4. Save the snapshot, then publish the Confluence page.
 
 Readers can use playback, alternate paths, Home/Data switching, board sizing and
-the panels. Playback starts paused. The snapshot is stored in the macro's
+the panels. Playback starts paused unless the imported diagram explicitly sets
+`autoplay: true`. Play / Pause labels and the adjacent status show whether steps
+are advancing; the import configuration preview always starts paused.
+The snapshot is stored in the macro's
 configuration, rather than fetched from a workstation, remote URL or mutable
 attachment. Importing a replacement is explicit. Cancel does not submit changes.
 

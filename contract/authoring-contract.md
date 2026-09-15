@@ -224,10 +224,35 @@ diagram in that same section:
 
 How the board opens. `"ambient"` (default — live animation, with an
 AMBIENT/STEP toggle whenever `steps` exist), `"step"` (opens as the
-click-through at step 1, auto-advancing), or `"ambient-only"` (no toggle; use
+click-through at step 1, paused by default), or `"ambient-only"` (no toggle; use
 for boards without a meaningful sequence). One diagram spec always supports
 both modes — repeating the same diagram in another tab with `"view": "step"`
 gives readers a guided version at zero extra authoring cost.
+
+### autoplay
+
+Optional boolean on `diagram`, default `false`. Set `"autoplay": true` to
+advance every three seconds when step view opens, including when the reader
+chooses STEP from ambient mode. Applies to every path in the diagram. It does
+not select step view itself; pair it with `"view": "step"` to play on page load.
+
+The controls visibly show **Playing · 3s / step**, **Paused**, or **Finished**,
+with labeled Play / Pause / Replay actions. Choosing a step, an arrow, or a
+path pauses advancement. Switching diagram tabs resumes only if the sequence
+was playing when hidden; a manual pause persists. Leaving the browser tab pauses
+until Play is pressed. A deep link to a specific step opens paused.
+
+Reduced motion disables automatic advancement and explains the disabled Play
+button; arrows and step chips still work. A one-step path also has no automatic
+playback. Pausing advancement does not freeze animations inside the current step.
+Workbench and Confluence configuration previews always start paused; published
+standalone pages and the Confluence viewer respect the authored setting.
+
+In the workbench, use **Steps → Playback settings** to choose the opening view
+and toggle **Autoplay when opened**. Existing specs with no `autoplay` field now
+open paused in the current renderer. To retain their earlier automatic behavior,
+add `"autoplay": true`. No schema version flag is required; rebuild older
+self-contained HTML exports to use the updated controls.
 
 ### nodes
 

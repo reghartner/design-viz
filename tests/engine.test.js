@@ -36,6 +36,14 @@ function loadCore(overrides = {}){
 const C = loadCore();
 function plain(value){ return JSON.parse(JSON.stringify(value)); }
 
+test('autoplay accepts strict booleans and warns on values that would otherwise imply accidental playback',()=>{
+  for (const autoplay of [true,false,'true',1,null,{}]){
+    const result=C.validate(C.normalize({nodes:{a:{}},rows:[['a']],steps:[{nodes:['a']}],autoplay}));
+    assert.strictEqual(result.errors.length,0);
+    assert.strictEqual(result.warnings.filter(w=>w.includes('.autoplay:')).length,typeof autoplay==='boolean'?0:1);
+  }
+});
+
 test('diagramHasDelta detects only strict boolean marks on declared nodes, edges, or steps', () => {
   assert.strictEqual(C.diagramHasDelta({}), false);
   assert.strictEqual(C.diagramHasDelta({nodes: {a: {}}, edges: [{}], steps: [{}]}), false);

@@ -137,6 +137,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Happy and failure outcomes on the SAME diagram; aligned alternate timelines | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
 | A send that never arrives, or a communication that is never sent | `docs/failed-communications.md` (also demonstrated in the alternate-path recipe) |
 | Copy/share steps across paths, continue a happy ending, or detach a shared step | `docs/workbench-step-reuse.md` |
+| Open a step view paused or playing; clarify Play / Pause state | `contract/authoring-contract.md` → `view` and `autoplay` |
 | A large home map, live Home / Data flow switching, or per-step placement | `cookbook/home-story.md`, `docs/homemap-workbench.md` |
 | Camera recording before an event, color clips, doorbell runners, fire, or delivery | `cookbook/camera-events.md` plus `tools/widget_doc.py screen` |
 | Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
@@ -155,6 +156,12 @@ Paths, failed communications, centerpiece views, scene-event controls, and
 fit controls need no schema-version flag. An old self-contained HTML page
 must be rebuilt with a current template to gain new rendering behavior;
 adding a made-up version or zoom field to its spec cannot update its engine.
+
+Step views now open paused unless `diagram.autoplay` is strictly `true`.
+For an automatically playing story use `view:"step", autoplay:true`; do not
+assume `view:"step"` starts playback by itself. The workbench exposes this in
+Steps → Playback settings and keeps its editing preview paused. Published
+Confluence snapshots honor the same setting; configuration previews stay paused.
 
 ## 3 — The conversation: agree on what to draw
 

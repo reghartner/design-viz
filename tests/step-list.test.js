@@ -92,13 +92,18 @@ function harness(raw=fixture()){
   for(const id of ['sec-steps','steps-section','steps-search','steps-list','steps-status','steps-paging',
     'steps-add','steps-duplicate','steps-earlier','steps-later','steps-previous','steps-next','steps-inspect',
     'steps-path','steps-path-tools','steps-path-label','steps-path-color','steps-fork','steps-path-save','steps-path-remove',
-    'steps-reuse','steps-independent','steps-remove-occurrence','steps-sharing','steps-shared-with','src','view']) root.appendChild(el('div',id));
+    'steps-reuse','steps-independent','steps-remove-occurrence','steps-sharing','steps-shared-with',
+    'steps-autoplay','steps-opening-view','src','view']) root.appendChild(el('div',id));
   const src=elements.src; src.value=JSON.stringify(raw,null,2);
   let rendered=src.value, target=null, locked=false, activePath=null, ui;
   const c=load({document:doc,setTimeout:fn=>timers.push(fn),MutationObserver:class {constructor(fn){ observers.push(fn); } observe(){}}});
   ui=c.initWorkbenchStepList({src,view:elements.view,renderedText:()=>rendered,selection:()=>target,locked:()=>locked,
     path:()=>activePath,selectPath(section,id){activePath=id;target=null;},
     inspect(){ inspections.push(target); },
+    configure(plan,section){
+      if(target && target.section!==section) target=null;
+      history.push(src.value); src.value=plan.text; rendered=src.value; return true;
+    },
     navigate(entry){ navigation.push(entry); target=entry.target; ui.sync(); },
     apply(plan,section){ history.push(src.value); src.value=plan.text; rendered=src.value;
       if(plan.pathId) activePath=plan.pathId;
@@ -113,6 +118,37 @@ function harness(raw=fixture()){
     undo(){ src.value=history.pop(); target=null; this.render(); },
     get target(){ return target; }};
 }
+
+test('playback settings save per diagram, preserve selection and content, and use normal undo',()=>{
+  const h=harness();h.select(1);
+  const auto=h.e['steps-autoplay'], opening=h.e['steps-opening-view'];
+  assert.equal(auto.checked,false);assert.equal(opening.value,'ambient');
+  auto.checked=true;auto.fire('click');assert.equal(auto.checked,true,'document click must not reset a pending change');
+  auto.fire('change');
+  assert.equal(dOf(JSON.parse(h.src.value)).autoplay,true);assert.equal(h.history.length,1);assert.equal(h.target.index,1);
+  assert.deepEqual(dOf(JSON.parse(h.src.value)).steps,dOf(fixture()).steps);
+  opening.value='step';opening.fire('change');assert.equal(dOf(JSON.parse(h.src.value)).view,'step');
+  h.undo();assert.equal(opening.value,'ambient');assert.equal(auto.checked,true);
+  h.undo();assert.equal(auto.checked,false);assert.deepEqual(JSON.parse(h.src.value),fixture());
+});
+
+test('playback settings refuse stale source and locked edits, and ambient-only disables autoplay',()=>{
+  const h=harness(),auto=h.e['steps-autoplay'],opening=h.e['steps-opening-view'];
+  h.lock(true);assert.equal(auto.disabled,true);auto.checked=true;auto.fire('change');assert.equal(h.history.length,0);
+  h.lock(false);h.src.value+=' ';auto.checked=true;auto.fire('change');assert.equal(h.history.length,0);assert.equal(auto.checked,false);
+  h.render();opening.value='ambient-only';opening.fire('change');assert.equal(auto.disabled,true);
+  opening.value='step';opening.fire('change');assert.equal(auto.disabled,false);
+});
+
+test('playback settings stay on the chosen section when the last inspected step belongs elsewhere',()=>{
+  const raw=fixture();raw.page.blocks[0].diagram={nodes:{n:{}},rows:[['n']],steps:[{text:'Introduction'}]};
+  const h=harness(raw);h.select(1);
+  h.e['steps-section'].value='0';h.e['steps-section'].fire('change');
+  h.e['steps-autoplay'].checked=true;h.e['steps-autoplay'].fire('change');
+  assert.equal(h.e['steps-section'].value,'0');assert.equal(h.target,null);
+  const saved=JSON.parse(h.src.value);
+  assert.equal(saved.page.blocks[0].diagram.autoplay,true);assert.equal(dOf(saved).autoplay,undefined);
+});
 
 test('Inspect requires a current selected step and refuses stale source or unfinished builder actions',()=>{
   const h=harness(),button=h.e['steps-inspect'];

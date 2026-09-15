@@ -22,10 +22,13 @@ function element(){
     fire(k){ for(const fn of events[k] || []) fn({}); }
   };
 }
-function stepperHarness(options, reducedMotion=false){
+function stepperHarness(options, reducedMotion=false, diagramSettings={}){
   let sequence=0;
   const intervals=new Map(), timeouts=new Map(), ids={}, paints=[];
-  const context={document:{createElement:element, getElementById:id=>ids[id] || null},
+  const visibilityListeners=new Set();
+  const context={document:{createElement:element, getElementById:id=>ids[id] || null,
+      addEventListener(type,fn){ if(type==='visibilitychange') visibilityListeners.add(fn); },
+      removeEventListener(type,fn){ if(type==='visibilitychange') visibilityListeners.delete(fn); }},
     window:{matchMedia:()=>({matches:reducedMotion}),
       setInterval(fn){ const id=++sequence; intervals.set(id,fn); return id; },
       clearInterval:id=>intervals.delete(id)},
@@ -34,7 +37,7 @@ function stepperHarness(options, reducedMotion=false){
   vm.createContext(context); vm.runInContext(code,context);
   const sec=element(), boardDiv=element(), board={svg:element(),nodeEls:{},edgeIds:{}};
   const term=Object.fromEntries(['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl',
-    'btnPrev','btnPlay','btnNext','btnAmb','btnStep'].map(k=>[k,element()]));
+    'btnPrev','btnPlay','btnNext','btnAmb','btnStep','playbackStatus'].map(k=>[k,element()]));
   term.bar.appendChild(element()).appendChild(term.stepN);
   const edge='a->b(int)', animation=element(); animation.parentNode=element();
   animation.beginElement=()=>{ animation.starts=(animation.starts || 0)+1; };
@@ -44,10 +47,12 @@ function stepperHarness(options, reducedMotion=false){
   const diagram={nodes:{a:{},b:{}},steps:[
     {id:'first',text:'First'},
     {id:'second',text:'Second',edges:[edge],packets:[{edge,delay:1}]},
-    {id:'third',text:'Third'}]};
+    {id:'third',text:'Third'}],...diagramSettings};
   const stepper=context.attachStepper(sec,boardDiv,term,diagram,'fs0',board,{},
     {setStep:(index,tween)=>paints.push({index,tween})},null,options);
   return {context,stepper,term,intervals,timeouts,paints,animation,boardDiv,
+    visibilityListeners,
+    visibility(hidden){ context.document.hidden=hidden; visibilityListeners.forEach(fn=>fn()); },
     tick(){ for(const fn of [...intervals.values()]) fn(); }};
 }
 
@@ -62,15 +67,64 @@ test('workbench step entry and tab reveal stay paused; explicit Play advances an
   assert.equal(h.term.btnPlay.attrs['aria-label'],'Play');
 });
 
-test('standalone retains autoplay, manual navigation pauses, and reduced motion remains a hard gate',()=>{
-  const h=stepperHarness(), s=h.stepper;
+test('autoplay is opt-in, manual navigation stays paused across tabs, and reduced motion is a hard gate',()=>{
+  for (const autoplay of [undefined,false,'true',1,null]){
+    const h=stepperHarness(undefined,false,{autoplay}); h.stepper.enterStep(true);
+    assert.equal(h.intervals.size,0); assert.equal(h.term.playbackStatus.textContent,'Paused');
+    assert.match(h.term.btnPlay.innerHTML,/Play/);
+  }
+  const h=stepperHarness(undefined,false,{autoplay:true}), s=h.stepper;
   s.enterStep(true); assert.equal(h.intervals.size,1);
+  assert.equal(h.term.playbackStatus.textContent,'Playing · 3s / step');
+  assert.equal(h.term.bar.attrs['data-playback'],'playing');
+  assert.match(h.term.btnPlay.innerHTML,/Pause/);
   h.term.btnNext.fire('click'); assert.equal(s.current().n,1); assert.equal(h.intervals.size,0);
-  s.onHide(); s.onShow(); assert.equal(h.intervals.size,1);
+  s.onHide(); s.onShow(); assert.equal(h.intervals.size,0);
   s.enterStep(false); assert.equal(h.intervals.size,0);
-  const quiet=stepperHarness(undefined,true);
+  const quiet=stepperHarness(undefined,true,{autoplay:true});
   quiet.stepper.enterStep(true); quiet.term.btnPlay.fire('click');
   assert.equal(quiet.intervals.size,0);
+  assert.equal(quiet.term.btnPlay.disabled,true);
+  assert.equal(quiet.term.playbackStatus.textContent,'Paused · reduced motion');
+  const editor=stepperHarness({autoplay:false},false,{autoplay:true});
+  editor.stepper.enterStep(true); assert.equal(editor.intervals.size,0);
+});
+
+test('tab re-entry resumes only an already playing sequence, and explicit pause cancels pending resume',()=>{
+  const h=stepperHarness();h.stepper.enterStep(true);h.term.btnPlay.fire('click');h.tick();
+  h.stepper.onHide();h.stepper.onHide();assert.equal(h.intervals.size,0);
+  h.stepper.onShow();assert.equal(h.intervals.size,1);assert.equal(h.stepper.current().n,1);
+  h.stepper.onHide();h.stepper.pause();h.stepper.onShow();assert.equal(h.intervals.size,0);
+  assert.equal(h.term.playbackStatus.textContent,'Paused');
+});
+
+test('leaving the browser pauses at the current step; returning does not silently restart',()=>{
+  const h=stepperHarness(undefined,false,{autoplay:true});h.stepper.enterStep(true);h.tick();
+  h.visibility(true);assert.equal(h.intervals.size,0);h.term.btnPlay.fire('click');assert.equal(h.intervals.size,0);
+  h.visibility(false);assert.equal(h.intervals.size,0);assert.equal(h.stepper.current().n,1);
+  h.term.btnPlay.fire('click');assert.equal(h.intervals.size,1);
+  h.stepper.destroy();assert.equal(h.visibilityListeners.size,0);
+  const ambient=stepperHarness();ambient.stepper.enterAmbient();const paints=ambient.paints.length;
+  ambient.visibility(true);ambient.visibility(false);assert.equal(ambient.paints.length,paints);
+});
+
+test('single-step stories have an explained disabled Play; ambient mode cannot start hidden playback',()=>{
+  const h=stepperHarness(undefined,false,{autoplay:true,steps:[{id:'only',text:'Only'}]});
+  h.stepper.enterStep(true);h.stepper.toggleAuto();assert.equal(h.intervals.size,0);
+  assert.equal(h.term.btnPlay.disabled,true);assert.equal(h.term.playbackStatus.textContent,'Single step');
+  const ambient=stepperHarness();ambient.stepper.toggleAuto();assert.equal(ambient.intervals.size,0);
+});
+
+test('presenter Space is an explicit Play command even when automatic step entry is off',()=>{
+  const h=stepperHarness(), handlers={}, view=element();
+  const doc={body:element(),documentElement:{},createElement:element,addEventListener:(name,fn)=>handlers[name]=fn};
+  h.context.wirePresenter({activeStepper:()=>h.stepper},view,{document:doc});
+  view.children[0].fire('click');
+  let prevented=0;const space=()=>handlers.keydown({key:' ',preventDefault(){prevented++;}});
+  space();assert.equal(h.stepper.mode(),'step');assert.equal(h.intervals.size,1);
+  assert.equal(h.term.playbackStatus.textContent,'Playing · 3s / step');
+  space();assert.equal(h.intervals.size,0);assert.equal(h.term.playbackStatus.textContent,'Paused');
+  assert.equal(prevented,2);
 });
 
 test('step picks tween like the arrows; restore jumps and the autoplay wrap stay settled',()=>{
@@ -101,7 +155,7 @@ test('pause never repaints a focused panel and a queued old tick cannot advance 
 });
 
 test('destroy cancels autoplay, packet delays and caption ghosts, and rejects stale callbacks',()=>{
-  const h=stepperHarness(); h.stepper.enterStep(true);
+  const h=stepperHarness(undefined,false,{autoplay:true}); h.stepper.enterStep(true);
   const staleTick=[...h.intervals.values()][0]; h.tick();
   assert.equal(h.stepper.current().n,1); assert.equal(h.timeouts.size,2);
   const staleTimeouts=[...h.timeouts.values()], before=h.paints.length;

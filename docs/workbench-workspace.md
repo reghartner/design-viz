@@ -57,6 +57,12 @@ does not render the preview again or change the selected step, path or view.
 Wide home-step inspectors place the map beside its device, person and signal
 controls. Narrow inspectors stack them.
 
+Preview panels move below the diagram when its section has 1000 pixels or
+less of usable width. This follows the space left by the editor and section
+padding, even on a wide desktop. The diagram (or Home in Home view) then gets
+the full row; supporting widgets wrap underneath. All six skins use this
+behavior in the workbench, standalone pages and embeds.
+
 Editor width and selected tool persist in this browser when local storage is
 available. Widths from the earlier layout are carried forward; the former
 inspector/JSON height split is no longer used. Focus and expansion are temporary.

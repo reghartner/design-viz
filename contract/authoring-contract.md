@@ -508,9 +508,26 @@ perspectives" of one timeline). Types:
   or external requests. Reduced motion and print hold a readable still of
   the entry or fire. LIVE → REC → SAVE preserves the same clip's animation;
   returning from OFF/BOOT restarts it. A different scene replaces the clip.
+  Scene timing is independent of recording: patch `scenePlayback:"waiting"`
+  to show the quiet setting before an event (empty doorway, no delivered
+  package, or a kitchen without fire/smoke). Set `mode:"rec"` in that same
+  step or earlier; the REC indicator runs while the scene waits. In a later
+  step, patch only `scenePlayback:"playing"` to start the clip while recording
+  continues. Both fields carry along the selected path. For example:
+  `{"panels":{"cam":{"mode":"rec","scenePlayback":"waiting"}}}` then
+  `{"panels":{"cam":{"scenePlayback":"playing"}}}`.
+  Omitted `scenePlayback` defaults to `playing`, preserving existing specs.
+  `waiting` resets the event; returning to `playing` starts it again. Further
+  playing steps and mode/banner changes keep the current clip running.
+  Direct jumps into a waiting step show the quiet scene; direct jumps into
+  a playing step start the event if the scene was not already playing.
+  OFF and BOOT keep their usual presentation regardless of scene playback.
   In the workbench, select a screen panel and choose **Screen scene**. The
   inline preview and **Replay clip** work even when the story camera is OFF;
-  replay affects only that preview. Try **starters… → screen clips**.
+  replay affects only that preview. In the step's screen patch editor, use
+  **Scene event → Before event / Play event** independently of **mode**.
+  **Inherit** removes only this step's override. Try **starters… → screen clips**
+  for a recording that starts at step 3 and captures the event at step 4.
 - `trace` — observed service internals and wall-time coverage:
   `{"id":"inside","type":"trace","title":"Inside the service",
   "spans":[{"id":"request","service":"api","name":"handle request",

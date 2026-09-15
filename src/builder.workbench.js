@@ -2489,7 +2489,8 @@ var PANEL_PATCH_FIELDS = {
   leds:      [],
   gauge:     [['value', 'num']],
   log:       [['log', 'jsonArr']],
-  screen:    [['mode', 'enum', ['off', 'boot', 'live', 'rec', 'save']], ['banner', 'text']],
+  screen:    [['mode', 'enum', ['off', 'boot', 'live', 'rec', 'save']],
+              ['scenePlayback', 'enum', ['waiting', 'playing']], ['banner', 'text']],
   waterfall: [['reveal', 'num'], ['highlight', 'text'], ['total', 'text']],
   orbit:     [['state', 'text'], ['via', 'text']],
   zoneframe: [['zones', 'jsonArr'], ['subject', 'json'],
@@ -4283,6 +4284,14 @@ function initWorkbenchBuilder(opts){
         if (f[1] === 'num') input.className += ' fnum';
       }
       input.setAttribute('aria-label', f[0]);
+      if (decl.type === 'screen' && f[0] === 'scenePlayback'){
+        input.setAttribute('aria-label', 'Scene event');
+        Array.prototype.forEach.call(input.options, function(option){
+          if (option.value === 'waiting') option.textContent = 'Before event';
+          else if (option.value === 'playing') option.textContent = 'Play event';
+          else if (option.value === '') option.textContent = 'Inherit';
+        });
+      }
       return input;
     }
     function rawControl(){
@@ -4294,6 +4303,11 @@ function initWorkbenchBuilder(opts){
       }, {textarea: true});
     }
     var fields = panelPatchFields(decl);
+    if (decl && decl.type === 'screen'){
+      var sceneNote = document.createElement('p'); sceneNote.className = 'home-note';
+      sceneNote.textContent = 'Recording and the scene event are independent. Choose Before event for a quiet scene, then Play event in a later step. Both settings carry forward until changed.';
+      body.appendChild(sceneNote);
+    }
     if (fields === null){
       body.appendChild(frow('patch ' + pid, rawControl()));
       return det;
@@ -4327,7 +4341,7 @@ function initWorkbenchBuilder(opts){
           if (out.error){ formError(out.error); return false; }
           return commitPatch(key, out.item[key]);
         });
-        body.appendChild(frow(key, input));
+        body.appendChild(frow(decl.type === 'screen' && key === 'scenePlayback' ? 'Scene event' : key, input));
       }
     });
     var rawFold = document.createElement('details');

@@ -245,6 +245,15 @@ function softwarePanelPatchWarnings(state, path, p, warnings){
   }
 }
 var SCENE_NAMES = ['person-at-door-night','person-through-door','package-drop','kitchen-fire','static-noise'];
+function screenPatchWarnings(state, path, warnings){
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return;
+  if (Object.prototype.hasOwnProperty.call(state, 'scenePlayback') && ['waiting','playing'].indexOf(state.scenePlayback) < 0)
+    warnings.push(path + '.scenePlayback: expected waiting|playing — using playing');
+  if (state.enterOnce && typeof state.enterOnce === 'object' && !Array.isArray(state.enterOnce)){
+    var once = Object.assign({}, state.enterOnce); delete once.enterOnce;
+    screenPatchWarnings(once, path + '.enterOnce', warnings);
+  }
+}
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
 var BUFFER_STATES = ['empty','buffered','protected','uploading','uploaded','dropped'];
@@ -1141,6 +1150,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PANEL_TYPES.join(' ') + ')');
     if (p.type === 'screen' && p.scene && SCENE_NAMES.indexOf(p.scene) < 0)
       warnings.push(PP + '.scene: unknown scene "' + p.scene + '" — using "static-noise" (valid: ' + SCENE_NAMES.join(' ') + ')');
+    if (p.type === 'screen') screenPatchWarnings(p.initial, PP + '.initial', warnings);
     if (p.type === 'waterfall' && !(Array.isArray(p.spans) && p.spans.length))
       warnings.push(PP + '.spans: waterfall needs spans:[{id, label, ms}] — panel renders empty');
     if (p.type === 'waterfall' && Array.isArray(p.spans)) p.spans.forEach(function(span, si){
@@ -1339,6 +1349,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(DP + '.steps[' + ti + '].panels.' + pid + ': patch must be an object of widget fields — ' +
           (Array.isArray(patch[pid]) ? 'got an array (log lines go in {"log": [...]})' : 'got ' + typeof patch[pid]) +
           '; the engine ignores this patch');
+      } else if (panelDeclById[pid] && panelDeclById[pid].type === 'screen'){
+        screenPatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (queuePanels[pid] && patch[pid]){
         if (patch[pid].state != null && QUEUE_STATES.indexOf(String(patch[pid].state)) < 0)
           warnings.push(DP + '.steps[' + ti + '].panels.' + pid + '.state: unknown queue state "' +

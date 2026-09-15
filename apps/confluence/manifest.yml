@@ -19,6 +19,6 @@ permissions:
       - unsafe-inline
 app:
   # Run `npm run forge -- register` once to replace this unregistered placeholder.
-  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  id: ari:cloud:ecosystem::app/dfec92f9-9b54-42cf-942e-6e19bc0983f2
   runtime:
     name: nodejs24.x

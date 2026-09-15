@@ -12,7 +12,7 @@ function load(extra = {}){
   return ctx;
 }
 const C = load();
-const names = ['person-at-door-night', 'person-through-door', 'package-drop', 'kitchen-fire', 'static-noise'];
+const names = ['person-at-door-night', 'person-through-door', 'doorbell-run-away', 'doorbell-runners', 'package-drop', 'kitchen-fire', 'static-noise'];
 function host(){
   const box = {className:'', overlays:'', overlayWrites:0, querySelectorAll(){return [];},
     insertAdjacentHTML(where, html){this.overlays = html;this.overlayWrites++;}};
@@ -164,12 +164,12 @@ test('preview replays the selected clip locally and safely handles absent or unk
   }
 });
 
-test('screen clip starter records before either scene event begins', () => {
+test('screen clip starter records before each scene event begins', () => {
   const raw = JSON.parse(fs.readFileSync(path.join(ROOT,'src/starters/screen-clips.json'),'utf8'));
   const result = C.validate(C.normalize(raw));
   assert.equal(result.errors.length, 0, result.errors.join('; '));
   assert.equal(result.warnings.length, 0, result.warnings.join('; '));
-  assert.deepEqual(raw.page.sections.map(s => s.diagram.panels[0].scene), ['person-through-door','kitchen-fire']);
+  assert.deepEqual(raw.page.sections.map(s => s.diagram.panels[0].scene), ['doorbell-run-away','doorbell-runners','person-through-door','kitchen-fire']);
   for (const s of raw.page.sections){
     const states = C.foldPanelStates(s.diagram)['camera-view'];
     assert.deepEqual(Array.from(states,s=>s.mode), ['off','live','rec','rec','save']);

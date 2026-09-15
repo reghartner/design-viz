@@ -244,7 +244,7 @@ function softwarePanelPatchWarnings(state, path, p, warnings){
     softwarePanelPatchWarnings(once, path + '.enterOnce', p, warnings);
   }
 }
-var SCENE_NAMES = ['person-at-door-night','person-through-door','package-drop','kitchen-fire','static-noise'];
+var SCENE_NAMES = ['person-at-door-night','person-through-door','doorbell-run-away','doorbell-runners','package-drop','kitchen-fire','static-noise'];
 function screenPatchWarnings(state, path, warnings){
   if (!state || typeof state !== 'object' || Array.isArray(state)) return;
   if (Object.prototype.hasOwnProperty.call(state, 'scenePlayback') && ['waiting','playing'].indexOf(state.scenePlayback) < 0)

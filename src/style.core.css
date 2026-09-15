@@ -473,6 +473,43 @@
 }
 @keyframes entrylight{0%,22%,100%{opacity:0;}40%,80%{opacity:.22;}}
 @keyframes entrystride{from{transform:rotate(-17deg);}to{transform:rotate(17deg);}}
+/* Doorbell perspective: runners recede down the path, then turn along the
+   sidewalk. Finite tracks leave an empty porch without replaying the event.
+   Base poses are mid-run stills for print and reduced motion. */
+.screenbox .doorbell-runner{--runner-shirt:#E4A06B;--runner-sleeve:#BB7554;--runner-delay:0s;transform-origin:0 0;transform:translate(143px,125px) scale(.78);}
+.screenbox .doorbell-runner-second{--runner-shirt:#6ABCB3;--runner-sleeve:#448C91;--runner-delay:.42s;transform:translate(186px,135px) scale(.88);}
+.screenbox .doorbell-leg{transform-origin:0 -27px;transform:rotate(-12deg) scaleY(.65);}
+.screenbox .doorbell-leg-back{transform:rotate(12deg);}
+.screenbox .doorbell-arm{transform-origin:8px -46px;transform:rotate(-18deg);}
+.screenbox .doorbell-arm-back{transform-origin:-8px -46px;transform:rotate(18deg);}
+.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-runner{animation:doorbellaway 7.2s linear var(--runner-delay) both;}
+.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-runner-second{animation-name:doorbellawaysecond;}
+.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-bounce{animation:doorbellbounce .32s ease-in-out var(--runner-delay) 23;}
+.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-leg{animation:doorbellstride .16s ease-in-out var(--runner-delay) 46 alternate;}
+.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-arm{animation:doorbellarms .16s ease-in-out var(--runner-delay) 46 alternate;}
+.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-leg-back,
+.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-arm:not(.doorbell-arm-back){animation-direction:alternate-reverse;}
+@keyframes doorbellaway{
+  0%{transform:translate(105px,180px) scale(1.35);}
+  16%{transform:translate(130px,146px) scale(.98);}
+  37%{transform:translate(154px,119px) scale(.66);}
+  60%{transform:translate(170px,103px) scale(.42);}
+  72%{transform:translate(180px,99px) scale(.33);}
+  82%{transform:translate(220px,97px) scale(.3);}
+  100%{transform:translate(339px,96px) scale(.27);}
+}
+@keyframes doorbellawaysecond{
+  0%{transform:translate(213px,178px) scale(1.25);}
+  16%{transform:translate(191px,149px) scale(1);}
+  37%{transform:translate(177px,122px) scale(.68);}
+  60%{transform:translate(168px,104px) scale(.43);}
+  72%{transform:translate(156px,99px) scale(.33);}
+  82%{transform:translate(109px,97px) scale(.3);}
+  100%{transform:translate(-19px,96px) scale(.27);}
+}
+@keyframes doorbellbounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-3px);}}
+@keyframes doorbellstride{from{transform:rotate(-14deg) scaleY(.48);}to{transform:rotate(14deg) scaleY(1);}}
+@keyframes doorbellarms{from{transform:rotate(-26deg);}to{transform:rotate(24deg);}}
 /* Small local changes in the flames/light, never a flashing full frame. */
 .screenbox .fire-flame{transform-origin:239px 105px;}
 .screenbox .fire-glow{filter:blur(10px);}
@@ -494,14 +531,14 @@
    Removing this class starts the clip from its beginning; REC is outside
    .scene, so its indicator keeps running independently. */
 .screenbox.scene-waiting .scene *{animation:none !important;}
-.screenbox.scene-waiting :is(.walker,.courier,.pkg,.entry-person,.fire-flame,.fire-glow,.fire-smoke,.fire-ember,.fire-alarm){visibility:hidden;}
+.screenbox.scene-waiting :is(.walker,.courier,.pkg,.entry-person,.doorbell-runner,.fire-flame,.fire-glow,.fire-smoke,.fire-ember,.fire-alarm){visibility:hidden;}
 .screenbox.scene-waiting .entry-door{transform:none;}
 .screenbox.scene-waiting .entry-light{opacity:0;}
 @media(prefers-reduced-motion:reduce){
-  .screenbox .scene-entry *, .screenbox .scene-fire *{animation:none !important;}
+  .screenbox :is(.scene-entry,.scene-doorbell,.scene-fire) *{animation:none !important;}
 }
 @media print{
-  .screenbox .scene-entry *, .screenbox .scene-fire *{animation:none !important;}
+  .screenbox :is(.scene-entry,.scene-doorbell,.scene-fire) *{animation:none !important;}
   .screenbox{print-color-adjust:exact;}
 }
 .screenbox.m-boot .flick{animation:flicker .18s steps(2) infinite;}

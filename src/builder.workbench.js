@@ -2603,7 +2603,7 @@ function patchFieldsCollect(fields, values){
   return {item: item};
 }
 
-var SCENE_TOKENS = ['person-at-door-night', 'person-through-door', 'package-drop', 'kitchen-fire', 'static-noise'];
+var SCENE_TOKENS = ['person-at-door-night', 'person-through-door', 'doorbell-run-away', 'doorbell-runners', 'package-drop', 'kitchen-fire', 'static-noise'];
 
 /* A local preview never patches camera mode or advances the story. Replay
    replaces only this SVG, so it cannot reset the diagram's animation. */

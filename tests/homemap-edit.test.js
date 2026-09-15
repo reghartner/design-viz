@@ -7,6 +7,59 @@ for (const name of ['validator', 'engine', 'builder.workbench'])
 const plain = value => JSON.parse(JSON.stringify(value));
 const fixture = () => JSON.parse(fs.readFileSync(path.join(__dirname, '../src/starters/homemap-story.json'), 'utf8'));
 const diagram = spec => spec.page.sections[0].diagram;
+function selectionFixture(){
+  function element(attrs={},parent=null,classes=[]){
+    return {parent,getAttribute:key=>attrs[key] ?? null,closest(selector){
+      for(let node=this;node;node=node.parent){
+        if(selector.split(',').some(s=>node.matches(s.trim()))) return node;
+      }
+      return null;
+    },matches(selector){
+      if(selector==='button') return attrs.tag==='button';
+      if(/^[a-z]/.test(selector)) return false;
+      return [...selector.matchAll(/\.([\w-]+)/g)].every(m=>classes.includes(m[1])) &&
+        [...selector.matchAll(/\[([^=\]]+)(?:="([^"]*)")?\]/g)].every(m=>m[2]===undefined ? Object.hasOwn(attrs,m[1]) : attrs[m[1]]===m[2]);
+    }};
+  }
+  const section=element({'data-dv-section':'2'},null,['doc-sec']);
+  const card=element({'data-dv-panel':'1'},section,['pt-homemap']);
+  return {card,section,element,
+    marker:kind=>element({},element({[kind]:'x'},card)),
+    button:element({tag:'button','data-home-layout':''},card),
+    title:element({},card)};
+}
+
+test('ambient map markers select shared layout even when a stepper exists; step view still selects its beat',()=>{
+  const f=selectionFixture();let mode='ambient';
+  const player=()=>({mode:()=>mode,sourceIndex:()=>6});
+  for(const attr of ['data-device','data-subject','data-home-room']){
+    const target=C.builderHomemapClickTarget(f.marker(attr),player,null);
+    assert.equal(target.kind,'panel');assert.equal(target.section,2);assert.equal(target.index,1);assert.equal(target.el,f.card);
+  }
+  mode='step';assert.deepEqual(plain(C.builderHomemapClickTarget(f.marker('data-device'),player,null)),{kind:'step',section:2,index:6});
+  assert.equal(C.builderHomemapClickTarget(f.marker('data-subject'),()=>null,null).kind,'panel');
+});
+
+test('explicit layout and title selection work in step view and retain layout scope only for this map',()=>{
+  const f=selectionFixture(),player=()=>({mode:()=> 'step',sourceIndex:()=>6});
+  assert.equal(C.builderHomemapClickTarget(f.button,player,null).kind,'panel');
+  assert.equal(C.builderHomemapClickTarget(f.title,player,null).kind,'panel');
+  const editing={kind:'panel',section:2,index:1};
+  assert.equal(C.builderHomemapClickTarget(f.marker('data-home-room'),player,editing).kind,'panel');
+  assert.equal(C.builderHomemapClickTarget(f.marker('data-home-room'),player,{...editing,index:0}).kind,'step');
+  assert.equal(C.builderHomemapClickTarget(f.element({tag:'button'},f.card),player,null),null);
+  assert.equal(C.builderHomemapClickTarget(f.section,player,null),null);
+});
+
+test('numeric outline controls keep unknown fields, allow defaults, and reject invalid numbers',()=>{
+  const shape=C.PANEL_SETUP_FIELDS.homemap.find(f=>f[0]==='outline')[2];
+  const base={w:300,h:164,future:'keep'};
+  assert.deepEqual(plain(C.objFieldsCollect(shape,base,{w:'280',h:'164'}).obj),{w:280,h:164,future:'keep'});
+  assert.deepEqual(plain(C.objFieldsCollect(shape,base,{w:'',h:'150'}).obj),{h:150,future:'keep'});
+  assert.equal(C.objFieldsCollect(shape,base,{w:'',h:''}).obj,null);
+  assert.ok(C.objFieldsCollect(shape,base,{w:'wide',h:'150'}).error);
+});
+
 function edit(spec, step, key, value, pid = 'home'){
   const result = C.planStepHomemapField(JSON.stringify(spec, null, 2), spec, 0, step, pid, key, value);
   assert.ok(!result.error, result.error); return JSON.parse(result.text);

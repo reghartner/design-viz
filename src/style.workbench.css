@@ -449,6 +449,10 @@ section.doc-sec.dv-inserttarget::before{content:"insert target"; position:absolu
   font:700 9px 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase;
   color:var(--card); background:var(--sub); padding:2px 6px; border-radius:4px; z-index:2; pointer-events:none;}
 .docview .stepline{cursor:pointer;} /* click selects the current step */
+.docview .home-layout-title{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.docview .home-layout-button{font:600 11px 'IBM Plex Sans',sans-serif;text-transform:none;letter-spacing:normal;min-height:30px;margin-left:auto;}
+.rowline .obj-field{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px;font-size:11px;}
+@media print{.home-layout-button{display:none !important;}}
 .playback-settings{padding:8px;border:1px solid var(--line);border-radius:6px;}
 .playback-settings summary{cursor:pointer;font-weight:600;}
 .playback-settings>label{display:block;margin-top:10px;}

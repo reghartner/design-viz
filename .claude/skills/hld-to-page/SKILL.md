@@ -163,6 +163,11 @@ assume `view:"step"` starts playback by itself. The workbench exposes this in
 Steps → Playback settings and keeps its editing preview paused. Published
 Confluence snapshots honor the same setting; configuration previews stay paused.
 
+In the workbench, **Edit layout** on a homemap opens shared size/room/device
+settings from either view. Ambient map clicks select this layout inspector;
+step markers select per-step controls unless the layout is already selected.
+Use **Edit shared home layout** / **Edit home at current step** to switch scope.
+
 ## 3 — The conversation: agree on what to draw
 
 The page's shape is decided WITH the operator. If the operator has already

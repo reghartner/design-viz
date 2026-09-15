@@ -3033,6 +3033,8 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var mode = String(state.mode || 'off');
     if (['off','boot','live','rec','save'].indexOf(mode) < 0) mode = 'off';
     var sceneName = SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
+    var scrClass = 'screenbox m-' + mode +
+      (state.scenePlayback === 'waiting' && ['live','rec','save'].indexOf(mode) >= 0 ? ' scene-waiting' : '');
     /* overlays are built separately from the scene so a mode change between
        two scene-showing modes can swap ONLY the overlays (surgical path
        below) and keep the scene subtree's animation state (the walker) */
@@ -3041,7 +3043,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
     if (mode === 'save') scrOvl += '<span class="ovl banner">' + esc(state.banner || 'SAVING CLIP') + '</span>';
     if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
-    h += '<div class="screenbox m-' + mode + '">';
+    h += '<div class="' + scrClass + '">';
     if (mode === 'boot') h += SCENES['static-noise'];
     else if (mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
     h += scrOvl + '</div>';
@@ -3750,15 +3752,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var scrBox = host.querySelector('.screenbox');
     if (scrBox){
       surgical = true;
-      scrBox.className = 'screenbox m-' + mode;
-      var oldOvls = scrBox.querySelectorAll('.ovl');
-      for (var ov = oldOvls.length - 1; ov >= 0; ov--)
-        oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
-      if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
+      scrBox.className = scrClass;
+      if (scrOvl !== host._scrOverlay){
+        var oldOvls = scrBox.querySelectorAll('.ovl');
+        for (var ov = oldOvls.length - 1; ov >= 0; ov--)
+          oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
+        if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
+      }
     }
   }
   host._scrMode = (type === 'screen') ? mode : undefined;
   host._scrScene = (type === 'screen') ? sceneName : undefined;
+  host._scrOverlay = (type === 'screen') ? scrOvl : undefined;
   host._lastHTML = (hBaseline != null) ? hBaseline : h;
   if (!surgical) host.innerHTML = h;
 

@@ -515,6 +515,13 @@ body.sk-daylight{background:#F4F2EC;}
 @keyframes fireglow{from{opacity:.55;}to{opacity:1;}}
 @keyframes firerise{0%{transform:translate(0,0) scale(.7);opacity:0;}20%{opacity:.9;}100%{transform:translate(-28px,-57px) scale(1.9);opacity:0;}}
 @keyframes fireember{0%{transform:translate(0,0);opacity:0;}15%{opacity:.8;}100%{transform:translate(-12px,-45px);opacity:0;}}
+/* A quiet scene can be live or recording before the story event begins.
+   Removing this class starts the clip from its beginning; REC is outside
+   .scene, so its indicator keeps running independently. */
+.screenbox.scene-waiting .scene *{animation:none !important;}
+.screenbox.scene-waiting :is(.walker,.courier,.pkg,.entry-person,.fire-flame,.fire-glow,.fire-smoke,.fire-ember,.fire-alarm){visibility:hidden;}
+.screenbox.scene-waiting .entry-door{transform:none;}
+.screenbox.scene-waiting .entry-light{opacity:0;}
 @media(prefers-reduced-motion:reduce){
   .screenbox .scene-entry *, .screenbox .scene-fire *{animation:none !important;}
 }
@@ -4620,6 +4627,15 @@ function softwarePanelPatchWarnings(state, path, p, warnings){
   }
 }
 var SCENE_NAMES = ['person-at-door-night','person-through-door','package-drop','kitchen-fire','static-noise'];
+function screenPatchWarnings(state, path, warnings){
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return;
+  if (Object.prototype.hasOwnProperty.call(state, 'scenePlayback') && ['waiting','playing'].indexOf(state.scenePlayback) < 0)
+    warnings.push(path + '.scenePlayback: expected waiting|playing — using playing');
+  if (state.enterOnce && typeof state.enterOnce === 'object' && !Array.isArray(state.enterOnce)){
+    var once = Object.assign({}, state.enterOnce); delete once.enterOnce;
+    screenPatchWarnings(once, path + '.enterOnce', warnings);
+  }
+}
 var QUEUE_STATES = ['empty','enqueue','held','dequeue'];
 var QUEUE_CTX_FIELDS = ['from','to','reason'];
 var BUFFER_STATES = ['empty','buffered','protected','uploading','uploaded','dropped'];
@@ -5516,6 +5532,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PANEL_TYPES.join(' ') + ')');
     if (p.type === 'screen' && p.scene && SCENE_NAMES.indexOf(p.scene) < 0)
       warnings.push(PP + '.scene: unknown scene "' + p.scene + '" — using "static-noise" (valid: ' + SCENE_NAMES.join(' ') + ')');
+    if (p.type === 'screen') screenPatchWarnings(p.initial, PP + '.initial', warnings);
     if (p.type === 'waterfall' && !(Array.isArray(p.spans) && p.spans.length))
       warnings.push(PP + '.spans: waterfall needs spans:[{id, label, ms}] — panel renders empty');
     if (p.type === 'waterfall' && Array.isArray(p.spans)) p.spans.forEach(function(span, si){
@@ -5714,6 +5731,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(DP + '.steps[' + ti + '].panels.' + pid + ': patch must be an object of widget fields — ' +
           (Array.isArray(patch[pid]) ? 'got an array (log lines go in {"log": [...]})' : 'got ' + typeof patch[pid]) +
           '; the engine ignores this patch');
+      } else if (panelDeclById[pid] && panelDeclById[pid].type === 'screen'){
+        screenPatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (queuePanels[pid] && patch[pid]){
         if (patch[pid].state != null && QUEUE_STATES.indexOf(String(patch[pid].state)) < 0)
           warnings.push(DP + '.steps[' + ti + '].panels.' + pid + '.state: unknown queue state "' +
@@ -9171,6 +9190,8 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var mode = String(state.mode || 'off');
     if (['off','boot','live','rec','save'].indexOf(mode) < 0) mode = 'off';
     var sceneName = SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
+    var scrClass = 'screenbox m-' + mode +
+      (state.scenePlayback === 'waiting' && ['live','rec','save'].indexOf(mode) >= 0 ? ' scene-waiting' : '');
     /* overlays are built separately from the scene so a mode change between
        two scene-showing modes can swap ONLY the overlays (surgical path
        below) and keep the scene subtree's animation state (the walker) */
@@ -9179,7 +9200,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
     if (mode === 'save') scrOvl += '<span class="ovl banner">' + esc(state.banner || 'SAVING CLIP') + '</span>';
     if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
-    h += '<div class="screenbox m-' + mode + '">';
+    h += '<div class="' + scrClass + '">';
     if (mode === 'boot') h += SCENES['static-noise'];
     else if (mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
     h += scrOvl + '</div>';
@@ -9888,15 +9909,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     var scrBox = host.querySelector('.screenbox');
     if (scrBox){
       surgical = true;
-      scrBox.className = 'screenbox m-' + mode;
-      var oldOvls = scrBox.querySelectorAll('.ovl');
-      for (var ov = oldOvls.length - 1; ov >= 0; ov--)
-        oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
-      if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
+      scrBox.className = scrClass;
+      if (scrOvl !== host._scrOverlay){
+        var oldOvls = scrBox.querySelectorAll('.ovl');
+        for (var ov = oldOvls.length - 1; ov >= 0; ov--)
+          oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
+        if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
+      }
     }
   }
   host._scrMode = (type === 'screen') ? mode : undefined;
   host._scrScene = (type === 'screen') ? sceneName : undefined;
+  host._scrOverlay = (type === 'screen') ? scrOvl : undefined;
   host._lastHTML = (hBaseline != null) ? hBaseline : h;
   if (!surgical) host.innerHTML = h;
 

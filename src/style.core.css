@@ -490,6 +490,13 @@
 @keyframes fireglow{from{opacity:.55;}to{opacity:1;}}
 @keyframes firerise{0%{transform:translate(0,0) scale(.7);opacity:0;}20%{opacity:.9;}100%{transform:translate(-28px,-57px) scale(1.9);opacity:0;}}
 @keyframes fireember{0%{transform:translate(0,0);opacity:0;}15%{opacity:.8;}100%{transform:translate(-12px,-45px);opacity:0;}}
+/* A quiet scene can be live or recording before the story event begins.
+   Removing this class starts the clip from its beginning; REC is outside
+   .scene, so its indicator keeps running independently. */
+.screenbox.scene-waiting .scene *{animation:none !important;}
+.screenbox.scene-waiting :is(.walker,.courier,.pkg,.entry-person,.fire-flame,.fire-glow,.fire-smoke,.fire-ember,.fire-alarm){visibility:hidden;}
+.screenbox.scene-waiting .entry-door{transform:none;}
+.screenbox.scene-waiting .entry-light{opacity:0;}
 @media(prefers-reduced-motion:reduce){
   .screenbox .scene-entry *, .screenbox .scene-fire *{animation:none !important;}
 }

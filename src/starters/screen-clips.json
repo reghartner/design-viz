@@ -6,7 +6,7 @@
       {
         "heading": "Someone comes home",
         "text": [
-          "A visitor approaches, the door opens, and they walk inside. Switch to step 2 to start the clip; return to step 1 and then 2 to replay it."
+          "Step 2 shows the quiet scene. Step 3 begins recording; step 4 triggers the event while REC stays on. Return to step 3, then 4, to replay the event."
         ],
         "diagram": {
           "primaryPanel": "camera-view",
@@ -56,7 +56,8 @@
               "title": "Entry camera",
               "scene": "person-through-door",
               "initial": {
-                "mode": "off"
+                "mode": "off",
+                "scenePlayback": "waiting"
               }
             }
           ],
@@ -66,17 +67,18 @@
               "nodes": [
                 "camera"
               ],
-              "text": "Camera in standby. Advance to watch the simulated clip.",
+              "text": "Camera in standby. The event has not happened yet.",
               "panels": {
                 "camera-view": {
-                  "mode": "off"
+                  "mode": "off",
+                  "scenePlayback": "waiting"
                 }
               }
             },
             {
               "id": "live",
               "edge": "camera->detector",
-              "text": "Live frames show the scene.",
+              "text": "Live frames show the quiet setting before the event.",
               "panels": {
                 "camera-view": {
                   "mode": "live"
@@ -85,11 +87,23 @@
             },
             {
               "id": "record",
-              "edge": "detector->phone",
-              "text": "Person entered \u2014 send an alert and record the same clip.",
+              "text": "Recording has begun. The scene is still quiet.",
               "panels": {
                 "camera-view": {
                   "mode": "rec"
+                }
+              },
+              "nodes": [
+                "camera"
+              ]
+            },
+            {
+              "id": "event",
+              "edge": "detector->phone",
+              "text": "A person enters while the camera is already recording. Send an alert.",
+              "panels": {
+                "camera-view": {
+                  "scenePlayback": "playing"
                 }
               }
             },
@@ -113,7 +127,7 @@
       {
         "heading": "A fire in the kitchen",
         "text": [
-          "Layered flames, rising smoke, embers, and warm reflected light show what the camera sees. These visuals illustrate a fictional event, not real detection results."
+          "Step 2 shows the quiet scene. Step 3 begins recording; step 4 triggers the event while REC stays on. Return to step 3, then 4, to replay the event."
         ],
         "diagram": {
           "primaryPanel": "camera-view",
@@ -163,7 +177,8 @@
               "title": "Kitchen camera",
               "scene": "kitchen-fire",
               "initial": {
-                "mode": "off"
+                "mode": "off",
+                "scenePlayback": "waiting"
               }
             }
           ],
@@ -173,17 +188,18 @@
               "nodes": [
                 "camera"
               ],
-              "text": "Camera in standby. Advance to watch the simulated clip.",
+              "text": "Camera in standby. The event has not happened yet.",
               "panels": {
                 "camera-view": {
-                  "mode": "off"
+                  "mode": "off",
+                  "scenePlayback": "waiting"
                 }
               }
             },
             {
               "id": "live",
               "edge": "camera->detector",
-              "text": "Live frames show the scene.",
+              "text": "Live frames show the quiet setting before the event.",
               "panels": {
                 "camera-view": {
                   "mode": "live"
@@ -192,11 +208,23 @@
             },
             {
               "id": "record",
-              "edge": "detector->phone",
-              "text": "Fire detected \u2014 send an alert and record the same clip.",
+              "text": "Recording has begun. The scene is still quiet.",
               "panels": {
                 "camera-view": {
                   "mode": "rec"
+                }
+              },
+              "nodes": [
+                "camera"
+              ]
+            },
+            {
+              "id": "event",
+              "edge": "detector->phone",
+              "text": "A fire starts in the kitchen while the camera is already recording. Send an alert.",
+              "panels": {
+                "camera-view": {
+                  "scenePlayback": "playing"
                 }
               }
             },

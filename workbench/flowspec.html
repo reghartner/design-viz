@@ -624,13 +624,10 @@ body.sk-aurora.sk-blueprint{
 .boardgrid.haspanels > .diagramcol{min-width:0;}
 .boardgrid.haspanels > .panelcol{align-self:start;min-width:0;}
 @media (max-width:980px){ .boardgrid.haspanels{grid-template-columns:1fr;} }
-/* The workbench consumes part of a wide viewport with its editor. Measure
-   the preview itself so adding panels cannot shrink its board to a thumbnail. */
+/* A section can be much narrower than the viewport or its document, e.g.
+   beside the workbench editor. Measure its actual diagram/panel space. */
 .docview{container-type:inline-size;}
-@container (max-width:900px){
-  .boardgrid.haspanels{grid-template-columns:1fr;}
-  .boardgrid.haspanels > .panelcol{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); align-items:start;}
-}
+.doc-sec{container:diagram-section / inline-size;}
 
 .board{--dv-board-ground:#0B1220; margin-top:12px; border-radius:12px; overflow-x:auto;
   border:1px solid color-mix(in srgb, var(--acc) 30%, transparent);}
@@ -640,7 +637,7 @@ body.sk-aurora.sk-blueprint{
 .board svg{display:block; min-width:980px; width:100%; height:auto;}
 /* when a panel column shares the row the board is only ~670-860px wide, so the
    980px floor would force a horizontal scrollbar; let the svg scale to fit
-   (it collapses to full width below 980px viewport via the grid media query). */
+   (panels move below it when the section no longer has room for both). */
 .boardgrid.haspanels .board svg{min-width:0;}
 .diagramcol{container-type:inline-size;}
 .board.board-size-readable .boardcanvas svg{min-width:1180px;}
@@ -4814,13 +4811,25 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
   .hmsubject{transform:none !important;}
   .hmtrail,.hmsig{display:none !important;}
 }
-@container (max-width:1000px){body .docview .boardgrid.haspanels.panel-first{grid-template-columns:minmax(0,1fr);}}
 @media(max-width:980px){body .docview .boardgrid.haspanels.panel-first{grid-template-columns:minmax(0,1fr);}}
 @media print{
   body .docview .boardgrid.haspanels.panel-first{display:block;}
   .primary-panel>.pwidget{display:block !important;break-inside:avoid;}
   .diagram-views,.primary-modes,.secondary-flow>summary{display:none !important;}
   .primary-panel .hmframe{max-height:none;}
+}
+
+/* Layout wins over skin-specific fixed sidebars. At 1000px, even the widest
+   skin would leave only ~660px for the diagram. Stack first, preserving all
+   available width for the active diagram or primary home panel. Named queries
+   cannot accidentally measure a nested diagram or widget container instead. */
+@media screen{
+  @container diagram-section (max-width:1000px){
+    body .docview .doc-sec .boardgrid.haspanels{grid-template-columns:minmax(0,1fr);}
+    body .docview .doc-sec .boardgrid.haspanels>.panelcol{
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));align-items:start;
+    }
+  }
 }
 </style>
 

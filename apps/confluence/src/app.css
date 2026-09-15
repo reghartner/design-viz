@@ -1,0 +1,27 @@
+/* Forge's iframe is content-sized. Avoid vh-based Home sizing feedback. */
+html,body{margin:0;min-width:0;background:transparent;font-family:'IBM Plex Sans',system-ui,sans-serif;}
+[hidden]{display:none !important;}
+body .docview{box-sizing:border-box;width:100%;max-width:none;padding:12px;}
+body .primary-panel .hmframe{max-height:560px;}
+.docview .copychip,.docview .embedchip{display:none;}
+.docview a[aria-disabled="true"]{cursor:default;opacity:.6;}
+.configuration{box-sizing:border-box;max-width:960px;margin:0 auto;padding:24px;background:#fff;color:#172b4d;border-bottom:1px solid #dfe1e6;}
+.configuration h1{font-size:22px;margin:0 0 12px;}
+.configuration p{margin:8px 0 16px;font-size:14px;line-height:1.5;}
+.configuration label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px;}
+.configuration input[type=file]{display:block;max-width:100%;font-size:14px;}
+.configuration textarea{box-sizing:border-box;width:100%;min-height:150px;max-height:350px;resize:vertical;padding:12px;border:1px solid #8590a2;border-radius:6px;font:12px/1.5 'IBM Plex Mono',monospace;background:#f7f8fa;color:#172b4d;}
+.configuration .help{font-size:12px;color:#596773;}
+.options{display:flex;flex-wrap:wrap;gap:16px;}
+.options label{flex:1 1 160px;min-width:0;}
+.options select{box-sizing:border-box;display:block;margin-top:6px;width:100%;padding:8px;border:1px solid #8590a2;border-radius:5px;background:#fff;color:#172b4d;}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;}
+.actions button{padding:8px 14px;font-size:14px;border:1px solid #8590a2;border-radius:5px;background:#f1f2f4;color:#172b4d;cursor:pointer;}
+.actions .primary{background:#0c66e4;color:#fff;border-color:#0c66e4;}
+.actions button:disabled{opacity:.5;cursor:default;}
+.configuration :focus-visible{outline:2px solid #0c66e4;outline-offset:3px;}
+.app-status{margin:0;padding:16px;color:#172b4d;background:#f1f2f4;white-space:pre-wrap;}
+#import-status{white-space:pre-wrap;}
+.error{color:#ae2a19 !important;}
+.preview-notice{margin:0;padding:8px 14px;background:#fff7d6;color:#533f04;font-size:12px;}
+@media(max-width:500px){.configuration{padding:16px;}body .docview{padding:6px;}}

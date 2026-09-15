@@ -1,0 +1,24 @@
+modules:
+  macro:
+    - key: flowview
+      title: Flowview
+      description: Interactive design diagrams authored outside Confluence.
+      resource: viewer
+      layout: block
+      config:
+        resource: viewer
+        title: Import a Flowview diagram
+        viewportSize: max
+        openOnInsert: true
+resources:
+  - key: viewer
+    path: static/viewer
+permissions:
+  content:
+    styles:
+      - unsafe-inline
+app:
+  # Run `npm run forge -- register` once to replace this unregistered placeholder.
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs24.x

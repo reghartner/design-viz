@@ -182,8 +182,16 @@
         <button class="bbtn" id="file-open">open&#8230;</button>
         <button class="bbtn" id="file-save">save</button>
         <button class="bbtn" id="file-export" title="write the spec JSON and the published page HTML into a folder you pick">export&#8230;</button>
+        <button class="bbtn" id="confluence-export">Export for Confluence</button>
+        <button class="bbtn" id="confluence-copy">Copy JSON for Confluence</button>
         <button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">diff</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
+        <div id="confluence-handoff" class="confluence-handoff" hidden>
+          <label for="confluence-json">Confluence JSON</label>
+          <textarea id="confluence-json" readonly spellcheck="false"></textarea>
+          <p id="confluence-status" role="status"></p>
+          <button class="bbtn" id="confluence-close">Close</button>
+        </div>
         <ul class="msgs" id="msgs"></ul>
       </div>
     </details>

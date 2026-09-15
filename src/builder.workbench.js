@@ -3183,6 +3183,50 @@ function initWorkbenchBuilder(opts){
       return w.write(contents).then(function(){ return w.close(); });
     });
   }
+  /* Manual handoff: download and clipboard share exactly the same snapshot.
+     Keep a selectable fallback for phones/LAN HTTP without Clipboard API. */
+  var confluenceBox = document.getElementById('confluence-handoff');
+  var confluenceText = document.getElementById('confluence-json');
+  var confluenceStatus = document.getElementById('confluence-status');
+  var confluenceCopy = document.getElementById('confluence-copy');
+  var confluenceExport = document.getElementById('confluence-export');
+  var confluenceClose = document.getElementById('confluence-close');
+  var confluenceCopyRun = 0;
+  function confluenceHandoff(copy){
+    var run = ++confluenceCopyRun, built = buildConfluenceExport(src.value);
+    if (built.error){
+      if (confluenceBox) confluenceBox.hidden = true;
+      inspectorMessage('Confluence export: ' + built.error); return;
+    }
+    if (confluenceBox && confluenceText && confluenceStatus){
+      confluenceBox.hidden = false; confluenceText.value = built.text;
+      confluenceStatus.textContent = 'Import this file or paste this JSON in the Flowview macro configuration.';
+    }
+    if (!copy){ downloadTextFile(built.name,built.text,'application/json'); return; }
+    function result(ok){
+      if (run !== confluenceCopyRun || !confluenceStatus) return;
+      confluenceStatus.textContent = ok ? 'Copied. Paste into the Flowview macro configuration in Confluence.' :
+        'Automatic copy is unavailable. Select and copy the JSON below, or use Export for Confluence.';
+    }
+    function fallback(){
+      var ok = false;
+      if (run !== confluenceCopyRun) return;
+      if (confluenceText){ confluenceText.focus(); confluenceText.select();
+        try { ok = document.execCommand('copy'); } catch (ex){}
+      }
+      result(ok);
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText)
+        navigator.clipboard.writeText(built.text).then(function(){result(true);},fallback);
+      else fallback();
+    } catch (ex){ fallback(); }
+  }
+  if (confluenceExport) confluenceExport.addEventListener('click',function(){confluenceHandoff(false);});
+  if (confluenceCopy) confluenceCopy.addEventListener('click',function(){confluenceHandoff(true);});
+  if (confluenceClose) confluenceClose.addEventListener('click',function(){
+    confluenceCopyRun++; confluenceBox.hidden = true; confluenceCopy.focus();
+  });
   var exportBtn = document.getElementById('file-export');
   if (exportBtn) exportBtn.addEventListener('click', function(){
     var parsed = parseEditor();

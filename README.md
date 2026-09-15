@@ -14,6 +14,12 @@ and its [cookbook index](cookbook/README.md). They include complete recipes for
 [alternate timelines](cookbook/alternate-paths.md), [Home-centered stories](cookbook/home-story.md),
 and [camera recording/event timing](cookbook/camera-events.md).
 
+**[Confluence viewer](docs/confluence.md):** keep editing in the workbench, then
+use **Export for Confluence** or **Copy JSON for Confluence** for manual import
+into the Forge macro. The viewer retains playback, alternate paths and panels.
+The company's agent can finish deployment using the
+[Forge integration handoff](docs/confluence-integration.md).
+
 **[Alternate paths](docs/alternate-paths.md):** show a happy path and failure
 outcomes on one diagram. Colored path rows align their step numbers beneath the transport controls; playback
 and panel state follow the selected sequence and stop at its own ending.

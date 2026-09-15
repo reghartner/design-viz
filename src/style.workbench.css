@@ -541,8 +541,9 @@ body.sk-aurora.sk-blueprint{
   .home-edit-map{position:sticky;top:0;margin-bottom:0;}
 }
 .home-edit-map:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-.home-edit-map [data-device]{cursor:pointer;}
-.home-edit-map [data-subject]{cursor:grab;touch-action:none;}
+.home-edit-map [data-device],.home-edit-map [data-subject],.home-edit-map [data-home-room]{cursor:grab;touch-action:none;}
+.home-edit-map .hmroom{pointer-events:stroke;}
+.home-edit-map.moving,.home-edit-map.moving *{cursor:grabbing;}
 .home-edit-map.placing,.home-edit-map.placing *{cursor:crosshair;touch-action:none;}
 .home-edit-map .hmframe *{animation:none !important;}
 .home-xy{display:grid;grid-template-columns:1fr 1fr;gap:10px;}

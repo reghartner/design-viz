@@ -711,8 +711,9 @@ perspectives" of one timeline). Types:
   `scan` (default), `sleep`, `detect`, `rec` (sweep stays live and a red recording light blinks), `off`; entry `closed` (default),
   `open`, `alert`; sensor `ok` (default), `warn`, `alert`, `off`; hub
   `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`. Sensors accept an `icon` from the shared
-  icon set (default/fallback `gear`). Every device has a marker, label, and
-  visible state text. Optional `rooms:[{label,x,y,w,h}]` adds named rectangular
+  icon set (default/fallback `gear`). Every device has a marker and label;
+  state is conveyed by its appearance and animation, with name/state text in
+  its hover title instead of a visible state chip. Optional `rooms:[{label,x,y,w,h}]` adds named rectangular
   areas behind the devices. Room coordinates use the same frame; rectangles
   must have positive size and fit inside 320×180, otherwise they warn and are
   ignored. Rooms are presentation boundaries, not simulated physical walls.
@@ -739,13 +740,16 @@ perspectives" of one timeline). Types:
   actors: `[{"id":"walker","label":"Visitor","icon":"gear","x":20,"y":150}]`.
   Each subject needs a unique nonempty id distinct from device ids and
   `signals`, plus finite starting `x`/`y` in the same 320×180 frame (clamped
-  to its bounds). Labels default to the id; omit `icon` for a person avatar,
+  to its bounds). Subject names default to the id and remain available in hover
+  titles and editor controls. Their visible labels are hidden by default; set
+  `showSubjectLabels: true` on the panel to display them (`false` or omission
+  keeps them hidden; other types warn and keep labels hidden). Omit `icon` for a person avatar,
   or use a shared icon token (unknown icons warn and fall back to `gear`).
   `initial` and step patches address subject ids with objects:
   `{"walker":{"x":120,"y":60}}`; `{"walker":null}` hides the subject.
   Positions and hidden state carry across steps; invalid subject patches
   warn and are ignored. Visible subjects glide from the previous position
-  on animated steps, with their label, optional icon, and a short fading trail. Reappearing after
+  on animated steps, with their optional label/icon and a short fading trail. Reappearing after
   hiding starts at the new position without a glide; reduced motion disables
   glides. Invalid subject declarations warn and are ignored.
   The workbench's **Home at this step** editor appears for every homemap even
@@ -753,7 +757,10 @@ perspectives" of one timeline). Types:
   the changed field, supports device state selectors, subject drag/tap placement
   and coordinates, hide/show/inherit, and device-to-device signals. Resetting
   to Inherit removes that field from this step. Shared source steps affect
-  every path that references them. See [the editing guide](../docs/homemap-workbench.md).
+  every path that references them. Dragging a device or room border/label in
+  the placement map updates its declaration coordinates across all steps/paths,
+  without changing any step patch or room occupants. Moves stay in the frame
+  and commit as one undo action; Escape cancels. See [the editing guide](../docs/homemap-workbench.md).
 - `signal` — link health for 1–6 named radio/wired links:
   `{"id":"net","type":"signal","links":[{"id":"wifi","label":"WiFi",
   "transport":"wifi"},{"id":"cell","label":"Cellular","transport":

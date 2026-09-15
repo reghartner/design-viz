@@ -26,17 +26,24 @@ over the current reading preference.
 
 Room rectangles are optional: use the homemap panel's **rooms** table to add
 labels and x/y/w/h values inside the 320×180 frame. Devices and people use that
-same coordinate space at every display size. Device state text and static signal
-arrows keep the map readable without motion or hover.
+same coordinate space at every display size. Device states use icons, color, and
+animation instead of text chips; hover a device to read its name and current state.
+Static signal arrows remain visible while paused or with reduced motion.
 
-The map's visual treatment is automatic: device icons and state badges, softly
+The map's visual treatment is automatic: device icons, softly
 raised room walls, camera sweeps, breathing activity halos, swinging doors, and
 people with a short fading movement trail. Rooms tint to reflect their current
 contents: an alert/detection takes priority over a warning, then a visible person.
 These tints describe the authored scene; they do not trigger device states or
 simulate sensing. A subject without an `icon` uses a person avatar.
 
-No new spec fields or schema version are needed. Reduced motion and print show
+Subject names are hidden on the map by default, including existing specs. Names
+remain available on hover and in the editing controls. To show them, select the
+homemap panel and set **Show subject labels → Shown** in the inspector. This writes
+`showSubjectLabels: true` on the panel; **Hidden (default)** removes the override.
+Device and room labels remain visible.
+
+No schema version change is needed. Reduced motion and print show
 the final state without animation. The inspector's placement map stays steady
 while you edit, and the main map previews the activity.
 
@@ -57,6 +64,15 @@ while you edit, and the main map previews the activity.
    carry until changed.
 5. Use Next/Previous or choose a path to continue editing. Manual transport keeps
    the step inspector on the selected beat. Undo restores the previous source.
+
+You can also drag any device marker or its label in the inspector's placement
+map. Camera coverage and signal endpoints follow the device while you drag.
+Drag a room's border or label to move its rectangle; its contents keep their
+positions. Device and room moves edit the shared layout for **all steps and
+paths**, while subject moves belong to the selected step. Items stay inside the
+320×180 frame. Each completed drag is one undo action; Escape or a cancelled
+pointer gesture restores the original layout. For precise keyboard edits, use
+the panel's **devices** and **rooms** coordinate tables.
 
 Edits are sparse: changing the door does not freeze the camera or person. A step
 shared by multiple paths is still one shared source entry, so editing it changes

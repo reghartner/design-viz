@@ -1209,6 +1209,13 @@ function resolveHashTarget(st, manifest){
 }
 
 /* ---------------- stock scenes for the screen widget ---------------- */
+var SCENE_LABELS = {
+  'person-at-door-night': 'Visitor at night',
+  'person-through-door': 'Person walking through a door',
+  'package-drop': 'Package delivery',
+  'kitchen-fire': 'Kitchen fire',
+  'static-noise': 'Static noise'
+};
 var SCENES = {
   'person-at-door-night':
     '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
@@ -1239,6 +1246,81 @@ var SCENES = {
     '<rect class="carried" x="9" y="104" width="20" height="15" rx="2" fill="#233040" stroke="#31404F" stroke-width="1.5"/></g>' +
     '<g class="pkg"><rect x="216" y="118" width="46" height="34" rx="3" fill="#233040" stroke="#31404F" stroke-width="2"/>' +
     '<line x1="216" y1="135" x2="262" y2="135" stroke="#31404F" stroke-width="2"/></g></svg>',
+  'person-through-door':
+    /* A single six-second entry: approach, door opens, cross the threshold,
+       door closes. No IDs or external assets, so many cameras can coexist.
+       CSS defaults hold a readable mid-entry pose for reduced motion. */
+    '<svg viewBox="0 0 320 180" class="scene scene-entry" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#152A35"/>' +
+    '<path d="M0 150H320V180H0Z" fill="#263E47"/>' +
+    '<path d="M0 160H320M0 177H320M64 150L40 180M140 150L132 180M230 150L242 180" stroke="#45616A" stroke-opacity=".35"/>' +
+    '<rect x="28" y="40" width="74" height="66" rx="3" fill="#385460" stroke="#65858C" stroke-width="3"/>' +
+    '<path d="M65 40V106M28 73H102" stroke="#729199" stroke-width="3"/>' +
+    '<path d="M34 47H58L34 69ZM72 80H95L72 100Z" fill="#9ACACF" opacity=".14"/>' +
+    '<rect x="168" y="22" width="88" height="132" rx="3" fill="#9BB3AD"/>' +
+    '<rect x="174" y="28" width="76" height="124" fill="#D8B47F"/>' +
+    '<path d="M174 28H250V48H200V152H174Z" fill="#AD8259"/>' +
+    '<path d="M200 48H250V152H200Z" fill="#F3D5A4"/>' +
+    '<path d="M210 56H238V107H210Z" fill="#BC9669"/><path d="M213 59H235V104H213Z" fill="#5C7877"/>' +
+    '<path class="entry-light" d="M174 152H250L282 180H139Z" fill="#FFDB9E" opacity=".22"/>' +
+    '<rect x="270" y="58" width="9" height="23" rx="4" fill="#C4D4C8"/>' +
+    '<circle cx="274.5" cy="65" r="2" fill="#7A9F90"/>' +
+    '<ellipse cx="294" cy="152" rx="16" ry="4" fill="#10282E"/>' +
+    '<path d="M286 137H303L300 153H289Z" fill="#BA8968"/>' +
+    '<path d="M294 140V111M294 126Q275 127 282 114Q294 113 294 126M294 119Q306 120 310 105Q296 103 294 119" fill="#6C9F88" stroke="#77AC94" stroke-width="2"/>' +
+    '<g class="entry-person"><ellipse cx="0" cy="155" rx="16" ry="4" fill="#0A1D24" opacity=".3"/>' +
+    '<g class="entry-stride" fill="none" stroke-linecap="round">' +
+    '<path class="entry-leg entry-leg-back" d="M2 127L-4 141L-7 153" stroke="#182E40" stroke-width="7"/>' +
+    '<path class="entry-arm entry-arm-back" d="M0 106L-10 117L-13 128" stroke="#328E93" stroke-width="6"/>' +
+    '<path class="entry-leg" d="M0 126L7 140L9 153" stroke="#294D5E" stroke-width="7"/>' +
+    '<path d="M0 105L0 126" stroke="#58C6BD" stroke-width="17"/>' +
+    '<path class="entry-arm" d="M2 106L12 116L14 126" stroke="#70DBCB" stroke-width="6"/>' +
+    '<path d="M1 95V100" stroke="#D9A17E" stroke-width="6"/>' +
+    '<circle cx="1" cy="87" r="9" fill="#E4B38B"/>' +
+    '<path d="M-7 86Q-9 76 2 76Q12 77 10 86L6 83L-7 84Z" fill="#24313D"/>' +
+    '</g></g>' +
+    '<g class="entry-door"><rect x="174" y="28" width="76" height="124" fill="#427C7E" stroke="#25575F" stroke-width="2"/>' +
+    '<rect x="183" y="39" width="58" height="47" rx="2" fill="#548F8D" stroke="#71A9A1"/>' +
+    '<rect x="183" y="108" width="58" height="34" rx="2" fill="#397175" stroke="#629A95"/>' +
+    '<path d="M231 99H240" stroke="#F4D795" stroke-width="3" stroke-linecap="round"/></g>' +
+    '<path d="M172 28V153H251" fill="none" stroke="#B6C9BB" stroke-width="3"/>' +
+    '<rect x="197" y="158" width="52" height="10" rx="3" fill="#10282E" opacity=".65"/>' +
+    '</svg>',
+  'kitchen-fire':
+    '<svg viewBox="0 0 320 180" class="scene scene-fire" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#1B2B38"/>' +
+    '<path d="M0 143H320V180H0Z" fill="#283E49"/>' +
+    '<path d="M0 162H320M57 143L42 180M139 143L133 180M235 143L247 180" stroke="#4E6470" stroke-opacity=".35"/>' +
+    '<rect x="23" y="33" width="84" height="62" rx="2" fill="#466172" stroke="#758F9B" stroke-width="3"/>' +
+    '<path d="M65 33V95M23 63H107" stroke="#819BA3" stroke-width="3"/>' +
+    '<path d="M30 41H57L30 58ZM72 70H99L72 88Z" fill="#B4CCD2" opacity=".15"/>' +
+    '<rect x="16" y="110" width="292" height="40" rx="2" fill="#385362"/>' +
+    '<path d="M24 116H87V144H24ZM96 116H163V144H96ZM172 117H197V144H172Z" fill="#476574" stroke="#6B8189"/>' +
+    '<path d="M74 122H79M150 122H155M185 122H190" stroke="#BBC7C3" stroke-width="2" stroke-linecap="round"/>' +
+    '<rect x="203" y="111" width="72" height="39" fill="#263C49"/>' +
+    '<rect x="213" y="122" width="52" height="22" rx="2" fill="#102633" stroke="#66808D"/>' +
+    '<path d="M217 127H260" stroke="#92A3A9" stroke-width="2"/>' +
+    '<circle cx="221" cy="116" r="2" fill="#C0C7BE"/><circle cx="237" cy="116" r="2" fill="#C0C7BE"/><circle cx="253" cy="116" r="2" fill="#C0C7BE"/>' +
+    '<rect x="12" y="104" width="300" height="8" rx="2" fill="#95A59F"/>' +
+    '<path d="M116 104V91Q116 84 123 84Q130 84 130 91" fill="none" stroke="#B9C9C6" stroke-width="3"/>' +
+    '<ellipse cx="144" cy="106" rx="24" ry="2" fill="#3A5661"/>' +
+    '<g class="fire-glow"><ellipse cx="234" cy="99" rx="78" ry="74" fill="#F98036" opacity=".12"/>' +
+    '<ellipse cx="234" cy="105" rx="46" ry="52" fill="#FFB45C" opacity=".13"/>' +
+    '<ellipse cx="234" cy="159" rx="60" ry="11" fill="#FFAC55" opacity=".18"/></g>' +
+    '<g fill="#879098"><g class="fire-smoke"><circle cx="237" cy="64" r="14" opacity=".23"/><circle cx="224" cy="55" r="18" opacity=".19"/></g>' +
+    '<g class="fire-smoke fire-smoke-late"><circle cx="241" cy="65" r="18" opacity=".2"/><circle cx="224" cy="55" r="15" opacity=".16"/></g></g>' +
+    '<ellipse cx="235" cy="105" rx="32" ry="3" fill="#182A34"/>' +
+    '<path d="M214 96H258L253 108H220Z" fill="#253D4A" stroke="#819096" stroke-width="1.5"/>' +
+    '<path d="M256 97H270" stroke="#667B84" stroke-width="3" stroke-linecap="round"/>' +
+    '<path class="fire-flame fire-outer" d="M216 100C202 87 217 72 215 59C225 64 226 74 228 77C231 61 243 53 239 35C260 54 247 64 252 75C259 72 259 66 259 62C273 82 266 98 254 103Z" fill="#EE6938"/>' +
+    '<path class="fire-flame fire-middle" d="M221 101C212 90 226 82 224 70C232 75 232 82 234 84C243 75 244 62 243 56C257 72 246 79 251 89C258 85 257 80 257 78C264 92 254 103 245 105Z" fill="#FFB74F"/>' +
+    '<path class="fire-flame fire-core" d="M230 103C224 98 231 90 233 84C240 89 235 94 241 96C247 91 246 87 247 85C255 97 247 106 239 107Z" fill="#FFE6A0"/>' +
+    '<g fill="#FFD180"><circle class="fire-ember" cx="229" cy="66" r="1.5"/>' +
+    '<circle class="fire-ember fire-ember-late" cx="252" cy="72" r="1.2"/></g>' +
+    '<ellipse cx="157" cy="21" rx="13" ry="5" fill="#ADC0C5"/>' +
+    '<path d="M150 21H159" stroke="#4E6875" stroke-width="1.5"/>' +
+    '<circle class="fire-alarm" cx="164" cy="21" r="1.8" fill="#FF8658"/>' +
+    '</svg>',
   'static-noise':
     '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
     '<rect width="320" height="180" fill="#0A0F14"/>' +
@@ -3666,7 +3748,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
   var surgical = false;
   var SCENE_SHOWING = {live: true, rec: true, save: true};
   if (type === 'screen' && host._lastHTML != null &&
-      SCENE_SHOWING[mode] && SCENE_SHOWING[host._scrMode]){
+      sceneName === host._scrScene && SCENE_SHOWING[mode] && SCENE_SHOWING[host._scrMode]){
     var scrBox = host.querySelector('.screenbox');
     if (scrBox){
       surgical = true;
@@ -3678,6 +3760,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     }
   }
   host._scrMode = (type === 'screen') ? mode : undefined;
+  host._scrScene = (type === 'screen') ? sceneName : undefined;
   host._lastHTML = (hBaseline != null) ? hBaseline : h;
   if (!surgical) host.innerHTML = h;
 

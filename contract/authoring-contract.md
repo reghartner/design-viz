@@ -495,12 +495,22 @@ perspectives" of one timeline). Types:
 - `screen` — a camera viewfinder: `{"id":"cam","type":"screen",
   "scene":"person-at-door-night","initial":{"mode":"off"}}`. Patched via
   `{"mode":"off|boot|live|rec|save", "banner":"<save-banner text>"}`. Stock
-  scenes: `person-at-door-night`, `package-drop`, `static-noise`. `rec` shows
+  scenes: `person-at-door-night`, `person-through-door`, `package-drop`,
+  `kitchen-fire`, `static-noise`. `rec` shows
   a blinking REC dot; `save` shows the banner. Scenes
   animate while shown: `person-at-door-night` walks a figure in;
   `package-drop` plays a delivery (courier walks in carrying a box, the
   package lands, the courier leaves; reduced motion shows the delivered
-  package only).
+  package only). `person-through-door` plays a 6.8-second entry: a person
+  approaches, the door swings open, they cross the threshold, and it closes.
+  `kitchen-fire` loops layered flames, rising smoke, embers, and reflected
+  light around a stove. These are simulated SVG clips, with no video assets
+  or external requests. Reduced motion and print hold a readable still of
+  the entry or fire. LIVE → REC → SAVE preserves the same clip's animation;
+  returning from OFF/BOOT restarts it. A different scene replaces the clip.
+  In the workbench, select a screen panel and choose **Screen scene**. The
+  inline preview and **Replay clip** work even when the story camera is OFF;
+  replay affects only that preview. Try **starters… → screen clips**.
 - `trace` — observed service internals and wall-time coverage:
   `{"id":"inside","type":"trace","title":"Inside the service",
   "spans":[{"id":"request","service":"api","name":"handle request",

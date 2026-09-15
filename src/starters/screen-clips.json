@@ -1,0 +1,222 @@
+{
+  "page": {
+    "title": "Camera clips",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Someone comes home",
+        "text": [
+          "A visitor approaches, the door opens, and they walk inside. Switch to step 2 to start the clip; return to step 1 and then 2 to replay it."
+        ],
+        "diagram": {
+          "primaryPanel": "camera-view",
+          "view": "step",
+          "nodes": {
+            "camera": {
+              "title": "Camera",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "detector": {
+              "title": "Entry detector",
+              "icon": "chip",
+              "tint": "mqtt"
+            },
+            "phone": {
+              "title": "Phone",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "detector",
+              "phone"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "detector",
+              "kind": "int",
+              "label": "frames"
+            },
+            {
+              "from": "detector",
+              "to": "phone",
+              "kind": "https",
+              "label": "event"
+            }
+          ],
+          "panels": [
+            {
+              "id": "camera-view",
+              "type": "screen",
+              "title": "Entry camera",
+              "scene": "person-through-door",
+              "initial": {
+                "mode": "off"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "standby",
+              "nodes": [
+                "camera"
+              ],
+              "text": "Camera in standby. Advance to watch the simulated clip.",
+              "panels": {
+                "camera-view": {
+                  "mode": "off"
+                }
+              }
+            },
+            {
+              "id": "live",
+              "edge": "camera->detector",
+              "text": "Live frames show the scene.",
+              "panels": {
+                "camera-view": {
+                  "mode": "live"
+                }
+              }
+            },
+            {
+              "id": "record",
+              "edge": "detector->phone",
+              "text": "Person entered \u2014 send an alert and record the same clip.",
+              "panels": {
+                "camera-view": {
+                  "mode": "rec"
+                }
+              }
+            },
+            {
+              "id": "save",
+              "nodes": [
+                "camera",
+                "phone"
+              ],
+              "text": "Keep the clip with the event for later review.",
+              "panels": {
+                "camera-view": {
+                  "mode": "save",
+                  "banner": "EVENT CLIP SAVED"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "heading": "A fire in the kitchen",
+        "text": [
+          "Layered flames, rising smoke, embers, and warm reflected light show what the camera sees. These visuals illustrate a fictional event, not real detection results."
+        ],
+        "diagram": {
+          "primaryPanel": "camera-view",
+          "view": "step",
+          "nodes": {
+            "camera": {
+              "title": "Camera",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "detector": {
+              "title": "Fire detector",
+              "icon": "chip",
+              "tint": "mqtt"
+            },
+            "phone": {
+              "title": "Phone",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "detector",
+              "phone"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "detector",
+              "kind": "int",
+              "label": "frames"
+            },
+            {
+              "from": "detector",
+              "to": "phone",
+              "kind": "https",
+              "label": "event"
+            }
+          ],
+          "panels": [
+            {
+              "id": "camera-view",
+              "type": "screen",
+              "title": "Kitchen camera",
+              "scene": "kitchen-fire",
+              "initial": {
+                "mode": "off"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "standby",
+              "nodes": [
+                "camera"
+              ],
+              "text": "Camera in standby. Advance to watch the simulated clip.",
+              "panels": {
+                "camera-view": {
+                  "mode": "off"
+                }
+              }
+            },
+            {
+              "id": "live",
+              "edge": "camera->detector",
+              "text": "Live frames show the scene.",
+              "panels": {
+                "camera-view": {
+                  "mode": "live"
+                }
+              }
+            },
+            {
+              "id": "record",
+              "edge": "detector->phone",
+              "text": "Fire detected \u2014 send an alert and record the same clip.",
+              "panels": {
+                "camera-view": {
+                  "mode": "rec"
+                }
+              }
+            },
+            {
+              "id": "save",
+              "nodes": [
+                "camera",
+                "phone"
+              ],
+              "text": "Keep the clip with the event for later review.",
+              "panels": {
+                "camera-view": {
+                  "mode": "save",
+                  "banner": "EVENT CLIP SAVED"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

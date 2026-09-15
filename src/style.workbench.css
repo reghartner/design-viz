@@ -303,6 +303,11 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .patchedit .rawjson{margin-top:4px;}
 .fchk{border:0; background:none; padding:0;}
 .fnote{border:0; background:none; font:500 11px 'IBM Plex Mono',monospace; color:var(--sub); padding:0;}
+.screen-scene-control{flex:1;min-width:0;display:grid;gap:8px;}
+.screen-scene-control>.fctl{width:100%;min-width:0;}
+.screen-scene-preview{min-width:0;}
+.screen-scene-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.screen-scene-footer .bbtn{min-height:32px;}
 .iacts{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
 .bdanger{color:#C0392B; border-color:#C0392B55;}
 .bdanger:hover{color:#C0392B; border-color:#C0392B;}

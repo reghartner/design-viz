@@ -305,7 +305,7 @@ var CONTRACT = [
   '  complete per-step state, so jumping to any step is always consistent. A',
   '  "log" patch key APPENDS lines; an "enterOnce" sub-object applies only at',
   '  its own step. Screen modes: off | boot | live | rec | save; scenes:',
-  '  person-at-door-night | package-drop | static-noise.',
+  '  person-at-door-night | person-through-door | package-drop | kitchen-fire | static-noise.',
   '- steps[n].lane tags the acting layer (declare colors in page.lanes; the pill',
   '  shows on the caption line).',
   '- Use tabs to group related diagrams and click-throughs into one experience;',

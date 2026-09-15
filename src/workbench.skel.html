@@ -148,8 +148,16 @@
           <div class="story-actions">
             <button class="bbtn" id="steps-add">Append step</button>
             <button class="bbtn" id="steps-duplicate" disabled>Duplicate</button>
+            <button class="bbtn" id="steps-reuse" aria-haspopup="dialog" aria-controls="step-reuse" disabled hidden>Reuse steps…</button>
             <button class="bbtn" id="steps-earlier" disabled>↑ Move up</button>
             <button class="bbtn" id="steps-later" disabled>↓ Move down</button>
+          </div>
+          <div class="story-sharing" id="steps-sharing" hidden>
+            <p class="story-note" id="steps-shared-with"></p>
+            <div class="story-actions">
+              <button class="bbtn" id="steps-independent" disabled>Make independent here</button>
+              <button class="bbtn" id="steps-remove-occurrence" disabled>Remove from this path</button>
+            </div>
           </div>
           <p class="story-note">Select a beat to edit it or branch after it. Step content is shared by paths that reference it. Append, duplicate and move affect the selected path; deleting a step removes it everywhere. Copies repeat patches, including appended events. Reveal/hide indices stay positional within each path.</p>
         </div>
@@ -270,6 +278,43 @@
   only needs a DOM. Motion is CSS dash animation plus SMIL packet dots; the reduced-motion preference
   disables packets, autoplay, and widget animation.
 </footer>
+
+<dialog class="reuse-dialog" id="step-reuse" aria-labelledby="reuse-title" aria-describedby="reuse-destination">
+  <div class="reuse-header">
+    <h2 id="reuse-title">Reuse steps</h2>
+    <p id="reuse-destination"></p>
+  </div>
+  <div class="reuse-scroll">
+    <div class="reuse-options">
+      <label>Source path<select class="fctl" id="reuse-source"></select></label>
+      <label>Reuse as<select class="fctl" id="reuse-mode"><option value="copy">Copy and customize</option><option value="share">Use shared steps</option></select></label>
+      <label>Placement<select class="fctl" id="reuse-placement"><option value="after">After selected step</option><option value="replace">Replace selected step</option><option value="rest">Replace the rest after selected step</option></select></label>
+    </div>
+    <p class="reuse-note" id="reuse-mode-note"></p>
+    <div class="reuse-columns">
+      <section class="reuse-pick" aria-label="Choose source steps">
+        <label>Find source steps<input class="fctl" id="reuse-search" type="search" placeholder="Caption, ID or number…"></label>
+        <p class="reuse-note">Select steps in any order; they are added in source order. Shift-click selects a range of matches. Continue from here uses the full source ending and replaces the destination’s remaining steps.</p>
+        <div class="reuse-count"><span id="reuse-selection" role="status">0 selected</span><button class="bbtn" id="reuse-clear">Clear selection</button></div>
+        <div id="reuse-list" class="reuse-list"></div>
+        <div class="story-actions" id="reuse-paging" hidden><button class="bbtn" id="reuse-previous">Previous 100</button><button class="bbtn" id="reuse-next">Next 100</button></div>
+        <p class="reuse-note" id="reuse-page"></p>
+      </section>
+      <section class="reuse-result" aria-label="Destination preview">
+        <h3>Destination preview</h3>
+        <p class="reuse-note">Panel state carries forward from this path’s preceding steps. Copies keep authored changes; they do not copy a frozen snapshot.</p>
+        <div id="reuse-preview" hidden>
+          <p id="reuse-result"></p>
+          <label>Preview step<select class="fctl" id="reuse-beat"></select></label>
+          <label>Preview panel<select class="fctl" id="reuse-panel"></select></label>
+          <div id="reuse-panel-body" class="reuse-panel-body sk-daylight"></div>
+          <details class="reuse-json"><summary>Resulting panel state</summary><pre id="reuse-state"></pre></details>
+        </div>
+      </section>
+    </div>
+  </div>
+  <div class="reuse-footer"><p id="reuse-feedback" role="status"></p><button class="bbtn" id="reuse-cancel">Cancel</button><button class="rbtn" id="reuse-apply" disabled>Copy steps</button></div>
+</dialog>
 
 <script>
 (function(){

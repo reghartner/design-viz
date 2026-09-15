@@ -132,6 +132,46 @@ body.workspace-focus .workwrap{max-width:none;}
 .story-actions .bbtn{min-height:32px;}
 .story-actions[hidden]{display:none;}
 .story-note{font-size:10px;line-height:1.45;color:var(--sub);margin:8px 0 0;}
+.story-step .story-shared{color:var(--accent);margin-top:3px;}
+.story-sharing{border-top:1px solid var(--line);margin-top:12px;padding-top:4px;}
+.reuse-dialog{box-sizing:border-box;width:min(1040px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);padding:0;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);box-shadow:0 20px 80px #0005;}
+.reuse-dialog[open]{display:flex;flex-direction:column;}
+.reuse-dialog::backdrop{background:#07111c88;backdrop-filter:blur(3px);}
+.reuse-dialog [hidden]{display:none !important;}
+.reuse-header{padding:18px 22px 12px;border-bottom:1px solid var(--line);flex:none;}
+.reuse-header p{margin:5px 0 0;font-size:12px;color:var(--sub);overflow-wrap:anywhere;max-height:4.5em;overflow:auto;}
+.reuse-scroll{overflow:auto;min-height:0;padding:16px 22px;}
+.reuse-options{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:12px;}
+.reuse-dialog label{font-size:12px;color:var(--sub);min-width:0;}
+.reuse-dialog select,.reuse-dialog input[type="search"]{display:block;width:100%;margin:5px 0 10px;min-height:36px;}
+.reuse-note{font-size:12px;color:var(--sub);line-height:1.5;margin:6px 0 12px;}
+.reuse-columns{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
+.reuse-pick,.reuse-result{min-width:0;}
+.reuse-result{border-left:1px solid var(--line);padding-left:22px;position:sticky;top:0;}
+.reuse-result h3{font-size:15px;margin:0 0 8px;}
+#reuse-result{font-size:12px;font-weight:600;overflow-wrap:anywhere;}
+.reuse-count{display:flex;justify-content:space-between;gap:8px;align-items:center;margin:10px 0;font-size:12px;}
+.reuse-list{display:grid;gap:7px;max-height:380px;overflow:auto;padding:2px;}
+.reuse-step{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--codebg);min-width:0;}
+.reuse-step:has(input:checked){border-color:var(--accent);box-shadow:inset 3px 0 var(--accent);}
+.reuse-step label{display:flex;gap:9px;align-items:flex-start;cursor:pointer;color:var(--ink);line-height:1.5;overflow-wrap:anywhere;}
+.reuse-step input{accent-color:var(--accent);flex:none;margin-top:3px;}
+.reuse-step small{display:block;color:var(--sub);font-size:10px;margin-top:4px;}
+.reuse-step .bbtn{display:block;margin:8px 0 0 24px;font-size:10px;}
+.reuse-panel-body{color:#23272E;--dink:#23272E;--dtext:#4A4F58;--dfaint:#79808B;background:#f4f2ec;padding:12px;border-radius:8px;overflow:auto;max-height:320px;}
+.reuse-panel-body *{animation:none !important;}
+.reuse-json{margin-top:10px;font-size:12px;}.reuse-json summary{cursor:pointer;}
+.reuse-json pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font:11px/1.5 monospace;}
+.reuse-footer{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end;padding:12px 22px;border-top:1px solid var(--line);flex:none;}
+#reuse-feedback{font-size:12px;line-height:1.4;margin:0 auto 0 0;flex:1;min-width:160px;overflow-wrap:anywhere;color:var(--sub);}
+@media(max-width:700px){
+  .reuse-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);}
+  .reuse-header,.reuse-footer{padding:12px;}.reuse-scroll{padding:12px;}
+  .reuse-options,.reuse-columns{grid-template-columns:1fr;gap:8px;}
+  .reuse-result{border-left:0;border-top:1px solid var(--line);padding:14px 0 0;position:static;}
+  .reuse-list{max-height:260px;}.reuse-dialog .bbtn,.reuse-dialog .rbtn{min-height:36px;}
+  #reuse-feedback{flex-basis:100%;}
+}
 @media(max-width:600px){
   .story-actions{display:grid;grid-template-columns:1fr 1fr;}
   .story-actions .bbtn{min-height:38px;}
@@ -4947,8 +4987,16 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
           <div class="story-actions">
             <button class="bbtn" id="steps-add">Append step</button>
             <button class="bbtn" id="steps-duplicate" disabled>Duplicate</button>
+            <button class="bbtn" id="steps-reuse" aria-haspopup="dialog" aria-controls="step-reuse" disabled hidden>Reuse steps…</button>
             <button class="bbtn" id="steps-earlier" disabled>↑ Move up</button>
             <button class="bbtn" id="steps-later" disabled>↓ Move down</button>
+          </div>
+          <div class="story-sharing" id="steps-sharing" hidden>
+            <p class="story-note" id="steps-shared-with"></p>
+            <div class="story-actions">
+              <button class="bbtn" id="steps-independent" disabled>Make independent here</button>
+              <button class="bbtn" id="steps-remove-occurrence" disabled>Remove from this path</button>
+            </div>
           </div>
           <p class="story-note">Select a beat to edit it or branch after it. Step content is shared by paths that reference it. Append, duplicate and move affect the selected path; deleting a step removes it everywhere. Copies repeat patches, including appended events. Reveal/hide indices stay positional within each path.</p>
         </div>
@@ -5069,6 +5117,43 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
   only needs a DOM. Motion is CSS dash animation plus SMIL packet dots; the reduced-motion preference
   disables packets, autoplay, and widget animation.
 </footer>
+
+<dialog class="reuse-dialog" id="step-reuse" aria-labelledby="reuse-title" aria-describedby="reuse-destination">
+  <div class="reuse-header">
+    <h2 id="reuse-title">Reuse steps</h2>
+    <p id="reuse-destination"></p>
+  </div>
+  <div class="reuse-scroll">
+    <div class="reuse-options">
+      <label>Source path<select class="fctl" id="reuse-source"></select></label>
+      <label>Reuse as<select class="fctl" id="reuse-mode"><option value="copy">Copy and customize</option><option value="share">Use shared steps</option></select></label>
+      <label>Placement<select class="fctl" id="reuse-placement"><option value="after">After selected step</option><option value="replace">Replace selected step</option><option value="rest">Replace the rest after selected step</option></select></label>
+    </div>
+    <p class="reuse-note" id="reuse-mode-note"></p>
+    <div class="reuse-columns">
+      <section class="reuse-pick" aria-label="Choose source steps">
+        <label>Find source steps<input class="fctl" id="reuse-search" type="search" placeholder="Caption, ID or number…"></label>
+        <p class="reuse-note">Select steps in any order; they are added in source order. Shift-click selects a range of matches. Continue from here uses the full source ending and replaces the destination’s remaining steps.</p>
+        <div class="reuse-count"><span id="reuse-selection" role="status">0 selected</span><button class="bbtn" id="reuse-clear">Clear selection</button></div>
+        <div id="reuse-list" class="reuse-list"></div>
+        <div class="story-actions" id="reuse-paging" hidden><button class="bbtn" id="reuse-previous">Previous 100</button><button class="bbtn" id="reuse-next">Next 100</button></div>
+        <p class="reuse-note" id="reuse-page"></p>
+      </section>
+      <section class="reuse-result" aria-label="Destination preview">
+        <h3>Destination preview</h3>
+        <p class="reuse-note">Panel state carries forward from this path’s preceding steps. Copies keep authored changes; they do not copy a frozen snapshot.</p>
+        <div id="reuse-preview" hidden>
+          <p id="reuse-result"></p>
+          <label>Preview step<select class="fctl" id="reuse-beat"></select></label>
+          <label>Preview panel<select class="fctl" id="reuse-panel"></select></label>
+          <div id="reuse-panel-body" class="reuse-panel-body sk-daylight"></div>
+          <details class="reuse-json"><summary>Resulting panel state</summary><pre id="reuse-state"></pre></details>
+        </div>
+      </section>
+    </div>
+  </div>
+  <div class="reuse-footer"><p id="reuse-feedback" role="status"></p><button class="bbtn" id="reuse-cancel">Cancel</button><button class="rbtn" id="reuse-apply" disabled>Copy steps</button></div>
+</dialog>
 
 <script>
 (function(){
@@ -17488,6 +17573,8 @@ function initWorkbenchBuilder(opts){
           var sharedNote = document.createElement('p'); sharedNote.className = 'fnote shared-step-note';
           sharedNote.textContent = 'Shared step — edits apply to: ' + sharing.map(function(route){return route.label;}).join(', ') + '.';
           guide.appendChild(sharedNote);
+          var independent = actionButton('Make independent here', function(){ if (stepList) stepList.editPathStep('independent'); });
+          independent.disabled = !!addToStep || !!connect; guide.appendChild(independent);
         }
       }
       var form = document.createElement('div');
@@ -17578,6 +17665,12 @@ function initWorkbenchBuilder(opts){
         }, armedHere ? 'bexit-inline' : ''));
       }
       if (t.kind === 'step' && !armedHere){
+        if (ctx.diagram && ctx.diagram.paths){
+          var removeHere = actionButton('Remove from this path', function(){ if (stepList) stepList.editPathStep('remove'); });
+          var selectedPath = diagramPathList(ctx.diagram).find(function(p){ return p.id === (stepperFor(t.section) && stepperFor(t.section).path()); });
+          removeHere.disabled = !!connect || !selectedPath || selectedPath.indices.length <= 1;
+          acts.appendChild(removeHere);
+        }
         acts.appendChild(actionButton('duplicate step', function(){
           commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
@@ -17592,7 +17685,7 @@ function initWorkbenchBuilder(opts){
         }));
       }
       if (!armedHere)
-        acts.appendChild(actionButton('delete ' + t.kind, deleteCurrent, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
+        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : 'delete ' + t.kind, deleteCurrent, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       guide.appendChild(acts);
     }
 
@@ -18938,7 +19031,9 @@ function builderStorySections(raw){
 function builderStorySteps(section, query, pathId){
   var terms = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   function count(n, noun){ return n + ' ' + noun + (n === 1 ? '' : 's'); }
-  var route = diagramPathList(section.diagram).find(function(p){return p.id === pathId;}) || diagramPathList(section.diagram)[0];
+  var paths = diagramPathList(section.diagram), route = paths.find(function(p){return p.id === pathId;}) || paths[0];
+  var owners = new Map();
+  paths.forEach(function(p){ if (p.id !== route.id) p.indices.forEach(function(i){ if (!owners.has(i)) owners.set(i, []); owners.get(i).push(p.label); }); });
   return route.indices.map(function(index,position){
     var step=section.diagram.steps[index];
     step = step || {};
@@ -18949,6 +19044,7 @@ function builderStorySteps(section, query, pathId){
     var haystack = [position + 1, caption, id, lane].concat(hops, nodes, panels).join(' ').toLowerCase();
     if (!terms.every(function(term){ return haystack.indexOf(term) >= 0; })) return null;
     return {index:index, position:position, pathId:section.diagram.paths ? route.id : undefined, caption:caption, id:id, lane:lane,
+      sharedWith:owners.get(index) || [],
       summary:[lane, count(hops.length, 'hop'), count(nodes.length, 'node'), count(panels.length, 'panel')].filter(Boolean).join(' · '),
       target:{kind:'step', section:section.section, index:index},
       path:section.path.concat(['steps', index]), tab:section.tab};
@@ -18967,6 +19063,38 @@ function initWorkbenchStepList(opts){
   var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
   var pathSignature='';
   var inspectButton = document.getElementById('steps-inspect');
+  var reuseButton = document.getElementById('steps-reuse'), independentButton = document.getElementById('steps-independent');
+  var removeOccurrence = document.getElementById('steps-remove-occurrence'), sharingBox = document.getElementById('steps-sharing');
+  var sharingText = document.getElementById('steps-shared-with');
+  function reuseContext(){
+    if (stale || !chosen || opts.locked() || opts.src.value !== indexedText ||
+        (opts.renderedText && opts.renderedText() !== opts.src.value)) return null;
+    var selected = route();
+    if (!selected) return null;
+    var ctx = builderPathOccurrence(indexedText, raw, chosen.section, selected.id, current());
+    if (ctx.error) return null;
+    return {text:indexedText, raw:raw, diagram:chosen.diagram, section:chosen.section, pathId:selected.id,
+      label:selected.label, index:current(), position:ctx.position, destination:ctx.route};
+  }
+  function applyPathPlan(plan, section){
+    if (plan.error){ status.textContent = plan.error; return false; }
+    if (!opts.apply(plan, section)) return false;
+    search.value = ''; refresh();
+    var selected = list.querySelector('[aria-current="step"]');
+    if (selected) selected.scrollIntoView({block:'nearest'});
+    return true;
+  }
+  function editPathStep(action){
+    if (!ready()) return false;
+    var ctx = reuseContext();
+    if (!ctx){ status.textContent = 'Select a step in this path first.'; return false; }
+    return applyPathPlan(planPathOccurrenceEdit(indexedText, raw, ctx.section, ctx.pathId, ctx.index, action), ctx.section);
+  }
+  var reuse = typeof initWorkbenchStepReuse === 'function' ? initWorkbenchStepReuse({
+    src:opts.src, context:reuseContext, apply:applyPathPlan, pause:opts.pause}) : null;
+  if (reuseButton) reuseButton.addEventListener('click', function(){ if (ready() && reuse && !reuseButton.disabled) reuse.open(); });
+  if (independentButton) independentButton.addEventListener('click', function(){ editPathStep('independent'); });
+  if (removeOccurrence) removeOccurrence.addEventListener('click', function(){ editPathStep('remove'); });
   if (inspectButton) inspectButton.addEventListener('click', function(){
     if (ready() && current() >= 0 && opts.inspect) opts.inspect();
   });
@@ -19003,6 +19131,14 @@ function initWorkbenchStepList(opts){
     buttons.later.disabled = blocked || index < 0 || index >= count - 1;
     buttons.previous.disabled = stale || offset === 0;
     buttons.next.disabled = stale || offset + pageSize >= entries.length;
+    var hasPaths = !!(chosen && chosen.diagram.paths), shared = hasPaths && index >= 0 ?
+      diagramPathList(chosen.diagram).filter(function(p){ return p.id !== selected.id && p.indices.indexOf(current()) >= 0; }) : [];
+    if (reuseButton){ reuseButton.hidden = !hasPaths; reuseButton.disabled = blocked || index < 0; }
+    if (sharingBox) sharingBox.hidden = !hasPaths || index < 0;
+    if (sharingText) sharingText.textContent = shared.length ? 'Shared with ' + shared.map(function(p){ return p.label; }).join(', ') + '. Edits apply to those paths too.' : 'This step is only used by this path.';
+    if (independentButton){ independentButton.hidden = !shared.length; independentButton.disabled = blocked || !shared.length; }
+    if (removeOccurrence) removeOccurrence.disabled = blocked || index < 0 || count <= 1;
+    if (reuse) reuse.refresh();
   }
   function invalidate(message){
     stale = true; list.innerHTML = ''; paging.hidden = true;
@@ -19034,6 +19170,10 @@ function initWorkbenchStepList(opts){
       caption.className = 'story-caption'; caption.textContent = entry.caption;
       meta.textContent = (entry.id ? entry.id + ' · ' : '') + entry.summary;
       text.appendChild(caption); text.appendChild(meta); button.appendChild(number); button.appendChild(text);
+      if (entry.sharedWith.length){
+        var shared = document.createElement('small'); shared.className = 'story-shared';
+        shared.textContent = 'Shared with ' + entry.sharedWith.join(', '); text.appendChild(shared);
+      }
       button.title = entry.caption + '\n' + meta.textContent;
       button.addEventListener('click', function(){
         if (!ready()) return;
@@ -19167,7 +19307,235 @@ function initWorkbenchStepList(opts){
     if (ev.key === 'Escape') setTimeout(sync, 0);
   });
   refresh();
-  return {sync:sync};
+  return {sync:sync, editPathStep:editPathStep};
+}
+/* ---- src/reuse.workbench.js ---- */
+/* Reuse changes path references and authored patches, never folded snapshots. */
+function builderPathOccurrence(text, raw, section, pathId, index){
+  var got = builderDiagram(text, raw, section);
+  if (got.error) return got;
+  var errors = [];
+  validatePaths(got.d, 'diagram', errors);
+  if (errors.length) return {error:errors.join('\n')};
+  if (!Array.isArray(got.d.paths)) return {error:'Create an alternate path first.'};
+  var path = got.d.paths.find(function(p){ return p.id === pathId; });
+  if (!path) return {error:'Path no longer exists. Select it again.'};
+  var step = Number.isInteger(index) && got.d.steps[index];
+  var position = step ? path.steps.indexOf(step.id) : -1;
+  if (position < 0) return {error:'Select a step in the destination path first.'};
+  return {diagram:got.d, path:got.path, route:path, position:position, step:step};
+}
+function builderReuseResult(text, raw, context, pathId, mutate){
+  var result = {}, plan = builderRewrite(text, raw, context.path, function(d){
+    var route = d.paths.find(function(p){ return p.id === pathId; });
+    var error = mutate(d, route, result);
+    if (error) return {error:error};
+    var errors = []; validatePaths(d, 'diagram', errors);
+    if (errors.length) return {error:errors.join('\n')};
+  });
+  if (plan.error) return plan;
+  plan.kind = 'step'; plan.pathId = pathId; plan.index = result.index;
+  plan.position = result.position; plan.insertedIds = result.insertedIds || [];
+  var range = jsonLocate(plan.text, context.path.concat(['steps', plan.index]));
+  if (range){ plan.start = range.start; plan.end = range.end; }
+  return plan;
+}
+function planReuseSteps(text, raw, section, pathId, index, options){
+  var ctx = builderPathOccurrence(text, raw, section, pathId, index);
+  if (ctx.error) return ctx;
+  options = options || {};
+  var source = ctx.diagram.paths.find(function(p){ return p.id === options.sourcePath; });
+  if (!source) return {error:'Choose an existing source path.'};
+  if (['copy','share'].indexOf(options.mode) < 0) return {error:'Choose independent copies or shared steps.'};
+  if (['after','replace','rest'].indexOf(options.placement) < 0) return {error:'Choose where to place the steps.'};
+  var ids = options.stepIds;
+  if (!Array.isArray(ids) || !ids.length) return {error:'Choose at least one source step.'};
+  if (new Set(ids).size !== ids.length || ids.some(function(id){ return source.steps.indexOf(id) < 0; }))
+    return {error:'Choose each step once from the source path.'};
+  /* Always preserve source order, even when checkboxes were selected backwards. */
+  ids = source.steps.filter(function(id){ return ids.indexOf(id) >= 0; });
+  return builderReuseResult(text, raw, ctx, pathId, function(d, route, result){
+    var position = ctx.position + (options.placement === 'replace' ? 0 : 1);
+    var remove = options.placement === 'replace' ? 1 : options.placement === 'rest' ? route.steps.length - position : 0;
+    var remaining = route.steps.slice(0, position).concat(route.steps.slice(position + remove));
+    if (options.mode === 'share'){
+      var collisions = ids.filter(function(id){ return remaining.indexOf(id) >= 0; });
+      if (collisions.length) return 'Already used in this path: ' + collisions.join(', ') + '. Choose Copy and customize, or replace those occurrences.';
+    }
+    var registry = new Map(), taken = Object.create(null);
+    d.steps.forEach(function(s){ if (s && s.id){ registry.set(s.id, s); taken[s.id] = true; } });
+    var inserted = ids.map(function(id){
+      if (options.mode === 'share') return id;
+      var copy = builderClone(registry.get(id));
+      copy.id = builderUniqueKey(taken, id + '-copy'); taken[copy.id] = true;
+      d.steps.push(copy); return copy.id;
+    });
+    var next = route.steps.slice(0, position).concat(inserted, route.steps.slice(position + remove));
+    if (JSON.stringify(next) === JSON.stringify(route.steps)) return 'These shared steps are already in that position.';
+    route.steps = next;
+    result.index = d.steps.findIndex(function(s){ return s.id === inserted[0]; });
+    result.position = position; result.insertedIds = inserted;
+  });
+}
+function planPathOccurrenceEdit(text, raw, section, pathId, index, action){
+  var ctx = builderPathOccurrence(text, raw, section, pathId, index);
+  if (ctx.error) return ctx;
+  return builderReuseResult(text, raw, ctx, pathId, function(d, route, result){
+    if (action === 'independent'){
+      var sharing = d.paths.filter(function(p){ return p.steps.indexOf(ctx.step.id) >= 0; });
+      if (sharing.length < 2) return 'This step is already independent of the other paths.';
+      var taken = Object.create(null); d.steps.forEach(function(s){ if (s && s.id) taken[s.id] = true; });
+      var copy = builderClone(d.steps[index]); copy.id = builderUniqueKey(taken, copy.id + '-copy');
+      result.index = d.steps.length; d.steps.push(copy); route.steps[ctx.position] = copy.id;
+      result.position = ctx.position;
+    } else if (action === 'remove'){
+      if (route.steps.length === 1) return 'Keep at least one step in this path. Add a step or remove the alternate instead.';
+      route.steps.splice(ctx.position, 1);
+      result.position = Math.min(ctx.position, route.steps.length - 1);
+      result.index = d.steps.findIndex(function(s){ return s.id === route.steps[result.position]; });
+    } else return 'Unknown step occurrence action.';
+  });
+}
+function builderReusePreview(raw, section, pathId){
+  var rec = specSectionPaths(raw)[section], d = rec && specValueAt(raw, rec.diagram);
+  if (!d || !Array.isArray(d.paths) || !d.paths.some(function(p){ return p.id === pathId; }))
+    return {error:'Destination path no longer exists.'};
+  var diagram = diagramForPath(d, pathId), states;
+  try { states = foldPanelStates(diagram); }
+  catch (ex){ return {error:'Unable to preview panel state. Fix the diagram validation errors first.'}; }
+  return {diagram:diagram, states:states};
+}
+
+/* Native dialog keeps background selection and builder shortcuts out of a reuse edit. */
+function initWorkbenchStepReuse(opts){
+  var dialog = document.getElementById('step-reuse');
+  if (!dialog) return null;
+  function el(id){ return document.getElementById('reuse-' + id); }
+  var source = el('source'), mode = el('mode'), placement = el('placement'), list = el('list');
+  var search = el('search'), feedback = el('feedback'), apply = el('apply'), preview = el('preview');
+  var beat = el('beat'), panel = el('panel'), panelHost = el('panel-body'), state = el('state');
+  var snapshot = null, selected = new Set(), plan = null, model = null, lastIndex = null;
+  var page = 0, pageSize = 100, filtered = [], rows = [], opener = null;
+  function isCurrent(){
+    var ctx = opts.context();
+    return snapshot && ctx && ctx.text === snapshot.text && ctx.section === snapshot.section &&
+      ctx.pathId === snapshot.pathId && ctx.index === snapshot.index;
+  }
+  function invalidate(){
+    plan = null; model = null; apply.disabled = true; preview.hidden = true;
+    feedback.textContent = 'The source or selection changed. Close this picker, Render, and open it again.';
+  }
+  function currentSource(){ return snapshot.diagram.paths.find(function(p){ return p.id === source.value; }); }
+  function selectedIds(){ return currentSource().steps.filter(function(id){ return selected.has(id); }); }
+  function option(select, value, label){ var o = document.createElement('option'); o.value = String(value); o.textContent = label; select.appendChild(o); }
+  function paintPanel(){
+    if (!isCurrent()){ invalidate(); return; }
+    if (!model) return;
+    var i = Number(beat.value), decl = (model.diagram.panels || []).find(function(p){ return p.id === panel.value; });
+    panelHost.textContent = ''; state.textContent = '';
+    if (!decl){ panelHost.textContent = 'This diagram has no panels. Review the destination steps above.'; return; }
+    var snapshots = model.states[decl.id] || [], value = snapshots[i] || {};
+    /* Renderers cache markup on their host. A fresh surface also prevents
+       a previous panel type from contributing its presentation state. */
+    var surface = document.createElement('div'); panelHost.appendChild(surface);
+    renderPanelBody(surface, decl, value, 'daylight', snapshots, i, false);
+    state.textContent = JSON.stringify(value, null, 2);
+  }
+  function updatePreview(){
+    if (!isCurrent()){ invalidate(); return; }
+    plan = planReuseSteps(snapshot.text, snapshot.raw, snapshot.section, snapshot.pathId, snapshot.index,
+      {sourcePath:source.value, stepIds:selectedIds(), mode:mode.value, placement:placement.value});
+    el('selection').textContent = selected.size + ' selected';
+    el('mode-note').textContent = mode.value === 'copy' ? 'Copies can be edited independently. Other paths keep their original steps.' :
+      'Shared steps have one body. Editing a shared step changes every path that uses it.';
+    apply.disabled = !!plan.error; preview.hidden = !!plan.error;
+    feedback.textContent = plan.error || '';
+    if (plan.error){ model = null; return; }
+    model = builderReusePreview(JSON.parse(plan.text), snapshot.section, snapshot.pathId);
+    if (model.error){ feedback.textContent = model.error; apply.disabled = true; preview.hidden = true; return; }
+    beat.innerHTML = '';
+    model.diagram.steps.forEach(function(s, i){
+      option(beat, i, (i + 1) + ' · ' + (s.text || s.id) + (plan.insertedIds.indexOf(s.id) >= 0 ? ' · ' + (mode.value === 'copy' ? 'copy' : 'shared') : ''));
+    });
+    beat.value = String(plan.position);
+    var priorPanel = panel.value;
+    panel.innerHTML = '';
+    (model.diagram.panels || []).forEach(function(p){ option(panel, p.id, p.title || p.id); });
+    var preferred = (model.diagram.panels || []).find(function(p){ return p.id === priorPanel; }) ||
+      (model.diagram.panels || []).find(function(p){ return p.id === model.diagram.primaryPanel; }) || (model.diagram.panels || [])[0];
+    panel.value = preferred ? preferred.id : ''; panel.disabled = !preferred;
+    el('result').textContent = snapshot.label + ' · ' + model.diagram.steps.length + ' steps after this change';
+    apply.textContent = (mode.value === 'copy' ? 'Copy ' : 'Share ') + selected.size + (selected.size === 1 ? ' step' : ' steps');
+    paintPanel();
+  }
+  function paintRows(){
+    list.innerHTML = ''; rows = [];
+    var sourcePath = currentSource(), terms = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    var byId = new Map(); snapshot.diagram.steps.forEach(function(s){ if (s && s.id) byId.set(s.id, s); });
+    filtered = sourcePath.steps.map(function(id, i){ return {id:id, index:i, step:byId.get(id)}; }).filter(function(row){
+      var text = [row.index + 1, row.id, row.step.text || ''].join(' ').toLowerCase();
+      return terms.every(function(term){ return text.indexOf(term) >= 0; });
+    });
+    page = Math.max(0, Math.min(page, Math.ceil(filtered.length / pageSize) - 1));
+    filtered.slice(page * pageSize, (page + 1) * pageSize).forEach(function(row){
+      var item = document.createElement('div'); item.className = 'reuse-step';
+      var label = document.createElement('label'), check = document.createElement('input'); check.type = 'checkbox'; check.checked = selected.has(row.id);
+      check.setAttribute('aria-label', 'Reuse step ' + (row.index + 1) + ': ' + (row.step.text || row.id));
+      check.addEventListener('click', function(ev){
+        if (!isCurrent()){ invalidate(); return; }
+        var anchor = filtered.findIndex(function(r){ return r.index === lastIndex; });
+        var at = filtered.findIndex(function(r){ return r.index === row.index; });
+        if (ev.shiftKey && anchor >= 0){
+          filtered.slice(Math.min(anchor, at), Math.max(anchor, at) + 1).forEach(function(r){ check.checked ? selected.add(r.id) : selected.delete(r.id); });
+        } else { check.checked ? selected.add(row.id) : selected.delete(row.id); }
+        lastIndex = row.index;
+        rows.forEach(function(r){ r.check.checked = selected.has(r.id); }); updatePreview();
+      });
+      var caption = document.createElement('span'); caption.textContent = (row.index + 1) + '. ' + (row.step.text || 'Untitled step');
+      var meta = document.createElement('small'); meta.textContent = row.id + (snapshot.destination.steps.indexOf(row.id) >= 0 ? ' · already in destination' : '');
+      caption.appendChild(meta); label.appendChild(check); label.appendChild(caption); item.appendChild(label);
+      var rest = document.createElement('button'); rest.type = 'button'; rest.className = 'bbtn'; rest.textContent = 'Continue from here';
+      rest.setAttribute('aria-label', 'Continue from source step ' + (row.index + 1));
+      rest.addEventListener('click', function(){
+        if (!isCurrent()){ invalidate(); return; }
+        selected = new Set(sourcePath.steps.slice(row.index)); placement.value = 'rest'; lastIndex = row.index;
+        paintRows(); updatePreview();
+      });
+      item.appendChild(rest); list.appendChild(item); rows.push({id:row.id, check:check});
+    });
+    el('page').textContent = filtered.length ? (page * pageSize + 1) + '–' + Math.min((page + 1) * pageSize, filtered.length) + ' of ' + filtered.length : 'No matching steps';
+    el('previous').disabled = page === 0; el('next').disabled = (page + 1) * pageSize >= filtered.length;
+    el('paging').hidden = filtered.length <= pageSize;
+  }
+  function close(){ dialog.close(); snapshot = null; plan = null; model = null; panelHost.textContent = ''; if (opener) opener.focus({preventScroll:true}); }
+  function open(){
+    var ctx = opts.context();
+    if (!ctx) return;
+    snapshot = ctx; selected = new Set(); lastIndex = null; page = 0; search.value = ''; mode.value = 'copy'; placement.value = 'after'; apply.textContent = 'Copy steps';
+    opener = document.activeElement;
+    source.innerHTML = '';
+    diagramPathList(snapshot.diagram).forEach(function(p){ option(source, p.id, p.label); });
+    source.value = (snapshot.diagram.paths.find(function(p){ return p.id !== snapshot.pathId; }) || snapshot.destination).id;
+    el('destination').textContent = 'Into ' + snapshot.label + ' · selected step ' + (snapshot.position + 1) + ': ' + (snapshot.diagram.steps[snapshot.index].text || snapshot.diagram.steps[snapshot.index].id);
+    paintRows(); updatePreview(); if (opts.pause) opts.pause(); dialog.showModal(); source.focus();
+  }
+  source.addEventListener('change', function(){ if (!isCurrent()){ invalidate(); return; } selected.clear(); lastIndex = null; page = 0; search.value = ''; paintRows(); updatePreview(); });
+  search.addEventListener('input', function(){ if (!isCurrent()){ invalidate(); return; } page = 0; paintRows(); });
+  el('clear').addEventListener('click', function(){ if (!isCurrent()){ invalidate(); return; } selected.clear(); lastIndex = null; paintRows(); updatePreview(); });
+  mode.addEventListener('change', updatePreview); placement.addEventListener('change', updatePreview);
+  beat.addEventListener('change', paintPanel); panel.addEventListener('change', paintPanel);
+  ['previous','next'].forEach(function(name){ el(name).addEventListener('click', function(){ if (!isCurrent()){ invalidate(); return; } page += name === 'next' ? 1 : -1; paintRows(); }); });
+  el('cancel').addEventListener('click', close);
+  dialog.addEventListener('cancel', function(ev){ ev.preventDefault(); close(); });
+  dialog.addEventListener('keydown', function(ev){ ev.stopPropagation(); });
+  dialog.addEventListener('click', function(ev){ ev.stopPropagation(); });
+  opts.src.addEventListener('input', function(){ if (dialog.open) invalidate(); });
+  apply.addEventListener('click', function(){
+    if (!isCurrent()){ invalidate(); return; }
+    if (!plan || plan.error || apply.disabled) return;
+    var pending = plan, section = snapshot.section; close(); opts.apply(pending, section);
+  });
+  return {open:open, refresh:function(){ if (dialog.open && !isCurrent()) invalidate(); }};
 }
 /* ---- src/workspace.workbench.js ---- */
 /* Preview position and layout never enter the spec or undo history. */

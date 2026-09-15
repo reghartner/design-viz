@@ -54,6 +54,9 @@ more room: drag the divider or **Expand editor** beside a compact live preview.
 persist locally; phones use a stacked layout.
 The [story-step editor](docs/workbench-steps.md) adds caption search, hidden-tab
 jumps, duplication, appending and reordering through the same undo history.
+[Reuse steps](docs/workbench-step-reuse.md) copies or shares beats between
+paths, previews their resulting state, and can detach a shared step in place
+or remove just one path's occurrence.
 
 ```
 design doc (prose / permalinks / mermaid)

@@ -2236,6 +2236,23 @@ function planPrimaryPanel(text, raw, sectionIdx, panelId){
   });
 }
 
+/* Layout selection must remain available even when a diagram has a stepper. */
+function builderHomemapClickTarget(element, getStepper, currentTarget){
+  var card = element.closest && element.closest('.pt-homemap[data-dv-panel]');
+  var section = card && card.closest('.doc-sec[data-dv-section]');
+  if (!section) return null;
+  var explicitLayout = element.closest('[data-home-layout]');
+  if (!explicitLayout && element.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
+  var ordinal = Number(section.getAttribute('data-dv-section')), index = Number(card.getAttribute('data-dv-panel'));
+  if (!Number.isInteger(ordinal) || !Number.isInteger(index)) return null;
+  var player = getStepper(ordinal);
+  var editingLayout = currentTarget && currentTarget.kind === 'panel' && currentTarget.section === ordinal && currentTarget.index === index;
+  var marker = element.closest('[data-device], [data-subject], [data-home-room]');
+  if (!explicitLayout && !editingLayout && marker && player && player.mode() === 'step')
+    return {section:ordinal, kind:'step', index:player.sourceIndex()};
+  return {section:ordinal, kind:'panel', index:index, el:card};
+}
+
 /* Read both snapshots through the engine, following the selected branch.
    Removing one authored key restores its inherited value, never a copied
    snapshot that would freeze unrelated devices or people. */
@@ -2451,7 +2468,7 @@ var PANEL_SETUP_FIELDS = {
   radar:     [['sensor', 'json'], ['facing', 'num'], ['spread', 'num'], ['range', 'num'],
               ['threshold', 'num'], ['rings', 'jsonAny'], ['scale', 'json'],
               ['zones', 'jsonArr'], ['initial', 'json']],
-  homemap:   [['outline', 'json'], ['rooms', 'rows', {cols: [
+  homemap:   [['outline', 'objf', {cols:[{k:'w',kind:'num',label:'Width'}, {k:'h',kind:'num',label:'Height'}]}], ['rooms', 'rows', {cols: [
                 {k:'label'}, {k:'x', kind:'num', req:true}, {k:'y', kind:'num', req:true},
                 {k:'w', kind:'num', req:true}, {k:'h', kind:'num', req:true}]}], ['devices', 'rows', {cols: [
                 {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
@@ -4044,6 +4061,10 @@ function initWorkbenchBuilder(opts){
   function homemapStepControl(diagram, panel, target){
     var box = document.createElement('fieldset'); box.className = 'home-edit';
     var title = document.createElement('legend'); title.textContent = (panel.title || panel.id) + ' · at this step'; box.appendChild(title);
+    box.appendChild(actionButton('Edit shared home layout', function(){
+      selectTarget({section:target.section, kind:'panel', index:diagram.panels.indexOf(panel)}, false);
+      rehighlight();
+    }));
     var sp = stepperFor(target.section);
     var snapshot = builderHomemapStep(diagram, target.index, panel.id, target.pathId || (sp && sp.path()));
     if (snapshot.error){ box.textContent = snapshot.error; return box; }
@@ -4660,7 +4681,10 @@ function initWorkbenchBuilder(opts){
       var input = colInput(col, base[col.k]);
       wireCommit(input, commitObj);
       inputs[col.k] = input;
-      line.appendChild(input);
+      if (col.label){
+        var field=document.createElement('label'); field.className='obj-field'; field.textContent=col.label;
+        field.appendChild(input); line.appendChild(field);
+      } else line.appendChild(input);
     });
     wrap.appendChild(line);
     wrap.appendChild(rawJsonFallback(key, cur, 'json'));
@@ -4733,6 +4757,9 @@ function initWorkbenchBuilder(opts){
         {after:function(){ renderInspector(); }});
     })));
     if (val.type === 'homemap'){
+      var layoutNote = document.createElement('p'); layoutNote.className = 'home-note';
+      layoutNote.textContent = 'Shared home layout · all steps and paths. Set outline w/h for the floor plan size; edit rooms, devices, and starting subject positions below. Coordinates use a 320 × 180 frame.';
+      rows.unshift(layoutNote);
       rows.push(frow('Show subject labels', selectControl(['Hidden (default)', 'Shown'], val.showSubjectLabels === true ? 'Shown' : 'Hidden (default)', function(v){
         return commitSimple('showSubjectLabels', v === 'Shown' ? 'true' : null);
       })));
@@ -5246,11 +5273,14 @@ function initWorkbenchBuilder(opts){
     /* Map editing follows the same manual transport/path selection as the
        preview. Play/Pause are excluded so selecting an inspector cannot
        immediately stop a user-started animation. */
+    if (!addToStep && !connect){
+      var homeTarget = builderHomemapClickTarget(ev.target, stepperFor, currentTarget);
+      if (homeTarget) return homeTarget;
+    }
     var transport = ev.target.closest && ev.target.closest('.tbtn');
-    var homeMarker = ev.target.closest && ev.target.closest('.pt-homemap [data-device], .pt-homemap [data-subject], .pt-homemap [data-home-room]');
-    if ((homeMarker && !addToStep && !connect) || (transport && /^(Previous|Next) step$/.test(transport.getAttribute('aria-label') || '') &&
-        currentTarget && currentTarget.kind === 'step')){
-      var activeSection = (homeMarker || transport).closest('.doc-sec');
+    if (transport && /^(Previous|Next) step$/.test(transport.getAttribute('aria-label') || '') &&
+        currentTarget && currentTarget.kind === 'step'){
+      var activeSection = transport.closest('.doc-sec');
       if (activeSection){
         var ordinal = Number(activeSection.getAttribute('data-dv-section')), player = stepperFor(ordinal);
         if (player) return {section:ordinal, kind:'step', index:player.sourceIndex()};
@@ -5776,7 +5806,20 @@ function initWorkbenchBuilder(opts){
     var d = specValueAt(parsed.raw, rec.diagram);
     return (d && Array.isArray(d.rows)) ? d.rows : null;
   }
+  function applyHomeLayoutControls(){
+    Array.prototype.forEach.call(view.querySelectorAll('.pt-homemap[data-dv-panel]'), function(card){
+      if (card.querySelector('[data-home-layout]')) return;
+      var button = document.createElement('button'); button.type = 'button'; button.className = 'bbtn home-layout-button';
+      button.textContent = 'Edit layout'; button.setAttribute('data-home-layout','');
+      button.setAttribute('aria-label','Edit home layout');
+      button.title = 'Edit shared size, rooms, devices, and starting positions';
+      var title = card.querySelector('.ptitle');
+      if (!title){ title=document.createElement('div'); title.className='ptitle'; card.insertBefore(title,card.firstChild); }
+      title.classList.add('home-layout-title'); title.appendChild(button);
+    });
+  }
   function applyRowGrabs(){
+    applyHomeLayoutControls();
     /* inject one grab handle per layout row, left of the row band —
        workbench-only chrome (this file never runs on published pages).
        Handles are skipped when any row has no drawn nodes: without a

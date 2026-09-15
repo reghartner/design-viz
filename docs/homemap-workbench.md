@@ -11,8 +11,8 @@ main view. Your selected path, step, device state, playback, and diagram sizing
 stay intact. In Home view, you can also expand **Data flow** below for a quick
 look at the supporting diagram.
 
-To choose the default when a page opens, click the homemap's title in the
-workbench and choose **Presentation → Centerpiece**. This writes
+To choose the default when a page opens, click **Edit layout** on the homemap
+in the workbench and choose **Presentation → Centerpiece**. This writes
 `diagram.primaryPanel: "home"` (using your panel's ID). **Sidebar** defaults
 to Data flow. Existing homemaps automatically get the live switch; they keep
 their authored opening layout. With multiple homemaps, the declared centerpiece
@@ -23,6 +23,19 @@ Switching is a reading preference for the current page, not a spec edit or undo
 entry. Workbench edits and skin changes retain it. A full page reload uses the
 authored default again; changing Presentation in the inspector takes precedence
 over the current reading preference.
+
+## Edit the shared layout
+
+Use **Edit layout** in the map header from either ambient or step view. The
+inspector opens the homemap panel's shared settings, including numeric **outline
+w/h** size fields, the **rooms** table, **devices**, and starting **subjects**.
+These settings apply to every step and path. In ambient mode, clicking a room,
+device, or person also selects this layout inspector. Once it is selected, map
+clicks keep that context until you select a step or **Edit home at current step**.
+
+The step inspector also has **Edit shared home layout**, so you can move directly
+between a beat's animation/state controls and the shared floor plan. Selecting
+the layout does not change the chosen path, step, or view.
 
 Room rectangles are optional: use the homemap panel's **rooms** table to add
 labels and x/y/w/h values inside the 320×180 frame. Devices and people use that
@@ -56,7 +69,8 @@ while you edit, and the main map previews the activity.
 
 ## Tweak one step
 
-1. Select a numbered step, or click a device/person in the main map. The inspector
+1. Select a numbered step, or click a device/person while in step view (unless
+   the shared layout inspector is selected). The inspector
    opens **The home · at this step**, including a placement map.
 2. Pick a device state. **Inherit · …** shows the value arriving from the previous
    step on this path (or initial/default state at step 1). Choosing Inherit removes

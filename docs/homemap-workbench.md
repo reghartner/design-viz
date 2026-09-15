@@ -13,6 +13,12 @@ main view. Your selected path, step, device state, playback, and diagram sizing
 stay intact. In Home view, you can also expand **Data flow** below for a quick
 look at the supporting diagram.
 
+Home view caps the map and its timeline at 800 pixels wide. On wide pages,
+including Confluence, supporting panels take the remaining width and arrange
+into columns when there is room. On narrow pages they sit below the centered
+map. A home without supporting panels stays centered at the same maximum
+width. This is automatic; no spec setting or schema update is needed.
+
 To choose the default when a page opens, click **Edit layout** on the homemap
 in the workbench and choose **Presentation → Centerpiece**. This writes
 `diagram.primaryPanel: "home"` (using your panel's ID). **Sidebar** defaults

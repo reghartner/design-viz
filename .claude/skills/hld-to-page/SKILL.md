@@ -247,6 +247,9 @@ not executable conditions or failure probabilities.
 **Choose the main view.** A `homemap` or other panel can be the centerpiece
 with `diagram.primaryPanel: "<panel-id>"`. Existing homemaps support live
 Home / Data flow switching while retaining the selected step and path.
+Home view automatically caps the map and timeline at 800px; supporting panels
+fill surplus width in responsive columns (also in Confluence), or sit below
+on narrow pages. No additional spec setting is required.
 Home device states use animation instead of state chips; subject labels
 are hidden unless `showSubjectLabels:true` is declared on the panel. Map
 device/room coordinates are shared layout; subject positions are sparse

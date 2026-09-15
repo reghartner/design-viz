@@ -4858,6 +4858,21 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 body .docview .boardgrid.haspanels.panel-first{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}
 body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-template-columns:minmax(0,1fr);}
 .primary-panel{min-width:0;}
+/* A home has a useful reading size. Give surplus width to its supporting
+   widgets instead of stretching the SVG frame around a height-limited map. */
+@media screen{
+  .panel-first>.primary-panel:has(>.pt-homemap){width:100%;max-width:800px;justify-self:center;}
+  body .docview .boardgrid.panel-first:has(>.primary-panel>.pt-homemap)>.panelcol:not([hidden]){
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));align-items:start;margin-top:0;
+  }
+}
+@media screen and (min-width:981px){
+  @container diagram-section (min-width:1001px){
+    body .docview .boardgrid.haspanels.panel-first:has(>.primary-panel>.pt-homemap):has(>.panelcol:not([hidden])){
+      grid-template-columns:minmax(0,800px) minmax(280px,1fr);
+    }
+  }
+}
 .primary-modes{display:flex;justify-content:flex-end;margin:8px 0;}
 .primary-modes:empty{display:none;}
 .primary-panel>.pwidget{margin-top:0;}

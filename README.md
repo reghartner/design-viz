@@ -9,6 +9,11 @@ of the same time-aware data — an ambient always-animating view and a guided st
 
 ## The pipeline
 
+For agents, start with the [HLD-to-page skill](.claude/skills/hld-to-page/SKILL.md)
+and its [cookbook index](cookbook/README.md). They include complete recipes for
+[alternate timelines](cookbook/alternate-paths.md), [Home-centered stories](cookbook/home-story.md),
+and [camera recording/event timing](cookbook/camera-events.md).
+
 **[Alternate paths](docs/alternate-paths.md):** show a happy path and failure
 outcomes on one diagram. Colored path rows align their step numbers beneath the transport controls; playback
 and panel state follow the selected sequence and stop at its own ending.

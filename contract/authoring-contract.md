@@ -497,7 +497,10 @@ perspectives" of one timeline). Types:
   `{"mode":"off|boot|live|rec|save", "banner":"<save-banner text>"}`. Stock
   scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`,
   `doorbell-runners`, `package-drop`, `kitchen-fire`, `static-noise`. `rec` shows
-  a blinking REC dot; `save` shows the banner. Scenes
+  a blinking REC dot; `save` shows the banner. All stock scenes use full-color
+  artwork under every skin; `static-noise` uses a color test pattern with
+  interference during boot. Existing scene names work without a new field;
+  rebuild older exported HTML with the current template to update its artwork. Scenes
   animate while shown: `person-at-door-night` walks a figure in;
   `package-drop` plays a delivery (courier walks in carrying a box, the
   package lands, the courier leaves; reduced motion shows the delivered

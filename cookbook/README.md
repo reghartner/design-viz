@@ -23,6 +23,9 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 
 | You were asked for… | Recipe |
 |---|---|
+| happy and failure outcomes on one diagram, shared steps, or a dropped/blocked communication | [alternate-paths.md](alternate-paths.md) |
+| a large home map, live Home / Data flow switching, device states, or draggable placement | [home-story.md](home-story.md) |
+| a color camera clip, doorbell runners, or recording before the visible event | [camera-events.md](camera-events.md) |
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |
 | retry attempts, backoff, deadline admission, or circuit recovery | `retries-and-circuits.md` |
 | replica positions, read-your-writes tokens, lag, or device/cloud versions | `replica-positions.md` |
@@ -31,11 +34,19 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | a temperature readout with warning / shutdown thresholds | `temperature.md` |
 | a battery / charge level that drains and raises a low event | `battery-level.md` |
 | motion detection — a sensor cone, an approach, a trip | `motion-detection.md` |
+| radar range, zones, targets, or occupancy | `radar-range.md` |
+| Wi-Fi/link health, retries, or a weak connection | `link-health.md` |
+| several devices in a fleet overview | `fleet-dashboard.md` |
+| camera recording buffers and dropped or retained frames | `recording-buffer.md` |
 | a message TO the camera that wakes it (mailbox + wake line) | `wake-message.md` |
 | traffic that exists only over a persistent connection while the SoC is awake | `persistent-when-awake.md` |
 | messages FROM the camera that ride the low-power chip over MQTT | `camera-to-cloud-via-lp-mqtt.md` |
 | SoC egress that chooses persistent connection OR MQTT via the LP chip | `soc-egress-routing.md` |
 | "move that up and to the right a little" — any visual adjustment | `adjustments.md` |
+
+For the editor itself, see [workspace sizing and focus](../docs/workbench-workspace.md),
+[step editing](../docs/workbench-steps.md), [copying/sharing steps](../docs/workbench-step-reuse.md),
+and [effective panel state](../docs/workbench-state-inspector.md).
 
 ## Ground rules that apply to every recipe
 
@@ -43,12 +54,15 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
   the WORKING SUBSET for one task and never contradict the contract.
 - Panels are patched SPARSELY per step; the engine folds patches into complete
   state, so any step jump renders correctly. Patch only what changed.
+- Alternate paths use one step registry. Shared IDs share content; a different
+  outcome needs its own ID at the first differing beat. State folds through
+  the selected path only, including any shared ending. See the alternate recipe.
 - The engine COMPUTES verdict-like state (a pir subject's tripped/clear, a
   thermo zone) from declared geometry/thresholds — author inputs, not
   conclusions for these computed widgets. `checks` instead displays explicitly
   sourced outcomes; it never runs rules or verifies a system. `table` change
   badges are also authored. `budget` computes comparisons from sourced values
   and limits, and shows missing data explicitly.
-- Every step needs content (an edge, nodes, or a panel patch), and each
+- Every step needs content (an edge, nodes, a panel patch, or `failures`), and each
   edge-bearing step needs a DISTINCT first edge or its number coin lands on
   another step's coin (the validator lint names both steps when this happens).

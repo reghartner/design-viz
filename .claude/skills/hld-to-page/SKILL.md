@@ -19,7 +19,7 @@ before starting (ask the operator for any you don't have):
 - **OUT** — the directory in YOUR project where the built page lands
   (created if missing).
 
-Every `tools/`, `contract/`, and `cookbook/` path here is relative to VIZ.
+Every `tools/`, `contract/`, `cookbook/`, `docs/`, and `src/` path here is relative to VIZ.
 Your durable deliverables are exactly two files, both in your own project:
 the spec JSON and its sibling coverage ledger
 (`<spec minus .spec.json>.ledger.md`). Scratch files (saved document
@@ -127,20 +127,41 @@ Everything else is fetched on demand, driven by what the HLD is about:
 Don't bulk-load reference material the document gives you no reason to
 need; don't re-read what you already hold.
 
+### Route current storytelling requests before proposing a layout
+
+These capabilities already exist. Load the matching recipe/guide, not every row:
+
+| The source or operator needs… | Read |
+|---|---|
+| Happy and failure outcomes on the SAME diagram; aligned alternate timelines | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
+| A send that never arrives, or a communication that is never sent | `docs/failed-communications.md` (also demonstrated in the alternate-path recipe) |
+| Copy/share steps across paths, continue a happy ending, or detach a shared step | `docs/workbench-step-reuse.md` |
+| A large home map, live Home / Data flow switching, or per-step placement | `cookbook/home-story.md`, `docs/homemap-workbench.md` |
+| Camera recording before an event, color clips, doorbell runners, fire, or delivery | `cookbook/camera-events.md` plus `tools/widget_doc.py screen` |
+| Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
+| A crowded editor, resizing, focus, or diagram fit controls | `docs/workbench-workspace.md` |
+| Database/payload state, checks, budgets, retry/circuit behavior, replicas, or rollout decisions | Matching recipes in `cookbook/README.md` and the corresponding widget docs |
+
+Paths, failed communications, centerpiece views, scene-event controls, and
+fit controls need no schema-version flag. An old self-contained HTML page
+must be rebuilt with a current template to gain new rendering behavior;
+adding a made-up version or zoom field to its spec cannot update its engine.
+
 ## 3 — The conversation: agree on what to draw
 
-The page's shape is decided WITH the operator, never alone and never from
-the document. Draft a compact proposal and STOP for approval before writing
-any spec. Ideas are welcome — this is where your domain thinking earns its
+The page's shape is decided WITH the operator. If the operator has already
+chosen the structure or authorized your proposed approach, use that approval;
+otherwise draft a compact proposal and wait for approval before writing the
+spec. Ideas are welcome — this is where your domain thinking earns its
 keep. Propose the page you would actually want to read:
 
 - **Structure**: sections/tabs, one line each on what that section argues.
 - **Widgets**: per section, which panels and WHY — and your ideas: two
   flows that race each other, a state machine underlying a retry ladder, a
-  waterfall for a latency budget, a failure tab mirroring the happy path.
+  waterfall for a latency budget, alternate outcomes sharing the happy-path diagram.
   Name close alternatives you rejected.
 - **Contract cards**: which wire table lands where.
-- **Failure modes**: where each goes (own section, extra steps, or bullet),
+- **Failure modes**: where each goes (alternate path, own section, extra steps, or bullet),
   and any you propose to leave off — with the reason.
 - **Everything accounted**: every ledger row maps to a proposed carrier or
   sits in the leave-off list with its reason. A row the proposal never
@@ -172,6 +193,31 @@ a genuine carrier limit qualifies — and plain text is a carrier (bullets,
 step text, log lines can state almost anything), so carrier limits are
 rare.
 
+**Alternate timelines share the diagram.** When outcomes use the same
+actors and topology, prefer `diagram.paths` to duplicate success/failure
+sections, subject to the operator's chosen structure. `diagram.steps` is a
+registry with stable, unique step IDs; paths are ordered references to it.
+Reuse IDs for shared beats, then give each outcome its own ID at the FIRST
+differing beat. For a branch at visible step 3, share steps 1–2 only. Never
+reuse the happy-path step 3 body for the alternate's different content.
+Editing a shared body intentionally changes every path that references it.
+Each path folds panel state from the panel initial values through its own
+sequence and ends at its own last reference. Rejoining a shared ending does
+not reset earlier state. Use independent copies when the outcome needs its
+own edits. See `cookbook/alternate-paths.md` for a complete spec and the
+workbench's copy/share/detach workflow. Paths describe authored outcomes,
+not executable conditions or failure probabilities.
+
+**Choose the main view.** A `homemap` or other panel can be the centerpiece
+with `diagram.primaryPanel: "<panel-id>"`. Existing homemaps support live
+Home / Data flow switching while retaining the selected step and path.
+Home device states use animation instead of state chips; subject labels
+are hidden unless `showSubjectLabels:true` is declared on the panel. Map
+device/room coordinates are shared layout; subject positions are sparse
+step patches. Device and room dragging in the step inspector changes all
+paths, while subject dragging edits the selected step. These are authoring
+coordinates in the 320×180 frame, not physical dimensions or sensor evidence.
+
 **Write each step like you were there.** For every step ask: what actually
 happens at this beat? Which components act, and which merely wait? What
 must the reader see to grasp the INTENT — the race, the handoff, the
@@ -193,8 +239,10 @@ subject positions), draw proportionally and put the stated figure verbatim
 in visible text — never type feet into a pixel field. Authoring geometry is
 only what the HLD does NOT state (pixel placement, sensor origin, subject
 paths): yours to choose, under one constraint — it must make the engine
-COMPUTE the outcome the HLD narrates. Never invent ids, sequence numbers,
-or finer breakdowns than the document gives.
+COMPUTE the outcome the HLD narrates. Never invent business identifiers,
+sequence numbers, or finer breakdowns than the document gives. Internal
+node/panel/step/path IDs are authoring references: choose stable, unique
+ones without presenting them as identifiers from the source system.
 
 **Computed outcomes stay computed.** `pir` trips, `radar` alerts/occupancy,
 `thermo`/`battery` zones are computed from your inputs — choose inputs that
@@ -215,13 +263,24 @@ not HOW: that's a missing fact — STOP AND ASK, never a plausible default.
 Named services survive: every service row appears as a node/float or is
 named in the step text/bullet of the beat where it acts.
 
-**Known engine limits** (workarounds, noted in your report):
+**Communication/playback rules and remaining limits** (report any workarounds):
 
 - One addressable edge per `from->to` pair — a second message between the
   same pair in the same direction lives in step text or a log line. A
   return message is its own opposite-direction edge with `"ret": true`.
-- `screen` has no playback mode — recorded-clip views are `save` + banner
-  or step text, never `live`.
+- Failed sends use `step.failures:{"from->to":"dropped"|"blocked"}` on an
+  existing edge: dropped means attempted but not delivered; blocked means
+  not sent. A received error response or timeout alone does not prove loss.
+  Failures are step-local; repeat them on a later beat if the break should
+  remain. Focus, node tones, and panel outcomes are authored separately.
+- `screen.mode` describes the camera (`off|boot|live|rec|save`), while
+  `scenePlayback:"waiting"|"playing"` controls the simulated event separately.
+  Record with `mode:"rec",scenePlayback:"waiting"`, then patch only
+  `scenePlayback:"playing"` when the action happens. Both carry along the
+  selected path; omission defaults to playing for existing specs. Stock
+  color clips are illustrative SVG animations, not footage or measured
+  event durations. There is no separate recorded-media playback mode;
+  describe a saved clip with `save` + banner or step text. See the camera recipe.
 - Buffers: `mark` only cells the story has written (the `head` shows the
   write position); `dropped` (red) exactly when data was LOST, `empty` for
   mere reuse. Every threshold a panel declares (`warn`/`low`/`crit`) is
@@ -229,8 +288,8 @@ named in the step text/bullet of the beat where it acts.
   with the normal covered/out-of-scope disposition.
 - Pick 0-based index language and keep it; when the HLD's unit differs from
   the widget's cells, state the conversion once in a caption or bullet.
-- Step hygiene: every step carries an edge, nodes, or a patch; two steps
-  must never share the same FIRST edge (reorder each step's `edges` list —
+- Step hygiene: every step carries an edge, nodes, a patch, or `failures`;
+  two edge-bearing steps must never share the same FIRST edge (reorder each step's `edges` list —
   true firing order is preserved with `packets`); an overflowing edge
   label gets shortened, not nudged.
 
@@ -279,7 +338,12 @@ widget list matches what you declared. Optional index over OUT:
 The build already ran the validator — do not re-run `validate.js`
 separately; this phase is the checking the build cannot do.
 Re-open the HLD. Walk the ledger row by row, pointing every `covered` row
-at its actual spec location. Then replay the spec start to finish with the
+at its actual spec location. Replay EVERY path, including its shared lead-in,
+first distinct beat, and early ending. Switch between outcomes to check that
+success state never leaks into a failure, and inspect any rejoined ending
+with its actual incoming state. Confirm quiet recording precedes the event
+where authored, and try Home / Data flow if a centerpiece is used. Then
+check the spec start to finish with the
 document beside you: every panel state matches the narrative at that beat;
 every number (JSON literals AND digits inside strings) matches its ledger
 row — authoring geometry exempt from tracing but still producing the HLD's

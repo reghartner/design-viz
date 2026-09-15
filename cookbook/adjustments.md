@@ -26,8 +26,19 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 | "the person should trip it one step later" | move the per-step `subject` points | verify with the pirModel snippet in `motion-detection.md` — never assert `tripped` |
 | "make the warning kick in sooner" | thermo `warn` / `crit` | zones are computed at render; also move the step values so the crossing lands on the intended step |
 | "put the temperature panel above the state panel" | order of the `panels` array | render order = array order |
+| "show the failure beside the happy path on this same diagram" | `diagram.paths` with ordered step IDs | share the prefix; the first DIFFERING beat needs a different ID; see `alternate-paths.md` |
+| "editing the alternate also changed the happy path" | **Make independent here**, or copy the step under a fresh ID and replace only that path's reference | shared IDs deliberately share one body; aligned columns do not imply shared content |
+| "copy these happy-path steps into the alternate" | **Steps → Reuse steps…** | copy by default; share only intentionally; inspect the resulting destination panel state |
+| "show a communication that doesn't happen" | `steps[i].failures` with `"from->to"` keys | `dropped` = attempted but lost; `blocked` = never sent; declared edge required; a timeout alone proves neither |
+| "make the home map the main view" | `diagram.primaryPanel:"home"` (use the panel's ID) | **Presentation → Centerpiece**; reader can switch Home / Data flow live |
+| "move a home device / room / person" | device/room declaration x/y; subject's per-step `{x,y}` patch | 320×180 frame; device/room drags change all steps; subject moves follow the selected step |
+| "remove the subject names" | omit `homemap.showSubjectLabels` or set it to false | names are hidden by default; `true` opts in; state chips are already omitted |
+| "start recording before the person moves / fire starts" | screen patch `mode:"rec",scenePlayback:"waiting"`, then later `scenePlayback:"playing"` | mode and scene phase inherit separately; see `camera-events.md` |
+| "make the old video scenes color" | rebuild with the current template | all stock clips are color automatically; existing scene tokens still work |
+| "make a dense trace readable / fit the whole diagram" | **Auto / Fit width / Readable** on routed diagrams; `routing:"lanes"` for track routing | no zoom/schema flag; lanes support flat rows of 1–5 cards, no floats or self-loops |
+| "the editor is squeezing the diagram" | drag the workspace divider; use **Expand editor** or **Focus workspace** | editor preferences, not spec fields; panels stack below when section width is at most 1000px |
 | "make the proposal tab stand out" | `tabs[i].highlight`: `true`, an accent name, or `"#RRGGBB"` | |
-| "more space between rows / bigger boxes" | **not spec-adjustable** | row gap (140 px), card size (54 px tall), and board width (1180 px) are engine constants — say so instead of guessing |
+| "more space between rows / bigger boxes" | no arbitrary row-gap/card-size field | engine computes sizing; lane routing expands gaps for its reserved tracks; do not invent a pixel-gap field |
 
 ## Working method for any adjustment
 
@@ -35,7 +46,7 @@ of knobs. This file maps the feedback to the knob. Two facts first:
    operator used — titles and labels are verbatim in the JSON).
 2. Apply the smallest knob from the table. Prefer structure changes (row
    order, stacking) over pixel nudges; pixel nudges exist only where the table
-   lists them (`floats.dx/dy`, `labelDx`, `bend`, pir coordinates).
+   lists them (float/label offsets, bends, or map/sensor coordinates).
 3. Re-validate. The lint is layout-aware — it will name label overflows,
    crowded corridors, and coin collisions with the numbers that justify the
    fix.

@@ -4981,6 +4981,8 @@ function initWorkbenchBuilder(opts){
           var sharedNote = document.createElement('p'); sharedNote.className = 'fnote shared-step-note';
           sharedNote.textContent = 'Shared step — edits apply to: ' + sharing.map(function(route){return route.label;}).join(', ') + '.';
           guide.appendChild(sharedNote);
+          var independent = actionButton('Make independent here', function(){ if (stepList) stepList.editPathStep('independent'); });
+          independent.disabled = !!addToStep || !!connect; guide.appendChild(independent);
         }
       }
       var form = document.createElement('div');
@@ -5071,6 +5073,12 @@ function initWorkbenchBuilder(opts){
         }, armedHere ? 'bexit-inline' : ''));
       }
       if (t.kind === 'step' && !armedHere){
+        if (ctx.diagram && ctx.diagram.paths){
+          var removeHere = actionButton('Remove from this path', function(){ if (stepList) stepList.editPathStep('remove'); });
+          var selectedPath = diagramPathList(ctx.diagram).find(function(p){ return p.id === (stepperFor(t.section) && stepperFor(t.section).path()); });
+          removeHere.disabled = !!connect || !selectedPath || selectedPath.indices.length <= 1;
+          acts.appendChild(removeHere);
+        }
         acts.appendChild(actionButton('duplicate step', function(){
           commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
@@ -5085,7 +5093,7 @@ function initWorkbenchBuilder(opts){
         }));
       }
       if (!armedHere)
-        acts.appendChild(actionButton('delete ' + t.kind, deleteCurrent, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
+        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : 'delete ' + t.kind, deleteCurrent, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       guide.appendChild(acts);
     }
 

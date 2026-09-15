@@ -13,7 +13,9 @@ function builderStorySections(raw){
 function builderStorySteps(section, query, pathId){
   var terms = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   function count(n, noun){ return n + ' ' + noun + (n === 1 ? '' : 's'); }
-  var route = diagramPathList(section.diagram).find(function(p){return p.id === pathId;}) || diagramPathList(section.diagram)[0];
+  var paths = diagramPathList(section.diagram), route = paths.find(function(p){return p.id === pathId;}) || paths[0];
+  var owners = new Map();
+  paths.forEach(function(p){ if (p.id !== route.id) p.indices.forEach(function(i){ if (!owners.has(i)) owners.set(i, []); owners.get(i).push(p.label); }); });
   return route.indices.map(function(index,position){
     var step=section.diagram.steps[index];
     step = step || {};
@@ -24,6 +26,7 @@ function builderStorySteps(section, query, pathId){
     var haystack = [position + 1, caption, id, lane].concat(hops, nodes, panels).join(' ').toLowerCase();
     if (!terms.every(function(term){ return haystack.indexOf(term) >= 0; })) return null;
     return {index:index, position:position, pathId:section.diagram.paths ? route.id : undefined, caption:caption, id:id, lane:lane,
+      sharedWith:owners.get(index) || [],
       summary:[lane, count(hops.length, 'hop'), count(nodes.length, 'node'), count(panels.length, 'panel')].filter(Boolean).join(' · '),
       target:{kind:'step', section:section.section, index:index},
       path:section.path.concat(['steps', index]), tab:section.tab};
@@ -42,6 +45,38 @@ function initWorkbenchStepList(opts){
   var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
   var pathSignature='';
   var inspectButton = document.getElementById('steps-inspect');
+  var reuseButton = document.getElementById('steps-reuse'), independentButton = document.getElementById('steps-independent');
+  var removeOccurrence = document.getElementById('steps-remove-occurrence'), sharingBox = document.getElementById('steps-sharing');
+  var sharingText = document.getElementById('steps-shared-with');
+  function reuseContext(){
+    if (stale || !chosen || opts.locked() || opts.src.value !== indexedText ||
+        (opts.renderedText && opts.renderedText() !== opts.src.value)) return null;
+    var selected = route();
+    if (!selected) return null;
+    var ctx = builderPathOccurrence(indexedText, raw, chosen.section, selected.id, current());
+    if (ctx.error) return null;
+    return {text:indexedText, raw:raw, diagram:chosen.diagram, section:chosen.section, pathId:selected.id,
+      label:selected.label, index:current(), position:ctx.position, destination:ctx.route};
+  }
+  function applyPathPlan(plan, section){
+    if (plan.error){ status.textContent = plan.error; return false; }
+    if (!opts.apply(plan, section)) return false;
+    search.value = ''; refresh();
+    var selected = list.querySelector('[aria-current="step"]');
+    if (selected) selected.scrollIntoView({block:'nearest'});
+    return true;
+  }
+  function editPathStep(action){
+    if (!ready()) return false;
+    var ctx = reuseContext();
+    if (!ctx){ status.textContent = 'Select a step in this path first.'; return false; }
+    return applyPathPlan(planPathOccurrenceEdit(indexedText, raw, ctx.section, ctx.pathId, ctx.index, action), ctx.section);
+  }
+  var reuse = typeof initWorkbenchStepReuse === 'function' ? initWorkbenchStepReuse({
+    src:opts.src, context:reuseContext, apply:applyPathPlan, pause:opts.pause}) : null;
+  if (reuseButton) reuseButton.addEventListener('click', function(){ if (ready() && reuse && !reuseButton.disabled) reuse.open(); });
+  if (independentButton) independentButton.addEventListener('click', function(){ editPathStep('independent'); });
+  if (removeOccurrence) removeOccurrence.addEventListener('click', function(){ editPathStep('remove'); });
   if (inspectButton) inspectButton.addEventListener('click', function(){
     if (ready() && current() >= 0 && opts.inspect) opts.inspect();
   });
@@ -78,6 +113,14 @@ function initWorkbenchStepList(opts){
     buttons.later.disabled = blocked || index < 0 || index >= count - 1;
     buttons.previous.disabled = stale || offset === 0;
     buttons.next.disabled = stale || offset + pageSize >= entries.length;
+    var hasPaths = !!(chosen && chosen.diagram.paths), shared = hasPaths && index >= 0 ?
+      diagramPathList(chosen.diagram).filter(function(p){ return p.id !== selected.id && p.indices.indexOf(current()) >= 0; }) : [];
+    if (reuseButton){ reuseButton.hidden = !hasPaths; reuseButton.disabled = blocked || index < 0; }
+    if (sharingBox) sharingBox.hidden = !hasPaths || index < 0;
+    if (sharingText) sharingText.textContent = shared.length ? 'Shared with ' + shared.map(function(p){ return p.label; }).join(', ') + '. Edits apply to those paths too.' : 'This step is only used by this path.';
+    if (independentButton){ independentButton.hidden = !shared.length; independentButton.disabled = blocked || !shared.length; }
+    if (removeOccurrence) removeOccurrence.disabled = blocked || index < 0 || count <= 1;
+    if (reuse) reuse.refresh();
   }
   function invalidate(message){
     stale = true; list.innerHTML = ''; paging.hidden = true;
@@ -109,6 +152,10 @@ function initWorkbenchStepList(opts){
       caption.className = 'story-caption'; caption.textContent = entry.caption;
       meta.textContent = (entry.id ? entry.id + ' · ' : '') + entry.summary;
       text.appendChild(caption); text.appendChild(meta); button.appendChild(number); button.appendChild(text);
+      if (entry.sharedWith.length){
+        var shared = document.createElement('small'); shared.className = 'story-shared';
+        shared.textContent = 'Shared with ' + entry.sharedWith.join(', '); text.appendChild(shared);
+      }
       button.title = entry.caption + '\n' + meta.textContent;
       button.addEventListener('click', function(){
         if (!ready()) return;
@@ -242,5 +289,5 @@ function initWorkbenchStepList(opts){
     if (ev.key === 'Escape') setTimeout(sync, 0);
   });
   refresh();
-  return {sync:sync};
+  return {sync:sync, editPathStep:editPathStep};
 }

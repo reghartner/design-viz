@@ -24,7 +24,7 @@ also hides the label and choices.
 
 ## Build a branch
 
-1. Open **story steps**, choose the section and select the last shared beat.
+1. Open the **Steps** tab, choose the section and select the last shared beat.
 2. Click **+ Alternate after selected step**. On the first fork the builder
    adds stable IDs to any unnamed steps and creates **Happy path** plus an
    orange **Dropped signal** path. The new path shares the prefix and gets
@@ -39,8 +39,13 @@ Shared steps have one body: changing a shared caption or patch updates every
 path referencing it. The inspector names those paths when a shared step is
 selected. The first colored branch step is the first differing reference, so
 editing its caption or patch leaves the aligned happy-path step untouched.
-Duplicate a step to make an independent copy. **Delete
-step** removes the shared body and its references from all paths; the editor
+Use **Make independent here** to replace a shared step in this path with a
+copy at the same position. **Reuse steps…** can copy or share selected steps
+from another path, or continue with its remaining steps. Its destination
+preview shows the resulting panel state before applying the change. See
+[step reuse](workbench-step-reuse.md) for placement and sharing controls.
+**Remove from this path** removes only the occurrence. **Delete from all
+paths** removes the shared body and its references from all paths; the editor
 refuses a deletion that would empty a path. **Remove alternate** removes only
 that path, retaining its step bodies in JSON for reuse. The document outline
 can still find unused bodies. Every structural edit uses one undo entry.

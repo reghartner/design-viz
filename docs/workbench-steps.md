@@ -22,6 +22,10 @@ change `diagram.view` in JSON to `step` or `ambient` to show one.
   The step inspector also has a **duplicate step** action.
 - **Earlier / Later** move the selected beat by one position in the full
   story, including neighbors hidden by the filter. End controls are disabled.
+- **Reuse steps…**, available on paths, copies or shares beats from another
+  path with a destination-state preview. **Make independent here** detaches
+  a shared beat in place; **Remove from this path** removes only its occurrence.
+  See [step reuse](workbench-step-reuse.md) for selecting ranges and continuations.
 
 These actions clear the filter, select their result and use one existing
 builder undo entry each. Undo/redo restores the source; it clears the builder

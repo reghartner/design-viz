@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const code = ['validator.js','engine.js','builder.workbench.js','steps.workbench.js']
+const code = ['validator.js','engine.js','builder.workbench.js','steps.workbench.js','reuse.workbench.js']
   .map(name=>fs.readFileSync(path.join(__dirname,'../src',name),'utf8')).join('\n');
 const plain = value=>JSON.parse(JSON.stringify(value));
 function load(globals={}){ const c={...globals}; vm.createContext(c); vm.runInContext(code,c); return c; }
@@ -90,18 +90,23 @@ function harness(raw=fixture()){
   const root=el(); doc.addEventListener=root.addEventListener.bind(root);
   doc.createElement=el; doc.getElementById=id=>elements[id] || null;
   for(const id of ['sec-steps','steps-section','steps-search','steps-list','steps-status','steps-paging',
-    'steps-add','steps-duplicate','steps-earlier','steps-later','steps-previous','steps-next','steps-inspect','src','view']) root.appendChild(el('div',id));
+    'steps-add','steps-duplicate','steps-earlier','steps-later','steps-previous','steps-next','steps-inspect',
+    'steps-path','steps-path-tools','steps-path-label','steps-path-color','steps-fork','steps-path-save','steps-path-remove',
+    'steps-reuse','steps-independent','steps-remove-occurrence','steps-sharing','steps-shared-with','src','view']) root.appendChild(el('div',id));
   const src=elements.src; src.value=JSON.stringify(raw,null,2);
-  let rendered=src.value, target=null, locked=false, ui;
+  let rendered=src.value, target=null, locked=false, activePath=null, ui;
   const c=load({document:doc,setTimeout:fn=>timers.push(fn),MutationObserver:class {constructor(fn){ observers.push(fn); } observe(){}}});
   ui=c.initWorkbenchStepList({src,view:elements.view,renderedText:()=>rendered,selection:()=>target,locked:()=>locked,
+    path:()=>activePath,selectPath(section,id){activePath=id;target=null;},
     inspect(){ inspections.push(target); },
     navigate(entry){ navigation.push(entry); target=entry.target; ui.sync(); },
     apply(plan,section){ history.push(src.value); src.value=plan.text; rendered=src.value;
+      if(plan.pathId) activePath=plan.pathId;
       target={kind:'step',section,index:plan.index}; return true; }});
   return {c,ui,doc,e:elements,src,history,navigation,inspections,root,
     render(){ rendered=src.value; observers.forEach(fn=>fn()); },
     select(index,section=1){ target={kind:'step',section,index}; ui.sync(); },
+    selectPath(id){activePath=id;ui.sync();},
     lock(value){ locked=value; root.fire('click'); },
     unlockOnEscape(){ root.addEventListener('keydown',()=>{ locked=false; }); },
     flushTimers(){ timers.splice(0).forEach(fn=>fn()); },
@@ -117,6 +122,35 @@ test('Inspect requires a current selected step and refuses stale source or unfin
   h.lock(true);assert.equal(button.disabled,true);button.fire('click');assert.equal(h.inspections.length,1);
   h.lock(false);h.src.value+=' ';button.fire('click');assert.equal(h.inspections.length,1);
   assert.equal(button.disabled,true);
+});
+
+test('path occurrence actions select their result, use one undo each and preserve other paths',()=>{
+  const raw=fixture();dOf(raw).paths=[{id:'happy',steps:['one','two','three']},{id:'offline',steps:['one','three']}];
+  const h=harness(raw),e=h.e;h.selectPath('offline');h.select(0);
+  assert.equal(e['steps-reuse'].disabled,false);assert.equal(e['steps-independent'].hidden,false);
+  assert.match(e['steps-shared-with'].textContent,/Happy path/);
+  e['steps-independent'].fire('click');
+  assert.equal(h.history.length,1);assert.equal(h.target.index,3);
+  assert.deepEqual(dOf(JSON.parse(h.src.value)).paths[1].steps,['one-copy1','three']);
+  assert.deepEqual(dOf(JSON.parse(h.src.value)).paths[0],dOf(raw).paths[0]);
+  assert.equal(e['steps-independent'].hidden,true);h.undo();h.select(0);
+  e['steps-remove-occurrence'].fire('click');
+  assert.equal(h.history.length,1);assert.equal(h.target.index,2);
+  assert.deepEqual(dOf(JSON.parse(h.src.value)).steps,dOf(raw).steps);
+  assert.deepEqual(dOf(JSON.parse(h.src.value)).paths[1].steps,['three']);
+  assert.equal(e['steps-remove-occurrence'].disabled,true);
+  e['steps-remove-occurrence'].fire('click');assert.equal(h.history.length,1);
+  h.undo();assert.equal(h.src.value,JSON.stringify(raw,null,2));
+});
+
+test('reuse and occurrence controls refuse stale source and active builder gestures',()=>{
+  const raw=fixture();dOf(raw).paths=[{id:'happy',steps:['one','two','three']},{id:'offline',steps:['one','three']}];
+  const h=harness(raw),e=h.e;h.selectPath('offline');h.select(0);h.lock(true);
+  assert.equal(e['steps-reuse'].disabled,true);assert.equal(e['steps-independent'].disabled,true);
+  e['steps-independent'].fire('click');assert.equal(h.history.length,0);
+  h.lock(false);h.src.value+=' ';e['steps-remove-occurrence'].fire('click');
+  assert.equal(h.history.length,0);assert.equal(e['steps-reuse'].disabled,true);
+  const pathless=harness();assert.equal(pathless.e['steps-reuse'].hidden,true);
 });
 
 test('filtered navigation and reorder act on original story indices and keep the same selected beat',()=>{

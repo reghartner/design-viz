@@ -37,69 +37,70 @@ h1{font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(30px,4.5vw,42
 h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .mdesc{color:var(--sub); max-width:80ch; margin:6px 0 14px; font-size:14.5px;}
 
-/* work area: rendered page on the left, spec editor on the right, so a render
-   click never requires scrolling back up. The editor column is sticky; below
-   the stack breakpoint the two fall back to the old top/bottom order. */
-.workwrap{max-width:1720px; margin:0 auto; padding:0 22px;}
+/* Keep one editor tool visible; resizing changes space, never content. */
+.workwrap{max-width:1720px;margin:0 auto;padding:0 22px;}
 .workmain{min-width:0;}
 .workspace-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:1676px;margin:18px auto 0;padding:8px 22px;background:var(--bg);}
 .workspace-hint{font-size:11px;color:var(--sub);}
-.workspace-divider{display:none;touch-action:none;user-select:none;border-radius:5px;position:relative;}
-.workspace-divider::after{content:"";position:absolute;background:var(--line);border-radius:3px;}
+.workspace-divider{display:none;touch-action:none;user-select:none;position:relative;cursor:col-resize;}
+.workspace-divider::after{content:"";position:absolute;width:2px;left:11px;top:12px;bottom:12px;border-radius:3px;background:var(--line);}
+.workspace-divider>span{display:block;position:sticky;top:45dvh;z-index:1;margin:120px auto 0;padding:12px 0;width:18px;text-align:center;border:1px solid var(--accent);border-radius:14px;background:var(--card);color:var(--accent);font:600 15px/1 monospace;}
 .workspace-divider:hover::after,.workspace-divider:focus-visible::after{background:var(--accent);}
+.workspace-divider:hover>span{box-shadow:0 0 0 3px var(--selglow);}
 .workspace-divider:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
 body.workspace-dragging,body.workspace-dragging *{user-select:none !important;cursor:inherit !important;}
+body.workspace-focus{margin:0;}
 body.workspace-focus>header,body.workspace-focus main>.wrap,body.workspace-focus>footer{display:none;}
 body.workspace-focus .workspace-tools{position:sticky;top:0;z-index:60;margin-top:0;max-width:none;}
 body.workspace-focus .workwrap{max-width:none;}
-#workspace-focus[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
-@media (max-width:1180px){.workspace-hint{display:none;}.workwrap{padding:0 12px;}.workspace-tools{padding:8px 12px;}}
-@media (max-width:640px){body{margin:0;}.workwrap{padding:0 8px;}.wrap{padding-inline:16px;}}
-@media (min-width:1181px){
-  .workwrap{display:grid;grid-template-columns:minmax(0,1fr) 12px var(--workspace-editor,440px);gap:6px;align-items:start;}
+#workspace-focus[aria-pressed="true"],#workspace-expand[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
+.editor-tabs{display:flex;gap:3px;padding:6px 10px 0;border-bottom:1px solid var(--line);flex:none;}
+.editor-tabs [role="tab"]{flex:1;min-width:0;min-height:38px;padding:8px 4px;border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;background:transparent;color:var(--sub);font:600 12px 'IBM Plex Sans',sans-serif;cursor:pointer;}
+.editor-tabs [aria-selected="true"]{border-bottom-color:var(--accent);color:var(--ink);background:var(--codebg);}
+.editor-tabs [role="tab"]:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;}
+.editor-utilities{flex:none;min-height:0;overflow:auto;}
+.editor-pane{min-width:0;}
+.editor-pane>.ssec>summary{display:none;}
+.editor-empty{padding:18px;margin:0;font-size:13px;color:var(--sub);}
+#editor-inspect:has(#sec-inspect:not([hidden]) #guide:not([hidden])) .editor-empty{display:none;}
+.editor-inspect-selection{margin:10px 14px 4px;}
+#editor-steps .story-list{max-height:none;overflow:visible;}
+.editor-file-tools{flex:none;gap:6px !important;}
+.editor-file-tools .msgs{flex-basis:100%;margin:0;}
+@media (max-width:1180px){.workwrap{padding:0 12px;}.workspace-tools{padding:8px 12px;}}
+@media (min-width:800px){
+  .workwrap{display:grid;grid-template-columns:minmax(0,1fr) 24px var(--workspace-editor,440px);align-items:start;}
   #workspace-columns{display:block;align-self:stretch;min-height:200px;}
-  #workspace-columns::after{width:3px;left:4px;top:30px;bottom:0;}
-  #workspace-columns{cursor:col-resize;}
-  #workspace-rows{height:12px;flex:none;cursor:row-resize;margin:0 6px;}
-  #workspace-rows::after{height:3px;top:4px;left:0;right:0;}
-  .specbox[open]:has(#sec-inspect[open]:not([hidden])):has(#sec-source[open]) #workspace-rows{display:block;}
+  .workwrap .specbox{position:sticky;top:12px;margin-top:12px;min-width:0;box-sizing:border-box;}
+  .workwrap .specbox[open]{display:flex;flex-direction:column;height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);}
+  .workwrap .specbox[open]::details-content{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;}
+  .workwrap .specbox>summary{flex:none;}
+  .workwrap .editor-utilities{max-height:42%;}
+  .workwrap .editor-pane{flex:1 1 0;min-height:160px;overflow:auto;}
+  .workwrap #editor-inspect,.workwrap #editor-json{display:flex;flex-direction:column;}
+  .workwrap #sec-source[open],.workwrap #sec-inspect[open]{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+  .workwrap #sec-source[open]::details-content,.workwrap #sec-inspect[open]::details-content{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+  .workwrap #sec-source[open] #src{flex:1 1 auto;height:auto;min-height:120px;resize:none;}
+  .workwrap #sec-inspect[open] .guide{overflow:auto;max-height:none;min-height:0;flex:1 1 auto;}
+  .workwrap .msgs{max-height:100px;overflow:auto;}
   body.workspace-focus .workmain{max-height:calc(100dvh - var(--workspace-toolbar,48px));overflow:auto;}
   body.workspace-focus .toolrow{margin-top:12px;}
   body.workspace-focus .workwrap .specbox{top:calc(var(--workspace-toolbar,48px) + 6px);margin-top:6px;}
-  body.workspace-focus .workwrap .specbox[open]{max-height:calc(100dvh - var(--workspace-toolbar,48px) - 12px);}
-  body.workspace-focus .workwrap .specbox[open]:has(#sec-source[open]){height:calc(100dvh - var(--workspace-toolbar,48px) - 12px);}
-  .workwrap .specbox{position:sticky; top:12px; margin-top:30px;}
-  /* the editor column is a flex stack capped to the viewport. The JSON
-     source section absorbs the leftover height while it is open;
-     collapsing it hands that height to the inspector section instead
-     (the :has() rows below), so a long inspector form gets the room.
-     A <details> element boxes its non-summary children inside the
-     ::details-content pseudo, so every flex pipe below styles that
-     pseudo too — flex on the details alone reaches only the summary. */
-  .workwrap .specbox[open]{display:flex; flex-direction:column; max-height:calc(100vh - 24px);}
-  /* while the source section is open the column takes a DEFINITE height so
-     flex-grow can hand the leftover to the textarea; collapsed, the column
-     hugs its content under the same cap */
-  .workwrap .specbox[open]:has(#sec-source[open]){height:calc(100vh - 24px);}
-  .workwrap .specbox[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow-y:auto;}
-  .workwrap .specbox > summary, .workwrap .ssec > summary{flex:none;}
-  .workwrap .ssec{min-height:0;}
-  /* the insert section holds pop-open panes (starter gallery, node/panel
-     palettes, mermaid import). As a shrinkable flex item it could get
-     LESS than its content height in the viewport-capped column, and the
-     overflow painted OVER the inspector below. It never shrinks now —
-     the inspector and JSON source absorb instead (both scroll inside). */
-  .workwrap #sec-insert{flex-shrink:0;}
-  .workwrap #sec-source[open]{flex:var(--workspace-source-share,60) 1 0;min-height:140px;display:flex;flex-direction:column;}
-  .workwrap #sec-source[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
-  .workwrap #sec-source[open] #src{flex:1 1 auto; height:auto; min-height:60px; resize:none;}
-  .workwrap #sec-inspect[open]{flex:var(--workspace-inspector-share,40) 1 0;min-height:120px;display:flex;flex-direction:column;}
-  .workwrap #sec-inspect[open]::details-content{display:flex; flex-direction:column; flex:1 1 auto; min-height:0;}
-  .workwrap #sec-inspect[open] .guide{overflow-y:auto;max-height:none;flex:1 1 auto;}
-  .workwrap .specbox:has(#sec-source:not([open])) #sec-inspect[open]{flex:1 1 auto;}
-  .workwrap .specbox:has(#sec-source:not([open])) #sec-inspect[open] .guide{max-height:none; flex:1 1 auto;}
-  .workwrap .msgs{max-height:120px; overflow-y:auto;}
+  body.workspace-focus .workwrap .specbox[open]{height:calc(100dvh - var(--workspace-toolbar,48px) - 12px);max-height:calc(100dvh - var(--workspace-toolbar,48px) - 12px);}
+  body.editor-expanded .workwrap{grid-template-columns:minmax(0,1fr) 320px;gap:16px;}
+  body.editor-expanded .workmain{grid-column:2;grid-row:1;}
+  body.editor-expanded .specbox{grid-column:1;grid-row:1;}
+  body.editor-expanded #workspace-columns{display:none;}
+  body.editor-expanded .workmain .docview{padding:12px;}
 }
+@media (max-width:799px){
+  .workspace-hint,#workspace-expand{display:none;}
+  .editor-utilities{max-height:50dvh;}
+  .editor-pane{max-height:75dvh;overflow:auto;}
+  #editor-inspect .guide{max-height:none;overflow:visible;}
+  .editor-tabs [role="tab"]{min-height:44px;}
+}
+@media (max-width:640px){body{margin:0;}.workwrap{padding:0 8px;}.wrap{padding-inline:16px;}}
 
 .toolrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:30px 0 12px;}
 .outline-results{max-height:220px; overflow:auto; display:flex; flex-direction:column; gap:3px; margin:6px 0;}
@@ -183,8 +184,10 @@ body.workspace-focus .workwrap{max-width:none;}
 
 /* spec editor */
 .specbox{margin-top:14px; border:1px solid var(--line); border-radius:10px; background:var(--card);}
-.specbox > summary{cursor:pointer; padding:9px 14px; font:600 12px 'IBM Plex Mono',monospace; color:var(--sub);}
+.specbox > summary{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer; padding:9px 14px; font:600 12px 'IBM Plex Mono',monospace; color:var(--sub);}
 .specbox > summary:hover{color:var(--ink);}
+.specbox>summary>span::before{content:"▸ ";}.specbox[open]>summary>span::before{content:"▾ ";}
+.specbox>summary::-webkit-details-marker{display:none;}
 .specbox[open] > summary{border-bottom:1px solid var(--line);}
 
 /* collapsible editor sections: insert / inspector / JSON source */
@@ -260,6 +263,9 @@ body.workspace-focus .workwrap{max-width:none;}
   max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}
 .guide .gpath{display:block; margin:2px 0 6px; font:600 11px 'IBM Plex Mono',monospace; color:var(--accent); word-break:break-all;}
+.guide button.gpath{border:0;padding:0;background:transparent;text-align:left;cursor:pointer;}
+.guide button.gpath:hover{text-decoration:underline;}
+.guide button.gpath:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 /* the ordinal line ("step 2 of 3") pulses once after a move so the effect
    of ↑/↓ is visible even when the form fields themselves do not change */
 @keyframes dvposflash{from{background:var(--selglow);} to{background:transparent;}}
@@ -490,11 +496,16 @@ body.sk-aurora.sk-blueprint{
 .diffline[data-kind="changed"]{border-left:3px solid #B0771A;}
 
 /* Step-local home scene authoring. */
-.home-edit{min-width:0;margin:12px 0;padding:10px;border:1px solid var(--line);border-radius:9px;}
+.home-edit{min-width:0;margin:12px 0;padding:10px;border:1px solid var(--line);border-radius:9px;container-type:inline-size;}
 .home-edit legend{font-size:12px;font-weight:700;color:var(--ink);}
 .home-edit .frow{margin:7px 0;}
 .home-note{font-size:11px;line-height:1.5;color:var(--sub);margin:7px 0;}
-.home-edit-map{border-radius:8px;overflow:hidden;margin-bottom:10px;}
+.home-edit-map{border-radius:8px;overflow:hidden;margin-bottom:10px;max-width:600px;}
+.home-edit-fields{min-width:0;}
+@container (min-width:700px){
+  .home-edit-body{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(300px,1fr);gap:16px;align-items:start;}
+  .home-edit-map{position:sticky;top:0;margin-bottom:0;}
+}
 .home-edit-map:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .home-edit-map [data-device]{cursor:pointer;}
 .home-edit-map [data-subject]{cursor:grab;touch-action:none;}
@@ -4825,7 +4836,7 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
   <div class="workspace-tools" aria-label="Workspace layout">
     <button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button>
     <button class="bbtn" id="workspace-reset">Reset layout</button>
-    <span class="workspace-hint">Drag dividers or focus one and use arrow keys.</span>
+    <span class="workspace-hint">Drag the divider to resize · Expand editor for more room.</span>
   </div>
   <div class="workwrap">
     <div class="workmain">
@@ -4837,12 +4848,18 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
       <div class="docview sk-aurora" id="docview" aria-label="Rendered documentation page"></div>
     </div>
 
-    <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click resets."></div>
+    <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
     <details class="specbox" id="spec-editor" open>
-      <summary>spec editor — insert &#183; inspector &#183; JSON source</summary>
+      <summary><span>Editor</span><button class="bbtn" type="button" id="workspace-expand" aria-pressed="false">⤢ Expand editor</button></summary>
+      <div class="editor-tabs" role="tablist" aria-label="Editor tools">
+        <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true">Inspect</button>
+        <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1">Steps</button>
+        <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1">JSON</button>
+      </div>
       <div class="draftbar" id="draftbar" hidden></div>
-      <details class="ssec" id="sec-insert" open>
-        <summary>insert</summary>
+      <div class="editor-utilities">
+      <details class="ssec" id="sec-insert">
+        <summary>insert &amp; import</summary>
         <div class="buildrow">
           <span class="bgroup" role="group" aria-label="add diagram elements">
             <button class="bbtn" id="add-node">+ node</button>
@@ -4858,10 +4875,6 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
             <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
             <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
             <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
-          </span>
-          <span class="bgroup" role="group" aria-label="history">
-            <button class="bbtn" id="undo-builder" disabled>undo</button>
-            <button class="bbtn" id="redo-builder" disabled>redo</button>
           </span>
           <button class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button>
           <span class="btarget" id="btarget"></span>
@@ -4909,8 +4922,11 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
         <div class="outline-status" id="outline-status" role="status"></div>
         <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
       </details>
-      <details class="ssec" id="sec-steps">
+      </div>
+      <div class="editor-pane" id="editor-steps" role="tabpanel" aria-labelledby="editor-tab-steps" hidden>
+      <details class="ssec" id="sec-steps" open>
         <summary>story steps</summary>
+        <button class="bbtn editor-inspect-selection" id="steps-inspect" type="button" disabled>Inspect selected step</button>
         <div class="story-tools">
           <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
           <div id="steps-path-tools" hidden>
@@ -4937,16 +4953,22 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
           <p class="story-note">Select a beat to edit it or branch after it. Step content is shared by paths that reference it. Append, duplicate and move affect the selected path; deleting a step removes it everywhere. Copies repeat patches, including appended events. Reveal/hide indices stay positional within each path.</p>
         </div>
       </details>
+      </div>
+      <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
+      <p class="editor-empty" id="editor-empty">Select an element in the preview, or choose a step in the Steps tab to edit it here.</p>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
         <div class="guide" id="guide" hidden></div>
       </details>
-      <div class="workspace-divider" id="workspace-rows" role="separator" tabindex="0" aria-label="Inspector share" aria-orientation="horizontal" aria-controls="sec-inspect" title="Drag to share space between inspector and JSON. Up/down arrows adjust; Home/End set limits; double-click resets."></div>
+      </div>
+      <div class="editor-pane" id="editor-json" role="tabpanel" aria-labelledby="editor-tab-json" hidden>
       <details class="ssec" id="sec-source" open>
         <summary>JSON source</summary>
         <textarea id="src" spellcheck="false" aria-label="Page spec JSON source"></textarea>
       </details>
-      <div class="specrow">
+      </div>
+      <div class="specrow editor-file-tools">
+        <span class="bgroup" role="group" aria-label="history"><button class="bbtn" id="undo-builder" disabled>undo</button><button class="bbtn" id="redo-builder" disabled>redo</button></span>
         <button class="rbtn" id="go">Render</button>
         <button class="bbtn" id="file-open">open&#8230;</button>
         <button class="bbtn" id="file-save">save</button>
@@ -15347,15 +15369,17 @@ function initWorkbenchBuilder(opts){
     var stored = null;
     try { stored = localStorage.getItem(SECS_KEY); } catch (ex){}
     var prefs = builderSectionPrefs(stored);
-    if (secInsert) secInsert.open = prefs.insert;
-    if (secSource) secSource.open = prefs.source;
+    if (secInsert) secInsert.open = opts.workspace && !stored ? false : prefs.insert;
+    if (secSource && !opts.workspace) secSource.open = prefs.source;
   })();
   if (secInsert) secInsert.addEventListener('toggle', persistSections);
   if (secSource) secSource.addEventListener('toggle', persistSections);
   function sourceVisible(){
-    return (!specbox || specbox.open) && (!secSource || secSource.open);
+    return (!specbox || specbox.open) && (!secSource || secSource.open) &&
+      (!opts.workspace || opts.workspace.tool() === 'json');
   }
   function openSource(){
+    if (opts.workspace) opts.workspace.showTool('json', {closeUtilities:true});
     if (specbox && !specbox.open) specbox.open = true;
     if (secSource && !secSource.open) secSource.open = true; /* toggle listener persists */
   }
@@ -16016,8 +16040,9 @@ function initWorkbenchBuilder(opts){
 
   /* ================= inspector: forms that write the JSON ================= */
 
-  function inspectorMessage(text){
+  function inspectorMessage(text, keepTool){
     if (!guide) return;
+    if (opts.workspace && !keepTool) opts.workspace.showTool('inspect');
     revealInspector();
     guide.hidden = false;
     guide.innerHTML = '';
@@ -16467,7 +16492,7 @@ function initWorkbenchBuilder(opts){
         return planStepHomemapField(src.value, raw, target.section, target.index, panel.id, key, value);
       }, {after:function(){ renderInspector(); }});
     }
-    function note(text){ var el = document.createElement('p'); el.className = 'home-note'; el.textContent = text; box.appendChild(el); return el; }
+    function note(text, parent){ var el = document.createElement('p'); el.className = 'home-note'; el.textContent = text; (parent || box).appendChild(el); return el; }
     function button(label, action){
       var b = document.createElement('button'); b.type = 'button'; b.className = 'bbtn'; b.textContent = label;
       b.addEventListener('click', action); return b;
@@ -16478,21 +16503,23 @@ function initWorkbenchBuilder(opts){
       select.value = value; select.addEventListener('change', function(){ action(select.value); }); return select;
     }
     note('Device states and positions carry forward. Inherit removes only this step’s change. Signals last for this step only.');
+    var body = document.createElement('div'); body.className = 'home-edit-body'; box.appendChild(body);
     var map = document.createElement('div'); map.className = 'home-edit-map sk-daylight'; map.tabIndex = 0;
-    map.setAttribute('aria-label', 'Home step placement map'); box.appendChild(map);
+    map.setAttribute('aria-label', 'Home step placement map'); body.appendChild(map);
     renderPanelBody(map, panel, snapshot.state, 'daylight', [], snapshot.position, false);
+    var fields = document.createElement('div'); fields.className = 'home-edit-fields'; body.appendChild(fields);
     var deviceControls = Object.create(null), subjectControls = Object.create(null);
     snapshot.model.devices.forEach(function(d, i){
       var before = snapshot.before.devices[i];
       var pairs = [['', 'Inherit · ' + before.state]].concat(HOMEMAP_STATES[d.kind].map(function(v){ return [v, v]; }));
       var ctl = choice(pairs, own(d.id) ? d.state : '', d.label + ' state', function(v){ commit(d.id, v === '' ? undefined : v); });
       deviceControls[d.id] = ctl;
-      box.appendChild(frow(d.label, ctl));
+      fields.appendChild(frow(d.label, ctl));
     });
     var armedSubject = null;
-    var placementNote = note('Click a device on this map to edit its state.');
+    var placementNote = note('Click a device on this map to edit its state.', fields);
     snapshot.model.subjects.forEach(function(sub, i){
-      var group = document.createElement('div'); group.className = 'home-subject'; box.appendChild(group);
+      var group = document.createElement('div'); group.className = 'home-subject'; fields.appendChild(group);
       var before = snapshot.before.subjects[i];
       var visibility = choice([['inherit', 'Inherit · ' + (before.hidden ? 'hidden' : before.x + ', ' + before.y)],
         ['show', 'Show at this position'], ['hide', 'Hidden']], own(sub.id) ? (sub.hidden ? 'hide' : 'show') : 'inherit',
@@ -16566,7 +16593,7 @@ function initWorkbenchBuilder(opts){
       if (device && deviceControls[device.getAttribute('data-device')]) deviceControls[device.getAttribute('data-device')].focus();
       else if (subject && subjectControls[subject.getAttribute('data-subject')]) subjectControls[subject.getAttribute('data-subject')].click();
     });
-    note('Signals · this step only');
+    note('Signals · this step only', fields);
     snapshot.model.signals.forEach(function(sig, i){
       var row = document.createElement('div'); row.className = 'home-signal';
       var label = document.createElement('span');
@@ -16575,14 +16602,14 @@ function initWorkbenchBuilder(opts){
       row.appendChild(label); row.appendChild(button('Remove', function(){
         var signals = snapshot.model.signals.filter(function(_, n){ return n !== i; }).map(function(s){ return {from:s.from, to:s.to}; });
         commit('signals', signals.length ? signals : undefined);
-      })); box.appendChild(row);
+      })); fields.appendChild(row);
     });
     if (snapshot.model.devices.length > 1){
       var endpoints = snapshot.model.devices.map(function(d){ return [d.id, d.label]; });
       var from = choice(endpoints, endpoints[0][0], 'Signal from', function(){});
       var to = choice(endpoints, endpoints[1][0], 'Signal to', function(){});
-      box.appendChild(frow('Signal from', from)); box.appendChild(frow('Signal to', to));
-      box.appendChild(button('Add signal', function(){
+      fields.appendChild(frow('Signal from', from)); fields.appendChild(frow('Signal to', to));
+      fields.appendChild(button('Add signal', function(){
         if (from.value === to.value){ formError('Choose two different devices for a signal.'); return; }
         var signals = snapshot.model.signals.map(function(s){ return {from:s.from, to:s.to}; });
         if (!signals.some(function(s){ return s.from === from.value && s.to === to.value; })) signals.push({from:from.value, to:to.value});
@@ -17295,6 +17322,7 @@ function initWorkbenchBuilder(opts){
                     index: only.index, el: only.el}, false);
       return;
     }
+    if (opts.workspace) opts.workspace.showTool('inspect', {closeUtilities:true});
     renderMultiInspector();
   }
   function applyBulkField(key, valueTextOrNull){
@@ -17415,9 +17443,17 @@ function initWorkbenchBuilder(opts){
     var path = parsed.error ? null : builderTargetPath(parsed.raw, t);
     var loc = path ? jsonLocate(src.value, path) : null;
 
-    var p = document.createElement('span');
+    var p = document.createElement(loc ? 'button' : 'span');
     p.className = 'gpath';
-    p.textContent = path ? builderPathString(path) : '';
+    p.textContent = path ? builderPathString(path) + (loc ? ' ↗ JSON' : '') : '';
+    if (loc){
+      var sourceAtSelection = src.value;
+      p.type = 'button'; p.setAttribute('aria-label', 'Show selected element in JSON');
+      p.addEventListener('click', function(){
+        if (src.value !== sourceAtSelection){ formError('Source changed. Click Render and reselect this element.'); return; }
+        selectRange(loc, true);
+      });
+    }
     guide.appendChild(p);
 
     var posText = parsed.error ? null : builderPositionLine(parsed.raw, t);
@@ -17585,7 +17621,7 @@ function initWorkbenchBuilder(opts){
       help.appendChild(tok);
     }
     guide.appendChild(help);
-    if (keepScroll != null) guide.scrollTop = keepScroll;
+    guide.scrollTop = keepScroll == null ? 0 : keepScroll;
   }
 
   /* ================= selection ================= */
@@ -17672,8 +17708,9 @@ function initWorkbenchBuilder(opts){
     return {section: gi, kind: 'section', el: secEl};
   }
 
-  function selectTarget(target, focusEditor){
+  function selectTarget(target, focusEditor, keepTool){
     pausePreview();
+    if (opts.workspace && !keepTool) opts.workspace.showTool('inspect', {closeUtilities:true});
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     currentTarget = {section: target.section, kind: target.kind,
@@ -17769,6 +17806,7 @@ function initWorkbenchBuilder(opts){
   var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({
     view:view, src:src, renderedText:opts.renderedText,
     pause:pausePreview,
+    inspect:function(){ if (opts.workspace) opts.workspace.showTool('inspect', {focus:true}); },
     selection:function(){ return currentTarget; },
     locked:function(){ return !!addToStep || !!connect; },
     path:function(section){var sp=stepperFor(section);return sp && sp.path();},
@@ -17785,7 +17823,7 @@ function initWorkbenchBuilder(opts){
       }
       if(entry.pathId){var sp=stepperFor(entry.target.section);if(sp) sp.selectPath(entry.pathId,entry.position);}
       var el = findTargetEl(entry.target);
-      selectTarget(Object.assign({}, entry.target, {el:el}), false);
+      selectTarget(Object.assign({}, entry.target, {el:el}), false, true);
       var loc = jsonLocate(src.value, entry.path);
       if (loc && sourceVisible()){
         src.setSelectionRange(loc.start, loc.end); scrollTextareaTo(loc.start);
@@ -18877,7 +18915,7 @@ function initWorkbenchBuilder(opts){
     var loc = findingLocation(src.value, parsed.raw, message, rawPath);
     if (!loc) return;
     selectRange(loc, true);
-    if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent');
+    if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent', true);
   };
 
   var initial = parseEditor();
@@ -18928,6 +18966,10 @@ function initWorkbenchStepList(opts){
   var pathLabel=document.getElementById('steps-path-label'), pathColor=document.getElementById('steps-path-color');
   var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
   var pathSignature='';
+  var inspectButton = document.getElementById('steps-inspect');
+  if (inspectButton) inspectButton.addEventListener('click', function(){
+    if (ready() && current() >= 0 && opts.inspect) opts.inspect();
+  });
   function route(){
     var paths=chosen ? diagramPathList(chosen.diagram) : [];
     var id=chosen && opts.path ? opts.path(chosen.section) : pathSelect && pathSelect.value;
@@ -18955,6 +18997,7 @@ function initWorkbenchStepList(opts){
       removePath.disabled=blocked || !chosen.diagram.paths || chosen.diagram.paths.length<2 || selected.id===chosen.diagram.paths[0].id;
       forkButton.disabled=blocked || index<0;}
     buttons.add.disabled = blocked;
+    if (inspectButton) inspectButton.disabled = blocked || index < 0;
     buttons.duplicate.disabled = blocked || index < 0 || index >= count;
     buttons.earlier.disabled = blocked || index <= 0 || index >= count;
     buttons.later.disabled = blocked || index < 0 || index >= count - 1;
@@ -19204,30 +19247,38 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl){
   return ctl;
 }
 
+/* Workspace preferences belong to the browser, never the authored spec. */
 function workspacePrefs(raw){
-  var prefs = {editor:440, inspector:40}, value;
+  var prefs = {editor:440, tool:'inspect'}, value;
   try { value = JSON.parse(raw); } catch (ex){ return prefs; }
-  if (!value || typeof value !== 'object') return prefs;
-  if (typeof value.editor === 'number' && Number.isFinite(value.editor)) prefs.editor = Math.max(340, Math.min(900, value.editor));
-  if (typeof value.inspector === 'number' && Number.isFinite(value.inspector)) prefs.inspector = Math.max(20, Math.min(80, value.inspector));
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return prefs;
+  if (typeof value.editor === 'number' && Number.isFinite(value.editor)) prefs.editor = Math.max(320, Math.min(1100, value.editor));
+  if (['inspect','steps','json'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
   return prefs;
 }
 function workspaceEditorBounds(contentWidth){
-  return {min:340, max:Math.max(340, Math.min(900, Math.floor(contentWidth - 560 - 24)))};
+  return {min:320, max:Math.max(320, Math.min(1100, Math.floor(contentWidth - 300 - 24)))};
 }
 function initWorkbenchWorkspace(){
   var wrap = document.querySelector('.workwrap');
   var cols = document.getElementById('workspace-columns');
-  var rows = document.getElementById('workspace-rows');
-  var inspect = document.getElementById('sec-inspect');
-  var source = document.getElementById('sec-source');
+  var editor = document.getElementById('spec-editor');
   var focus = document.getElementById('workspace-focus');
+  var expand = document.getElementById('workspace-expand');
   var reset = document.getElementById('workspace-reset');
   var toolbar = document.querySelector('.workspace-tools');
-  if (!wrap || !cols || !rows || !inspect || !source || !focus || !reset || !toolbar) return;
-  var key = 'dv-workbench-layout-v1', raw = null;
-  try { raw = localStorage.getItem(key); } catch (ex){}
-  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0;
+  var src = document.getElementById('src');
+  var guide = document.getElementById('guide');
+  if (!wrap || !cols || !editor || !focus || !expand || !reset || !toolbar || !src) return null;
+  var names = ['inspect','steps','json'], tabs = {}, panes = {}, scrolls = {};
+  names.forEach(function(name){
+    tabs[name] = document.getElementById('editor-tab-' + name);
+    panes[name] = document.getElementById('editor-' + name);
+  });
+  if (names.some(function(name){ return !tabs[name] || !panes[name]; })) return null;
+  var key = 'dv-workbench-layout-v2', raw = null;
+  try { raw = localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v1'); } catch (ex){}
+  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0, expanded = false, priorFocus = false;
   function persist(){
     try { localStorage.setItem(key, JSON.stringify(prefs)); } catch (ex){}
   }
@@ -19241,88 +19292,139 @@ function initWorkbenchWorkspace(){
   function paint(){
     var b = bounds(), width = effectiveWidth();
     wrap.style.setProperty('--workspace-editor', width + 'px');
-    wrap.style.setProperty('--workspace-inspector-share', prefs.inspector);
-    wrap.style.setProperty('--workspace-source-share', 100 - prefs.inspector);
     document.body.style.setProperty('--workspace-toolbar', toolbar.getBoundingClientRect().height + 'px');
     cols.setAttribute('aria-valuemin', b.min);
     cols.setAttribute('aria-valuemax', b.max);
     cols.setAttribute('aria-valuenow', Math.round(width));
     cols.setAttribute('aria-valuetext', Math.round(width) + ' pixels of editor width');
-    rows.setAttribute('aria-valuemin', 20);
-    rows.setAttribute('aria-valuemax', 80);
-    rows.setAttribute('aria-valuenow', Math.round(prefs.inspector));
-    rows.setAttribute('aria-valuetext', Math.round(prefs.inspector) + '% inspector / ' + Math.round(100 - prefs.inspector) + '% JSON; minimum pane heights apply');
+    document.body.classList.toggle('editor-expanded', expanded);
+    expand.setAttribute('aria-pressed', String(expanded));
+    expand.textContent = expanded ? '↙ Return to split' : '⤢ Expand editor';
   }
-  function assign(axis, value){
-    var b = axis === 'editor' ? bounds() : {min:20, max:80};
-    prefs[axis] = Math.max(b.min, Math.min(b.max, Math.round(value)));
-    paint();
+  /* Show/hide existing panes; do not rebuild a form, source textarea, or
+     preview. Keep both editor scroll positions and native text selection. */
+  function showTool(name, options){
+    if (names.indexOf(name) < 0) return false;
+    options = options || {};
+    var changed = prefs.tool !== name;
+    if (changed){
+      scrolls[prefs.tool] = {pane:panes[prefs.tool].scrollTop, source:src.scrollTop,
+        inspector:guide ? guide.scrollTop : 0, form:guide && guide.firstChild};
+      prefs.tool = name;
+    }
+    editor.open = true;
+    names.forEach(function(n){
+      var active = n === name;
+      tabs[n].setAttribute('aria-selected', String(active));
+      tabs[n].tabIndex = active ? 0 : -1;
+      panes[n].hidden = !active;
+    });
+    var section = document.getElementById(name === 'json' ? 'sec-source' : 'sec-' + name);
+    if (section) section.open = true;
+    if (changed && scrolls[name]){
+      panes[name].scrollTop = scrolls[name].pane;
+      if (name === 'json') src.scrollTop = scrolls[name].source;
+      if (name === 'inspect' && guide)
+        guide.scrollTop = guide.firstChild === scrolls[name].form ? scrolls[name].inspector : 0;
+    }
+    if (options.closeUtilities){
+      ['sec-insert','sec-outline'].forEach(function(id){ var el = document.getElementById(id); if (el) el.open = false; });
+    }
+    if (options.focus) tabs[name].focus({preventScroll:true});
+    if (changed) persist();
+    return true;
+  }
+  names.forEach(function(name, index){
+    tabs[name].addEventListener('click', function(){ showTool(name, {closeUtilities:true}); });
+    tabs[name].addEventListener('keydown', function(ev){
+      if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+      var next;
+      if (ev.key === 'ArrowRight') next = (index + 1) % names.length;
+      else if (ev.key === 'ArrowLeft') next = (index + names.length - 1) % names.length;
+      else if (ev.key === 'Home') next = 0;
+      else if (ev.key === 'End') next = names.length - 1;
+      else return;
+      ev.preventDefault(); ev.stopPropagation();
+      showTool(names[next], {focus:true, closeUtilities:true});
+    });
+  });
+  function assign(value){
+    var b = bounds(); prefs.editor = Math.max(b.min, Math.min(b.max, Math.round(value))); paint();
   }
   function finish(cancel){
     if (!drag) return;
     var done = drag; drag = null;
-    if (cancel) prefs[done.axis] = done.before;
+    if (cancel) prefs.editor = done.before;
     document.body.classList.remove('workspace-dragging');
     document.body.style.cursor = done.cursor;
-    if (done.handle.hasPointerCapture(done.id)) done.handle.releasePointerCapture(done.id);
+    if (cols.hasPointerCapture(done.id)) cols.releasePointerCapture(done.id);
     paint();
     if (!cancel) persist();
   }
-  function wire(handle, axis){
-    handle.addEventListener('pointerdown', function(ev){
-      if (ev.button !== 0 || !ev.isPrimary || drag) return;
-      ev.preventDefault();
-      handle.focus({preventScroll:true});
-      var a = inspect.getBoundingClientRect(), s = source.getBoundingClientRect();
-      drag = {axis:axis, handle:handle, id:ev.pointerId, before:prefs[axis],
-        start:axis === 'editor' ? ev.clientX : ev.clientY,
-        value:axis === 'editor' ? effectiveWidth() : prefs.inspector,
-        height:Math.max(1, a.height + s.height), cursor:document.body.style.cursor};
-      handle.setPointerCapture(ev.pointerId);
-      document.body.classList.add('workspace-dragging');
-      document.body.style.cursor = axis === 'editor' ? 'col-resize' : 'row-resize';
-    });
-    handle.addEventListener('pointermove', function(ev){
-      if (!drag || drag.handle !== handle || drag.id !== ev.pointerId) return;
-      assign(axis, axis === 'editor' ? drag.value + drag.start - ev.clientX : drag.value + (ev.clientY - drag.start) * 100 / drag.height);
-    });
-    handle.addEventListener('pointerup', function(ev){ if (drag && drag.handle === handle && drag.id === ev.pointerId) finish(false); });
-    handle.addEventListener('pointercancel', function(ev){ if (drag && drag.handle === handle && drag.id === ev.pointerId) finish(true); });
-    handle.addEventListener('lostpointercapture', function(){ if (drag && drag.handle === handle) finish(true); });
-    handle.addEventListener('keydown', function(ev){
-      if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
-      var value = axis === 'editor' ? effectiveWidth() : prefs.inspector;
-      var amount = axis === 'editor' ? (ev.shiftKey ? 50 : 20) : (ev.shiftKey ? 10 : 5);
-      if (ev.key === 'Home') value = axis === 'editor' ? bounds().min : 20;
-      else if (ev.key === 'End') value = axis === 'editor' ? bounds().max : 80;
-      else if (axis === 'editor' && ev.key === 'ArrowLeft') value += amount;
-      else if (axis === 'editor' && ev.key === 'ArrowRight') value -= amount;
-      else if (axis === 'inspector' && ev.key === 'ArrowDown') value += amount;
-      else if (axis === 'inspector' && ev.key === 'ArrowUp') value -= amount;
-      else return;
-      ev.preventDefault(); ev.stopPropagation();
-      assign(axis, value); persist();
-    });
-    handle.addEventListener('dblclick', function(){ assign(axis, axis === 'editor' ? 440 : 40); persist(); });
-  }
-  wire(cols, 'editor'); wire(rows, 'inspector');
-  reset.addEventListener('click', function(){ finish(true); prefs = workspacePrefs(null); paint(); persist(); });
-  focus.addEventListener('click', function(){
-    finish(true);
-    var on = !document.body.classList.contains('workspace-focus');
+  cols.addEventListener('pointerdown', function(ev){
+    if (expanded || ev.button !== 0 || !ev.isPrimary || drag) return;
+    ev.preventDefault(); cols.focus({preventScroll:true});
+    drag = {id:ev.pointerId, before:prefs.editor, start:ev.clientX,
+      value:effectiveWidth(), cursor:document.body.style.cursor};
+    cols.setPointerCapture(ev.pointerId);
+    document.body.classList.add('workspace-dragging'); document.body.style.cursor = 'col-resize';
+  });
+  cols.addEventListener('pointermove', function(ev){
+    if (drag && drag.id === ev.pointerId) assign(drag.value + drag.start - ev.clientX);
+  });
+  cols.addEventListener('pointerup', function(ev){ if (drag && drag.id === ev.pointerId) finish(false); });
+  cols.addEventListener('pointercancel', function(ev){ if (drag && drag.id === ev.pointerId) finish(true); });
+  cols.addEventListener('lostpointercapture', function(){ if (drag) finish(true); });
+  cols.addEventListener('keydown', function(ev){
+    if (expanded || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    var value = effectiveWidth(), amount = ev.shiftKey ? 50 : 20;
+    if (ev.key === 'Home') value = bounds().min;
+    else if (ev.key === 'End') value = bounds().max;
+    else if (ev.key === 'ArrowLeft') value += amount;
+    else if (ev.key === 'ArrowRight') value -= amount;
+    else return;
+    ev.preventDefault(); ev.stopPropagation(); assign(value); persist();
+  });
+  cols.addEventListener('dblclick', function(){
+    var style = getComputedStyle(wrap);
+    assign((wrap.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0) - 24) / 2);
+    persist();
+  });
+  function setFocus(on){
+    var was = document.body.classList.contains('workspace-focus');
+    if (on === was) return;
     if (on) pageScroll = window.scrollY;
     document.body.classList.toggle('workspace-focus', on);
-    focus.setAttribute('aria-pressed', String(on));
-    focus.textContent = on ? 'Exit focus' : 'Focus workspace';
+    focus.setAttribute('aria-pressed', String(on)); focus.textContent = on ? 'Exit focus' : 'Focus workspace';
     paint(); window.scrollTo(0, on ? 0 : pageScroll);
+  }
+  function setExpanded(on){
+    finish(true);
+    if (expanded === on) return;
+    if (on) priorFocus = document.body.classList.contains('workspace-focus');
+    expanded = on; editor.open = true;
+    setFocus(on ? true : priorFocus); paint();
+  }
+  expand.addEventListener('click', function(ev){
+    ev.preventDefault(); ev.stopPropagation(); /* button inside the editor summary */
+    setExpanded(!expanded);
+  });
+  focus.addEventListener('click', function(){
+    finish(true);
+    if (expanded){ setExpanded(false); setFocus(false); }
+    else setFocus(!document.body.classList.contains('workspace-focus'));
+  });
+  reset.addEventListener('click', function(){
+    finish(true); setExpanded(false); prefs.editor = 440; paint(); persist();
   });
   window.addEventListener('resize', function(){ finish(true); paint(); });
   window.addEventListener('blur', function(){ finish(true); });
   if (typeof ResizeObserver !== 'undefined'){
-    var observer = new ResizeObserver(paint);
-    observer.observe(wrap); observer.observe(toolbar);
+    var observer = new ResizeObserver(paint); observer.observe(wrap); observer.observe(toolbar);
   }
-  paint();
+  showTool(prefs.tool); paint();
+  return {showTool:showTool, tool:function(){return prefs.tool;},
+    setExpanded:setExpanded, expanded:function(){return expanded;}};
 }
 /* ---- src/boot.workbench.js ---- */
 /* boot.workbench.js — demo spec, contract text, and editor wiring for the
@@ -19770,9 +19872,9 @@ go(false);
 
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
-initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); },
+var workspace = initWorkbenchWorkspace();
+initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }, workspace:workspace,
   starters: STARTERS, renderedText: function(){ return lastRenderedText; },
   ctl: function(){ return lastCtl; }});
-initWorkbenchWorkspace();
 })();
 </script>

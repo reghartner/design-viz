@@ -75,30 +75,38 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl){
   return ctl;
 }
 
+/* Workspace preferences belong to the browser, never the authored spec. */
 function workspacePrefs(raw){
-  var prefs = {editor:440, inspector:40}, value;
+  var prefs = {editor:440, tool:'inspect'}, value;
   try { value = JSON.parse(raw); } catch (ex){ return prefs; }
-  if (!value || typeof value !== 'object') return prefs;
-  if (typeof value.editor === 'number' && Number.isFinite(value.editor)) prefs.editor = Math.max(340, Math.min(900, value.editor));
-  if (typeof value.inspector === 'number' && Number.isFinite(value.inspector)) prefs.inspector = Math.max(20, Math.min(80, value.inspector));
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return prefs;
+  if (typeof value.editor === 'number' && Number.isFinite(value.editor)) prefs.editor = Math.max(320, Math.min(1100, value.editor));
+  if (['inspect','steps','json'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
   return prefs;
 }
 function workspaceEditorBounds(contentWidth){
-  return {min:340, max:Math.max(340, Math.min(900, Math.floor(contentWidth - 560 - 24)))};
+  return {min:320, max:Math.max(320, Math.min(1100, Math.floor(contentWidth - 300 - 24)))};
 }
 function initWorkbenchWorkspace(){
   var wrap = document.querySelector('.workwrap');
   var cols = document.getElementById('workspace-columns');
-  var rows = document.getElementById('workspace-rows');
-  var inspect = document.getElementById('sec-inspect');
-  var source = document.getElementById('sec-source');
+  var editor = document.getElementById('spec-editor');
   var focus = document.getElementById('workspace-focus');
+  var expand = document.getElementById('workspace-expand');
   var reset = document.getElementById('workspace-reset');
   var toolbar = document.querySelector('.workspace-tools');
-  if (!wrap || !cols || !rows || !inspect || !source || !focus || !reset || !toolbar) return;
-  var key = 'dv-workbench-layout-v1', raw = null;
-  try { raw = localStorage.getItem(key); } catch (ex){}
-  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0;
+  var src = document.getElementById('src');
+  var guide = document.getElementById('guide');
+  if (!wrap || !cols || !editor || !focus || !expand || !reset || !toolbar || !src) return null;
+  var names = ['inspect','steps','json'], tabs = {}, panes = {}, scrolls = {};
+  names.forEach(function(name){
+    tabs[name] = document.getElementById('editor-tab-' + name);
+    panes[name] = document.getElementById('editor-' + name);
+  });
+  if (names.some(function(name){ return !tabs[name] || !panes[name]; })) return null;
+  var key = 'dv-workbench-layout-v2', raw = null;
+  try { raw = localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v1'); } catch (ex){}
+  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0, expanded = false, priorFocus = false;
   function persist(){
     try { localStorage.setItem(key, JSON.stringify(prefs)); } catch (ex){}
   }
@@ -112,86 +120,137 @@ function initWorkbenchWorkspace(){
   function paint(){
     var b = bounds(), width = effectiveWidth();
     wrap.style.setProperty('--workspace-editor', width + 'px');
-    wrap.style.setProperty('--workspace-inspector-share', prefs.inspector);
-    wrap.style.setProperty('--workspace-source-share', 100 - prefs.inspector);
     document.body.style.setProperty('--workspace-toolbar', toolbar.getBoundingClientRect().height + 'px');
     cols.setAttribute('aria-valuemin', b.min);
     cols.setAttribute('aria-valuemax', b.max);
     cols.setAttribute('aria-valuenow', Math.round(width));
     cols.setAttribute('aria-valuetext', Math.round(width) + ' pixels of editor width');
-    rows.setAttribute('aria-valuemin', 20);
-    rows.setAttribute('aria-valuemax', 80);
-    rows.setAttribute('aria-valuenow', Math.round(prefs.inspector));
-    rows.setAttribute('aria-valuetext', Math.round(prefs.inspector) + '% inspector / ' + Math.round(100 - prefs.inspector) + '% JSON; minimum pane heights apply');
+    document.body.classList.toggle('editor-expanded', expanded);
+    expand.setAttribute('aria-pressed', String(expanded));
+    expand.textContent = expanded ? '↙ Return to split' : '⤢ Expand editor';
   }
-  function assign(axis, value){
-    var b = axis === 'editor' ? bounds() : {min:20, max:80};
-    prefs[axis] = Math.max(b.min, Math.min(b.max, Math.round(value)));
-    paint();
+  /* Show/hide existing panes; do not rebuild a form, source textarea, or
+     preview. Keep both editor scroll positions and native text selection. */
+  function showTool(name, options){
+    if (names.indexOf(name) < 0) return false;
+    options = options || {};
+    var changed = prefs.tool !== name;
+    if (changed){
+      scrolls[prefs.tool] = {pane:panes[prefs.tool].scrollTop, source:src.scrollTop,
+        inspector:guide ? guide.scrollTop : 0, form:guide && guide.firstChild};
+      prefs.tool = name;
+    }
+    editor.open = true;
+    names.forEach(function(n){
+      var active = n === name;
+      tabs[n].setAttribute('aria-selected', String(active));
+      tabs[n].tabIndex = active ? 0 : -1;
+      panes[n].hidden = !active;
+    });
+    var section = document.getElementById(name === 'json' ? 'sec-source' : 'sec-' + name);
+    if (section) section.open = true;
+    if (changed && scrolls[name]){
+      panes[name].scrollTop = scrolls[name].pane;
+      if (name === 'json') src.scrollTop = scrolls[name].source;
+      if (name === 'inspect' && guide)
+        guide.scrollTop = guide.firstChild === scrolls[name].form ? scrolls[name].inspector : 0;
+    }
+    if (options.closeUtilities){
+      ['sec-insert','sec-outline'].forEach(function(id){ var el = document.getElementById(id); if (el) el.open = false; });
+    }
+    if (options.focus) tabs[name].focus({preventScroll:true});
+    if (changed) persist();
+    return true;
+  }
+  names.forEach(function(name, index){
+    tabs[name].addEventListener('click', function(){ showTool(name, {closeUtilities:true}); });
+    tabs[name].addEventListener('keydown', function(ev){
+      if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+      var next;
+      if (ev.key === 'ArrowRight') next = (index + 1) % names.length;
+      else if (ev.key === 'ArrowLeft') next = (index + names.length - 1) % names.length;
+      else if (ev.key === 'Home') next = 0;
+      else if (ev.key === 'End') next = names.length - 1;
+      else return;
+      ev.preventDefault(); ev.stopPropagation();
+      showTool(names[next], {focus:true, closeUtilities:true});
+    });
+  });
+  function assign(value){
+    var b = bounds(); prefs.editor = Math.max(b.min, Math.min(b.max, Math.round(value))); paint();
   }
   function finish(cancel){
     if (!drag) return;
     var done = drag; drag = null;
-    if (cancel) prefs[done.axis] = done.before;
+    if (cancel) prefs.editor = done.before;
     document.body.classList.remove('workspace-dragging');
     document.body.style.cursor = done.cursor;
-    if (done.handle.hasPointerCapture(done.id)) done.handle.releasePointerCapture(done.id);
+    if (cols.hasPointerCapture(done.id)) cols.releasePointerCapture(done.id);
     paint();
     if (!cancel) persist();
   }
-  function wire(handle, axis){
-    handle.addEventListener('pointerdown', function(ev){
-      if (ev.button !== 0 || !ev.isPrimary || drag) return;
-      ev.preventDefault();
-      handle.focus({preventScroll:true});
-      var a = inspect.getBoundingClientRect(), s = source.getBoundingClientRect();
-      drag = {axis:axis, handle:handle, id:ev.pointerId, before:prefs[axis],
-        start:axis === 'editor' ? ev.clientX : ev.clientY,
-        value:axis === 'editor' ? effectiveWidth() : prefs.inspector,
-        height:Math.max(1, a.height + s.height), cursor:document.body.style.cursor};
-      handle.setPointerCapture(ev.pointerId);
-      document.body.classList.add('workspace-dragging');
-      document.body.style.cursor = axis === 'editor' ? 'col-resize' : 'row-resize';
-    });
-    handle.addEventListener('pointermove', function(ev){
-      if (!drag || drag.handle !== handle || drag.id !== ev.pointerId) return;
-      assign(axis, axis === 'editor' ? drag.value + drag.start - ev.clientX : drag.value + (ev.clientY - drag.start) * 100 / drag.height);
-    });
-    handle.addEventListener('pointerup', function(ev){ if (drag && drag.handle === handle && drag.id === ev.pointerId) finish(false); });
-    handle.addEventListener('pointercancel', function(ev){ if (drag && drag.handle === handle && drag.id === ev.pointerId) finish(true); });
-    handle.addEventListener('lostpointercapture', function(){ if (drag && drag.handle === handle) finish(true); });
-    handle.addEventListener('keydown', function(ev){
-      if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
-      var value = axis === 'editor' ? effectiveWidth() : prefs.inspector;
-      var amount = axis === 'editor' ? (ev.shiftKey ? 50 : 20) : (ev.shiftKey ? 10 : 5);
-      if (ev.key === 'Home') value = axis === 'editor' ? bounds().min : 20;
-      else if (ev.key === 'End') value = axis === 'editor' ? bounds().max : 80;
-      else if (axis === 'editor' && ev.key === 'ArrowLeft') value += amount;
-      else if (axis === 'editor' && ev.key === 'ArrowRight') value -= amount;
-      else if (axis === 'inspector' && ev.key === 'ArrowDown') value += amount;
-      else if (axis === 'inspector' && ev.key === 'ArrowUp') value -= amount;
-      else return;
-      ev.preventDefault(); ev.stopPropagation();
-      assign(axis, value); persist();
-    });
-    handle.addEventListener('dblclick', function(){ assign(axis, axis === 'editor' ? 440 : 40); persist(); });
-  }
-  wire(cols, 'editor'); wire(rows, 'inspector');
-  reset.addEventListener('click', function(){ finish(true); prefs = workspacePrefs(null); paint(); persist(); });
-  focus.addEventListener('click', function(){
-    finish(true);
-    var on = !document.body.classList.contains('workspace-focus');
+  cols.addEventListener('pointerdown', function(ev){
+    if (expanded || ev.button !== 0 || !ev.isPrimary || drag) return;
+    ev.preventDefault(); cols.focus({preventScroll:true});
+    drag = {id:ev.pointerId, before:prefs.editor, start:ev.clientX,
+      value:effectiveWidth(), cursor:document.body.style.cursor};
+    cols.setPointerCapture(ev.pointerId);
+    document.body.classList.add('workspace-dragging'); document.body.style.cursor = 'col-resize';
+  });
+  cols.addEventListener('pointermove', function(ev){
+    if (drag && drag.id === ev.pointerId) assign(drag.value + drag.start - ev.clientX);
+  });
+  cols.addEventListener('pointerup', function(ev){ if (drag && drag.id === ev.pointerId) finish(false); });
+  cols.addEventListener('pointercancel', function(ev){ if (drag && drag.id === ev.pointerId) finish(true); });
+  cols.addEventListener('lostpointercapture', function(){ if (drag) finish(true); });
+  cols.addEventListener('keydown', function(ev){
+    if (expanded || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    var value = effectiveWidth(), amount = ev.shiftKey ? 50 : 20;
+    if (ev.key === 'Home') value = bounds().min;
+    else if (ev.key === 'End') value = bounds().max;
+    else if (ev.key === 'ArrowLeft') value += amount;
+    else if (ev.key === 'ArrowRight') value -= amount;
+    else return;
+    ev.preventDefault(); ev.stopPropagation(); assign(value); persist();
+  });
+  cols.addEventListener('dblclick', function(){
+    var style = getComputedStyle(wrap);
+    assign((wrap.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0) - 24) / 2);
+    persist();
+  });
+  function setFocus(on){
+    var was = document.body.classList.contains('workspace-focus');
+    if (on === was) return;
     if (on) pageScroll = window.scrollY;
     document.body.classList.toggle('workspace-focus', on);
-    focus.setAttribute('aria-pressed', String(on));
-    focus.textContent = on ? 'Exit focus' : 'Focus workspace';
+    focus.setAttribute('aria-pressed', String(on)); focus.textContent = on ? 'Exit focus' : 'Focus workspace';
     paint(); window.scrollTo(0, on ? 0 : pageScroll);
+  }
+  function setExpanded(on){
+    finish(true);
+    if (expanded === on) return;
+    if (on) priorFocus = document.body.classList.contains('workspace-focus');
+    expanded = on; editor.open = true;
+    setFocus(on ? true : priorFocus); paint();
+  }
+  expand.addEventListener('click', function(ev){
+    ev.preventDefault(); ev.stopPropagation(); /* button inside the editor summary */
+    setExpanded(!expanded);
+  });
+  focus.addEventListener('click', function(){
+    finish(true);
+    if (expanded){ setExpanded(false); setFocus(false); }
+    else setFocus(!document.body.classList.contains('workspace-focus'));
+  });
+  reset.addEventListener('click', function(){
+    finish(true); setExpanded(false); prefs.editor = 440; paint(); persist();
   });
   window.addEventListener('resize', function(){ finish(true); paint(); });
   window.addEventListener('blur', function(){ finish(true); });
   if (typeof ResizeObserver !== 'undefined'){
-    var observer = new ResizeObserver(paint);
-    observer.observe(wrap); observer.observe(toolbar);
+    var observer = new ResizeObserver(paint); observer.observe(wrap); observer.observe(toolbar);
   }
-  paint();
+  showTool(prefs.tool); paint();
+  return {showTool:showTool, tool:function(){return prefs.tool;},
+    setExpanded:setExpanded, expanded:function(){return expanded;}};
 }

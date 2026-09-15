@@ -41,6 +41,10 @@ function initWorkbenchStepList(opts){
   var pathLabel=document.getElementById('steps-path-label'), pathColor=document.getElementById('steps-path-color');
   var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
   var pathSignature='';
+  var inspectButton = document.getElementById('steps-inspect');
+  if (inspectButton) inspectButton.addEventListener('click', function(){
+    if (ready() && current() >= 0 && opts.inspect) opts.inspect();
+  });
   function route(){
     var paths=chosen ? diagramPathList(chosen.diagram) : [];
     var id=chosen && opts.path ? opts.path(chosen.section) : pathSelect && pathSelect.value;
@@ -68,6 +72,7 @@ function initWorkbenchStepList(opts){
       removePath.disabled=blocked || !chosen.diagram.paths || chosen.diagram.paths.length<2 || selected.id===chosen.diagram.paths[0].id;
       forkButton.disabled=blocked || index<0;}
     buttons.add.disabled = blocked;
+    if (inspectButton) inspectButton.disabled = blocked || index < 0;
     buttons.duplicate.disabled = blocked || index < 0 || index >= count;
     buttons.earlier.disabled = blocked || index <= 0 || index >= count;
     buttons.later.disabled = blocked || index < 0 || index >= count - 1;

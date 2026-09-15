@@ -2862,15 +2862,17 @@ function initWorkbenchBuilder(opts){
     var stored = null;
     try { stored = localStorage.getItem(SECS_KEY); } catch (ex){}
     var prefs = builderSectionPrefs(stored);
-    if (secInsert) secInsert.open = prefs.insert;
-    if (secSource) secSource.open = prefs.source;
+    if (secInsert) secInsert.open = opts.workspace && !stored ? false : prefs.insert;
+    if (secSource && !opts.workspace) secSource.open = prefs.source;
   })();
   if (secInsert) secInsert.addEventListener('toggle', persistSections);
   if (secSource) secSource.addEventListener('toggle', persistSections);
   function sourceVisible(){
-    return (!specbox || specbox.open) && (!secSource || secSource.open);
+    return (!specbox || specbox.open) && (!secSource || secSource.open) &&
+      (!opts.workspace || opts.workspace.tool() === 'json');
   }
   function openSource(){
+    if (opts.workspace) opts.workspace.showTool('json', {closeUtilities:true});
     if (specbox && !specbox.open) specbox.open = true;
     if (secSource && !secSource.open) secSource.open = true; /* toggle listener persists */
   }
@@ -3531,8 +3533,9 @@ function initWorkbenchBuilder(opts){
 
   /* ================= inspector: forms that write the JSON ================= */
 
-  function inspectorMessage(text){
+  function inspectorMessage(text, keepTool){
     if (!guide) return;
+    if (opts.workspace && !keepTool) opts.workspace.showTool('inspect');
     revealInspector();
     guide.hidden = false;
     guide.innerHTML = '';
@@ -3982,7 +3985,7 @@ function initWorkbenchBuilder(opts){
         return planStepHomemapField(src.value, raw, target.section, target.index, panel.id, key, value);
       }, {after:function(){ renderInspector(); }});
     }
-    function note(text){ var el = document.createElement('p'); el.className = 'home-note'; el.textContent = text; box.appendChild(el); return el; }
+    function note(text, parent){ var el = document.createElement('p'); el.className = 'home-note'; el.textContent = text; (parent || box).appendChild(el); return el; }
     function button(label, action){
       var b = document.createElement('button'); b.type = 'button'; b.className = 'bbtn'; b.textContent = label;
       b.addEventListener('click', action); return b;
@@ -3993,21 +3996,23 @@ function initWorkbenchBuilder(opts){
       select.value = value; select.addEventListener('change', function(){ action(select.value); }); return select;
     }
     note('Device states and positions carry forward. Inherit removes only this step’s change. Signals last for this step only.');
+    var body = document.createElement('div'); body.className = 'home-edit-body'; box.appendChild(body);
     var map = document.createElement('div'); map.className = 'home-edit-map sk-daylight'; map.tabIndex = 0;
-    map.setAttribute('aria-label', 'Home step placement map'); box.appendChild(map);
+    map.setAttribute('aria-label', 'Home step placement map'); body.appendChild(map);
     renderPanelBody(map, panel, snapshot.state, 'daylight', [], snapshot.position, false);
+    var fields = document.createElement('div'); fields.className = 'home-edit-fields'; body.appendChild(fields);
     var deviceControls = Object.create(null), subjectControls = Object.create(null);
     snapshot.model.devices.forEach(function(d, i){
       var before = snapshot.before.devices[i];
       var pairs = [['', 'Inherit · ' + before.state]].concat(HOMEMAP_STATES[d.kind].map(function(v){ return [v, v]; }));
       var ctl = choice(pairs, own(d.id) ? d.state : '', d.label + ' state', function(v){ commit(d.id, v === '' ? undefined : v); });
       deviceControls[d.id] = ctl;
-      box.appendChild(frow(d.label, ctl));
+      fields.appendChild(frow(d.label, ctl));
     });
     var armedSubject = null;
-    var placementNote = note('Click a device on this map to edit its state.');
+    var placementNote = note('Click a device on this map to edit its state.', fields);
     snapshot.model.subjects.forEach(function(sub, i){
-      var group = document.createElement('div'); group.className = 'home-subject'; box.appendChild(group);
+      var group = document.createElement('div'); group.className = 'home-subject'; fields.appendChild(group);
       var before = snapshot.before.subjects[i];
       var visibility = choice([['inherit', 'Inherit · ' + (before.hidden ? 'hidden' : before.x + ', ' + before.y)],
         ['show', 'Show at this position'], ['hide', 'Hidden']], own(sub.id) ? (sub.hidden ? 'hide' : 'show') : 'inherit',
@@ -4081,7 +4086,7 @@ function initWorkbenchBuilder(opts){
       if (device && deviceControls[device.getAttribute('data-device')]) deviceControls[device.getAttribute('data-device')].focus();
       else if (subject && subjectControls[subject.getAttribute('data-subject')]) subjectControls[subject.getAttribute('data-subject')].click();
     });
-    note('Signals · this step only');
+    note('Signals · this step only', fields);
     snapshot.model.signals.forEach(function(sig, i){
       var row = document.createElement('div'); row.className = 'home-signal';
       var label = document.createElement('span');
@@ -4090,14 +4095,14 @@ function initWorkbenchBuilder(opts){
       row.appendChild(label); row.appendChild(button('Remove', function(){
         var signals = snapshot.model.signals.filter(function(_, n){ return n !== i; }).map(function(s){ return {from:s.from, to:s.to}; });
         commit('signals', signals.length ? signals : undefined);
-      })); box.appendChild(row);
+      })); fields.appendChild(row);
     });
     if (snapshot.model.devices.length > 1){
       var endpoints = snapshot.model.devices.map(function(d){ return [d.id, d.label]; });
       var from = choice(endpoints, endpoints[0][0], 'Signal from', function(){});
       var to = choice(endpoints, endpoints[1][0], 'Signal to', function(){});
-      box.appendChild(frow('Signal from', from)); box.appendChild(frow('Signal to', to));
-      box.appendChild(button('Add signal', function(){
+      fields.appendChild(frow('Signal from', from)); fields.appendChild(frow('Signal to', to));
+      fields.appendChild(button('Add signal', function(){
         if (from.value === to.value){ formError('Choose two different devices for a signal.'); return; }
         var signals = snapshot.model.signals.map(function(s){ return {from:s.from, to:s.to}; });
         if (!signals.some(function(s){ return s.from === from.value && s.to === to.value; })) signals.push({from:from.value, to:to.value});
@@ -4810,6 +4815,7 @@ function initWorkbenchBuilder(opts){
                     index: only.index, el: only.el}, false);
       return;
     }
+    if (opts.workspace) opts.workspace.showTool('inspect', {closeUtilities:true});
     renderMultiInspector();
   }
   function applyBulkField(key, valueTextOrNull){
@@ -4930,9 +4936,17 @@ function initWorkbenchBuilder(opts){
     var path = parsed.error ? null : builderTargetPath(parsed.raw, t);
     var loc = path ? jsonLocate(src.value, path) : null;
 
-    var p = document.createElement('span');
+    var p = document.createElement(loc ? 'button' : 'span');
     p.className = 'gpath';
-    p.textContent = path ? builderPathString(path) : '';
+    p.textContent = path ? builderPathString(path) + (loc ? ' ↗ JSON' : '') : '';
+    if (loc){
+      var sourceAtSelection = src.value;
+      p.type = 'button'; p.setAttribute('aria-label', 'Show selected element in JSON');
+      p.addEventListener('click', function(){
+        if (src.value !== sourceAtSelection){ formError('Source changed. Click Render and reselect this element.'); return; }
+        selectRange(loc, true);
+      });
+    }
     guide.appendChild(p);
 
     var posText = parsed.error ? null : builderPositionLine(parsed.raw, t);
@@ -5100,7 +5114,7 @@ function initWorkbenchBuilder(opts){
       help.appendChild(tok);
     }
     guide.appendChild(help);
-    if (keepScroll != null) guide.scrollTop = keepScroll;
+    guide.scrollTop = keepScroll == null ? 0 : keepScroll;
   }
 
   /* ================= selection ================= */
@@ -5187,8 +5201,9 @@ function initWorkbenchBuilder(opts){
     return {section: gi, kind: 'section', el: secEl};
   }
 
-  function selectTarget(target, focusEditor){
+  function selectTarget(target, focusEditor, keepTool){
     pausePreview();
+    if (opts.workspace && !keepTool) opts.workspace.showTool('inspect', {closeUtilities:true});
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     currentTarget = {section: target.section, kind: target.kind,
@@ -5284,6 +5299,7 @@ function initWorkbenchBuilder(opts){
   var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({
     view:view, src:src, renderedText:opts.renderedText,
     pause:pausePreview,
+    inspect:function(){ if (opts.workspace) opts.workspace.showTool('inspect', {focus:true}); },
     selection:function(){ return currentTarget; },
     locked:function(){ return !!addToStep || !!connect; },
     path:function(section){var sp=stepperFor(section);return sp && sp.path();},
@@ -5300,7 +5316,7 @@ function initWorkbenchBuilder(opts){
       }
       if(entry.pathId){var sp=stepperFor(entry.target.section);if(sp) sp.selectPath(entry.pathId,entry.position);}
       var el = findTargetEl(entry.target);
-      selectTarget(Object.assign({}, entry.target, {el:el}), false);
+      selectTarget(Object.assign({}, entry.target, {el:el}), false, true);
       var loc = jsonLocate(src.value, entry.path);
       if (loc && sourceVisible()){
         src.setSelectionRange(loc.start, loc.end); scrollTextareaTo(loc.start);
@@ -6392,7 +6408,7 @@ function initWorkbenchBuilder(opts){
     var loc = findingLocation(src.value, parsed.raw, message, rawPath);
     if (!loc) return;
     selectRange(loc, true);
-    if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent');
+    if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent', true);
   };
 
   var initial = parseEditor();

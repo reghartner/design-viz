@@ -449,6 +449,11 @@ section.doc-sec.dv-inserttarget::before{content:"insert target"; position:absolu
   font:700 9px 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase;
   color:var(--card); background:var(--sub); padding:2px 6px; border-radius:4px; z-index:2; pointer-events:none;}
 .docview .stepline{cursor:pointer;} /* click selects the current step */
+.playback-settings{padding:8px;border:1px solid var(--line);border-radius:6px;}
+.playback-settings summary{cursor:pointer;font-weight:600;}
+.playback-settings>label{display:block;margin-top:10px;}
+.playback-settings .playback-setting-check{display:flex;align-items:center;gap:6px;}
+.playback-settings .fnote{margin:8px 0 0;line-height:1.5;}
 .rbtn{background:var(--accent); color:var(--accent-ink, #fff); border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
   padding:7px 16px; border-radius:8px; cursor:pointer;}
 .rbtn:hover{filter:brightness(1.08);}

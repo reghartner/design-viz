@@ -44,6 +44,19 @@ function initWorkbenchStepList(opts){
   var pathLabel=document.getElementById('steps-path-label'), pathColor=document.getElementById('steps-path-color');
   var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
   var pathSignature='';
+  var autoplayInput = document.getElementById('steps-autoplay'), openingView = document.getElementById('steps-opening-view');
+  function playbackSettings(){
+    if (autoplayInput) autoplayInput.checked = !!chosen && chosen.diagram.autoplay === true;
+    if (openingView) openingView.value = chosen && VIEW_SET.indexOf(chosen.diagram.view) >= 0 ? chosen.diagram.view : 'ambient';
+  }
+  function configurePlayback(key, value){
+    if (!ready() || !chosen){ playbackSettings(); return; }
+    var plan = planSetField(indexedText, raw, chosen.path, key, JSON.stringify(value));
+    if (plan.error){ status.textContent = plan.error; playbackSettings(); return; }
+    if (opts.configure && opts.configure(plan)) refresh(); else playbackSettings();
+  }
+  if (autoplayInput) autoplayInput.addEventListener('change', function(){ configurePlayback('autoplay', autoplayInput.checked); });
+  if (openingView) openingView.addEventListener('change', function(){ configurePlayback('view', openingView.value); });
   var inspectButton = document.getElementById('steps-inspect');
   var reuseButton = document.getElementById('steps-reuse'), independentButton = document.getElementById('steps-independent');
   var removeOccurrence = document.getElementById('steps-remove-occurrence'), sharingBox = document.getElementById('steps-sharing');
@@ -86,6 +99,7 @@ function initWorkbenchStepList(opts){
     return paths.find(function(p){return p.id===id;}) || paths[0];
   }
   function pathControls(){
+    playbackSettings();
     if(!pathSelect) return;
     var paths=chosen ? diagramPathList(chosen.diagram) : [], selected=route();
     pathTools.hidden=!(chosen && chosen.diagram.paths);
@@ -103,6 +117,8 @@ function initWorkbenchStepList(opts){
     var selected=route(), index = selected ? selected.indices.indexOf(current()) : -1, count=selected ? selected.indices.length : 0;
     var blocked = stale || opts.locked() || !chosen;
     select.disabled = blocked; search.disabled = blocked;
+    if (autoplayInput) autoplayInput.disabled = blocked || chosen.diagram.view === 'ambient-only';
+    if (openingView) openingView.disabled = blocked;
     if(pathSelect){pathSelect.disabled=blocked;pathLabel.disabled=blocked;pathColor.disabled=blocked;savePath.disabled=blocked;
       removePath.disabled=blocked || !chosen.diagram.paths || chosen.diagram.paths.length<2 || selected.id===chosen.diagram.paths[0].id;
       forkButton.disabled=blocked || index<0;}

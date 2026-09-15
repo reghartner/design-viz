@@ -1231,6 +1231,7 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .termbar{position:relative; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   border-radius:0 0 12px 12px; border:1px solid color-mix(in srgb, var(--acc) 30%, transparent); border-top:0;}
 .sk-aurora .termbar{background:#0B1220; border-top:1px dashed #25364F;}
+.termbar[hidden]{display:none;}
 .sk-daylight .termbar{background:#FBFAF6; border-top:1px dashed #E0DCD1;}
 .tbtn{font:600 12px 'IBM Plex Mono',monospace; padding:5px 11px; border-radius:7px; cursor:pointer;}
 .sk-aurora .tbtn{background:#141A21; border:1px solid #2A343F; color:#9FB0BF;}
@@ -1238,6 +1239,15 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .sk-daylight .tbtn{background:#FFFFFF; border:1px solid #E0DCD1; color:#6B6F7A;}
 .sk-daylight .tbtn:hover{border-color:#4956C9; color:#4956C9;}
 .schips{display:flex; gap:5px; flex-wrap:wrap;}
+.step-transport{display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:100%;}
+.step-transport .tbtn{min-width:34px;min-height:34px;}
+.step-transport .playback-button{min-width:88px;white-space:nowrap;}
+.step-transport .tbtn:disabled{opacity:.45;cursor:default;}
+.playback-status{display:inline-flex;align-items:center;gap:6px;margin-left:4px;font:600 12px 'IBM Plex Mono',monospace;color:var(--dink);white-space:nowrap;}
+.playback-status::before{content:'';width:7px;height:7px;border:1px solid currentColor;border-radius:50%;box-sizing:border-box;}
+[data-playback="playing"] .playback-status::before{background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 15%,transparent);}
+[data-playback="playing"] .playback-button{box-shadow:inset 0 -2px currentColor;}
+@media(max-width:640px){.step-transport .tbtn{min-width:44px;min-height:44px;}}
 .schip{font:700 11px 'IBM Plex Mono',monospace; width:26px; height:26px; border-radius:7px; cursor:pointer; padding:0;}
 .dvdelta{fill:var(--delta); stroke:rgba(0,0,0,.4); stroke-width:1; pointer-events:none;}
 .schip.dvd{position:relative;}
@@ -5389,6 +5399,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     warnings.push(DP + '.primaryPanel: must name an existing panel — using the standard flow layout');
   if (d.view && VIEW_SET.indexOf(d.view) < 0)
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
+  if (Object.prototype.hasOwnProperty.call(d, 'autoplay') && typeof d.autoplay !== 'boolean')
+    warnings.push(DP + '.autoplay: must be true or false — opening paused');
   if (!d.nodes || typeof d.nodes !== 'object'){ errors.push(DP + '.nodes: required — map of node id to {title, sub, icon, tint}'); return; }
   if (!Array.isArray(d.rows) || d.rows.length === 0){ errors.push(DP + '.rows: required — array of rows, each an array of node ids (nested array = stack)'); return; }
   if (d.routing != null && d.routing !== 'lanes' && d.routing !== 'curves')
@@ -10248,8 +10260,9 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId){
 
 /* ---------------- stepper (click-through) ---------------- */
 function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
-  var autoplay = !options || options.autoplay !== false;
+  var autoplay = d.autoplay === true && (!options || options.autoplay !== false);
   var destroyed = false;
+  var hidden = false, resumeOnShow = false;
   var source = d, paths = diagramPathList(source), selectedPath = paths[0];
   var explicitPaths = Array.isArray(source.paths) && source.paths.length > 0;
   d = diagramForPath(source, selectedPath.id);
@@ -10452,25 +10465,41 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       termbar.btnPrev.disabled = cur === 0; termbar.btnNext.disabled = cur === N - 1;
       if (cur === N - 1) stopAuto();
     }
+    syncPlayback();
     paintedStep = cur;
     if (onChange) onChange(claimAddressBar !== false);
   }
   function startAuto(){
-    if (destroyed || timer || RM || !N) return;
-    if (explicitPaths && N === 1) return;
+    if (destroyed || timer || RM || N < 2 || mode !== 'step' || hidden || document.hidden) return;
     if (explicitPaths && cur === N - 1) setStep(0, false, false);
     /* the modulo wrap back to step 0 is a jump, not a narrative move */
     var id = window.setInterval(function(){
       if (timer === id) setStep(cur + 1, false, cur + 1 < N ? undefined : false);
     }, 3000);
     timer = id;
-    btnPlay.innerHTML = '&#10074;&#10074;';
-    btnPlay.setAttribute('aria-label', 'Pause');
+    syncPlayback();
   }
   function stopAuto(){
     if (timer){ window.clearInterval(timer); timer = null; }
-    btnPlay.innerHTML = '&#9654;';
-    btnPlay.setAttribute('aria-label', 'Play');
+    resumeOnShow = false;
+    syncPlayback();
+  }
+  function syncPlayback(){
+    var ended = explicitPaths && N > 1 && cur === N - 1;
+    var state = timer ? 'playing' : ended ? 'finished' : 'paused';
+    var action = timer ? 'Pause' : ended ? 'Replay' : 'Play';
+    btnPlay.innerHTML = '<span aria-hidden="true">' + (timer ? '&#10074;&#10074;' : '&#9654;') + '</span> ' + action;
+    btnPlay.setAttribute('aria-label', action);
+    btnPlay.disabled = RM || N < 2;
+    btnPlay.title = RM ? 'Automatic steps are disabled by reduced motion. Use the step arrows.' :
+      N < 2 ? 'This path has only one step.' : timer ? 'Pause automatic step advancement' :
+      ended ? 'Play this path again from step 1' : 'Advance one step every 3 seconds';
+    bar.setAttribute('data-playback', state);
+    var label = timer ? 'Playing · 3s / step' : N < 2 ? 'Single step' : RM ? 'Paused · reduced motion' : ended ? 'Finished' : 'Paused';
+    if (termbar.playbackStatus && termbar.playbackStatus.textContent !== label) termbar.playbackStatus.textContent = label;
+  }
+  function visibilityChanged(){
+    if (document.hidden && !destroyed){ stopAuto(); if (mode === 'step') settleCurrentStep(); }
   }
   function selectPath(id, at){
     if (destroyed) return false;
@@ -10566,7 +10595,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (replacement) replacement.focus({preventScroll:true});
   });
 
-  syncToggle();
+  if (document.addEventListener) document.addEventListener('visibilitychange', visibilityChanged);
+  syncToggle(); syncPlayback();
   return {
     sectionEl: secBox,
     scrollTargetEl: boardDiv,
@@ -10594,9 +10624,19 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     toggleAuto: function(){ if (timer) stopAuto(); else startAuto(); },
     /* Pausing must not replace panel contents: an editor may have focus there. */
     pause: stopAuto,
-    destroy: function(){ destroyed = true; stopAuto(); clearLit(); clearCaptionTween(); },
-    onHide: function(){ if (!destroyed){ stopAuto(); settleCurrentStep(); } },
-    onShow: function(){ if (!destroyed){ settleCurrentStep(); if (mode === 'step' && autoplay) startAuto(); } }
+    destroy: function(){
+      destroyed = true; stopAuto(); clearLit(); clearCaptionTween();
+      if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
+    },
+    onHide: function(){ if (!destroyed && !hidden){
+      var wasPlaying = !!timer; hidden = true; stopAuto();
+      resumeOnShow = wasPlaying && (!options || options.autoplay !== false); settleCurrentStep();
+    } },
+    onShow: function(){ if (!destroyed){
+      hidden = false; settleCurrentStep();
+      var resume = resumeOnShow; resumeOnShow = false;
+      if (resume) startAuto();
+    } }
   };
 }
 
@@ -10947,7 +10987,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   bar = document.createElement('div');
   bar.className = 'termbar'; bar.hidden = true;
   var btnPrev = document.createElement('button'); btnPrev.className = 'tbtn'; btnPrev.innerHTML = '&#8249;'; btnPrev.setAttribute('aria-label', 'Previous step');
-  var btnPlay = document.createElement('button'); btnPlay.className = 'tbtn'; btnPlay.innerHTML = '&#9654;'; btnPlay.setAttribute('aria-label', 'Play');
+  var btnPlay = document.createElement('button'); btnPlay.className = 'tbtn playback-button';
   var btnNext = document.createElement('button'); btnNext.className = 'tbtn'; btnNext.innerHTML = '&#8250;'; btnNext.setAttribute('aria-label', 'Next step');
   var chips = document.createElement('div'); chips.className = 'schips';
   if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
@@ -10969,7 +11009,13 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   line.appendChild(stepN); line.appendChild(lanePill); line.appendChild(stepText);
   line.appendChild(failureStatus);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
-  bar.appendChild(btnPrev); bar.appendChild(btnPlay); bar.appendChild(btnNext);
+  var transport = document.createElement('div'); transport.className = 'step-transport';
+  transport.setAttribute('role','group'); transport.setAttribute('aria-label','Step playback');
+  transport.appendChild(btnPrev); transport.appendChild(btnPlay); transport.appendChild(btnNext);
+  var playbackStatus = document.createElement('span'); playbackStatus.className = 'playback-status';
+  playbackStatus.setAttribute('role','status'); playbackStatus.setAttribute('aria-live','polite');
+  playbackStatus.title = 'Shows whether the steps advance automatically. Animations within the current step can continue while paused.';
+  transport.appendChild(playbackStatus); bar.appendChild(transport);
   bar.appendChild(chips); bar.appendChild(line);
   boardLayout.controlsHost.appendChild(bar);
 
@@ -10990,7 +11036,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
-    btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep
+    btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
     printSteps(next);
     return renderBoard(bwrap, next, prefix, skin, protos, backlinks);
@@ -11662,7 +11708,8 @@ function wirePresenter(ctl, view, win){
       ev.preventDefault();
     } else if (ev.key === ' '){
       if (!sp) return;
-      if (sp.mode() !== 'step') sp.enterStep(true); else sp.toggleAuto();
+      if (sp.mode() !== 'step') sp.enterStep(false);
+      sp.toggleAuto();
       ev.preventDefault();
     } else if (/^[1-9]$/.test(ev.key) && ctl.tabBlock){
       var ti = parseInt(ev.key, 10) - 1;

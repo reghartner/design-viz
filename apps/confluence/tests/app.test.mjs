@@ -12,9 +12,9 @@ const names=['buildConfluenceExport','buildConfluenceConfig','confluenceSections
   'confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','renderPage','applySkinClasses'];
 const source=(await Promise.all(['validator','engine','confluence'].map(n=>readFile(new URL('src/'+n+'.js',root),'utf8')))).join('\n');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,5));
-async function setup(t,{config={},configuring=true,submit,contextError=false}={}){
+async function setup(t,{config={},configuring=true,submit,contextError=false,reducedMotion=true}={}){
   const dom=new JSDOM(html,{url:'https://forge.example/viewer/',runScripts:'outside-only',pretendToBeVisual:true});
-  const win=dom.window;win.TextEncoder=TextEncoder;win.matchMedia=()=>({matches:true});
+  const win=dom.window;win.TextEncoder=TextEncoder;win.matchMedia=()=>({matches:reducedMotion});
   /* JSDOM has no SVG geometry. Browser QA covers actual paths and layout;
      these bridge tests only need deterministic points for placing coins. */
   win.SVGElement.prototype.getTotalLength=()=>100;
@@ -64,6 +64,19 @@ test('published viewer renders saved Home paths and navigation without import co
   const button=Array.from(s.el('docview').querySelectorAll('button')).find(b=>b.getAttribute('aria-label')==='Go to step 3 on Internet down');
   assert.ok(button);button.click();
   assert.match(s.el('docview').textContent,/STEP 3\/4/);assert.equal(s.calls.submits.length,0);
+});
+test('published playback honors the authored opt-in; configuration previews always start paused',async t=>{
+  for (const autoplay of [false,true]){
+    const raw=JSON.parse(home);raw.page.sections[0].diagram.autoplay=autoplay;
+    const config={specJson:JSON.stringify(raw)};
+    const published=await setup(t,{configuring:false,config,reducedMotion:false});
+    const status=published.el('docview').querySelector('.playback-status');
+    assert.equal(status.textContent,autoplay?'Playing · 3s / step':'Paused');
+    const button=published.el('docview').querySelector('.playback-button');button.click();
+    assert.equal(status.textContent,autoplay?'Paused':'Playing · 3s / step');
+    const preview=await setup(t,{config,reducedMotion:false});
+    assert.equal(preview.el('docview').querySelector('.playback-status').textContent,'Paused');
+  }
 });
 test('complex trace viewer renders lane routing and trace panels',async t=>{
   const s=await setup(t,{configuring:false,config:{specJson:trace}});

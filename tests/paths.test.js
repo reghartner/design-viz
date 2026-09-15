@@ -107,7 +107,7 @@ function harness(d=fixture()){
   // Enable timer logic but keep geometry/animation irrelevant to the test.
   c.RM=false;
   const board=()=>({svg:el(),nodeEls:{},edgeIds:{}}),term={};
-  ['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep'].forEach(k=>term[k]=el());
+  ['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep','playbackStatus'].forEach(k=>term[k]=el());
   term.bar.appendChild(el()).appendChild(term.stepN);
   folded=c.foldPanelStates(c.diagramForPath(d));
   const sp=c.attachStepper(el(),el(),term,d,'test',board(),{},
@@ -121,6 +121,9 @@ test('switching paths pauses, rebuilds the chosen sequence, and stops at its own
   h.sp.selectPath('dropped',2);assert.equal(h.intervals.size,0);assert.equal(h.sp.path(),'dropped');
   assert.deepEqual(plain(h.rendered.at(-1)),['one','two','three','drop']);assert.equal(h.sp.sourceIndex(3),5);
   h.term.btnPlay.fire('click');h.tick();assert.equal(h.sp.current().id,'drop');assert.equal(h.intervals.size,0);
+  assert.equal(h.term.playbackStatus.textContent,'Finished');assert.equal(h.term.btnPlay.getAttribute('aria-label'),'Replay');
+  h.term.btnPlay.fire('click');assert.equal(h.sp.current().n,0);assert.equal(h.intervals.size,1);
+  h.sp.jump(3);assert.equal(h.intervals.size,0);
   assert.equal(h.term.btnNext.disabled,true);h.sp.advance(10);assert.equal(h.sp.current().id,'drop');
   assert.equal(h.paints.at(-1).state,'lost');
   h.sp.selectPath('happy',4);assert.equal(h.sp.current().id,'five');assert.equal(h.paints.at(-1).state,'applied');

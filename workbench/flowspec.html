@@ -455,6 +455,11 @@ section.doc-sec.dv-inserttarget::before{content:"insert target"; position:absolu
   font:700 9px 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase;
   color:var(--card); background:var(--sub); padding:2px 6px; border-radius:4px; z-index:2; pointer-events:none;}
 .docview .stepline{cursor:pointer;} /* click selects the current step */
+.playback-settings{padding:8px;border:1px solid var(--line);border-radius:6px;}
+.playback-settings summary{cursor:pointer;font-weight:600;}
+.playback-settings>label{display:block;margin-top:10px;}
+.playback-settings .playback-setting-check{display:flex;align-items:center;gap:6px;}
+.playback-settings .fnote{margin:8px 0 0;line-height:1.5;}
 .rbtn{background:var(--accent); color:var(--accent-ink, #fff); border:0; font:600 12.5px 'IBM Plex Sans',sans-serif;
   padding:7px 16px; border-radius:8px; cursor:pointer;}
 .rbtn:hover{filter:brightness(1.08);}
@@ -1770,6 +1775,7 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .termbar{position:relative; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   border-radius:0 0 12px 12px; border:1px solid color-mix(in srgb, var(--acc) 30%, transparent); border-top:0;}
 .sk-aurora .termbar{background:#0B1220; border-top:1px dashed #25364F;}
+.termbar[hidden]{display:none;}
 .sk-daylight .termbar{background:#FBFAF6; border-top:1px dashed #E0DCD1;}
 .tbtn{font:600 12px 'IBM Plex Mono',monospace; padding:5px 11px; border-radius:7px; cursor:pointer;}
 .sk-aurora .tbtn{background:#141A21; border:1px solid #2A343F; color:#9FB0BF;}
@@ -1777,6 +1783,15 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .sk-daylight .tbtn{background:#FFFFFF; border:1px solid #E0DCD1; color:#6B6F7A;}
 .sk-daylight .tbtn:hover{border-color:#4956C9; color:#4956C9;}
 .schips{display:flex; gap:5px; flex-wrap:wrap;}
+.step-transport{display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:100%;}
+.step-transport .tbtn{min-width:34px;min-height:34px;}
+.step-transport .playback-button{min-width:88px;white-space:nowrap;}
+.step-transport .tbtn:disabled{opacity:.45;cursor:default;}
+.playback-status{display:inline-flex;align-items:center;gap:6px;margin-left:4px;font:600 12px 'IBM Plex Mono',monospace;color:var(--dink);white-space:nowrap;}
+.playback-status::before{content:'';width:7px;height:7px;border:1px solid currentColor;border-radius:50%;box-sizing:border-box;}
+[data-playback="playing"] .playback-status::before{background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 15%,transparent);}
+[data-playback="playing"] .playback-button{box-shadow:inset 0 -2px currentColor;}
+@media(max-width:640px){.step-transport .tbtn{min-width:44px;min-height:44px;}}
 .schip{font:700 11px 'IBM Plex Mono',monospace; width:26px; height:26px; border-radius:7px; cursor:pointer; padding:0;}
 .dvdelta{fill:var(--delta); stroke:rgba(0,0,0,.4); stroke-width:1; pointer-events:none;}
 .schip.dvd{position:relative;}
@@ -5025,6 +5040,14 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
         <button class="bbtn editor-inspect-selection" id="steps-inspect" type="button" disabled>Inspect selected step</button>
         <div class="story-tools">
           <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
+          <details class="playback-settings">
+            <summary>Playback settings</summary>
+            <label>Open diagram in<select class="fctl" id="steps-opening-view" aria-label="Open diagram in">
+              <option value="ambient">Ambient view</option><option value="step">Step view</option><option value="ambient-only">Ambient only</option>
+            </select></label>
+            <label class="playback-setting-check"><input type="checkbox" id="steps-autoplay"> Autoplay when opened</label>
+            <p class="fnote">Applies to this section and all its paths when entering step view. Off by default; plays every 3 seconds when on. The editor preview always starts paused.</p>
+          </details>
           <div id="steps-path-tools" hidden>
             <label>Path<select class="fctl" id="steps-path" aria-label="Story path"></select></label>
             <label>Path label<input class="fctl" id="steps-path-label" aria-label="Path label"></label>
@@ -5120,6 +5143,7 @@ body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-te
       <tr><td>sections[n]</td><td><code>{heading?, accent?, source?, text?, bullets?, contract?, diagram?}</code></td><td>One bounding box. <code>accent</code>: <code>green blue violet amber pink cyan red slate</code> or a hex; defaults cycle. <code>text</code> is a paragraph or list of paragraphs. <code>source</code>: optional permalink (HLD section) — renders a small "source&#8599;" chip beside the heading, new tab.</td></tr>
       <tr><td>sections[n].contract</td><td><code>{title?, source?, fields:[{k, v?, g?, hot?, link?, delta?, revealAt?, hideAt?}], note?}</code></td><td>Message-contract card: a compact "on the wire" field table. <code>delta</code> is <code>added|removed|changed</code>; reveal indices bind the row to this section's diagram steps. Optional <code>source</code> chip on the card title and footer <code>note</code>.</td></tr>
       <tr><td>diagram.view</td><td><code>"ambient" | "step" | "ambient-only"</code></td><td>How the board opens. <code>ambient</code> (default): live view with an AMBIENT/STEP toggle when <code>steps</code> exist. <code>step</code>: opens as the click-through at step 1. <code>ambient-only</code>: no toggle — for boards without a meaningful sequence. One diagram spec always drives both flavors.</td></tr>
+      <tr><td>diagram.autoplay</td><td>boolean</td><td>Defaults to <code>false</code>: step view opens paused. Set <code>true</code> to advance every 3 seconds when step view opens. Workbench and Confluence configuration previews stay paused; reduced motion disables automatic steps. No schema-version change needed.</td></tr>
       <tr><td>diagram.nodes</td><td><code>{id: {title?, sub?, icon?, tint?, group?, link?}}</code></td><td>Service cards. <code>icon</code> from the fixed set below (default <code>gear</code>); <code>tint</code> colors the icon chip (default <code>cmd</code>). <code>group</code>: containment-boundary membership. <code>link</code>: optional permalink — a small clickable &#8599; on the card corner, new tab.</td></tr>
       <tr><td>diagram.groups</td><td><code>{groupId: {title?}}</code></td><td>Declares containment boundaries: a dashed titled box drawn around all member nodes (a device holding two chips). Put members in one stack column; an edge between stack members draws as a vertical interconnect.</td></tr>
       <tr><td>diagram.rows</td><td><code>[[slot, ...], ...]</code></td><td>Flow-ordered slots per row. A slot is a node id, or an <b>array of ids = a stack</b> (fan-out targets in one column). Even rows lay left&#8594;right, odd rows right&#8594;left — the serpentine. The wrap edge between rows is detected automatically.</td></tr>
@@ -6196,6 +6220,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     warnings.push(DP + '.primaryPanel: must name an existing panel — using the standard flow layout');
   if (d.view && VIEW_SET.indexOf(d.view) < 0)
     warnings.push(DP + '.view: unknown view "' + d.view + '" — using "ambient" (valid: ' + VIEW_SET.join(', ') + ')');
+  if (Object.prototype.hasOwnProperty.call(d, 'autoplay') && typeof d.autoplay !== 'boolean')
+    warnings.push(DP + '.autoplay: must be true or false — opening paused');
   if (!d.nodes || typeof d.nodes !== 'object'){ errors.push(DP + '.nodes: required — map of node id to {title, sub, icon, tint}'); return; }
   if (!Array.isArray(d.rows) || d.rows.length === 0){ errors.push(DP + '.rows: required — array of rows, each an array of node ids (nested array = stack)'); return; }
   if (d.routing != null && d.routing !== 'lanes' && d.routing !== 'curves')
@@ -11055,8 +11081,9 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId){
 
 /* ---------------- stepper (click-through) ---------------- */
 function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
-  var autoplay = !options || options.autoplay !== false;
+  var autoplay = d.autoplay === true && (!options || options.autoplay !== false);
   var destroyed = false;
+  var hidden = false, resumeOnShow = false;
   var source = d, paths = diagramPathList(source), selectedPath = paths[0];
   var explicitPaths = Array.isArray(source.paths) && source.paths.length > 0;
   d = diagramForPath(source, selectedPath.id);
@@ -11259,25 +11286,41 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       termbar.btnPrev.disabled = cur === 0; termbar.btnNext.disabled = cur === N - 1;
       if (cur === N - 1) stopAuto();
     }
+    syncPlayback();
     paintedStep = cur;
     if (onChange) onChange(claimAddressBar !== false);
   }
   function startAuto(){
-    if (destroyed || timer || RM || !N) return;
-    if (explicitPaths && N === 1) return;
+    if (destroyed || timer || RM || N < 2 || mode !== 'step' || hidden || document.hidden) return;
     if (explicitPaths && cur === N - 1) setStep(0, false, false);
     /* the modulo wrap back to step 0 is a jump, not a narrative move */
     var id = window.setInterval(function(){
       if (timer === id) setStep(cur + 1, false, cur + 1 < N ? undefined : false);
     }, 3000);
     timer = id;
-    btnPlay.innerHTML = '&#10074;&#10074;';
-    btnPlay.setAttribute('aria-label', 'Pause');
+    syncPlayback();
   }
   function stopAuto(){
     if (timer){ window.clearInterval(timer); timer = null; }
-    btnPlay.innerHTML = '&#9654;';
-    btnPlay.setAttribute('aria-label', 'Play');
+    resumeOnShow = false;
+    syncPlayback();
+  }
+  function syncPlayback(){
+    var ended = explicitPaths && N > 1 && cur === N - 1;
+    var state = timer ? 'playing' : ended ? 'finished' : 'paused';
+    var action = timer ? 'Pause' : ended ? 'Replay' : 'Play';
+    btnPlay.innerHTML = '<span aria-hidden="true">' + (timer ? '&#10074;&#10074;' : '&#9654;') + '</span> ' + action;
+    btnPlay.setAttribute('aria-label', action);
+    btnPlay.disabled = RM || N < 2;
+    btnPlay.title = RM ? 'Automatic steps are disabled by reduced motion. Use the step arrows.' :
+      N < 2 ? 'This path has only one step.' : timer ? 'Pause automatic step advancement' :
+      ended ? 'Play this path again from step 1' : 'Advance one step every 3 seconds';
+    bar.setAttribute('data-playback', state);
+    var label = timer ? 'Playing · 3s / step' : N < 2 ? 'Single step' : RM ? 'Paused · reduced motion' : ended ? 'Finished' : 'Paused';
+    if (termbar.playbackStatus && termbar.playbackStatus.textContent !== label) termbar.playbackStatus.textContent = label;
+  }
+  function visibilityChanged(){
+    if (document.hidden && !destroyed){ stopAuto(); if (mode === 'step') settleCurrentStep(); }
   }
   function selectPath(id, at){
     if (destroyed) return false;
@@ -11373,7 +11416,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (replacement) replacement.focus({preventScroll:true});
   });
 
-  syncToggle();
+  if (document.addEventListener) document.addEventListener('visibilitychange', visibilityChanged);
+  syncToggle(); syncPlayback();
   return {
     sectionEl: secBox,
     scrollTargetEl: boardDiv,
@@ -11401,9 +11445,19 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     toggleAuto: function(){ if (timer) stopAuto(); else startAuto(); },
     /* Pausing must not replace panel contents: an editor may have focus there. */
     pause: stopAuto,
-    destroy: function(){ destroyed = true; stopAuto(); clearLit(); clearCaptionTween(); },
-    onHide: function(){ if (!destroyed){ stopAuto(); settleCurrentStep(); } },
-    onShow: function(){ if (!destroyed){ settleCurrentStep(); if (mode === 'step' && autoplay) startAuto(); } }
+    destroy: function(){
+      destroyed = true; stopAuto(); clearLit(); clearCaptionTween();
+      if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
+    },
+    onHide: function(){ if (!destroyed && !hidden){
+      var wasPlaying = !!timer; hidden = true; stopAuto();
+      resumeOnShow = wasPlaying && (!options || options.autoplay !== false); settleCurrentStep();
+    } },
+    onShow: function(){ if (!destroyed){
+      hidden = false; settleCurrentStep();
+      var resume = resumeOnShow; resumeOnShow = false;
+      if (resume) startAuto();
+    } }
   };
 }
 
@@ -11754,7 +11808,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   bar = document.createElement('div');
   bar.className = 'termbar'; bar.hidden = true;
   var btnPrev = document.createElement('button'); btnPrev.className = 'tbtn'; btnPrev.innerHTML = '&#8249;'; btnPrev.setAttribute('aria-label', 'Previous step');
-  var btnPlay = document.createElement('button'); btnPlay.className = 'tbtn'; btnPlay.innerHTML = '&#9654;'; btnPlay.setAttribute('aria-label', 'Play');
+  var btnPlay = document.createElement('button'); btnPlay.className = 'tbtn playback-button';
   var btnNext = document.createElement('button'); btnNext.className = 'tbtn'; btnNext.innerHTML = '&#8250;'; btnNext.setAttribute('aria-label', 'Next step');
   var chips = document.createElement('div'); chips.className = 'schips';
   if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
@@ -11776,7 +11830,13 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   line.appendChild(stepN); line.appendChild(lanePill); line.appendChild(stepText);
   line.appendChild(failureStatus);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
-  bar.appendChild(btnPrev); bar.appendChild(btnPlay); bar.appendChild(btnNext);
+  var transport = document.createElement('div'); transport.className = 'step-transport';
+  transport.setAttribute('role','group'); transport.setAttribute('aria-label','Step playback');
+  transport.appendChild(btnPrev); transport.appendChild(btnPlay); transport.appendChild(btnNext);
+  var playbackStatus = document.createElement('span'); playbackStatus.className = 'playback-status';
+  playbackStatus.setAttribute('role','status'); playbackStatus.setAttribute('aria-live','polite');
+  playbackStatus.title = 'Shows whether the steps advance automatically. Animations within the current step can continue while paused.';
+  transport.appendChild(playbackStatus); bar.appendChild(transport);
   bar.appendChild(chips); bar.appendChild(line);
   boardLayout.controlsHost.appendChild(bar);
 
@@ -11797,7 +11857,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
-    btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep
+    btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
     printSteps(next);
     return renderBoard(bwrap, next, prefix, skin, protos, backlinks);
@@ -12469,7 +12529,8 @@ function wirePresenter(ctl, view, win){
       ev.preventDefault();
     } else if (ev.key === ' '){
       if (!sp) return;
-      if (sp.mode() !== 'step') sp.enterStep(true); else sp.toggleAuto();
+      if (sp.mode() !== 'step') sp.enterStep(false);
+      sp.toggleAuto();
       ev.preventDefault();
     } else if (/^[1-9]$/.test(ev.key) && ctl.tabBlock){
       var ti = parseInt(ev.key, 10) - 1;
@@ -16459,7 +16520,7 @@ function initWorkbenchBuilder(opts){
   }
   function formError(text){
     var slot = guide && guide.querySelector('.ierr');
-    if (!slot){ inspectorMessage(text); return; }
+    if (!slot){ if (text) inspectorMessage(text); return; }
     slot.textContent = text || '';
     slot.hidden = !text;
   }
@@ -18265,6 +18326,7 @@ function initWorkbenchBuilder(opts){
   /* The step list shares this builder's selection, render and undo pipeline. */
   var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({
     view:view, src:src, renderedText:opts.renderedText,
+    configure:function(plan){ return applyPlan(plan); },
     pause:pausePreview,
     inspect:function(){ if (opts.workspace) opts.workspace.showTool('inspect', {focus:true}); },
     selection:function(){ return currentTarget; },
@@ -19429,6 +19491,19 @@ function initWorkbenchStepList(opts){
   var pathLabel=document.getElementById('steps-path-label'), pathColor=document.getElementById('steps-path-color');
   var forkButton=document.getElementById('steps-fork'), savePath=document.getElementById('steps-path-save'), removePath=document.getElementById('steps-path-remove');
   var pathSignature='';
+  var autoplayInput = document.getElementById('steps-autoplay'), openingView = document.getElementById('steps-opening-view');
+  function playbackSettings(){
+    if (autoplayInput) autoplayInput.checked = !!chosen && chosen.diagram.autoplay === true;
+    if (openingView) openingView.value = chosen && VIEW_SET.indexOf(chosen.diagram.view) >= 0 ? chosen.diagram.view : 'ambient';
+  }
+  function configurePlayback(key, value){
+    if (!ready() || !chosen){ playbackSettings(); return; }
+    var plan = planSetField(indexedText, raw, chosen.path, key, JSON.stringify(value));
+    if (plan.error){ status.textContent = plan.error; playbackSettings(); return; }
+    if (opts.configure && opts.configure(plan)) refresh(); else playbackSettings();
+  }
+  if (autoplayInput) autoplayInput.addEventListener('change', function(){ configurePlayback('autoplay', autoplayInput.checked); });
+  if (openingView) openingView.addEventListener('change', function(){ configurePlayback('view', openingView.value); });
   var inspectButton = document.getElementById('steps-inspect');
   var reuseButton = document.getElementById('steps-reuse'), independentButton = document.getElementById('steps-independent');
   var removeOccurrence = document.getElementById('steps-remove-occurrence'), sharingBox = document.getElementById('steps-sharing');
@@ -19471,6 +19546,7 @@ function initWorkbenchStepList(opts){
     return paths.find(function(p){return p.id===id;}) || paths[0];
   }
   function pathControls(){
+    playbackSettings();
     if(!pathSelect) return;
     var paths=chosen ? diagramPathList(chosen.diagram) : [], selected=route();
     pathTools.hidden=!(chosen && chosen.diagram.paths);
@@ -19488,6 +19564,8 @@ function initWorkbenchStepList(opts){
     var selected=route(), index = selected ? selected.indices.indexOf(current()) : -1, count=selected ? selected.indices.length : 0;
     var blocked = stale || opts.locked() || !chosen;
     select.disabled = blocked; search.disabled = blocked;
+    if (autoplayInput) autoplayInput.disabled = blocked || chosen.diagram.view === 'ambient-only';
+    if (openingView) openingView.disabled = blocked;
     if(pathSelect){pathSelect.disabled=blocked;pathLabel.disabled=blocked;pathColor.disabled=blocked;savePath.disabled=blocked;
       removePath.disabled=blocked || !chosen.diagram.paths || chosen.diagram.paths.length<2 || selected.id===chosen.diagram.paths[0].id;
       forkButton.disabled=blocked || index<0;}
@@ -20362,6 +20440,7 @@ var CONTRACT = [
   '  "diagram": {',
   '    "view": "ambient",               // "ambient" (toggle to step) | "step" (opens as',
   '                                     // click-through) | "ambient-only" (no toggle)',
+  '    "autoplay": false,               // optional; true = advance every 3s on step entry',
   '    "nodes":  {"<id>": {"title":"<name>", "sub":"<one-line detail>",',
   '                        "icon":"<icon>", "tint":"<tint>",',
   '                        "group":"<groupId>",          // optional: containment boundary',

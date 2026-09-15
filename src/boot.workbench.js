@@ -198,6 +198,7 @@ var CONTRACT = [
   '  "diagram": {',
   '    "view": "ambient",               // "ambient" (toggle to step) | "step" (opens as',
   '                                     // click-through) | "ambient-only" (no toggle)',
+  '    "autoplay": false,               // optional; true = advance every 3s on step entry',
   '    "nodes":  {"<id>": {"title":"<name>", "sub":"<one-line detail>",',
   '                        "icon":"<icon>", "tint":"<tint>",',
   '                        "group":"<groupId>",          // optional: containment boundary',

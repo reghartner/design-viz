@@ -3615,7 +3615,7 @@ function initWorkbenchBuilder(opts){
   }
   function formError(text){
     var slot = guide && guide.querySelector('.ierr');
-    if (!slot){ inspectorMessage(text); return; }
+    if (!slot){ if (text) inspectorMessage(text); return; }
     slot.textContent = text || '';
     slot.hidden = !text;
   }
@@ -5421,6 +5421,7 @@ function initWorkbenchBuilder(opts){
   /* The step list shares this builder's selection, render and undo pipeline. */
   var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({
     view:view, src:src, renderedText:opts.renderedText,
+    configure:function(plan){ return applyPlan(plan); },
     pause:pausePreview,
     inspect:function(){ if (opts.workspace) opts.workspace.showTool('inspect', {focus:true}); },
     selection:function(){ return currentTarget; },

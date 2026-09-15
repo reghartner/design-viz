@@ -33,6 +33,11 @@ inspector opens the homemap panel's shared settings, including the **outline**
 fields **Width**, **Height**, **Left (auto)** and **Top (auto)**, the **rooms**
 table, **devices**, and starting **subjects**. Outline fields use large inputs
 in two columns. Press Enter, Tab, or click away to save; each edit can be undone.
+**Rooms**, **Devices**, and **Subjects** start collapsed with item counts.
+Expand a group to see compact named rows, then expand the element you want to
+edit. New items open automatically. Open/closed choices survive field edits,
+dragging and inspector reselection during the current workbench session;
+they are viewing preferences and do not change the spec or create undo entries.
 These settings apply to every step and path. In ambient mode, clicking a room,
 device, or person also selects this layout inspector. Once it is selected, map
 clicks keep that context until you select a step or **Edit home at current step**.

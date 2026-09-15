@@ -2975,6 +2975,7 @@ function initWorkbenchBuilder(opts){
   }
   var selectedEl = null;
   var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
+  var homeElementFolds = Object.create(null); /* inspector-only disclosure preferences */
   var inspectorScrollKey = null; /* target of the last-rendered inspector form */
   var invalidateEffectiveState = null;
   var insertSection = 0;    /* zero-based ordinal of the section inserts target */
@@ -4650,7 +4651,7 @@ function initWorkbenchBuilder(opts){
       if (ev.key === 'Enter' && input.tagName !== 'TEXTAREA'){ ev.preventDefault(); go(); }
     });
   }
-  function rowsFieldControl(key, cur, shape){
+  function rowsFieldControl(key, cur, shape, folds){
     var wrap = document.createElement('div');
     wrap.className = 'rowsedit';
     var rowRefs = [];
@@ -4665,7 +4666,10 @@ function initWorkbenchBuilder(opts){
       if (out.error){ formError(key + ': ' + out.error); return false; }
       formError('');
       var ok = commitSimple(key, out.items.length ? JSON.stringify(out.items) : null);
-      if (ok) refreshFormSoon(); /* resync typed rows, raw fallback, stale bases */
+      if (ok){
+        if (folds) folds.items = refs.filter(function(r){return !rowIsBlank(r);}).map(function(r){return r.fold.open;});
+        refreshFormSoon(); /* resync typed rows, raw fallback, stale bases */
+      }
       return ok;
     }
     var addBtn = document.createElement('button');
@@ -4729,8 +4733,22 @@ function initWorkbenchBuilder(opts){
       acts.appendChild(smallButton('✕', 'remove this item', function(){
         commitRows(rowRefs.filter(function(r){ return r !== ref; }));
       }));
+      var index = rowRefs.length;
       rowRefs.push(ref);
-      return line;
+      if (!folds) return line;
+      var fold = document.createElement('details'); fold.className = 'home-element';
+      fold.open = !base || folds.items[index] === true; ref.fold = fold;
+      var summary = document.createElement('summary');
+      var name = document.createElement('span'); name.className = 'home-element-name';
+      var singular = key.slice(0,-1);
+      name.textContent = base ? base.label || base.id || singular[0].toUpperCase() + singular.slice(1) + ' ' + (index + 1) : 'New ' + singular;
+      var kind = document.createElement('span'); kind.className = 'home-element-kind';
+      kind.textContent = ' · ' + (base ? (key === 'rooms' ? base.kind || 'room' : key === 'devices' ? base.display === 'door' ? 'door' : base.kind || 'device' : 'subject') : 'unsaved');
+      summary.appendChild(name); summary.appendChild(kind); fold.appendChild(summary); fold.appendChild(line);
+      fold.addEventListener('toggle',function(){
+        if (fold.isConnected) folds.items[rowRefs.indexOf(ref)] = fold.open;
+      });
+      return fold;
     }
     (Array.isArray(cur) ? cur : []).forEach(function(it){
       wrap.appendChild(buildRow(it && typeof it === 'object' ? it : {}));
@@ -4748,6 +4766,16 @@ function initWorkbenchBuilder(opts){
     wrap.appendChild(addBtn);
     wrap.appendChild(rawJsonFallback(key, cur, 'jsonArr'));
     return wrap;
+  }
+  function homemapElementsControl(key, cur, shape){
+    var identity = JSON.stringify([currentTarget.section,currentTarget.index,key]);
+    var state = homeElementFolds[identity] || (homeElementFolds[identity] = {open:false,items:[]});
+    var group = document.createElement('details'); group.className = 'home-elements'; group.open = state.open;
+    var summary = document.createElement('summary');
+    summary.textContent = key[0].toUpperCase() + key.slice(1) + ' (' + (Array.isArray(cur) ? cur.length : 0) + ')';
+    group.appendChild(summary); group.appendChild(rowsFieldControl(key,cur,shape,state));
+    group.addEventListener('toggle',function(){if (group.isConnected) state.open = group.open;});
+    return group;
   }
   function mapFieldControl(key, cur, opts){
     var wrap = document.createElement('div');
@@ -4859,7 +4887,10 @@ function initWorkbenchBuilder(opts){
           }
           return commitSimple(key, v == null ? null : JSON.stringify(v));
         }, {placeholder: '90s, 5m, 2h30m'}));
-      if (kind === 'rows') return frowBlock(key, rowsFieldControl(key, cur, f[2] || {cols: []}));
+      if (kind === 'rows'){
+        if (val.type === 'homemap') return homemapElementsControl(key,cur,f[2] || {cols:[]});
+        return frowBlock(key, rowsFieldControl(key, cur, f[2] || {cols: []}));
+      }
       if (kind === 'map') return frowBlock(key, mapFieldControl(key, cur, f[2] || {}));
       if (kind === 'objf') return frowBlock(key, objFieldsControl(key, cur, f[2] || {cols: []}));
       if (kind === 'csv'){

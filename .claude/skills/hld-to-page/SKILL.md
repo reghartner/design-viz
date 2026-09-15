@@ -172,6 +172,9 @@ The shared inspector has its own drag map, available without steps: drag rooms,
 devices, doors and starting subjects; use the House grip to move the outline
 and square corners to resize it or rooms. Faded subjects stay initially hidden.
 These edits preserve all per-step overrides; numeric fields remain available.
+Rooms, Devices and Subjects are collapsible groups with individually collapsible
+named elements. Expand a group and an element for its fields; new items open
+automatically. Disclosure state is an editor preference, never a spec field.
 For outside scenes use room `kind:"outdoor"` and position the house with
 `outline:{x,y,w,h}` (omitted x/y centers). For architectural doors use entry
 `display:"door"`, hinge x/y, `facing`, `doorWidth`, and signed `doorSwing`;

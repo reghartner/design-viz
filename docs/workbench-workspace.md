@@ -22,32 +22,52 @@ reference material. On a desktop, the preview scrolls beside a viewport-sized
 editor. **Exit focus** returns to the normal page and its previous scroll
 position. Focus mode lasts only until you exit or reload.
 
-At widths above 1180 pixels, drag the vertical divider to change editor width.
-Select anything in the diagram to open its inspector. When both the inspector
-and JSON source are open, drag their horizontal divider to share the height.
-Collapse **JSON source** to give a long inspector the available space, or
-collapse **insert** to make more room for either pane.
+The editor has three tools, with one visible at a time:
 
-Both dividers are keyboard accessible:
+- **Inspect** edits the selected element. Selecting something in the preview
+  opens this pane. Click the path beneath its title to open that element in
+  JSON. With no selection, it shows a short starting hint.
+- **Steps** provides the searchable story list and path controls. Selecting a
+  beat stays in this pane; **Inspect selected step** opens its fields.
+- **JSON** gives the source the full pane. Validation links and explicit source
+  jumps open it automatically. Raw edits still require **Render** before using
+  builder actions.
 
-- Tab to the divider. Left/right moves the editor boundary; up/down changes
-  the inspector's share. Shift uses larger increments.
+Tab into the tool bar, then use Left/Right or Home/End to switch tools. Changing
+tools retains the existing forms and source textarea, including uncommitted
+source text and its selection. **Insert & import** and **Document outline**
+remain collapsible above the active tool. Undo/redo and file actions stay
+visible below it. Selecting a tool or a preview element closes those utilities
+to make room; an active import or diff can still be closed using its own controls.
+
+At widths of 800 pixels and up, drag the vertical divider's visible handle to
+change editor width. The divider is also keyboard accessible:
+
+- Tab to the divider. Left/right moves the editor boundary. Shift uses larger
+  increments.
 - Home and End choose the minimum and maximum sizes.
-- Double-click a divider to reset it, or use **Reset layout** for both.
+- Double-click the divider for a balanced split. **Reset layout** restores the
+  default 440-pixel editor width and keeps the selected tool.
 
-The editor stays between 340 and 900 pixels wide, with at least 560 pixels
-reserved for the preview on desktop. Inspector share ranges from 20% to 80%;
-minimum pane heights still apply, so a short viewport can constrain the split.
-Large import forms and validation messages can make the editor column scroll.
+The editor stays between 320 and 1100 pixels wide, with at least 300 pixels
+reserved for the preview. **Expand editor** moves the editor to the left and
+keeps a 320-pixel live preview on the right. It also enters Focus workspace.
+**Return to split** restores the previous width and focus setting. Expansion
+does not render the preview again or change the selected step, path or view.
+Wide home-step inspectors place the map beside its device, person and signal
+controls. Narrow inspectors stack them.
 
-Dimensions persist in this browser when local storage is available. Resizing
-the window clamps the displayed editor width without losing its saved size.
+Editor width and selected tool persist in this browser when local storage is
+available. Widths from the earlier layout are carried forward; the former
+inspector/JSON height split is no longer used. Focus and expansion are temporary.
+Resizing the window clamps the displayed editor width without losing its saved size.
 These preferences are independent of the spec, drafts and undo history.
 Cancelling a pointer drag or moving focus out of the window restores the size
 from before that drag.
 
 At smaller widths, including phones, the preview and editor stack vertically
-and dividers disappear. Focus mode still hides reference material. The JSON
+and the divider and Expand editor control disappear. The three tools remain
+available. Focus mode still hides reference material. The JSON
 textarea keeps native text editing and vertical resizing where the browser
 supports it. This is a browser layout, not an operating-system fullscreen mode.
 

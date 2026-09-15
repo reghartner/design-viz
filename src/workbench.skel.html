@@ -37,7 +37,7 @@
   <div class="workspace-tools" aria-label="Workspace layout">
     <button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button>
     <button class="bbtn" id="workspace-reset">Reset layout</button>
-    <span class="workspace-hint">Drag dividers or focus one and use arrow keys.</span>
+    <span class="workspace-hint">Drag the divider to resize · Expand editor for more room.</span>
   </div>
   <div class="workwrap">
     <div class="workmain">
@@ -49,12 +49,18 @@
       <div class="docview sk-aurora" id="docview" aria-label="Rendered documentation page"></div>
     </div>
 
-    <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click resets."></div>
+    <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
     <details class="specbox" id="spec-editor" open>
-      <summary>spec editor — insert &#183; inspector &#183; JSON source</summary>
+      <summary><span>Editor</span><button class="bbtn" type="button" id="workspace-expand" aria-pressed="false">⤢ Expand editor</button></summary>
+      <div class="editor-tabs" role="tablist" aria-label="Editor tools">
+        <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true">Inspect</button>
+        <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1">Steps</button>
+        <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1">JSON</button>
+      </div>
       <div class="draftbar" id="draftbar" hidden></div>
-      <details class="ssec" id="sec-insert" open>
-        <summary>insert</summary>
+      <div class="editor-utilities">
+      <details class="ssec" id="sec-insert">
+        <summary>insert &amp; import</summary>
         <div class="buildrow">
           <span class="bgroup" role="group" aria-label="add diagram elements">
             <button class="bbtn" id="add-node">+ node</button>
@@ -70,10 +76,6 @@
             <button class="bbtn" id="starters" aria-expanded="false" aria-controls="gallery">starters&#8230;</button>
             <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
             <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
-          </span>
-          <span class="bgroup" role="group" aria-label="history">
-            <button class="bbtn" id="undo-builder" disabled>undo</button>
-            <button class="bbtn" id="redo-builder" disabled>redo</button>
           </span>
           <button class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button>
           <span class="btarget" id="btarget"></span>
@@ -121,8 +123,11 @@
         <div class="outline-status" id="outline-status" role="status"></div>
         <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
       </details>
-      <details class="ssec" id="sec-steps">
+      </div>
+      <div class="editor-pane" id="editor-steps" role="tabpanel" aria-labelledby="editor-tab-steps" hidden>
+      <details class="ssec" id="sec-steps" open>
         <summary>story steps</summary>
+        <button class="bbtn editor-inspect-selection" id="steps-inspect" type="button" disabled>Inspect selected step</button>
         <div class="story-tools">
           <label>Section<select class="fctl" id="steps-section" aria-label="Story section"></select></label>
           <div id="steps-path-tools" hidden>
@@ -149,16 +154,22 @@
           <p class="story-note">Select a beat to edit it or branch after it. Step content is shared by paths that reference it. Append, duplicate and move affect the selected path; deleting a step removes it everywhere. Copies repeat patches, including appended events. Reveal/hide indices stay positional within each path.</p>
         </div>
       </details>
+      </div>
+      <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
+      <p class="editor-empty" id="editor-empty">Select an element in the preview, or choose a step in the Steps tab to edit it here.</p>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
         <div class="guide" id="guide" hidden></div>
       </details>
-      <div class="workspace-divider" id="workspace-rows" role="separator" tabindex="0" aria-label="Inspector share" aria-orientation="horizontal" aria-controls="sec-inspect" title="Drag to share space between inspector and JSON. Up/down arrows adjust; Home/End set limits; double-click resets."></div>
+      </div>
+      <div class="editor-pane" id="editor-json" role="tabpanel" aria-labelledby="editor-tab-json" hidden>
       <details class="ssec" id="sec-source" open>
         <summary>JSON source</summary>
         <textarea id="src" spellcheck="false" aria-label="Page spec JSON source"></textarea>
       </details>
-      <div class="specrow">
+      </div>
+      <div class="specrow editor-file-tools">
+        <span class="bgroup" role="group" aria-label="history"><button class="bbtn" id="undo-builder" disabled>undo</button><button class="bbtn" id="redo-builder" disabled>redo</button></span>
         <button class="rbtn" id="go">Render</button>
         <button class="bbtn" id="file-open">open&#8230;</button>
         <button class="bbtn" id="file-save">save</button>

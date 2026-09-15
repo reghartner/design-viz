@@ -68,7 +68,7 @@ test('append supports an edgeless state story and creates its steps array withou
 });
 
 function harness(raw=fixture()){
-  const doc={activeElement:null}, elements={}, observers=[], history=[], navigation=[], timers=[];
+  const doc={activeElement:null}, elements={}, observers=[], history=[], navigation=[], inspections=[], timers=[];
   function el(tag='div',id=''){
     const attrs={}, handlers={};
     const node={tagName:tag.toUpperCase(),id,children:[],value:'',disabled:false,hidden:false,open:true,handlers,
@@ -90,15 +90,16 @@ function harness(raw=fixture()){
   const root=el(); doc.addEventListener=root.addEventListener.bind(root);
   doc.createElement=el; doc.getElementById=id=>elements[id] || null;
   for(const id of ['sec-steps','steps-section','steps-search','steps-list','steps-status','steps-paging',
-    'steps-add','steps-duplicate','steps-earlier','steps-later','steps-previous','steps-next','src','view']) root.appendChild(el('div',id));
+    'steps-add','steps-duplicate','steps-earlier','steps-later','steps-previous','steps-next','steps-inspect','src','view']) root.appendChild(el('div',id));
   const src=elements.src; src.value=JSON.stringify(raw,null,2);
   let rendered=src.value, target=null, locked=false, ui;
   const c=load({document:doc,setTimeout:fn=>timers.push(fn),MutationObserver:class {constructor(fn){ observers.push(fn); } observe(){}}});
   ui=c.initWorkbenchStepList({src,view:elements.view,renderedText:()=>rendered,selection:()=>target,locked:()=>locked,
+    inspect(){ inspections.push(target); },
     navigate(entry){ navigation.push(entry); target=entry.target; ui.sync(); },
     apply(plan,section){ history.push(src.value); src.value=plan.text; rendered=src.value;
       target={kind:'step',section,index:plan.index}; return true; }});
-  return {c,ui,doc,e:elements,src,history,navigation,root,
+  return {c,ui,doc,e:elements,src,history,navigation,inspections,root,
     render(){ rendered=src.value; observers.forEach(fn=>fn()); },
     select(index,section=1){ target={kind:'step',section,index}; ui.sync(); },
     lock(value){ locked=value; root.fire('click'); },
@@ -107,6 +108,16 @@ function harness(raw=fixture()){
     undo(){ src.value=history.pop(); target=null; this.render(); },
     get target(){ return target; }};
 }
+
+test('Inspect requires a current selected step and refuses stale source or unfinished builder actions',()=>{
+  const h=harness(),button=h.e['steps-inspect'];
+  assert.equal(button.disabled,true);button.fire('click');assert.equal(h.inspections.length,0);
+  h.select(1);assert.equal(button.disabled,false);button.fire('click');
+  assert.deepEqual(h.inspections,[{kind:'step',section:1,index:1}]);
+  h.lock(true);assert.equal(button.disabled,true);button.fire('click');assert.equal(h.inspections.length,1);
+  h.lock(false);h.src.value+=' ';button.fire('click');assert.equal(h.inspections.length,1);
+  assert.equal(button.disabled,true);
+});
 
 test('filtered navigation and reorder act on original story indices and keep the same selected beat',()=>{
   const h=harness(),e=h.e;

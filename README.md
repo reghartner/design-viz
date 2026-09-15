@@ -12,7 +12,7 @@ of the same time-aware data — an ambient always-animating view and a guided st
 **[Alternate paths](docs/alternate-paths.md):** show a happy path and failure
 outcomes on one diagram. Colored path rows align their step numbers beneath the transport controls; playback
 and panel state follow the selected sequence and stop at its own ending.
-Try **starters… → alternate paths**, or fork a beat in **story steps**.
+Try **starters… → alternate paths**, or fork a beat in the **Steps** tab.
 
 **[Failed communications](docs/failed-communications.md):** show a packet
 dropped in transit or a communication that was never sent, using broken
@@ -48,9 +48,10 @@ See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions
 The [effective-state inspector](docs/workbench-state-inspector.md) explains
 the panel values at a selected step, including inherited and transient values,
 with links to their authored JSON and read-only snapshots.
-Use [workspace focus and resizable panes](docs/workbench-workspace.md) for
-more room: drag either divider, use arrow keys, or collapse JSON for a long
-inspector. Dimensions persist locally; phones use a stacked layout.
+Use [workspace focus and the resizable editor](docs/workbench-workspace.md) for
+more room: drag the divider or **Expand editor** beside a compact live preview.
+**Inspect / Steps / JSON** each get a dedicated pane. Width and selected tool
+persist locally; phones use a stacked layout.
 The [story-step editor](docs/workbench-steps.md) adds caption search, hidden-tab
 jumps, duplication, appending and reordering through the same undo history.
 
@@ -261,8 +262,8 @@ For rapid trial-and-error, `workbench/flowspec.html` is the same engine with
 an editable JSON panel and a Render button: paste your spec, tweak, render,
 and copy the result back into the `.spec.json` when it looks right. Clicking
 a rendered node, edge, edge label, step coin, panel widget, or section box
-selects that element's JSON in the editor and opens an **inspector form**
-for it: every common field is an editable control (selects for icon, tint,
+opens an **inspector form** for it, with a link to select its exact JSON:
+every common field is an editable control (selects for icon, tint,
 kind, edge endpoints, step edge and lane; text fields elsewhere) that writes
 straight through to the JSON and re-renders on commit. Clearing an optional
 field removes it from the spec. Renaming a node or panel **id** rewrites
@@ -271,7 +272,7 @@ node lists, panel patches. **delete** removes the element and prunes what
 pointed at it (deleting a node also removes its edges and their step
 references; steps legally survive as captions). Steps get **↑ earlier / ↓
 later** reorder buttons. Every builder action pushes an **undo** snapshot
-(the `undo` button in the INSERT row, 30 deep). Selection maps the last
+(the always-visible `undo` button below the editor, 30 deep). Selection maps the last
 render onto the current editor text — re-render after hand-reordering
 edits to keep the two aligned. The INSERT buttons splice a ready-made node,
 step, panel, or section into the spec and re-render; inserts target the

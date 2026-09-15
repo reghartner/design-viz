@@ -1,13 +1,15 @@
 # Story steps
 
-Open **story steps** in the workbench editor. Choose a section, including one
+Open the **Steps** tab in the workbench editor. Choose a section, including one
 in a hidden tab, then search by caption, step ID, lane, node, hop or panel ID.
 Numbers always refer to the full selected path (or the full story without paths). The metadata counts explicitly listed
 hops, nodes and panel patches at that beat, not the resulting inherited state.
 The list displays up to 200 matches per page, with Previous/Next controls.
 
-Select a beat to reveal its scenario, pause at that step, open the inspector
-and select its exact JSON source. Keyboard focus stays in the list. Arrow
+Select a beat to reveal its scenario, pause at that step and prepare its
+inspector. The Steps tab and keyboard focus stay in the list; use **Inspect
+selected step** to open the fields. The path beneath the inspector title opens
+the element's exact JSON source. Arrow
 keys and Home/End move focus; Enter or Space selects the focused beat. The
 filter keeps normal text-editing behavior. Focusing this editor pauses Play.
 An `ambient-only` diagram still permits source editing but has no step preview;

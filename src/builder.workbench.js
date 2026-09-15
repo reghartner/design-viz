@@ -4067,7 +4067,7 @@ function initWorkbenchBuilder(opts){
       var svg = map.querySelector('svg'), matrix = svg && svg.getScreenCTM();
       if (!matrix) return null;
       var p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; p = p.matrixTransform(matrix.inverse());
-      return {x:Math.round(Math.max(0, Math.min(320, p.x))), y:Math.round(Math.max(0, Math.min(180, p.y)))};
+      return homemapPointFromDisplay(p);
     }
     var moving = null, swallowClick = false;
     function previewMove(move){

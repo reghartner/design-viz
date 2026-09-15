@@ -30,6 +30,13 @@ same coordinate space at every display size. Device states use icons, color, and
 animation instead of text chips; hover a device to read its name and current state.
 Static signal arrows remain visible while paused or with reduced motion.
 
+The Home tile uses a taller display with more vertical space between items and
+smaller device/room labels. Devices and people keep their original proportions.
+Specs and coordinate controls still use 320×180; the renderer and drag controls
+map between those coordinates and the taller view automatically. Do not rescale
+existing positions or add a new schema field. The centerpiece still caps its
+height relative to the viewport, with the step controls directly beneath it.
+
 The map's visual treatment is automatic: device icons, softly
 raised room walls, camera sweeps, breathing activity halos, swinging doors, and
 people with a short fading movement trail. Rooms tint to reflect their current

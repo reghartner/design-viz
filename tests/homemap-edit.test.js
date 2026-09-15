@@ -94,22 +94,109 @@ test('centerpiece references rename and delete with their panel; unknown IDs war
   result = C.planPrimaryPanel(JSON.stringify(spec), spec, 0, null);
   assert.equal(diagram(JSON.parse(result.text)).primaryPanel, undefined);
 });
-test('static signals and textual states survive paused jumps and reduced motion, and clear in ambient', () => {
+test('state titles and visual cues survive without chips when paused, in reduced motion, and in ambient', () => {
   const d = diagram(fixture()), panel = d.panels[0];
   const snapshot = C.builderHomemapStep(d, 1, 'home', 'happy');
   const host = {querySelector:()=>null};
   C.renderPanelBody(host, panel, snapshot.state, 'pastel', [], 1, false);
-  assert.match(host.innerHTML, /class="hmlink"/); assert.match(host.innerHTML, />detect<\/text>/);
+  assert.match(host.innerHTML, /class="hmlink"/); assert.match(host.innerHTML, /: detect<\/title>/);
+  assert.match(host.innerHTML, /hm-camera hm-detect/);
+  assert.doesNotMatch(host.innerHTML, /hmstatus|>detect<\/text>/);
   assert.doesNotMatch(host.innerHTML, /class="hmsig"/);
   const oldMotion = C.RM; C.RM = true;
   try {
     const quiet = {querySelector:()=>null};
     C.renderPanelBody(quiet, panel, snapshot.state, 'pastel', [], 1, true);
     assert.match(quiet.innerHTML, /class="hmlink"/);
+    assert.match(quiet.innerHTML, /: detect<\/title>/);
+    assert.match(quiet.innerHTML, /hm-camera hm-detect/);
+    assert.doesNotMatch(quiet.innerHTML, /hmstatus/);
     assert.doesNotMatch(quiet.innerHTML, /class="hmsig"|class="hmsweep"/);
   } finally { C.RM = oldMotion; }
   C.renderPanelBody(host, panel, panel.initial, 'pastel', [], -1, false);
   assert.doesNotMatch(host.innerHTML, /class="hmlink"/);
+  assert.doesNotMatch(host.innerHTML, /hmstatus/);
+  assert.match(host.innerHTML, /: scan<\/title>/);
+});
+
+test('subject labels opt in without losing names, markers, motion, or hidden-state behavior', () => {
+  const panel = diagram(fixture()).panels[0], host = {querySelector:()=>null};
+  panel.subjects[0].label = '<Visitor & guest>';
+  const draw = (state = {}) => C.renderPanelBody(host, panel, state, 'pastel', [], 0, true);
+  draw();
+  assert.doesNotMatch(host.innerHTML, /hmactor-label/);
+  assert.match(host.innerHTML, /<title>&lt;Visitor &amp; guest&gt;<\/title>/);
+  assert.match(host.innerHTML, /data-subject="visitor"/);
+  assert.match(host.innerHTML, /text-anchor="middle">Porch cam<\/text>/);
+  panel.showSubjectLabels = true; draw({visitor:{x:180,y:80}});
+  assert.match(host.innerHTML, /hmactor-label[^>]*>&lt;Visitor &amp; guest&gt;<\/text>/);
+  assert.match(host.innerHTML, /transform:translate/);
+  assert.match(host._lastHTML, /hmactor-label/);
+  draw({visitor:null}); assert.doesNotMatch(host.innerHTML, /data-subject=|hmactor-label/);
+  for (const value of [false, undefined, 'true', 1, null]){
+    panel.showSubjectLabels = value; draw();
+    assert.doesNotMatch(host.innerHTML, /hmactor-label/);
+    assert.match(host.innerHTML, /<title>&lt;Visitor &amp; guest&gt;<\/title>/);
+  }
+});
+
+test('subject label preference survives normalization and validates as a boolean', () => {
+  for (const value of [true, false, undefined, 'true', 1, null]){
+    const spec = fixture(); diagram(spec).panels[0].showSubjectLabels = value;
+    const normalized = C.normalize(spec), result = C.validate(normalized);
+    assert.deepEqual(plain(result.errors), []);
+    assert.equal(normalized.sections[0].diagram.panels[0].showSubjectLabels, value);
+    assert.equal(result.warnings.some(w=>w.includes('.showSubjectLabels:')), value !== undefined && typeof value !== 'boolean');
+  }
+});
+
+test('device layout moves affect every path without changing states, subjects, or other declarations', () => {
+  const spec = fixture(), original = JSON.stringify(spec), d = diagram(spec);
+  const result = C.planHomemapLayoutPosition(JSON.stringify(spec, null, 2), spec, 0, 'home', 'device', 'cam', {x:75,y:85});
+  assert.ok(!result.error, result.error);
+  const next = JSON.parse(result.text), expected = JSON.parse(original);
+  Object.assign(diagram(expected).panels[0].devices[0], {x:75,y:85});
+  assert.deepEqual(next, expected);
+  assert.equal(JSON.stringify(spec), original);
+  for (const [pathId, index] of [['happy', 2], ['offline', 5]]){
+    const before = C.builderHomemapStep(d, index, 'home', pathId);
+    const after = C.builderHomemapStep(diagram(next), index, 'home', pathId);
+    assert.deepEqual(plain(after.state), plain(before.state));
+    assert.equal(after.model.devices[0].x, 75); assert.equal(after.model.devices[0].y, 85);
+    if (after.model.signals.length) assert.equal(after.model.signals[0].fromXY.x, 75);
+  }
+});
+
+test('room layout moves preserve dimensions, occupants, and original indices through invalid rooms', () => {
+  const spec = fixture(), panel = diagram(spec).panels[0];
+  panel.rooms.unshift(null, {label:'Invalid',x:-1,y:0,w:30,h:30});
+  const before = JSON.stringify(spec);
+  const result = C.planHomemapLayoutPosition(before, spec, 0, 'home', 'room', 2, {x:20,y:0});
+  assert.ok(!result.error, result.error);
+  const next = JSON.parse(result.text), expected = JSON.parse(before);
+  Object.assign(diagram(expected).panels[0].rooms[2], {x:20,y:0});
+  assert.deepEqual(next, expected);
+  assert.equal(JSON.stringify(spec), before);
+  const host = {querySelector:()=>null}; C.renderPanelBody(host, panel, {}, 'pastel');
+  assert.match(host.innerHTML, /data-home-room="2"/);
+  assert.doesNotMatch(host.innerHTML, /data-home-room="[01]"/);
+});
+
+test('layout moves reject invalid identities and coordinates and support nested pages and special IDs', () => {
+  const spec = fixture(), source = JSON.stringify(spec);
+  for (const [kind, key, point] of [['device','missing',{x:1,y:1}], ['subject','visitor',{x:1,y:1}],
+    ['room',-1,{x:1,y:1}], ['room','0',{x:1,y:1}], ['room',0,{x:320,y:180}],
+    ['device','cam',{x:321,y:1}], ['device','cam',{x:-1,y:1}], ['device','cam',{x:0,y:181}],
+    ['device','cam',{x:Infinity,y:1}], ['device','cam',{x:'20',y:1}], ['device','cam',null]])
+    assert.ok(C.planHomemapLayoutPosition(source, spec, 0, 'home', kind, key, point).error);
+  assert.ok(C.planHomemapLayoutPosition(source, spec, 0, 'absent', 'device', 'cam', {x:1,y:1}).error);
+  assert.equal(JSON.stringify(spec), source);
+  const panel = diagram(spec).panels[0]; panel.id = '__proto__'; panel.devices[0].id = 'constructor';
+  spec.page.blocks = [{tabs:[{label:'Map',sections:spec.page.sections}]}]; delete spec.page.sections;
+  const moved = C.planHomemapLayoutPosition(JSON.stringify(spec), spec, 0, '__proto__', 'device', 'constructor', {x:320,y:180});
+  assert.ok(!moved.error, moved.error);
+  const device = JSON.parse(moved.text).page.blocks[0].tabs[0].sections[0].diagram.panels[0].devices[0];
+  assert.equal(device.x, 320); assert.equal(device.y, 180);
 });
 test('room geometry is bounded and labels are escaped before SVG rendering', () => {
   const panel = diagram(fixture()).panels[0], warnings = [];

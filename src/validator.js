@@ -536,6 +536,8 @@ function homemapRooms(panel, path, warnings){
 
 function homemapDeclarationWarnings(panel, path, warnings){
   homemapRooms(panel, path, warnings);
+  if (panel.showSubjectLabels !== undefined && typeof panel.showSubjectLabels !== 'boolean')
+    warnings.push(path + '.showSubjectLabels: expected a boolean — subject labels stay hidden');
   var devices = Object.create(null), seen = Object.create(null);
   if (!(Array.isArray(panel.devices) && panel.devices.length))
     warnings.push(path + '.devices: homemap needs a devices array — rendering a placeholder');

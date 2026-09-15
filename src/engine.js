@@ -3419,7 +3419,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       s += '<rect class="hmoutline" x="' + o.x + '" y="' + o.y + '" width="' + o.w + '" height="' + o.h + '" rx="9"/>';
       homemapRoomModel(panel, hm).forEach(function(space){
         var room = space.room;
-        s += '<g class="hmspace hm-room-' + space.tone + '">';
+        s += '<g class="hmspace hm-room-' + space.tone + '" data-home-room="' + panel.rooms.indexOf(room) + '">';
         s += '<rect class="hmroom" x="' + room.x + '" y="' + room.y + '" width="' + room.w + '" height="' + room.h + '" rx="2"/>' +
           '<path class="hmroomwall" d="M' + (room.x + 2) + ' ' + (room.y + room.h - 2) + ' V' + (room.y + 2) + ' H' + (room.x + room.w - 2) + '"/>' +
           '<text class="hmroomlabel" x="' + (room.x + 6) + '" y="' + (room.y + 11) + '">' + esc(room.label || '') + '</text></g>';
@@ -3486,28 +3486,26 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
             (d.x - 6) + '" y="' + (d.y - 6) + '" width="12" height="12"/>';
         }
         var labelY = d.y > 139 ? d.y - 25 : d.y + 20;
-        var labelX = clamp(d.x, 28, 292), statusW = d.state.length * 4.3 + 10;
+        var labelX = clamp(d.x, 28, 292);
         s += '<text class="hmlbl" x="' + labelX + '" y="' + labelY +
-          '" text-anchor="middle">' + esc(d.label) + '</text>';
-        s += '<rect class="hmstatus-bg" x="' + (labelX - statusW / 2) + '" y="' + (labelY + 3) +
-          '" width="' + statusW + '" height="11" rx="5.5"/>';
-        s += '<text class="hmstatus" x="' + labelX + '" y="' + (labelY + 11) +
-          '" text-anchor="middle">' + esc(d.state) + '</text></g>';
+          '" text-anchor="middle">' + esc(d.label) + '</text></g>';
       });
       hm.subjects.forEach(function(sub){
         if (sub.hidden) return;
         var prev = hmSubjPrev[sub.id];
         s += '<g class="hmsubject" data-subject="' + esc(sub.id) + '"' +
           ((transient && hmMoved[sub.id]) ? ' style="transform:translate(' + (prev.x - sub.x) +
-            'px,' + (prev.y - sub.y) + 'px)"' : '') + '>';
+            'px,' + (prev.y - sub.y) + 'px)"' : '') + '><title>' + esc(sub.label) + '</title>';
         s += '<ellipse class="hmactor-shadow" cx="' + sub.x + '" cy="' + (sub.y + 9) + '" rx="7" ry="2.2"/>';
         s += '<circle class="hmsubjectdot" cx="' + sub.x + '" cy="' + sub.y + '" r="7"/>';
         if (sub.icon) s += '<use class="hmactor-icon" href="#i-' + esc(sub.icon) + '" x="' +
           (sub.x - 5) + '" y="' + (sub.y - 5) + '" width="10" height="10"/>';
         else s += '<circle class="hmactor-icon" cx="' + sub.x + '" cy="' + (sub.y - 2.2) + '" r="1.8"/>' +
           '<path class="hmactor-icon" d="M' + (sub.x - 3.4) + ' ' + (sub.y + 4) + ' v-1 a3.4 3.4 0 0 1 6.8 0 v1 Z"/>';
-        s += '<text class="hmlbl hmactor-label" x="' + clamp(sub.x, 24, 296) + '" y="' + (sub.y > 146 ? sub.y - 12 : sub.y + 19) +
-          '" text-anchor="middle">' + esc(sub.label) + '</text></g>';
+        if (panel.showSubjectLabels === true)
+          s += '<text class="hmlbl hmactor-label" x="' + clamp(sub.x, 24, 296) + '" y="' + (sub.y > 146 ? sub.y - 12 : sub.y + 19) +
+            '" text-anchor="middle">' + esc(sub.label) + '</text>';
+        s += '</g>';
       });
       if (!hm.devices.length) s += '<text class="hmlbl" x="160" y="94" text-anchor="middle">No devices configured</text>';
       if (transient) hmSignals.forEach(function(sig, i){

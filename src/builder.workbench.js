@@ -2252,6 +2252,31 @@ function builderHomemapStep(d, stepIndex, panelId, pathId){
     model:homemapModel(panel, state), before:homemapModel(panel, localIndex ? states[localIndex - 1] : initial)};
 }
 
+/* Devices and room rectangles belong to the shared layout. Moving them never
+   writes a step patch or moves a room's occupants. */
+function planHomemapLayoutPosition(text, raw, sectionIdx, panelId, kind, key, point){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var panels = got.d.panels || [], pi = panels.findIndex(function(p){ return p && p.id === panelId && p.type === 'homemap'; });
+  if (pi < 0) return {error:'Homemap not found — reselect and try again.'};
+  var panel = panels[pi], index = -1, item, list;
+  if (kind === 'device'){
+    list = 'devices';
+    if (homemapModel(panel).devices.some(function(d){ return d.id === key; }))
+      index = panel.devices.findIndex(function(d){ return d && d.id === key; });
+  } else if (kind === 'room'){
+    list = 'rooms';
+    if (Number.isInteger(key) && Array.isArray(panel.rooms) && homemapRooms(panel).indexOf(panel.rooms[key]) >= 0) index = key;
+  }
+  if (index < 0) return {error:'Choose an existing device or room.'};
+  item = panel[list][index];
+  var maxX = 320 - (kind === 'room' ? item.w : 0), maxY = 180 - (kind === 'room' ? item.h : 0);
+  if (!homemapSubjectPosition(point) || point.x < 0 || point.y < 0 || point.x > maxX || point.y > maxY)
+    return {error:'Keep the whole item inside the 320×180 map.'};
+  return planSetFields(text, raw, got.path.concat(['panels', pi, list, index]),
+    [['x', JSON.stringify(point.x)], ['y', JSON.stringify(point.y)]]);
+}
+
 function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, value){
   var got = builderStepAt(raw, sectionIdx, stepIdx);
   if (!got) return {error:'Step not found — reselect and try again.'};
@@ -3978,10 +4003,11 @@ function initWorkbenchBuilder(opts){
     var snapshot = builderHomemapStep(diagram, target.index, panel.id, target.pathId || (sp && sp.path()));
     if (snapshot.error){ box.textContent = snapshot.error; return box; }
     var indexedText = src.value, own = function(k){ return Object.prototype.hasOwnProperty.call(snapshot.patch, k); };
-    function commit(key, value){
+    function commit(key, value, layoutKind){
       if (src.value !== indexedText){ formError('The source changed. Reselect this step before editing its map.'); return false; }
       if (addToStep){ formError('Finish ADD TO STEP before editing the map.'); return false; }
       return commitCascade(function(raw){
+        if (layoutKind) return planHomemapLayoutPosition(src.value, raw, target.section, panel.id, layoutKind, key, value);
         return planStepHomemapField(src.value, raw, target.section, target.index, panel.id, key, value);
       }, {after:function(){ renderInspector(); }});
     }
@@ -3995,7 +4021,7 @@ function initWorkbenchBuilder(opts){
       pairs.forEach(function(pair){ var o = document.createElement('option'); o.value = pair[0]; o.textContent = pair[1]; select.appendChild(o); });
       select.value = value; select.addEventListener('change', function(){ action(select.value); }); return select;
     }
-    note('Device states and positions carry forward. Inherit removes only this step’s change. Signals last for this step only.');
+    note('Device states and subject positions carry forward. Inherit removes only this step’s change. Signals last for this step only.');
     var body = document.createElement('div'); body.className = 'home-edit-body'; box.appendChild(body);
     var map = document.createElement('div'); map.className = 'home-edit-map sk-daylight'; map.tabIndex = 0;
     map.setAttribute('aria-label', 'Home step placement map'); body.appendChild(map);
@@ -4010,7 +4036,8 @@ function initWorkbenchBuilder(opts){
       fields.appendChild(frow(d.label, ctl));
     });
     var armedSubject = null;
-    var placementNote = note('Click a device on this map to edit its state.', fields);
+    var placementHint = 'Drag devices or room borders/labels to change the layout for all steps. Rooms move independently of their contents. Click a device to edit its state.';
+    var placementNote = note(placementHint, fields);
     snapshot.model.subjects.forEach(function(sub, i){
       var group = document.createElement('div'); group.className = 'home-subject'; fields.appendChild(group);
       var before = snapshot.before.subjects[i];
@@ -4034,7 +4061,7 @@ function initWorkbenchBuilder(opts){
       });
       place.setAttribute('aria-pressed', 'false'); subjectControls[sub.id] = place; group.appendChild(place);
     });
-    if (snapshot.model.subjects.length) placementNote.textContent = 'Drag a person, or choose Place and tap this map. Coordinates also work with a keyboard.';
+    if (snapshot.model.subjects.length) placementNote.textContent = 'Drag a person, or choose Place and tap this map, to move them at this step. ' + placementHint;
     function eventPoint(ev){
       var svg = map.querySelector('svg'), matrix = svg && svg.getScreenCTM();
       if (!matrix) return null;
@@ -4042,32 +4069,59 @@ function initWorkbenchBuilder(opts){
       return {x:Math.round(Math.max(0, Math.min(320, p.x))), y:Math.round(Math.max(0, Math.min(180, p.y)))};
     }
     var moving = null, swallowClick = false;
+    function previewMove(move){
+      var previewPanel = panel, state = snapshot.state;
+      if (move && move.kind === 'subject'){
+        state = Object.assign(Object.create(null), state); state[move.key] = move.point;
+      } else if (move){
+        previewPanel = Object.assign({}, panel);
+        var list = move.kind === 'device' ? 'devices' : 'rooms';
+        previewPanel[list] = panel[list].map(function(item, i){
+          return i === move.index ? Object.assign({}, item, move.point) : item;
+        });
+      }
+      renderPanelBody(map, previewPanel, state, 'daylight', [], snapshot.position, false);
+    }
     function cancelMove(){
-      if (moving){ moving.el.style.transform = ''; moving.el.style.transition = ''; moving = null; }
+      if (!moving) return;
+      var pointer = moving.pointer; moving = null;
+      map.classList.remove('moving'); previewMove(null);
+      if (map.hasPointerCapture(pointer)) map.releasePointerCapture(pointer);
     }
     map.addEventListener('pointerdown', function(ev){
       if (ev.button !== 0 || armedSubject !== null) return;
-      var el = ev.target.closest('[data-subject]');
+      var el = ev.target.closest('[data-subject], [data-device], [data-home-room]');
       if (!el) return;
-      var sub = snapshot.model.subjects.find(function(s){ return s.id === el.getAttribute('data-subject'); });
-      var at = eventPoint(ev); if (!sub || !at) return;
-      ev.preventDefault(); map.focus(); map.setPointerCapture(ev.pointerId);
-      moving = {el:el, sub:sub, start:at, point:{x:sub.x, y:sub.y}, pointer:ev.pointerId, changed:false};
-      el.style.transition = 'none';
+      var kind, key, item, index;
+      if (el.hasAttribute('data-subject')){
+        kind = 'subject'; key = el.getAttribute('data-subject');
+        item = snapshot.model.subjects.find(function(s){ return s.id === key; });
+      } else if (el.hasAttribute('data-device')){
+        kind = 'device'; key = el.getAttribute('data-device');
+        item = snapshot.model.devices.find(function(d){ return d.id === key; });
+        index = panel.devices.findIndex(function(d){ return d && d.id === key; });
+      } else {
+        kind = 'room'; key = index = Number(el.getAttribute('data-home-room'));
+        item = panel.rooms[index];
+      }
+      var at = eventPoint(ev); if (!item || !at) return;
+      ev.preventDefault(); map.focus({preventScroll:true}); map.setPointerCapture(ev.pointerId);
+      moving = {kind:kind, key:key, index:index, item:item, start:at, point:{x:item.x, y:item.y}, pointer:ev.pointerId, changed:false};
+      map.classList.add('moving');
     });
     map.addEventListener('pointermove', function(ev){
       if (!moving || ev.pointerId !== moving.pointer) return;
       var at = eventPoint(ev); if (!at) return;
-      moving.point = {x:Math.round(Math.max(0, Math.min(320, moving.sub.x + at.x - moving.start.x))),
-        y:Math.round(Math.max(0, Math.min(180, moving.sub.y + at.y - moving.start.y)))};
-      moving.changed = moving.point.x !== moving.sub.x || moving.point.y !== moving.sub.y;
-      moving.el.style.transform = 'translate(' + (moving.point.x - moving.sub.x) + 'px,' + (moving.point.y - moving.sub.y) + 'px)';
+      var maxX = 320 - (moving.kind === 'room' ? moving.item.w : 0), maxY = 180 - (moving.kind === 'room' ? moving.item.h : 0);
+      moving.point = {x:Math.max(0, Math.min(maxX, Math.round(moving.item.x + at.x - moving.start.x))),
+        y:Math.max(0, Math.min(maxY, Math.round(moving.item.y + at.y - moving.start.y)))};
+      moving.changed = moving.point.x !== moving.item.x || moving.point.y !== moving.item.y;
+      previewMove(moving);
     });
     map.addEventListener('pointerup', function(ev){
       if (!moving || ev.pointerId !== moving.pointer) return;
       var done = moving; cancelMove();
-      if (map.hasPointerCapture(ev.pointerId)) map.releasePointerCapture(ev.pointerId);
-      if (done.changed){ swallowClick = true; commit(done.sub.id, done.point); }
+      if (done.changed){ swallowClick = true; commit(done.key, done.point, done.kind === 'subject' ? null : done.kind); }
     });
     map.addEventListener('pointercancel', cancelMove);
     map.addEventListener('lostpointercapture', cancelMove);
@@ -4621,6 +4675,9 @@ function initWorkbenchBuilder(opts){
         {after:function(){ renderInspector(); }});
     })));
     if (val.type === 'homemap'){
+      rows.push(frow('Show subject labels', selectControl(['Hidden (default)', 'Shown'], val.showSubjectLabels === true ? 'Shown' : 'Hidden (default)', function(v){
+        return commitSimple('showSubjectLabels', v === 'Shown' ? 'true' : null);
+      })));
       var editStep = document.createElement('button'); editStep.type = 'button'; editStep.className = 'bbtn';
       editStep.textContent = 'Edit home at current step';
       var sp = stepperFor(t.section); editStep.disabled = !sp;
@@ -5132,7 +5189,7 @@ function initWorkbenchBuilder(opts){
        preview. Play/Pause are excluded so selecting an inspector cannot
        immediately stop a user-started animation. */
     var transport = ev.target.closest && ev.target.closest('.tbtn');
-    var homeMarker = ev.target.closest && ev.target.closest('.pt-homemap [data-device], .pt-homemap [data-subject]');
+    var homeMarker = ev.target.closest && ev.target.closest('.pt-homemap [data-device], .pt-homemap [data-subject], .pt-homemap [data-home-room]');
     if ((homeMarker && !addToStep && !connect) || (transport && /^(Previous|Next) step$/.test(transport.getAttribute('aria-label') || '') &&
         currentTarget && currentTarget.kind === 'step')){
       var activeSection = (homeMarker || transport).closest('.doc-sec');

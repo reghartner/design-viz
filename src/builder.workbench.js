@@ -3903,6 +3903,29 @@ function initWorkbenchBuilder(opts){
   }
 
   /* ---- per-kind form builders; each returns an array of DOM rows ---- */
+  function catalogControls(val){
+    var registry=opts.catalog && opts.catalog();
+    var rows=[];
+    if (registry && typeof FlowCanon!=='undefined'){
+      var bound=val.binding || {}, service=registry.services.find(function(s){return s.entityRef===bound.entityRef;});
+      function set(ref,api,operation){
+        try { return commitSimple('binding',ref ? JSON.stringify(FlowCanon.binding(registry,ref,api,operation)) : null); }
+        catch(ex){formError(ex.message);return false;}
+      }
+      var picker=selectControl(registry.services.map(function(s){return s.entityRef;}),bound.entityRef,function(ref){
+        var ok=set(ref); if(ok) refreshFormSoon(); return ok;
+      },true);
+      Array.prototype.forEach.call(picker.options,function(option){var s=registry.services.find(function(s){return s.entityRef===option.value;});if(s) option.textContent=s.title+' · '+s.entityRef;});
+      rows.push(frow('Company service',picker));
+      if(service){
+        rows.push(frow('Service API',selectControl((service.apis || []).map(function(a){return a.entityRef;}),bound.api && bound.api.entityRef,function(api){var ok=set(service.entityRef,api);if(ok)refreshFormSoon();return ok;},true)));
+        var api=(service.apis || []).find(function(a){return bound.api && a.entityRef===bound.api.entityRef;});
+        if(api) rows.push(frow('API operation',selectControl((api.operations || []).map(function(o){return o.operationId;}),bound.api.operationId,function(op){return set(service.entityRef,api.entityRef,op);},true)));
+      }
+    }
+    if(val.binding || !registry) rows.push(frow('Service binding JSON',jsonFieldControl('binding',val.binding,'json')));
+    return rows;
+  }
   function nodeForm(val, ctx){
     var t = currentTarget;
     ensureGroupDatalist([ctx.diagram]);
@@ -3933,7 +3956,7 @@ function initWorkbenchBuilder(opts){
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
       frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); }))
-    ];
+    ].concat(catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
   }
   function edgeForm(val, ctx){
     var t = currentTarget;
@@ -3996,6 +4019,11 @@ function initWorkbenchBuilder(opts){
     var rows = [
       frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
     ];
+    var evidence=document.createElement('details');
+    var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
+    evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
+    evidence.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'json')));
+    rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){
       if (p && p.type === 'homemap') rows.push(homemapStepControl(ctx.diagram, p, t));
     });
@@ -6761,4 +6789,9 @@ function initWorkbenchBuilder(opts){
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);
   applyRowGrabs(); /* the boot render happened before this wiring ran */
+  return {loadSpec:function(raw){
+    var next=normalize(raw), findings=validate(next);
+    if(findings.errors.length) throw new Error(findings.errors.join('\n'));
+    return applyPlan({text:JSON.stringify(raw,null,2)});
+  }};
 }

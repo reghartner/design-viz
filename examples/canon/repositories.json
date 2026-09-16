@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "repositories": {
+    "https://github.com/fictional-home/doorbell-services": {
+      "head": "2222222222222222222222222222222222222222",
+      "revisions": {
+        "1111111111111111111111111111111111111111": {
+          "src/porch-hub.js": "// Fictional source fixture; never executed.\n// flow:receiveButton:start\nfunction receiveButton(event) {\n  return publishLocalEvent(button);\n}\n// flow:receiveButton:end\n",
+          "src/recording-service.js": "// Fictional source fixture; never executed.\n// flow:createRecording:start\nfunction createRecording(event) {\n  return storeRecording(event, { timeoutMs: 500 });\n}\n// flow:createRecording:end\n",
+          "src/notification-service.js": "// Fictional source fixture; never executed.\n// flow:notifyResident:start\nfunction notifyResident(event) {\n  return sendPush(resident, recording);\n}\n// flow:notifyResident:end\n"
+        },
+        "2222222222222222222222222222222222222222": {
+          "src/porch-hub.js": "// Fictional source fixture; never executed.\n// flow:receiveButton:start\nfunction receiveButton(event) {\n  return publishLocalEvent(button);\n}\n// flow:receiveButton:end\n",
+          "src/recording-service.js": "// Fictional source fixture; never executed.\n// flow:createRecording:start\nfunction createRecording(event) {\n  return storeRecording(event, { timeoutMs: 50 });\n}\n// flow:createRecording:end\n",
+          "src/notification-service.js": "// Fictional source fixture; never executed.\n// flow:notifyResident:start\nfunction notifyResident(event) {\n  return sendPush(resident, recording);\n}\n// flow:notifyResident:end\n"
+        }
+      }
+    }
+  }
+}

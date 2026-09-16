@@ -68,7 +68,7 @@ def main() -> int:
         "STYLE_CORE": core_css,
         "ICONS": icons,
         "DEMO_SPEC": read("flowview.demo.json").strip(),
-        "JS": js_bundle("validator.js", "engine.js", "boot.flowview.js"),
+        "JS": js_bundle("canon.js", "validator.js", "engine.js", "boot.flowview.js"),
     })
     (ROOT / "template" / "flowview.html").write_text(flowview)
 
@@ -76,7 +76,7 @@ def main() -> int:
         "STYLE_PAGE": read("style.workbench.css").rstrip(),
         "STYLE_CORE": core_css,
         "ICONS": icons,
-        "JS": js_bundle("validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "boot.workbench.js"),
+        "JS": js_bundle("canon.js", "validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "canon.workbench.js", "boot.workbench.js"),
         "STARTERS": json.dumps([
             {"name": name, "desc": desc, "spec": json.loads(read(source))}
             for name, desc, source in STARTERS

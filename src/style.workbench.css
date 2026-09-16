@@ -34,6 +34,10 @@ h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 /* Keep one editor tool visible; resizing changes space, never content. */
 .workwrap{max-width:1720px;margin:0 auto;padding:0 22px;}
 .workmain{min-width:0;}
+.canon-tools{font-size:12px;max-width:100%;}
+.canon-tools summary{cursor:pointer;}
+.canon-tools textarea{display:block;box-sizing:border-box;width:min(600px,100%);min-height:90px;font:11px monospace;}
+.canon-tools button{margin:6px 8px 6px 0;}
 .workspace-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:1676px;margin:18px auto 0;padding:8px 22px;background:var(--bg);}
 .workspace-hint{font-size:11px;color:var(--sub);}
 .workspace-divider{display:none;touch-action:none;user-select:none;position:relative;cursor:col-resize;}

@@ -464,6 +464,9 @@ go(false);
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
 var workspace = initWorkbenchWorkspace();
-initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }, workspace:workspace,
+var canonContext;
+var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }, workspace:workspace,
+  catalog:function(){return canonContext && canonContext.catalog;},
   starters: STARTERS, renderedText: function(){ return lastRenderedText; },
   ctl: function(){ return lastCtl; }});
+canonContext=initCanonWorkbench({src:src,loadSpec:function(raw){return workbenchBuilder.loadSpec(raw);}});

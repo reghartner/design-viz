@@ -1283,3 +1283,9 @@ contract stays the authority; a recipe shows the working subset for one task.
 (In real output, the second tab's `diagram` is a full literal copy of the first
 diagram object with `"view": "step"` added — JSON has no references; the
 placeholder line above is illustrative only and must not appear in output.)
+
+## Connected company evidence
+
+Optional `page.canon`, node `binding`, and node/step `codeRefs` are documented in
+[the canonical flow contract](../docs/canon.md). These preserve HLD provenance
+and carry portable snapshots, not runtime API calls or an assertion of correctness.

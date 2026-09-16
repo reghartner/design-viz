@@ -253,6 +253,17 @@ review. The fictional `examples/canon/` catalog is for demonstrations only. For 
 central repository, drift scanner, review dispositions and company adapter, use
 `docs/canon.md`. Plain PR closure never accepts a source revision; a regression
 keeps the expected story unchanged and links its issue.
+For approved reference traces and incident alternates, use
+`cookbook/canonical-incidents.md` and `tools/canon/trace-cli.mjs`. Bind exact
+service/operation names with `traceMatch`; disambiguate parallel/repeated calls
+with explicit selectors, never timestamp guesses. Budgets are authored. Missing
+spans/metrics mean unknown; queue pressure and failed delivery require explicit
+evidence. Generate independent IDs from the first differing beat and preserve
+only the unchanged prefix. Do not copy happy-path physical/phone outcomes after
+the fork without evidence and review. Keep the canonical spec unchanged until
+an explicit spec review accepts the overlay. Company integration handoff:
+`docs/backstage-integration.md`.
+
 
 **Choose the main view.** A `homemap` or other panel can be the centerpiece
 with `diagram.primaryPanel: "<panel-id>"`. Existing homemaps support live

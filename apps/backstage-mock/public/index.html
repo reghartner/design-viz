@@ -4,7 +4,17 @@
 <main><div class="intro"><div><p class="eyebrow">CANONICAL FLOWS</p><h1>Your systems, their stories, the evidence.</h1><p>Review code changes against the flows people depend on.</p></div><button id="scan">Scan for code drift</button></div>
 <p id="status" role="status"></p><section id="entity" hidden></section>
 <nav id="diagrams" aria-label="Diagrams"></nav>
+<section id="incident-tools">
+<div class="stage-head"><div><p class="eyebrow">TRACE EVIDENCE</p><h2>Turn an incident into an alternate path</h2></div><button id="canonical" class="quiet">Show canonical flow</button></div>
+<p>Approve a clean reference mapping, then compare a trace. Missing telemetry stays unknown. After a divergence, service calls do not automatically prove a door opened or a phone displayed an alert.</p>
+<div class="trace-controls"><label>Diagram section <select id="trace-section"></select></label><label>Fictional trace <select id="trace-fixture"><option value="happy">Happy reference</option><option value="service-error">Recording service · HTTP 500</option><option value="database-slow">Database latency</option><option value="backpressure">Queue buildup + backpressure</option><option value="partial">Missing database span</option><option value="dropped">Explicit delivery failure</option></select></label><button id="load-trace" class="quiet">Load example</button><label>Import trace JSON <input id="trace-file" type="file" accept=".json,application/json"></label></div>
+<details id="trace-input"><summary>Paste or inspect trace JSON</summary><textarea id="trace-json" aria-label="Trace JSON" spellcheck="false"></textarea></details>
+<div class="actions"><button id="preview-reference" class="quiet">Preview reference mapping</button><button id="compare-trace">Compare incident</button><span id="reference-state"></span></div>
+<div id="trace-result" role="status"></div>
+<div id="reference-approval" hidden><label>Reference review reason <input id="reference-reason" placeholder="Why this is a suitable happy reference"></label><button id="approve-reference">Approve reference mapping</button></div>
+<div id="incident-actions" class="actions" hidden><a id="download-incident" class="button" download="incident.flowspec.json">Download overlay JSON</a><button id="propose-incident" class="quiet">Propose incident as alternate</button></div>
+</section>
 <section class="stage"><div class="stage-head"><h2 id="title">Loading repository…</h2><a id="edit" class="button" target="_blank" rel="noopener">Open in builder</a></div><iframe id="viewer" title="Interactive canonical flow"></iframe></section>
-<section id="incident-tools" hidden></section>
+
 <section><div class="stage-head"><h2>Code drift reviews</h2><button id="refresh" class="quiet">Refresh reviews</button></div><p>These are local review records standing in for GitHub PRs. Decisions and proposed specs persist across restarts.</p><div id="reviews"></div></section>
 </main></body></html>

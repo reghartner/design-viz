@@ -94,6 +94,7 @@ export function decide(specs,state,id,{disposition,reason,ticket,actor='local re
     const currentSpec=byId.get(review.diagramId);
     if(!currentSpec || digest(currentSpec)!==review.baseRevision)throw new Error('Spec changed after proposal; rebase the proposal.');
     next.specs[review.diagramId]=C.clone(review.proposedSpec);review.status='updated';
+    if(review.supersedes && next.reviews[review.supersedes]){next.reviews[review.supersedes].status='superseded';next.reviews[review.supersedes].resolvedBy=id;}
     if(review.resolves && next.reviews[review.resolves]){
       const prior=next.reviews[review.resolves];
       if(!prior.impacts.some(i=>i.diagramId===review.diagramId))throw new Error('Spec proposal is unrelated to the drift review.');
@@ -112,14 +113,19 @@ export function propose(specs,state,{id,spec,baseRevision,review:resolves},now=n
   if(!current || digest(current)!==baseRevision)throw new Error('Spec changed; reload the current revision before proposing.');
   const errors=C.validateSpec(spec).errors;if(errors.length)throw new Error(errors.join('\n'));
   if(spec.page?.canon?.id!==id)throw new Error('A proposal cannot change the diagram identity.');
-  const next=C.clone(state),key=digest([id,baseRevision,spec,resolves]).slice(0,20);
-  next.reviews[key]={id:key,type:'spec',status:'open',createdAt:now,diagramId:id,baseRevision,proposedSpec:C.clone(spec),resolves,impacts:[]};
+  const prior=state.reviews[resolves];let supersedes;
+  if(prior?.type==='spec'){
+    if(prior.diagramId!==id || prior.baseRevision!==baseRevision || prior.status!=='open')throw new Error('Proposal is stale or belongs to a different diagram.');
+    supersedes=prior.id;resolves=prior.resolves;
+  }
+  const next=C.clone(state),key=digest([id,baseRevision,spec,resolves,supersedes]).slice(0,20);
+  next.reviews[key]={id:key,type:'spec',status:'open',createdAt:now,diagramId:id,baseRevision,proposedSpec:C.clone(spec),resolves,supersedes,impacts:[]};
   return {id:key,state:next};
 }
 
 export function reportMarkdown(reviews){
   return '# Flowview drift report\n\n'+reviews.map(r=>{
     const diff=r.before && r.after ? r.before.text.split('\n').map(x=>'- '+x).concat(r.after.text.split('\n').map(x=>'+ '+x)).join('\n') : r.error || '';
-    return '## '+r.id+' · '+r.status+'\n\n'+r.reference?.path+'\n\n'+r.impacts.map(i=>'- '+i.diagramId+' / '+i.sectionId+' / '+i.targetId+': '+i.description).join('\n')+'\n\n```diff\n'+diff.replace(/```/g,'` ` `')+'\n```\n';
+    return '## '+r.id+' · '+r.status+'\n\n'+(r.reference?.path || 'Spec proposal: '+r.diagramId)+'\n\n'+r.impacts.map(i=>'- '+i.diagramId+' / '+i.sectionId+' / '+i.targetId+': '+i.description).join('\n')+'\n\n```diff\n'+diff.replace(/```/g,'` ` `')+'\n```\n';
   }).join('\n');
 }

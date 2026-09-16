@@ -1,0 +1,30 @@
+{
+  "sourceUrl": "https://example.test/honeycomb/dropped",
+  "spans": [
+    {
+      "trace.trace_id": "demo-dropped",
+      "trace.span_id": "button",
+      "trace.parent_id": "",
+      "service.name": "porch-hub",
+      "name": "POST /button",
+      "startMs": 0,
+      "duration_ms": 350,
+      "error": false,
+      "deployment.environment.name": "demo",
+      "service.version": "1.0.0"
+    },
+    {
+      "trace.trace_id": "demo-dropped",
+      "trace.span_id": "record",
+      "trace.parent_id": "button",
+      "service.name": "recording-service",
+      "name": "POST /recordings",
+      "startMs": 10,
+      "duration_ms": 240,
+      "error": true,
+      "deployment.environment.name": "demo",
+      "service.version": "1.0.0",
+      "flow.delivery_failed": true
+    }
+  ]
+}

@@ -7,6 +7,14 @@ in colored bounding boxes, tab groups, and animated flow diagrams that each offe
 of the same time-aware data — an ambient always-animating view and a guided step-through
 (click-through) view.
 
+## Connected company flows
+
+Run `node apps/backstage-mock/server.mjs` and open port 8766 for a fictional central
+repository with catalog-seeded editing, code drift reviews, approved reference
+traces, and incident alternates. No company sandbox is needed. See the
+[canonical flow guide](docs/canon.md), [doorbell recipe](cookbook/canonical-incidents.md),
+and [Backstage/company handoff](docs/backstage-integration.md).
+
 ## The pipeline
 
 For agents, start with the [HLD-to-page skill](.claude/skills/hld-to-page/SKILL.md)

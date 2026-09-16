@@ -4576,3 +4576,8 @@ test('homemap subject validator: initial and step patches warn; valid subjects a
     {walker: null}, JSON.parse('{"__proto__":{"x":50,"y":80}}')
   ])), {errors: [], warnings: []});
 });
+test('coin lint compares steps within each path, not mutually exclusive alternate steps',()=>{
+  const d={nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{id:'base',edge:'a->b'},{id:'incident',edge:'a->b'},{id:'repeat',edge:'a->b'}],paths:[{id:'happy',steps:['base']},{id:'incident',steps:['incident']}]};
+  assert.equal(C.lintPage(C.normalize(d)).filter(w=>w.includes('shares first edge')).length,0);
+  d.paths[1].steps.push('repeat');assert.equal(C.lintPage(C.normalize(d)).filter(w=>w.includes('shares first edge')).length,1);
+});

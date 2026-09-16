@@ -4956,6 +4956,28 @@ body.sk-blueprint{--home-card-inset:24px;}
     }
   }
 }
+
+/* Runtime evidence remains legible without motion and in Home view. */
+.runtime-status{display:flex;flex-basis:100%;flex-wrap:wrap;gap:7px;margin-top:8px}
+.runtime-status[hidden]{display:none}
+.runtime-chip{border:1px solid currentColor;border-radius:8px;padding:5px 9px;font:600 12px/1.5 monospace;color:#a45310;background:#fff6e9}
+.runtime-service-error,.runtime-delivery-failed{color:#b52f47;background:#fff0f3}
+.runtime-unknown,.runtime-ambiguous{color:#596777;background:#f0f4f8}
+.runtime-node-badge{pointer-events:none;color:#d97706}
+.runtime-node-badge.runtime-service-error,.runtime-node-badge.runtime-delivery-failed{color:#dc3659}
+.runtime-node-badge.runtime-unknown,.runtime-node-badge.runtime-ambiguous{color:#718096}
+.runtime-node-badge circle{fill:currentColor;stroke:#fff;stroke-width:2;animation:runtime-pulse 1.8s ease-out infinite}
+.runtime-node-badge text{fill:#fff;font:bold 15px monospace}
+.runtime-node-badge.runtime-unknown circle,.runtime-node-badge.runtime-ambiguous circle{animation:none}
+@keyframes runtime-pulse{0%,100%{stroke-width:2}50%{stroke-width:5}}
+@media(prefers-reduced-motion:reduce){.runtime-node-badge circle{animation:none}}
+.runtime-retry text{transform-origin:0 0;animation:runtime-turn 2.5s linear infinite}
+.runtime-backpressure text{animation:runtime-pressure 1.4s ease-in-out infinite}
+.runtime-queue-buildup text{animation:runtime-stack 1.5s steps(3,end) infinite}
+@keyframes runtime-turn{to{transform:rotate(360deg)}}
+@keyframes runtime-pressure{50%{transform:translateX(-3px)}}
+@keyframes runtime-stack{0%{opacity:.35}100%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.runtime-node-badge text{animation:none}}
 </style>
 
 <svg aria-hidden="true" style="position:absolute; width:0; height:0; overflow:hidden">
@@ -5409,7 +5431,7 @@ var FlowCanon = (function(){
           kind:kind,targetId:id,description:value && (value.text || value.title) || '',reference:ref});
       }); }
       Object.keys(d.nodes || {}).forEach(function(id){add(d.nodes[id],'node',id);});
-      (Array.isArray(d.steps) ? d.steps : []).forEach(function(st,i){add(st,'step',st.id || String(i));});
+      (Array.isArray(d.steps) ? d.steps : []).forEach(function(st,i){add(st,'step',st && st.id || String(i));});
     });
     return out;
   }
@@ -5418,7 +5440,7 @@ var FlowCanon = (function(){
     if (!object(p)) return errors;
     if (p.canon!=null){
       var c=p.canon;
-      if (!object(c) || c.version!==1 || !c.id || !['design','canonical'].includes(c.kind) || !entityRef(c.owner))
+      if (!object(c) || c.version!==1 || typeof c.id!=='string' || !/^[a-z0-9][a-z0-9_.-]*$/i.test(c.id) || !['design','canonical'].includes(c.kind) || !entityRef(c.owner))
         errors.push('page.canon: expected {version:1,id,kind:"design"|"canonical",owner:<entity reference>}');
     }
     var identities=new Map();
@@ -5429,7 +5451,7 @@ var FlowCanon = (function(){
       var identity=JSON.stringify([ref.repository,ref.path,ref.revision,ref.anchor]);
       if (identities.has(ref.id) && identities.get(ref.id)!==identity) errors.push('codeRefs: '+ref.id+' identifies conflicting locations or baselines');
       identities.set(ref.id,identity);
-      if (item.kind==='step' && !sections(raw)[item.section].diagram.steps.some(function(s){return s.id===item.targetId;})) errors.push('codeRefs: referenced steps require stable IDs');
+      if (item.kind==='step' && !sections(raw)[item.section].diagram.steps.some(function(s){return s && s.id===item.targetId;})) errors.push('codeRefs: referenced steps require stable IDs');
     });
     sections(raw).forEach(function(sec){
       Object.values(sec.diagram.nodes || {}).concat(sec.diagram.steps || []).forEach(function(v){if(v && v.codeRefs!=null && !Array.isArray(v.codeRefs)) errors.push('codeRefs: expected an array');});
@@ -5437,6 +5459,38 @@ var FlowCanon = (function(){
         var node=sec.diagram.nodes[id], b=node && node.binding;
         if (b!=null && (!object(b) || !entityRef(b.entityRef))) errors.push('nodes.'+id+'.binding: expected a catalog entityRef');
         if (b && b.api && !entityRef(b.api.entityRef)) errors.push('nodes.'+id+'.binding.api: expected an API entityRef');
+      });
+    });
+    sections(raw).forEach(function(sec){
+      var d=sec.diagram, steps=Array.isArray(d.steps)?d.steps:[], ids=new Set(steps.map(function(s){return s && s.id;}));
+      if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
+      if(d.incidents!=null && (!Array.isArray(d.incidents) || d.incidents.some(function(i){return !object(i) || typeof i.pathId!=='string' || typeof i.traceId!=='string' || typeof i.firstDivergence!=='string';})))errors.push('incidents: expected comparison provenance objects');
+      var parents=new Map(steps.filter(function(s){return s && s.traceMatch;}).map(function(s){return [s.id,s.traceMatch.parentStepId];}));
+      parents.forEach(function(parent,id){var seen=new Set([id]);while(parent){if(seen.has(parent)){errors.push('traceMatch: cyclic parentStepId');break;}seen.add(parent);parent=parents.get(parent);}});
+      steps.forEach(function(st){
+        if(!st)return;
+        var m=st.traceMatch;
+        if(m!=null){
+          if(!object(m) || typeof m.serviceName!=='string' || !m.serviceName.trim() || typeof m.operation!=='string' || !m.operation.trim() || !st.id)errors.push('traceMatch: stable step ID, serviceName and operation required');
+          else {
+            if(m.panelId && !(Array.isArray(d.panels)?d.panels:[]).some(function(p){return p.id===m.panelId && p.type==='queue';}))errors.push('traceMatch.panelId: expected a declared queue panel');
+            if(m.nodeId && !Object.prototype.hasOwnProperty.call(d.nodes || {},m.nodeId))errors.push('traceMatch: unknown nodeId '+m.nodeId);
+            if(m.parentStepId && (!ids.has(m.parentStepId) || m.parentStepId===st.id))errors.push('traceMatch: unknown or self parentStepId');
+            ['maxDurationMs','maxQueueDepth'].forEach(function(k){if(m[k]!=null && (typeof m[k]!=='number' || !Number.isFinite(m[k]) || m[k]<0))errors.push('traceMatch.'+k+': nonnegative number required');});
+            if(m.occurrence!=null && (!Number.isInteger(m.occurrence) || m.occurrence<1))errors.push('traceMatch.occurrence: positive integer required');
+            if(m.repeat!=null && m.repeat!=='attempts')errors.push('traceMatch.repeat: expected attempts');
+            if(m.repeat && m.occurrence)errors.push('traceMatch: occurrence and repeat cannot be combined');
+            var allowed=['service.namespace','service.version','deployment.environment.name','deployment.environment','http.response.status_code','http.status_code','db.system','db.system.name','messaging.queue.depth','queue.depth','messaging.message.age_ms','flow.backpressure','flow.delivery_failed','retry.attempt','flow.step.id'];
+            if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !allowed.includes(k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
+          }
+        }
+        if(st.conditions!=null){
+          if(!Array.isArray(st.conditions))errors.push('conditions: expected an array');
+          else st.conditions.forEach(function(c){
+            if(!object(c) || !['service-error','delivery-failed','slow','database-slow','queue-buildup','backpressure','retry','unknown','ambiguous'].includes(c.kind) || typeof c.label!=='string')errors.push('conditions: expected a supported kind and label');
+            if(c && c.nodeId && !Object.prototype.hasOwnProperty.call(d.nodes || {},c.nodeId))errors.push('conditions: unknown nodeId');
+          });
+        }
       });
     });
     return errors;
@@ -7218,14 +7272,19 @@ function lintDiagram(d, DP, usedKinds, warnings){
         ' — expect crowding; consider fewer return edges or a second section');
   });
 
-  var firstEdgeAt = {};
-  (d.steps || []).forEach(function(st, ti){
-    var k = stepDeliveredKeys(st)[0];
-    if (!k) return;
-    if (firstEdgeAt[k] != null)
-      warnings.push(DP + '.steps[' + ti + ']: shares first edge "' + k + '" with steps[' +
-        firstEdgeAt[k] + '] — both step coins land on the same midpoint; reorder the edges list of one step');
-    else firstEdgeAt[k] = ti;
+  var reportedPairs = new Set();
+  diagramPathList(d).forEach(function(path){
+    var firstEdgeAt = new Map();
+    path.indices.forEach(function(ti){
+      var k = stepDeliveredKeys(d.steps[ti])[0];
+      if (!k) return;
+      if (firstEdgeAt.has(k)){
+        var earlier=firstEdgeAt.get(k), pair=earlier+':'+ti;
+        if(!reportedPairs.has(pair))warnings.push(DP + '.steps[' + ti + ']: shares first edge "' + k + '" with steps[' +
+          earlier + '] — both step coins land on the same midpoint; reorder the edges list of one step');
+        reportedPairs.add(pair);
+      }else firstEdgeAt.set(k,ti);
+    });
   });
 }
 
@@ -11342,6 +11401,31 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId){
   };
 }
 
+/* Runtime evidence is transient per-step state. Labels remain readable when
+   animation is reduced or the service board is hidden behind a Home view. */
+function renderRuntimeConditions(board, host, conditions){
+  conditions = Array.isArray(conditions) ? conditions : [];
+  Object.keys(board.nodeEls || {}).forEach(function(id){
+    var node=board.nodeEls[id];
+    if(node.querySelectorAll)node.querySelectorAll('.runtime-node-badge').forEach(function(e){e.remove();});
+  });
+  if(host){host.textContent='';host.hidden=!conditions.length;}
+  var symbols={'service-error':'!','delivery-failed':'×','slow':'◷','database-slow':'◷','queue-buildup':'▤','backpressure':'⇤','retry':'↻','unknown':'?','ambiguous':'?'};
+  var grouped=Object.create(null);
+  conditions.forEach(function(c){
+    if(host){var chip=document.createElement('span');chip.className='runtime-chip runtime-'+c.kind;chip.textContent=(symbols[c.kind] || '!')+' '+c.label;host.appendChild(chip);}
+    if(c.nodeId && Object.prototype.hasOwnProperty.call(board.nodeEls,c.nodeId)){if(!grouped[c.nodeId])grouped[c.nodeId]=[];grouped[c.nodeId].push(c);}
+  });
+  Object.keys(grouped).forEach(function(id){
+    var node=board.nodeEls[id],items=grouped[id],c=items[0],card=node.querySelector('.card');
+    var badge=document.createElementNS(SVGNS,'g');badge.setAttribute('class','runtime-node-badge runtime-'+c.kind);
+    badge.setAttribute('transform','translate('+(Number(card.getAttribute('width'))-12)+' '+(Number(card.getAttribute('height'))-10)+')');
+    var title=document.createElementNS(SVGNS,'title');title.textContent=items.map(function(v){return v.label;}).join('; ');badge.appendChild(title);
+    var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','11');badge.appendChild(circle);
+    var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=symbols[c.kind] || '!';badge.appendChild(text);node.appendChild(badge);
+  });
+}
+
 /* ---------------- stepper (click-through) ---------------- */
 function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
   var autoplay = d.autoplay === true && (!options || options.autoplay !== false);
@@ -11361,7 +11445,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
             packets: (st && Array.isArray(st.packets)) ? st.packets : null,
             text: (st && st.text) || '',
             link: (st && typeof st.link === 'string') ? st.link : null,
-            codeRefs:st && st.codeRefs};
+            codeRefs:st && st.codeRefs,conditions:st && st.conditions};
   }); }
   var steps = playbackSteps(d);
   var N = steps.length;
@@ -11529,6 +11613,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     applyNodeTones(board.nodeEls, nodeTonesAt(toneStates, cur, true), tonePulses);
     setFragmentStep(secBox, cur, true);
     var s = steps[cur];
+    renderRuntimeConditions(board,termbar.runtimeStatus,s.conditions);
     s.keys.forEach(function(key){
       var info = board.edgeIds[key];
       var pe = document.getElementById(info.domId);
@@ -11645,6 +11730,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     boardDiv.classList.remove('dv-step-tween');
     boardDiv.classList.remove('stepmode');
     applyNodeTones(board.nodeEls, nodeTonesAt(toneStates, 0, false), []);
+    renderRuntimeConditions(board,termbar.runtimeStatus,[]);
     bar.hidden = true;
     setFragmentStep(secBox, 0, false);
     syncToggle();
@@ -12016,6 +12102,23 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   }
 
   var d = sec.diagram;
+  if(d.referenceTrace || (Array.isArray(d.incidents) && d.incidents.length)){
+    var traceDetails=document.createElement('details');traceDetails.className='canon-evidence';
+    var traceSummary=document.createElement('summary');traceSummary.textContent='Trace evidence and comparison limits';traceDetails.appendChild(traceSummary);
+    function traceNote(text){var p=document.createElement('p');p.textContent=text;traceDetails.appendChild(p);}
+    if(d.referenceTrace && d.referenceTrace.trace){
+      traceNote('Approved reference: '+d.referenceTrace.trace.traceId+' · '+(d.referenceTrace.approval && d.referenceTrace.approval.reason || ''));
+      if(typeof FlowCanon!=='undefined' && FlowCanon.http(d.referenceTrace.trace.sourceUrl))appendCanonLinks(traceDetails,[{label:'Reference trace',url:FlowCanon.http(d.referenceTrace.trace.sourceUrl)}]);
+    }
+    (Array.isArray(d.incidents)?d.incidents:[]).forEach(function(incident){
+      if(!incident || typeof incident!=='object')return;
+      traceNote(incident.traceId+' · first difference: '+incident.firstDivergence);
+      traceNote(incident.note || 'Trace evidence is observational; missing spans do not establish an outage.');
+      (Array.isArray(incident.warnings)?incident.warnings:[]).forEach(traceNote);
+      if(Array.isArray(incident.unmatched) && incident.unmatched.length)traceNote('Unmatched spans: '+incident.unmatched.map(function(s){return s.serviceName+' / '+s.operation;}).join(', '));
+      if(typeof FlowCanon!=='undefined' && FlowCanon.http(incident.sourceUrl))appendCanonLinks(traceDetails,[{label:'Incident trace',url:FlowCanon.http(incident.sourceUrl)}]);
+    });box.appendChild(traceDetails);
+  }
   var activeDiagram = diagramForPath(d);
   var prefix = 'fs' + gi;
   var hasPanels = Array.isArray(d.panels) && d.panels.length > 0;
@@ -12115,6 +12218,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   line.appendChild(failureStatus);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
   line.appendChild(evidenceLinks);
+  var runtimeStatus=document.createElement('span');runtimeStatus.className='runtime-status';runtimeStatus.hidden=true;runtimeStatus.setAttribute('aria-label','Runtime evidence');line.appendChild(runtimeStatus);
   var transport = document.createElement('div'); transport.className = 'step-transport';
   transport.setAttribute('role','group'); transport.setAttribute('aria-label','Step playback');
   transport.appendChild(btnPrev); transport.appendChild(btnPlay); transport.appendChild(btnNext);
@@ -12141,7 +12245,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.appendChild(ol);
 
   var stepper = attachStepper(box, boardDiv, {
-    bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,
+    bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
     printSteps(next);
@@ -17213,6 +17317,7 @@ function initWorkbenchBuilder(opts){
     var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
     evidence.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'json')));
+    evidence.appendChild(frow('Runtime conditions JSON',jsonFieldControl('conditions',val.conditions,'jsonArr')));
     rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){
       if (p && p.type === 'homemap') rows.push(homemapStepControl(ctx.diagram, p, t));

@@ -4366,3 +4366,25 @@ body.sk-blueprint{--home-card-inset:24px;}
     }
   }
 }
+
+/* Runtime evidence remains legible without motion and in Home view. */
+.runtime-status{display:flex;flex-basis:100%;flex-wrap:wrap;gap:7px;margin-top:8px}
+.runtime-status[hidden]{display:none}
+.runtime-chip{border:1px solid currentColor;border-radius:8px;padding:5px 9px;font:600 12px/1.5 monospace;color:#a45310;background:#fff6e9}
+.runtime-service-error,.runtime-delivery-failed{color:#b52f47;background:#fff0f3}
+.runtime-unknown,.runtime-ambiguous{color:#596777;background:#f0f4f8}
+.runtime-node-badge{pointer-events:none;color:#d97706}
+.runtime-node-badge.runtime-service-error,.runtime-node-badge.runtime-delivery-failed{color:#dc3659}
+.runtime-node-badge.runtime-unknown,.runtime-node-badge.runtime-ambiguous{color:#718096}
+.runtime-node-badge circle{fill:currentColor;stroke:#fff;stroke-width:2;animation:runtime-pulse 1.8s ease-out infinite}
+.runtime-node-badge text{fill:#fff;font:bold 15px monospace}
+.runtime-node-badge.runtime-unknown circle,.runtime-node-badge.runtime-ambiguous circle{animation:none}
+@keyframes runtime-pulse{0%,100%{stroke-width:2}50%{stroke-width:5}}
+@media(prefers-reduced-motion:reduce){.runtime-node-badge circle{animation:none}}
+.runtime-retry text{transform-origin:0 0;animation:runtime-turn 2.5s linear infinite}
+.runtime-backpressure text{animation:runtime-pressure 1.4s ease-in-out infinite}
+.runtime-queue-buildup text{animation:runtime-stack 1.5s steps(3,end) infinite}
+@keyframes runtime-turn{to{transform:rotate(360deg)}}
+@keyframes runtime-pressure{50%{transform:translateX(-3px)}}
+@keyframes runtime-stack{0%{opacity:.35}100%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.runtime-node-badge text{animation:none}}

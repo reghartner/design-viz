@@ -14,8 +14,8 @@
           "routing": "lanes",
           "nodes": {
             "camera": {
-              "title": "Porch camera",
-              "icon": "camera",
+              "title": "Doorbell camera",
+              "icon": "doorbell",
               "tint": "dev"
             },
             "hub": {
@@ -44,7 +44,7 @@
               }
             },
             "cloud": {
-              "title": "Event service",
+              "title": "Recording service",
               "icon": "cloud",
               "tint": "cmd",
               "binding": {
@@ -69,7 +69,7 @@
               }
             },
             "phone": {
-              "title": "Home app",
+              "title": "Notification service",
               "icon": "phone",
               "tint": "data",
               "binding": {
@@ -92,15 +92,27 @@
                   "path": "/notifications"
                 }
               }
+            },
+            "database": {
+              "title": "Clip metadata DB",
+              "icon": "db",
+              "tint": "data"
+            },
+            "queue": {
+              "title": "Notification queue",
+              "icon": "package",
+              "tint": "mqtt"
             }
           },
           "rows": [
             [
               "camera",
-              "hub"
+              "hub",
+              "cloud"
             ],
             [
-              "cloud",
+              "database",
+              "queue",
               "phone"
             ]
           ],
@@ -109,19 +121,31 @@
               "from": "camera",
               "to": "hub",
               "kind": "mqtt",
-              "label": "local detection"
+              "label": "button pressed"
             },
             {
               "from": "hub",
               "to": "cloud",
               "kind": "https",
-              "label": "upload event"
+              "label": "create recording"
+            },
+            {
+              "from": "queue",
+              "to": "phone",
+              "kind": "https",
+              "label": "consume notification"
             },
             {
               "from": "cloud",
-              "to": "phone",
+              "to": "database",
               "kind": "https",
-              "label": "notify resident"
+              "label": "persist metadata"
+            },
+            {
+              "from": "cloud",
+              "to": "queue",
+              "kind": "mqtt",
+              "label": "enqueue notification"
             }
           ],
           "panels": [
@@ -211,13 +235,28 @@
               "title": "What the resident knows",
               "states": [
                 "Quiet",
-                "Motion detected",
-                "Uploading",
-                "Resident notified",
-                "Local recording only"
+                "Button pressed",
+                "Recording requested",
+                "Resident notified"
               ],
               "initial": {
                 "state": "Quiet"
+              }
+            },
+            {
+              "id": "resident",
+              "type": "phone",
+              "title": "Resident phone",
+              "initial": {
+                "clock": "9:41"
+              }
+            },
+            {
+              "id": "delivery",
+              "type": "queue",
+              "title": "Notification delivery",
+              "initial": {
+                "state": "empty"
               }
             }
           ],
@@ -233,7 +272,7 @@
             {
               "id": "detect",
               "edge": "camera->hub",
-              "text": "A visitor approaches. The porch camera detects motion and signals the local hub.",
+              "text": "The visitor presses the doorbell. The porch hub receives the button event.",
               "panels": {
                 "home": {
                   "cam": "detect",
@@ -250,7 +289,7 @@
                   ]
                 },
                 "outcome": {
-                  "state": "Motion detected"
+                  "state": "Button pressed"
                 }
               },
               "codeRefs": [
@@ -266,19 +305,20 @@
                   },
                   "startLine": 2,
                   "endLine": 6,
-                  "purpose": "A visitor approaches. The porch camera detects motion and signals the local hub."
+                  "purpose": "The visitor presses the doorbell. The porch hub receives the button event."
                 }
               ],
               "traceMatch": {
                 "serviceName": "porch-hub",
                 "operation": "POST /button",
-                "maxDurationMs": 500
+                "maxDurationMs": 500,
+                "nodeId": "hub"
               }
             },
             {
               "id": "upload",
               "edge": "hub->cloud",
-              "text": "The visitor reaches the door. The camera records while the hub uploads the event.",
+              "text": "Recording service accepts the request and begins the authored recording workflow.",
               "panels": {
                 "home": {
                   "cam": "rec",
@@ -289,7 +329,7 @@
                   }
                 },
                 "outcome": {
-                  "state": "Uploading"
+                  "state": "Recording requested"
                 }
               },
               "codeRefs": [
@@ -305,29 +345,68 @@
                   },
                   "startLine": 2,
                   "endLine": 6,
-                  "purpose": "The visitor reaches the door. The camera records while the hub uploads the event."
+                  "purpose": "Recording service accepts the request and begins the authored recording workflow."
                 }
               ],
               "traceMatch": {
                 "serviceName": "recording-service",
                 "operation": "POST /recordings",
-                "maxDurationMs": 500
+                "maxDurationMs": 500,
+                "nodeId": "cloud",
+                "parentStepId": "detect"
+              }
+            },
+            {
+              "id": "persist",
+              "edge": "cloud->database",
+              "text": "Clip metadata is persisted within the authored 150 ms database budget.",
+              "traceMatch": {
+                "serviceName": "clip-store",
+                "operation": "INSERT clip",
+                "nodeId": "database",
+                "role": "database",
+                "parentStepId": "upload",
+                "maxDurationMs": 150
+              }
+            },
+            {
+              "id": "enqueue",
+              "edge": "cloud->queue",
+              "text": "A resident notification is queued. The normal queue depth stays at or below 20.",
+              "traceMatch": {
+                "serviceName": "notification-queue",
+                "operation": "publish doorbell",
+                "nodeId": "queue",
+                "parentStepId": "upload",
+                "maxDurationMs": 100,
+                "maxQueueDepth": 20,
+                "panelId": "delivery"
+              },
+              "panels": {
+                "delivery": {
+                  "state": "enqueue",
+                  "reason": "Doorbell alert queued"
+                }
               }
             },
             {
               "id": "notify",
-              "edge": "cloud->phone",
-              "text": "The resident is notified and opens the front door.",
+              "edge": "queue->phone",
+              "text": "The notification service delivers the doorbell alert to the resident app.",
               "panels": {
-                "home": {
-                  "door": "open",
-                  "visitor": {
-                    "x": 132,
-                    "y": 124
-                  }
-                },
                 "outcome": {
                   "state": "Resident notified"
+                },
+                "resident": {
+                  "notify": {
+                    "app": "Home",
+                    "title": "Someone is at your door",
+                    "text": "Doorbell pressed \u00b7 recording available"
+                  }
+                },
+                "delivery": {
+                  "state": "dequeue",
+                  "reason": "Resident notification delivered"
                 }
               },
               "codeRefs": [
@@ -343,17 +422,21 @@
                   },
                   "startLine": 2,
                   "endLine": 6,
-                  "purpose": "The resident is notified and opens the front door."
+                  "purpose": "The notification service delivers the doorbell alert to the resident app."
                 }
               ],
               "traceMatch": {
                 "serviceName": "notification-service",
                 "operation": "POST /notifications",
-                "maxDurationMs": 500
+                "maxDurationMs": 500,
+                "nodeId": "phone",
+                "parentStepId": "enqueue"
               }
             }
-          ]
-        }
+          ],
+          "autoplay": false
+        },
+        "id": "doorbell-flow"
       }
     ],
     "canon": {

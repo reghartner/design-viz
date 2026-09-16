@@ -21,6 +21,7 @@ try{
     if(args.includes('--write-specs')){
       const specs=effectiveSpecs(r.specs,next);
       for(const entry of r.entries)await atomicJSON(entry.filename,specs.find(s=>s.page.canon.id===entry.id));
+      next.specs={}; // Materialized files, including later human edits, are authoritative.
     }
     console.log('Decision recorded.');
   }

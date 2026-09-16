@@ -249,7 +249,10 @@ HLD provenance; use optional `page.canon` for design/canonical ownership. Resolv
 node service/API bindings from a supplied catalog, never invent company entities.
 Attach reviewed code references with full commit SHAs and unique literal anchors;
 require stable step IDs. Canonical status and behavioral impact require human
-review. The fictional `examples/canon/` catalog is for demonstrations only.
+review. The fictional `examples/canon/` catalog is for demonstrations only. For the
+central repository, drift scanner, review dispositions and company adapter, use
+`docs/canon.md`. Plain PR closure never accepts a source revision; a regression
+keeps the expected story unchanged and links its issue.
 
 **Choose the main view.** A `homemap` or other panel can be the centerpiece
 with `diagram.primaryPanel: "<panel-id>"`. Existing homemaps support live

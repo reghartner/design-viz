@@ -61,7 +61,10 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
             hit.reference.revision=review.head;hit.reference.startLine=review.after.startLine;hit.reference.endLine=review.after.endLine;
           }
         }
-        if(review?.type==='spec')return send(200,{simulated:true,catalog,spec:review.proposedSpec,revision});
+        if(review?.type==='spec'){
+          if(review.diagramId!==spec.page.canon.id || review.baseRevision!==revision || review.status!=='open')throw new Error('Proposal is stale; reopen the current canonical spec before editing.');
+          return send(200,{simulated:true,catalog,spec:review.proposedSpec,revision});
+        }
         return send(200,{simulated:true,catalog,spec,revision});
       }
       if(url.pathname.startsWith('/api/canon/specs/'))return send(200,find(decodeURIComponent(url.pathname.slice('/api/canon/specs/'.length))));

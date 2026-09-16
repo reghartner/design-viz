@@ -137,7 +137,9 @@ and **Approve reference mapping**. Then load **Recording service · HTTP 500**,
 **Database latency**, **Queue buildup + backpressure**, **Missing database span**,
 or **Explicit delivery failure** and **Compare incident**. Choose the orange
 path in the embedded viewer. Download its portable spec, or **Propose incident
-as alternate** and review the proposed spec before making it canonical.
+as alternate** and review the proposed spec before making it canonical. **Edit proposed spec**
+opens that draft in the builder; resubmission preserves its drift-review link and
+supersedes the older proposal only when the new draft is accepted.
 
 The reference approval persists an explicit local review, sanitized operational
 span metadata, and the reviewed selectors. The comparison is a separate overlay;

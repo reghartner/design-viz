@@ -57,3 +57,14 @@ test('local portal serves the hosted builder, persists reviewed baselines and re
     const spec=await (await fetch(base+'/api/canon/specs/doorbell')).json();assert.equal(C.references(spec)[1].reference.revision,'2'.repeat(40));
   }finally{await new Promise(r=>server.close(r));await fs.rm(dir,{recursive:true,force:true});}
 });
+test('editing a proposed spec preserves the underlying drift review and rejects stale proposal reuse',async()=>{
+  const {D,spec,snapshot}=await load(),scanned=await D.scan([spec],new D.SnapshotSources(snapshot)),drift=scanned.findings[0];
+  const changed=C.clone(spec);changed.page.sections[0].diagram.steps[2].codeRefs[0].revision=drift.head;
+  const first=D.propose([spec],scanned.state,{id:'doorbell',spec:changed,baseRevision:D.digest(spec),review:drift.id});
+  changed.page.sections[0].diagram.steps[2].text='A human revised this draft.';
+  const second=D.propose([spec],first.state,{id:'doorbell',spec:changed,baseRevision:D.digest(spec),review:first.id});
+  assert.equal(second.state.reviews[second.id].resolves,drift.id);assert.equal(second.state.reviews[first.id].status,'open');
+  const accepted=D.decide([spec],second.state,second.id,{disposition:'update',reason:'Reviewed revised draft'});
+  assert.equal(accepted.reviews[first.id].status,'superseded');assert.equal(accepted.reviews[drift.id].status,'updated');
+  assert.throws(()=>D.propose([spec],accepted,{id:'doorbell',spec:changed,baseRevision:D.digest(changed),review:first.id}),/stale/);
+});

@@ -22,7 +22,7 @@ async function refresh(){
       const reason=el('input');reason.placeholder='Review reason (required)';reason.setAttribute('aria-label','Review reason '+review.id);card.append(reason);
       const actions=el('div',null,'actions');
       async function decide(disposition){try{await api('decisions',{id:review.id,disposition,reason:reason.value});status('Decision saved.');await refresh();select(selected);}catch(e){status(e.message,true);}}
-      if(review.type==='spec'){const accept=el('button','Approve spec update');accept.onclick=()=>decide('update');actions.append(accept);}
+      if(review.type==='spec'){const edit=el('a','Edit proposed spec','button');edit.href='/workbench/flowspec.html?canon='+encodeURIComponent(review.diagramId)+'&review='+review.id;edit.target='_blank';edit.rel='noopener';const accept=el('button','Approve spec update');accept.onclick=()=>decide('update');actions.append(edit,accept);}
       else{
         if(!review.error){const accept=el('button','No behavioral impact');accept.onclick=()=>decide('no-impact');actions.append(accept);}
         const issue=el('button','Record regression ticket','quiet');issue.onclick=()=>decide('regression');actions.append(issue);

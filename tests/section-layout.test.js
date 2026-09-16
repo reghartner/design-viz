@@ -85,3 +85,13 @@ test('renaming and bulk deleting a panel update every saved host arrangement',()
   raw=JSON.parse(p.text);for(const list of Object.values(raw.sectionLayout))assert.ok(list.every(t=>!t.panel));
   assert.equal(raw.steps[0].panels,undefined);
 });
+
+test('optimization fills the row without supporting panels and respects any explicit centerpiece',()=>{
+  for(const panels of [[],[{id:'home',type:'homemap'}],[{id:'home',type:'state'}]]){
+    const d=diagram();d.panels=panels;
+    for(const target of ['default','backstage','confluence']){
+      const tiles=ctx.sectionLayoutPreset(d,target);assert.ok(tiles.every(t=>t.w===12));noOverlap(tiles);
+      if(panels.length)assert.equal(tiles[0].panel,'home');
+    }
+  }
+});

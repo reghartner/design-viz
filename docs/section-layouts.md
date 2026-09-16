@@ -22,7 +22,8 @@ retain their existing separate editing controls.
   Row are displayed starting at 1. Width is in columns; height is in grid rows.
 - **Optimize layout** saves a starting arrangement for the selected target.
   Responsive and Backstage use an eight-column main tile with supporting
-  panels in four columns. Confluence gives the diagram and Home a full row,
+  panels in four columns; without supporting panels, main tiles fill the row.
+  Confluence gives the diagram and Home a full row,
   with smaller panels paired below. A declared centerpiece comes first.
 - **Reset layout** removes only the selected target's arrangement. The default
   arrangement applies if one exists; otherwise the existing Home/Data flow

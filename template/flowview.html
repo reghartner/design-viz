@@ -5630,8 +5630,9 @@ function sectionLayoutPreset(d, target){
   var tiles=sectionLayoutTiles(d), narrow=target==='confluence', items=[];
   var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
   var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
+  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.type!=='homemap';});
   ordered.forEach(function(t){
-    var large=t.key==='diagram'||t.type==='homemap', w=large?(narrow?12:8):(narrow?6:4), h=large?12:t.type==='phone'?10:t.type==='screen'?8:6;
+    var large=t.key==='diagram'||t.type==='homemap'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=large?12:t.type==='phone'?10:t.type==='screen'?8:6;
     var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
       var it={x:x,y:0,w:w,h:h}, hits;
       while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)

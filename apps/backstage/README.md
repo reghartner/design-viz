@@ -9,6 +9,10 @@ and links to matching steps on each happy/alternate path. It refreshes every
 60 seconds while visible, on focus, and on demand. Changing services cancels old
 requests. Failed refreshes retain the last result with a visible warning.
 
+Walk through the [interactive lifecycle guide](../../docs/diagrams/backstage/backstage.html) for catalog authoring,
+service discovery, GitHub scans, human decisions, refusal gates and trace evidence.
+The guide distinguishes portable implementation from company deployment.
+
 ## Try the mock
 
 Run `node apps/backstage-mock/server.mjs` from the repository root and open:

@@ -6,6 +6,10 @@ a paginated Backstage adapter, GitHub drift runner, and deterministic trace mapp
 The mock portal is not an installed Backstage plugin and supplies no company auth.
 The final integration belongs in the company's Backstage/GitHub environment.
 
+Walk through the [interactive lifecycle guide](diagrams/backstage/backstage.html) for catalog authoring,
+service discovery, GitHub scans, human decisions, refusal gates and trace evidence.
+The guide distinguishes portable implementation from company deployment.
+
 ## Boundaries and authority
 
 - **Central Git repository:** authoritative specs, registry, reviewed source pins,

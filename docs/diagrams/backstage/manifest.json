@@ -1,0 +1,24 @@
+{
+  "pages": [
+    {
+      "file": "backstage.html",
+      "spec": "backstage.spec.json",
+      "title": "Backstage + GitHub — from service catalog to reviewed canon",
+      "family": "backstage",
+      "description": "Seven guided diagrams covering Backstage discovery, spec authoring, GitHub source drift, human dispositions, refusal gates and incident evidence.",
+      "tags": [
+        "backstage",
+        "github",
+        "drift",
+        "architecture",
+        "canon"
+      ],
+      "widgets": [
+        "checks",
+        "log",
+        "state",
+        "table"
+      ]
+    }
+  ]
+}

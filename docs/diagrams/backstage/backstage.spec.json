@@ -1,0 +1,2383 @@
+{
+  "page": {
+    "title": "Backstage + GitHub — from service catalog to reviewed canon",
+    "contract": "1",
+    "generatedFrom": {
+      "url": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+      "label": "Flowview integration docs + implementation",
+      "version": "d647942ccea4",
+      "at": "09-16-2026 08:38"
+    },
+    "protocols": {
+      "handoff": {
+        "label": "Documented handoff",
+        "color": "#38bdf8"
+      },
+      "repo": {
+        "label": "Repository read / write",
+        "color": "#34d399"
+      },
+      "review": {
+        "label": "Human review",
+        "color": "#a78bfa"
+      },
+      "evidence": {
+        "label": "Evidence / derived data",
+        "color": "#fbbf24"
+      },
+      "workflow": {
+        "label": "GitHub workflow event",
+        "color": "#fb7185"
+      }
+    },
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Overview",
+            "sections": [
+              {
+                "heading": "Who owns what",
+                "accent": "blue",
+                "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                "text": "Backstage supplies service identity. Git holds the reviewed story. Source scans supply evidence; a human decides what it means.",
+                "bullets": [
+                  "**Read this as a guided tour:** choose Play or step forward. The page opens paused. Animation shows logical handoffs, not measured latency.",
+                  "**Current implementation + company handoff:** the plugin, renderer and scanner exist here. Company authentication, repository access and hosted adapters are installation work; this page does not claim they are deployed.",
+                  "**HLD and canon coexist:** preserve the design-document link. Canonical promotion is an explicit human review, never a consequence of being listed in Backstage.",
+                  "**Confluence remains a viewer:** export compact JSON from the workbench and import a snapshot into Forge. Editing stays outside Confluence."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "routing": "lanes",
+                  "nodes": {
+                    "catalog": {
+                      "title": "Backstage",
+                      "sub": "services + APIs",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md"
+                    },
+                    "editor": {
+                      "title": "Flowview editor",
+                      "sub": "bound diagram specs",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md"
+                    },
+                    "git": {
+                      "title": "Central Git",
+                      "sub": "reviewed source of truth",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md"
+                    },
+                    "scan": {
+                      "title": "GitHub Actions",
+                      "sub": "source drift scanner",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "review": {
+                      "title": "Human review",
+                      "sub": "behavioral decision",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "reader": {
+                      "title": "Diagrams tab",
+                      "sub": "service-linked views",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "catalog",
+                      "editor",
+                      "git"
+                    ],
+                    [
+                      "scan",
+                      "review",
+                      "reader"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "catalog",
+                      "to": "editor",
+                      "label": "Catalog snapshot",
+                      "kind": "handoff"
+                    },
+                    {
+                      "from": "editor",
+                      "to": "git",
+                      "label": "Reviewed spec",
+                      "kind": "repo"
+                    },
+                    {
+                      "from": "git",
+                      "to": "scan",
+                      "label": "Registry + pins",
+                      "kind": "repo"
+                    },
+                    {
+                      "from": "scan",
+                      "to": "review",
+                      "label": "Diff evidence",
+                      "kind": "evidence"
+                    },
+                    {
+                      "from": "review",
+                      "to": "git",
+                      "label": "Explicit decision",
+                      "kind": "review"
+                    },
+                    {
+                      "from": "git",
+                      "to": "reader",
+                      "label": "Published specs",
+                      "kind": "handoff"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "stage",
+                      "type": "state",
+                      "title": "Current responsibility",
+                      "states": [
+                        "IDENTITY",
+                        "AUTHOR",
+                        "PUBLISH",
+                        "SCAN",
+                        "DECIDE",
+                        "DISCOVER"
+                      ],
+                      "initial": {
+                        "state": "IDENTITY"
+                      }
+                    },
+                    {
+                      "id": "authority",
+                      "type": "table",
+                      "title": "Sources of authority",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Current value"
+                        }
+                      ],
+                      "initial": {
+                        "rows": [
+                          {
+                            "id": "0",
+                            "cells": {
+                              "field": "Service / API identity",
+                              "value": "Backstage catalog"
+                            }
+                          },
+                          {
+                            "id": "1",
+                            "cells": {
+                              "field": "Expected behavior",
+                              "value": "Reviewed spec in Git"
+                            }
+                          },
+                          {
+                            "id": "2",
+                            "cells": {
+                              "field": "Observed code change",
+                              "value": "Immutable source comparison"
+                            }
+                          },
+                          {
+                            "id": "3",
+                            "cells": {
+                              "field": "Behavioral impact",
+                              "value": "Human decision"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "identity",
+                      "text": "Backstage supplies fully qualified service/API identities, ownership and endpoint links.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                      "edge": "catalog->editor",
+                      "panels": {
+                        "stage": {
+                          "state": "IDENTITY"
+                        }
+                      }
+                    },
+                    {
+                      "id": "author",
+                      "text": "The editor uses those catalog choices; the narrative and its canonical status still require review.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "nodes": [
+                        "editor"
+                      ],
+                      "panels": {
+                        "stage": {
+                          "state": "AUTHOR"
+                        }
+                      }
+                    },
+                    {
+                      "id": "publish",
+                      "text": "The central Git repository holds authoritative specs, the registry, reviewed source pins and audit decisions.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                      "edge": "editor->git",
+                      "panels": {
+                        "stage": {
+                          "state": "PUBLISH"
+                        }
+                      }
+                    },
+                    {
+                      "id": "scan",
+                      "text": "GitHub Actions compares referenced source regions; it never executes watched service code.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "git->scan",
+                      "panels": {
+                        "stage": {
+                          "state": "SCAN"
+                        }
+                      }
+                    },
+                    {
+                      "id": "decide",
+                      "text": "A report gives the reviewer code differences and every affected diagram/step, without deciding behavioral impact.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "scan->review",
+                      "panels": {
+                        "stage": {
+                          "state": "DECIDE"
+                        }
+                      }
+                    },
+                    {
+                      "id": "accept",
+                      "text": "A maintainer accepts a harmless change, records a regression, or reviews a deliberate spec update.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "review->git",
+                      "panels": {
+                        "authority": {
+                          "rows": [
+                            {
+                              "id": "0",
+                              "cells": {
+                                "field": "No impact",
+                                "value": "Advance only reviewed source pin"
+                              }
+                            },
+                            {
+                              "id": "1",
+                              "cells": {
+                                "field": "Regression",
+                                "value": "Keep expected story + issue"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "field": "Intended behavior",
+                                "value": "Review an updated spec"
+                              }
+                            },
+                            {
+                              "id": "3",
+                              "cells": {
+                                "field": "Plain closure",
+                                "value": "No baseline acceptance"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "discover",
+                      "text": "Published bindings automatically associate diagrams with Component and API pages in Backstage.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "edge": "git->reader",
+                      "panels": {
+                        "stage": {
+                          "state": "DISCOVER"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Author",
+            "sections": [
+              {
+                "heading": "Author a service-bound story",
+                "accent": "violet",
+                "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                "text": "Use catalog identity for the actors and reviewed code anchors for the story beats. A proposed HLD stays linked to its design document.",
+                "bullets": [
+                  "**Company deployment boundary:** these flows describe the integration contract. Runnable read endpoints live in the development mock; the authenticated company backend and approved-Git provider must still be implemented and deployed.",
+                  "**Identity:** bind `kind:namespace/name`, not a display name. Bind an API explicitly if its entity page should list the diagram.",
+                  "**Source references:** pin a full immutable commit SHA, a repository path and unique literal start/end anchors. Line numbers help navigation; anchors define the watched region.",
+                  "**Company backend:** supply authenticated context and proposal routes, actual reviewer identity and repository policy. The local portal simulates these decisions in its JSON store.",
+                  "**Catalog limitations:** convert OpenAPI YAML and external references in the company API pipeline. A failed refresh must not silently remove saved bindings. Endpoint links do not invoke live APIs."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "routing": "lanes",
+                  "nodes": {
+                    "catalog": {
+                      "title": "Catalog API",
+                      "sub": "Components + APIs",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md"
+                    },
+                    "adapter": {
+                      "title": "Catalog adapter",
+                      "sub": "server-side credentials",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md"
+                    },
+                    "editor": {
+                      "title": "Flowview editor",
+                      "sub": "service / API pickers",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md"
+                    },
+                    "proposal": {
+                      "title": "Spec proposal",
+                      "sub": "base revision attached",
+                      "icon": "package",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md"
+                    },
+                    "reviewer": {
+                      "title": "Reviewer",
+                      "sub": "identity + repo policy",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md"
+                    },
+                    "git": {
+                      "title": "Central Git",
+                      "sub": "approved spec + registry",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "catalog",
+                      "adapter",
+                      "editor"
+                    ],
+                    [
+                      "proposal",
+                      "reviewer",
+                      "git"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "adapter",
+                      "to": "catalog",
+                      "label": "Paged read",
+                      "kind": "https"
+                    },
+                    {
+                      "from": "adapter",
+                      "to": "editor",
+                      "label": "Catalog + context",
+                      "kind": "handoff"
+                    },
+                    {
+                      "from": "editor",
+                      "to": "proposal",
+                      "label": "Propose spec",
+                      "kind": "handoff"
+                    },
+                    {
+                      "from": "proposal",
+                      "to": "reviewer",
+                      "label": "Review draft",
+                      "kind": "review"
+                    },
+                    {
+                      "from": "reviewer",
+                      "to": "git",
+                      "label": "Approve + publish",
+                      "kind": "repo"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "stage",
+                      "type": "state",
+                      "title": "Authoring state",
+                      "states": [
+                        "CATALOG",
+                        "DRAFT",
+                        "PROPOSED",
+                        "REVIEWED",
+                        "PUBLISHED"
+                      ],
+                      "initial": {
+                        "state": "CATALOG"
+                      }
+                    },
+                    {
+                      "id": "refs",
+                      "type": "table",
+                      "title": "What the spec carries",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Current value"
+                        }
+                      ],
+                      "initial": {
+                        "rows": [
+                          {
+                            "id": "0",
+                            "cells": {
+                              "field": "Provenance",
+                              "value": "Design document + version"
+                            }
+                          },
+                          {
+                            "id": "1",
+                            "cells": {
+                              "field": "Service",
+                              "value": "Fully qualified entityRef"
+                            }
+                          },
+                          {
+                            "id": "2",
+                            "cells": {
+                              "field": "Step",
+                              "value": "Stable step ID"
+                            }
+                          },
+                          {
+                            "id": "3",
+                            "cells": {
+                              "field": "Code",
+                              "value": "Repository + path + reviewed SHA"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "catalog",
+                      "text": "The backend adapter paginates Component/API entities and maps owners, provided APIs, operations and endpoints.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                      "edge": "adapter->catalog",
+                      "panels": {
+                        "stage": {
+                          "state": "CATALOG"
+                        }
+                      }
+                    },
+                    {
+                      "id": "context",
+                      "text": "Authenticated company context seeds the workbench with the catalog, spec and revision token.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                      "edge": "adapter->editor",
+                      "panels": {
+                        "stage": {
+                          "state": "DRAFT"
+                        }
+                      }
+                    },
+                    {
+                      "id": "bind",
+                      "text": "Choose the service, API and operation; attach code references to stable step IDs. Preserve HLD provenance.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "nodes": [
+                        "editor"
+                      ],
+                      "panels": {
+                        "refs": {
+                          "rows": [
+                            {
+                              "id": "0",
+                              "cells": {
+                                "field": "Service binding",
+                                "value": "kind:namespace/name"
+                              }
+                            },
+                            {
+                              "id": "1",
+                              "cells": {
+                                "field": "Source revision",
+                                "value": "Reviewed immutable SHA"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "field": "Watched region",
+                                "value": "Unique literal anchors"
+                              }
+                            },
+                            {
+                              "id": "3",
+                              "cells": {
+                                "field": "Story type",
+                                "value": "Design or reviewed canonical"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "propose",
+                      "text": "Submit the spec with its base revision. Stale proposals must be rejected instead of overwriting newer work.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                      "edge": "editor->proposal",
+                      "panels": {
+                        "stage": {
+                          "state": "PROPOSED"
+                        }
+                      }
+                    },
+                    {
+                      "id": "review",
+                      "text": "The company adapter verifies the real reviewer and applies repository policy; a browser-supplied actor is not authorization.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                      "edge": "proposal->reviewer",
+                      "panels": {
+                        "stage": {
+                          "state": "REVIEWED"
+                        }
+                      }
+                    },
+                    {
+                      "id": "publish",
+                      "text": "An approved Git change becomes the published spec. Include it in the registry for source-drift scans.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "edge": "reviewer->git",
+                      "panels": {
+                        "stage": {
+                          "state": "PUBLISHED"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "contract": {
+                  "title": "Code-reference contract",
+                  "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                  "fields": [
+                    {
+                      "k": "revision",
+                      "g": "The immutable full commit SHA actually reviewed",
+                      "hot": true
+                    },
+                    {
+                      "k": "anchor.start / anchor.end",
+                      "g": "Unique literal lines, inclusive; not regular expressions"
+                    },
+                    {
+                      "k": "startLine / endLine",
+                      "g": "Navigation hints at the pinned revision"
+                    },
+                    {
+                      "k": "purpose",
+                      "g": "The behavior this source region supports"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Discover",
+            "sections": [
+              {
+                "heading": "Discover diagrams from a service",
+                "accent": "cyan",
+                "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                "text": "A service page asks for diagrams bound to its exact entity identity. The backend derives associations from the approved specs this viewer may read.",
+                "bullets": [
+                  "**Company deployment boundary:** these flows describe the integration contract. Runnable read endpoints live in the development mock; the authenticated company backend and approved-Git provider must still be implemented and deployed.",
+                  "**Automatic association:** inspect every section/tab for service bindings and explicit API bindings. Matching nodes also link to happy and alternate steps; a node without steps still associates.",
+                  "**Freshness:** refresh every 60 seconds while visible, on focus and on demand. Cancel old requests when changing services. Approved additions/removals/rebindings update the next published snapshot.",
+                  "**Access:** authenticate both the Backstage proxy and the central repository API. Cache by published revision and authorization scope; an all-diagram index must not leak to a restricted viewer.",
+                  "**Empty is different from broken:** no matching diagrams returns an empty result; an unavailable/invalid index returns an error. Failed refreshes retain the last result and show a warning."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "routing": "lanes",
+                  "nodes": {
+                    "page": {
+                      "title": "Entity page",
+                      "sub": "Component / API",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md"
+                    },
+                    "proxy": {
+                      "title": "Backstage proxy",
+                      "sub": "authenticated GET",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md"
+                    },
+                    "api": {
+                      "title": "Company API",
+                      "sub": "derive associations",
+                      "icon": "server",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md"
+                    },
+                    "repo": {
+                      "title": "Published specs",
+                      "sub": "viewer-authorized set",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "page",
+                      "proxy"
+                    ],
+                    [
+                      "api",
+                      "repo"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "page",
+                      "to": "proxy",
+                      "label": "Entity query",
+                      "kind": "https"
+                    },
+                    {
+                      "from": "proxy",
+                      "to": "api",
+                      "label": "Authenticated GET",
+                      "kind": "https"
+                    },
+                    {
+                      "from": "api",
+                      "to": "repo",
+                      "label": "Read published set",
+                      "kind": "repo"
+                    },
+                    {
+                      "from": "api",
+                      "to": "proxy",
+                      "label": "Result or error",
+                      "kind": "https",
+                      "ret": true
+                    },
+                    {
+                      "from": "proxy",
+                      "to": "page",
+                      "label": "Diagrams + links",
+                      "kind": "https",
+                      "ret": true
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "stage",
+                      "type": "state",
+                      "title": "Discovery state",
+                      "states": [
+                        "REQUEST",
+                        "FILTER",
+                        "INDEX",
+                        "RESULT",
+                        "REFRESH",
+                        "WARNING"
+                      ],
+                      "initial": {
+                        "state": "REQUEST"
+                      }
+                    },
+                    {
+                      "id": "index",
+                      "type": "table",
+                      "title": "Association rules",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Current value"
+                        }
+                      ],
+                      "initial": {
+                        "rows": [
+                          {
+                            "id": "0",
+                            "cells": {
+                              "field": "Match",
+                              "value": "Full kind / namespace / name"
+                            }
+                          },
+                          {
+                            "id": "1",
+                            "cells": {
+                              "field": "Scope",
+                              "value": "Authorized published specs"
+                            }
+                          },
+                          {
+                            "id": "2",
+                            "cells": {
+                              "field": "Included",
+                              "value": "All sections and paths"
+                            }
+                          },
+                          {
+                            "id": "3",
+                            "cells": {
+                              "field": "Excluded",
+                              "value": "Unapproved drafts"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "request",
+                      "text": "The entity page reads its identity from Backstage useEntity and queries through the authenticated proxy.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "edge": "page->proxy",
+                      "panels": {
+                        "stage": {
+                          "state": "REQUEST"
+                        }
+                      }
+                    },
+                    {
+                      "id": "forward",
+                      "text": "The proxy allows GET requests and keeps its upstream token on the backend. Use identity forwarding for per-user visibility.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "edge": "proxy->api"
+                    },
+                    {
+                      "id": "filter",
+                      "text": "The company API obtains only published specs the requesting viewer is authorized to read.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "edge": "api->repo",
+                      "panels": {
+                        "stage": {
+                          "state": "FILTER"
+                        }
+                      }
+                    },
+                    {
+                      "id": "index",
+                      "text": "Build associations from explicit service/API bindings. Match full references case-insensitively; namespaces and kinds remain distinct.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "nodes": [
+                        "api"
+                      ],
+                      "panels": {
+                        "stage": {
+                          "state": "INDEX"
+                        }
+                      }
+                    },
+                    {
+                      "id": "result",
+                      "text": "Return a versioned result with diagram cards, owners, HLD links, and matching happy/alternate step links.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "edge": "api->proxy",
+                      "panels": {
+                        "stage": {
+                          "state": "RESULT"
+                        }
+                      }
+                    },
+                    {
+                      "id": "display",
+                      "text": "The Diagrams tab displays the current result, including an explanatory empty state when no bindings match.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "edge": "proxy->page"
+                    },
+                    {
+                      "id": "refresh",
+                      "text": "While visible, refresh every 60 seconds, on focus and on demand; switching services cancels stale requests.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "nodes": [
+                        "page"
+                      ],
+                      "panels": {
+                        "stage": {
+                          "state": "REFRESH"
+                        }
+                      }
+                    },
+                    {
+                      "id": "refresh-error",
+                      "text": "If refresh fails, keep the last result and display a warning. Do not present an unavailable index as zero diagrams.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "nodes": [
+                        "page",
+                        "api"
+                      ],
+                      "panels": {
+                        "stage": {
+                          "state": "WARNING"
+                        }
+                      },
+                      "tone": {
+                        "api": "warn"
+                      }
+                    }
+                  ],
+                  "paths": [
+                    {
+                      "id": "happy",
+                      "label": "Refresh succeeds",
+                      "color": "#38bdf8",
+                      "steps": [
+                        "request",
+                        "forward",
+                        "filter",
+                        "index",
+                        "result",
+                        "display",
+                        "refresh"
+                      ]
+                    },
+                    {
+                      "id": "refresh-failed",
+                      "label": "Refresh fails",
+                      "color": "#fbbf24",
+                      "steps": [
+                        "request",
+                        "forward",
+                        "filter",
+                        "index",
+                        "result",
+                        "display",
+                        "refresh-error"
+                      ]
+                    }
+                  ]
+                },
+                "contract": {
+                  "title": "GET /api/canon/entity-diagrams",
+                  "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                  "fields": [
+                    {
+                      "k": "entityRef",
+                      "g": "Fully qualified Component or API identity",
+                      "hot": true
+                    },
+                    {
+                      "k": "revision",
+                      "g": "Published content revision"
+                    },
+                    {
+                      "k": "diagrams[]",
+                      "g": "Owner, design source, viewer/edit URLs, matched sections and steps"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Scan",
+            "sections": [
+              {
+                "heading": "Scan source changes in GitHub",
+                "accent": "amber",
+                "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                "text": "A scheduled or manually dispatched workflow compares reviewed anchored source against current default-branch code. The result is evidence, not a behavioral verdict.",
+                "bullets": [
+                  "**Cadence:** weekdays at 08:23 America/New_York, including daylight-saving changes. GitHub scheduling can run late. Opt in with `FLOWVIEW_CANON_ENABLED=true` and configure `FLOWVIEW_REGISTRY`.",
+                  "**Read and write identities:** a read-only source GitHub App token reads watched repositories; the central `GITHUB_TOKEN` writes review evidence. The runner uses one configured GitHub/GHES host.",
+                  "**Stable comparison:** literal anchors follow code across unrelated line movement. Missing files, denied access or missing/duplicate/reversed anchors require repair.",
+                  "**Deduplication and recovery:** reuse one review per changed reference scope, even if closed without a disposition. Reuse an interrupted run’s branch. Previously recorded regressions remain visible.",
+                  "**Report-only mode:** manual `dry_run` saves Markdown/JSON evidence without opening PRs. Run summaries include clean scans and failures; report artifacts are retained for 30 days."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "routing": "lanes",
+                  "nodes": {
+                    "trigger": {
+                      "title": "Schedule / run",
+                      "sub": "weekday or dispatch",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/.github/workflows/canon-drift.yml"
+                    },
+                    "runner": {
+                      "title": "Trusted runner",
+                      "sub": "default branch only",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "registry": {
+                      "title": "Registry + specs",
+                      "sub": "reviewed source pins",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md"
+                    },
+                    "sources": {
+                      "title": "Source GitHub",
+                      "sub": "immutable code blobs",
+                      "icon": "cloud",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "compare": {
+                      "title": "Anchor comparison",
+                      "sub": "source text, not execution",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md"
+                    },
+                    "report": {
+                      "title": "Evidence report",
+                      "sub": "review PR + artifacts",
+                      "icon": "package",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "trigger",
+                      "runner",
+                      "registry"
+                    ],
+                    [
+                      "sources",
+                      "compare",
+                      "report"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "trigger",
+                      "to": "runner",
+                      "label": "Start workflow",
+                      "kind": "workflow"
+                    },
+                    {
+                      "from": "runner",
+                      "to": "registry",
+                      "label": "Read registry",
+                      "kind": "repo"
+                    },
+                    {
+                      "from": "runner",
+                      "to": "sources",
+                      "label": "Read source blobs",
+                      "kind": "https"
+                    },
+                    {
+                      "from": "sources",
+                      "to": "compare",
+                      "label": "Anchored text",
+                      "kind": "evidence"
+                    },
+                    {
+                      "from": "registry",
+                      "to": "compare",
+                      "label": "Reviewed baseline",
+                      "kind": "evidence"
+                    },
+                    {
+                      "from": "compare",
+                      "to": "report",
+                      "label": "Diff + affected steps",
+                      "kind": "evidence"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "status",
+                      "type": "state",
+                      "title": "Scan result",
+                      "states": [
+                        "READING",
+                        "COMPARING",
+                        "DRIFT",
+                        "CLEAN",
+                        "REPAIR"
+                      ],
+                      "initial": {
+                        "state": "READING"
+                      }
+                    },
+                    {
+                      "id": "baseline",
+                      "type": "table",
+                      "title": "Expected behavior",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Current value"
+                        }
+                      ],
+                      "initial": {
+                        "rows": [
+                          {
+                            "id": "0",
+                            "cells": {
+                              "field": "Before scan",
+                              "value": "Reviewed spec + code pin"
+                            }
+                          },
+                          {
+                            "id": "1",
+                            "cells": {
+                              "field": "After scan",
+                              "value": "Still unchanged"
+                            }
+                          },
+                          {
+                            "id": "2",
+                            "cells": {
+                              "field": "Report",
+                              "value": "Evidence for a human"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "audit",
+                      "type": "log",
+                      "title": "What the system records",
+                      "tags": {
+                        "READ": "#38bdf8",
+                        "REVIEW": "#a78bfa",
+                        "WRITE": "#34d399",
+                        "WARN": "#fbbf24"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "start",
+                      "text": "Schedule or workflow dispatch starts a run against trusted default-branch tooling; never check out a report PR head.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "trigger->runner",
+                      "panels": {
+                        "status": {
+                          "state": "READING"
+                        },
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "READ",
+                              "text": "Trusted default branch; watched code is data."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "registry",
+                      "text": "Read the checked-in registry, registered specs, code reference pins and prior drift decisions.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/tools/canon/github.mjs",
+                      "edge": "runner->registry"
+                    },
+                    {
+                      "id": "source",
+                      "text": "Read immutable source blobs at the reviewed pin and the current source default-branch revision through the API.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "runner->sources",
+                      "panels": {
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "READ",
+                              "text": "Source-reading credentials remain read-only."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "compare",
+                      "text": "Locate each unique literal anchor range and compare its text. Unrelated line movement alone is ignored.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "edge": "sources->compare",
+                      "nodes": [
+                        "registry"
+                      ],
+                      "panels": {
+                        "status": {
+                          "state": "COMPARING"
+                        }
+                      }
+                    },
+                    {
+                      "id": "changed",
+                      "text": "Changed anchored text identifies every affected diagram and step. This still does not establish behavioral impact.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "registry->compare",
+                      "panels": {
+                        "status": {
+                          "state": "DRIFT"
+                        },
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "REVIEW",
+                              "text": "Source changed. Expected story and baseline remain unchanged."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "report",
+                      "text": "Create or reuse one evidence PR for the changed reference scope, plus Markdown/JSON reports and an Actions summary.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "compare->report",
+                      "panels": {
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "REVIEW",
+                              "text": "Review required. A closed report without a disposition is reused."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "clean",
+                      "text": "If anchored content is unchanged, record a clean scan. No behavioral decision or baseline update is needed.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "nodes": [
+                        "compare",
+                        "report"
+                      ],
+                      "panels": {
+                        "status": {
+                          "state": "CLEAN"
+                        },
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "READ",
+                              "text": "No referenced code changed."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "repair",
+                      "text": "If source or anchors cannot be resolved, save repair evidence and fail the scan visibly; expected behavior stays unchanged.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "nodes": [
+                        "sources",
+                        "compare",
+                        "report"
+                      ],
+                      "panels": {
+                        "status": {
+                          "state": "REPAIR"
+                        },
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "WARN",
+                              "text": "Repair required; unreadable source is not a clean scan."
+                            }
+                          ]
+                        }
+                      },
+                      "tone": {
+                        "compare": "warn"
+                      }
+                    }
+                  ],
+                  "paths": [
+                    {
+                      "id": "changed",
+                      "label": "Changed source",
+                      "color": "#38bdf8",
+                      "steps": [
+                        "start",
+                        "registry",
+                        "source",
+                        "compare",
+                        "changed",
+                        "report"
+                      ]
+                    },
+                    {
+                      "id": "clean",
+                      "label": "No drift",
+                      "color": "#34d399",
+                      "steps": [
+                        "start",
+                        "registry",
+                        "source",
+                        "compare",
+                        "clean"
+                      ]
+                    },
+                    {
+                      "id": "repair",
+                      "label": "Reference unreadable",
+                      "color": "#fbbf24",
+                      "steps": [
+                        "start",
+                        "registry",
+                        "source",
+                        "repair"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Review",
+            "sections": [
+              {
+                "heading": "Choose the human disposition",
+                "accent": "violet",
+                "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                "text": "The same evidence can represent a harmless refactor, a regression, or an intended change. Only a human review supplies that interpretation.",
+                "bullets": [
+                  "**No impact:** label the report `flowview/no-impact` and close it. A validated decision advances only the exact reviewed source revision and records the audit decision.",
+                  "**Regression:** label `flowview/regression`, include `Regression ticket: https://…` in the body and close. Preserve the expected story and code baseline while tracking the issue.",
+                  "**Intentional change:** update the affected spec and reviewed pin in an ordinary reviewed PR. The author can be a human or agent; publication still follows repository review.",
+                  "**No disposition:** simply closing or merging the evidence report leaves the baseline unchanged. The report is not an executable behavior update.",
+                  "**Publication:** accepted pins and audit state are written atomically in one non-forced Git commit. If branch protection blocks bot writes, the company must route acceptance through its approved process."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "routing": "lanes",
+                  "nodes": {
+                    "report": {
+                      "title": "Evidence PR",
+                      "sub": "diff + impacted steps",
+                      "icon": "package",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "human": {
+                      "title": "Maintainer",
+                      "sub": "classify behavioral impact",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "decision": {
+                      "title": "Decision runner",
+                      "sub": "verify evidence + actor",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/tools/canon/github.mjs"
+                    },
+                    "git": {
+                      "title": "Central Git",
+                      "sub": "specs + audit state",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "ticket": {
+                      "title": "Regression issue",
+                      "sub": "team follows up",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "proposal": {
+                      "title": "Spec update PR",
+                      "sub": "intentional new behavior",
+                      "icon": "package",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "report",
+                      "human",
+                      "decision"
+                    ],
+                    [
+                      "git",
+                      "ticket",
+                      "proposal"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "report",
+                      "to": "human",
+                      "label": "Review evidence",
+                      "kind": "review"
+                    },
+                    {
+                      "from": "human",
+                      "to": "decision",
+                      "label": "Label + close",
+                      "kind": "workflow"
+                    },
+                    {
+                      "from": "decision",
+                      "to": "git",
+                      "label": "Atomic commit",
+                      "kind": "repo"
+                    },
+                    {
+                      "from": "human",
+                      "to": "ticket",
+                      "label": "Link regression",
+                      "kind": "review"
+                    },
+                    {
+                      "from": "human",
+                      "to": "proposal",
+                      "label": "Revise story",
+                      "kind": "review"
+                    },
+                    {
+                      "from": "proposal",
+                      "to": "git",
+                      "label": "Reviewed change",
+                      "kind": "repo"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "outcome",
+                      "type": "table",
+                      "title": "What changes",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Current value"
+                        }
+                      ],
+                      "initial": {
+                        "rows": [
+                          {
+                            "id": "0",
+                            "cells": {
+                              "field": "Expected story",
+                              "value": "Unchanged"
+                            }
+                          },
+                          {
+                            "id": "1",
+                            "cells": {
+                              "field": "Source pin",
+                              "value": "Previously reviewed SHA"
+                            }
+                          },
+                          {
+                            "id": "2",
+                            "cells": {
+                              "field": "Audit / issue",
+                              "value": "Awaiting explicit decision"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "audit",
+                      "type": "log",
+                      "title": "What the system records",
+                      "tags": {
+                        "READ": "#38bdf8",
+                        "REVIEW": "#a78bfa",
+                        "WRITE": "#34d399",
+                        "WARN": "#fbbf24"
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "read",
+                      "text": "The maintainer reads the code diff and every affected diagram/step, then determines whether behavior changed.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "report->human",
+                      "panels": {
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "REVIEW",
+                              "text": "Code drift is evidence, not a behavioral verdict."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "no-impact",
+                      "text": "For a harmless change, the maintainer applies flowview/no-impact and closes the report.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "human->decision",
+                      "panels": {
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "REVIEW",
+                              "text": "Explicit no-impact disposition submitted."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "validate",
+                      "text": "The decision runner verifies the report, live actor permission, exact disposition and current evidence before accepting it.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "nodes": [
+                        "decision"
+                      ],
+                      "panels": {
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "READ",
+                              "text": "Validate the decision against trusted current state."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "accept",
+                      "text": "Commit the exact reviewed source pin and audit decision together. The expected narrative stays unchanged.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "decision->git",
+                      "panels": {
+                        "outcome": {
+                          "rows": [
+                            {
+                              "id": "0",
+                              "cells": {
+                                "field": "Expected story",
+                                "value": "Unchanged"
+                              }
+                            },
+                            {
+                              "id": "1",
+                              "cells": {
+                                "field": "Source pin",
+                                "value": "Exact revision in reviewed report"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "field": "Audit / issue",
+                                "value": "No-impact acceptance recorded"
+                              }
+                            }
+                          ]
+                        },
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "WRITE",
+                              "text": "Reviewed pin + audit decision; never accept an unrelated later HEAD."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "regression",
+                      "text": "For a regression, the maintainer links a real team issue, sets flowview/regression and closes the report.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "human->ticket",
+                      "panels": {
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "REVIEW",
+                              "text": "Regression ticket linked; preserve the expected behavior."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "record-regression",
+                      "text": "After validating the regression decision, write its audit state while retaining the expected story and accepted source pin.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "nodes": [
+                        "decision",
+                        "git"
+                      ],
+                      "panels": {
+                        "outcome": {
+                          "rows": [
+                            {
+                              "id": "0",
+                              "cells": {
+                                "field": "Expected story",
+                                "value": "Unchanged"
+                              }
+                            },
+                            {
+                              "id": "1",
+                              "cells": {
+                                "field": "Source pin",
+                                "value": "Previously reviewed SHA"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "field": "Audit / issue",
+                                "value": "Regression + linked issue recorded"
+                              }
+                            }
+                          ]
+                        },
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "WRITE",
+                              "text": "Record regression; do not bless the broken behavior."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "intended",
+                      "text": "For intended behavior, revise the spec and source pin in an ordinary PR; an agent may assist the author.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "human->proposal",
+                      "panels": {
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "REVIEW",
+                              "text": "Proposed new expected behavior requires ordinary review."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "publish",
+                      "text": "The reviewed spec update changes the approved story and pin together; the next published snapshot is discoverable.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/apps/backstage/README.md",
+                      "edge": "proposal->git",
+                      "panels": {
+                        "outcome": {
+                          "rows": [
+                            {
+                              "id": "0",
+                              "cells": {
+                                "field": "Expected story",
+                                "value": "Updated through reviewed spec PR"
+                              }
+                            },
+                            {
+                              "id": "1",
+                              "cells": {
+                                "field": "Source pin",
+                                "value": "Revision reviewed with that update"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "field": "Audit / issue",
+                                "value": "Ordinary PR review record"
+                              }
+                            }
+                          ]
+                        },
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "WRITE",
+                              "text": "Publish the reviewed behavior change."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "closed",
+                      "text": "Closing or merging a report with no disposition leaves the baseline unchanged. A later scan reuses that report.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "nodes": [
+                        "report",
+                        "git"
+                      ],
+                      "panels": {
+                        "audit": {
+                          "log": [
+                            {
+                              "tag": "WARN",
+                              "text": "No explicit disposition; no accepted revision."
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "paths": [
+                    {
+                      "id": "no-impact",
+                      "label": "No impact",
+                      "color": "#38bdf8",
+                      "steps": [
+                        "read",
+                        "no-impact",
+                        "validate",
+                        "accept"
+                      ]
+                    },
+                    {
+                      "id": "regression",
+                      "label": "Regression",
+                      "color": "#fb923c",
+                      "steps": [
+                        "read",
+                        "regression",
+                        "record-regression"
+                      ]
+                    },
+                    {
+                      "id": "intended",
+                      "label": "Intended change",
+                      "color": "#a78bfa",
+                      "steps": [
+                        "read",
+                        "intended",
+                        "publish"
+                      ]
+                    },
+                    {
+                      "id": "unclassified",
+                      "label": "Closed only",
+                      "color": "#94a3b8",
+                      "steps": [
+                        "read",
+                        "closed"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "heading": "Refuse an unsafe or stale decision",
+                "accent": "red",
+                "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                "text": "A disposition is conditional on the evidence and repository state that were actually reviewed. A refused decision cannot advance canon.",
+                "bullets": [
+                  "**Gate inputs:** same-repository closed bot PR, expected branch and evidence marker, live write/maintain/admin actor permission, exactly one disposition, and a ticket for regression.",
+                  "**Recheck evidence:** a changed scope or changed anchored source requires a rescan/review. No-impact acceptance pins the revision in the report even if unrelated later source commits leave that region unchanged.",
+                  "**Races and policy:** a moved default branch or a blocked non-forced commit fails without accepting a baseline. Fix configuration or route through the company’s protected-branch process and rerun.",
+                  "**Idempotence:** repeated identical decision events do not create another acceptance commit. Closed/labeled/edited events support adding a missing ticket and retrying."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "routing": "lanes",
+                  "nodes": {
+                    "event": {
+                      "title": "Review event",
+                      "sub": "closed / labeled / edited",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/.github/workflows/canon-drift.yml"
+                    },
+                    "gate": {
+                      "title": "Decision gates",
+                      "sub": "identity + exact evidence",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/tools/canon/github.mjs"
+                    },
+                    "git": {
+                      "title": "Accepted baseline",
+                      "sub": "atomic non-forced update",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    },
+                    "repair": {
+                      "title": "Repair + review",
+                      "sub": "rescan / fix policy",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "event",
+                      "gate"
+                    ],
+                    [
+                      "git",
+                      "repair"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "event",
+                      "to": "gate",
+                      "label": "Load live review",
+                      "kind": "workflow"
+                    },
+                    {
+                      "from": "gate",
+                      "to": "git",
+                      "label": "Accept reviewed pin",
+                      "kind": "repo"
+                    },
+                    {
+                      "from": "gate",
+                      "to": "repair",
+                      "label": "Explain refusal",
+                      "kind": "evidence"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "gates",
+                      "type": "checks",
+                      "title": "Decision gates",
+                      "checks": [
+                        {
+                          "id": "actor",
+                          "label": "Authorized maintainer"
+                        },
+                        {
+                          "id": "report",
+                          "label": "Trusted report + one disposition"
+                        },
+                        {
+                          "id": "evidence",
+                          "label": "Reviewed evidence still matches"
+                        },
+                        {
+                          "id": "write",
+                          "label": "Git update permitted"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "baseline",
+                      "type": "table",
+                      "title": "Accepted state",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Current value"
+                        }
+                      ],
+                      "initial": {
+                        "rows": [
+                          {
+                            "id": "0",
+                            "cells": {
+                              "field": "Story",
+                              "value": "Previously reviewed story"
+                            }
+                          },
+                          {
+                            "id": "1",
+                            "cells": {
+                              "field": "Pin",
+                              "value": "Previously accepted source revision"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "load",
+                      "text": "Load the live closed bot report and the event sender’s current repository permission from GitHub.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/tools/canon/github.mjs",
+                      "edge": "event->gate"
+                    },
+                    {
+                      "id": "verify",
+                      "text": "Validate report provenance, one explicit disposition and matching reviewed evidence. A regression also requires an issue.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "nodes": [
+                        "gate"
+                      ],
+                      "panels": {
+                        "gates": {
+                          "results": {
+                            "actor": {
+                              "status": "pass",
+                              "detail": "Live write/maintain/admin permission"
+                            },
+                            "report": {
+                              "status": "pass",
+                              "detail": "Expected bot PR and one disposition"
+                            },
+                            "evidence": {
+                              "status": "pass",
+                              "detail": "Exact reviewed source still matches"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "write",
+                      "text": "For no-impact acceptance, if the Git update is permitted, write the reviewed pin and audit atomically without forcing the branch. Regression records audit only and retains the previous pin.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "edge": "gate->git",
+                      "panels": {
+                        "gates": {
+                          "results": {
+                            "actor": {
+                              "status": "pass",
+                              "detail": "Authorized"
+                            },
+                            "report": {
+                              "status": "pass",
+                              "detail": "Valid disposition"
+                            },
+                            "evidence": {
+                              "status": "pass",
+                              "detail": "Exact report revision"
+                            },
+                            "write": {
+                              "status": "pass",
+                              "detail": "Non-forced update accepted"
+                            }
+                          }
+                        },
+                        "baseline": {
+                          "rows": [
+                            {
+                              "id": "0",
+                              "cells": {
+                                "field": "Story",
+                                "value": "Unchanged for no-impact acceptance"
+                              }
+                            },
+                            {
+                              "id": "1",
+                              "cells": {
+                                "field": "Pin",
+                                "value": "Exact reviewed revision"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "stale",
+                      "text": "If anchored source or report evidence changed, refuse acceptance and require a new scan and review.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/tools/canon/github.mjs",
+                      "nodes": [
+                        "gate",
+                        "repair"
+                      ],
+                      "panels": {
+                        "gates": {
+                          "results": {
+                            "actor": {
+                              "status": "pass",
+                              "detail": "Authorized"
+                            },
+                            "report": {
+                              "status": "pass",
+                              "detail": "Valid report"
+                            },
+                            "evidence": {
+                              "status": "fail",
+                              "detail": "Source or evidence no longer matches"
+                            },
+                            "write": {
+                              "status": "skip",
+                              "detail": "No acceptance attempted"
+                            }
+                          }
+                        }
+                      },
+                      "tone": {
+                        "gate": "warn"
+                      },
+                      "failures": {
+                        "gate->git": "blocked"
+                      }
+                    },
+                    {
+                      "id": "unauthorized",
+                      "text": "An unprivileged actor, invalid report or ambiguous disposition is refused; the baseline remains untouched.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "nodes": [
+                        "gate"
+                      ],
+                      "panels": {
+                        "gates": {
+                          "results": {
+                            "actor": {
+                              "status": "fail",
+                              "detail": "Decision is not authorized"
+                            },
+                            "write": {
+                              "status": "skip",
+                              "detail": "No acceptance attempted"
+                            }
+                          }
+                        }
+                      },
+                      "tone": {
+                        "gate": "warn"
+                      },
+                      "failures": {
+                        "gate->git": "blocked"
+                      }
+                    },
+                    {
+                      "id": "protected",
+                      "text": "If branch policy or a concurrent default-branch update rejects the commit, fail the run and leave canon unchanged.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/github-drift-automation.md",
+                      "nodes": [
+                        "gate",
+                        "git",
+                        "repair"
+                      ],
+                      "panels": {
+                        "gates": {
+                          "results": {
+                            "actor": {
+                              "status": "pass",
+                              "detail": "Authorized"
+                            },
+                            "report": {
+                              "status": "pass",
+                              "detail": "Valid report"
+                            },
+                            "evidence": {
+                              "status": "pass",
+                              "detail": "Evidence checked"
+                            },
+                            "write": {
+                              "status": "fail",
+                              "detail": "Policy or concurrent update refused write"
+                            }
+                          }
+                        }
+                      },
+                      "tone": {
+                        "git": "warn"
+                      }
+                    }
+                  ],
+                  "paths": [
+                    {
+                      "id": "accepted",
+                      "label": "No-impact accepted",
+                      "color": "#38bdf8",
+                      "steps": [
+                        "load",
+                        "verify",
+                        "write"
+                      ]
+                    },
+                    {
+                      "id": "stale",
+                      "label": "Stale evidence",
+                      "color": "#fbbf24",
+                      "steps": [
+                        "load",
+                        "stale"
+                      ]
+                    },
+                    {
+                      "id": "denied",
+                      "label": "Unauthorized",
+                      "color": "#fb7185",
+                      "steps": [
+                        "load",
+                        "unauthorized"
+                      ]
+                    },
+                    {
+                      "id": "protected",
+                      "label": "Git write refused",
+                      "color": "#a78bfa",
+                      "steps": [
+                        "load",
+                        "verify",
+                        "protected"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Traces",
+            "sections": [
+              {
+                "heading": "Compare runtime evidence to canon",
+                "accent": "pink",
+                "source": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                "text": "Source drift asks whether referenced code changed. Trace comparison asks how one observed execution differs from the approved story. Both feed reviewed proposals.",
+                "bullets": [
+                  "**Approve the reference:** paste/export Honeycomb JSON, sanitize it, map exact service/operation selectors, then explicitly review the mapping against the spec revision.",
+                  "**Compare an incident:** preserve the unchanged prefix, branch at the first differing beat with independent step IDs, and keep canon untouched until a spec review accepts the overlay.",
+                  "**Evidence boundaries:** a missing span is unknown. A received HTTP error still animates the observed call; only explicit delivery failure gets a broken edge. Queue buildup and backpressure require measured/explicit evidence.",
+                  "**Do not invent the customer outcome:** later physical actions and phone UX require evidence/review. The baseline’s uninstrumented shared prefix is authored context, not newly verified behavior.",
+                  "**Input and freshness:** one trace per import, up to 10,000 spans and 2 MB in the portal. Environment mismatches block comparison; changed selectors/budgets require reference reapproval. Bodies, headers and arbitrary attributes are dropped."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "routing": "lanes",
+                  "nodes": {
+                    "export": {
+                      "title": "Trace JSON",
+                      "sub": "exported runtime evidence",
+                      "icon": "package",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md"
+                    },
+                    "mapper": {
+                      "title": "Trace mapper",
+                      "sub": "selectors + sanitization",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md"
+                    },
+                    "review": {
+                      "title": "Reference review",
+                      "sub": "approve exact mapping",
+                      "icon": "shield",
+                      "tint": "auth",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md"
+                    },
+                    "canon": {
+                      "title": "Reviewed story",
+                      "sub": "reference + spec revision",
+                      "icon": "db",
+                      "tint": "data",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md"
+                    },
+                    "incident": {
+                      "title": "Incident compare",
+                      "sub": "observed divergence",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md"
+                    },
+                    "overlay": {
+                      "title": "Alternate draft",
+                      "sub": "independent failure path",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "export",
+                      "mapper",
+                      "review"
+                    ],
+                    [
+                      "canon",
+                      "incident",
+                      "overlay"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "export",
+                      "to": "mapper",
+                      "label": "Import + sanitize",
+                      "kind": "evidence"
+                    },
+                    {
+                      "from": "mapper",
+                      "to": "review",
+                      "label": "Preview mapping",
+                      "kind": "review"
+                    },
+                    {
+                      "from": "review",
+                      "to": "canon",
+                      "label": "Approve reference",
+                      "kind": "review"
+                    },
+                    {
+                      "from": "canon",
+                      "to": "incident",
+                      "label": "Reviewed expectation",
+                      "kind": "evidence"
+                    },
+                    {
+                      "from": "export",
+                      "to": "incident",
+                      "label": "Incident trace",
+                      "kind": "evidence"
+                    },
+                    {
+                      "from": "incident",
+                      "to": "overlay",
+                      "label": "Divergent steps",
+                      "kind": "evidence"
+                    },
+                    {
+                      "from": "overlay",
+                      "to": "canon",
+                      "label": "Reviewed spec PR",
+                      "kind": "repo"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "status",
+                      "type": "state",
+                      "title": "Evidence workflow",
+                      "states": [
+                        "IMPORT",
+                        "MAP",
+                        "APPROVE",
+                        "COMPARE",
+                        "PROPOSE",
+                        "REVIEW"
+                      ],
+                      "initial": {
+                        "state": "IMPORT"
+                      }
+                    },
+                    {
+                      "id": "limits",
+                      "type": "table",
+                      "title": "What this evidence means",
+                      "columns": [
+                        {
+                          "id": "field",
+                          "label": "Field"
+                        },
+                        {
+                          "id": "value",
+                          "label": "Current value"
+                        }
+                      ],
+                      "initial": {
+                        "rows": [
+                          {
+                            "id": "0",
+                            "cells": {
+                              "field": "Missing span",
+                              "value": "Unknown, not failed delivery"
+                            }
+                          },
+                          {
+                            "id": "1",
+                            "cells": {
+                              "field": "HTTP error",
+                              "value": "Observed request / response"
+                            }
+                          },
+                          {
+                            "id": "2",
+                            "cells": {
+                              "field": "Queue pressure",
+                              "value": "Measured or explicitly instrumented"
+                            }
+                          },
+                          {
+                            "id": "3",
+                            "cells": {
+                              "field": "Canonical spec",
+                              "value": "Unchanged by comparison"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "import",
+                      "text": "Import exported trace JSON and retain only supported operational identity, timing and error attributes.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "edge": "export->mapper",
+                      "panels": {
+                        "status": {
+                          "state": "IMPORT"
+                        }
+                      }
+                    },
+                    {
+                      "id": "map",
+                      "text": "Match exact service/operation selectors; ambiguous or missing matches remain visible. Do not guess concurrency from timestamps.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "edge": "mapper->review",
+                      "panels": {
+                        "status": {
+                          "state": "MAP"
+                        }
+                      }
+                    },
+                    {
+                      "id": "approve",
+                      "text": "Explicitly approve the sanitized reference mapping against the spec revision. Company integration applies real repository review policy.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                      "edge": "review->canon",
+                      "panels": {
+                        "status": {
+                          "state": "APPROVE"
+                        }
+                      }
+                    },
+                    {
+                      "id": "expectation",
+                      "text": "Read the approved reference and authored expectations before comparing an incident trace.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "edge": "canon->incident",
+                      "panels": {
+                        "status": {
+                          "state": "COMPARE"
+                        }
+                      }
+                    },
+                    {
+                      "id": "incident",
+                      "text": "Supply a new incident trace. Environment mismatches block comparison; missing measurements remain unknown.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "edge": "export->incident"
+                    },
+                    {
+                      "id": "overlay",
+                      "text": "Build an isolated alternate at the first differing beat. Preserve only the unchanged prefix and use independent divergent steps.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/backstage-integration.md",
+                      "edge": "incident->overlay",
+                      "panels": {
+                        "status": {
+                          "state": "PROPOSE"
+                        }
+                      }
+                    },
+                    {
+                      "id": "propose",
+                      "text": "A human or agent may edit the alternate and propose it through normal spec review; comparison alone never changes canon.",
+                      "link": "https://github.com/reghartner/design-viz/blob/d647942ccea40c9cf16ccb0260e9397fe66f9a28/docs/canon.md",
+                      "edge": "overlay->canon",
+                      "panels": {
+                        "status": {
+                          "state": "REVIEW"
+                        },
+                        "limits": {
+                          "rows": [
+                            {
+                              "id": "0",
+                              "cells": {
+                                "field": "Overlay",
+                                "value": "Portable incident proposal"
+                              }
+                            },
+                            {
+                              "id": "1",
+                              "cells": {
+                                "field": "Proposed customer outcome",
+                                "value": "Requires human review"
+                              }
+                            },
+                            {
+                              "id": "2",
+                              "cells": {
+                                "field": "Publication",
+                                "value": "Only an approved spec change"
+                              }
+                            },
+                            {
+                              "id": "3",
+                              "cells": {
+                                "field": "Evidence",
+                                "value": "Retained with its comparison limits"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "skin": "daylight"
+  }
+}

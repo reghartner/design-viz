@@ -157,3 +157,32 @@ test('a diagram without panels restores its board and controls from a custom lay
     assert.equal(grid.querySelector('.board'),board);assert.equal(grid.querySelector('.termbar'),bar);
   }
 });
+
+test('detached step controls retain one live transport across layout focus, alternates, and ambient mode',async t=>{
+  for(const panels of [true,false])for(const controlsFirst of [true,false]){
+    const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+    if(!panels){delete d.panels;delete d.primaryPanel;d.steps.forEach(st=>delete st.panels);}
+    d.sectionLayout={confluence:[
+      {x:0,y:controlsFirst?6:0,w:12,h:12},
+      {controls:'steps',x:0,y:controlsFirst?0:12,w:12,h:6}
+    ]};
+    const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
+    const grid=view.querySelector('.section-layout-grid'),bar=view.querySelector('.termbar'),board=view.querySelector('.board');
+    function detached(){
+      assert.equal(grid.querySelector('[data-layout-key="steps"]>.termbar'),bar);
+      assert.equal(grid.querySelector('[data-layout-key="diagram"] .termbar'),null);
+      assert.equal(view.querySelectorAll('.termbar').length,1);assert.equal(view.querySelector('.board'),board);
+    }
+    detached();view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();
+    const caption=bar.querySelector('.stepline').textContent;assert.match(caption,/STEP 3\/4/);
+    for(let i=0;i<2;i++){
+      if(panels){view.querySelector('[data-view-focus="panel"]').click();assert.ok(bar.closest('.primary-panel'));}
+      [...view.querySelectorAll('.diagram-view-choice button')].find(b=>b.textContent==='Data flow').click();
+      assert.equal(grid.hidden,true);assert.equal(bar.querySelector('.stepline').textContent,caption);
+      view.querySelector('[data-view-layout]').click();detached();assert.equal(bar.querySelector('.stepline').textContent,caption);
+    }
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='AMBIENT').click();assert.equal(bar.hidden,true);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();assert.equal(bar.hidden,false);detached();
+    bar.querySelector('[aria-label="Next step"]').click();assert.match(bar.querySelector('.stepline').textContent,/STEP 2\/4/);
+  }
+});

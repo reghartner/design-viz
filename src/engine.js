@@ -4587,6 +4587,7 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
 function createSectionComposition(box, layout, d, board, bar, base, target, changed){
   var items=sectionLayoutItems(d,target || 'default');
   if(!items)return null;
+  var separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';});
   var group=layout.viewChoicesHost;
   if(!group){
     var toolbar=document.createElement('div');toolbar.className='diagram-views';
@@ -4622,19 +4623,22 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     items.slice().sort(function(a,b){return a.y-b.y || a.x-b.x;}).forEach(function(it){
       var tile=document.createElement('div');tile.className='section-layout-tile';
       var key=sectionLayoutKey(it),panel=(d.panels || []).find(function(p){return p.id===it.panel;});
-      tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',panel ? panel.title || panel.id : 'Data flow');
+      tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',key==='steps' ? 'Step controls' : panel ? panel.title || panel.id : 'Data flow');
       tile.style.setProperty('--tile-x',it.x+1);tile.style.setProperty('--tile-y',it.y+1);
       tile.style.setProperty('--tile-w',it.w);tile.style.setProperty('--tile-h',it.h);
       grid.appendChild(tile);
-      if(it.panel != null){
+      if(key==='steps'){
+        move(bar,tile);
+        var hint=document.createElement('div');hint.className='section-steps-placeholder';hint.textContent='Choose Step to show playback controls.';tile.appendChild(hint);
+      }else if(it.panel != null){
         var index=(d.panels || []).indexOf(panel),card=cards.find(function(c){return Number(c.getAttribute('data-dv-panel'))===index;});
         move(card,tile);
       }else if(layout.diagramCol){
         move(layout.diagramCol,tile);
-        if(bar && !layout.diagramCol.contains(bar))move(bar,layout.diagramCol);
+        if(!separateSteps && bar && !layout.diagramCol.contains(bar))move(bar,layout.diagramCol);
       }else{
         var col=document.createElement('div');col.className='diagramcol';tile.appendChild(col);
-        move(board,col);if(bar)move(bar,col);
+        move(board,col);if(!separateSteps && bar)move(bar,col);
       }
     });
     layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;

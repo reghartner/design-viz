@@ -38,7 +38,7 @@ test('host presets are deterministic, compact, non-overlapping and preserve all 
   const d=diagram();
   for(const host of ['default','backstage','confluence']){
     const a=ctx.sectionLayoutPreset(d,host),b=ctx.sectionLayoutPreset(d,host);
-    assert.deepEqual(plain(a),plain(b));assert.equal(a.length,4);noOverlap(a);
+    assert.deepEqual(plain(a),plain(b));assert.equal(a.length,5);noOverlap(a);
     const warnings=[];ctx.sectionLayoutWarnings({...d,sectionLayout:{[host]:a}},'diagram',warnings);assert.deepEqual(warnings,[]);
     assert.equal(a[0].panel,'home');assert.equal(a[0].w,host==='confluence'?12:8);
     if(host==='backstage')assert.deepEqual(plain(a.find(t=>t.panel==='phone')),{panel:'phone',x:8,y:0,w:4,h:10});
@@ -93,5 +93,50 @@ test('optimization fills the row without supporting panels and respects any expl
       const tiles=ctx.sectionLayoutPreset(d,target);assert.ok(tiles.every(t=>t.w===12));noOverlap(tiles);
       if(panels.length)assert.equal(tiles[0].panel,'home');
     }
+  }
+});
+
+
+test('step controls have a distinct identity and survive profile round trips and collision-aware moves',()=>{
+  const d=diagram();d.panels.push({id:'steps',type:'state'});
+  const items=ctx.sectionLayoutPreset(d,'confluence');
+  assert.equal(items.filter(t=>ctx.sectionLayoutKey(t)==='steps').length,1);
+  assert.equal(items.filter(t=>ctx.sectionLayoutKey(t)==='panel:steps').length,1);
+  d.sectionLayout={confluence:items};
+  assert.deepEqual(plain(ctx.sectionLayoutItems(d,'confluence')),plain(items));
+  const before=JSON.stringify(d),moved=ctx.sectionLayoutGesture(items,'steps',0,-12,false);
+  assert.equal(moved.find(t=>t.controls==='steps').y,0);noOverlap(moved);assert.equal(JSON.stringify(d),before);
+  const p=ctx.planSectionLayout(before,d,0,'backstage',moved);assert.ok(!p.error,p.error);
+  assert.deepEqual(JSON.parse(p.text).sectionLayout.confluence,plain(items));
+  assert.equal(JSON.parse(p.text).sectionLayout.backstage.find(t=>t.controls==='steps').y,0);
+});
+test('old layouts retain attached controls until explicitly detached; separation is idempotent and preserves source',()=>{
+  const d=diagram();d.sectionLayout={default:[board,phone]};
+  const items=ctx.sectionLayoutItems(d,'default'),before=JSON.stringify(items);
+  assert.ok(!items.some(t=>t.controls));
+  const detached=ctx.sectionLayoutDetachSteps(d,items),graph=detached.find(t=>ctx.sectionLayoutKey(t)==='diagram'),controls=detached.find(t=>t.controls);
+  assert.equal(graph.h,8);assert.deepEqual(plain(controls),{controls:'steps',x:0,y:8,w:8,h:4});
+  noOverlap(detached);assert.equal(JSON.stringify(items),before);
+  assert.equal(ctx.sectionLayoutDetachSteps(d,detached),detached);
+  const tiny=ctx.sectionLayoutDetachSteps(d,[{...board,h:3},{...phone,x:0,y:3,w:8}]);noOverlap(tiny);
+  assert.ok(tiny.every(t=>t.h>=3));
+});
+test('step-free and ambient-only diagrams do not show control tiles; saved positions can be reused later',()=>{
+  for(const overrides of [{steps:[]},{view:'ambient-only'}]){
+    const d={...diagram(),...overrides},saved={controls:'steps',x:0,y:12,w:12,h:4};
+    d.sectionLayout={default:[board,saved]};
+    assert.ok(!ctx.sectionLayoutPreset(d,'default').some(t=>t.controls));
+    const items=ctx.sectionLayoutItems(d,'default');assert.ok(!items.some(t=>t.controls));
+    assert.equal(ctx.sectionLayoutDetachSteps(d,items),items);
+    const warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);assert.deepEqual(warnings,[]);
+    assert.ok(!ctx.planSectionLayout(JSON.stringify(d),d,0,'backstage',items).error);
+  }
+});
+test('control tile declarations reject invalid or ambiguous identities and duplicates',()=>{
+  const d=diagram(),text=JSON.stringify(d),tile={controls:'steps',x:0,y:12,w:12,h:4};
+  for(const items of [[{...tile,controls:'other'}],[{...tile,controls:{toString:null}}],[{...tile,panel:'phone'}],[tile,tile]]){
+    assert.ok(ctx.planSectionLayout(text,d,0,'default',items).error);
+    const valid=ctx.sectionLayoutItems({...d,sectionLayout:{default:items}},'default');
+    assert.ok(valid.filter(t=>t.controls).length<=1);
   }
 });

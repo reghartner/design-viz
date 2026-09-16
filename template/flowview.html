@@ -94,6 +94,9 @@ body.sk-daylight{background:#F4F2EC;}
 .section-layout-tile .board{flex:1;min-height:80px;margin:0;}
 .section-layout-tile .boardcanvas>svg{height:auto;width:100%;min-width:0;}
 .section-layout-tile .termbar{flex:none;max-height:50%;overflow:auto;margin:0;}
+.section-layout-tile[data-layout-key="steps"]>.termbar{box-sizing:border-box;height:100%;max-height:none;border-radius:12px;align-content:flex-start;}
+.section-steps-placeholder{box-sizing:border-box;height:100%;display:flex;align-items:center;justify-content:center;padding:16px;border:1px dashed var(--acc);border-radius:12px;color:var(--dfaint);font:12px 'IBM Plex Sans',sans-serif;}
+.section-layout-tile:has(>.termbar:not([hidden]))>.section-steps-placeholder{display:none;}
 .docview .section-layout-tile>.pt-homemap{display:flex;flex-direction:column;}
 .section-layout-tile>.pt-homemap>.ptitle{flex:none;}
 .section-layout-tile>.pt-homemap>.pbody{flex:1;min-height:0;}
@@ -106,7 +109,8 @@ body.sk-daylight{background:#F4F2EC;}
 }
 @media print{
   .section-layout-grid{display:block;}
-  .section-layout-tile,.section-layout-tile>.diagramcol,.docview .section-layout-tile>.pwidget{height:auto;overflow:visible;margin-bottom:12px;}
+  .section-steps-placeholder{display:none;}
+  .section-layout-tile,.section-layout-tile>.diagramcol,.section-layout-tile[data-layout-key="steps"]>.termbar,.docview .section-layout-tile>.pwidget{height:auto;overflow:visible;margin-bottom:12px;}
 }
 .boardgrid.haspanels{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:12px; align-items:start;}
 .boardgrid.haspanels > .diagramcol{min-width:0;}
@@ -5609,11 +5613,16 @@ function validatePaths(d, path, errors){
 
 /* Section composition uses a bounded twelve-column grid. Missing/new panels
    are appended; collisions push later tiles down instead of hiding content. */
-function sectionLayoutKey(item){ return item && item.panel != null ? 'panel:' + item.panel : 'diagram'; }
+function sectionLayoutKey(item){
+  if(item && item.panel!=null)return typeof item.panel==='string'?'panel:'+item.panel:'invalid-panel';
+  return item && item.controls!=null ? (item.controls==='steps'?'steps':'invalid-controls') : 'diagram';
+}
 function sectionLayoutTiles(d){
-  return [{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
+  var tiles=[{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
     return {key:'panel:' + p.id,panel:p.id,type:p.type,title:p.title || p.id};
   }));
+  if(Array.isArray(d.steps) && d.steps.length && d.view!=='ambient-only')tiles.push({key:'steps',controls:'steps',title:'Step controls'});
+  return tiles;
 }
 function sectionLayoutPack(items, priority){
   var placed = [], order = items.map(function(it){return Object.assign({},it);});
@@ -5630,9 +5639,11 @@ function sectionLayoutPreset(d, target){
   var tiles=sectionLayoutTiles(d), narrow=target==='confluence', items=[];
   var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
   var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
-  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.type!=='homemap';});
+  var controls=tiles.find(function(t){return t.key==='steps';});
+  if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
+  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && t.type!=='homemap';});
   ordered.forEach(function(t){
-    var large=t.key==='diagram'||t.type==='homemap'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=large?12:t.type==='phone'?10:t.type==='screen'?8:6;
+    var large=t.key==='diagram'||t.key==='steps'||t.type==='homemap'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=t.key==='steps'?((d.paths || []).length>1?6:4):large?12:t.type==='phone'?10:t.type==='screen'?8:6;
     var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
       var it={x:x,y:0,w:w,h:h}, hits;
       while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
@@ -5640,7 +5651,7 @@ function sectionLayoutPreset(d, target){
       return it;
     });
     candidates.sort(function(a,b){return a.y-b.y||a.x-b.x;});
-    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;items.push(item);
+    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;if(t.controls)item.controls=t.controls;items.push(item);
   });
   return items;
 }
@@ -5650,16 +5661,18 @@ function sectionLayoutItems(d, target){
   var items = [], used = Object.create(null);
   saved.forEach(function(it){
     if (!it || typeof it !== 'object') return;
+    if(it.controls!=null && (it.controls!=='steps'||it.panel!=null))return;
     var key = sectionLayoutKey(it);
     if (used[key] || !tiles.some(function(t){return t.key === key;})) return;
     if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
     var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
     if (it.panel != null) copy.panel=it.panel;
+    if (it.controls==='steps') copy.controls='steps';
     used[key]=true;items.push(copy);
   });
   var y = items.reduce(function(n,it){return Math.max(n,it.y+it.h);},0);
   tiles.forEach(function(t){
-    if (used[t.key]) return;
+    if (used[t.key] || t.key==='steps') return; /* Old layouts keep controls attached. */
     var item={x:0,y:y,w:12,h:t.key==='diagram'||t.type==='homemap'?12:6};
     if(t.panel != null)item.panel=t.panel;
     items.push(item);y+=item.h;
@@ -5678,7 +5691,8 @@ function sectionLayoutWarnings(d, path, warnings){
       var p=path+'.sectionLayout.'+target+'['+i+']',key=sectionLayoutKey(it);
       if(!it||typeof it!=='object'||Array.isArray(it)||!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);})||it.x<0||it.y<0||it.w<1||it.h<3||it.x+it.w>12||it.y>500||it.h>40)
         warnings.push(p+': use integer x/y/w/h; 12 columns, y 0–500, h 3–40');
-      if(used[key]||!tiles.some(function(t){return t.key===key;}))warnings.push(p+': duplicate or unknown diagram/panel tile');
+      if(it && it.controls!=null && (it.controls!=='steps'||it.panel!=null))warnings.push(p+': controls must be "steps", without a panel ID');
+      if(used[key]||(key!=='steps'&&!tiles.some(function(t){return t.key===key;})))warnings.push(p+': duplicate or unknown diagram/panel tile');
       used[key]=true;
     });
   });
@@ -11156,6 +11170,7 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
 function createSectionComposition(box, layout, d, board, bar, base, target, changed){
   var items=sectionLayoutItems(d,target || 'default');
   if(!items)return null;
+  var separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';});
   var group=layout.viewChoicesHost;
   if(!group){
     var toolbar=document.createElement('div');toolbar.className='diagram-views';
@@ -11191,19 +11206,22 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     items.slice().sort(function(a,b){return a.y-b.y || a.x-b.x;}).forEach(function(it){
       var tile=document.createElement('div');tile.className='section-layout-tile';
       var key=sectionLayoutKey(it),panel=(d.panels || []).find(function(p){return p.id===it.panel;});
-      tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',panel ? panel.title || panel.id : 'Data flow');
+      tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',key==='steps' ? 'Step controls' : panel ? panel.title || panel.id : 'Data flow');
       tile.style.setProperty('--tile-x',it.x+1);tile.style.setProperty('--tile-y',it.y+1);
       tile.style.setProperty('--tile-w',it.w);tile.style.setProperty('--tile-h',it.h);
       grid.appendChild(tile);
-      if(it.panel != null){
+      if(key==='steps'){
+        move(bar,tile);
+        var hint=document.createElement('div');hint.className='section-steps-placeholder';hint.textContent='Choose Step to show playback controls.';tile.appendChild(hint);
+      }else if(it.panel != null){
         var index=(d.panels || []).indexOf(panel),card=cards.find(function(c){return Number(c.getAttribute('data-dv-panel'))===index;});
         move(card,tile);
       }else if(layout.diagramCol){
         move(layout.diagramCol,tile);
-        if(bar && !layout.diagramCol.contains(bar))move(bar,layout.diagramCol);
+        if(!separateSteps && bar && !layout.diagramCol.contains(bar))move(bar,layout.diagramCol);
       }else{
         var col=document.createElement('div');col.className='diagramcol';tile.appendChild(col);
-        move(board,col);if(bar)move(bar,col);
+        move(board,col);if(!separateSteps && bar)move(bar,col);
       }
     });
     layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;

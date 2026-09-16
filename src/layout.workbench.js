@@ -18,6 +18,16 @@ function sectionLayoutGesture(items,key,dx,dy,resize){
   else{item.x=Math.max(0,Math.min(12-item.w,item.x+Math.round(dx)));item.y=Math.max(0,Math.min(500,item.y+Math.round(dy)));}
   return sectionLayoutPack(next,key);
 }
+/* Separating a legacy combined tile is an explicit, undoable authoring edit. */
+function sectionLayoutDetachSteps(d,items){
+  if(!sectionLayoutTiles(d).some(function(t){return t.key==='steps';}) || items.some(function(it){return sectionLayoutKey(it)==='steps';}))return items;
+  var next=items.map(function(it){return Object.assign({},it);}),diagram=next.find(function(it){return sectionLayoutKey(it)==='diagram';});
+  if(!diagram)return items;
+  var height=Math.min((d.paths || []).length>1?6:4,Math.max(3,diagram.h-3));
+  diagram.h=Math.max(3,diagram.h-height);
+  next.push({controls:'steps',x:diagram.x,y:diagram.y+diagram.h,w:diagram.w,h:height});
+  return sectionLayoutPack(next,'steps');
+}
 function initSectionLayoutEditor(opts){
   var view=opts.view,editing=null,drag=null,selected='diagram',widths={backstage:1080,confluence:760};
   function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text)n.textContent=text;return n;}
@@ -80,7 +90,7 @@ function initSectionLayoutEditor(opts){
     var row=section.querySelector('.section-arrange-fields');if(!row)return;row.replaceChildren();
     var items=sectionLayoutItems(d,target.value);if(!items)return;
     var choose=el('select');choose.setAttribute('aria-label','Layout element');
-    sectionLayoutTiles(d).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;choose.appendChild(o);});
+    sectionLayoutTiles(d).filter(function(t){return items.some(function(it){return sectionLayoutKey(it)===t.key;});}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;choose.appendChild(o);});
     if(!items.some(function(it){return sectionLayoutKey(it)===selected;}))selected='diagram';choose.value=selected;
     choose.addEventListener('change',function(){selected=choose.value;fields(section,d);});row.appendChild(choose);
     var item=items.find(function(it){return sectionLayoutKey(it)===selected;}),inputs={};
@@ -108,7 +118,10 @@ function initSectionLayoutEditor(opts){
           if(editing===index){editing=null;refresh();return;}
           editing=index;selected='diagram';if(opts.pause)opts.pause();
           var current=rawDiagram(index),items=sectionLayoutItems(current,target.value);
-          if(!items)persist(index,sectionLayoutPreset(current,target.value));else{forceLayout(index);refresh();}
+          if(!items)persist(index,sectionLayoutPreset(current,target.value));else{
+            var detached=sectionLayoutDetachSteps(current,items);
+            if(detached!==items)persist(index,detached);else{forceLayout(index);refresh();}
+          }
         });arrange.setAttribute('data-arrange-toggle','');controls.appendChild(arrange);
         controls.appendChild(button('Optimize layout',function(){if(!ready())return;editing=index;persist(index,sectionLayoutPreset(rawDiagram(index),target.value));}));
         controls.appendChild(button('Reset layout',function(){if(!ready())return;editing=null;persist(index,null);}));

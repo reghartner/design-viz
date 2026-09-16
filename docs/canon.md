@@ -98,12 +98,15 @@ steps are listed. Acceptance updates only the exact reviewed reference revision;
 regressions preserve the expected spec and retain a linked issue. Bare closure is
 not a disposition. A separate scan cursor/review identity avoids repeated reports.
 
-`.github/workflows/canon-drift.yml` is disabled until the repository variable
-`FLOWVIEW_CANON_ENABLED=true` is set. Before enabling it, set `FLOWVIEW_REGISTRY`
-to the company registry path and supply `FLOWVIEW_SOURCE_TOKEN` with read access
-to the watched repositories (prefer a company installation-token integration).
-`GITHUB_TOKEN` needs contents and PR write access to the central spec repository.
-The weekday schedule is 06:23 UTC; workflow dispatch also runs a scan.
+`.github/workflows/canon-drift.yml` runs when the repository variable
+`FLOWVIEW_CANON_ENABLED=true` is set. Configure `FLOWVIEW_REGISTRY` and source
+access using the [GitHub automation setup](github-drift-automation.md). It runs
+weekdays at 08:23 America/New_York; workflow dispatch supports a report-only
+scan. Every runner invocation saves Markdown/JSON evidence and an Actions
+summary, including clean scans and failures. Source access/anchor errors fail
+visibly. Private sources can use a freshly minted read-only GitHub App token;
+central writes use `GITHUB_TOKEN`. The real sample registry is
+`examples/canon/github/registry.json`, separate from the fictional local fixtures.
 
 The company runner opens one bot PR per changed reference scope with the code
 comparison and all affected steps. Label a review `flowview/no-impact` and close
@@ -118,9 +121,10 @@ in one Git commit. Branch protection is respected: if bot commits are disallowed
 company integration must route that commit through its protected-branch process.
 
 The workflow always checks out the trusted default branch, never a PR head.
-Watched code and report content remain data. PR creation/deduplication and the
-source adapter are tested against an HTTP GitHub double; no real GitHub scans or
-company PRs are created by the local demo.
+Watched code and report content remain data. Repeated identical decision events
+are idempotent. PR creation/deduplication, repair reports and review gates are
+tested against an HTTP GitHub double. The live sample workflow reads this repo;
+the local portal and rehearsal do not create company PRs.
 
 `tools/canon/backstage.mjs` is the read-only company catalog adapter. It paginates
 Backstage's catalog and maps components, ownership, provided APIs and resolved

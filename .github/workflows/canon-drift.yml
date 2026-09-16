@@ -1,10 +1,16 @@
 name: canonical-flow-drift
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Save the report without opening PRs
+        type: boolean
+        default: false
   schedule:
-    - cron: '23 6 * * 1-5'
+    - cron: '23 8 * * 1-5'
+      timezone: America/New_York
   pull_request_target:
-    types: [closed, labeled]
+    types: [closed, labeled, edited]
 permissions:
   contents: write
   pull-requests: write
@@ -15,18 +21,54 @@ jobs:
   drift:
     if: vars.FLOWVIEW_CANON_ENABLED == 'true' && (github.event_name != 'pull_request_target' || (github.event.pull_request.state == 'closed' && startsWith(github.event.pull_request.head.ref, 'flowview/drift/')))
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       # Never check out a PR head. Source repositories are read as text by API.
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Check configuration
+        env:
+          FLOWVIEW_REGISTRY: ${{ vars.FLOWVIEW_REGISTRY }}
+          FLOWVIEW_SOURCE_APP_CLIENT_ID: ${{ vars.FLOWVIEW_SOURCE_APP_CLIENT_ID }}
+          FLOWVIEW_SOURCE_REPOSITORIES: ${{ vars.FLOWVIEW_SOURCE_REPOSITORIES }}
+        run: |
+          node --input-type=module <<'JS'
+          import {registry} from './tools/canon/registry.mjs';
+          if (!process.env.FLOWVIEW_REGISTRY) throw new Error('Set FLOWVIEW_REGISTRY to the checked-in registry path.');
+          const r = await registry(process.env.FLOWVIEW_REGISTRY);
+          if (!r.specs.length) throw new Error('The registry contains no diagrams.');
+          if (process.env.FLOWVIEW_SOURCE_APP_CLIENT_ID && !process.env.FLOWVIEW_SOURCE_REPOSITORIES) {
+            throw new Error('Set FLOWVIEW_SOURCE_REPOSITORIES to the explicit list of watched repositories.');
+          }
+          JS
+      - name: Create a fresh read-only source token
+        if: vars.FLOWVIEW_SOURCE_APP_CLIENT_ID != ''
+        id: source-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.FLOWVIEW_SOURCE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.FLOWVIEW_SOURCE_APP_PRIVATE_KEY }}
+          owner: ${{ vars.FLOWVIEW_SOURCE_OWNER || github.repository_owner }}
+          repositories: ${{ vars.FLOWVIEW_SOURCE_REPOSITORIES }}
+          permission-contents: read
       - name: Scan or record explicit review disposition
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FLOWVIEW_SOURCE_TOKEN: ${{ secrets.FLOWVIEW_SOURCE_TOKEN }}
+          FLOWVIEW_SOURCE_TOKEN: ${{ steps.source-token.outputs.token || secrets.FLOWVIEW_SOURCE_TOKEN }}
           FLOWVIEW_REGISTRY: ${{ vars.FLOWVIEW_REGISTRY }}
           FLOWVIEW_COMMAND: ${{ github.event_name == 'pull_request_target' && 'decision' || 'scan' }}
+          FLOWVIEW_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
         run: node tools/canon/github.mjs "$FLOWVIEW_COMMAND"
+      - name: Save scan evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flowview-drift-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .local/canon-github/
+          retention-days: 30
+          if-no-files-found: ignore

@@ -16,6 +16,8 @@ traces, and incident alternates. No company sandbox is needed. See the
 and [Backstage/company handoff](docs/backstage-integration.md). The
 [runnable sample app](examples/canon/doorbell-app/README.md) rehearses harmless and
 breaking source changes against actual local Git commits and fixed contract tests.
+For unattended GitHub scans, use the [automation setup](docs/github-drift-automation.md):
+weekday runs, report-only previews, saved evidence, and human-reviewed drift PRs.
 
 
 ## The pipeline

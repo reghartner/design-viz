@@ -253,6 +253,10 @@ review. The fictional `examples/canon/` catalog is for demonstrations only. For 
 central repository, drift scanner, review dispositions and company adapter, use
 `docs/canon.md`. Plain PR closure never accepts a source revision; a regression
 keeps the expected story unchanged and links its issue.
+For scheduled GitHub scans and company setup, use `docs/github-drift-automation.md`.
+The live sample registry is `examples/canon/github/registry.json`; the local mock
+registry contains fictional repositories and must not be enabled for live scans.
+Scanning opens evidence reviews, never automatic behavioral acceptance.
 For approved reference traces and incident alternates, use
 `cookbook/canonical-incidents.md` and `tools/canon/trace-cli.mjs`. Bind exact
 service/operation names with `traceMatch`; disambiguate parallel/repeated calls

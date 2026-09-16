@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "diagrams": [
+    {
+      "id": "doorbell-github",
+      "path": "doorbell.json",
+      "title": "Doorbell sample app · live GitHub source references"
+    }
+  ]
+}

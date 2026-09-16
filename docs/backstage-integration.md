@@ -121,3 +121,9 @@ Local validation covers core algorithms, HTTP adapter doubles, persistence,
 renderer regression suites and browser interaction. It does not establish company
 SSO, GitHub branch-policy compatibility, Honeycomb export conventions or an installed
 Backstage plugin; those are the final integration checks.
+
+## Section layout profiles
+
+See [section arrangements and host previews](section-layouts.md) for saved
+placement and size of diagram/panel tiles, host selection and deployment notes.
+Preview dimensions simulate the content area; verify the actual installed host.

@@ -86,3 +86,7 @@ as preview playback, even for diagrams without steps. It survives normal
 edits, Render and skin changes, independently of whether a step can be matched.
 It is not saved in JSON, drafts, undo or local storage; reloading resets to
 Auto. See [trace viewing](trace-import.md) for sizing and pan behavior.
+
+For saved panel/diagram placement within a section, use
+[section arrangements and host previews](section-layouts.md). These layouts are
+spec content and have their own per-section reset, separate from editor sizing.

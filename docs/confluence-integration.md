@@ -122,3 +122,9 @@ PRs against the host adapter; avoid copying or rewriting the shared renderer.
 - [Content security permissions](https://developer.atlassian.com/platform/forge/manifest-reference/permissions/)
 - [App distribution](https://developer.atlassian.com/platform/forge/distribute-your-apps/)
 - [Currently unavailable Forge capabilities](https://developer.atlassian.com/platform/adopting-forge-from-connect/connect-forge-equivalences/connect-forge-capabilities-notavailable/)
+
+## Section layout profiles
+
+See [section arrangements and host previews](section-layouts.md) for saved
+placement and size of diagram/panel tiles, host selection and deployment notes.
+Preview dimensions simulate the content area; verify the actual installed host.

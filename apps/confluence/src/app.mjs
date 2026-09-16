@@ -28,7 +28,7 @@ export async function startConfluenceApp(document, bridge, core){
     const page = core.confluenceDisplayPage(built.exported.page,built.config);
     const selectedSkin = core.SKIN_NAMES.includes(page.skin) ? page.skin : 'aurora';
     core.applySkinClasses(document.body,host,selectedSkin);
-    controller = core.renderPage(host,page,selectedSkin,{}, {autoplay:!configuring});
+    controller = core.renderPage(host,page,selectedSkin,{}, {autoplay:!configuring,layoutTarget:'confluence'});
     controller.onChange = protectLinks;
     protectLinks();
   }

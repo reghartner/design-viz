@@ -913,6 +913,81 @@ function validatePaths(d, path, errors){
   });
 }
 
+/* Section composition uses a bounded twelve-column grid. Missing/new panels
+   are appended; collisions push later tiles down instead of hiding content. */
+function sectionLayoutKey(item){ return item && item.panel != null ? 'panel:' + item.panel : 'diagram'; }
+function sectionLayoutTiles(d){
+  return [{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
+    return {key:'panel:' + p.id,panel:p.id,type:p.type,title:p.title || p.id};
+  }));
+}
+function sectionLayoutPack(items, priority){
+  var placed = [], order = items.map(function(it){return Object.assign({},it);});
+  if (priority) order.sort(function(a,b){return (sectionLayoutKey(a) === priority ? -1 : 0) - (sectionLayoutKey(b) === priority ? -1 : 0);});
+  order.forEach(function(it){
+    function overlaps(p){return it.x < p.x+p.w && it.x+it.w > p.x && it.y < p.y+p.h && it.y+it.h > p.y;}
+    var hits;
+    while ((hits = placed.filter(overlaps)).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+    placed.push(it);
+  });
+  return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
+}
+function sectionLayoutPreset(d, target){
+  var tiles=sectionLayoutTiles(d), narrow=target==='confluence', items=[];
+  var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
+  var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
+  ordered.forEach(function(t){
+    var large=t.key==='diagram'||t.type==='homemap', w=large?(narrow?12:8):(narrow?6:4), h=large?12:t.type==='phone'?10:t.type==='screen'?8:6;
+    var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
+      var it={x:x,y:0,w:w,h:h}, hits;
+      while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
+        it.y=Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+      return it;
+    });
+    candidates.sort(function(a,b){return a.y-b.y||a.x-b.x;});
+    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;items.push(item);
+  });
+  return items;
+}
+function sectionLayoutItems(d, target){
+  var layouts = d.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
+  if (!Array.isArray(saved)) return null;
+  var items = [], used = Object.create(null);
+  saved.forEach(function(it){
+    if (!it || typeof it !== 'object') return;
+    var key = sectionLayoutKey(it);
+    if (used[key] || !tiles.some(function(t){return t.key === key;})) return;
+    if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
+    var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
+    if (it.panel != null) copy.panel=it.panel;
+    used[key]=true;items.push(copy);
+  });
+  var y = items.reduce(function(n,it){return Math.max(n,it.y+it.h);},0);
+  tiles.forEach(function(t){
+    if (used[t.key]) return;
+    var item={x:0,y:y,w:12,h:t.key==='diagram'||t.type==='homemap'?12:6};
+    if(t.panel != null)item.panel=t.panel;
+    items.push(item);y+=item.h;
+  });
+  return sectionLayoutPack(items);
+}
+function sectionLayoutWarnings(d, path, warnings){
+  var v=d.sectionLayout;
+  if(v == null)return;
+  if(typeof v!=='object'||Array.isArray(v)){warnings.push(path+'.sectionLayout: expected default/backstage/confluence grid layouts');return;}
+  Object.keys(v).forEach(function(target){
+    if(['default','backstage','confluence'].indexOf(target)<0){warnings.push(path+'.sectionLayout: unknown target '+target);return;}
+    var list=v[target],used=Object.create(null),tiles=sectionLayoutTiles(d);
+    if(!Array.isArray(list)){warnings.push(path+'.sectionLayout.'+target+': expected an array of tiles');return;}
+    list.forEach(function(it,i){
+      var p=path+'.sectionLayout.'+target+'['+i+']',key=sectionLayoutKey(it);
+      if(!it||typeof it!=='object'||Array.isArray(it)||!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);})||it.x<0||it.y<0||it.w<1||it.h<3||it.x+it.w>12||it.y>500||it.h>40)
+        warnings.push(p+': use integer x/y/w/h; 12 columns, y 0–500, h 3–40');
+      if(used[key]||!tiles.some(function(t){return t.key===key;}))warnings.push(p+': duplicate or unknown diagram/panel tile');
+      used[key]=true;
+    });
+  });
+}
 function normalize(raw){
   if (raw && raw.page) return raw.page;
   if (raw && (raw.blocks || raw.sections)) return raw;
@@ -980,6 +1055,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!d) return;
   var DP = P + '.diagram';
   validatePaths(d, DP, errors);
+  sectionLayoutWarnings(d, DP, warnings);
   if (d.primaryPanel != null && (typeof d.primaryPanel !== 'string' ||
       !(Array.isArray(d.panels) && d.panels.some(function(p){ return p && p.id === d.primaryPanel; }))))
     warnings.push(DP + '.primaryPanel: must name an existing panel — using the standard flow layout');

@@ -122,3 +122,38 @@ test('display overrides persist separately from the imported JSON',async t=>{
   assert.equal(config.section,'1');assert.equal(config.focus,'data');assert.equal(config.skin,'daylight');
   assert.deepEqual(JSON.parse(config.specJson),JSON.parse(home));
 });
+
+test('Forge selects the Confluence composition and preserves alternate state through live view switches',async t=>{
+  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  d.sectionLayout={default:[{x:0,y:0,w:8,h:12}],confluence:[{panel:'home',x:0,y:0,w:12,h:12},{x:0,y:12,w:12,h:12}]};
+  const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
+  const grid=view.querySelector('.section-layout-grid');assert.equal(grid.dataset.layoutTarget,'confluence');
+  assert.equal(grid.firstChild.dataset.layoutKey,'panel:home');assert.equal(grid.firstChild.style.getPropertyValue('--tile-w'),'12');
+  assert.equal(grid.querySelectorAll('.pwidget').length,d.panels.length,'unspecified panels stay visible');
+  const bar=view.querySelector('.termbar'),map=view.querySelector('.pt-homemap'),board=view.querySelector('.board');
+  view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();
+  const caption=bar.querySelector('.stepline').textContent;
+  for(let i=0;i<2;i++){
+    view.querySelector('[data-view-focus="panel"]').click();assert.equal(grid.hidden,true);
+    assert.equal(map.closest('.boardgrid').hidden,false);assert.equal(bar.querySelector('.stepline').textContent,caption);
+    view.querySelector('[data-view-focus="flow"]').click();assert.equal(grid.hidden,true);
+    view.querySelector('[data-view-layout]').click();assert.equal(grid.hidden,false);
+    assert.equal(view.querySelector('.pt-homemap'),map);assert.equal(view.querySelector('.board'),board);
+    assert.equal(view.querySelector('.termbar'),bar);assert.equal(bar.querySelector('.stepline').textContent,caption);
+  }
+  assert.equal(view.querySelectorAll('.termbar').length,1);
+});
+
+test('a diagram without panels restores its board and controls from a custom layout',async t=>{
+  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  delete d.panels;delete d.primaryPanel;delete d.paths;d.steps=[{id:'start',nodes:['camera'],text:'Start'}];
+  d.sectionLayout={default:[{x:0,y:0,w:12,h:12}]};
+  const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
+  const grid=view.querySelector('.section-layout-grid'),board=view.querySelector('.board'),bar=view.querySelector('.termbar');
+  for(let i=0;i<2;i++){
+    [...view.querySelectorAll('.diagram-view-choice button')].find(b=>b.textContent==='Data flow').click();
+    assert.equal(grid.hidden,true);assert.equal(view.querySelector('.boardgrid').hidden,false);
+    view.querySelector('[data-view-layout]').click();assert.equal(grid.hidden,false);
+    assert.equal(grid.querySelector('.board'),board);assert.equal(grid.querySelector('.termbar'),bar);
+  }
+});

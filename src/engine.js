@@ -4582,6 +4582,76 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
     destroy:function(){destroyed = true;}};
 }
 
+/* Saved section composition moves the existing live widgets, never their state.
+   Home/Data flow remain available and restore the original DOM placement. */
+function createSectionComposition(box, layout, d, board, bar, base, target, changed){
+  var items=sectionLayoutItems(d,target || 'default');
+  if(!items)return null;
+  var group=layout.viewChoicesHost;
+  if(!group){
+    var toolbar=document.createElement('div');toolbar.className='diagram-views';
+    group=document.createElement('div');group.className='diagram-view-choice';
+    toolbar.appendChild(group);box.insertBefore(toolbar,layout.grid);
+  }
+  var button=document.createElement('button');button.type='button';button.className='mbtn';
+  button.textContent='Layout';button.setAttribute('data-view-layout','');group.insertBefore(button,group.firstChild);
+  var standard;
+  if(!base){standard=document.createElement('button');standard.type='button';standard.className='mbtn';standard.textContent='Data flow';group.appendChild(standard);}
+  var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
+  grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
+  var active=false, saved=[], oldHidden, flowHidden;
+  function move(node,host){
+    if(!node)return;
+    var anchor=document.createComment('layout position');node.parentNode.insertBefore(anchor,node);
+    saved.push({node:node,anchor:anchor});host.appendChild(node);
+  }
+  function restore(){
+    if(!active)return;
+    saved.forEach(function(rec){if(rec.anchor.parentNode){rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);}});
+    saved=[];grid.replaceChildren();grid.hidden=true;layout.grid.hidden=oldHidden;
+    if(layout.flowDisclosure)layout.flowDisclosure.hidden=flowHidden;
+    active=false;button.setAttribute('aria-pressed','false');
+    if(standard)standard.setAttribute('aria-pressed','true');
+    if(changed)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
+    if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
+  }
+  function activate(){
+    if(active)return;
+    oldHidden=layout.grid.hidden;flowHidden=layout.flowDisclosure && layout.flowDisclosure.hidden;
+    var cards=Array.prototype.slice.call(box.querySelectorAll('.pwidget[data-dv-panel]'));
+    items.slice().sort(function(a,b){return a.y-b.y || a.x-b.x;}).forEach(function(it){
+      var tile=document.createElement('div');tile.className='section-layout-tile';
+      var key=sectionLayoutKey(it),panel=(d.panels || []).find(function(p){return p.id===it.panel;});
+      tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',panel ? panel.title || panel.id : 'Data flow');
+      tile.style.setProperty('--tile-x',it.x+1);tile.style.setProperty('--tile-y',it.y+1);
+      tile.style.setProperty('--tile-w',it.w);tile.style.setProperty('--tile-h',it.h);
+      grid.appendChild(tile);
+      if(it.panel != null){
+        var index=(d.panels || []).indexOf(panel),card=cards.find(function(c){return Number(c.getAttribute('data-dv-panel'))===index;});
+        move(card,tile);
+      }else if(layout.diagramCol){
+        move(layout.diagramCol,tile);
+        if(bar && !layout.diagramCol.contains(bar))move(bar,layout.diagramCol);
+      }else{
+        var col=document.createElement('div');col.className='diagramcol';tile.appendChild(col);
+        move(board,col);if(bar)move(bar,col);
+      }
+    });
+    layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;
+    grid.hidden=false;active=true;button.setAttribute('aria-pressed','true');
+    if(changed)changed(grid);
+    if(standard)standard.setAttribute('aria-pressed','false');
+    group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed','false');});
+  }
+  function setMode(value){if(value==='layout')activate();else{restore();if(base)base.setMode(value);}}
+  button.addEventListener('click',activate);
+  if(standard)standard.addEventListener('click',restore);
+  group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]'))restore();},true);
+  activate();
+  return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
+    destroy:function(){if(base)base.destroy();}};
+}
+
 function sectionHasProse(sec){
   if (!sec || typeof sec !== 'object') return false;
   var hasText = typeof sec.text === 'string' ? sec.text.length > 0 :
@@ -4844,11 +4914,14 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var hasDelta = diagramHasDelta(d);
   var btnDelta = null, bar = null;
   function addFocusControl(){
-    if (!primaryPanel) return;
-    result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
+    if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
       d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', function(host){
         if (result.stepper) result.stepper.scrollTargetEl = host;
       });
+    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,function(host){
+      if(result.stepper)result.stepper.scrollTargetEl=host;
+    });
+    if(composition)result.presentation=composition;
   }
   if (hasDelta){
     btnDelta = document.createElement('button');

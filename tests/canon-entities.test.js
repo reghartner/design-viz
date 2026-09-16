@@ -71,7 +71,7 @@ test('portal entity lists reflect approved changes and registry additions/remova
     const manifest=JSON.parse(await fs.readFile(path.join(dir,'registry.json')));manifest.diagrams.push({id:'extra',path:'specs/extra.json'});
     await fs.writeFile(path.join(dir,'registry.json'),JSON.stringify(manifest));
     const added=await get(lookup);assert.equal(added.diagrams.length,1);assert.equal(added.diagrams[0].id,'extra');assert.equal(added.diagrams[0].kind,'design');
-    const viewer=new URL(added.diagrams[0].viewerUrl);assert.equal((await (await fetch(viewer.searchParams.get('spec'))).json()).page.canon.id,'extra');
+    const viewer=new URL(added.diagrams[0].viewerUrl);assert.equal(viewer.searchParams.get('layout'),'backstage');assert.equal(new URL(added.diagrams[0].editUrl).searchParams.get('layout'),'backstage');assert.equal((await (await fetch(viewer.searchParams.get('spec'))).json()).page.canon.id,'extra');
     manifest.diagrams.pop();await fs.writeFile(path.join(dir,'registry.json'),JSON.stringify(manifest));
     assert.equal((await get(lookup)).diagrams.length,0);
     await fs.writeFile(path.join(dir,'registry.json'),'broken json');

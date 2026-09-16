@@ -95,7 +95,8 @@ function boot(raw){
   if (v.errors.length){ fail(v.errors); return; }
   var bootSkin = resolveSkin(readCookieText(), page.skin);
   applySkinClasses(document.body, view, bootSkin);
-  var ctl = renderPage(view, page, bootSkin, backlinkData);
+  var layoutTarget=new URLSearchParams(window.location.search).get('layout');
+  var ctl = renderPage(view, page, bootSkin, backlinkData, {layoutTarget:layoutTarget});
   if (embedRequest){
     /* compose with the step deep-link fields: m=/s= without an explicit
        d= selector must address the EMBEDDED diagram, not the page's

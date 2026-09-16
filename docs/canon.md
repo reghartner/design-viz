@@ -227,3 +227,48 @@ These commands write proposed files; committing a reference or incident into the
 central repository remains a reviewed change. See the
 [company integration handoff](backstage-integration.md) and
 [doorbell incident cookbook](../cookbook/canonical-incidents.md).
+
+## Runnable doorbell app rehearsal
+
+`examples/canon/doorbell-app/` contains real, intentionally simple JavaScript for
+button handling, recording and notification, backed by in-memory fakes. Run it
+with `node examples/canon/doorbell-app/run.mjs`, or open the mock portal's
+**Doorbell code-change rehearsal** section and choose **Run code-change rehearsal**.
+
+The rehearsal uses three actual local Git commits: a working 500 ms deadline,
+a harmless refactor inside the referenced recording function, and a deliberately
+broken 50 ms deadline. It runs the same app contract tests in separate processes
+at each revision and reads the source through `LocalGitSources`, not string-only
+snapshots. The refactor yields identical behavior and a source drift report; the
+simulated no-impact review advances only the recording reference. The broken
+revision fails two contract tests, times out ordinary 120 ms storage, and never
+notifies the resident. Its simulated regression review preserves the accepted
+working spec. Repeated scans retain that review without duplication.
+
+For a repeatable command-line run, use a new evidence directory:
+
+```sh
+node tools/canon/doorbell-rehearsal.mjs --out .local/doorbell-demo-1
+node tools/canon/cli.mjs scan --registry .local/doorbell-demo-1/registry.json --state .local/doorbell-demo-1/state.json --local-sources .local/doorbell-demo-1/local-sources.json --out .local/doorbell-demo-1/rescan.md
+```
+
+Omitting `--out` creates a unique directory under `.local/doorbell-rehearsals/`.
+An existing output directory is rejected; previous evidence is never overwritten.
+The portal saves its latest report with its local state and keeps source/test
+artifacts in a neighboring `doorbell-rehearsals/` directory. The report includes
+commit SHAs, before/after source, behavior JSON, affected diagram steps and review
+dispositions. `baseline.tests.tap`, `non-breaking.tests.tap`, and
+`breaking.tests.tap` retain the unchanged contract's actual results.
+
+Local source configuration is `{version:1,repositories:{"https://example.test/doorbell-app":"source"}}`;
+paths resolve relative to that configuration file. `LocalGitSources` reads HEAD
+and immutable blobs from explicitly mapped repositories. Uncommitted file changes
+are not accepted as evidence. It does not fetch, check out, execute source, run
+hooks or apply filters. The fake repository URL is an identity only: its temporary
+commit links are not hosted on GitHub. Inspect source through the report or the
+saved local Git repository.
+
+The rehearsal runner separately executes only the fixed, checked-in sample app.
+It ignores API-supplied paths or commands. It never edits your checkout, pushes
+commits, opens real review PRs or contacts storage/push services. Both review
+dispositions are explicitly simulated; production review policy remains unchanged.

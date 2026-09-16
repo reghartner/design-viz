@@ -1,0 +1,6 @@
+{
+  "name": "fictional-doorbell-app",
+  "private": true,
+  "type": "module",
+  "scripts": {"demo":"node run.mjs", "test":"node --test contract.test.mjs"}
+}

@@ -263,6 +263,10 @@ only the unchanged prefix. Do not copy happy-path physical/phone outcomes after
 the fork without evidence and review. Keep the canonical spec unchanged until
 an explicit spec review accepts the overlay. Company integration handoff:
 `docs/backstage-integration.md`.
+For a runnable code-drift demonstration, use the fixed fictional app in
+`examples/canon/doorbell-app/` and `tools/canon/doorbell-rehearsal.mjs`; it tests a
+refactor and a timeout regression in an isolated local Git history. The rehearsal's
+review decisions are simulations, never automatic approval of company changes.
 
 
 **Choose the main view.** A `homemap` or other panel can be the centerpiece

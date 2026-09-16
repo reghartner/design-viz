@@ -6,11 +6,20 @@ pixels initially). They simulate available space; they do not connect to a host
 or reproduce its navigation, theme, permissions, or enclosing macro. Horizontal
 scrolling lets you inspect a preview wider than your editor split.
 
-In a section, choose **Arrange section**. Each panel and the data-flow diagram
-gets a grab bar and a lower-right resize handle. Drag either handle to snap to
+In a section, choose **Arrange section**. Each panel, the data-flow diagram, and the step controls
+get a grab bar and a lower-right resize handle. Drag either handle to snap to
 a twelve-column grid. Overlapping tiles move down to remain visible. Click
 **Done arranging** to see the reader view. Diagram nodes and Home elements
-retain their existing separate editing controls.
+retain their existing separate editing controls. Drag **Step controls** to put
+play/pause, alternate-path chips, step buttons, and the caption beside the Home
+map or elsewhere in the section. They move as one live group.
+
+Existing saved layouts retain controls attached to their diagram until you
+choose **Arrange section**. That action separates the combined tile into a
+diagram and a controls tile as one undoable edit. Optimize also creates separate
+controls, initially below the centerpiece (or diagram). Sections without steps,
+or with `view:"ambient-only"`, have no controls tile. In Ambient mode a saved
+controls tile prompts you to choose Step; switching views keeps its position.
 
 - A completed move or resize is one **Undo** / **Redo** operation. Escape,
   pointer cancellation, losing focus, or resizing the window cancels a drag.
@@ -47,18 +56,24 @@ Omitting it preserves the existing presentation.
   "default": [
     {"panel":"home", "x":0, "y":0, "w":8, "h":12},
     {"panel":"phone", "x":8, "y":0, "w":4, "h":12},
-    {"x":0, "y":12, "w":12, "h":12}
+    {"controls":"steps", "x":0, "y":12, "w":12, "h":6},
+    {"x":0, "y":18, "w":12, "h":12}
   ],
   "confluence": [
     {"panel":"home", "x":0, "y":0, "w":12, "h":12},
-    {"x":0, "y":12, "w":12, "h":12},
-    {"panel":"phone", "x":0, "y":24, "w":6, "h":12}
+    {"controls":"steps", "x":0, "y":12, "w":12, "h":6},
+    {"x":0, "y":18, "w":12, "h":12},
+    {"panel":"phone", "x":0, "y":30, "w":6, "h":12}
   ]
 }
 ```
 
-A tile without `panel` is the data-flow diagram, including its step controls.
-`panel` names a declared panel ID. `x` and `y` are zero-based grid positions;
+A tile without `panel` or `controls` is the data-flow diagram. `panel` names a
+declared panel ID; `controls:"steps"` identifies the step-controls tile. Do not
+combine `panel` and `controls` on one tile. Omitting the controls tile preserves
+the previous combined diagram-and-controls presentation. A saved controls
+position is ignored while no steps are available and reused if steps return.
+`x` and `y` are zero-based grid positions;
 `w` and `h` are integer spans. There are twelve columns, with `x + w <= 12`,
 `y` from 0 to 500, and `h` from 3 to 40. Rows are 32 pixels with an 8-pixel gap.
 These are presentation coordinates, not story evidence or Home coordinates.

@@ -915,11 +915,16 @@ function validatePaths(d, path, errors){
 
 /* Section composition uses a bounded twelve-column grid. Missing/new panels
    are appended; collisions push later tiles down instead of hiding content. */
-function sectionLayoutKey(item){ return item && item.panel != null ? 'panel:' + item.panel : 'diagram'; }
+function sectionLayoutKey(item){
+  if(item && item.panel!=null)return typeof item.panel==='string'?'panel:'+item.panel:'invalid-panel';
+  return item && item.controls!=null ? (item.controls==='steps'?'steps':'invalid-controls') : 'diagram';
+}
 function sectionLayoutTiles(d){
-  return [{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
+  var tiles=[{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
     return {key:'panel:' + p.id,panel:p.id,type:p.type,title:p.title || p.id};
   }));
+  if(Array.isArray(d.steps) && d.steps.length && d.view!=='ambient-only')tiles.push({key:'steps',controls:'steps',title:'Step controls'});
+  return tiles;
 }
 function sectionLayoutPack(items, priority){
   var placed = [], order = items.map(function(it){return Object.assign({},it);});
@@ -936,9 +941,11 @@ function sectionLayoutPreset(d, target){
   var tiles=sectionLayoutTiles(d), narrow=target==='confluence', items=[];
   var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
   var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
-  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.type!=='homemap';});
+  var controls=tiles.find(function(t){return t.key==='steps';});
+  if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
+  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && t.type!=='homemap';});
   ordered.forEach(function(t){
-    var large=t.key==='diagram'||t.type==='homemap'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=large?12:t.type==='phone'?10:t.type==='screen'?8:6;
+    var large=t.key==='diagram'||t.key==='steps'||t.type==='homemap'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=t.key==='steps'?((d.paths || []).length>1?6:4):large?12:t.type==='phone'?10:t.type==='screen'?8:6;
     var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
       var it={x:x,y:0,w:w,h:h}, hits;
       while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
@@ -946,7 +953,7 @@ function sectionLayoutPreset(d, target){
       return it;
     });
     candidates.sort(function(a,b){return a.y-b.y||a.x-b.x;});
-    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;items.push(item);
+    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;if(t.controls)item.controls=t.controls;items.push(item);
   });
   return items;
 }
@@ -956,16 +963,18 @@ function sectionLayoutItems(d, target){
   var items = [], used = Object.create(null);
   saved.forEach(function(it){
     if (!it || typeof it !== 'object') return;
+    if(it.controls!=null && (it.controls!=='steps'||it.panel!=null))return;
     var key = sectionLayoutKey(it);
     if (used[key] || !tiles.some(function(t){return t.key === key;})) return;
     if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
     var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
     if (it.panel != null) copy.panel=it.panel;
+    if (it.controls==='steps') copy.controls='steps';
     used[key]=true;items.push(copy);
   });
   var y = items.reduce(function(n,it){return Math.max(n,it.y+it.h);},0);
   tiles.forEach(function(t){
-    if (used[t.key]) return;
+    if (used[t.key] || t.key==='steps') return; /* Old layouts keep controls attached. */
     var item={x:0,y:y,w:12,h:t.key==='diagram'||t.type==='homemap'?12:6};
     if(t.panel != null)item.panel=t.panel;
     items.push(item);y+=item.h;
@@ -984,7 +993,8 @@ function sectionLayoutWarnings(d, path, warnings){
       var p=path+'.sectionLayout.'+target+'['+i+']',key=sectionLayoutKey(it);
       if(!it||typeof it!=='object'||Array.isArray(it)||!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);})||it.x<0||it.y<0||it.w<1||it.h<3||it.x+it.w>12||it.y>500||it.h>40)
         warnings.push(p+': use integer x/y/w/h; 12 columns, y 0–500, h 3–40');
-      if(used[key]||!tiles.some(function(t){return t.key===key;}))warnings.push(p+': duplicate or unknown diagram/panel tile');
+      if(it && it.controls!=null && (it.controls!=='steps'||it.panel!=null))warnings.push(p+': controls must be "steps", without a panel ID');
+      if(used[key]||(key!=='steps'&&!tiles.some(function(t){return t.key===key;})))warnings.push(p+': duplicate or unknown diagram/panel tile');
       used[key]=true;
     });
   });

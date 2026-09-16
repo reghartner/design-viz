@@ -186,6 +186,8 @@
       </div>
       <div class="specrow editor-file-tools">
         <span class="bgroup" role="group" aria-label="history"><button class="bbtn" id="undo-builder" disabled>undo</button><button class="bbtn" id="redo-builder" disabled>redo</button></span>
+        <span class="bgroup" role="group" aria-label="Object clipboard"><button class="bbtn" id="object-copy" title="Copy selected objects (⌘/Ctrl C)">Copy</button><button class="bbtn" id="object-paste" aria-haspopup="dialog">Paste…</button><button class="bbtn" id="object-duplicate" title="Duplicate selected objects (⌘/Ctrl D)">Duplicate</button></span>
+        <p id="object-clipboard-status" class="object-clipboard-status" role="status"></p>
         <button class="rbtn" id="go">Render</button>
         <button class="bbtn" id="file-open">open&#8230;</button>
         <button class="bbtn" id="file-save">save</button>
@@ -296,6 +298,15 @@
   disables packets, autoplay, and widget animation.
 </footer>
 
+<dialog class="object-clipboard-dialog" id="object-clipboard" aria-labelledby="object-clipboard-title">
+  <h2 id="object-clipboard-title">Paste objects</h2>
+  <p id="object-clipboard-destination"></p>
+  <button type="button" class="bbtn" id="object-clipboard-read">Read system clipboard</button>
+  <label for="object-clipboard-text">Copied Flowview objects</label>
+  <textarea id="object-clipboard-text" spellcheck="false" placeholder="Paste objects copied from another diagram or tab…"></textarea>
+  <p id="object-clipboard-feedback" role="status"></p>
+  <div class="story-actions"><button type="button" class="bbtn" id="object-clipboard-cancel">Cancel</button><button type="button" class="rbtn" id="object-clipboard-apply">Paste copy</button></div>
+</dialog>
 <dialog class="reuse-dialog" id="step-reuse" aria-labelledby="reuse-title" aria-describedby="reuse-destination">
   <div class="reuse-header">
     <h2 id="reuse-title">Reuse steps</h2>

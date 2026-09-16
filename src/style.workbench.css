@@ -335,6 +335,15 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .rowsedit{flex:1; min-width:0; display:grid; grid-template-columns:minmax(0,1fr); gap:4px;}
 .rowline{display:flex; gap:4px; align-items:center; min-width:0;}
 .rowline .fctl{flex:1 1 0; width:0; min-width:0;}
+/* Object clipboard stays usable on mobile and on LAN pages without Clipboard API. */
+.object-clipboard-status{width:100%;margin:0;font-size:12px;overflow-wrap:anywhere;}
+.object-clipboard-status:empty{display:none;}
+.object-clipboard-dialog{box-sizing:border-box;width:min(640px,calc(100vw - 24px));max-height:90dvh;overflow:auto;padding:24px;border:1px solid #8391a4;border-radius:14px;background:#fff;color:#172b4d;}
+.object-clipboard-dialog::backdrop{background:#13223880;}
+.object-clipboard-dialog h2{margin-top:0;}
+.object-clipboard-dialog label{display:block;margin:18px 0 8px;}
+.object-clipboard-dialog textarea{box-sizing:border-box;width:100%;min-height:180px;max-height:40dvh;resize:vertical;font:12px/1.5 monospace;padding:12px;}
+.object-clipboard-dialog p{font-size:13px;line-height:1.5;overflow-wrap:anywhere;}
 /* 5+ column items (homemap devices, budget metrics) render as a card:
    labeled inputs in a wrapping grid, item actions bottom-right */
 .rowline.rowcard{display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr));
@@ -342,7 +351,7 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .rowline.rowcard .fctl{flex:none; width:100%; box-sizing:border-box;}
 .rowcell{display:flex; flex-direction:column; gap:2px; min-width:0;}
 .rowk{font:600 9px 'IBM Plex Mono',monospace; color:var(--sub);}
-.rowcardacts{grid-column:1 / -1; display:flex; gap:4px; justify-content:flex-end;}
+.rowcardacts{grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;}
 .home-elements,.home-element{min-width:0;border:1px solid var(--line);border-radius:7px;}
 .home-elements>summary,.home-element>summary{cursor:pointer;padding:9px 10px;font:600 12px/1.5 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
 .home-elements>summary:focus-visible,.home-element>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}

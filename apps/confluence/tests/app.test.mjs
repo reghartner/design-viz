@@ -10,7 +10,7 @@ const home=await readFile(new URL('src/starters/homemap-story.json',root),'utf8'
 const trace=await readFile(new URL('src/starters/complex-trace.json',root),'utf8');
 const names=['buildConfluenceExport','buildConfluenceConfig','confluenceSections','confluenceDisplayPage',
   'confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','renderPage','applySkinClasses'];
-const source=(await Promise.all(['validator','engine','confluence'].map(n=>readFile(new URL('src/'+n+'.js',root),'utf8')))).join('\n');
+const source=(await Promise.all(['canon','validator','engine','confluence'].map(n=>readFile(new URL('src/'+n+'.js',root),'utf8')))).join('\n');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,5));
 async function setup(t,{config={},configuring=true,submit,contextError=false,reducedMotion=true}={}){
   const dom=new JSDOM(html,{url:'https://forge.example/viewer/',runScripts:'outside-only',pretendToBeVisual:true});
@@ -30,7 +30,7 @@ async function setup(t,{config={},configuring=true,submit,contextError=false,red
   t.after(()=>{app.destroy();win.close();});
   const el=id=>win.document.getElementById(id);
   const paste=text=>{el('spec-input').value=text;el('spec-input').dispatchEvent(new win.Event('input'));el('validate').click();};
-  return {win,el,paste,calls,core};
+  return {win,el,paste,calls,core,app};
 }
 test('imports, previews and saves a snapshot without shipping the workbench',async t=>{
   const s=await setup(t);s.paste(home);
@@ -185,4 +185,40 @@ test('detached step controls retain one live transport across layout focus, alte
     [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();assert.equal(bar.hidden,false);detached();
     bar.querySelector('[aria-label="Next step"]').click();assert.match(bar.querySelector('.stepline').textContent,/STEP 2\/4/);
   }
+});
+
+
+test('node reference menus support right-click, keyboard focus, Forge navigation, and disposal',async t=>{
+  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  d.nodes.cloud.binding={entityRef:'component:default/events',catalogUrl:'https://backstage.example/catalog/default/component/events',label:'Events <safe>',api:{entityRef:'api:default/events',definitionUrl:'https://api.example/openapi',title:'Events'}};
+  d.nodes.cloud.codeRefs=[{id:'events.handle',repository:'https://github.example/team/events',revision:'a'.repeat(40),path:'src/handler.js',anchor:{start:'start',end:'end'},startLine:10,endLine:15}];
+  const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview'),node=view.querySelector('[data-dv-node="cloud"]'),trigger=node.querySelector('.nrefs-trigger');
+  const rightClick=new s.win.MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:70,clientY:90});node.dispatchEvent(rightClick);
+  const pop=view.querySelector('.node-link-menu');assert.equal(rightClick.defaultPrevented,true);assert.equal(pop.hidden,false);
+  assert.equal(trigger.getAttribute('aria-expanded'),'true');assert.equal(s.win.document.activeElement,pop.querySelector('a'));
+  const links=[...pop.querySelectorAll('a')];assert.equal(links.length,3);assert.match(links[0].textContent,/Events <safe>/);assert.equal(pop.querySelector('safe'),null);
+  assert.match(links[2].href,/blob\/a{40}\/src\/handler.js#L10-L15$/);
+  links[0].dispatchEvent(new s.win.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));assert.equal(s.win.document.activeElement,links[1]);
+  links[1].dispatchEvent(new s.win.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(pop.hidden,true);assert.equal(s.win.document.activeElement,trigger);
+  trigger.dispatchEvent(new s.win.KeyboardEvent('keydown',{key:'F10',shiftKey:true,bubbles:true,cancelable:true}));assert.equal(pop.hidden,false);
+  const board=node.closest('.board');board.dispatchEvent(new s.win.Event('scroll'));assert.equal(pop.hidden,false,'queued scroll without new movement keeps the menu open');
+  board.scrollLeft=20;board.dispatchEvent(new s.win.Event('scroll'));assert.equal(pop.hidden,true,'new board movement dismisses the menu');
+  trigger.dispatchEvent(new s.win.MouseEvent('click',{bubbles:true,cancelable:true}));assert.equal(pop.hidden,false);
+  pop.querySelector('a').dispatchEvent(new s.win.MouseEvent('click',{bubbles:true,cancelable:true}));await settle();
+  assert.deepEqual(s.calls.urls,['https://backstage.example/catalog/default/component/events']);
+  s.win.document.body.dispatchEvent(new s.win.MouseEvent('pointerdown',{bubbles:true}));assert.equal(pop.hidden,true);
+  trigger.dispatchEvent(new s.win.MouseEvent('click',{bubbles:true,cancelable:true}));assert.equal(pop.hidden,false);
+  s.app.destroy();assert.equal(pop.isConnected,false);assert.equal(trigger.getAttribute('aria-expanded'),'false');
+});
+
+test('nodes without references retain native context menus and path replacement removes open menus',async t=>{
+  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  d.nodes.cloud.binding={entityRef:'component:default/events',catalogUrl:'https://backstage.example/events'};
+  const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
+  const camera=view.querySelector('[data-dv-node="camera"]'),ev=new s.win.MouseEvent('contextmenu',{bubbles:true,cancelable:true});camera.dispatchEvent(ev);assert.equal(ev.defaultPrevented,false);assert.equal(camera.querySelector('.nrefs-trigger'),null);
+  view.querySelector('[data-dv-node="cloud"] .nrefs-trigger').dispatchEvent(new s.win.MouseEvent('click',{bubbles:true,cancelable:true}));
+  const old=view.querySelector('.node-link-menu');assert.equal(old.hidden,false);
+  view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();assert.equal(old.isConnected,false);
+  const next=view.querySelector('.node-link-menu');assert.notEqual(next,old);assert.equal(next.hidden,true);
+  view.querySelector('[data-dv-node="cloud"] .nrefs-trigger').dispatchEvent(new s.win.MouseEvent('click',{bubbles:true,cancelable:true}));assert.equal(next.hidden,false);
 });

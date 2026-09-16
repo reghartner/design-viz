@@ -22,7 +22,7 @@ export class GitHubSources {
     return parts.map(encodeURIComponent).join('/');
   }
   async get(path,raw=false){
-    const r=await this.fetch(this.apiBase+path,{headers:{Authorization:'Bearer '+this.token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});
+    const r=await this.fetch(this.apiBase+path,{signal:AbortSignal.timeout(30000),headers:{Authorization:'Bearer '+this.token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});
     if(!r.ok)throw new Error('GitHub source read failed ('+r.status+').');
     const value=raw?await r.text():await r.json();if(raw && value.length>2_000_000)throw new Error('Source file exceeds 2 MB.');return value;
   }

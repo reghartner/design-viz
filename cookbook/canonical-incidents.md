@@ -38,3 +38,7 @@ It applies a harmless refactor and a 500→50 ms timeout regression, runs an unc
 app contract at each revision, and verifies no-impact acceptance versus preserved
 expected behavior. The same rehearsal is available in the local portal; read
 `docs/canon.md#runnable-doorbell-app-rehearsal` for the evidence files and rescan CLI.
+
+For unattended scans of actual GitHub source, use `examples/canon/github/registry.json`
+and `docs/github-drift-automation.md`. The weekday Actions job saves reports and
+opens drift reviews; the fictional portal registry is not a live scan target.

@@ -74,10 +74,12 @@ never send requests to those APIs.
 
 ## Connect code review automation
 
-Follow `docs/canon.md` to configure `FLOWVIEW_REGISTRY`, the cross-repository read
-token, and opt-in `FLOWVIEW_CANON_ENABLED`. Select the cadence in
-`.github/workflows/canon-drift.yml`. Prefer a GitHub App installation token scoped
-to the needed central/source repositories. Configure the bot and branch protection
+Follow [GitHub drift automation](github-drift-automation.md) to configure
+`FLOWVIEW_REGISTRY`, source access, and opt-in `FLOWVIEW_CANON_ENABLED`. The
+weekday 08:23 America/New_York cadence is in `.github/workflows/canon-drift.yml`.
+The workflow supports freshly minted read-only GitHub App source tokens,
+manual report-only runs, saved artifacts and summaries. Central writes use a
+separate `GITHUB_TOKEN`. Configure the bot and branch protection
 so explicit baseline acceptance either writes its atomic commit or routes that
 commit through the company's protected-branch review process.
 

@@ -28,7 +28,7 @@ test('GitHub workflow adapter opens one review PR per changed scope and reuses i
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   try{
-    const env={...process.env,GITHUB_REPOSITORY:'example/specs',GITHUB_TOKEN:'mock',GITHUB_API_URL:'http://127.0.0.1:'+server.address().port,GITHUB_SERVER_URL:'https://github.com',FLOWVIEW_REGISTRY:'examples/canon/registry.json',GITHUB_EVENT_PATH:eventFile};
+    const env={...process.env,GITHUB_REPOSITORY:'example/specs',GITHUB_TOKEN:'mock',GITHUB_API_URL:'http://127.0.0.1:'+server.address().port,GITHUB_SERVER_URL:'https://github.com',FLOWVIEW_REGISTRY:'examples/canon/registry.json',GITHUB_EVENT_PATH:eventFile,FLOWVIEW_REPORT_DIR:require('node:path').join(tmp,'report')};
     await run(process.execPath,['tools/canon/github.mjs','scan'],{env});
     await run(process.execPath,['tools/canon/github.mjs','scan'],{env});
     assert.equal(unexpected,undefined);assert.equal(pulls.length,1);assert.match(pulls[0].body,/doorbell/);assert.match(pulls[0].body,/timeoutMs: 50/);

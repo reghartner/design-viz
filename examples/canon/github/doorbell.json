@@ -1,0 +1,146 @@
+{
+  "page": {
+    "title": "Doorbell sample app · live GitHub source references",
+    "skin": "pastel",
+    "canon": {
+      "version": 1,
+      "id": "doorbell-github",
+      "kind": "canonical",
+      "owner": "group:default/flowview-demo"
+    },
+    "sections": [
+      {
+        "heading": "Button press → saved recording → notification",
+        "text": [
+          "This diagram describes the dependency-free sample app in this repository. Calls are in-process and storage/push are in-memory fakes; it does not represent deployed company services.",
+          "The GitHub scan watches the three anchored functions linked to these steps. Changes outside those anchors are not covered. It compares source text and leaves behavioral impact to a human reviewer."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "routing": "lanes",
+          "nodes": {
+            "button": {
+              "title": "Button event",
+              "icon": "doorbell",
+              "tint": "dev"
+            },
+            "hub": {
+              "title": "Button handler",
+              "icon": "gear",
+              "tint": "mqtt"
+            },
+            "recording": {
+              "title": "Recording + fake storage",
+              "icon": "db",
+              "tint": "cmd"
+            },
+            "notification": {
+              "title": "Notification + fake push",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "button",
+              "hub"
+            ],
+            [
+              "recording",
+              "notification"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "button",
+              "to": "hub",
+              "kind": "data",
+              "label": "in-process event"
+            },
+            {
+              "from": "hub",
+              "to": "recording",
+              "kind": "data",
+              "label": "await createRecording"
+            },
+            {
+              "from": "hub",
+              "to": "notification",
+              "kind": "data",
+              "label": "await notifyResident"
+            }
+          ],
+          "steps": [
+            {
+              "id": "press",
+              "title": "Receive the button press",
+              "edge": "button->hub",
+              "text": "The sample handler validates a doorbell.pressed event with a resident, then waits for recording before sending a notification.",
+              "codeRefs": [
+                {
+                  "id": "receiveButton",
+                  "label": "receiveButton",
+                  "repository": "https://github.com/reghartner/design-viz",
+                  "path": "examples/canon/doorbell-app/src/porch-hub.js",
+                  "revision": "dd74202e5740e2882159521ed1553b082dd9002e",
+                  "anchor": {
+                    "start": "// flow:receiveButton:start",
+                    "end": "// flow:receiveButton:end"
+                  },
+                  "startLine": 4,
+                  "endLine": 13,
+                  "purpose": "The sample handler validates a doorbell.pressed event with a resident, then waits for recording before sending a notification."
+                }
+              ]
+            },
+            {
+              "id": "record",
+              "title": "Save the recording",
+              "edge": "hub->recording",
+              "text": "The fake storage takes 120 ms by default. The recording function allows 500 ms; a timeout stops the handler before notification.",
+              "codeRefs": [
+                {
+                  "id": "createRecording",
+                  "label": "createRecording",
+                  "repository": "https://github.com/reghartner/design-viz",
+                  "path": "examples/canon/doorbell-app/src/recording-service.js",
+                  "revision": "dd74202e5740e2882159521ed1553b082dd9002e",
+                  "anchor": {
+                    "start": "// flow:createRecording:start",
+                    "end": "// flow:createRecording:end"
+                  },
+                  "startLine": 1,
+                  "endLine": 5,
+                  "purpose": "The fake storage takes 120 ms by default. The recording function allows 500 ms; a timeout stops the handler before notification."
+                }
+              ]
+            },
+            {
+              "id": "notify",
+              "title": "Notify after recording",
+              "edge": "hub->notification",
+              "text": "After storage succeeds, the notification function passes the saved recording ID and resident ID to the in-memory push port.",
+              "codeRefs": [
+                {
+                  "id": "notifyResident",
+                  "label": "notifyResident",
+                  "repository": "https://github.com/reghartner/design-viz",
+                  "path": "examples/canon/doorbell-app/src/notification-service.js",
+                  "revision": "dd74202e5740e2882159521ed1553b082dd9002e",
+                  "anchor": {
+                    "start": "// flow:notifyResident:start",
+                    "end": "// flow:notifyResident:end"
+                  },
+                  "startLine": 1,
+                  "endLine": 5,
+                  "purpose": "After storage succeeds, the notification function passes the saved recording ID and resident ID to the in-memory push port."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

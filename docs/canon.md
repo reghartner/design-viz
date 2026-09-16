@@ -133,6 +133,21 @@ contracts need conversion in the company adapter; unsupported contracts remain
 linked with a visible warning. `flowview.io/telemetry-service` maps a catalog
 component to its trace service name when they differ. Credentials stay server-side.
 
+## Discover diagrams from a service
+
+The mock portal's **Services** directory lists the catalog with automatic diagram
+counts. Opening a service shows only diagrams explicitly bound to its full entity
+reference, with canonical/HLD badges, owner, design-document links and matching
+steps on each path. API bindings also have reverse associations. A service's name
+in another namespace does not match. Bound ambient nodes still associate a flow.
+
+Approved spec changes, additions and removals update these lists without a server
+restart. Pages refresh every minute while visible and on focus; failures remain
+visible instead of being reported as zero diagrams. Unapproved drafts stay out.
+The [Backstage entity plugin](../apps/backstage/README.md) implements the same
+experience as a real Component/API **Diagrams** tab. Its guide describes the
+company's authenticated proxy, repository provider and installation steps.
+
 ## Reference traces and incident alternates
 
 The portal's **Trace evidence** controls accept pasted JSON or a local JSON file.

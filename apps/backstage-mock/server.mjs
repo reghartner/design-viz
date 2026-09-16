@@ -8,19 +8,22 @@ import {scan,decide,propose,digest,effectiveSpecs,SnapshotSources,reportMarkdown
 import C from '../../tools/canon/core.cjs';
 import {runDoorbellRehearsal} from '../../tools/canon/doorbell-rehearsal.mjs';
 import {referencePreview,approveReference,compareTrace} from '../../tools/canon/traces.mjs';
+import {buildEntityDiagramIndex,diagramsForEntity} from '../../tools/canon/entity-diagrams.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 
 export async function createCanonServer({registryPath=path.join(root,'examples/canon/registry.json'),statePath=path.join(root,'.local/canon/state.json')}={}){
-  const reg=await registry(registryPath),catalog=C.catalog(await json(path.join(reg.root,'catalog.json'))),sources=new SnapshotSources(await json(path.join(reg.root,'repositories.json')));
+  const initialRegistry=await registry(registryPath),catalog=C.catalog(await json(path.join(initialRegistry.root,'catalog.json'))),sources=new SnapshotSources(await json(path.join(initialRegistry.root,'repositories.json')));
   let state=await stateFile(statePath),mutations=Promise.resolve(),rehearsalJob=null;
-  const specs=()=>effectiveSpecs(reg.specs,state);
-  const find=id=>{const spec=specs().find(s=>s.page.canon.id===id);if(!spec)throw new Error('Diagram not found.');return spec;};
   async function mutate(fn){const job=mutations.then(async()=>{const result=await fn();await atomicJSON(statePath,state);return result;});mutations=job.catch(()=>{});return job;}
   const server=http.createServer(async(req,res)=>{
     const origin='http://'+req.headers.host,url=new URL(req.url,origin);
     function send(status,data,type='application/json'){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(Buffer.isBuffer(data)?data:type==='application/json'?JSON.stringify(data,(_,value)=>typeof value==='string'?value.replace(/^http:\/\/localhost:8766(?=\/(catalog|apis|issues)\/)/,origin):value):data);}
     async function body(){let text='';for await(const chunk of req){text+=chunk;if(text.length>2_000_000)throw new Error('Request exceeds 2 MB.');}return JSON.parse(text || '{}');}
     try{
+      // A freshly read registry makes added/removed diagrams visible without a
+      // server restart. Approved local overlays remain the mock's authority.
+      const reg=await registry(registryPath),specs=()=>effectiveSpecs(reg.specs,state);
+      const find=id=>{const spec=specs().find(s=>s.page.canon.id===id);if(!spec)throw new Error('Diagram not found.');return spec;};
       if(req.method==='POST'){
         if(req.headers.origin && req.headers.origin!==origin)return send(403,{error:'Cross-origin writes are not allowed.'});
         if(req.headers['content-type']?.split(';')[0]!=='application/json')return send(415,{error:'Use application/json.'});
@@ -59,6 +62,14 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
         return send(200,url.pathname.endsWith('/spec')?entry.spec:entry);
       }
       if(url.pathname==='/api/canon/catalog')return send(200,catalog);
+      if(url.pathname==='/api/canon/entity-diagrams'){
+        const index=buildEntityDiagramIndex(specs(),{publicBaseUrl:origin});
+        return send(200,diagramsForEntity(index,url.searchParams.get('entityRef')));
+      }
+      if(url.pathname==='/api/canon/services'){
+        const index=buildEntityDiagramIndex(specs(),{publicBaseUrl:origin});
+        return send(200,{version:1,services:catalog.services.map(s=>({...s,diagramCount:diagramsForEntity(index,s.entityRef).diagrams.length}))});
+      }
       if(url.pathname==='/api/canon/registry')return send(200,{simulated:true,diagrams:specs().map(s=>({id:s.page.canon.id,title:s.page.title,owner:s.page.canon.owner,revision:digest(s),sections:C.sections(s).map((section,index)=>({index,title:section.heading || 'Diagram '+(index+1),hasReference:!!section.diagram.referenceTrace}))})),incidents:Object.values(state.incidents || {}).map(i=>({id:i.id,diagramId:i.diagramId,traceId:i.trace.traceId,createdAt:i.createdAt})),reviews:Object.values(state.reviews),audit:state.audit});
       if(url.pathname==='/api/canon/context'){
         const spec=find(url.searchParams.get('id')),revision=digest(spec),review=state.reviews[url.searchParams.get('review')];
@@ -78,7 +89,7 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
       if(url.pathname==='/api/canon/report')return send(200,reportMarkdown(Object.values(state.reviews)),'text/markdown; charset=utf-8');
       let file;
       if(url.pathname==='/' || /^\/(catalog|apis|issues)\//.test(url.pathname))file=path.join(root,'apps/backstage-mock/public/index.html');
-      else if(/^\/(app\.mjs|style\.css)$/.test(url.pathname))file=path.join(root,'apps/backstage-mock/public',url.pathname.slice(1));
+      else if(/^\/(app\.mjs|entity-view\.mjs|style\.css)$/.test(url.pathname))file=path.join(root,'apps/backstage-mock/public',url.pathname.slice(1));
       else if(/^\/(template|workbench)\/[^/]+\.html$/.test(url.pathname))file=path.join(root,url.pathname.slice(1));
       else if(/^\/src\/starters\/[a-z0-9-]+\.json$/.test(url.pathname))file=path.join(root,url.pathname.slice(1));
       else return send(404,{error:'Not found.'});

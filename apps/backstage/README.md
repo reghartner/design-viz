@@ -1,0 +1,155 @@
+# Flowview entity diagrams for Backstage
+
+This source workspace plugin adds a **Diagrams** tab to Component and API entity
+pages. It discovers published diagrams from explicit spec bindings; no per-service
+list, catalog annotation, or manual Backstage link maintenance is required.
+
+The tab shows canonical/design status, owner, design-document links, matched nodes,
+and links to matching steps on each happy/alternate path. It refreshes every
+60 seconds while visible, on focus, and on demand. Changing services cancels old
+requests. Failed refreshes retain the last result with a visible warning.
+
+## Try the mock
+
+Run `node apps/backstage-mock/server.mjs` from the repository root and open:
+
+- `http://localhost:8766/#services`
+- `http://localhost:8766/catalog/default/component/recording-service`
+
+The mock has the same association API and demonstrates the service experience;
+it is not a running Backstage installation. The package below is the actual
+Backstage frontend integration, ready for the company agent to install.
+
+## Install in the company Backstage app
+
+Copy this directory into your Backstage workspace as `plugins/flowview`, or bring
+it into that workspace through your normal internal package process. Keep
+`tools/canon/entity-diagrams.mjs` and its dependencies in the central repository
+backend. Align the Backstage dependency versions with the host app's release;
+this package is typechecked against the versions pinned in `package-lock.json`.
+It is private source code, not a published npm package.
+
+Add `@flowview/backstage-plugin` as a dependency of the frontend app workspace.
+For a Yarn workspace, its package dependency can use `"workspace:^"`.
+
+For the new frontend system, include the default plugin in the app's features:
+
+```tsx
+import flowviewPlugin from '@flowview/backstage-plugin';
+
+const app = createApp({
+  features: [/* your existing features, */ flowviewPlugin],
+});
+```
+
+This registers the tab for Component and API entities automatically, including
+entities that currently have zero diagrams. Keep the empty tab: it explains how
+a service becomes associated instead of suggesting that the integration is absent.
+
+For an app that still defines `EntityLayout` routes explicitly, use the named
+component on the service/API entity page:
+
+```tsx
+import {EntityFlowviewContent} from '@flowview/backstage-plugin';
+
+<EntityLayout.Route path="/diagrams" title="Diagrams">
+  <EntityFlowviewContent />
+</EntityLayout.Route>
+```
+
+The component gets the entity from Backstage's `useEntity`; it does not guess
+identity from display names. It uses `FetchApi` and discovers the proxy base on
+each request. The optional frontend `flowview.proxyPath` defaults to `/flowview`.
+`config.d.ts` declares that path's frontend visibility; it contains no credentials.
+
+## Connect the read API
+
+Enable the normal authenticated Backstage proxy backend, and configure a read-only
+route to the company's authenticated central repository API:
+
+```yaml
+proxy:
+  endpoints:
+    '/flowview':
+      target: 'https://flowview.internal.example/api/canon'
+      credentials: require
+      allowedMethods: ['GET']
+      headers:
+        Authorization: 'Bearer ${FLOWVIEW_PROXY_TOKEN}'
+```
+
+The token is a backend secret. Use your company's identity-forwarding adapter
+instead if diagram visibility varies by user. Requiring a Backstage login is not
+a substitute for diagram-level authorization. Authoring/viewer URLs must also
+have the company's normal access controls. Do not point a production proxy at
+the no-auth mock server.
+
+Expose this GET endpoint from the company adapter:
+
+```
+/api/canon/entity-diagrams?entityRef=component%3Adefault%2Frecording-service
+```
+
+After obtaining the published specs the requesting viewer can read:
+
+```js
+import {buildEntityDiagramIndex, diagramsForEntity}
+  from './tools/canon/entity-diagrams.mjs';
+
+const index = buildEntityDiagramIndex(authorizedPublishedSpecs, {
+  publicBaseUrl: 'https://flowview.internal.example',
+});
+const result = diagramsForEntity(index, requestedEntityRef);
+// Return result as JSON with the company's normal read authorization.
+```
+
+Use an absolute, externally reachable `publicBaseUrl` (including any deployment
+path prefix). It supplies the viewer, builder and spec URLs; diagrams cannot
+choose the upstream proxy target. Mount those routes at the same base path, or
+adapt URL generation in the company backend to its existing hosted builder.
+The frontend only activates HTTP(S) evidence links without embedded credentials.
+
+The result is version 1 with `entityRef`, a content `revision`, and `diagrams`.
+Each entry has `id`, `title`, `kind`, `owner`, `revision`, `viewerUrl`, `editUrl`,
+optional `designDocument`, and `sections`. Sections contain matched `nodes`,
+a `url`, and paths with numbered, linked steps. Empty results are HTTP 200 with
+an empty array; an invalid/unavailable index must be an error, not an empty list.
+`src/api.ts` contains the frontend contract and response checks.
+
+Refresh the repository provider when approved Git changes land, or read its current
+snapshot per request. Cache by published revision and authorization scope if
+needed. Never share an all-diagram index with a viewer who can only read a subset.
+The mock rereads the registry on requests and derives the index after applying
+approved local decisions; unapproved proposals never appear.
+
+## Association rules
+
+- `nodes.*.binding.entityRef` associates a diagram with a catalog service.
+- `nodes.*.binding.api.entityRef` also associates it with that explicit API.
+- Fully qualified kind/namespace/name is compared case-insensitively. The same
+  name in another namespace or kind is a different entity.
+- Every section/tab is indexed. Multiple matching nodes/sections become one
+  diagram card. Nodes without steps still associate the diagram.
+- Matching steps include explicit node focus, edge endpoints (including failed
+  sends), tones, conditions, and `traceMatch.nodeId`. Links preserve each path's
+  actual step number, including shared steps and independent alternate steps.
+- Viewer routing helpers generate section/step references, so prose sections,
+  duplicate headings and alternate timelines cannot shift links off by one.
+- Display names, source-repository URLs and telemetry names do not create inferred
+  associations. Removed/rebound nodes remove the old service association.
+
+## Verify
+
+```sh
+npm ci --no-fund --no-audit
+npm run verify
+```
+
+CI typechecks against real Backstage packages and tests rendering, automatic
+refresh/error states, request cancellation, link safety and the authenticated
+proxy client. Root Node tests cover indexing, alternate links and registry/review
+updates. Company SSO, authorization and mounting the tab in the company's actual
+Backstage app remain the final integration checks.
+
+References: [entity-content extensions](https://backstage.io/docs/frontend-system/building-plugins/#plugin-specific-extensions),
+[authenticated proxy configuration](https://backstage.io/docs/plugins/proxying/).

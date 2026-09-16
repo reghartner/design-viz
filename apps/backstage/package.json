@@ -1,0 +1,42 @@
+{
+  "name": "@flowview/backstage-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "verify": "npm run check && npm test"
+  },
+  "dependencies": {
+    "@backstage/catalog-model": "1.10.1",
+    "@backstage/frontend-plugin-api": "0.18.1",
+    "@backstage/plugin-catalog-react": "3.2.3"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.30.2"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.24",
+    "@types/react-dom": "18.3.7",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.30.2",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4",
+    "jsdom": "26.1.0",
+    "@testing-library/react": "16.3.0"
+  },
+  "backstage": {
+    "role": "frontend-plugin",
+    "pluginId": "flowview"
+  },
+  "configSchema": "config.d.ts"
+}

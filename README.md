@@ -83,6 +83,9 @@ jumps, duplication, appending and reordering through the same undo history.
 [Reuse steps](docs/workbench-step-reuse.md) copies or shares beats between
 paths, previews their resulting state, and can detach a shared step in place
 or remove just one path's occurrence.
+The [object clipboard](docs/workbench-clipboard.md) copies Home elements, panels,
+nodes and whole sections between diagrams. It includes mobile controls,
+⌘/Ctrl C/V/D, fresh IDs, and one-step Undo.
 
 ```
 design doc (prose / permalinks / mermaid)

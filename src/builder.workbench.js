@@ -2975,6 +2975,7 @@ function initWorkbenchBuilder(opts){
   }
   var selectedEl = null;
   var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
+  var clipboardHomeTarget = null;
   var homeElementFolds = Object.create(null); /* inspector-only disclosure preferences */
   var inspectorScrollKey = null; /* target of the last-rendered inspector form */
   var invalidateEffectiveState = null;
@@ -3715,6 +3716,46 @@ function initWorkbenchBuilder(opts){
     if (parsed.error){ formError(parsed.error); return false; }
     return applyPlan(planFor(parsed.raw), opt);
   }
+  function clipboardSelection(){
+    if (multiSel.length > 1) return multiSel;
+    if (clipboardHomeTarget && clipboardHomeTarget.text === src.value && currentTarget &&
+        currentTarget.kind === 'panel' && clipboardHomeTarget.target.section === currentTarget.section && clipboardHomeTarget.target.index === currentTarget.index)
+      return [clipboardHomeTarget.target];
+    return currentTarget ? [currentTarget] : [];
+  }
+  function homeClipboardSelect(target){clipboardHomeTarget={text:src.value,target:target};}
+  function clipboardDestination(targets){
+    var selected=targets && targets[0] || clipboardSelection()[0];
+    return {section:selected ? selected.section : insertSection,index:selected && ['panel','home'].indexOf(selected.kind)>=0 ? selected.index : undefined};
+  }
+  function applyClipboardPlan(plan){
+    return applyPlan(plan,{after:function(){
+      clearMultiSelect();clipboardHomeTarget=null;
+      var t=plan.target;
+      if(t.kind === 'home'){
+        var identity=JSON.stringify([t.section,t.index,t.field]);
+        var folds=homeElementFolds[identity] || (homeElementFolds[identity]={open:true,items:[]});folds.open=true;folds.items[t.item]=true;
+        selectTarget({kind:'panel',section:t.section,index:t.index},false);homeClipboardSelect(t);
+      } else selectTarget(t,false);
+    }});
+  }
+  var objectClipboard = typeof initBuilderClipboard === 'function' ? initBuilderClipboard(document,{
+    text:function(){return src.value;},selection:clipboardSelection,destination:clipboardDestination,
+    blocked:function(){return !!(addToStep || connect || rowDrag || nodeDrag || groupDrag || view.querySelector('.home-edit-map.moving') || (guide && guide.querySelector('.home-edit-map.moving')));},
+    destinationLabel:function(dest){
+      var parsed=parseEditor(),panel;
+      if(!parsed.error){var got=builderDiagram(src.value,parsed.raw,dest.section);if(!got.error)panel=(got.d.panels || [])[dest.index];}
+      return 'Destination: section '+(dest.section+1)+(panel ? ' · '+(panel.title || panel.id) : '')+'. Select a Home panel first to paste a room, device, or subject.';
+    },apply:applyClipboardPlan,
+    duplicate:function(targets){
+      if(targets.length !== 1 || ['node','section','step'].indexOf(targets[0].kind)<0)return null;
+      var t=targets[0];return commitCascade(function(raw){
+        var plan=t.kind === 'node' ? planDuplicateNode(src.value,raw,t.section,t.id) :
+          t.kind === 'section' ? planDuplicateSection(src.value,raw,t.section) : planDuplicateStep(src.value,raw,t.section,t.index,stepperFor(t.section) && stepperFor(t.section).path());
+        return plan;
+      },{after:function(plan){clearMultiSelect();selectTarget({kind:t.kind,section:t.kind === 'section' ? plan.index : t.section,id:plan.id,index:plan.index},false);}});
+    }
+  }) : null;
   function commitValue(valueText){
     /* replace the selected element's WHOLE value (bullet string, paragraph) */
     var parsed = parseEditor();
@@ -4136,6 +4177,11 @@ function initWorkbenchBuilder(opts){
     var hint = document.createElement('p'); hint.className = 'home-note';
     hint.textContent = 'Drag rooms, devices, doors, or people. Drag the House grip to move the outline; drag square corners to resize it or a room. Faded people start hidden. Changes apply across all paths; step overrides stay intact. Escape cancels.';
     box.appendChild(hint);
+    var copyTools=document.createElement('div');copyTools.className='story-actions';
+    var picked=null, pickLabel=document.createElement('span');pickLabel.className='home-note';pickLabel.textContent='Select an element to copy or duplicate.';copyTools.appendChild(pickLabel);
+    var copyItem=actionButton('Copy element',function(){if(picked && objectClipboard)objectClipboard.copy([picked]);});
+    var duplicateItem=actionButton('Duplicate element',function(){if(picked && objectClipboard)objectClipboard.duplicate([picked]);});
+    copyItem.disabled=duplicateItem.disabled=true;copyTools.appendChild(copyItem);copyTools.appendChild(duplicateItem);box.appendChild(copyTools);
     var map = document.createElement('div'); map.className = 'home-edit-map home-layout-map sk-daylight'; map.tabIndex = 0;
     map.setAttribute('aria-label', 'Shared home layout placement map'); box.appendChild(map);
     var scene = builderHomemapLayoutScene(panel), indexedText = src.value, moving = null;
@@ -4202,6 +4248,10 @@ function initWorkbenchBuilder(opts){
         index=panel[list].findIndex(function(d){return d && d.id === key;});
       }
       var start=eventPoint(ev);if (!item || !start) return;
+      if(kind !== 'outline'){
+        picked={kind:'home',section:target.section,index:target.index,field:kind === 'device' ? 'devices' : kind === 'room' ? 'rooms' : 'subjects',item:index};
+        homeClipboardSelect(picked);pickLabel.textContent=item.label || item.id || 'Room';copyItem.disabled=duplicateItem.disabled=false;
+      } else {picked=null;clipboardHomeTarget=null;copyItem.disabled=duplicateItem.disabled=true;pickLabel.textContent='House outline';}
       ev.preventDefault();map.focus({preventScroll:true});map.setPointerCapture(ev.pointerId);
       moving={kind:kind,key:key,item:item,index:index,start:start,pointer:ev.pointerId,resize:el.hasAttribute('data-home-resize'),changed:false};
       map.classList.add('moving');
@@ -4755,6 +4805,18 @@ function initWorkbenchBuilder(opts){
         acts.className = 'rowcardacts';
         line.appendChild(acts);
       }
+      if (folds && base && objectClipboard){
+        var homeTarget={kind:'home',section:currentTarget.section,index:currentTarget.index,field:key,item:rowRefs.length};
+        function rowClipboard(action){
+          var parsed=parseEditor(),path=parsed.error ? null : builderTargetPath(parsed.raw,{kind:'panel',section:homeTarget.section,index:homeTarget.index});
+          var live=path && specValueAt(parsed.raw,path.concat([key,homeTarget.item]));
+          if(JSON.stringify(live)!==JSON.stringify(base)){formError('The element changed. Reselect it before copying.');return;}
+          homeClipboardSelect(homeTarget);objectClipboard[action]([homeTarget]);
+        }
+        acts.appendChild(smallButton('Copy', 'Copy this Home element', function(){rowClipboard('copy');}));
+        acts.appendChild(smallButton('Duplicate', 'Duplicate this Home element', function(){rowClipboard('duplicate');}));
+        line.addEventListener('focusin',function(){homeClipboardSelect(homeTarget);});
+      }
       acts.appendChild(smallButton('↑', 'move this item up', function(){ moveRow(ref, -1); }));
       acts.appendChild(smallButton('↓', 'move this item down', function(){ moveRow(ref, 1); }));
       /* commit first; only a SUCCESSFUL commit removes the line (via the
@@ -4774,6 +4836,7 @@ function initWorkbenchBuilder(opts){
       var kind = document.createElement('span'); kind.className = 'home-element-kind';
       kind.textContent = ' · ' + (base ? (key === 'rooms' ? base.kind || 'room' : key === 'devices' ? base.display === 'door' ? 'door' : base.kind || 'device' : 'subject') : 'unsaved');
       summary.appendChild(name); summary.appendChild(kind); fold.appendChild(summary); fold.appendChild(line);
+      if(homeTarget)summary.addEventListener('click',function(){homeClipboardSelect(homeTarget);});
       fold.addEventListener('toggle',function(){
         if (fold.isConnected) folds.items[rowRefs.indexOf(ref)] = fold.open;
       });
@@ -5234,6 +5297,10 @@ function initWorkbenchBuilder(opts){
     if (form.childNodes.length) guide.appendChild(form);
     var acts = document.createElement('div');
     acts.className = 'iacts';
+    if(objectClipboard && (kind === 'node' || kind === 'panel')){
+      acts.appendChild(actionButton('Copy selected',function(){objectClipboard.copy(multiSel);}));
+      acts.appendChild(actionButton('Duplicate selected',function(){objectClipboard.duplicate(multiSel);}));
+    }
     if (kind === 'node' || kind === 'edge' || kind === 'step'){
       acts.appendChild(actionButton('mark delta', function(){ return applyBulkField('delta', 'true'); }));
       acts.appendChild(actionButton('clear delta', function(){ return applyBulkField('delta', null); }));
@@ -5348,6 +5415,11 @@ function initWorkbenchBuilder(opts){
 
       var acts = document.createElement('div');
       acts.className = 'iacts';
+      if(objectClipboard && ['node','section','panel'].indexOf(t.kind)>=0){
+        acts.appendChild(actionButton('Copy '+t.kind,function(){objectClipboard.copy([t]);}));
+        acts.appendChild(actionButton('Paste…',function(){clipboardHomeTarget=null;objectClipboard.open();}));
+        if(t.kind === 'panel')acts.appendChild(actionButton('Duplicate panel',function(){objectClipboard.duplicate([t]);}));
+      }
       if (t.kind === 'node'){
         acts.appendChild(actionButton('duplicate', function(){
           commitCascade(function(raw){ return planDuplicateNode(src.value, raw, t.section, t.id); },
@@ -5478,7 +5550,14 @@ function initWorkbenchBuilder(opts){
        immediately stop a user-started animation. */
     if (!addToStep && !connect){
       var homeTarget = builderHomemapClickTarget(ev.target, stepperFor, currentTarget);
-      if (homeTarget) return homeTarget;
+      if (homeTarget){
+        if(homeTarget.kind === 'panel'){
+          var marker=ev.target.closest('[data-device],[data-subject],[data-home-room]');
+          if(marker)homeTarget.homeElement=marker.hasAttribute('data-device') ? {field:'devices',id:marker.getAttribute('data-device')} :
+            marker.hasAttribute('data-subject') ? {field:'subjects',id:marker.getAttribute('data-subject')} : {field:'rooms',item:Number(marker.getAttribute('data-home-room'))};
+        }
+        return homeTarget;
+      }
     }
     var transport = ev.target.closest && ev.target.closest('.tbtn');
     if (transport && /^(Previous|Next) step$/.test(transport.getAttribute('aria-label') || '') &&
@@ -5558,6 +5637,7 @@ function initWorkbenchBuilder(opts){
   }
 
   function selectTarget(target, focusEditor, keepTool){
+    clipboardHomeTarget=null;
     pausePreview();
     if (opts.workspace && !keepTool) opts.workspace.showTool('inspect', {closeUtilities:true});
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
@@ -5576,6 +5656,11 @@ function initWorkbenchBuilder(opts){
     renderInspector();
     applyStepMarkers();
     if (stepList) stepList.sync();
+    if(target.homeElement && !parsed.error){
+      var panelPath=builderTargetPath(parsed.raw,currentTarget), home=panelPath && specValueAt(parsed.raw,panelPath), pick=target.homeElement;
+      var item=pick.field === 'rooms' ? pick.item : home && (home[pick.field] || []).findIndex(function(x){return x.id === pick.id;});
+      if(home && item>=0)homeClipboardSelect({kind:'home',section:target.section,index:target.index,field:pick.field,item:item});
+    }
     if (focusEditor === false) return;
     var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
     var loc = path ? jsonLocate(src.value, path) : null;
@@ -5748,6 +5833,7 @@ function initWorkbenchBuilder(opts){
   }
   document.addEventListener('click', addModeBlocker, true);
   document.addEventListener('keydown', function(ev){
+    if(document.querySelector('#object-clipboard[open]'))return;
     /* the tab bar switches tabs on Arrow/Home/End — pause that too
        while the mode is armed (capture phase beats the engine's
        tab-bar listener) */
@@ -6514,6 +6600,7 @@ function initWorkbenchBuilder(opts){
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
+    if(document.querySelector('#object-clipboard[open]'))return;
     if (ev.key === 'Escape'){
       if (rowDrag){ cancelRowDrag(); return; }
       if (nodeDrag){ cancelNodeDrag(); return; }

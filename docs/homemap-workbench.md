@@ -127,6 +127,13 @@ No schema version change is needed. Reduced motion and print show
 the final state without animation. The inspector's placement map stays steady
 while you edit, and the main map previews the activity.
 
+To copy a room, device, door or subject, use **Edit layout**, select it in the
+shared placement map, and choose **Copy element** or **Duplicate element**.
+Expanded element rows have the same actions. Select a destination Home panel
+before **Paste…**. **Copy panel** carries the entire layout and initial state.
+See [object clipboard](workbench-clipboard.md) for keyboard, mobile and
+cross-diagram behavior; step overrides stay with the original objects.
+
 ## Tweak one step
 
 1. Select a numbered step, or click a device/person while in step view (unless

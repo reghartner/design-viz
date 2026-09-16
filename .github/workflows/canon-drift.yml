@@ -69,6 +69,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: flowview-drift-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .local/canon-github/
+          path: |
+            .local/canon-github/report.md
+            .local/canon-github/report.json
+          include-hidden-files: true
           retention-days: 30
           if-no-files-found: ignore

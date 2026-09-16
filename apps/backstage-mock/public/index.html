@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Flowview · Company repository</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.mjs"></script></head>
+<body><header><span class="brand">Flowview</span><span class="badge">SIMULATED COMPANY · no live services</span><a href="/">Diagram repository</a><a href="/api/canon/report">Drift report</a></header>
+<main><div class="intro"><div><p class="eyebrow">CANONICAL FLOWS</p><h1>Your systems, their stories, the evidence.</h1><p>Review code changes against the flows people depend on.</p></div><button id="scan">Scan for code drift</button></div>
+<p id="status" role="status"></p><section id="entity" hidden></section>
+<nav id="diagrams" aria-label="Diagrams"></nav>
+<section class="stage"><div class="stage-head"><h2 id="title">Loading repository…</h2><a id="edit" class="button" target="_blank" rel="noopener">Open in builder</a></div><iframe id="viewer" title="Interactive canonical flow"></iframe></section>
+<section id="incident-tools" hidden></section>
+<section><div class="stage-head"><h2>Code drift reviews</h2><button id="refresh" class="quiet">Refresh reviews</button></div><p>These are local review records standing in for GitHub PRs. Decisions and proposed specs persist across restarts.</p><div id="reviews"></div></section>
+</main></body></html>

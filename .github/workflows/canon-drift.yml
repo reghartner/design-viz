@@ -1,0 +1,32 @@
+name: canonical-flow-drift
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 6 * * 1-5'
+  pull_request_target:
+    types: [closed, labeled]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: canonical-flow-drift
+  cancel-in-progress: false
+jobs:
+  drift:
+    if: vars.FLOWVIEW_CANON_ENABLED == 'true' && (github.event_name != 'pull_request_target' || (github.event.pull_request.state == 'closed' && startsWith(github.event.pull_request.head.ref, 'flowview/drift/')))
+    runs-on: ubuntu-latest
+    steps:
+      # Never check out a PR head. Source repositories are read as text by API.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Scan or record explicit review disposition
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FLOWVIEW_SOURCE_TOKEN: ${{ secrets.FLOWVIEW_SOURCE_TOKEN }}
+          FLOWVIEW_REGISTRY: ${{ vars.FLOWVIEW_REGISTRY }}
+          FLOWVIEW_COMMAND: ${{ github.event_name == 'pull_request_target' && 'decision' || 'scan' }}
+        run: node tools/canon/github.mjs "$FLOWVIEW_COMMAND"

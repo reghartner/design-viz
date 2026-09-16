@@ -1289,3 +1289,9 @@ placeholder line above is illustrative only and must not appear in output.)
 Optional `page.canon`, node `binding`, and node/step `codeRefs` are documented in
 [the canonical flow contract](../docs/canon.md). These preserve HLD provenance
 and carry portable snapshots, not runtime API calls or an assertion of correctness.
+
+Optional step `traceMatch` selectors, `conditions`, `diagram.referenceTrace`, and
+`diagram.incidents` are also defined there. These fields preserve measured
+provenance and distinguish unknown telemetry from a failed communication.
+See the [incident recipe](../cookbook/canonical-incidents.md) for independent
+alternate steps and the reference approval workflow.

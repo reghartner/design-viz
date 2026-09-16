@@ -62,7 +62,7 @@ if(process.argv[2]==='scan'){
   }
   const ticket=/^Regression ticket:\s*(https?:\/\/\S+)\s*$/mi.exec(pr.body)?.[1];
   const next=decide(reg.specs,result.state,id,{disposition:noImpact?'no-impact':'regression',reason:'Reviewed in '+pr.html_url,ticket,actor});
-  const files=[{path:statePath,content:JSON.stringify(next,null,2)+'\n'}];
+  const files=[];
   if(noImpact){
     for(const spec of effectiveSpecs(reg.specs,next)){
       const entry=reg.entries.find(e=>e.id===spec.page.canon.id),relative=path.relative(process.cwd(),entry.filename);
@@ -70,6 +70,10 @@ if(process.argv[2]==='scan'){
       files.push({path:relative.split(path.sep).join('/'),content:JSON.stringify(spec,null,2)+'\n'});
     }
   }
+  // Git is authoritative after materializing baseline changes. Persisting spec
+  // overlays here would hide later human commits from subsequent scans.
+  next.specs={};
+  files.push({path:statePath,content:JSON.stringify(next,null,2)+'\n'});
   const commit=await commitFiles(files,'Record Flowview review '+id);
   // No force: branch protection and concurrent commits must remain authoritative.
   await request('/git/refs/heads/'+encodeURIComponent(branch),'PATCH',{sha:commit,force:false});

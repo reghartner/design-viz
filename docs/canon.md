@@ -128,3 +128,100 @@ OpenAPI JSON operations into the same snapshot shape as the mock. YAML API
 contracts need conversion in the company adapter; unsupported contracts remain
 linked with a visible warning. `flowview.io/telemetry-service` maps a catalog
 component to its trace service name when they differ. Credentials stay server-side.
+
+## Reference traces and incident alternates
+
+The portal's **Trace evidence** controls accept pasted JSON or a local JSON file.
+Load the fictional **Happy reference**, preview the mapping, supply a reason,
+and **Approve reference mapping**. Then load **Recording service · HTTP 500**,
+**Database latency**, **Queue buildup + backpressure**, **Missing database span**,
+or **Explicit delivery failure** and **Compare incident**. Choose the orange
+path in the embedded viewer. Download its portable spec, or **Propose incident
+as alternate** and review the proposed spec before making it canonical.
+
+The reference approval persists an explicit local review, sanitized operational
+span metadata, and the reviewed selectors. The comparison is a separate overlay;
+it never edits the stored canonical flow. The last 20 comparison results persist
+in local state. Physical actions and customer outcomes after a divergence need
+human review; an observed server span alone does not prove a phone displayed an
+alert. The shared prefix is the authored baseline, not independent verification
+of uninstrumented actions. The viewer's **Trace evidence and comparison limits**
+disclosure carries these qualifications into standalone and Forge exports.
+
+Steps bind evidence with optional `traceMatch`:
+
+```json
+{
+  "id":"persist",
+  "traceMatch":{
+    "serviceName":"clip-store",
+    "operation":"INSERT clip",
+    "nodeId":"database",
+    "parentStepId":"upload",
+    "role":"database",
+    "maxDurationMs":150
+  }
+}
+```
+
+Matching uses exact service and operation names. Optional `namespace` and
+`attributes` disambiguate services/calls. `parentStepId` requires an ancestor or
+same-trace span-link relationship, including async consumers. `occurrence:1`
+selects the first of fully timed, non-overlapping calls; concurrent calls require
+an explicit attribute or parent selector. `repeat:"attempts"` groups calls only
+when distinct numeric `retry.attempt` values and a common parent establish an
+attempt group. It cannot be combined with `occurrence`. A span cannot silently
+satisfy two authored steps. Missing or ambiguous matches remain visible.
+
+Budgets are authored expectations, not inferred SLOs. `maxDurationMs` compares
+individual observed durations. `maxQueueDepth` uses `messaging.queue.depth` or
+`queue.depth`; absent measurements remain unknown. `panelId` can name a declared
+`queue` panel: measured buildup adds a held-state patch labeled **Last measured**.
+`messaging.message.age_ms` supplies oldest age. `flow.backpressure:true` and
+`flow.delivery_failed:true` are explicit instrumentation adapters; they are never
+inferred from a missing span. A received HTTP error animates the observed call;
+only explicit failed delivery creates a broken edge.
+
+Input accepts a nonempty span array, `{spans:[...]}`, or Honeycomb `{events:[...]}`
+with event `data`. Fields are `trace.trace_id`, `trace.span_id`, `trace.parent_id`,
+`service.name`, `name`, `duration_ms`, ISO `timestamp`/event `time`, and `error`.
+Aliases are `traceId`, `spanId`/`id`, `parentId`, `serviceName`, `operation`,
+`durationMs`, and numeric `startMs` **in milliseconds**. The importer preserves
+same-trace `links:[{traceId,spanId}]`. OTLP resourceSpans and opaque Honeycomb
+query result bundles need conversion to this shape; unsupported input fails
+visibly rather than guessing duration units. One import contains exactly one
+trace, at most 10,000 spans and (through the portal) 2 MB of JSON.
+
+Only identity/timing/error fields and these operational attributes are retained:
+`service.namespace`, `service.version`, `deployment.environment.name` (or legacy
+`deployment.environment`), `http.response.status_code`/`http.status_code`,
+`db.system`/`db.system.name`, `messaging.queue.depth`/`queue.depth`,
+`messaging.message.age_ms`, `flow.backpressure`, `flow.delivery_failed`,
+`retry.attempt`, and `flow.step.id`. Bodies, headers and other arbitrary attributes
+are dropped. Span operation names and source URLs still need the company's
+normal data handling policy. Environment mismatches block comparison; missing
+environment and service version changes are reported. Changed selectors or budgets
+require reference reapproval. Unmatched spans are reported and never assigned
+invented nodes, outcomes or root causes.
+
+`diagram.referenceTrace` holds the approved mapping and reference.
+`diagram.incidents` holds portable comparison provenance. Generated divergent
+steps have unique IDs, `evidence`, and `conditions`. Conditions accept
+`service-error`, `delivery-failed`, `slow`, `database-slow`, `queue-buildup`,
+`backpressure`, `retry`, `unknown`, and `ambiguous`, plus a readable `label`,
+optional `nodeId`, and measured values/span IDs. The renderer shows semantic icons,
+per-step diagnostics, and node animations with a reduced-motion alternative.
+These controls are under **Code and trace evidence** in the step inspector.
+
+For agent workflows:
+
+```sh
+node tools/canon/trace-cli.mjs preview --spec examples/canon/specs/doorbell.json --trace examples/canon/traces/happy.json
+node tools/canon/trace-cli.mjs reference --spec examples/canon/specs/doorbell.json --trace examples/canon/traces/happy.json --reason 'Reviewed fixture mapping' --out /tmp/doorbell-reference.json
+node tools/canon/trace-cli.mjs compare --spec /tmp/doorbell-reference.json --trace examples/canon/traces/backpressure.json --out /tmp/doorbell-incident.json
+```
+
+These commands write proposed files; committing a reference or incident into the
+central repository remains a reviewed change. See the
+[company integration handoff](backstage-integration.md) and
+[doorbell incident cookbook](../cookbook/canonical-incidents.md).

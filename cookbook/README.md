@@ -68,3 +68,6 @@ and [effective panel state](../docs/workbench-state-inspector.md).
 - Every step needs content (an edge, nodes, a panel patch, or `failures`), and each
   edge-bearing step needs a DISTINCT first edge or its number coin lands on
   another step's coin (the validator lint names both steps when this happens).
+
+- [Canonical flows and incident traces](canonical-incidents.md): connect real
+  catalog/code identities, approve a reference, and derive evidence-aware alternates.

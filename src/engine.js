@@ -4089,6 +4089,31 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId){
   };
 }
 
+/* Runtime evidence is transient per-step state. Labels remain readable when
+   animation is reduced or the service board is hidden behind a Home view. */
+function renderRuntimeConditions(board, host, conditions){
+  conditions = Array.isArray(conditions) ? conditions : [];
+  Object.keys(board.nodeEls || {}).forEach(function(id){
+    var node=board.nodeEls[id];
+    if(node.querySelectorAll)node.querySelectorAll('.runtime-node-badge').forEach(function(e){e.remove();});
+  });
+  if(host){host.textContent='';host.hidden=!conditions.length;}
+  var symbols={'service-error':'!','delivery-failed':'×','slow':'◷','database-slow':'◷','queue-buildup':'▤','backpressure':'⇤','retry':'↻','unknown':'?','ambiguous':'?'};
+  var grouped=Object.create(null);
+  conditions.forEach(function(c){
+    if(host){var chip=document.createElement('span');chip.className='runtime-chip runtime-'+c.kind;chip.textContent=(symbols[c.kind] || '!')+' '+c.label;host.appendChild(chip);}
+    if(c.nodeId && Object.prototype.hasOwnProperty.call(board.nodeEls,c.nodeId)){if(!grouped[c.nodeId])grouped[c.nodeId]=[];grouped[c.nodeId].push(c);}
+  });
+  Object.keys(grouped).forEach(function(id){
+    var node=board.nodeEls[id],items=grouped[id],c=items[0],card=node.querySelector('.card');
+    var badge=document.createElementNS(SVGNS,'g');badge.setAttribute('class','runtime-node-badge runtime-'+c.kind);
+    badge.setAttribute('transform','translate('+(Number(card.getAttribute('width'))-12)+' '+(Number(card.getAttribute('height'))-10)+')');
+    var title=document.createElementNS(SVGNS,'title');title.textContent=items.map(function(v){return v.label;}).join('; ');badge.appendChild(title);
+    var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','11');badge.appendChild(circle);
+    var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=symbols[c.kind] || '!';badge.appendChild(text);node.appendChild(badge);
+  });
+}
+
 /* ---------------- stepper (click-through) ---------------- */
 function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
   var autoplay = d.autoplay === true && (!options || options.autoplay !== false);
@@ -4108,7 +4133,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
             packets: (st && Array.isArray(st.packets)) ? st.packets : null,
             text: (st && st.text) || '',
             link: (st && typeof st.link === 'string') ? st.link : null,
-            codeRefs:st && st.codeRefs};
+            codeRefs:st && st.codeRefs,conditions:st && st.conditions};
   }); }
   var steps = playbackSteps(d);
   var N = steps.length;
@@ -4276,6 +4301,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     applyNodeTones(board.nodeEls, nodeTonesAt(toneStates, cur, true), tonePulses);
     setFragmentStep(secBox, cur, true);
     var s = steps[cur];
+    renderRuntimeConditions(board,termbar.runtimeStatus,s.conditions);
     s.keys.forEach(function(key){
       var info = board.edgeIds[key];
       var pe = document.getElementById(info.domId);
@@ -4392,6 +4418,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     boardDiv.classList.remove('dv-step-tween');
     boardDiv.classList.remove('stepmode');
     applyNodeTones(board.nodeEls, nodeTonesAt(toneStates, 0, false), []);
+    renderRuntimeConditions(board,termbar.runtimeStatus,[]);
     bar.hidden = true;
     setFragmentStep(secBox, 0, false);
     syncToggle();
@@ -4763,6 +4790,23 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   }
 
   var d = sec.diagram;
+  if(d.referenceTrace || (Array.isArray(d.incidents) && d.incidents.length)){
+    var traceDetails=document.createElement('details');traceDetails.className='canon-evidence';
+    var traceSummary=document.createElement('summary');traceSummary.textContent='Trace evidence and comparison limits';traceDetails.appendChild(traceSummary);
+    function traceNote(text){var p=document.createElement('p');p.textContent=text;traceDetails.appendChild(p);}
+    if(d.referenceTrace && d.referenceTrace.trace){
+      traceNote('Approved reference: '+d.referenceTrace.trace.traceId+' · '+(d.referenceTrace.approval && d.referenceTrace.approval.reason || ''));
+      if(typeof FlowCanon!=='undefined' && FlowCanon.http(d.referenceTrace.trace.sourceUrl))appendCanonLinks(traceDetails,[{label:'Reference trace',url:FlowCanon.http(d.referenceTrace.trace.sourceUrl)}]);
+    }
+    (Array.isArray(d.incidents)?d.incidents:[]).forEach(function(incident){
+      if(!incident || typeof incident!=='object')return;
+      traceNote(incident.traceId+' · first difference: '+incident.firstDivergence);
+      traceNote(incident.note || 'Trace evidence is observational; missing spans do not establish an outage.');
+      (Array.isArray(incident.warnings)?incident.warnings:[]).forEach(traceNote);
+      if(Array.isArray(incident.unmatched) && incident.unmatched.length)traceNote('Unmatched spans: '+incident.unmatched.map(function(s){return s.serviceName+' / '+s.operation;}).join(', '));
+      if(typeof FlowCanon!=='undefined' && FlowCanon.http(incident.sourceUrl))appendCanonLinks(traceDetails,[{label:'Incident trace',url:FlowCanon.http(incident.sourceUrl)}]);
+    });box.appendChild(traceDetails);
+  }
   var activeDiagram = diagramForPath(d);
   var prefix = 'fs' + gi;
   var hasPanels = Array.isArray(d.panels) && d.panels.length > 0;
@@ -4862,6 +4906,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   line.appendChild(failureStatus);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
   line.appendChild(evidenceLinks);
+  var runtimeStatus=document.createElement('span');runtimeStatus.className='runtime-status';runtimeStatus.hidden=true;runtimeStatus.setAttribute('aria-label','Runtime evidence');line.appendChild(runtimeStatus);
   var transport = document.createElement('div'); transport.className = 'step-transport';
   transport.setAttribute('role','group'); transport.setAttribute('aria-label','Step playback');
   transport.appendChild(btnPrev); transport.appendChild(btnPlay); transport.appendChild(btnNext);
@@ -4888,7 +4933,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.appendChild(ol);
 
   var stepper = attachStepper(box, boardDiv, {
-    bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,
+    bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
     printSteps(next);

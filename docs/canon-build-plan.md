@@ -38,3 +38,11 @@ Connect authenticated catalog/repository providers, select repository access and
 review policy, deploy the portal/plugin behind company authentication, and enable
 the scheduled workflow. Cloud installation and real service calls are outside local
 verification. The renderer, editor and local workflow must run without a sandbox.
+
+## Delivered locally
+
+All three stages are implemented: connected authoring, durable drift review with
+GitHub/Backstage adapters, and approved trace mappings with isolated incident
+alternates. Fictional fixtures exercise the complete doorbell flow. See
+`docs/canon.md` to rehearse it and `docs/backstage-integration.md` for the company
+agent's remaining authentication, hosting, repository policy and installation work.

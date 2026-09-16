@@ -96,7 +96,7 @@ var FlowCanon = (function(){
           kind:kind,targetId:id,description:value && (value.text || value.title) || '',reference:ref});
       }); }
       Object.keys(d.nodes || {}).forEach(function(id){add(d.nodes[id],'node',id);});
-      (Array.isArray(d.steps) ? d.steps : []).forEach(function(st,i){add(st,'step',st.id || String(i));});
+      (Array.isArray(d.steps) ? d.steps : []).forEach(function(st,i){add(st,'step',st && st.id || String(i));});
     });
     return out;
   }
@@ -105,7 +105,7 @@ var FlowCanon = (function(){
     if (!object(p)) return errors;
     if (p.canon!=null){
       var c=p.canon;
-      if (!object(c) || c.version!==1 || !c.id || !['design','canonical'].includes(c.kind) || !entityRef(c.owner))
+      if (!object(c) || c.version!==1 || typeof c.id!=='string' || !/^[a-z0-9][a-z0-9_.-]*$/i.test(c.id) || !['design','canonical'].includes(c.kind) || !entityRef(c.owner))
         errors.push('page.canon: expected {version:1,id,kind:"design"|"canonical",owner:<entity reference>}');
     }
     var identities=new Map();
@@ -116,7 +116,7 @@ var FlowCanon = (function(){
       var identity=JSON.stringify([ref.repository,ref.path,ref.revision,ref.anchor]);
       if (identities.has(ref.id) && identities.get(ref.id)!==identity) errors.push('codeRefs: '+ref.id+' identifies conflicting locations or baselines');
       identities.set(ref.id,identity);
-      if (item.kind==='step' && !sections(raw)[item.section].diagram.steps.some(function(s){return s.id===item.targetId;})) errors.push('codeRefs: referenced steps require stable IDs');
+      if (item.kind==='step' && !sections(raw)[item.section].diagram.steps.some(function(s){return s && s.id===item.targetId;})) errors.push('codeRefs: referenced steps require stable IDs');
     });
     sections(raw).forEach(function(sec){
       Object.values(sec.diagram.nodes || {}).concat(sec.diagram.steps || []).forEach(function(v){if(v && v.codeRefs!=null && !Array.isArray(v.codeRefs)) errors.push('codeRefs: expected an array');});
@@ -124,6 +124,38 @@ var FlowCanon = (function(){
         var node=sec.diagram.nodes[id], b=node && node.binding;
         if (b!=null && (!object(b) || !entityRef(b.entityRef))) errors.push('nodes.'+id+'.binding: expected a catalog entityRef');
         if (b && b.api && !entityRef(b.api.entityRef)) errors.push('nodes.'+id+'.binding.api: expected an API entityRef');
+      });
+    });
+    sections(raw).forEach(function(sec){
+      var d=sec.diagram, steps=Array.isArray(d.steps)?d.steps:[], ids=new Set(steps.map(function(s){return s && s.id;}));
+      if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
+      if(d.incidents!=null && (!Array.isArray(d.incidents) || d.incidents.some(function(i){return !object(i) || typeof i.pathId!=='string' || typeof i.traceId!=='string' || typeof i.firstDivergence!=='string';})))errors.push('incidents: expected comparison provenance objects');
+      var parents=new Map(steps.filter(function(s){return s && s.traceMatch;}).map(function(s){return [s.id,s.traceMatch.parentStepId];}));
+      parents.forEach(function(parent,id){var seen=new Set([id]);while(parent){if(seen.has(parent)){errors.push('traceMatch: cyclic parentStepId');break;}seen.add(parent);parent=parents.get(parent);}});
+      steps.forEach(function(st){
+        if(!st)return;
+        var m=st.traceMatch;
+        if(m!=null){
+          if(!object(m) || typeof m.serviceName!=='string' || !m.serviceName.trim() || typeof m.operation!=='string' || !m.operation.trim() || !st.id)errors.push('traceMatch: stable step ID, serviceName and operation required');
+          else {
+            if(m.panelId && !(Array.isArray(d.panels)?d.panels:[]).some(function(p){return p.id===m.panelId && p.type==='queue';}))errors.push('traceMatch.panelId: expected a declared queue panel');
+            if(m.nodeId && !Object.prototype.hasOwnProperty.call(d.nodes || {},m.nodeId))errors.push('traceMatch: unknown nodeId '+m.nodeId);
+            if(m.parentStepId && (!ids.has(m.parentStepId) || m.parentStepId===st.id))errors.push('traceMatch: unknown or self parentStepId');
+            ['maxDurationMs','maxQueueDepth'].forEach(function(k){if(m[k]!=null && (typeof m[k]!=='number' || !Number.isFinite(m[k]) || m[k]<0))errors.push('traceMatch.'+k+': nonnegative number required');});
+            if(m.occurrence!=null && (!Number.isInteger(m.occurrence) || m.occurrence<1))errors.push('traceMatch.occurrence: positive integer required');
+            if(m.repeat!=null && m.repeat!=='attempts')errors.push('traceMatch.repeat: expected attempts');
+            if(m.repeat && m.occurrence)errors.push('traceMatch: occurrence and repeat cannot be combined');
+            var allowed=['service.namespace','service.version','deployment.environment.name','deployment.environment','http.response.status_code','http.status_code','db.system','db.system.name','messaging.queue.depth','queue.depth','messaging.message.age_ms','flow.backpressure','flow.delivery_failed','retry.attempt','flow.step.id'];
+            if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !allowed.includes(k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
+          }
+        }
+        if(st.conditions!=null){
+          if(!Array.isArray(st.conditions))errors.push('conditions: expected an array');
+          else st.conditions.forEach(function(c){
+            if(!object(c) || !['service-error','delivery-failed','slow','database-slow','queue-buildup','backpressure','retry','unknown','ambiguous'].includes(c.kind) || typeof c.label!=='string')errors.push('conditions: expected a supported kind and label');
+            if(c && c.nodeId && !Object.prototype.hasOwnProperty.call(d.nodes || {},c.nodeId))errors.push('conditions: unknown nodeId');
+          });
+        }
       });
     });
     return errors;

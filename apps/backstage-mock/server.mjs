@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {registry,json,stateFile,atomicJSON} from '../../tools/canon/registry.mjs';
 import {scan,decide,propose,digest,effectiveSpecs,SnapshotSources,reportMarkdown} from '../../tools/canon/drift.mjs';
 import C from '../../tools/canon/core.cjs';
+import {referencePreview,approveReference,compareTrace} from '../../tools/canon/traces.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 
 export async function createCanonServer({registryPath=path.join(root,'examples/canon/registry.json'),statePath=path.join(root,'.local/canon/state.json')}={}){
@@ -16,13 +17,27 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
   async function mutate(fn){const job=mutations.then(async()=>{const result=await fn();await atomicJSON(statePath,state);return result;});mutations=job.catch(()=>{});return job;}
   const server=http.createServer(async(req,res)=>{
     const origin='http://'+req.headers.host,url=new URL(req.url,origin);
-    function send(status,data,type='application/json'){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(Buffer.isBuffer(data)?data:type==='application/json'?JSON.stringify(data):data);}
+    function send(status,data,type='application/json'){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(Buffer.isBuffer(data)?data:type==='application/json'?JSON.stringify(data,(_,value)=>typeof value==='string'?value.replace(/^http:\/\/localhost:8766(?=\/(catalog|apis|issues)\/)/,origin):value):data);}
     async function body(){let text='';for await(const chunk of req){text+=chunk;if(text.length>2_000_000)throw new Error('Request exceeds 2 MB.');}return JSON.parse(text || '{}');}
     try{
       if(req.method==='POST'){
         if(req.headers.origin && req.headers.origin!==origin)return send(403,{error:'Cross-origin writes are not allowed.'});
         if(req.headers['content-type']?.split(';')[0]!=='application/json')return send(415,{error:'Use application/json.'});
         const data=await body();
+        if(url.pathname==='/api/canon/reference-preview')return send(200,referencePreview(find(data.id),data.trace,data.section || 0));
+        if(url.pathname==='/api/canon/reference-approve')return send(200,await mutate(async()=>{
+          const current=find(data.id);if(data.baseRevision!==digest(current))throw new Error('Diagram changed; preview the reference again.');
+          const spec=approveReference(current,data.trace,{section:data.section || 0,reason:data.reason});
+          const proposed=propose(reg.specs,state,{id:data.id,spec,baseRevision:data.baseRevision});
+          state=decide(reg.specs,proposed.state,proposed.id,{disposition:'update',reason:data.reason});return {revision:digest(spec)};
+        }));
+        if(url.pathname==='/api/canon/compare')return send(200,await mutate(async()=>{
+          const current=find(data.id),result=compareTrace(current,data.trace,{section:data.section || 0,label:data.label || 'Incident trace'});
+          const id=digest([data.id,result.trace,result.spec]).slice(0,20),entry={id,diagramId:data.id,baseRevision:digest(current),createdAt:new Date().toISOString(),...result};
+          state.incidents=state.incidents || {};state.incidents[id]=entry;
+          const keys=Object.keys(state.incidents);for(const key of keys.slice(0,Math.max(0,keys.length-20)))delete state.incidents[key];
+          return entry;
+        }));
         if(url.pathname==='/api/canon/scan')return send(200,await mutate(async()=>{const result=await scan(reg.specs,sources,state);state=result.state;return {reviews:result.findings};}));
         if(url.pathname==='/api/canon/decisions')return send(200,await mutate(async()=>{state=decide(reg.specs,state,data.id,{...data,ticket:data.ticket || origin+'/issues/'+data.id});return state.reviews[data.id];}));
         if(url.pathname==='/api/canon/proposals')return send(200,await mutate(async()=>{
@@ -31,8 +46,13 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
         return send(404,{error:'Unknown action.'});
       }
       if(req.method!=='GET')return send(405,{error:'Method not supported.'});
+      if(/^\/api\/canon\/fixtures\/[a-z-]+$/.test(url.pathname))return send(200,await json(path.join(root,'examples/canon/traces',url.pathname.split('/').pop()+'.json')));
+      if(/^\/api\/canon\/incidents\/[a-f0-9]{20}(\/spec)?$/.test(url.pathname)){
+        const entry=state.incidents?.[url.pathname.split('/')[4]];if(!entry)return send(404,{error:'Incident no longer available.'});
+        return send(200,url.pathname.endsWith('/spec')?entry.spec:entry);
+      }
       if(url.pathname==='/api/canon/catalog')return send(200,catalog);
-      if(url.pathname==='/api/canon/registry')return send(200,{simulated:true,diagrams:specs().map(s=>({id:s.page.canon.id,title:s.page.title,owner:s.page.canon.owner,revision:digest(s)})),reviews:Object.values(state.reviews),audit:state.audit});
+      if(url.pathname==='/api/canon/registry')return send(200,{simulated:true,diagrams:specs().map(s=>({id:s.page.canon.id,title:s.page.title,owner:s.page.canon.owner,revision:digest(s),sections:C.sections(s).map((section,index)=>({index,title:section.heading || 'Diagram '+(index+1),hasReference:!!section.diagram.referenceTrace}))})),incidents:Object.values(state.incidents || {}).map(i=>({id:i.id,diagramId:i.diagramId,traceId:i.trace.traceId,createdAt:i.createdAt})),reviews:Object.values(state.reviews),audit:state.audit});
       if(url.pathname==='/api/canon/context'){
         const spec=find(url.searchParams.get('id')),revision=digest(spec),review=state.reviews[url.searchParams.get('review')];
         if(review?.type==='drift' && !review.error){

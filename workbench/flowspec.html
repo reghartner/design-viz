@@ -597,6 +597,31 @@ body.sk-aurora.sk-blueprint{
 .home-subject{padding:8px 0;border-top:1px solid var(--line);}
 .home-subject .bbtn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);}
 .home-signal{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;margin:6px 0;}
+
+/* Host previews affect the preview frame, never the authored story. */
+.layout-preview-tools,.section-arrange-actions,.section-arrange-fields{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.layout-preview-tools{margin:10px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--ink);}
+.layout-preview-tools label,.section-arrange-fields label{display:flex;align-items:center;gap:5px;}
+.layout-preview-tools select,.layout-preview-tools input,.section-arrange-fields select,.section-arrange-fields input{box-sizing:border-box;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:6px;min-height:34px;font:inherit;}
+.layout-preview-tools input{width:88px;}
+.layout-preview-stage{min-width:0;max-width:100%;overflow:auto;}
+.layout-preview-frame{box-sizing:border-box;min-width:320px;}
+.layout-preview-frame>.docview{box-sizing:border-box;width:100%;max-width:none;}
+.layout-preview-frame[data-target="confluence"]>.docview{padding:12px;border-radius:0;}
+.layout-preview-frame[data-target="backstage"]>.docview{padding:16px;border-radius:4px;}
+.section-arranger{margin:12px 0;color:var(--dtext);font:12px 'IBM Plex Sans',sans-serif;}
+.section-arrange-fields{padding:10px 0;}
+.section-arrange-fields[hidden]{display:none;}
+.section-arrange-fields input{width:60px;}
+.section-arrange-fields select{max-width:190px;}
+.section-arranging .section-layout-tile{outline:1px dashed var(--acc);padding-top:30px;box-sizing:border-box;}
+.section-arranging .section-layout-tile.layout-selected{outline:2px solid var(--acc);}
+.section-tile-move,.section-tile-resize{display:none;position:absolute;z-index:4;touch-action:none;user-select:none;background:var(--card);color:var(--ink);border:1px solid var(--line);font:12px 'IBM Plex Sans',sans-serif;cursor:grab;}
+.section-arranging .section-tile-move{display:block;top:0;left:0;right:0;height:28px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.section-arranging .section-tile-resize{display:block;right:1px;bottom:1px;width:32px;height:32px;cursor:nwse-resize;border-radius:6px 0 0 0;}
+.layout-dragging{user-select:none;}
+.layout-dragging .section-layout-tile{transition:none;}
+@media print{.section-arranger,.section-tile-move,.section-tile-resize,.layout-preview-tools{display:none !important;}}
 /* style.core.css — shared doc/board/widget styles for both built pages. */
 :root{--delta:#2FBF71;}
 .tabbar{display:flex; gap:6px; flex-wrap:wrap; margin-top:24px;}
@@ -660,6 +685,28 @@ body.sk-aurora.sk-blueprint{
 .dv-fragment-hidden{visibility:hidden !important;}
 
 .boardgrid{display:block;}
+.docview .boardgrid[hidden],.section-layout-grid[hidden]{display:none !important;}
+.section-layout-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:32px;gap:8px;margin-top:12px;}
+.section-layout-tile{grid-column:var(--tile-x)/span var(--tile-w);grid-row:var(--tile-y)/span var(--tile-h);min-width:0;min-height:0;position:relative;}
+.docview .section-layout-tile>.pwidget{box-sizing:border-box;width:100%;height:100%;max-width:none;margin:0;overflow:auto;}
+.section-layout-tile>.diagramcol{display:flex;flex-direction:column;height:100%;min-height:0;overflow:auto;}
+.section-layout-tile .board{flex:1;min-height:80px;margin:0;}
+.section-layout-tile .boardcanvas>svg{height:auto;width:100%;min-width:0;}
+.section-layout-tile .termbar{flex:none;max-height:50%;overflow:auto;margin:0;}
+.docview .section-layout-tile>.pt-homemap{display:flex;flex-direction:column;}
+.section-layout-tile>.pt-homemap>.ptitle{flex:none;}
+.section-layout-tile>.pt-homemap>.pbody{flex:1;min-height:0;}
+.section-layout-tile .hmframe{height:100%;max-height:100%;}
+@container diagram-section (max-width:640px){
+  .section-layout-grid{display:flex;flex-direction:column;}
+  .section-layout-tile{height:clamp(160px,calc(var(--tile-h)*40px - 8px),600px);flex:none;}
+  .section-layout-tile:has(>.pt-homemap){height:auto;}
+  .section-layout-tile .hmframe{height:auto;}
+}
+@media print{
+  .section-layout-grid{display:block;}
+  .section-layout-tile,.section-layout-tile>.diagramcol,.docview .section-layout-tile>.pwidget{height:auto;overflow:visible;margin-bottom:12px;}
+}
 .boardgrid.haspanels{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:12px; align-items:start;}
 .boardgrid.haspanels > .diagramcol{min-width:0;}
 .boardgrid.haspanels > .panelcol{align-self:start;min-width:0;}
@@ -5246,6 +5293,7 @@ body.sk-blueprint{--home-card-inset:24px;}
       <tr><td>diagram.routing</td><td><code>"curves" | "lanes"</code></td><td>Optional lane routing reserves tracks and ports around cards. Supports 1–5 unstacked cards per row, no floats or self-loops; otherwise warns and uses curves. Imports use dependency rows and lanes. Readable size enlarges the board for horizontal scrolling.</td></tr>
       <tr><td>diagram.floats</td><td><code>[{id, side:"above"}]</code></td><td>Branch nodes off the main flow (auth, signing). X position computed from the edges that touch them.</td></tr>
       <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> of the hop (default <code>int</code>). Zero-based reveal indices draw the edge only for the selected step interval. <code>bend</code>/<code>labelDx</code>/<code>labelDy</code> are optional manual nudges.</td></tr>
+      <tr><td>diagram.sectionLayout</td><td><code>{default:[{x:0,y:0,w:8,h:12},{panel:"home",x:8,y:0,w:4,h:12}]}</code></td><td>Saved twelve-column tile layouts: default, backstage, confluence. Arrange section to drag/resize; Preview selects the target and Optimize layout supplies a starting arrangement. Coordinates are zero-based, height 3–40 rows. Unspecified tiles stay visible; narrow views stack. <a href="../docs/section-layouts.md">Layout guide</a>.</td></tr>
       <tr><td>diagram.primaryPanel</td><td><code>"home"</code></td><td>Optional centerpiece panel ID: show it large with playback below it and a collapsible Data flow underneath. Set Presentation → Centerpiece in the panel inspector. Homemap steps have device states, subject drag/tap placement, visibility, inheritance, and signal controls.</td></tr>
       <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Twenty-six types are documented in <code>contract/authoring-contract.md</code>, including <code>table</code> for data snapshots, <code>checks</code> for authored decisions, <code>budget</code> for resource limits, and <code>replicas</code> for positions and reported lag. <code>waterfall</code> supports <code>startMs</code> offsets for overlapping trace spans; <code>trace</code> shows service internals and child-covered versus uncovered wall time.</td></tr>
       <tr><td>steps[n].id</td><td><code>"ota.3"</code></td><td>Optional unique step identifier for deep links, search and preview restoration. Duplicating a step gives its copy a new ID.</td></tr>
@@ -6447,6 +6495,82 @@ function validatePaths(d, path, errors){
   });
 }
 
+/* Section composition uses a bounded twelve-column grid. Missing/new panels
+   are appended; collisions push later tiles down instead of hiding content. */
+function sectionLayoutKey(item){ return item && item.panel != null ? 'panel:' + item.panel : 'diagram'; }
+function sectionLayoutTiles(d){
+  return [{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
+    return {key:'panel:' + p.id,panel:p.id,type:p.type,title:p.title || p.id};
+  }));
+}
+function sectionLayoutPack(items, priority){
+  var placed = [], order = items.map(function(it){return Object.assign({},it);});
+  if (priority) order.sort(function(a,b){return (sectionLayoutKey(a) === priority ? -1 : 0) - (sectionLayoutKey(b) === priority ? -1 : 0);});
+  order.forEach(function(it){
+    function overlaps(p){return it.x < p.x+p.w && it.x+it.w > p.x && it.y < p.y+p.h && it.y+it.h > p.y;}
+    var hits;
+    while ((hits = placed.filter(overlaps)).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+    placed.push(it);
+  });
+  return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
+}
+function sectionLayoutPreset(d, target){
+  var tiles=sectionLayoutTiles(d), narrow=target==='confluence', items=[];
+  var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
+  var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
+  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.type!=='homemap';});
+  ordered.forEach(function(t){
+    var large=t.key==='diagram'||t.type==='homemap'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=large?12:t.type==='phone'?10:t.type==='screen'?8:6;
+    var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
+      var it={x:x,y:0,w:w,h:h}, hits;
+      while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
+        it.y=Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+      return it;
+    });
+    candidates.sort(function(a,b){return a.y-b.y||a.x-b.x;});
+    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;items.push(item);
+  });
+  return items;
+}
+function sectionLayoutItems(d, target){
+  var layouts = d.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
+  if (!Array.isArray(saved)) return null;
+  var items = [], used = Object.create(null);
+  saved.forEach(function(it){
+    if (!it || typeof it !== 'object') return;
+    var key = sectionLayoutKey(it);
+    if (used[key] || !tiles.some(function(t){return t.key === key;})) return;
+    if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
+    var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
+    if (it.panel != null) copy.panel=it.panel;
+    used[key]=true;items.push(copy);
+  });
+  var y = items.reduce(function(n,it){return Math.max(n,it.y+it.h);},0);
+  tiles.forEach(function(t){
+    if (used[t.key]) return;
+    var item={x:0,y:y,w:12,h:t.key==='diagram'||t.type==='homemap'?12:6};
+    if(t.panel != null)item.panel=t.panel;
+    items.push(item);y+=item.h;
+  });
+  return sectionLayoutPack(items);
+}
+function sectionLayoutWarnings(d, path, warnings){
+  var v=d.sectionLayout;
+  if(v == null)return;
+  if(typeof v!=='object'||Array.isArray(v)){warnings.push(path+'.sectionLayout: expected default/backstage/confluence grid layouts');return;}
+  Object.keys(v).forEach(function(target){
+    if(['default','backstage','confluence'].indexOf(target)<0){warnings.push(path+'.sectionLayout: unknown target '+target);return;}
+    var list=v[target],used=Object.create(null),tiles=sectionLayoutTiles(d);
+    if(!Array.isArray(list)){warnings.push(path+'.sectionLayout.'+target+': expected an array of tiles');return;}
+    list.forEach(function(it,i){
+      var p=path+'.sectionLayout.'+target+'['+i+']',key=sectionLayoutKey(it);
+      if(!it||typeof it!=='object'||Array.isArray(it)||!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);})||it.x<0||it.y<0||it.w<1||it.h<3||it.x+it.w>12||it.y>500||it.h>40)
+        warnings.push(p+': use integer x/y/w/h; 12 columns, y 0–500, h 3–40');
+      if(used[key]||!tiles.some(function(t){return t.key===key;}))warnings.push(p+': duplicate or unknown diagram/panel tile');
+      used[key]=true;
+    });
+  });
+}
 function normalize(raw){
   if (raw && raw.page) return raw.page;
   if (raw && (raw.blocks || raw.sections)) return raw;
@@ -6514,6 +6638,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!d) return;
   var DP = P + '.diagram';
   validatePaths(d, DP, errors);
+  sectionLayoutWarnings(d, DP, warnings);
   if (d.primaryPanel != null && (typeof d.primaryPanel !== 'string' ||
       !(Array.isArray(d.panels) && d.panels.some(function(p){ return p && p.id === d.primaryPanel; }))))
     warnings.push(DP + '.primaryPanel: must name an existing panel — using the standard flow layout');
@@ -11914,6 +12039,76 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
     destroy:function(){destroyed = true;}};
 }
 
+/* Saved section composition moves the existing live widgets, never their state.
+   Home/Data flow remain available and restore the original DOM placement. */
+function createSectionComposition(box, layout, d, board, bar, base, target, changed){
+  var items=sectionLayoutItems(d,target || 'default');
+  if(!items)return null;
+  var group=layout.viewChoicesHost;
+  if(!group){
+    var toolbar=document.createElement('div');toolbar.className='diagram-views';
+    group=document.createElement('div');group.className='diagram-view-choice';
+    toolbar.appendChild(group);box.insertBefore(toolbar,layout.grid);
+  }
+  var button=document.createElement('button');button.type='button';button.className='mbtn';
+  button.textContent='Layout';button.setAttribute('data-view-layout','');group.insertBefore(button,group.firstChild);
+  var standard;
+  if(!base){standard=document.createElement('button');standard.type='button';standard.className='mbtn';standard.textContent='Data flow';group.appendChild(standard);}
+  var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
+  grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
+  var active=false, saved=[], oldHidden, flowHidden;
+  function move(node,host){
+    if(!node)return;
+    var anchor=document.createComment('layout position');node.parentNode.insertBefore(anchor,node);
+    saved.push({node:node,anchor:anchor});host.appendChild(node);
+  }
+  function restore(){
+    if(!active)return;
+    saved.forEach(function(rec){if(rec.anchor.parentNode){rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);}});
+    saved=[];grid.replaceChildren();grid.hidden=true;layout.grid.hidden=oldHidden;
+    if(layout.flowDisclosure)layout.flowDisclosure.hidden=flowHidden;
+    active=false;button.setAttribute('aria-pressed','false');
+    if(standard)standard.setAttribute('aria-pressed','true');
+    if(changed)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
+    if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
+  }
+  function activate(){
+    if(active)return;
+    oldHidden=layout.grid.hidden;flowHidden=layout.flowDisclosure && layout.flowDisclosure.hidden;
+    var cards=Array.prototype.slice.call(box.querySelectorAll('.pwidget[data-dv-panel]'));
+    items.slice().sort(function(a,b){return a.y-b.y || a.x-b.x;}).forEach(function(it){
+      var tile=document.createElement('div');tile.className='section-layout-tile';
+      var key=sectionLayoutKey(it),panel=(d.panels || []).find(function(p){return p.id===it.panel;});
+      tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',panel ? panel.title || panel.id : 'Data flow');
+      tile.style.setProperty('--tile-x',it.x+1);tile.style.setProperty('--tile-y',it.y+1);
+      tile.style.setProperty('--tile-w',it.w);tile.style.setProperty('--tile-h',it.h);
+      grid.appendChild(tile);
+      if(it.panel != null){
+        var index=(d.panels || []).indexOf(panel),card=cards.find(function(c){return Number(c.getAttribute('data-dv-panel'))===index;});
+        move(card,tile);
+      }else if(layout.diagramCol){
+        move(layout.diagramCol,tile);
+        if(bar && !layout.diagramCol.contains(bar))move(bar,layout.diagramCol);
+      }else{
+        var col=document.createElement('div');col.className='diagramcol';tile.appendChild(col);
+        move(board,col);if(bar)move(bar,col);
+      }
+    });
+    layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;
+    grid.hidden=false;active=true;button.setAttribute('aria-pressed','true');
+    if(changed)changed(grid);
+    if(standard)standard.setAttribute('aria-pressed','false');
+    group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed','false');});
+  }
+  function setMode(value){if(value==='layout')activate();else{restore();if(base)base.setMode(value);}}
+  button.addEventListener('click',activate);
+  if(standard)standard.addEventListener('click',restore);
+  group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]'))restore();},true);
+  activate();
+  return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
+    destroy:function(){if(base)base.destroy();}};
+}
+
 function sectionHasProse(sec){
   if (!sec || typeof sec !== 'object') return false;
   var hasText = typeof sec.text === 'string' ? sec.text.length > 0 :
@@ -12176,11 +12371,14 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var hasDelta = diagramHasDelta(d);
   var btnDelta = null, bar = null;
   function addFocusControl(){
-    if (!primaryPanel) return;
-    result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
+    if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
       d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', function(host){
         if (result.stepper) result.stepper.scrollTargetEl = host;
       });
+    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,function(host){
+      if(result.stepper)result.stepper.scrollTargetEl=host;
+    });
+    if(composition)result.presentation=composition;
   }
   if (hasDelta){
     btnDelta = document.createElement('button');
@@ -14193,6 +14391,9 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
   return builderRewrite(text, raw, got.path, function(d){
     d.panels[panelIdx].id = newId;
     if (d.primaryPanel === oldId) d.primaryPanel = newId;
+    if(d.sectionLayout)Object.keys(d.sectionLayout).forEach(function(target){
+      if(Array.isArray(d.sectionLayout[target]))d.sectionLayout[target].forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});
+    });
     (d.steps || []).forEach(function(st){
       if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, oldId)){
         var patches = Object.create(null); /* "__proto__" — see planRenameNode */
@@ -14267,6 +14468,9 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
   var id = p.id;
   return builderRewrite(text, raw, got.path, function(d){
     if (d.primaryPanel === id) delete d.primaryPanel;
+    if(d.sectionLayout)Object.keys(d.sectionLayout).forEach(function(target){
+      if(Array.isArray(d.sectionLayout[target]))d.sectionLayout[target]=d.sectionLayout[target].filter(function(it){return !it || it.panel!==id;});
+    });
     d.panels.splice(panelIdx, 1);
     if (!d.panels.length) delete d.panels;
     (d.steps || []).forEach(function(st){
@@ -19101,6 +19305,13 @@ function initWorkbenchBuilder(opts){
     }
   }) : null;
 
+  var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
+    view:view,src:src,ctl:opts.ctl,render:render,renderedText:opts.renderedText,pause:pausePreview,
+    locked:function(){return !!addToStep || !!connect;},
+    commit:function(section,target,items){
+      return commitCascade(function(raw){return planSectionLayout(src.value,raw,section,target,items);});
+    }
+  }) : null;
   view.addEventListener('dv:pathrender',applyRowGrabs);
   view.addEventListener('dv:pathchange',function(ev){
     var followStep = currentTarget && currentTarget.kind === 'step';
@@ -19422,6 +19633,7 @@ function initWorkbenchBuilder(opts){
     });
   }
   function applyRowGrabs(){
+    if(sectionLayoutEditor)sectionLayoutEditor.refresh();
     applyHomeLayoutControls();
     /* inject one grab handle per layout row, left of the row band —
        workbench-only chrome (this file never runs on published pages).
@@ -21073,7 +21285,8 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl){
   var tabs = activeTabReferences(previousCtl);
   var saved = workbenchPreviewSnapshot(previousPage, previousCtl);
   if (previousCtl) previousCtl.destroy();
-  var ctl = renderPage(view, page, skin, null, {autoplay:false});
+  var target = typeof document !== 'undefined' && document.getElementById ? document.getElementById('layout-preview-target') : null;
+  var ctl = renderPage(view, page, skin, null, {autoplay:false,layoutTarget:target ? target.value : (typeof window !== 'undefined' && window.location ? new URLSearchParams(window.location.search).get('layout') : 'default')});
   restoreActiveTabs(ctl, tabs);
   restoreWorkbenchPreview(page, ctl, saved);
   return ctl;
@@ -21257,6 +21470,184 @@ function initWorkbenchWorkspace(){
   showTool(prefs.tool); paint();
   return {showTool:showTool, tool:function(){return prefs.tool;},
     setExpanded:setExpanded, expanded:function(){return expanded;}};
+}
+/* ---- src/layout.workbench.js ---- */
+/* Authored section layouts are spec data; host preview dimensions are workspace
+   state. Pointer previews never write source until one successful release. */
+function planSectionLayout(text,raw,section,target,items){
+  var got=builderDiagram(text,raw,section);
+  if(got.error)return got;
+  if(['default','backstage','confluence'].indexOf(target)<0)return {error:'Unknown layout target.'};
+  var layouts=builderClone(got.d.sectionLayout || {});
+  if(items===null)delete layouts[target];else layouts[target]=items;
+  var copy=Object.assign({},got.d,{sectionLayout:layouts}),warnings=[];
+  sectionLayoutWarnings(copy,'diagram',warnings);
+  if(warnings.length)return {error:warnings.join('\n')};
+  return planSetField(text,raw,got.path,'sectionLayout',Object.keys(layouts).length?JSON.stringify(layouts):null);
+}
+function sectionLayoutGesture(items,key,dx,dy,resize){
+  var next=items.map(function(it){return Object.assign({},it);}),item=next.find(function(it){return sectionLayoutKey(it)===key;});
+  if(!item)return next;
+  if(resize){item.w=Math.max(1,Math.min(12-item.x,item.w+Math.round(dx)));item.h=Math.max(3,Math.min(40,item.h+Math.round(dy)));}
+  else{item.x=Math.max(0,Math.min(12-item.w,item.x+Math.round(dx)));item.y=Math.max(0,Math.min(500,item.y+Math.round(dy)));}
+  return sectionLayoutPack(next,key);
+}
+function initSectionLayoutEditor(opts){
+  var view=opts.view,editing=null,drag=null,selected='diagram',widths={backstage:1080,confluence:760};
+  function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text)n.textContent=text;return n;}
+  function button(label,fn){var b=el('button','bbtn',label);b.type='button';b.addEventListener('click',fn);return b;}
+  var toolbar=el('div','layout-preview-tools'),label=el('label',null,'Preview '),target=el('select');
+  target.id='layout-preview-target';target.setAttribute('aria-label','Preview host');
+  [['default','Responsive'],['backstage','Backstage'],['confluence','Confluence']].forEach(function(v){var o=el('option',null,v[1]);o.value=v[0];target.appendChild(o);});
+  label.appendChild(target);toolbar.appendChild(label);
+  var widthLabel=el('label',null,'Width '),width=el('input');width.type='number';width.min='320';width.max='1920';width.step='10';width.setAttribute('aria-label','Preview width in pixels');widthLabel.appendChild(width);toolbar.appendChild(widthLabel);
+  var note=el('span','fnote');toolbar.appendChild(note);
+  var stage=el('div','layout-preview-stage'),frame=el('div','layout-preview-frame');
+  view.parentNode.insertBefore(toolbar,view);view.parentNode.insertBefore(stage,view);stage.appendChild(frame);frame.appendChild(view);
+  function feedback(text){note.textContent=text;}
+  function setFrame(){
+    var host=target.value;frame.setAttribute('data-target',host);
+    width.disabled=host==='default';width.value=host==='default'?'':widths[host];
+    frame.style.width=host==='default'?'100%':widths[host]+'px';
+    view.style.setProperty('--home-max-height',host==='confluence'?'560px':'70vh');
+    feedback(host==='default'?'Responsive to the editor split.':host+' content-area simulation · actual host widths vary · scroll to inspect wide previews.');
+  }
+  function rawDiagram(index){
+    try{var raw=JSON.parse(opts.src.value),rec=specSectionPaths(raw)[index];return rec&&specValueAt(raw,rec.diagram);}catch(ex){return null;}
+  }
+  function ready(){
+    if(opts.renderedText && opts.renderedText()!==opts.src.value){feedback('Render the current JSON before arranging the section.');return false;}
+    if(opts.locked && opts.locked()){feedback('Finish the current diagram editing action first.');return false;}
+    return true;
+  }
+  function persist(index,items){
+    if(!ready())return false;
+    var ok=opts.commit(index,target.value,items);if(ok)feedback('Saved '+target.options[target.selectedIndex].text+' layout · Undo restores the previous arrangement.');
+    return ok;
+  }
+  function forceLayout(index){
+    var ctl=opts.ctl && opts.ctl(),rec=ctl && ctl.sections.find(function(r){return r.number===index+1;});
+    if(rec && rec.presentation)rec.presentation.setMode('layout');
+  }
+  function updateTarget(){
+    cancel();editing=null;setFrame();opts.render();
+    var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){if(rec.presentation && rec.sectionEl.querySelector('.section-layout-grid'))rec.presentation.setMode('layout');});
+    refresh();
+  }
+  target.addEventListener('change',updateTarget);
+  width.addEventListener('change',function(){
+    cancel();var n=Number(width.value);if(!Number.isFinite(n))n=760;
+    widths[target.value]=Math.max(320,Math.min(1920,Math.round(n)));setFrame();
+  });
+  function paint(grid,items){
+    grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
+      var item=items.find(function(it){return sectionLayoutKey(it)===tile.getAttribute('data-layout-key');});if(!item)return;
+      tile.style.setProperty('--tile-x',item.x+1);tile.style.setProperty('--tile-y',item.y+1);tile.style.setProperty('--tile-w',item.w);tile.style.setProperty('--tile-h',item.h);
+    });
+  }
+  function cancel(){
+    if(!drag)return;var prior=drag;drag=null;paint(prior.grid,prior.items);
+    if(prior.handle.hasPointerCapture(prior.pointer))prior.handle.releasePointerCapture(prior.pointer);
+    prior.grid.classList.remove('layout-dragging');
+  }
+  function fields(section,d){
+    var row=section.querySelector('.section-arrange-fields');if(!row)return;row.replaceChildren();
+    var items=sectionLayoutItems(d,target.value);if(!items)return;
+    var choose=el('select');choose.setAttribute('aria-label','Layout element');
+    sectionLayoutTiles(d).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;choose.appendChild(o);});
+    if(!items.some(function(it){return sectionLayoutKey(it)===selected;}))selected='diagram';choose.value=selected;
+    choose.addEventListener('change',function(){selected=choose.value;fields(section,d);});row.appendChild(choose);
+    var item=items.find(function(it){return sectionLayoutKey(it)===selected;}),inputs={};
+    [['x','Column',1,12],['y','Row',1,501],['w','Width',1,12],['h','Height',3,40]].forEach(function(f){
+      var l=el('label',null,f[1]+' '),input=el('input');input.type='number';input.min=f[2];input.max=f[3];input.step='1';input.value=item[f[0]]+(f[0]==='x'||f[0]==='y'?1:0);input.setAttribute('aria-label',f[1]);inputs[f[0]]=input;l.appendChild(input);row.appendChild(l);
+    });
+    row.appendChild(button('Apply size / position',function(){
+      var next=items.map(function(it){return Object.assign({},it);}),it=next.find(function(v){return sectionLayoutKey(v)===selected;});
+      Object.keys(inputs).forEach(function(k){it[k]=Number(inputs[k].value)-(k==='x'||k==='y'?1:0);});
+      var warnings=[];sectionLayoutWarnings(Object.assign({},d,{sectionLayout:{default:next}}),'diagram',warnings);
+      if(warnings.length){feedback(warnings[0]);return;}
+      persist(Number(section.getAttribute('data-dv-section')),sectionLayoutPack(next,selected));
+    }));
+    section.querySelectorAll('.section-layout-tile').forEach(function(tile){tile.classList.toggle('layout-selected',tile.getAttribute('data-layout-key')===selected);});
+  }
+  function refresh(){
+    if(drag && !drag.grid.isConnected)cancel();
+    view.querySelectorAll('.doc-sec[data-dv-section]').forEach(function(section){
+      var index=Number(section.getAttribute('data-dv-section')),d=rawDiagram(index);if(!d)return;
+      var actions=section.querySelector('.section-arranger');
+      if(!actions){
+        actions=el('div','section-arranger');var controls=el('div','section-arrange-actions');actions.appendChild(controls);
+        var arrange=button('Arrange section',function(){
+          if(!ready())return;
+          if(editing===index){editing=null;refresh();return;}
+          editing=index;selected='diagram';if(opts.pause)opts.pause();
+          var current=rawDiagram(index),items=sectionLayoutItems(current,target.value);
+          if(!items)persist(index,sectionLayoutPreset(current,target.value));else{forceLayout(index);refresh();}
+        });arrange.setAttribute('data-arrange-toggle','');controls.appendChild(arrange);
+        controls.appendChild(button('Optimize layout',function(){if(!ready())return;editing=index;persist(index,sectionLayoutPreset(rawDiagram(index),target.value));}));
+        controls.appendChild(button('Reset layout',function(){if(!ready())return;editing=null;persist(index,null);}));
+        var caption=el('span','fnote');caption.setAttribute('data-arrange-target','');controls.appendChild(caption);
+        actions.appendChild(el('div','section-arrange-fields'));
+        actions.addEventListener('click',function(ev){ev.stopPropagation();});actions.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
+        var board=section.querySelector('.diagram-views,.boardgrid');section.insertBefore(actions,board);
+      }
+      actions.querySelector('[data-arrange-toggle]').textContent=editing===index?'Done arranging':'Arrange section';
+      actions.querySelector('[data-arrange-toggle]').setAttribute('aria-pressed',String(editing===index));
+      actions.querySelector('[data-arrange-target]').textContent='Editing '+target.options[target.selectedIndex].text+' layout';
+      actions.querySelector('.section-arrange-fields').hidden=editing!==index;
+      section.classList.toggle('section-arranging',editing===index);
+      if(editing===index){
+        forceLayout(index);fields(section,d);
+        section.querySelectorAll('.section-layout-tile').forEach(function(tile){
+          if(tile.querySelector('.section-tile-move'))return;
+          var name=tile.getAttribute('data-layout-label');
+          var move=el('button','section-tile-move','⠿ '+name);move.type='button';move.setAttribute('aria-label','Move '+name);move.title='Drag to move. Arrow keys move; Shift + arrows resize.';tile.appendChild(move);
+          var resize=el('button','section-tile-resize','↘');resize.type='button';resize.setAttribute('aria-label','Resize '+name);resize.title='Drag to resize; arrow keys also resize.';tile.appendChild(resize);
+        });
+      }
+    });
+  }
+  view.addEventListener('pointerdown',function(ev){
+    var handle=ev.target.closest('.section-tile-move,.section-tile-resize');if(!handle || ev.button!==0 || ev.isPrimary===false)return;
+    var section=handle.closest('.doc-sec'),index=Number(section.getAttribute('data-dv-section'));if(editing!==index||!ready())return;
+    var grid=handle.closest('.section-layout-grid');if(getComputedStyle(grid).display!=='grid'){feedback('Use size / position fields on narrow screens, or widen the preview to drag.');return;}
+    ev.preventDefault();ev.stopPropagation();cancel();selected=handle.parentNode.getAttribute('data-layout-key');
+    var items=sectionLayoutItems(rawDiagram(index),target.value),rect=grid.getBoundingClientRect();
+    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),cell:(grid.clientWidth+8)/12};
+    handle.setPointerCapture(ev.pointerId);grid.classList.add('layout-dragging');
+  },true);
+  view.addEventListener('pointermove',function(ev){
+    if(!drag||ev.pointerId!==drag.pointer)return;ev.preventDefault();
+    var rect=drag.grid.getBoundingClientRect();
+    drag.next=sectionLayoutGesture(drag.items,drag.key,(ev.clientX-drag.x+drag.left-rect.left)/drag.cell,(ev.clientY-drag.y+drag.top-rect.top)/40,drag.resize);paint(drag.grid,drag.next);
+  },true);
+  view.addEventListener('pointerup',function(ev){
+    if(!drag||ev.pointerId!==drag.pointer)return;ev.preventDefault();ev.stopPropagation();var finished=drag;cancel();
+    if(finished.text!==opts.src.value){feedback('Source changed during the gesture; arrangement cancelled.');return;}
+    if(JSON.stringify(finished.items)!==JSON.stringify(finished.next))persist(finished.section,finished.next);
+    else fields(finished.handle.closest('.doc-sec'),rawDiagram(finished.section));
+  },true);
+  ['pointercancel','lostpointercapture'].forEach(function(type){view.addEventListener(type,cancel,true);});
+  view.addEventListener('keydown',function(ev){
+    var handle=ev.target.closest('.section-tile-move,.section-tile-resize');if(!handle)return;
+    if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();return;}
+    if(ev.altKey||ev.metaKey||ev.ctrlKey||['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(ev.key)<0)return;
+    ev.preventDefault();ev.stopPropagation();if(!ready())return;
+    var section=handle.closest('.doc-sec'),index=Number(section.getAttribute('data-dv-section')),key=handle.parentNode.getAttribute('data-layout-key');
+    selected=key;var delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[ev.key];
+    var resize=ev.shiftKey||handle.classList.contains('section-tile-resize');
+    if(persist(index,sectionLayoutGesture(sectionLayoutItems(rawDiagram(index),target.value),key,delta[0],delta[1],resize)))setTimeout(function(){
+      if(editing!==index)return;refresh();
+      var sec=view.querySelector('[data-dv-section="'+index+'"]');if(!sec)return;
+      var tile=Array.prototype.find.call(sec.querySelectorAll('.section-layout-tile'),function(t){return t.getAttribute('data-layout-key')===key;});
+      var focus=tile && tile.querySelector(resize?'.section-tile-resize':'.section-tile-move');if(focus)focus.focus({preventScroll:true});
+    },0);
+  },true);
+  view.addEventListener('click',function(ev){if(ev.target.closest('.section-tile-move,.section-tile-resize')){ev.preventDefault();ev.stopPropagation();}},true);
+  document.addEventListener('keydown',function(ev){if(drag&&ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();}},true);
+  window.addEventListener('blur',cancel);window.addEventListener('resize',cancel);opts.src.addEventListener('input',cancel);
+  var query=new URLSearchParams(window.location.search).get('layout');if(['backstage','confluence'].indexOf(query)>=0)target.value=query;
+  setFrame();return {refresh:refresh};
 }
 /* ---- src/canon.workbench.js ---- */
 /* Optional same-origin company repository adapter. Static/offline authoring
@@ -21583,6 +21974,10 @@ var CONTRACT = [
   '  Each path has its own playback ending and folded panel state.',
   '  Example: happy=[accept,auth,queue,deliver,ack], drop=[accept,auth,queue,lost].',
   '  Path IDs must be unique; each path needs existing, non-repeated step IDs.',
+  '- Optional diagram.sectionLayout declares default/backstage/confluence tile arrays.',
+  '  Each tile uses integer x/y/w/h on 12 columns, h 3–40; panel names a panel ID;',
+  '  omit panel for the diagram. Arrange section authors these layouts; Preview',
+  '  and Optimize layout select the host profile. See docs/section-layouts.md.',
   '- Optional diagram.primaryPanel names a declared panel to make it the large',
   '  centerpiece, with playback beneath it and Data flow collapsed below.',
   '  Use this for a homemap-led story. No schema version flag is needed.',

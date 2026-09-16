@@ -81,6 +81,9 @@ Use [workspace focus and the resizable editor](docs/workbench-workspace.md) for
 more room: drag the divider or **Expand editor** beside a compact live preview.
 **Inspect / Steps / JSON** each get a dedicated pane. Width and selected tool
 persist locally; phones use a stacked layout.
+[Section arrangements and host previews](docs/section-layouts.md) let you drag and
+resize panels and diagrams, with separate layouts for Backstage and Confluence.
+
 The [story-step editor](docs/workbench-steps.md) adds caption search, hidden-tab
 jumps, duplication, appending and reordering through the same undo history.
 [Reuse steps](docs/workbench-step-reuse.md) copies or shares beats between

@@ -69,7 +69,8 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl){
   var tabs = activeTabReferences(previousCtl);
   var saved = workbenchPreviewSnapshot(previousPage, previousCtl);
   if (previousCtl) previousCtl.destroy();
-  var ctl = renderPage(view, page, skin, null, {autoplay:false});
+  var target = typeof document !== 'undefined' && document.getElementById ? document.getElementById('layout-preview-target') : null;
+  var ctl = renderPage(view, page, skin, null, {autoplay:false,layoutTarget:target ? target.value : (typeof window !== 'undefined' && window.location ? new URLSearchParams(window.location.search).get('layout') : 'default')});
   restoreActiveTabs(ctl, tabs);
   restoreWorkbenchPreview(page, ctl, saved);
   return ctl;

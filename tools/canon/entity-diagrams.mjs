@@ -15,8 +15,8 @@ export function buildEntityDiagramIndex(specs,{publicBaseUrl=''}={}){
     const page=C.pageOf(spec),canon=page.canon;
     if(!canon || ids.has(canon.id))throw new Error('Indexed diagrams require unique page.canon IDs.');ids.add(canon.id);
     const revision=digest(spec),specUrl=base+'/api/canon/specs/'+encodeURIComponent(canon.id);
-    const viewerUrl=base+'/template/flowview.html?spec='+encodeURIComponent(specUrl)+'&v='+revision;
-    const editUrl=base+'/workbench/flowspec.html?canon='+encodeURIComponent(canon.id);
+    const viewerUrl=base+'/template/flowview.html?spec='+encodeURIComponent(specUrl)+'&v='+revision+'&layout=backstage';
+    const editUrl=base+'/workbench/flowspec.html?canon='+encodeURIComponent(canon.id)+'&layout=backstage';
     // Includes prose-only sections and every tab, exactly as the viewer counts
     // and names them. Duplicate/numeric headings use its canonical references.
     const sections=[];

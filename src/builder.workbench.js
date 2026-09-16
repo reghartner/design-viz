@@ -879,6 +879,9 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
   return builderRewrite(text, raw, got.path, function(d){
     d.panels[panelIdx].id = newId;
     if (d.primaryPanel === oldId) d.primaryPanel = newId;
+    if(d.sectionLayout)Object.keys(d.sectionLayout).forEach(function(target){
+      if(Array.isArray(d.sectionLayout[target]))d.sectionLayout[target].forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});
+    });
     (d.steps || []).forEach(function(st){
       if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, oldId)){
         var patches = Object.create(null); /* "__proto__" — see planRenameNode */
@@ -953,6 +956,9 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
   var id = p.id;
   return builderRewrite(text, raw, got.path, function(d){
     if (d.primaryPanel === id) delete d.primaryPanel;
+    if(d.sectionLayout)Object.keys(d.sectionLayout).forEach(function(target){
+      if(Array.isArray(d.sectionLayout[target]))d.sectionLayout[target]=d.sectionLayout[target].filter(function(it){return !it || it.panel!==id;});
+    });
     d.panels.splice(panelIdx, 1);
     if (!d.panels.length) delete d.panels;
     (d.steps || []).forEach(function(st){
@@ -5787,6 +5793,13 @@ function initWorkbenchBuilder(opts){
     }
   }) : null;
 
+  var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
+    view:view,src:src,ctl:opts.ctl,render:render,renderedText:opts.renderedText,pause:pausePreview,
+    locked:function(){return !!addToStep || !!connect;},
+    commit:function(section,target,items){
+      return commitCascade(function(raw){return planSectionLayout(src.value,raw,section,target,items);});
+    }
+  }) : null;
   view.addEventListener('dv:pathrender',applyRowGrabs);
   view.addEventListener('dv:pathchange',function(ev){
     var followStep = currentTarget && currentTarget.kind === 'step';
@@ -6108,6 +6121,7 @@ function initWorkbenchBuilder(opts){
     });
   }
   function applyRowGrabs(){
+    if(sectionLayoutEditor)sectionLayoutEditor.refresh();
     applyHomeLayoutControls();
     /* inject one grab handle per layout row, left of the row band —
        workbench-only chrome (this file never runs on published pages).

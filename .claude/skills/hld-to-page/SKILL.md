@@ -291,6 +291,17 @@ step patches. Device and room dragging in the step inspector changes all
 paths, while subject dragging edits the selected step. These are authoring
 coordinates in the 320×180 frame, not physical dimensions or sensor evidence.
 
+**Arrange for the delivery surface.** For independently positioned/resized
+panels and data-flow diagrams, use `diagram.sectionLayout` with `default`,
+`backstage`, and/or `confluence` profiles. Read `docs/section-layouts.md` for the
+12-column tile contract and a complete example. The workbench's Arrange section
+and Optimize layout controls author these profiles; its host/width preview is
+temporary. Forge selects Confluence automatically; catalog viewer links select
+Backstage. Missing profiles fall back to default, then the existing layout.
+Preserve panel IDs and story state; tile geometry is not evidence. Do not change
+Home coordinates, steps or paths to fit a host. Verify a narrow stacked preview
+and the real installed host separately.
+
 **Write each step like you were there.** For every step ask: what actually
 happens at this beat? Which components act, and which merely wait? What
 must the reader see to grasp the INTENT — the race, the handoff, the

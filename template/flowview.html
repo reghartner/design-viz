@@ -6430,14 +6430,19 @@ function lintDiagram(d, DP, usedKinds, warnings){
         ' — expect crowding; consider fewer return edges or a second section');
   });
 
-  var firstEdgeAt = {};
-  (d.steps || []).forEach(function(st, ti){
-    var k = stepDeliveredKeys(st)[0];
-    if (!k) return;
-    if (firstEdgeAt[k] != null)
-      warnings.push(DP + '.steps[' + ti + ']: shares first edge "' + k + '" with steps[' +
-        firstEdgeAt[k] + '] — both step coins land on the same midpoint; reorder the edges list of one step');
-    else firstEdgeAt[k] = ti;
+  var reportedPairs = new Set();
+  diagramPathList(d).forEach(function(path){
+    var firstEdgeAt = new Map();
+    path.indices.forEach(function(ti){
+      var k = stepDeliveredKeys(d.steps[ti])[0];
+      if (!k) return;
+      if (firstEdgeAt.has(k)){
+        var earlier=firstEdgeAt.get(k), pair=earlier+':'+ti;
+        if(!reportedPairs.has(pair))warnings.push(DP + '.steps[' + ti + ']: shares first edge "' + k + '" with steps[' +
+          earlier + '] — both step coins land on the same midpoint; reorder the edges list of one step');
+        reportedPairs.add(pair);
+      }else firstEdgeAt.set(k,ti);
+    });
   });
 }
 

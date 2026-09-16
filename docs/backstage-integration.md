@@ -127,3 +127,30 @@ Backstage plugin; those are the final integration checks.
 See [section arrangements and host previews](section-layouts.md) for saved
 placement and size of diagram/panel tiles, host selection and deployment notes.
 Preview dimensions simulate the content area; verify the actual installed host.
+
+## Node reference menus
+
+Right-click a diagram node, or tap its **…** button, to open its saved links.
+The button is keyboard focusable: Enter, Space, or Shift+F10 opens it; arrows
+move among links and Escape closes it and returns focus. Ordinary node clicks
+still select the node in the workbench. Nodes without available links retain
+the browser's normal context menu.
+
+Destinations come from existing spec fields:
+
+- `nodes.<id>.binding.catalogUrl`: Backstage service page.
+- `binding.api.definitionUrl` and `binding.api.endpoints`: API definition and
+  environment endpoints.
+- `nodes.<id>.codeRefs`: pinned repository/file/line links, using the existing
+  code-reference contract. `nodes.<id>.link` also appears as **Source** when it
+  is an HTTP(S) URL; existing direct source arrows remain available.
+- Code references on steps involving the node appear under **Related step
+  code**, with their step title or ID. An edge's endpoints can both show this
+  evidence; that association does not establish code ownership. The viewer
+  uses steps in the displayed path. Duplicate destinations appear once.
+
+Links are read from the spec, without fetching a catalog or invoking API
+operations. Service names alone do not generate destinations. The existing
+catalog binding workflow supplies the URLs; no additional menu/schema flag is
+needed. Forge uses its navigation bridge for these links. Company deployment
+requires the updated viewer/Forge bundle as usual.

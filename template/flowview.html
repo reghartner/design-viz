@@ -222,6 +222,13 @@ body.sk-daylight{background:#F4F2EC;}
 .sk-daylight .nbackpop{color:#6B6F7A;background:#FFFFFF;border:1px solid #C9CDE9;}
 .sk-daylight .nbacklink{color:#4956C9;border-color:#C9CDE9;background:#EEF0FB;}
 .sk-daylight .nbacklink:hover,.sk-daylight .nbacklink:focus{color:#2A33A0;border-color:#4956C9;}
+.nrefs-trigger:focus-visible circle{stroke:currentColor;stroke-width:1.5;}
+.node-link-menu{inset:auto;margin:0;width:320px;max-height:min(420px,calc(100dvh - 16px));overflow:auto;flex-direction:column;align-items:stretch;gap:7px;padding:12px;font-size:12px;}
+.node-link-menu .node-link-title{padding-right:28px;font-size:14px;overflow-wrap:anywhere;}
+.node-link-menu .nbacklabel{margin-top:5px;font-size:10px;}
+.node-link-menu .node-reference-link{padding:9px 10px;border-radius:6px;overflow-wrap:anywhere;}
+.node-link-close{position:absolute;right:5px;top:5px;width:30px;height:30px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:22px;cursor:pointer;}
+.node-link-menu :focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 .srcchip{font:600 10px 'IBM Plex Mono',monospace; text-decoration:none; padding:2px 8px; border-radius:999px;
   border:1px solid color-mix(in srgb, var(--acc) 45%, transparent); color:var(--acc); margin-left:10px; vertical-align:2px;}
 .sk-daylight .srcchip{color:color-mix(in srgb, var(--acc) 60%, #1B2027);}
@@ -6810,6 +6817,109 @@ function wireNodeBacklinks(host, svg, diagram, prefix, backlinks){
   if (scrollHost && scrollHost.addEventListener) scrollHost.addEventListener('scroll', close);
 }
 
+/* Node references are authored evidence. Related step code is labeled as such,
+   never presented as proof that an endpoint owns the referenced implementation. */
+function nodeReferenceLinks(diagram,id){
+  if(typeof FlowCanon==='undefined')return [];
+  var node=(diagram.nodes || {})[id];if(!node)return [];
+  var out=[],seen=Object.create(null),binding=node.binding || {};
+  function label(value,fallback){return typeof value==='string' && value ? value : fallback;}
+  function add(group,name,url){url=FlowCanon.http(url);if(!url || seen[url])return;seen[url]=true;out.push({group:group,label:name,url:url});}
+  function code(refs,group,suffix){
+    (Array.isArray(refs)?refs:[]).forEach(function(ref){
+      if(!ref || typeof ref!=='object' || Array.isArray(ref))return;
+      add(group,'Code · '+label(ref.label,label(ref.id,'source'))+(suffix?' · '+suffix:''),FlowCanon.codeUrl(ref));
+    });
+  }
+  add('Node links','Source',node.link);
+  add('Node links','Backstage · '+label(binding.label,label(binding.entityRef,id)),binding.catalogUrl);
+  var api=binding.api || {};
+  add('Node links','API definition · '+label(api.operationId,label(api.title,label(api.entityRef,'API'))),api.definitionUrl);
+  Object.keys(api.endpoints || {}).forEach(function(env){add('Node links','Endpoint · '+env,api.endpoints[env]);});
+  code(node.codeRefs,'Node links');
+  (Array.isArray(diagram.steps)?diagram.steps:[]).forEach(function(step,index){
+    if(!step || !Array.isArray(step.codeRefs))return;
+    var keys=stepKeys(step).concat(Object.keys(stepFailures(step)));
+    var involved=(Array.isArray(step.nodes) && step.nodes.indexOf(id)>=0) ||
+      (step.traceMatch && step.traceMatch.nodeId===id) ||
+      (step.tone && Object.prototype.hasOwnProperty.call(step.tone,id)) ||
+      (Array.isArray(step.conditions) && step.conditions.some(function(c){return c && c.nodeId===id;})) ||
+      (diagram.edges || []).some(function(e){return (e.from===id || e.to===id) && keys.indexOf(e.from+'->'+e.to)>=0;});
+    if(involved)code(step.codeRefs,'Related step code',label(step.title,label(step.id,'Step '+(index+1))));
+  });
+  return out;
+}
+function wireNodeReferences(host,svg,diagram,prefix){
+  if(!svg || typeof svg.querySelectorAll!=='function')return null;
+  var triggers=svg.querySelectorAll('.nrefs-trigger');if(!triggers.length)return null;
+  var pop=document.createElement('div');pop.className='nbackpop node-link-menu';pop.id=prefix+'-node-links';
+  pop.setAttribute('role','dialog');pop.setAttribute('popover','auto');pop.hidden=true;host.appendChild(pop);
+  var active=null,open=false,destroyed=false,scrollAtOpen=[];
+  function inside(target){return pop.contains(target) || !!(active && active.contains(target));}
+  function close(focus){
+    if(!open)return;open=false;scrollAtOpen=[];
+    var trigger=active;active=null;if(trigger)trigger.setAttribute('aria-expanded','false');
+    document.removeEventListener('pointerdown',outside,true);document.removeEventListener('focusin',focusOutside,true);
+    document.removeEventListener('keydown',escape,true);document.removeEventListener('scroll',scroll,true);
+    window.removeEventListener('resize',resize);
+    if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;
+    if(focus && trigger && trigger.isConnected)trigger.focus();
+  }
+  function outside(ev){if(!inside(ev.target))close(false);}
+  function focusOutside(ev){if(!inside(ev.target))close(false);}
+  function escape(ev){if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close(true);}}
+  function scroll(ev){
+    var target=ev.target===document?(document.scrollingElement || document.documentElement):ev.target;
+    /* Scrolling a narrow board to reach the trigger can queue an event that
+       arrives after opening. Dismiss only for movement since the menu opened. */
+    if(scrollAtOpen.some(function(s){return s.el===target && (s.x!==target.scrollLeft || s.y!==target.scrollTop);}))close(false);
+  }
+  function resize(){close(false);}
+  function show(trigger,point){
+    if(destroyed)return;
+    var id=trigger.getAttribute('data-dv-node-id'),node=(diagram.nodes || {})[id] || {},links=nodeReferenceLinks(diagram,id);
+    if(!links.length)return;close(false);active=trigger;open=true;pop.replaceChildren();
+    var title=document.createElement('strong');title.className='node-link-title';title.textContent=node.title || id;pop.appendChild(title);
+    pop.setAttribute('aria-label','Links for '+(node.title || id));
+    var dismiss=document.createElement('button');dismiss.type='button';dismiss.className='node-link-close';dismiss.textContent='×';dismiss.setAttribute('aria-label','Close node links');dismiss.addEventListener('click',function(){close(true);});pop.appendChild(dismiss);
+    var group;
+    links.forEach(function(item){
+      if(group!==item.group){var heading=document.createElement('span');heading.className='nbacklabel';heading.textContent=item.group;pop.appendChild(heading);group=item.group;}
+      var a=document.createElement('a');a.className='nbacklink node-reference-link';a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=item.label+' ↗';pop.appendChild(a);
+    });
+    trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
+    var rect=trigger.getBoundingClientRect(),vw=window.innerWidth || document.documentElement.clientWidth,vh=window.innerHeight || document.documentElement.clientHeight;
+    var left=point?point.x:rect.left,top=point?point.y:rect.bottom+6;
+    pop.style.left=Math.max(8,Math.min(vw-pop.offsetWidth-8,left))+'px';pop.style.top=Math.max(8,Math.min(vh-pop.offsetHeight-8,top))+'px';
+    pop.querySelector('a').focus({preventScroll:true});
+    for(var ancestor=trigger;ancestor;ancestor=ancestor.parentElement)scrollAtOpen.push({el:ancestor,x:ancestor.scrollLeft,y:ancestor.scrollTop});
+    document.addEventListener('pointerdown',outside,true);document.addEventListener('focusin',focusOutside,true);
+    document.addEventListener('keydown',escape,true);document.addEventListener('scroll',scroll,true);window.addEventListener('resize',resize);
+  }
+  function triggerFrom(ev){var node=ev.target.closest && ev.target.closest('.node[data-dv-node]');return node && node.querySelector('.nrefs-trigger');}
+  svg.addEventListener('contextmenu',function(ev){
+    var trigger=triggerFrom(ev);if(!trigger)return;
+    ev.preventDefault();ev.stopPropagation();show(trigger,ev.clientX||ev.clientY?{x:ev.clientX,y:ev.clientY}:null);
+  });
+  triggers.forEach(function(trigger){
+    trigger.setAttribute('aria-controls',pop.id);
+    trigger.addEventListener('mousedown',function(ev){ev.stopPropagation();});
+    trigger.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();if(open && active===trigger)close(false);else show(trigger);});
+    trigger.addEventListener('keydown',function(ev){
+      if(ev.key==='Enter'||ev.key===' '||ev.key==='ContextMenu'||(ev.shiftKey&&ev.key==='F10')){ev.preventDefault();ev.stopPropagation();show(trigger);}
+    });
+  });
+  pop.addEventListener('click',function(ev){ev.stopPropagation();});
+  pop.addEventListener('keydown',function(ev){
+    ev.stopPropagation();var links=Array.prototype.slice.call(pop.querySelectorAll('a')),index=links.indexOf(document.activeElement);
+    if(['ArrowDown','ArrowUp','Home','End'].indexOf(ev.key)<0)return;ev.preventDefault();
+    var next=ev.key==='Home'?0:ev.key==='End'?links.length-1:ev.key==='ArrowDown'?(index+1)%links.length:(index-1+links.length)%links.length;
+    links[next].focus();
+  });
+  pop.addEventListener('toggle',function(ev){if(ev.newState==='closed')close(false);});
+  return {destroy:function(){close(false);destroyed=true;pop.remove();}};
+}
+
 /* Fragment reveal state is deliberately a pure function of the target step.
    Invalid indices are ignored (the validator warns), and ambient mode always
    shows the complete section. */
@@ -8005,6 +8115,7 @@ var SCENES = {
 
 /* ---------------- board renderer ---------------- */
 function renderBoard(el, d, prefix, skin, protos, backlinks){
+  if(el._nodeLinks){el._nodeLinks.destroy();el._nodeLinks=null;}
   var SK = SKINS[skinBase(skin)];
   var L = layout(d);
   var ADJ = L.routing === 'lanes' ? laneRoutes(d,L) : edgeAutoAdjust(d.edges || [], L);
@@ -8074,7 +8185,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
     var nodeLink = n.link || (typeof FlowCanon!=='undefined' && n.binding && FlowCanon.http(n.binding.catalogUrl));
     var hasNodeLink = nodeLink && typeof nodeLink === 'string';
-    var backlinkX = p.w - (hasNodeLink ? 38 : 15);
+    var hasReferences=nodeReferenceLinks(d,id).length>0,referenceX=p.w-(hasNodeLink?38:15);
+    var backlinkX = p.w - 15 - (hasNodeLink?23:0) - (hasReferences?23:0);
     s += '<g class="node tint-' + tint + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' ? '<title>'+esc(nodeTitle)+'</title>' : '') +
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
@@ -8086,6 +8198,10 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
            '<circle cx="' + (p.w - 15) + '" cy="14" r="9" fill="transparent"/>' +
            '<text x="' + (p.w - 15) + '" y="18" text-anchor="middle">&#8599;</text></a>' : '') +
+         (hasReferences ?
+           '<g class="nlink nrefs-trigger" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Links for ' + esc(nodeTitle) + '">' +
+           '<title>Links · right-click this node or open here</title><circle cx="' + referenceX + '" cy="14" r="10" fill="transparent"/>' +
+           '<text x="' + referenceX + '" y="18" text-anchor="middle">&#8943;</text></g>' : '') +
          (siblingPages.length ?
            '<g class="nbackref" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Other pages containing ' + esc(nodeTitle) + '">' +
            '<circle cx="' + backlinkX + '" cy="14" r="9" fill="transparent"/>' +
@@ -8102,6 +8218,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     if (node) nodeEls[id] = node;
   });
   wireNodeBacklinks(el, svg, d, prefix, backlinks);
+  el._nodeLinks=wireNodeReferences(el,svg,d,prefix);
 
   /* measured pass: labels, coins, ambient loop dots, manual step dots */
   var stepByEdge = {};
@@ -11478,6 +11595,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var lg = document.createElement('div'); lg.className = 'lg';
   var bwrap = document.createElement('div');
   bwrap.className = 'boardcanvas';
+  result.destroy=function(){if(bwrap._nodeLinks){bwrap._nodeLinks.destroy();bwrap._nodeLinks=null;}};
   boardDiv.appendChild(lg); boardDiv.appendChild(bwrap);
   boardLayout.diagramHost.appendChild(boardDiv);
 
@@ -11645,6 +11763,7 @@ function renderPage(view, page, skin, backlinks, options){
     ctl.sections.forEach(function(rec){
       if (rec.boardSize) rec.boardSize.destroy();
       if (rec.presentation) rec.presentation.destroy();
+      if (rec.destroy) rec.destroy();
     });
     ctl.onChange = null;
   };
@@ -11672,7 +11791,7 @@ function renderPage(view, page, skin, backlinks, options){
     var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                flowDisclosure:built.flowDisclosure, presentation:built.presentation,
-               contractCard:built.contractCard, contractRows:built.contractRows};
+               contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);
     return built;

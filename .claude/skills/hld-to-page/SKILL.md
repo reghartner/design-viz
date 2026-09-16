@@ -261,6 +261,11 @@ Scanning opens evidence reviews, never automatic behavioral acceptance.
 Published node bindings also drive Backstage's automatic **Diagrams** tab; see
 `apps/backstage/README.md`. Use the full kind/namespace/name identity. Do not add a
 parallel manual diagram list or infer service associations from display names.
+Bound nodes expose saved Backstage/API/source/code destinations through
+right-click and a keyboard/touch **…** button. Preserve `binding` URLs and
+immutable `codeRefs`; do not invent destinations from node titles. Code from
+steps involving the node is labeled **Related step code**, not node ownership.
+See the node-reference menu section in `docs/backstage-integration.md`.
 For approved reference traces and incident alternates, use
 `cookbook/canonical-incidents.md` and `tools/canon/trace-cli.mjs`. Bind exact
 service/operation names with `traceMatch`; disambiguate parallel/repeated calls

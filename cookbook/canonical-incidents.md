@@ -31,3 +31,10 @@ For the exact schema, CLI, supported Honeycomb export shape, repeated/parallel c
 rules, and integration boundaries, read `docs/canon.md` and
 `docs/backstage-integration.md`. Mapping changes require reference reapproval;
 ordinary HLDs need none of this metadata.
+
+To test drift against runnable source and real local commits, use the
+`examples/canon/doorbell-app/` sample and `node tools/canon/doorbell-rehearsal.mjs`.
+It applies a harmless refactor and a 500→50 ms timeout regression, runs an unchanged
+app contract at each revision, and verifies no-impact acceptance versus preserved
+expected behavior. The same rehearsal is available in the local portal; read
+`docs/canon.md#runnable-doorbell-app-rehearsal` for the evidence files and rescan CLI.

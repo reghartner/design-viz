@@ -3,16 +3,23 @@ import {writeFile,mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {scan,decide,SnapshotSources,GitHubSources,reportMarkdown,effectiveSpecs} from './drift.mjs';
 import {registry,json,stateFile,atomicJSON} from './registry.mjs';
+import {LocalGitSources} from './local-git.mjs';
 const args=process.argv.slice(2),command=args.shift();
 function flag(name,fallback){const i=args.indexOf('--'+name);return i<0?fallback:args[i+1];}
 if(!['scan','decide'].includes(command)){
-  console.log('Usage: node tools/canon/cli.mjs scan|decide --registry registry.json --state state.json [--sources snapshots.json | --github] [--out report.md]\nDecision: --review ID --disposition no-impact|regression|update --reason TEXT [--ticket URL] [--write-specs]');process.exit(command?1:0);
+  console.log('Usage: node tools/canon/cli.mjs scan|decide --registry registry.json --state state.json [--sources snapshots.json | --local-sources paths.json | --github] [--out report.md]\nDecision: --review ID --disposition no-impact|regression|update --reason TEXT [--ticket URL] [--write-specs]');process.exit(command?1:0);
 }
 try{
   const r=await registry(flag('registry','examples/canon/registry.json')),statePath=flag('state','.local/canon-state.json'),state=await stateFile(statePath);
   let next;
   if(command==='scan'){
-    const source=args.includes('--github')?new GitHubSources({token:process.env.FLOWVIEW_GITHUB_TOKEN,host:process.env.FLOWVIEW_GITHUB_HOST,apiBase:process.env.FLOWVIEW_GITHUB_API}):new SnapshotSources(await json(flag('sources','examples/canon/repositories.json')));
+    if(args.includes('--github') && flag('local-sources'))throw new Error('Choose either GitHub or local sources.');
+    let source;
+    if(flag('local-sources')){
+      const file=path.resolve(flag('local-sources')),config=await json(file);
+      if(config.version!==1 || !config.repositories || Array.isArray(config.repositories))throw new Error('Expected version-1 local sources with a repositories map.');
+      source=new LocalGitSources(Object.fromEntries(Object.entries(config.repositories).map(([url,dir])=>[url,path.resolve(path.dirname(file),dir)])));
+    }else source=args.includes('--github')?new GitHubSources({token:process.env.FLOWVIEW_GITHUB_TOKEN,host:process.env.FLOWVIEW_GITHUB_HOST,apiBase:process.env.FLOWVIEW_GITHUB_API}):new SnapshotSources(await json(flag('sources','examples/canon/repositories.json')));
     const result=await scan(r.specs,source,state);next=result.state;
     const out=flag('out','.local/canon-report.md');await mkdir(path.dirname(path.resolve(out)),{recursive:true});await writeFile(out,reportMarkdown(result.findings));
     console.log(JSON.stringify({reviews:result.findings.map(f=>({id:f.id,status:f.status,impacts:f.impacts.length})),report:out},null,2));

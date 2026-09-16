@@ -84,3 +84,30 @@ $('propose-incident').onclick=()=>traceAction($('propose-incident'),async()=>{
   const result=await api('proposals',{id:incident.diagramId,spec:incident.spec,baseRevision:incident.baseRevision});await refresh();status('Created spec review '+result.id+'. Review and approve it below to retain this alternate.');
 });
 select(selected);
+
+function showRehearsal(report){
+  const host=$('rehearsal-result');host.replaceChildren();if(!report)return;
+  $('rehearsal-status').textContent=report.note;
+  const stages=el('div',null,'rehearsal-stages');
+  for(const stage of report.stages){
+    const card=el('article',null,'review '+(stage.review?.status || 'accepted'));
+    card.append(el('h3',stage.name),el('p',stage.testExitCode?'App contract: FAIL · expected regression':'App contract: PASS'),el('p',stage.behavior.recordings.length+' recording(s) saved · '+stage.behavior.notifications.length+' notification(s) delivered'));
+    if(stage.behavior.error)card.append(el('p',stage.behavior.error.message));
+    card.append(el('p','Commit '+stage.revision.slice(0,12),'eyebrow'));
+    if(stage.review){
+      card.append(el('p','Drift review: '+stage.review.status),el('p',stage.review.decision.reason));
+      const details=el('details');details.append(el('summary','Inspect source change'),el('pre','BEFORE\n'+stage.review.before.text),el('pre','AFTER\n'+stage.review.after.text));card.append(details);
+      const impacts=el('ul');for(const i of stage.review.impacts)impacts.append(el('li',i.diagramId+' · '+i.targetId));card.append(impacts);
+    }
+    stages.append(card);
+  }
+  host.append(stages,el('p','Accepted recording revision stays at '+report.acceptedRevision.slice(0,12)+'. The broken commit is reported without rewriting the expected flow.'));
+  const download=el('a','Download evidence JSON');download.href='/api/canon/doorbell-rehearsal';download.download='doorbell-rehearsal.json';host.append(download);
+}
+$('run-rehearsal').onclick=async()=>{
+  const button=$('run-rehearsal');button.disabled=true;$('rehearsal-status').textContent='Running baseline, refactor and regression checks…';
+  try{showRehearsal(await api('doorbell-rehearsal',{}));}
+  catch(e){$('rehearsal-status').textContent='Rehearsal failed: '+e.message;}
+  finally{button.disabled=false;}
+};
+showRehearsal(await api('doorbell-rehearsal').catch(()=>null));

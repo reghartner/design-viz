@@ -6,12 +6,13 @@ import {fileURLToPath} from 'node:url';
 import {registry,json,stateFile,atomicJSON} from '../../tools/canon/registry.mjs';
 import {scan,decide,propose,digest,effectiveSpecs,SnapshotSources,reportMarkdown} from '../../tools/canon/drift.mjs';
 import C from '../../tools/canon/core.cjs';
+import {runDoorbellRehearsal} from '../../tools/canon/doorbell-rehearsal.mjs';
 import {referencePreview,approveReference,compareTrace} from '../../tools/canon/traces.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 
 export async function createCanonServer({registryPath=path.join(root,'examples/canon/registry.json'),statePath=path.join(root,'.local/canon/state.json')}={}){
   const reg=await registry(registryPath),catalog=C.catalog(await json(path.join(reg.root,'catalog.json'))),sources=new SnapshotSources(await json(path.join(reg.root,'repositories.json')));
-  let state=await stateFile(statePath),mutations=Promise.resolve();
+  let state=await stateFile(statePath),mutations=Promise.resolve(),rehearsalJob=null;
   const specs=()=>effectiveSpecs(reg.specs,state);
   const find=id=>{const spec=specs().find(s=>s.page.canon.id===id);if(!spec)throw new Error('Diagram not found.');return spec;};
   async function mutate(fn){const job=mutations.then(async()=>{const result=await fn();await atomicJSON(statePath,state);return result;});mutations=job.catch(()=>{});return job;}
@@ -24,6 +25,11 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
         if(req.headers.origin && req.headers.origin!==origin)return send(403,{error:'Cross-origin writes are not allowed.'});
         if(req.headers['content-type']?.split(';')[0]!=='application/json')return send(415,{error:'Use application/json.'});
         const data=await body();
+        if(url.pathname==='/api/canon/doorbell-rehearsal'){
+          // Fixed trusted fixture only. Request data cannot select executable code.
+          if(!rehearsalJob)rehearsalJob=runDoorbellRehearsal({parentDir:path.join(path.dirname(statePath),'doorbell-rehearsals')}).then(report=>mutate(async()=>{state.rehearsal=report;return report;})).finally(()=>{rehearsalJob=null;});
+          return send(200,await rehearsalJob);
+        }
         if(url.pathname==='/api/canon/reference-preview')return send(200,referencePreview(find(data.id),data.trace,data.section || 0));
         if(url.pathname==='/api/canon/reference-approve')return send(200,await mutate(async()=>{
           const current=find(data.id);if(data.baseRevision!==digest(current))throw new Error('Diagram changed; preview the reference again.');
@@ -46,6 +52,7 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
         return send(404,{error:'Unknown action.'});
       }
       if(req.method!=='GET')return send(405,{error:'Method not supported.'});
+      if(url.pathname==='/api/canon/doorbell-rehearsal')return send(200,state.rehearsal || null);
       if(/^\/api\/canon\/fixtures\/[a-z-]+$/.test(url.pathname))return send(200,await json(path.join(root,'examples/canon/traces',url.pathname.split('/').pop()+'.json')));
       if(/^\/api\/canon\/incidents\/[a-f0-9]{20}(\/spec)?$/.test(url.pathname)){
         const entry=state.incidents?.[url.pathname.split('/')[4]];if(!entry)return send(404,{error:'Incident no longer available.'});

@@ -13,7 +13,10 @@ Run `node apps/backstage-mock/server.mjs` and open port 8766 for a fictional cen
 repository with catalog-seeded editing, code drift reviews, approved reference
 traces, and incident alternates. No company sandbox is needed. See the
 [canonical flow guide](docs/canon.md), [doorbell recipe](cookbook/canonical-incidents.md),
-and [Backstage/company handoff](docs/backstage-integration.md).
+and [Backstage/company handoff](docs/backstage-integration.md). The
+[runnable sample app](examples/canon/doorbell-app/README.md) rehearses harmless and
+breaking source changes against actual local Git commits and fixed contract tests.
+
 
 ## The pipeline
 

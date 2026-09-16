@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "source": "Fictional Backstage catalog \u2014 local mock",
+  "services": [
+    {
+      "entityRef": "component:default/porch-hub",
+      "title": "Porch hub",
+      "owner": "group:default/home-team",
+      "catalogUrl": "http://localhost:8766/catalog/default/component/porch-hub",
+      "telemetry": {
+        "serviceName": "porch-hub"
+      },
+      "apis": [
+        {
+          "entityRef": "api:default/porch-hub",
+          "title": "Porch hub API",
+          "definitionUrl": "http://localhost:8766/apis/porch-hub",
+          "endpoints": {
+            "development": "https://porch-hub.example.test"
+          },
+          "operations": [
+            {
+              "operationId": "receiveButton",
+              "method": "POST",
+              "path": "/button"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entityRef": "component:default/recording-service",
+      "title": "Recording service",
+      "owner": "group:default/home-team",
+      "catalogUrl": "http://localhost:8766/catalog/default/component/recording-service",
+      "telemetry": {
+        "serviceName": "recording-service"
+      },
+      "apis": [
+        {
+          "entityRef": "api:default/recording-service",
+          "title": "Recording service API",
+          "definitionUrl": "http://localhost:8766/apis/recording-service",
+          "endpoints": {
+            "development": "https://recording-service.example.test"
+          },
+          "operations": [
+            {
+              "operationId": "createRecording",
+              "method": "POST",
+              "path": "/recordings"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entityRef": "component:default/notification-service",
+      "title": "Notification service",
+      "owner": "group:default/home-team",
+      "catalogUrl": "http://localhost:8766/catalog/default/component/notification-service",
+      "telemetry": {
+        "serviceName": "notification-service"
+      },
+      "apis": [
+        {
+          "entityRef": "api:default/notification-service",
+          "title": "Notification service API",
+          "definitionUrl": "http://localhost:8766/apis/notification-service",
+          "endpoints": {
+            "development": "https://notification-service.example.test"
+          },
+          "operations": [
+            {
+              "operationId": "notifyResident",
+              "method": "POST",
+              "path": "/notifications"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

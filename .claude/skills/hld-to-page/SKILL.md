@@ -244,6 +244,13 @@ own edits. See `cookbook/alternate-paths.md` for a complete spec and the
 workbench's copy/share/detach workflow. Paths describe authored outcomes,
 not executable conditions or failure probabilities.
 
+**Connect to company evidence when requested.** Read `docs/canon.md`. Preserve
+HLD provenance; use optional `page.canon` for design/canonical ownership. Resolve
+node service/API bindings from a supplied catalog, never invent company entities.
+Attach reviewed code references with full commit SHAs and unique literal anchors;
+require stable step IDs. Canonical status and behavioral impact require human
+review. The fictional `examples/canon/` catalog is for demonstrations only.
+
 **Choose the main view.** A `homemap` or other panel can be the centerpiece
 with `diagram.primaryPanel: "<panel-id>"`. Existing homemaps support live
 Home / Data flow switching while retaining the selected step and path.

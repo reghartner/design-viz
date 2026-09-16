@@ -1489,7 +1489,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     var shownTitle = L.routing === 'lanes' && Array.from(nodeTitle).length > 13 ? Array.from(nodeTitle).slice(0,12).join('')+'…' : nodeTitle;
     var siblingPages = typeof n.title === 'string' &&
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
-    var hasNodeLink = n.link && typeof n.link === 'string';
+    var nodeLink = n.link || (typeof FlowCanon!=='undefined' && n.binding && FlowCanon.http(n.binding.catalogUrl));
+    var hasNodeLink = nodeLink && typeof nodeLink === 'string';
     var backlinkX = p.w - (hasNodeLink ? 38 : 15);
     s += '<g class="node tint-' + tint + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' ? '<title>'+esc(nodeTitle)+'</title>' : '') +
@@ -1499,7 +1500,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
          '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(shownTitle) + '</text>' +
          '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>' +
          (hasNodeLink ?
-           '<a class="nlink" href="' + esc(n.link) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
+           '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
            '<circle cx="' + (p.w - 15) + '" cy="14" r="9" fill="transparent"/>' +
            '<text x="' + (p.w - 15) + '" y="18" text-anchor="middle">&#8599;</text></a>' : '') +
          (siblingPages.length ?
@@ -4106,7 +4107,8 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
             lane: (st && typeof st.lane === 'string') ? st.lane : null,
             packets: (st && Array.isArray(st.packets)) ? st.packets : null,
             text: (st && st.text) || '',
-            link: (st && typeof st.link === 'string') ? st.link : null};
+            link: (st && typeof st.link === 'string') ? st.link : null,
+            codeRefs:st && st.codeRefs};
   }); }
   var steps = playbackSteps(d);
   var N = steps.length;
@@ -4243,6 +4245,10 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       termbar.lanePill.style.borderColor = lm.color;
     }
     stepText.textContent = s.text;
+    if(termbar.evidenceLinks && typeof FlowCanon!=='undefined'){
+      var stepLinks=FlowCanon.links(s);termbar.evidenceLinks.innerHTML='';
+      appendCanonLinks(termbar.evidenceLinks,stepLinks);termbar.evidenceLinks.hidden=!stepLinks.length;
+    }
     if (termbar.failureStatus){
       var failures = communicationFailureText(source,s.failures);
       termbar.failureStatus.textContent = failures; termbar.failureStatus.hidden = !failures;
@@ -4717,6 +4723,9 @@ function createBoardSizeControl(board, legend, label){
     destroy:function(){ destroyed = true; if (observer) observer.disconnect(); }};
 }
 
+function appendCanonLinks(host,links){
+  links.forEach(function(link){var a=document.createElement('a');a.href=link.url;a.target='_blank';a.rel='noopener';a.textContent=link.label+' ↗';host.appendChild(a);});
+}
 function buildSection(container, sec, gi, sectionReference, protos, skin, lanes, backlinks, onChange, onProseChange, options){
   var accRaw = sec.accent;
   var acc = isHex(accRaw) ? accRaw : (ACCENTS[accRaw] || ACCENTS[ACCENT_CYCLE[gi % ACCENT_CYCLE.length]]);
@@ -4740,6 +4749,18 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
                 contractCard:box.querySelector('.ctcard'),
                 contractRows:Array.prototype.slice.call(box.querySelectorAll('.ctrow'))};
   if (!sec.diagram) return result;
+
+  if (typeof FlowCanon!=='undefined'){
+    var catalogLinks=[];
+    Object.keys(sec.diagram.nodes || {}).forEach(function(id){
+      FlowCanon.links(sec.diagram.nodes[id]).forEach(function(link){catalogLinks.push({label:id+' · '+link.label,url:link.url});});
+    });
+    if(catalogLinks.length){
+      var evidence=document.createElement('details');evidence.className='canon-evidence';
+      var evidenceSummary=document.createElement('summary');evidenceSummary.textContent='Services, APIs and source code';evidence.appendChild(evidenceSummary);
+      appendCanonLinks(evidence,catalogLinks);box.appendChild(evidence);
+    }
+  }
 
   var d = sec.diagram;
   var activeDiagram = diagramForPath(d);
@@ -4832,6 +4853,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var srcA = document.createElement('a');
   srcA.className = 'steplink'; srcA.target = '_blank'; srcA.rel = 'noopener';
   srcA.textContent = 'source ↗'; srcA.hidden = true;
+  var evidenceLinks=document.createElement('span');evidenceLinks.className='canon-step-links';evidenceLinks.hidden=true;
   var copyStep = document.createElement('button');
   copyStep.type = 'button'; copyStep.className = 'copychip stepcopy';
   copyStep.innerHTML = COPY_ICON; copyStep.title = 'Copy link';
@@ -4839,6 +4861,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   line.appendChild(stepN); line.appendChild(lanePill); line.appendChild(stepText);
   line.appendChild(failureStatus);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
+  line.appendChild(evidenceLinks);
   var transport = document.createElement('div'); transport.className = 'step-transport';
   transport.setAttribute('role','group'); transport.setAttribute('aria-label','Step playback');
   transport.appendChild(btnPrev); transport.appendChild(btnPlay); transport.appendChild(btnNext);
@@ -4865,7 +4888,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.appendChild(ol);
 
   var stepper = attachStepper(box, boardDiv, {
-    bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,
+    bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
     printSteps(next);

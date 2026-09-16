@@ -1,0 +1,371 @@
+{
+  "page": {
+    "title": "Canonical doorbell flow \u00b7 fictional demo",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Doorbell press to resident notification",
+        "text": [
+          "A fictional, reviewable flow connected to mock Backstage services, source code, and trace evidence. No company services are contacted."
+        ],
+        "diagram": {
+          "primaryPanel": "home",
+          "view": "step",
+          "routing": "lanes",
+          "nodes": {
+            "camera": {
+              "title": "Porch camera",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "hub": {
+              "title": "Home hub",
+              "icon": "antenna",
+              "tint": "mqtt",
+              "binding": {
+                "entityRef": "component:default/porch-hub",
+                "label": "Porch hub",
+                "owner": "group:default/home-team",
+                "catalogUrl": "http://localhost:8766/catalog/default/component/porch-hub",
+                "telemetry": {
+                  "serviceName": "porch-hub"
+                },
+                "api": {
+                  "entityRef": "api:default/porch-hub",
+                  "title": "Porch hub API",
+                  "definitionUrl": "http://localhost:8766/apis/porch-hub",
+                  "endpoints": {
+                    "development": "https://porch-hub.example.test"
+                  },
+                  "operationId": "receiveButton",
+                  "method": "POST",
+                  "path": "/button"
+                }
+              }
+            },
+            "cloud": {
+              "title": "Event service",
+              "icon": "cloud",
+              "tint": "cmd",
+              "binding": {
+                "entityRef": "component:default/recording-service",
+                "label": "Recording service",
+                "owner": "group:default/home-team",
+                "catalogUrl": "http://localhost:8766/catalog/default/component/recording-service",
+                "telemetry": {
+                  "serviceName": "recording-service"
+                },
+                "api": {
+                  "entityRef": "api:default/recording-service",
+                  "title": "Recording service API",
+                  "definitionUrl": "http://localhost:8766/apis/recording-service",
+                  "endpoints": {
+                    "development": "https://recording-service.example.test"
+                  },
+                  "operationId": "createRecording",
+                  "method": "POST",
+                  "path": "/recordings"
+                }
+              }
+            },
+            "phone": {
+              "title": "Home app",
+              "icon": "phone",
+              "tint": "data",
+              "binding": {
+                "entityRef": "component:default/notification-service",
+                "label": "Notification service",
+                "owner": "group:default/home-team",
+                "catalogUrl": "http://localhost:8766/catalog/default/component/notification-service",
+                "telemetry": {
+                  "serviceName": "notification-service"
+                },
+                "api": {
+                  "entityRef": "api:default/notification-service",
+                  "title": "Notification service API",
+                  "definitionUrl": "http://localhost:8766/apis/notification-service",
+                  "endpoints": {
+                    "development": "https://notification-service.example.test"
+                  },
+                  "operationId": "notifyResident",
+                  "method": "POST",
+                  "path": "/notifications"
+                }
+              }
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "hub"
+            ],
+            [
+              "cloud",
+              "phone"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "hub",
+              "kind": "mqtt",
+              "label": "local detection"
+            },
+            {
+              "from": "hub",
+              "to": "cloud",
+              "kind": "https",
+              "label": "upload event"
+            },
+            {
+              "from": "cloud",
+              "to": "phone",
+              "kind": "https",
+              "label": "notify resident"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "The home",
+              "outline": {
+                "w": 300,
+                "h": 164
+              },
+              "rooms": [
+                {
+                  "label": "PORCH",
+                  "x": 10,
+                  "y": 8,
+                  "w": 65,
+                  "h": 164
+                },
+                {
+                  "label": "ENTRY",
+                  "x": 75,
+                  "y": 8,
+                  "w": 75,
+                  "h": 164
+                },
+                {
+                  "label": "LIVING ROOM",
+                  "x": 150,
+                  "y": 8,
+                  "w": 160,
+                  "h": 164
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Porch cam",
+                  "x": 40,
+                  "y": 42,
+                  "facing": 70,
+                  "spread": 60,
+                  "range": 72
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "label": "Front door",
+                  "x": 102,
+                  "y": 90
+                },
+                {
+                  "id": "hub",
+                  "kind": "hub",
+                  "label": "Home hub",
+                  "x": 205,
+                  "y": 58
+                },
+                {
+                  "id": "motion",
+                  "kind": "sensor",
+                  "label": "Motion",
+                  "icon": "gear",
+                  "x": 262,
+                  "y": 130
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "visitor",
+                  "label": "Visitor",
+                  "x": 35,
+                  "y": 130
+                }
+              ],
+              "initial": {
+                "cam": "scan",
+                "door": "closed",
+                "hub": "idle",
+                "motion": "ok"
+              }
+            },
+            {
+              "id": "outcome",
+              "type": "state",
+              "title": "What the resident knows",
+              "states": [
+                "Quiet",
+                "Motion detected",
+                "Uploading",
+                "Resident notified",
+                "Local recording only"
+              ],
+              "initial": {
+                "state": "Quiet"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "quiet",
+              "text": "A quiet home. The camera scans the porch; the door is closed.",
+              "nodes": [
+                "camera",
+                "hub"
+              ]
+            },
+            {
+              "id": "detect",
+              "edge": "camera->hub",
+              "text": "A visitor approaches. The porch camera detects motion and signals the local hub.",
+              "panels": {
+                "home": {
+                  "cam": "detect",
+                  "hub": "rx",
+                  "visitor": {
+                    "x": 56,
+                    "y": 113
+                  },
+                  "signals": [
+                    {
+                      "from": "cam",
+                      "to": "hub"
+                    }
+                  ]
+                },
+                "outcome": {
+                  "state": "Motion detected"
+                }
+              },
+              "codeRefs": [
+                {
+                  "id": "porch-hub.receiveButton",
+                  "label": "receiveButton",
+                  "repository": "https://github.com/fictional-home/doorbell-services",
+                  "path": "src/porch-hub.js",
+                  "revision": "1111111111111111111111111111111111111111",
+                  "anchor": {
+                    "start": "// flow:receiveButton:start",
+                    "end": "// flow:receiveButton:end"
+                  },
+                  "startLine": 2,
+                  "endLine": 6,
+                  "purpose": "A visitor approaches. The porch camera detects motion and signals the local hub."
+                }
+              ],
+              "traceMatch": {
+                "serviceName": "porch-hub",
+                "operation": "POST /button",
+                "maxDurationMs": 500
+              }
+            },
+            {
+              "id": "upload",
+              "edge": "hub->cloud",
+              "text": "The visitor reaches the door. The camera records while the hub uploads the event.",
+              "panels": {
+                "home": {
+                  "cam": "rec",
+                  "hub": "tx",
+                  "visitor": {
+                    "x": 94,
+                    "y": 140
+                  }
+                },
+                "outcome": {
+                  "state": "Uploading"
+                }
+              },
+              "codeRefs": [
+                {
+                  "id": "recording-service.createRecording",
+                  "label": "createRecording",
+                  "repository": "https://github.com/fictional-home/doorbell-services",
+                  "path": "src/recording-service.js",
+                  "revision": "1111111111111111111111111111111111111111",
+                  "anchor": {
+                    "start": "// flow:createRecording:start",
+                    "end": "// flow:createRecording:end"
+                  },
+                  "startLine": 2,
+                  "endLine": 6,
+                  "purpose": "The visitor reaches the door. The camera records while the hub uploads the event."
+                }
+              ],
+              "traceMatch": {
+                "serviceName": "recording-service",
+                "operation": "POST /recordings",
+                "maxDurationMs": 500
+              }
+            },
+            {
+              "id": "notify",
+              "edge": "cloud->phone",
+              "text": "The resident is notified and opens the front door.",
+              "panels": {
+                "home": {
+                  "door": "open",
+                  "visitor": {
+                    "x": 132,
+                    "y": 124
+                  }
+                },
+                "outcome": {
+                  "state": "Resident notified"
+                }
+              },
+              "codeRefs": [
+                {
+                  "id": "notification-service.notifyResident",
+                  "label": "notifyResident",
+                  "repository": "https://github.com/fictional-home/doorbell-services",
+                  "path": "src/notification-service.js",
+                  "revision": "1111111111111111111111111111111111111111",
+                  "anchor": {
+                    "start": "// flow:notifyResident:start",
+                    "end": "// flow:notifyResident:end"
+                  },
+                  "startLine": 2,
+                  "endLine": 6,
+                  "purpose": "The resident is notified and opens the front door."
+                }
+              ],
+              "traceMatch": {
+                "serviceName": "notification-service",
+                "operation": "POST /notifications",
+                "maxDurationMs": 500
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "canon": {
+      "version": 1,
+      "id": "doorbell",
+      "kind": "canonical",
+      "owner": "group:default/home-team"
+    },
+    "generatedFrom": {
+      "url": "https://example.test/designs/doorbell",
+      "label": "Fictional doorbell HLD",
+      "version": "1"
+    }
+  }
+}

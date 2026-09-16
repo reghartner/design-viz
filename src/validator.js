@@ -1416,6 +1416,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
 function validate(page){
   var errors = [], warnings = [];
   if (!page){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
+  if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   var blocks = blocksOf(page);
   if (!blocks.length){
     errors.push('page.blocks: required — provide at least one section or tabs block');

@@ -10,7 +10,7 @@ const outdir = path.join(app, preview ? 'preview' : 'static/viewer');
 const exports = ['buildConfluenceExport', 'buildConfluenceConfig', 'confluenceSections',
   'confluenceDisplayPage', 'confluenceSourceUrl', 'CONFLUENCE_INPUT_BYTES',
   'SKIN_NAMES', 'renderPage', 'applySkinClasses'];
-const core = (await Promise.all(['validator.js','engine.js','confluence.js'].map(name =>
+const core = (await Promise.all(['canon.js','validator.js','engine.js','confluence.js'].map(name =>
   readFile(path.join(root, 'src', name), 'utf8')))).join('\n') + '\nexport {' + exports.join(',') + '};';
 
 await rm(outdir, {recursive:true, force:true});

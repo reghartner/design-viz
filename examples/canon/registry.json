@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "diagrams": [
+    {
+      "id": "doorbell",
+      "path": "specs/doorbell.json",
+      "title": "Canonical doorbell flow \u00b7 fictional demo"
+    }
+  ]
+}

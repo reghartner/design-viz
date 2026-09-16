@@ -8,7 +8,7 @@ if (!(args.length === 1 || (args.length === 3 && args[1] === '-o'))){
 }
 try {
   const core = {TextEncoder,URL}; vm.createContext(core);
-  for (const file of ['validator.js','confluence.js'])
+  for (const file of ['canon.js','validator.js','confluence.js'])
     vm.runInContext(fs.readFileSync(path.join(__dirname,'../src',file),'utf8'),core);
   const result = core.buildConfluenceExport(fs.readFileSync(args[0],'utf8'));
   if (result.error) throw new Error(result.error);

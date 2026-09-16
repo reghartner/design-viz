@@ -4272,6 +4272,11 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 body .docview .boardgrid.haspanels.panel-first{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;align-items:start;}
 body .docview .boardgrid.panel-first:not(:has(>.panelcol:not([hidden]))){grid-template-columns:minmax(0,1fr);}
 .primary-panel{min-width:0;}
+.canon-evidence{margin:10px 0;color:var(--dtext);font:12px/1.6 'IBM Plex Sans',sans-serif;}
+.canon-evidence summary{cursor:pointer;font-weight:600;}
+.canon-evidence a,.canon-step-links a{display:inline-block;color:var(--dink);margin:4px 12px 4px 0;overflow-wrap:anywhere;}
+.canon-step-links{display:block;flex-basis:100%;}
+.canon-step-links[hidden]{display:none;}
 /* Keep the home at its existing maximum height, then give surplus horizontal
    space to supporting widgets. Match the 320:216 SVG and each skin's card
    padding/borders so the map reaches that height without empty side space. */

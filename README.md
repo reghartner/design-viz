@@ -29,6 +29,9 @@ and its [cookbook index](cookbook/README.md). They include complete recipes for
 [alternate timelines](cookbook/alternate-paths.md), [Home-centered stories](cookbook/home-story.md),
 and [camera recording/event timing](cookbook/camera-events.md).
 
+For repository PRs, use the [PR-handling skill](.claude/skills/design-viz-pr/SKILL.md).
+It starts with the diff and loads only the review guidance for the affected surfaces.
+
 **[Confluence viewer](docs/confluence.md):** keep editing in the workbench, then
 use **Export for Confluence** or **Copy JSON for Confluence** for manual import
 into the Forge macro. The viewer retains playback, alternate paths and panels.

@@ -1,0 +1,20 @@
+# Editor
+
+- Follow the user action through selection, the mutation planner, JSON write,
+  rerender and restored selection. Check one Undo/Redo per logical operation,
+  invalid-input preservation and stale dialogs after source/section changes.
+- Keep shared Home layout/initial state distinct from per-step overrides. Use
+  `docs/homemap-workbench.md` only for those controls. Test the context being
+  edited, including non-step selection when affected.
+- Step operations: read `docs/workbench-step-reuse.md` and, for branch semantics,
+  `docs/alternate-paths.md`. Copies are independent; shared references deliberately
+  edit one body. Verify IDs, path membership and the first independent branch.
+- Clipboard operations: read `docs/workbench-clipboard.md`. Check reference/ID
+  remapping, cross-spec destinations, initial versus animated state, native text
+  editing, mobile/manual fallback and failure without partial mutation.
+
+Run suites for the touched planner/control (for example `builder`, `clipboard`,
+`reuse-steps`, `homemap-edit` or `workspace`). For interaction changes, exercise
+the user gesture in the built workbench and Undo/Redo; cover keyboard and narrow
+layout when affected. Read `docs/workbench-workspace.md` only for sizing/focus.
+Behavior changes also need the corresponding user guide/HLD skill route updated.

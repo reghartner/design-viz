@@ -1,12 +1,29 @@
-const $=id=>document.getElementById(id);let selected,registry,referenceDraft=null,incident=null;
+import {entityRefFromPath,renderServiceDirectory,renderEntityDiagrams} from './entity-view.mjs';
+const $=id=>document.getElementById(id);let selected,registry,referenceDraft=null,incident=null,renderedRevision,entityRevision,refreshing,refreshSequence=0;
+const entityRef=entityRefFromPath(location.pathname);
 function el(tag,text,cls){const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;}
 function status(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
 async function api(path,data){const r=await fetch('/api/canon/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const result=await r.json();if(!r.ok)throw new Error(result.error);return result;}
-function select(id){selected=id;const diagram=registry.diagrams.find(d=>d.id===id);$('title').textContent=diagram.title;$('viewer').src='/template/flowview.html?spec='+encodeURIComponent('/api/canon/specs/'+id)+'&v='+diagram.revision;$('edit').href='/workbench/flowspec.html?canon='+encodeURIComponent(id);$('trace-section').replaceChildren();for(const section of diagram.sections){const option=el('option',section.title);option.value=section.index;$('trace-section').append(option);} $('reference-state').textContent=diagram.sections[0]?.hasReference?'Approved reference attached':'Reference not yet approved';$('compare-trace').disabled=!diagram.sections[0]?.hasReference;$('reference-approval').hidden=true;referenceDraft=null;$('incident-actions').hidden=true;}
+function select(id){const diagram=registry.diagrams.find(d=>d.id===id);if(!diagram)return;selected=id;renderedRevision=diagram.revision;$('title').textContent=diagram.title;$('viewer').src='/template/flowview.html?spec='+encodeURIComponent('/api/canon/specs/'+id)+'&v='+diagram.revision;$('edit').href='/workbench/flowspec.html?canon='+encodeURIComponent(id);$('trace-section').replaceChildren();for(const section of diagram.sections){const option=el('option',section.title);option.value=section.index;$('trace-section').append(option);} $('reference-state').textContent=diagram.sections[0]?.hasReference?'Approved reference attached':'Reference not yet approved';$('compare-trace').disabled=!diagram.sections[0]?.hasReference;$('reference-approval').hidden=true;referenceDraft=null;$('incident-actions').hidden=true;}
 async function refresh(){
-  registry=await api('registry');$('diagrams').replaceChildren();
-  for(const d of registry.diagrams){const b=el('button',d.title,'quiet');b.onclick=()=>select(d.id);$('diagrams').append(b);}
-  if(!selected)select(registry.diagrams[0].id);
+  const sequence=++refreshSequence;
+  const [next,services,associations]=await Promise.all([api('registry'),api('services'),entityRef?api('entity-diagrams?entityRef='+encodeURIComponent(entityRef)):null]);
+  if(sequence!==refreshSequence)return;
+  registry=next;renderServiceDirectory($('service-list'),services.services);$('services').hidden=!!entityRef;
+  if(associations && associations.revision!==entityRevision){
+    const service=services.services.find(s=>s.entityRef.toLowerCase()===entityRef);
+    document.title=(service?.title || entityRef)+' · Flowview';
+    renderEntityDiagrams($('entity'),associations,service,id=>{select(id);$('diagram-stage').scrollIntoView({behavior:'smooth'});});entityRevision=associations.revision;
+  }
+  const available=associations?registry.diagrams.filter(d=>associations.diagrams.some(a=>a.id===d.id)):registry.diagrams;
+  $('diagrams').replaceChildren();
+  $('diagrams').hidden=!!entityRef;
+  $('diagram-stage').hidden=!available.length;$('incident-tools').hidden=!!entityRef || !available.length;
+  $('sample-app').hidden=!!entityRef;$('review-section').hidden=!!entityRef;$('scan').hidden=!!entityRef;
+  document.querySelector('.intro').hidden=!!entityRef;
+  for(const d of available){const b=el('button',d.title,'quiet');b.onclick=()=>select(d.id);$('diagrams').append(b);}
+  if(!available.some(d=>d.id===selected)){selected=null;if(available.length)select(available[0].id);else{$('viewer').removeAttribute('src');renderedRevision=null;}}
+  else if(registry.diagrams.find(d=>d.id===selected).revision!==renderedRevision)select(selected);
   $('reviews').replaceChildren();
   if(!registry.reviews.length)$('reviews').append(el('p','No reviews yet. Scan the fictional source history to find the recording timeout change.'));
   for(const review of [...registry.reviews].reverse()){
@@ -36,11 +53,18 @@ async function refresh(){
 $('scan').onclick=async()=>{const b=$('scan');b.disabled=true;try{const result=await api('scan',{});status(result.reviews.length+' changed reference group(s) found. Existing reviews are reused.');await refresh();}catch(e){status(e.message,true);}finally{b.disabled=false;}};
 $('refresh').onclick=()=>refresh().catch(e=>status(e.message,true));
 await refresh().catch(e=>status(e.message,true));
-if(location.pathname!=='/'){
+if(location.pathname.startsWith('/issues/')){
   const entity=$('entity');entity.hidden=false;
-  if(location.pathname.startsWith('/issues/')){const review=registry.reviews.find(r=>r.id===location.pathname.split('/').pop());entity.append(el('h2','Simulated regression ticket'),el('p',review?.decision?.reason || 'No recorded regression.'));}
-  else{const catalog=await api('catalog'),name=location.pathname.split('/').pop(),service=catalog.services.find(s=>s.entityRef.endsWith('/'+name));entity.append(el('h2',service?.title || 'Catalog entity'),el('pre',JSON.stringify(service || {},null,2)));}
+  const review=registry?.reviews.find(r=>r.id===location.pathname.split('/').pop());entity.append(el('h2','Simulated regression ticket'),el('p',review?.decision?.reason || 'No recorded regression.'));
 }
+async function refreshAutomatically(){
+  if(document.hidden || refreshing)return;
+  refreshing=refresh().then(()=>{if($('status').dataset.refreshError){status('Service diagrams refreshed.');delete $('status').dataset.refreshError;}}).catch(e=>{status('Refresh failed; the last displayed results may be out of date. '+e.message,true);$('status').dataset.refreshError='true';}).finally(()=>{refreshing=null;});
+  await refreshing;
+}
+setInterval(refreshAutomatically,60000);
+window.addEventListener('focus',refreshAutomatically);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAutomatically();});
 
 function resetTraceReview(){referenceDraft=null;$('reference-approval').hidden=true;}
 function refreshTraceSection(){
@@ -83,7 +107,6 @@ $('propose-incident').onclick=()=>traceAction($('propose-incident'),async()=>{
   if(!incident?.pathId)throw new Error('Compare an incident first.');
   const result=await api('proposals',{id:incident.diagramId,spec:incident.spec,baseRevision:incident.baseRevision});await refresh();status('Created spec review '+result.id+'. Review and approve it below to retain this alternate.');
 });
-select(selected);
 
 function showRehearsal(report){
   const host=$('rehearsal-result');host.replaceChildren();if(!report)return;

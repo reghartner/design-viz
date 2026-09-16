@@ -21,12 +21,14 @@ The final integration belongs in the company's Backstage/GitHub environment.
 ## Mount the company experience
 
 Host the generated `template/flowview.html`, `workbench/flowspec.html`, and portal
-assets behind company authentication. Mount the portal as a Backstage route or a
-same-company iframe page. Add a service entity tab linking to registry entries
-whose `nodes.*.binding.entityRef` matches the entity's fully qualified reference.
-That reverse index can be computed from `FlowCanon.sections(spec)` and each
-section's `diagram.nodes`. Use the entity reference, not a mutable display title.
-No Backstage database fork or catalog schema change is needed for spec storage.
+assets behind company authentication. Install the [Flowview entity plugin](../apps/backstage/README.md)
+for a **Diagrams** tab on Component and API pages, or mount the mock portal as a
+development preview. `tools/canon/entity-diagrams.mjs` derives associations from
+`nodes.*.binding.entityRef` and explicit API bindings across every section/tab.
+The tab lists canonical flows and HLD designs with links to relevant happy and
+alternate steps, and refreshes automatically. No per-service annotation or
+manually maintained list is needed. Company installation, authenticated proxy
+configuration and per-viewer diagram visibility are described in the plugin guide.
 
 Replace `apps/backstage-mock/server.mjs` with an authenticated backend adapter;
 reuse the data-only modules in `tools/canon/`. The mock's serialized local JSON
@@ -40,6 +42,8 @@ The browser contract is same-origin `/api/canon/`:
 | GET `catalog` | Version-1 snapshot from `fetchBackstageCatalog` |
 | GET `registry` | Diagram IDs, titles, owners, revision tokens, section metadata, reviews |
 | GET `context?id=…&review=…` | `{catalog,spec,revision,simulated:false}`; optional review draft |
+| GET `entity-diagrams?entityRef=…` | Version-1 derived associations for a full entity reference, with diagram/section/path/step links |
+| GET `services` | Mock catalog services with derived diagram counts |
 | GET `specs/:id` | Current approved spec |
 | POST `proposals` | `{id,spec,baseRevision,review?}` → proposal/PR ID |
 | POST `scan` | Queue/report a source scan under an authorized service identity |

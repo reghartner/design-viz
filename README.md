@@ -18,6 +18,8 @@ and [Backstage/company handoff](docs/backstage-integration.md). The
 breaking source changes against actual local Git commits and fixed contract tests.
 For unattended GitHub scans, use the [automation setup](docs/github-drift-automation.md):
 weekday runs, report-only previews, saved evidence, and human-reviewed drift PRs.
+The [Backstage entity plugin](apps/backstage/README.md) automatically lists related
+diagrams and steps on service/API pages. Try the mock portal's **Services** directory.
 
 
 ## The pipeline

@@ -257,6 +257,9 @@ For scheduled GitHub scans and company setup, use `docs/github-drift-automation.
 The live sample registry is `examples/canon/github/registry.json`; the local mock
 registry contains fictional repositories and must not be enabled for live scans.
 Scanning opens evidence reviews, never automatic behavioral acceptance.
+Published node bindings also drive Backstage's automatic **Diagrams** tab; see
+`apps/backstage/README.md`. Use the full kind/namespace/name identity. Do not add a
+parallel manual diagram list or infer service associations from display names.
 For approved reference traces and incident alternates, use
 `cookbook/canonical-incidents.md` and `tools/canon/trace-cli.mjs`. Bind exact
 service/operation names with `traceMatch`; disambiguate parallel/repeated calls

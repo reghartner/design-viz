@@ -6,3 +6,10 @@ vm.runInContext(fs.readFileSync(path.join(__dirname,'../../src/validator.js'),'u
 // Copy JSON values across the VM boundary only when comparing prototypes.
 module.exports=context.FlowCanon;
 module.exports.validateSpec=raw=>context.validate(context.normalize(raw));
+// Reuse the viewer's pure routing helpers for repository links. Load lazily so
+// scanners that only need the portable evidence schema do not load the renderer.
+module.exports.viewerRouting=()=>{
+  if(!context.sectionReferences)vm.runInContext(fs.readFileSync(path.join(__dirname,'../../src/engine.js'),'utf8'),context);
+  return {blocksOf:context.blocksOf,sectionReferences:context.sectionReferences,buildHash:context.buildHash,
+    diagramPathList:context.diagramPathList,stepKeys:context.stepKeys,stepFailures:context.stepFailures,stepReference:context.stepReference};
+};

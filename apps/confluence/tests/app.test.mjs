@@ -310,3 +310,22 @@ test('attached transport heights follow the active host profile and hiding the d
   view.querySelector('[data-layout-id="detached"]').click();assert.equal(host().classList.contains('layout-has-attached-controls'),false);assert.equal(host().style.getPropertyValue('--attached-controls-height'),'');
   view.querySelector('[data-layout-id="map"]').click();assert.equal(host().style.getPropertyValue('--attached-controls-height'),'272px');
 });
+
+test('all row routing modes expose sizing without changing the drawing or requiring steps',async t=>{
+  for(const routing of [undefined,'curves','lanes'])for(const withSteps of [false,true]){
+    const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+    delete d.routing;if(routing)d.routing=routing;
+    if(!withSteps){delete d.steps;delete d.paths;}
+    const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
+    const board=view.querySelector('.board'),svg=board.querySelector('.boardcanvas>svg'),drawing=svg.outerHTML;
+    const group=board.querySelector('[aria-label="Diagram size"]');assert.ok(group,'controls available for '+(routing || 'default')+' routing');
+    const buttons=[...group.querySelectorAll('button')];assert.deepEqual(buttons.map(b=>b.textContent),['Auto','Fit width','Readable']);
+    assert.ok(board.classList.contains('board-size-auto'));
+    for(const [i,mode] of [[2,'readable'],[1,'fit'],[0,'auto']]){
+      buttons[i].click();assert.ok(board.classList.contains('board-size-'+mode));
+      assert.deepEqual(buttons.map(b=>b.getAttribute('aria-pressed')),buttons.map((_,n)=>String(n===i)));
+      assert.equal(board.querySelector('.boardcanvas>svg'),svg);assert.equal(svg.outerHTML,drawing,'sizing does not rebuild or reroute the drawing');
+    }
+    assert.equal(s.calls.submits.length,0,'viewing choices never save macro configuration');
+  }
+});

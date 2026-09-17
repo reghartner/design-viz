@@ -78,9 +78,10 @@ choose **import trace…**, paste or open event JSON, and **Build diagram**.
 The result is a service board, an offset-aware waterfall, and a step for each
 span. No account connection is required. **starters… → Honeycomb trace** opens
 a fictional example immediately. Agents use `node tools/trace2spec.js`.
-Routed diagrams offer **Auto**, **Fit width** and **Readable** views. On a
-phone, Auto keeps labels legible and lets you scroll sideways; Fit width
-shows the complete graph. These controls also work in published pages.
+All row diagrams offer **Auto**, **Fit width** and **Readable** views, with
+curved edges or lane routing. In a narrow diagram column, Auto keeps labels
+legible and lets you scroll sideways; Fit width shows the complete graph.
+These controls also work in published pages; no routing setting is required.
 
 **Broader design panels:** `table` shows data snapshots, `checks` shows
 authored decisions and invariants, and `budget` compares resource usage with

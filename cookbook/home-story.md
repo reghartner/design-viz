@@ -75,6 +75,12 @@ show the activity. Subject names are hidden by default and remain available
 on hover/in editing controls. Add `showSubjectLabels:true` to the panel to
 show them. Device and room labels stay visible.
 
+For a cloud service on the map, use a device with `kind:"sensor", icon:"cloud"`.
+Sensor also serves as the generic device marker. In **Edit layout → Devices**,
+its **icon** dropdown lists all supported symbols with a preview. Subjects have
+the same picker and default to a person; cameras, hubs and entry devices use
+fixed symbols. See [icon choices](../docs/homemap-workbench.md#choose-a-device-or-subject-icon).
+
 For a cramped workbench, use **Focus workspace**, the draggable divider,
 **Expand editor**, and the **Inspect / Steps / JSON** panes. Supporting panels
 stack below the main diagram when its usable section width is 1000px or

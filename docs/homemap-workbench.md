@@ -87,6 +87,24 @@ same coordinate space at every display size. Device states use icons, color, and
 animation instead of text chips; hover a device to read its name and current state.
 Static signal arrows remain visible while paused or with reduced motion.
 
+### Choose a device or subject icon
+
+For a cloud service on the map, expand **Devices**, open the device, choose
+**kind → sensor**, then **icon → cloud**. Sensor is also the generic device
+marker type. Its icon dropdown shows the supported names and previews the
+selected symbol; **Default (gear)** removes the explicit icon setting.
+
+The choices are `terminal`, `cloud`, `shield`, `gear`, `db`, `antenna`, `thermo`,
+`pump`, `router`, `package`, `key`, `server`, `chip`, `phone`, `house`, `camera`,
+`doorbell`, `lock`, `bulb`, and `car`. Cameras and hubs use fixed camera/router
+icons; entry devices use their entry marker or door drawing. Their inspector
+explains this instead of offering an icon control that would have no effect.
+
+**Subjects** use the same dropdown with **Default (person)**. Use subjects for
+moving actors such as visitors or cars; use devices for a cloud service so it
+can participate in device states and signal arrows. These are shared layout
+settings across all paths and steps. Each icon edit supports Undo/Redo.
+
 ### Include outside and place the house
 
 In **rooms**, set **kind → outdoor** for a yard, driveway, garden, or porch.

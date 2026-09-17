@@ -1,0 +1,499 @@
+{
+  "page": {
+    "title": "Doorbell Recording and Upload",
+    "contract": "1",
+    "skin": "pastel",
+    "lanes": {
+      "LOCAL": {
+        "label": "Local camera",
+        "color": "#16A34A"
+      },
+      "CLOUD": {
+        "label": "Cloud HTTPS",
+        "color": "#2563EB"
+      },
+      "OUTCOME": {
+        "label": "Outcome",
+        "color": "#EA580C"
+      }
+    },
+    "sections": [
+      {
+        "heading": "Does cloud failure mean recording stopped?",
+        "accent": "cyan",
+        "text": [
+          "This fictional training design separates local recording from cloud persistence. The camera is on with no livestream and no recording initially; a local trigger begins recording while the porch is empty; then a person walks through the door while recording continues.",
+          "Choose an outcome on the shared topology. All outcomes share camera ready, quiet recording starts, person enters, and the upload request is sent."
+        ],
+        "bullets": [
+          {
+            "text": "**Confirmed answer:** a failed cloud interaction does *not* necessarily mean the camera stopped recording."
+          },
+          {
+            "text": "**Timeout branch:** storage and notification delivery are *unknown*, not confirmed absent."
+          },
+          {
+            "text": "**Scope:** scene motion is illustrative; no durations, retry limits, payload identifiers, capacities, or field-of-view measurements are supplied."
+          }
+        ],
+        "contract": {
+          "title": "Only inter-component communications",
+          "fields": [
+            {
+              "k": "Camera -> Upload API",
+              "v": "HTTPS",
+              "g": "upload request"
+            },
+            {
+              "k": "Upload API -> Clip Store",
+              "v": "HTTPS",
+              "g": "clip write"
+            },
+            {
+              "k": "Upload API -> Resident Phone",
+              "v": "HTTPS",
+              "g": "resident notification"
+            }
+          ],
+          "note": "The document supplies no API URLs, payload fields, elapsed durations, queue depths, retry limits, storage capacities, identifiers, or field-of-view measurements."
+        },
+        "diagram": {
+          "view": "step",
+          "primaryPanel": "home",
+          "nodes": {
+            "camera": {
+              "title": "Camera",
+              "sub": "local recorder",
+              "icon": "doorbell",
+              "tint": "dev"
+            },
+            "upload": {
+              "title": "Upload API",
+              "sub": "cloud entry",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "store": {
+              "title": "Clip Store",
+              "sub": "cloud storage",
+              "icon": "db",
+              "tint": "data"
+            },
+            "phone": {
+              "title": "Resident Phone",
+              "sub": "notification",
+              "icon": "phone",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "upload",
+              [
+                "store",
+                "phone"
+              ]
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "upload",
+              "kind": "https",
+              "label": "upload request"
+            },
+            {
+              "from": "upload",
+              "to": "store",
+              "kind": "https",
+              "label": "write clip"
+            },
+            {
+              "from": "upload",
+              "to": "phone",
+              "kind": "https",
+              "label": "Clip available"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "Front door",
+              "outline": {
+                "x": 164,
+                "y": 10,
+                "w": 150,
+                "h": 160
+              },
+              "rooms": [
+                {
+                  "label": "OUTSIDE - PORCH",
+                  "kind": "outdoor",
+                  "x": 6,
+                  "y": 10,
+                  "w": 151,
+                  "h": 160
+                },
+                {
+                  "label": "INSIDE - ENTRY",
+                  "x": 167,
+                  "y": 13,
+                  "w": 144,
+                  "h": 154
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Camera",
+                  "x": 58,
+                  "y": 68,
+                  "facing": 35,
+                  "spread": 70,
+                  "range": 92
+                },
+                {
+                  "id": "frontdoor",
+                  "kind": "entry",
+                  "display": "door",
+                  "label": "Front door",
+                  "x": 164,
+                  "y": 108,
+                  "facing": 270,
+                  "doorWidth": 30,
+                  "doorSwing": 90
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "person",
+                  "label": "Person",
+                  "x": 102,
+                  "y": 98
+                }
+              ],
+              "initial": {
+                "cam": "scan",
+                "frontdoor": "closed",
+                "person": null
+              }
+            },
+            {
+              "id": "clip",
+              "type": "screen",
+              "title": "Camera view",
+              "scene": "person-through-door",
+              "initial": {
+                "mode": "active",
+                "scenePlayback": "waiting"
+              }
+            },
+            {
+              "id": "resident",
+              "type": "phone",
+              "title": "Resident Phone",
+              "initial": {
+                "clock": "9:41"
+              }
+            },
+            {
+              "id": "cloud",
+              "type": "state",
+              "title": "Cloud result",
+              "states": [
+                "Not started",
+                "Upload sent",
+                "Stored and notified",
+                "Storage link lost",
+                "Timeout: unknown"
+              ],
+              "colors": {
+                "Stored and notified": "#16A34A",
+                "Storage link lost": "#DC2626",
+                "Timeout: unknown": "#7C3AED"
+              },
+              "initial": {
+                "state": "Not started"
+              }
+            },
+            {
+              "id": "evidence",
+              "type": "log",
+              "title": "Evidence",
+              "tags": {
+                "LOCAL": "#16A34A",
+                "HTTPS": "#2563EB",
+                "OK": "#16A34A",
+                "FAIL": "#DC2626",
+                "UNK": "#7C3AED"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "ready",
+              "nodes": [
+                "camera"
+              ],
+              "lane": "LOCAL",
+              "text": "Camera ready: the camera is on, with no livestream and no recording initially. The porch is empty.",
+              "panels": {
+                "home": {
+                  "cam": "scan",
+                  "frontdoor": "closed",
+                  "person": null
+                },
+                "clip": {
+                  "mode": "active",
+                  "scenePlayback": "waiting"
+                },
+                "cloud": {
+                  "state": "Not started"
+                },
+                "evidence": {
+                  "log": [
+                    {
+                      "tag": "LOCAL",
+                      "text": "camera on; no livestream; no recording"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "record",
+              "nodes": [
+                "camera"
+              ],
+              "lane": "LOCAL",
+              "text": "A local trigger begins recording while the porch is still empty.",
+              "panels": {
+                "home": {
+                  "cam": "rec"
+                },
+                "clip": {
+                  "mode": "rec",
+                  "scenePlayback": "waiting"
+                },
+                "evidence": {
+                  "log": [
+                    {
+                      "tag": "LOCAL",
+                      "text": "quiet local recording starts"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "enter",
+              "nodes": [
+                "camera"
+              ],
+              "lane": "LOCAL",
+              "text": "A person walks through the door while recording continues. Scene motion is illustrative, not measured elapsed time.",
+              "panels": {
+                "home": {
+                  "frontdoor": "open",
+                  "person": {
+                    "x": 228,
+                    "y": 98
+                  }
+                },
+                "clip": {
+                  "scenePlayback": "playing"
+                },
+                "evidence": {
+                  "log": [
+                    {
+                      "tag": "LOCAL",
+                      "text": "person enters; recording continues"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "send_upload",
+              "edge": "camera->upload",
+              "lane": "CLOUD",
+              "text": "Camera sends an upload request to Upload API over HTTPS.",
+              "panels": {
+                "cloud": {
+                  "state": "Upload sent"
+                },
+                "evidence": {
+                  "log": [
+                    {
+                      "tag": "HTTPS",
+                      "text": "Camera -> Upload API: upload request"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "store_ok",
+              "edge": "upload->store",
+              "lane": "CLOUD",
+              "text": "Happy path: the Clip Store write completes. Local recording remains on at the end shown here.",
+              "panels": {
+                "evidence": {
+                  "log": [
+                    {
+                      "tag": "OK",
+                      "text": "Clip Store write completes"
+                    },
+                    {
+                      "tag": "LOCAL",
+                      "text": "local recording remains on"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "notify_ok",
+              "edge": "upload->phone",
+              "lane": "OUTCOME",
+              "text": "Upload API delivers a \"Clip available\" notification to Resident Phone. No recording-stop event is included.",
+              "panels": {
+                "resident": {
+                  "notify": {
+                    "app": "Doorbell",
+                    "title": "Clip available",
+                    "text": "The clip is available."
+                  }
+                },
+                "cloud": {
+                  "state": "Stored and notified"
+                },
+                "evidence": {
+                  "log": [
+                    {
+                      "tag": "OK",
+                      "text": "resident notification delivered"
+                    },
+                    {
+                      "tag": "LOCAL",
+                      "text": "no recording-stop event in example"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "store_lost",
+              "failures": {
+                "upload->store": "dropped"
+              },
+              "tone": {
+                "store": "dim",
+                "phone": "dim"
+              },
+              "lane": "OUTCOME",
+              "text": "Confirmed storage-link loss: the Upload API's attempted write never reaches Clip Store. No clip is stored and no notification is sent. Local recording continues. This outcome ends at the failed write.",
+              "panels": {
+                "cloud": {
+                  "state": "Storage link lost"
+                },
+                "evidence": {
+                  "log": [
+                    {
+                      "tag": "FAIL",
+                      "text": "attempted write never reaches Clip Store"
+                    },
+                    {
+                      "tag": "FAIL",
+                      "text": "no clip stored; no notification sent"
+                    },
+                    {
+                      "tag": "LOCAL",
+                      "text": "local recording continues"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "timeout_unknown",
+              "failures": {
+                "camera->upload": "blocked"
+              },
+              "tone": {
+                "upload": "warn",
+                "store": "dim",
+                "phone": "dim"
+              },
+              "lane": "OUTCOME",
+              "text": "Response timeout: the camera observes a timeout waiting for the upload request to complete. The evidence does not establish whether Upload API reached Clip Store. Cloud persistence and notification delivery are unknown. Local recording continues. This outcome ends at the timeout; it does not retry.",
+              "panels": {
+                "cloud": {
+                  "state": "Timeout: unknown"
+                },
+                "evidence": {
+                  "log": [
+                    {
+                      "tag": "UNK",
+                      "text": "camera observed upload timeout"
+                    },
+                    {
+                      "tag": "UNK",
+                      "text": "storage and notification delivery unknown"
+                    },
+                    {
+                      "tag": "LOCAL",
+                      "text": "local recording continues; no retry shown"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Happy path",
+              "color": "#16A34A",
+              "steps": [
+                "ready",
+                "record",
+                "enter",
+                "send_upload",
+                "store_ok",
+                "notify_ok"
+              ]
+            },
+            {
+              "id": "storage_loss",
+              "label": "Storage link loss",
+              "color": "#DC2626",
+              "steps": [
+                "ready",
+                "record",
+                "enter",
+                "send_upload",
+                "store_lost"
+              ]
+            },
+            {
+              "id": "timeout",
+              "label": "Response timeout",
+              "color": "#7C3AED",
+              "steps": [
+                "ready",
+                "record",
+                "enter",
+                "send_upload",
+                "timeout_unknown"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

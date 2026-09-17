@@ -29,6 +29,14 @@ and its [cookbook index](cookbook/README.md). They include complete recipes for
 [alternate timelines](cookbook/alternate-paths.md), [Home-centered stories](cookbook/home-story.md),
 and [camera recording/event timing](cookbook/camera-events.md).
 
+For a larger seed, use [one flow, two perspectives](cookbook/two-perspectives.md):
+an 11-component doorbell design with an 18-step happy path, two alternate
+endings, and synchronized engineering and resident-story views. Its source,
+storyboard, coverage ledger and spec are provided together for authoring agents.
+The skill now plans evidence and state before JSON; the
+[authoring trials](docs/authoring-evaluation/results.md) record the smaller-model
+tests, observed failures, instruction changes, and remaining review needs.
+
 For repository PRs, use the [PR-handling skill](.claude/skills/design-viz-pr/SKILL.md).
 It starts with the diff and loads only the review guidance for the affected surfaces.
 

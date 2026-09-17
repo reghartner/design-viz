@@ -1,0 +1,44 @@
+[
+  {
+    "artifact": "round1-doorbell.spec.json",
+    "sha256": "f24b4f62d8c66b117c6c357c6e16741b28cbfb4c1cc03af41e43cc6b68106e91",
+    "model": "gpt-5.5",
+    "reasoningEffort": "low"
+  },
+  {
+    "artifact": "round1-webhook.spec.json",
+    "sha256": "4f78b2736464a9a7fc65853cc475aa036bdaf8c60ad7fa2bc13558a5a7bc0418",
+    "model": "gpt-5.5",
+    "reasoningEffort": "low"
+  },
+  {
+    "artifact": "round2-doorbell.spec.json",
+    "sha256": "f673ba83770e3b0a8ba01ffbfb9acc1f6c261c46e8fff0746ed6ae628b1dc3dc",
+    "model": "gpt-5.5",
+    "reasoningEffort": "low"
+  },
+  {
+    "artifact": "round2-webhook.spec.json",
+    "sha256": "48a2a0c429c3bfc478eb8bac563a0cc4dd828e87eeb6db300d97e98670a89783",
+    "model": "gpt-5.5",
+    "reasoningEffort": "low"
+  },
+  {
+    "artifact": "round3-doorbell.spec.json",
+    "sha256": "b94d9f755dfc24bb9e380ea21eba1cf36e54d0af93bb487608cc4f9f0db0a326",
+    "model": "gpt-5.5",
+    "reasoningEffort": "low"
+  },
+  {
+    "artifact": "round3-checkout.spec.json",
+    "sha256": "8c37f5831ee823eec1c1d35d40a6c203c9e4a3af81eacbd86c2bab32d95f9369",
+    "model": "gpt-5.5",
+    "reasoningEffort": "low"
+  },
+  {
+    "artifact": "round3-webhook.spec.json",
+    "sha256": "ea8c5a57ae5655242832e9a95747cd86bab49058cd91d655c643dda7896a771a",
+    "model": "gpt-5.5",
+    "reasoningEffort": "low"
+  }
+]

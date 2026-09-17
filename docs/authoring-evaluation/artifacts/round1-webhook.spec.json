@@ -1,0 +1,630 @@
+{
+  "page": {
+    "title": "Webhook acknowledgment and retry",
+    "contract": "1",
+    "skin": "daylight",
+    "generatedFrom": {
+      "url": "https://github.com/reghartner/design-viz/blob/main/docs/authoring-evaluation/cases/webhook.md",
+      "label": "Webhook acknowledgment and retry",
+      "version": "n/a",
+      "at": "09-17-2026 00:00"
+    },
+    "protocols": {
+      "sql": {
+        "label": "SQL",
+        "color": "#8B5CF6"
+      }
+    },
+    "lanes": {
+      "APP": {
+        "label": "Application",
+        "color": "#0EA5E9"
+      },
+      "DATA": {
+        "label": "Ledger",
+        "color": "#8B5CF6"
+      },
+      "OPS": {
+        "label": "Operator",
+        "color": "#F59E0B"
+      }
+    },
+    "blocks": [
+      {
+        "heading": "Same topology, three outcomes",
+        "accent": "cyan",
+        "text": [
+          "Sender posts an event to Receiver using HTTPS. Receiver writes to Ledger using SQL and sends an HTTPS acknowledgment to Sender. Missing acknowledgment is shown as a delivery outcome, not as proof that the Ledger write or application failed."
+        ],
+        "bullets": [
+          {
+            "text": "**Shared prefix:** all outcomes share the send and the first successful Ledger write."
+          },
+          {
+            "text": "**Retry rule:** Sender retries at most once with the same idempotency key; the actual key value is unspecified."
+          },
+          {
+            "text": "**Lost acknowledgment:** the signal is confirmed lost before reaching Sender; the timeout has no supplied duration."
+          },
+          {
+            "text": "**Recovery effect:** the retry queries Ledger, finds the existing key, and returns an HTTPS acknowledgment without writing or applying again."
+          },
+          {
+            "text": "**Paused recovery:** an operator pauses Sender before its retry, so the retry is not sent and Sender still has no successful acknowledgment."
+          }
+        ],
+        "contract": {
+          "title": "On the wire: event post and acknowledgment",
+          "fields": [
+            {
+              "k": "transport",
+              "v": "HTTPS",
+              "g": "Sender posts the event to Receiver; Receiver sends the acknowledgment to Sender"
+            },
+            {
+              "k": "ledgerWrite",
+              "v": "SQL",
+              "g": "Receiver writes and later queries Ledger using SQL"
+            },
+            {
+              "k": "idempotencyKey",
+              "v": "unspecified",
+              "g": "same key is reused for the retry",
+              "hot": true
+            },
+            {
+              "k": "retryLimit",
+              "v": "at most once",
+              "g": "Sender has one retry attempt available",
+              "hot": true
+            },
+            {
+              "k": "timeoutDuration",
+              "v": "unsupplied",
+              "g": "no timeout or animation duration is asserted"
+            }
+          ],
+          "note": "The source supplies no backlog measurements, API links, code references, concrete key value, or timeout duration."
+        },
+        "diagram": {
+          "view": "step",
+          "nodes": {
+            "sender": {
+              "title": "Sender",
+              "sub": "posts event; may retry once",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "receiver": {
+              "title": "Receiver",
+              "sub": "applies or deduplicates",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "ledger": {
+              "title": "Ledger",
+              "sub": "idempotency key + operation",
+              "icon": "db",
+              "tint": "data"
+            },
+            "operator": {
+              "title": "Operator",
+              "sub": "pauses Sender",
+              "icon": "terminal",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "operator"
+            ],
+            [
+              "sender",
+              "receiver",
+              "ledger"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "sender",
+              "to": "receiver",
+              "kind": "https",
+              "label": "POST event"
+            },
+            {
+              "from": "receiver",
+              "to": "ledger",
+              "kind": "sql",
+              "label": "write/query key"
+            },
+            {
+              "from": "receiver",
+              "to": "sender",
+              "kind": "https",
+              "ret": true,
+              "label": "ack"
+            },
+            {
+              "from": "operator",
+              "to": "sender",
+              "kind": "int",
+              "label": "pause"
+            }
+          ],
+          "panels": [
+            {
+              "id": "senderState",
+              "type": "state",
+              "title": "Sender acknowledgment",
+              "states": [
+                "No acknowledgment",
+                "Acknowledged",
+                "Timed out",
+                "Paused before retry"
+              ],
+              "colors": {
+                "Acknowledged": "#16A34A",
+                "Timed out": "#D97706",
+                "Paused before retry": "#7C3AED"
+              },
+              "initial": {
+                "state": "No acknowledgment"
+              }
+            },
+            {
+              "id": "operation",
+              "type": "state",
+              "title": "Operation application",
+              "states": [
+                "Not applied",
+                "Applied once"
+              ],
+              "colors": {
+                "Applied once": "#16A34A"
+              },
+              "initial": {
+                "state": "Not applied"
+              }
+            },
+            {
+              "id": "ledgerState",
+              "type": "table",
+              "title": "Ledger record",
+              "columns": [
+                {
+                  "id": "field",
+                  "label": "Field"
+                },
+                {
+                  "id": "value",
+                  "label": "Value"
+                }
+              ],
+              "initial": {
+                "rows": [],
+                "note": "Receiver has not applied the event."
+              }
+            },
+            {
+              "id": "idempotency",
+              "type": "checks",
+              "title": "Idempotency effect",
+              "checks": [
+                {
+                  "id": "sameKey",
+                  "label": "Retry uses same key"
+                },
+                {
+                  "id": "existingKey",
+                  "label": "Existing key found"
+                },
+                {
+                  "id": "applyOnce",
+                  "label": "Operation applied exactly once"
+                }
+              ],
+              "initial": {
+                "results": {
+                  "sameKey": {
+                    "status": "pending"
+                  },
+                  "existingKey": {
+                    "status": "pending"
+                  },
+                  "applyOnce": {
+                    "status": "pending"
+                  }
+                }
+              }
+            },
+            {
+              "id": "events",
+              "type": "log",
+              "title": "Outcome log",
+              "tags": {
+                "HTTPS": "#0EA5E9",
+                "SQL": "#8B5CF6",
+                "LOSS": "#F97316",
+                "OPS": "#F59E0B",
+                "STATE": "#16A34A"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "send.initial",
+              "edge": "sender->receiver",
+              "lane": "APP",
+              "text": "Sender posts an event to Receiver using HTTPS.",
+              "panels": {
+                "events": {
+                  "log": [
+                    {
+                      "tag": "HTTPS",
+                      "text": "Sender -> Receiver: event post"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "ledger.write",
+              "edge": "receiver->ledger",
+              "lane": "DATA",
+              "text": "Receiver writes to Ledger using SQL; the write records the idempotency key and applies the operation exactly once.",
+              "panels": {
+                "operation": {
+                  "state": "Applied once"
+                },
+                "ledgerState": {
+                  "rows": [
+                    {
+                      "id": "key",
+                      "cells": {
+                        "field": "idempotencyKey",
+                        "value": "recorded; value unspecified"
+                      },
+                      "status": "added"
+                    },
+                    {
+                      "id": "application",
+                      "cells": {
+                        "field": "applications",
+                        "value": "1"
+                      },
+                      "status": "added"
+                    }
+                  ],
+                  "note": "First successful write applies the operation exactly once."
+                },
+                "idempotency": {
+                  "results": {
+                    "sameKey": {
+                      "status": "pending"
+                    },
+                    "existingKey": {
+                      "status": "pending"
+                    },
+                    "applyOnce": {
+                      "status": "pass",
+                      "detail": "The shared Ledger write applied the operation."
+                    }
+                  }
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "SQL",
+                      "text": "Receiver -> Ledger: record key and apply operation"
+                    },
+                    {
+                      "tag": "STATE",
+                      "text": "Applications: 1"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "ack.delivered",
+              "edge": "receiver->sender",
+              "lane": "APP",
+              "text": "Receiver sends an HTTPS acknowledgment and Sender receives it.",
+              "panels": {
+                "senderState": {
+                  "state": "Acknowledged"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "HTTPS",
+                      "text": "Receiver -> Sender: acknowledgment delivered"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "sender.finish",
+              "nodes": [
+                "sender"
+              ],
+              "lane": "APP",
+              "text": "Sender finishes without a retry.",
+              "panels": {
+                "events": {
+                  "log": [
+                    {
+                      "tag": "STATE",
+                      "text": "Happy path complete; no retry sent"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "ack.lost",
+              "failures": {
+                "receiver->sender": "dropped"
+              },
+              "nodes": [
+                "receiver",
+                "sender"
+              ],
+              "tone": {
+                "sender": "warn"
+              },
+              "lane": "APP",
+              "text": "Receiver sends the acknowledgment, but the signal is confirmed lost before reaching Sender.",
+              "panels": {
+                "events": {
+                  "log": [
+                    {
+                      "tag": "LOSS",
+                      "text": "Receiver -> Sender: acknowledgment confirmed lost"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "sender.timeout",
+              "nodes": [
+                "sender"
+              ],
+              "tone": {
+                "sender": "alert"
+              },
+              "lane": "APP",
+              "text": "Sender times out; the source supplies no timeout duration.",
+              "panels": {
+                "senderState": {
+                  "state": "Timed out"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "STATE",
+                      "text": "Sender timed out; duration unsupplied"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "retry.query",
+              "nodes": [
+                "sender",
+                "receiver",
+                "ledger"
+              ],
+              "lane": "DATA",
+              "text": "Sender retries once using the same idempotency key; Receiver queries Ledger using SQL and finds the existing key.",
+              "panels": {
+                "idempotency": {
+                  "results": {
+                    "sameKey": {
+                      "status": "pass",
+                      "detail": "Retry uses the same key."
+                    },
+                    "existingKey": {
+                      "status": "pass",
+                      "detail": "Ledger already has the key."
+                    },
+                    "applyOnce": {
+                      "status": "pass",
+                      "detail": "No second write/apply."
+                    }
+                  },
+                  "note": "The retry proves the acknowledgment was missing, not that the operation failed."
+                },
+                "ledgerState": {
+                  "rows": [
+                    {
+                      "id": "key",
+                      "cells": {
+                        "field": "idempotencyKey",
+                        "value": "existing; value unspecified"
+                      },
+                      "status": "neutral"
+                    },
+                    {
+                      "id": "application",
+                      "cells": {
+                        "field": "applications",
+                        "value": "1"
+                      },
+                      "status": "neutral"
+                    }
+                  ],
+                  "note": "Receiver finds the existing key and does not write/apply again."
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "HTTPS",
+                      "text": "Sender -> Receiver: retry with same key"
+                    },
+                    {
+                      "tag": "SQL",
+                      "text": "Receiver -> Ledger: query existing key"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "retry.ack",
+              "nodes": [
+                "receiver",
+                "sender"
+              ],
+              "lane": "APP",
+              "text": "Receiver returns an HTTPS acknowledgment without writing or applying again; Sender receives it and finishes.",
+              "panels": {
+                "senderState": {
+                  "state": "Acknowledged"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "HTTPS",
+                      "text": "Receiver -> Sender: retry acknowledgment delivered"
+                    },
+                    {
+                      "tag": "STATE",
+                      "text": "Applications remain 1"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "operator.pause",
+              "edge": "operator->sender",
+              "lane": "OPS",
+              "text": "An operator pauses Sender before its retry.",
+              "panels": {
+                "senderState": {
+                  "state": "Paused before retry"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "OPS",
+                      "text": "Operator pauses Sender before retry"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "retry.prevented",
+              "failures": {
+                "sender->receiver": "blocked"
+              },
+              "nodes": [
+                "sender"
+              ],
+              "tone": {
+                "sender": "warn"
+              },
+              "lane": "OPS",
+              "text": "The retry is not sent. The operation remains applied once in Ledger, and Sender has no successful acknowledgment.",
+              "panels": {
+                "idempotency": {
+                  "results": {
+                    "sameKey": {
+                      "status": "skip",
+                      "detail": "Retry prevented before send."
+                    },
+                    "existingKey": {
+                      "status": "pending"
+                    },
+                    "applyOnce": {
+                      "status": "pass",
+                      "detail": "The first Ledger write remains the only application."
+                    }
+                  },
+                  "note": "The paused path ends before recovery."
+                },
+                "ledgerState": {
+                  "rows": [
+                    {
+                      "id": "key",
+                      "cells": {
+                        "field": "idempotencyKey",
+                        "value": "recorded; value unspecified"
+                      },
+                      "status": "neutral"
+                    },
+                    {
+                      "id": "application",
+                      "cells": {
+                        "field": "applications",
+                        "value": "1"
+                      },
+                      "status": "neutral"
+                    }
+                  ],
+                  "note": "Operation remains applied once; no retry is sent."
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "OPS",
+                      "text": "Retry prevented; no Sender -> Receiver retry"
+                    },
+                    {
+                      "tag": "STATE",
+                      "text": "Sender still has no successful acknowledgment"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Happy path",
+              "color": "#0EA5E9",
+              "steps": [
+                "send.initial",
+                "ledger.write",
+                "ack.delivered",
+                "sender.finish"
+              ]
+            },
+            {
+              "id": "recovery",
+              "label": "Lost ack + recovery",
+              "color": "#F97316",
+              "steps": [
+                "send.initial",
+                "ledger.write",
+                "ack.lost",
+                "sender.timeout",
+                "retry.query",
+                "retry.ack"
+              ]
+            },
+            {
+              "id": "paused",
+              "label": "Lost ack + paused retry",
+              "color": "#7C3AED",
+              "steps": [
+                "send.initial",
+                "ledger.write",
+                "ack.lost",
+                "sender.timeout",
+                "operator.pause",
+                "retry.prevented"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

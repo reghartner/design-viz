@@ -1,0 +1,995 @@
+{
+  "page": {
+    "title": "A visitor at the door \u2014 one flow, two perspectives",
+    "skin": "pastel",
+    "protocols": {
+      "sql": {
+        "label": "SQL",
+        "color": "#9a75c4"
+      },
+      "amqp": {
+        "label": "AMQP",
+        "color": "#d29437"
+      }
+    },
+    "sections": [
+      {
+        "heading": "From a doorbell press to a welcomed visitor",
+        "text": [
+          "Switch between Resident story and Data flow at any step. Both use one timeline, including storage rejection and delayed notification.",
+          "Fictional teaching design v1 \u00b7 source: docs/hlds/doorbell-perspectives.md. Animation is illustrative; the screen shows the recorded porch approach."
+        ],
+        "diagram": {
+          "id": "doorbell-perspectives",
+          "view": "step",
+          "autoplay": false,
+          "primaryPanel": "home",
+          "layoutName": "Resident story",
+          "sectionLayout": {
+            "default": [
+              {
+                "panel": "home",
+                "x": 0,
+                "y": 0,
+                "w": 8,
+                "h": 11
+              },
+              {
+                "panel": "clip",
+                "x": 8,
+                "y": 0,
+                "w": 4,
+                "h": 7
+              },
+              {
+                "panel": "experience",
+                "x": 8,
+                "y": 7,
+                "w": 4,
+                "h": 4
+              },
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 11,
+                "w": 12,
+                "h": 9
+              },
+              {
+                "panel": "resident-phone",
+                "x": 0,
+                "y": 20,
+                "w": 4,
+                "h": 11
+              },
+              {
+                "panel": "checkpoints",
+                "x": 4,
+                "y": 20,
+                "w": 4,
+                "h": 11
+              },
+              {
+                "panel": "outbox",
+                "x": 8,
+                "y": 20,
+                "w": 4,
+                "h": 11
+              },
+              {
+                "x": 0,
+                "y": 31,
+                "w": 12,
+                "h": 17
+              }
+            ]
+          },
+          "nodes": {
+            "camera": {
+              "title": "Camera",
+              "icon": "doorbell",
+              "sub": "local recording",
+              "tint": "dev"
+            },
+            "gateway": {
+              "title": "Event Gateway",
+              "icon": "cloud",
+              "sub": "event ingress",
+              "tint": "cmd"
+            },
+            "policy": {
+              "title": "Policy",
+              "icon": "shield",
+              "sub": "publish permission",
+              "tint": "auth"
+            },
+            "registry": {
+              "title": "Registry",
+              "icon": "db",
+              "sub": "device enrollment",
+              "tint": "data"
+            },
+            "bus": {
+              "title": "Event Bus",
+              "icon": "server",
+              "sub": "clip-processing jobs",
+              "tint": "data"
+            },
+            "worker": {
+              "title": "Clip Worker",
+              "icon": "gear",
+              "sub": "clip persistence",
+              "tint": "cmd"
+            },
+            "store": {
+              "title": "Clip Store",
+              "icon": "db",
+              "sub": "cloud media",
+              "tint": "data"
+            },
+            "notify": {
+              "title": "Notifications",
+              "icon": "gear",
+              "sub": "delivery outbox",
+              "tint": "cmd"
+            },
+            "push": {
+              "title": "Push Provider",
+              "icon": "antenna",
+              "sub": "phone delivery",
+              "tint": "mqtt"
+            },
+            "phone": {
+              "title": "Phone",
+              "icon": "phone",
+              "sub": "notification + playback",
+              "tint": "dev"
+            },
+            "playback": {
+              "title": "Playback API",
+              "icon": "key",
+              "sub": "authorized clip access",
+              "tint": "auth"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "gateway",
+              "policy"
+            ],
+            [
+              "registry",
+              "bus",
+              "worker"
+            ],
+            [
+              "store",
+              "notify",
+              "push"
+            ],
+            [
+              "phone",
+              "playback"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "gateway",
+              "kind": "mqtt",
+              "label": "doorbell event"
+            },
+            {
+              "from": "gateway",
+              "to": "policy",
+              "kind": "https",
+              "label": "may publish?"
+            },
+            {
+              "from": "policy",
+              "to": "registry",
+              "kind": "sql",
+              "label": "check enrollment"
+            },
+            {
+              "from": "policy",
+              "to": "bus",
+              "kind": "amqp",
+              "label": "publish clip job"
+            },
+            {
+              "from": "bus",
+              "to": "worker",
+              "kind": "amqp",
+              "label": "deliver job"
+            },
+            {
+              "from": "camera",
+              "to": "worker",
+              "kind": "https",
+              "label": "upload"
+            },
+            {
+              "from": "worker",
+              "to": "store",
+              "kind": "https",
+              "label": "persist clip"
+            },
+            {
+              "from": "worker",
+              "to": "notify",
+              "kind": "https",
+              "label": "schedule delivery"
+            },
+            {
+              "from": "notify",
+              "to": "push",
+              "kind": "https",
+              "label": "push request"
+            },
+            {
+              "from": "push",
+              "to": "phone",
+              "kind": "https",
+              "label": "clip ready"
+            },
+            {
+              "from": "phone",
+              "to": "playback",
+              "kind": "https",
+              "label": "open clip",
+              "labelDx": -100,
+              "labelDy": -10
+            },
+            {
+              "from": "playback",
+              "to": "store",
+              "kind": "https",
+              "label": "fetch clip"
+            },
+            {
+              "from": "playback",
+              "to": "phone",
+              "kind": "https",
+              "label": "return clip",
+              "ret": true,
+              "labelDx": 90,
+              "labelDy": 22
+            },
+            {
+              "from": "store",
+              "to": "worker",
+              "kind": "https",
+              "label": "503",
+              "ret": true,
+              "labelDx": 35,
+              "labelDy": -12
+            },
+            {
+              "from": "push",
+              "to": "notify",
+              "kind": "https",
+              "label": "429: held",
+              "ret": true
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "At the front door",
+              "outline": {
+                "x": 128,
+                "y": 16,
+                "w": 182,
+                "h": 156
+              },
+              "rooms": [
+                {
+                  "label": "OUTSIDE \u00b7 PORCH",
+                  "kind": "outdoor",
+                  "x": 6,
+                  "y": 16,
+                  "w": 116,
+                  "h": 156
+                },
+                {
+                  "label": "ENTRY",
+                  "x": 130,
+                  "y": 18,
+                  "w": 76,
+                  "h": 152
+                },
+                {
+                  "label": "LIVING ROOM",
+                  "x": 208,
+                  "y": 18,
+                  "w": 100,
+                  "h": 152
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Doorbell",
+                  "x": 112,
+                  "y": 66,
+                  "facing": 122,
+                  "spread": 95,
+                  "range": 130
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "display": "door",
+                  "label": "Front door",
+                  "x": 128,
+                  "y": 121,
+                  "facing": 270,
+                  "doorWidth": 28,
+                  "doorSwing": 90
+                },
+                {
+                  "id": "cloud",
+                  "kind": "sensor",
+                  "icon": "cloud",
+                  "label": "Clip delivery",
+                  "x": 48,
+                  "y": 35
+                },
+                {
+                  "id": "handset",
+                  "kind": "sensor",
+                  "icon": "phone",
+                  "label": "Resident phone",
+                  "x": 270,
+                  "y": 58
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "visitor",
+                  "label": "Visitor",
+                  "x": 22,
+                  "y": 151
+                },
+                {
+                  "id": "resident",
+                  "label": "Resident",
+                  "x": 262,
+                  "y": 128
+                }
+              ],
+              "initial": {
+                "cam": "scan",
+                "door": "closed",
+                "cloud": "ok",
+                "handset": "ok",
+                "visitor": null,
+                "resident": {
+                  "x": 262,
+                  "y": 128
+                }
+              }
+            },
+            {
+              "id": "clip",
+              "type": "screen",
+              "title": "Porch camera / saved approach",
+              "scene": "person-at-door-night",
+              "initial": {
+                "mode": "active",
+                "scenePlayback": "waiting"
+              }
+            },
+            {
+              "id": "experience",
+              "type": "state",
+              "title": "Resident experience",
+              "states": [
+                "Quiet",
+                "Visitor waiting",
+                "Clip ready",
+                "Welcoming",
+                "Inside",
+                "No cloud clip",
+                "Delivery pending"
+              ],
+              "initial": {
+                "state": "Quiet"
+              },
+              "colors": {
+                "Clip ready": "#168669",
+                "Inside": "#168669",
+                "No cloud clip": "#dc5555",
+                "Delivery pending": "#d18a21"
+              }
+            },
+            {
+              "id": "resident-phone",
+              "type": "phone",
+              "title": "Resident notifications"
+            },
+            {
+              "id": "checkpoints",
+              "type": "checks",
+              "title": "End-to-end checkpoints",
+              "checks": [
+                {
+                  "id": "permitted",
+                  "label": "Device permitted"
+                },
+                {
+                  "id": "local",
+                  "label": "Local clip retained"
+                },
+                {
+                  "id": "cloud",
+                  "label": "Cloud clip stored"
+                },
+                {
+                  "id": "notified",
+                  "label": "Resident notified"
+                },
+                {
+                  "id": "viewed",
+                  "label": "Clip opened"
+                }
+              ],
+              "initial": {
+                "results": {
+                  "permitted": {
+                    "status": "pending"
+                  },
+                  "local": {
+                    "status": "pending"
+                  },
+                  "cloud": {
+                    "status": "pending"
+                  },
+                  "notified": {
+                    "status": "pending"
+                  },
+                  "viewed": {
+                    "status": "pending"
+                  }
+                }
+              }
+            },
+            {
+              "id": "outbox",
+              "type": "queue",
+              "title": "Notification outbox \u00b7 this event",
+              "initial": {
+                "state": "empty"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "ready",
+              "text": "The porch is quiet. Camera is active; the resident is inside.",
+              "nodes": [
+                "camera"
+              ]
+            },
+            {
+              "id": "arm",
+              "text": "A local schedule starts recording before anyone arrives. No livestream is open.",
+              "nodes": [
+                "camera"
+              ],
+              "panels": {
+                "home": {
+                  "cam": "rec"
+                },
+                "clip": {
+                  "mode": "rec",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "approach",
+              "text": "A visitor approaches the porch while the camera records.",
+              "nodes": [
+                "camera"
+              ],
+              "panels": {
+                "home": {
+                  "visitor": {
+                    "x": 32,
+                    "y": 143
+                  }
+                },
+                "clip": {
+                  "scenePlayback": "playing"
+                },
+                "experience": {
+                  "state": "Visitor waiting"
+                }
+              }
+            },
+            {
+              "id": "ring",
+              "text": "The visitor presses the doorbell. Camera sends the event to Event Gateway.",
+              "edge": "camera->gateway",
+              "panels": {
+                "home": {
+                  "visitor": {
+                    "x": 107,
+                    "y": 112
+                  },
+                  "signals": [
+                    {
+                      "from": "cam",
+                      "to": "cloud"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "authorize",
+              "text": "Event Gateway asks Policy whether this device may publish.",
+              "edge": "gateway->policy"
+            },
+            {
+              "id": "enrollment",
+              "text": "Registry confirms enrollment and permission; Policy allows the event.",
+              "edge": "policy->registry",
+              "panels": {
+                "checkpoints": {
+                  "results": {
+                    "permitted": {
+                      "status": "pass"
+                    },
+                    "local": {
+                      "status": "pending"
+                    },
+                    "cloud": {
+                      "status": "pending"
+                    },
+                    "notified": {
+                      "status": "pending"
+                    },
+                    "viewed": {
+                      "status": "pending"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "publish",
+              "text": "Policy publishes the clip-processing job to Event Bus.",
+              "edge": "policy->bus"
+            },
+            {
+              "id": "consume",
+              "text": "Event Bus delivers the job to Clip Worker.",
+              "edge": "bus->worker"
+            },
+            {
+              "id": "local-clip",
+              "text": "Recording ends. Camera retains the local clip and uploads its bytes to Clip Worker.",
+              "edge": "camera->worker",
+              "panels": {
+                "home": {
+                  "cam": "scan",
+                  "signals": [
+                    {
+                      "from": "cam",
+                      "to": "cloud"
+                    }
+                  ]
+                },
+                "clip": {
+                  "mode": "save",
+                  "banner": "LOCAL CLIP RETAINED"
+                },
+                "checkpoints": {
+                  "results": {
+                    "permitted": {
+                      "status": "pass"
+                    },
+                    "local": {
+                      "status": "pass"
+                    },
+                    "cloud": {
+                      "status": "pending"
+                    },
+                    "notified": {
+                      "status": "pending"
+                    },
+                    "viewed": {
+                      "status": "pending"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "persist",
+              "text": "Clip Worker stores the clip successfully. Cloud persistence is now confirmed.",
+              "edge": "worker->store",
+              "panels": {
+                "clip": {
+                  "banner": "LOCAL + CLOUD CLIP"
+                },
+                "checkpoints": {
+                  "results": {
+                    "permitted": {
+                      "status": "pass"
+                    },
+                    "local": {
+                      "status": "pass"
+                    },
+                    "cloud": {
+                      "status": "pass"
+                    },
+                    "notified": {
+                      "status": "pending"
+                    },
+                    "viewed": {
+                      "status": "pending"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "schedule",
+              "text": "Clip Worker schedules delivery; Notifications adds the item to its outbox.",
+              "edge": "worker->notify",
+              "panels": {
+                "outbox": {
+                  "state": "enqueue",
+                  "label": "Visitor clip ready",
+                  "from": "Clip Worker",
+                  "to": "Push Provider",
+                  "reason": "Awaiting push submission"
+                }
+              }
+            },
+            {
+              "id": "push-request",
+              "text": "Notifications removes the outbox item and submits it to Push Provider.",
+              "edge": "notify->push",
+              "panels": {
+                "outbox": {
+                  "state": "dequeue",
+                  "to": "Push Provider",
+                  "reason": ""
+                }
+              }
+            },
+            {
+              "id": "notify-resident",
+              "text": "The phone receives \u201cVisitor at the front door.\u201d The resident starts toward the entry.",
+              "edge": "push->phone",
+              "panels": {
+                "resident-phone": {
+                  "notify": {
+                    "app": "Doorbell",
+                    "title": "Visitor at the front door",
+                    "text": "Your porch clip is ready."
+                  }
+                },
+                "home": {
+                  "signals": [
+                    {
+                      "from": "cloud",
+                      "to": "handset"
+                    }
+                  ],
+                  "resident": {
+                    "x": 222,
+                    "y": 128
+                  }
+                },
+                "outbox": {
+                  "state": "empty"
+                },
+                "experience": {
+                  "state": "Clip ready"
+                },
+                "checkpoints": {
+                  "results": {
+                    "permitted": {
+                      "status": "pass"
+                    },
+                    "local": {
+                      "status": "pass"
+                    },
+                    "cloud": {
+                      "status": "pass"
+                    },
+                    "notified": {
+                      "status": "pass"
+                    },
+                    "viewed": {
+                      "status": "pending"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "open-clip",
+              "text": "The resident opens the notification; the phone requests the saved clip.",
+              "edge": "phone->playback",
+              "panels": {
+                "home": {
+                  "resident": {
+                    "x": 190,
+                    "y": 126
+                  }
+                }
+              }
+            },
+            {
+              "id": "fetch-clip",
+              "text": "Playback API authorizes the resident and fetches the stored clip.",
+              "edge": "playback->store"
+            },
+            {
+              "id": "view-clip",
+              "text": "The phone receives the authorized clip. The resident sees the recorded porch approach.",
+              "edge": "playback->phone",
+              "panels": {
+                "clip": {
+                  "banner": "SAVED CLIP \u00b7 RESIDENT VIEW"
+                },
+                "checkpoints": {
+                  "results": {
+                    "permitted": {
+                      "status": "pass"
+                    },
+                    "local": {
+                      "status": "pass"
+                    },
+                    "cloud": {
+                      "status": "pass"
+                    },
+                    "notified": {
+                      "status": "pass"
+                    },
+                    "viewed": {
+                      "status": "pass"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "welcome",
+              "text": "The resident opens the door. The visitor crosses into the entry.",
+              "nodes": [
+                "camera",
+                "phone"
+              ],
+              "panels": {
+                "home": {
+                  "door": "open",
+                  "visitor": {
+                    "x": 164,
+                    "y": 112
+                  },
+                  "resident": {
+                    "x": 182,
+                    "y": 143
+                  }
+                },
+                "experience": {
+                  "state": "Welcoming"
+                }
+              }
+            },
+            {
+              "id": "inside",
+              "text": "The visitor joins the resident inside; the door closes. The saved clip remains available.",
+              "nodes": [
+                "camera",
+                "phone"
+              ],
+              "panels": {
+                "home": {
+                  "door": "closed",
+                  "visitor": {
+                    "x": 228,
+                    "y": 102
+                  },
+                  "resident": {
+                    "x": 264,
+                    "y": 132
+                  }
+                },
+                "experience": {
+                  "state": "Inside"
+                }
+              }
+            },
+            {
+              "id": "store-rejected",
+              "text": "Clip Worker attempts persistence. Clip Store rejects it before storing bytes and returns HTTP 503.",
+              "panels": {
+                "home": {
+                  "cloud": "alert"
+                },
+                "experience": {
+                  "state": "No cloud clip"
+                },
+                "checkpoints": {
+                  "results": {
+                    "permitted": {
+                      "status": "pass"
+                    },
+                    "local": {
+                      "status": "pass"
+                    },
+                    "cloud": {
+                      "status": "fail"
+                    },
+                    "notified": {
+                      "status": "skip"
+                    },
+                    "viewed": {
+                      "status": "skip"
+                    }
+                  },
+                  "note": "The rejection occurs before persistence; local retention is unaffected."
+                }
+              },
+              "tone": {
+                "store": "alert",
+                "worker": "warn"
+              },
+              "edges": [
+                "worker->store",
+                "store->worker"
+              ]
+            },
+            {
+              "id": "local-only",
+              "text": "The workflow stops. The clip remains local; the resident is not notified and the visitor waits outside.",
+              "nodes": [
+                "camera",
+                "worker"
+              ],
+              "panels": {
+                "clip": {
+                  "banner": "LOCAL ONLY \u00b7 CLOUD REJECTED"
+                }
+              }
+            },
+            {
+              "id": "push-delayed",
+              "text": "Push Provider returns HTTP 429 before phone delivery. The resident has not been notified.",
+              "edge": "push->notify",
+              "panels": {
+                "home": {
+                  "cloud": "warn"
+                },
+                "experience": {
+                  "state": "Delivery pending"
+                },
+                "checkpoints": {
+                  "results": {
+                    "permitted": {
+                      "status": "pass"
+                    },
+                    "local": {
+                      "status": "pass"
+                    },
+                    "cloud": {
+                      "status": "pass"
+                    },
+                    "notified": {
+                      "status": "warn"
+                    },
+                    "viewed": {
+                      "status": "pending"
+                    }
+                  },
+                  "note": "Provider rejected this delivery attempt before forwarding it."
+                },
+                "outbox": {
+                  "state": "empty"
+                }
+              },
+              "tone": {
+                "push": "warn"
+              }
+            },
+            {
+              "id": "hold-delivery",
+              "text": "Notifications holds the delivery for later retry. The cloud clip exists; the visitor is still waiting.",
+              "nodes": [
+                "notify"
+              ],
+              "panels": {
+                "outbox": {
+                  "state": "held",
+                  "label": "Visitor clip ready",
+                  "reason": "Provider rate limit \u00b7 retry time unspecified",
+                  "from": "Notifications",
+                  "to": "Push Provider"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Visitor welcomed",
+              "color": "#16a085",
+              "steps": [
+                "ready",
+                "arm",
+                "approach",
+                "ring",
+                "authorize",
+                "enrollment",
+                "publish",
+                "consume",
+                "local-clip",
+                "persist",
+                "schedule",
+                "push-request",
+                "notify-resident",
+                "open-clip",
+                "fetch-clip",
+                "view-clip",
+                "welcome",
+                "inside"
+              ]
+            },
+            {
+              "id": "storage-rejected",
+              "label": "Cloud storage rejected",
+              "color": "#e17838",
+              "steps": [
+                "ready",
+                "arm",
+                "approach",
+                "ring",
+                "authorize",
+                "enrollment",
+                "publish",
+                "consume",
+                "local-clip",
+                "store-rejected",
+                "local-only"
+              ]
+            },
+            {
+              "id": "push-delayed",
+              "label": "Notification delayed",
+              "color": "#8b70cf",
+              "steps": [
+                "ready",
+                "arm",
+                "approach",
+                "ring",
+                "authorize",
+                "enrollment",
+                "publish",
+                "consume",
+                "local-clip",
+                "persist",
+                "schedule",
+                "push-request",
+                "push-delayed",
+                "hold-delivery"
+              ]
+            }
+          ],
+          "routing": "lanes"
+        }
+      }
+    ]
+  }
+}

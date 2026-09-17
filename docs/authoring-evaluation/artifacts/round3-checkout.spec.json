@@ -1,0 +1,238 @@
+{
+  "page": {
+    "title": "Checkout Reference vs Incident",
+    "contract": "1",
+    "skin": "daylight",
+    "protocols": {
+      "sql": {"label": "SQL", "color": "#64748B"}
+    },
+    "lanes": {
+      "CLIENT": {"label": "Client", "color": "#2563EB"},
+      "API": {"label": "API", "color": "#7C3AED"},
+      "DEPS": {"label": "Dependencies", "color": "#059669"},
+      "TRACE": {"label": "Trace evidence", "color": "#D97706"}
+    },
+    "blocks": [
+      {
+        "heading": "What this page answers",
+        "accent": "blue",
+        "text": [
+          "For on-call engineers, this page compares the intended checkout behavior with a partial incident observation on the same topology. The incident path preserves what the trace cannot tell us instead of treating missing spans as proof that work did not happen."
+        ],
+        "bullets": [
+          "**Reference:** Browser calls Checkout API; Checkout API calls Inventory and Payments concurrently; Orders is written only after both succeed; Browser receives success.",
+          "**Incident observation:** request arrives and both dependency calls begin; Payments returns HTTP 500; Inventory completion is unrecorded; no order-write span appears; Browser shows a generic error.",
+          "**Limits:** no service catalog, code reference, API URL, span duration, queue measurement, compensation, retry, reservation release, or database slowness is provided."
+        ]
+      },
+      {
+        "heading": "Shared topology, divergent evidence",
+        "accent": "cyan",
+        "diagram": {
+          "view": "step",
+          "nodes": {
+            "browser": {"title": "Browser", "sub": "shopper session", "icon": "phone", "tint": "dev"},
+            "checkout": {"title": "Checkout API", "sub": "orchestrates checkout", "icon": "cloud", "tint": "cmd"},
+            "inventory": {"title": "Inventory", "sub": "stock reservation", "icon": "package", "tint": "data"},
+            "payments": {"title": "Payments", "sub": "payment authorization", "icon": "key", "tint": "auth"},
+            "orders": {"title": "Orders", "sub": "order store", "icon": "db", "tint": "data"}
+          },
+          "rows": [
+            ["browser", "checkout"],
+            [["inventory", "payments"], "orders"]
+          ],
+          "edges": [
+            {"from": "browser", "to": "checkout", "kind": "https", "label": "checkout request"},
+            {"from": "checkout", "to": "inventory", "kind": "https", "label": "reserve stock"},
+            {"from": "checkout", "to": "payments", "kind": "https", "label": "authorize payment"},
+            {"from": "checkout", "to": "orders", "kind": "sql", "label": "write order"},
+            {"from": "checkout", "to": "browser", "kind": "https", "label": "checkout result", "ret": true},
+            {"from": "payments", "to": "checkout", "kind": "https", "label": "authorize result", "ret": true}
+          ],
+          "panels": [
+            {
+              "id": "outcome",
+              "type": "checks",
+              "title": "Outcome facts",
+              "checks": [
+                {"id": "inventory", "label": "Inventory result known"},
+                {"id": "payment", "label": "Payment authorized"},
+                {"id": "order", "label": "Order write established"},
+                {"id": "browser", "label": "Browser outcome observed"}
+              ],
+              "initial": {
+                "results": {
+                  "inventory": {"status": "pending", "detail": "No dependency result yet."},
+                  "payment": {"status": "pending", "detail": "No dependency result yet."},
+                  "order": {"status": "pending", "detail": "Write is gated by dependency results."},
+                  "browser": {"status": "pending", "detail": "No result yet."}
+                },
+                "note": "Choose a path to compare intended behavior and observed evidence."
+              }
+            },
+            {
+              "id": "ordersTable",
+              "type": "table",
+              "title": "Orders evidence",
+              "columns": [
+                {"id": "item", "label": "Item"},
+                {"id": "status", "label": "Status"},
+                {"id": "evidence", "label": "Evidence"}
+              ],
+              "initial": {
+                "rows": [
+                  {"id": "write", "cells": {"item": "Order write", "status": "Pending", "evidence": "Checkout request has not completed."}}
+                ],
+                "note": "No order row is inferred before the write step."
+              }
+            },
+            {
+              "id": "traceLog",
+              "type": "log",
+              "title": "Trace notes",
+              "tags": {"REF": "#2563EB", "OBS": "#D97706", "UNK": "#DC2626"}
+            }
+          ],
+          "steps": [
+            {
+              "id": "request_arrives",
+              "edge": "browser->checkout",
+              "lane": "CLIENT",
+              "text": "Browser sends the HTTPS checkout request and Checkout API receives it.",
+              "panels": {
+                "traceLog": {"log": [{"tag": "REF", "text": "checkout request arrives at Checkout API"}]}
+              }
+            },
+            {
+              "id": "dependencies_start",
+              "edges": ["checkout->inventory", "checkout->payments"],
+              "lane": "API",
+              "text": "Checkout API starts the Inventory reservation and Payments authorization concurrently; the source gives no relative ordering between them.",
+              "panels": {
+                "outcome": {
+                  "results": {
+                    "inventory": {"status": "pending", "detail": "Reservation call started."},
+                    "payment": {"status": "pending", "detail": "Authorization call started."},
+                    "order": {"status": "pending", "detail": "Order write waits for both operations to succeed."},
+                    "browser": {"status": "pending", "detail": "Checkout remains in progress."}
+                  },
+                  "note": "Both dependency calls are started before the branch outcome is known."
+                },
+                "traceLog": {"log": [{"tag": "REF", "text": "Inventory and Payments calls begin concurrently"}]}
+              }
+            },
+            {
+              "id": "reference_dependency_success",
+              "nodes": ["inventory", "payments", "checkout"],
+              "lane": "DEPS",
+              "text": "In the reference path, Inventory reserves stock and Payments authorizes payment. Their completions are grouped because no relative completion order is established.",
+              "panels": {
+                "outcome": {
+                  "results": {
+                    "inventory": {"status": "pass", "detail": "Stock reserved."},
+                    "payment": {"status": "pass", "detail": "Payment authorized."},
+                    "order": {"status": "pending", "detail": "Both prerequisites are now satisfied."},
+                    "browser": {"status": "pending", "detail": "Checkout API can proceed to order creation."}
+                  },
+                  "note": "Reference behavior only; this is not claimed for the incident."
+                },
+                "traceLog": {"log": [{"tag": "REF", "text": "both dependency operations succeed"}]}
+              }
+            },
+            {
+              "id": "reference_order_write",
+              "edge": "checkout->orders",
+              "lane": "API",
+              "text": "Checkout API writes the order to Orders using SQL after both dependency operations succeed.",
+              "panels": {
+                "outcome": {
+                  "results": {
+                    "inventory": {"status": "pass", "detail": "Stock reserved."},
+                    "payment": {"status": "pass", "detail": "Payment authorized."},
+                    "order": {"status": "pass", "detail": "Order write occurs after both successes."},
+                    "browser": {"status": "pending", "detail": "Success has not yet returned to the Browser."}
+                  },
+                  "note": "The order write depends on both successful dependency outcomes."
+                },
+                "ordersTable": {
+                  "rows": [
+                    {"id": "write", "status": "added", "cells": {"item": "Order write", "status": "Written", "evidence": "Reference path after Inventory and Payments success."}}
+                  ],
+                  "note": "Reference design asserts the write at this point."
+                },
+                "traceLog": {"log": [{"tag": "REF", "text": "SQL order write follows both successes"}]}
+              }
+            },
+            {
+              "id": "reference_browser_success",
+              "edge": "checkout->browser",
+              "lane": "CLIENT",
+              "text": "Checkout API returns HTTPS success and Browser receives a successful checkout result.",
+              "panels": {
+                "outcome": {
+                  "results": {
+                    "inventory": {"status": "pass", "detail": "Stock reserved."},
+                    "payment": {"status": "pass", "detail": "Payment authorized."},
+                    "order": {"status": "pass", "detail": "Order written."},
+                    "browser": {"status": "pass", "detail": "Browser receives checkout success."}
+                  },
+                  "note": "Reference endpoint."
+                },
+                "traceLog": {"log": [{"tag": "REF", "text": "Browser receives success"}]}
+              }
+            },
+            {
+              "id": "incident_payment_500",
+              "edge": "payments->checkout",
+              "lane": "TRACE",
+              "tone": {"payments": "alert", "inventory": "warn", "orders": "warn"},
+              "text": "In the incident observation, Payments returns HTTP 500 to Checkout API. This is a delivered error response, not a dropped communication.",
+              "panels": {
+                "outcome": {
+                  "results": {
+                    "inventory": {"status": "warn", "detail": "Inventory span has no recorded completion; reservation outcome is unknown."},
+                    "payment": {"status": "fail", "detail": "Payments returned HTTP 500 to Checkout API."},
+                    "order": {"status": "warn", "detail": "No order-write span appears; the trace alone does not prove absence."},
+                    "browser": {"status": "pending", "detail": "Browser result not reached yet."}
+                  },
+                  "note": "The first differing incident beat is the received payment error plus explicit unknowns."
+                },
+                "ordersTable": {
+                  "rows": [
+                    {"id": "inventory", "status": "changed", "cells": {"item": "Inventory completion", "status": "Unknown", "evidence": "No recorded completion span."}},
+                    {"id": "write", "status": "changed", "cells": {"item": "Order write", "status": "Unknown", "evidence": "No order-write span appears; absence is not established."}}
+                  ],
+                  "note": "The incident trace is partial. Missing spans remain unknown."
+                },
+                "traceLog": {"log": [{"tag": "OBS", "text": "Payments returns HTTP 500"}, {"tag": "UNK", "text": "Inventory completion and order write are not established"}]}
+              }
+            },
+            {
+              "id": "incident_browser_error",
+              "edge": "checkout->browser",
+              "lane": "CLIENT",
+              "tone": {"browser": "alert", "checkout": "warn", "inventory": "warn", "payments": "alert", "orders": "warn"},
+              "text": "Browser eventually displays a generic error. The incident path ends here with Inventory reservation and order-write status still unknown.",
+              "panels": {
+                "outcome": {
+                  "results": {
+                    "inventory": {"status": "warn", "detail": "Unknown; no completion span was recorded."},
+                    "payment": {"status": "fail", "detail": "HTTP 500 was observed."},
+                    "order": {"status": "warn", "detail": "Unknown; no write span appears, but non-write is not proven."},
+                    "browser": {"status": "fail", "detail": "Browser displays a generic error."}
+                  },
+                  "note": "No compensation, retry, reservation release, queue growth, or database slowness is established."
+                },
+                "traceLog": {"log": [{"tag": "OBS", "text": "Browser displays generic error; incident reconstruction stops"}]}
+              }
+            }
+          ],
+          "paths": [
+            {"id": "reference", "label": "Reference checkout", "color": "#2563EB", "steps": ["request_arrives", "dependencies_start", "reference_dependency_success", "reference_order_write", "reference_browser_success"]},
+            {"id": "incident", "label": "Incident observation", "color": "#D97706", "steps": ["request_arrives", "dependencies_start", "incident_payment_500", "incident_browser_error"]}
+          ]
+        }
+      }
+    ]
+  }
+}

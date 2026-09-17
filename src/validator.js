@@ -245,8 +245,27 @@ function softwarePanelPatchWarnings(state, path, p, warnings){
   }
 }
 var SCENE_NAMES = ['person-at-door-night','person-through-door','doorbell-run-away','doorbell-runners','package-drop','kitchen-fire','static-noise'];
+var SCREEN_MODES = ['off','boot','active','live','rec','save','unavailable'];
+/* Shared threshold normalization: old hot-only specs keep their exact behavior. */
+function thermoLimits(panel){
+  var min = isFiniteNum(panel.min) ? panel.min : 0;
+  var max = isFiniteNum(panel.max) && panel.max > min ? panel.max : min + 100;
+  function bound(v){ return isFiniteNum(v) ? Math.min(max, Math.max(min, v)) : null; }
+  var warn = bound(panel.warn), crit = bound(panel.crit);
+  var lowWarn = bound(panel.lowWarn), lowCrit = bound(panel.lowCrit), swap;
+  if (warn !== null && crit !== null && warn > crit){ swap = warn; warn = crit; crit = swap; }
+  if (lowWarn !== null && lowCrit !== null && lowCrit > lowWarn){ swap = lowWarn; lowWarn = lowCrit; lowCrit = swap; }
+  var coldEnd = lowWarn !== null ? lowWarn : lowCrit, hotStart = warn !== null ? warn : crit;
+  var overlap = coldEnd !== null && hotStart !== null && coldEnd >= hotStart;
+  if (overlap) lowWarn = lowCrit = null;
+  return {min:min,max:max,warn:warn,crit:crit,lowWarn:lowWarn,lowCrit:lowCrit,overlap:overlap};
+}
 function screenPatchWarnings(state, path, warnings){
   if (!state || typeof state !== 'object' || Array.isArray(state)) return;
+  if (state.mode != null && SCREEN_MODES.indexOf(state.mode) < 0)
+    warnings.push(path + '.mode: unknown camera mode — using off');
+  if (state.reason != null && typeof state.reason !== 'string')
+    warnings.push(path + '.reason: expected text or null — using the default explanation');
   if (Object.prototype.hasOwnProperty.call(state, 'scenePlayback') && ['waiting','playing'].indexOf(state.scenePlayback) < 0)
     warnings.push(path + '.scenePlayback: expected waiting|playing — using playing');
   if (state.enterOnce && typeof state.enterOnce === 'object' && !Array.isArray(state.enterOnce)){
@@ -464,6 +483,14 @@ var HOMEMAP_STATES = {
   camera: ['scan', 'sleep', 'detect', 'rec', 'off'], entry: ['closed', 'open', 'alert'],
   sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'tx', 'alert']
 };
+var HOMEMAP_THERMAL = ['normal','warm','hot','cold','freezing'];
+function homemapDevicePatchValid(kind, value){
+  if (typeof value === 'string') return HOMEMAP_STATES[kind].indexOf(value) >= 0;
+  return panelObject(value) && Object.keys(value).every(function(k){
+    return k === 'state' ? HOMEMAP_STATES[kind].indexOf(value[k]) >= 0 :
+      k === 'thermal' && HOMEMAP_THERMAL.indexOf(value[k]) >= 0;
+  });
+}
 function homemapDeviceValid(d){
   return d && typeof d.id === 'string' && d.id !== '' && d.id !== 'signals' &&
     typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(HOMEMAP_STATES, d.kind) &&
@@ -522,7 +549,14 @@ function homemapPatchWarnings(obj, path, declaration, warnings){
       warnings.push(path + '.' + k + ': undeclared device or subject id — patch ignored');
     } else {
       var vocab = HOMEMAP_STATES[devices[k].kind];
-      if (vocab.indexOf(obj[k]) < 0)
+      if (panelObject(obj[k])){
+        Object.keys(obj[k]).forEach(function(field){
+          var allowed = field === 'state' ? vocab : field === 'thermal' ? HOMEMAP_THERMAL : null;
+          if (!allowed || allowed.indexOf(obj[k][field]) < 0)
+            warnings.push(path + '.' + k + '.' + field + ': invalid device attribute — ignored' +
+              (allowed ? ' (valid: ' + allowed.join(' ') + ')' : ' (use state or thermal)'));
+        });
+      } else if (vocab.indexOf(obj[k]) < 0)
         warnings.push(path + '.' + k + ': unknown ' + devices[k].kind + ' state "' + obj[k] +
           '" — using "' + vocab[0] + '" (valid: ' + vocab.join(' ') + ')');
     }
@@ -1290,7 +1324,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     }
     if (p.type === 'thermo'){
       thermoPanels[p.id] = true;
-      ['min','max','warn','crit'].forEach(function(tk){
+      ['min','max','warn','crit','lowWarn','lowCrit'].forEach(function(tk){
         if (p[tk] != null && !isFiniteNum(p[tk]))
           warnings.push(PP + '.' + tk + ': must be a finite number — ignored');
       });
@@ -1299,6 +1333,10 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(PP + '.max: must exceed min — using min+100');
       if (isFiniteNum(p.warn) && isFiniteNum(p.crit) && p.warn > p.crit)
         warnings.push(PP + ': warn exceeds crit — thresholds swapped at render');
+      if (isFiniteNum(p.lowWarn) && isFiniteNum(p.lowCrit) && p.lowCrit > p.lowWarn)
+        warnings.push(PP + ': lowCrit exceeds lowWarn — cold thresholds swapped at render');
+      if (thermoLimits(p).overlap)
+        warnings.push(PP + ': cold and hot ranges overlap — cold thresholds ignored; leave a safe interval');
       if (p.initial && p.initial.value != null && !isFiniteNum(p.initial.value))
         warnings.push(PP + '.initial.value: must be a finite number — rendered as NO DATA');
     }
@@ -1672,14 +1710,29 @@ function foldPhoneStates(panel, steps){
 
 /* Carry device states and subject positions; signals belong only to their authored step. */
 function foldHomemapStates(panel, steps){
-  var carried = Object.create(null), states = [], subjects = Object.create(null);
+  var carried = Object.create(null), states = [], subjects = Object.create(null), devices = Object.create(null);
+  (Array.isArray(panel.devices) ? panel.devices : []).forEach(function(d){
+    if (homemapDeviceValid(d) && !devices[d.id]) devices[d.id] = d;
+  });
   homemapSubjects(panel).forEach(function(sub){ subjects[sub.id] = sub; });
   function apply(patch){
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return;
     Object.keys(patch).forEach(function(k){
       if (k === 'signals') return;
       if (subjects[k] && patch[k] !== null && !homemapSubjectPosition(patch[k])) return;
-      carried[k] = patch[k];
+      if (devices[k] && (panelObject(patch[k]) || panelObject(carried[k]))){
+        var before = panelObject(carried[k]) ? carried[k] : typeof carried[k] === 'string' ? {state:carried[k]} : {};
+        var update = panelObject(patch[k]) ? patch[k] : {state:patch[k]};
+        var next = Object.assign({}, before);
+        ['state','thermal'].forEach(function(field){
+          var allowed = field === 'state' ? HOMEMAP_STATES[devices[k].kind] : HOMEMAP_THERMAL;
+          if (allowed.indexOf(update[field]) >= 0) next[field] = update[field];
+        });
+        /* Legacy scalar values still select the operating state; an invalid
+           scalar gets the documented default in homemapModel. */
+        if (!panelObject(patch[k])) next.state = patch[k];
+        carried[k] = next;
+      } else carried[k] = patch[k];
     });
   }
   function snapshot(signals){

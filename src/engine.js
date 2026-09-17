@@ -2036,31 +2036,32 @@ function pirModel(panel, state){
    rather than trusting the author to assert it; `state.label` overrides only
    the zone-chip caption. A missing value renders as a dash (zone 'na').
    Reversed warn/crit are swapped (the validator warns). */
-var THERMO_ZONE_LABELS = {ok: 'NOMINAL', warn: 'WARNING', crit: 'CRITICAL', na: 'NO DATA'};
+var THERMO_ZONE_LABELS = {ok: 'NOMINAL', warn: 'WARNING', crit: 'CRITICAL', 'cold-warn':'COLD WARNING', 'cold-crit':'TOO COLD', na: 'NO DATA'};
 function thermoModel(panel, state){
   panel = panel || {}; state = state || {};
   /* finite-only: JSON overflow literals (1e400) parse to Infinity, which is
      typeof 'number' but would poison every percentage into NaN and emit
      invalid SVG/CSS attribute values — treat non-finite as absent */
   function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
-  var min = fin(panel.min) != null ? panel.min : 0;
-  var max = fin(panel.max) != null && panel.max > min ? panel.max : min + 100;
-  var warn = fin(panel.warn) != null ? clamp(panel.warn, min, max) : null;
-  var crit = fin(panel.crit) != null ? clamp(panel.crit, min, max) : null;
-  if (warn != null && crit != null && warn > crit){ var sw = warn; warn = crit; crit = sw; }
+  var limits = thermoLimits(panel), min = limits.min, max = limits.max;
+  var warn = limits.warn, crit = limits.crit, lowWarn = limits.lowWarn, lowCrit = limits.lowCrit;
   var value = fin(state.value);
   var zone = 'na';
   if (value != null){
     zone = 'ok';
+    if (lowWarn != null && value <= lowWarn) zone = 'cold-warn';
+    if (lowCrit != null && value <= lowCrit) zone = 'cold-crit';
     if (warn != null && value >= warn) zone = 'warn';
     if (crit != null && value >= crit) zone = 'crit';
   }
   function pct(v){ return clamp((v - min) / (max - min) * 100, 0, 100); }
-  return {value: value, min: min, max: max, warn: warn, crit: crit, zone: zone,
+  return {value: value, min: min, max: max, warn: warn, crit: crit, lowWarn:lowWarn, lowCrit:lowCrit, zone: zone,
           unit: panel.unit != null ? String(panel.unit) : '°C',
           pct: value != null ? pct(value) : 0,
           warnPct: warn != null ? pct(warn) : null,
           critPct: crit != null ? pct(crit) : null,
+          lowWarnPct: lowWarn != null ? pct(lowWarn) : null,
+          lowCritPct: lowCrit != null ? pct(lowCrit) : null,
           label: state.label != null ? String(state.label) : THERMO_ZONE_LABELS[zone]};
 }
 
@@ -2180,9 +2181,12 @@ function homemapModel(panel, state){
     var vocab = HOMEMAP_STATES[d.kind];
     var x = clamp(d.x, 0, 320), y = clamp(d.y, 0, 180);
     var floorDoor = d.kind === 'entry' && d.display === 'door';
+    var devicePatch = Object.prototype.hasOwnProperty.call(state, d.id) ? state[d.id] : undefined;
+    var operating = panelObject(devicePatch) ? devicePatch.state : devicePatch;
     var facing = fin(d.facing) != null ? d.facing : floorDoor ? 0 : Math.atan2(90 - y, 160 - x) * 180 / Math.PI;
     var item = {id: d.id, kind: d.kind, label: String(d.label != null ? d.label : d.id),
-      x: x, y: y, state: Object.prototype.hasOwnProperty.call(state, d.id) && vocab.indexOf(state[d.id]) >= 0 ? state[d.id] : vocab[0],
+      x: x, y: y, state: vocab.indexOf(operating) >= 0 ? operating : vocab[0],
+      thermal: panelObject(devicePatch) && HOMEMAP_THERMAL.indexOf(devicePatch.thermal) >= 0 ? devicePatch.thermal : 'normal',
       icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
       facing: ((facing % 360) + 360) % 360,
       spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
@@ -2231,11 +2235,28 @@ function homemapRoomModel(panel, model){
   });
 }
 
-function homemapDoorHTML(d, transition, outline){
+function homemapThermalHTML(d, scaleY, clearing){
+  var thermal = clearing || d.thermal;
+  if (!thermal || thermal === 'normal') return '';
+  var cold = thermal === 'cold' || thermal === 'freezing';
+  var s = '<g class="hmthermal thermal-' + thermal + (clearing ? ' thermal-clearing' : '') +
+    '" data-home-thermal="' + esc(d.id) + '" data-thermal="' + esc(d.thermal) + '" transform="translate(' + d.x + ' ' + (d.y * scaleY) + ')">' +
+    '<title>' + esc(d.label + ': ' + (clearing ? 'temperature returning to normal' : thermal)) + '</title>' +
+    '<circle class="thermal-halo" r="20"/><circle class="thermal-rim" r="12"/>';
+  if (cold){
+    for (var i = 0; i < 6; i++) s += '<path class="thermal-frost" transform="rotate(' + (i * 60) + ')" d="M0 -11 V-19 M-3 -16 L0 -13 L3 -16"/>';
+    s += '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><path d="M0 -4 V4 M-3.5 -2 L3.5 2 M-3.5 2 L3.5 -2"/></g>';
+  } else {
+    [-8,0,8].forEach(function(x,i){ s += '<path class="thermal-wave" style="animation-delay:-' + (i * .65) + 's" d="M' + x + ' -13 C' + (x-5) + ' -18 ' + (x+5) + ' -21 ' + x + ' -27"/>'; });
+    s += '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><use href="#i-thermo" x="-5" y="-5" width="10" height="10"/></g>';
+  }
+  return s + '</g>';
+}
+function homemapDoorHTML(d, transition, outline, clearing){
   var w = d.doorWidth, angle = d.doorSwing * Math.PI / 180;
   var endX = (w * Math.cos(angle)).toFixed(3), endY = (w * Math.sin(angle)).toFixed(3);
   var body = '<g class="hmdev hm-entry hm-' + esc(d.state) + ' hm-floor-door" data-device="' + esc(d.id) + '">' +
-    '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>' +
+    '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>' + homemapThermalHTML(d, HOMEMAP_Y_SCALE, clearing) +
     '<g transform="translate(' + d.x + ' ' + (d.y * HOMEMAP_Y_SCALE) + ') scale(1 ' + HOMEMAP_Y_SCALE + ') rotate(' + d.facing + ')">' +
     '<path class="hm-door-threshold" d="M-1 0 H' + (w + 1) + '"/>' +
     '<path class="hm-door-hit" d="M0 0 H' + w + ' M' + w + ' 0 A' + w + ' ' + w + ' 0 0 ' + (d.doorSwing > 0 ? 1 : 0) + ' ' + endX + ' ' + endY + '"/>' +
@@ -3121,6 +3142,13 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     /* threshold track: shaded warn/crit bands under the value fill, threshold
        ticks over it, numeric scale beneath */
     h += '<div class="thbar">';
+    if (tm.lowWarnPct != null || tm.lowCritPct != null){
+      var safeStart = tm.lowWarnPct != null ? tm.lowWarnPct : tm.lowCritPct;
+      var safeEnd = tm.warnPct != null ? tm.warnPct : tm.critPct != null ? tm.critPct : 100;
+      h += '<span class="thband safe" style="left:' + safeStart.toFixed(1) + '%;width:' + (safeEnd-safeStart).toFixed(1) + '%"></span>';
+    }
+    if (tm.lowWarnPct != null) h += '<span class="thband cold-warn" style="left:' + (tm.lowCritPct || 0).toFixed(1) + '%;width:' + (tm.lowWarnPct-(tm.lowCritPct || 0)).toFixed(1) + '%"></span>';
+    if (tm.lowCritPct != null) h += '<span class="thband cold-crit" style="left:0;width:' + tm.lowCritPct.toFixed(1) + '%"></span>';
     if (tm.warnPct != null)
       h += '<span class="thband warn" style="left:' + tm.warnPct.toFixed(1) + '%;width:' +
            ((tm.critPct != null ? tm.critPct : 100) - tm.warnPct).toFixed(1) + '%"></span>';
@@ -3131,11 +3159,18 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       h += '<span class="thfill z-' + tm.zone + '" style="width:' + tm.pct.toFixed(1) + '%"></span>';
     if (tm.warnPct != null) h += '<span class="thtick warn" style="left:' + tm.warnPct.toFixed(1) + '%"></span>';
     if (tm.critPct != null) h += '<span class="thtick crit" style="left:' + tm.critPct.toFixed(1) + '%"></span>';
+    ['lowWarn','lowCrit'].forEach(function(key){
+      if (tm[key] != null) h += '<span class="thtick ' + (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') + '" style="left:' + tm[key+'Pct'].toFixed(1) + '%" title="' + (key === 'lowWarn' ? 'Cold warning' : 'Cold critical') + ': ' + esc(String(tm[key]) + tm.unit) + '"></span>';
+    });
     h += '</div>';
     h += '<div class="thscale"><span class="lo">' + esc(String(tm.min)) + '</span>';
     if (tm.warn != null) h += '<span class="warn" style="left:' + tm.warnPct.toFixed(1) + '%">' + esc(String(tm.warn)) + '</span>';
     if (tm.crit != null) h += '<span class="crit" style="left:' + tm.critPct.toFixed(1) + '%">' + esc(String(tm.crit)) + '</span>';
+    ['lowWarn','lowCrit'].forEach(function(key){
+      if (tm[key] != null) h += '<span class="' + (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') + '" style="left:' + tm[key+'Pct'].toFixed(1) + '%">' + esc(String(tm[key])) + '</span>';
+    });
     h += '<span class="hi">' + esc(String(tm.max)) + '</span></div>';
+    if (tm.lowWarn != null || tm.lowCrit != null) h += '<div class="thrange-key"><span>Cold limits</span><span>Safe interval</span><span>' + (tm.warn != null || tm.crit != null ? 'Hot limits' : '') + '</span></div>';
     /* step-history sparkline: every step's value plots as a faint frame (dots
        + ghost line) so the axis is stable; the bright line and dots reveal
        only up to the current step, so stepping tells the thermal story and a
@@ -3149,6 +3184,9 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       var sX = function(i){ return 6 + 248 * i / (hist.length - 1); };
       var sY = function(vv){ return 54 - clamp((vv - tm.min) / (tm.max - tm.min), 0, 1) * 46; };
       h += '<svg class="thspark" viewBox="0 0 260 62" role="img" aria-label="temperature per step">';
+      ['lowWarn','lowCrit'].forEach(function(key){
+        if (tm[key] != null) h += '<line class="thguide ' + (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') + '" x1="6" x2="254" y1="' + sY(tm[key]).toFixed(1) + '" y2="' + sY(tm[key]).toFixed(1) + '"/>';
+      });
       if (tm.warn != null)
         h += '<line class="thguide warn" x1="6" x2="254" y1="' + sY(tm.warn).toFixed(1) + '" y2="' + sY(tm.warn).toFixed(1) + '"/>';
       if (tm.crit != null)
@@ -3271,7 +3309,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     h += '</div>';
   } else if (type === 'screen'){
     var mode = String(state.mode || 'off');
-    if (['off','boot','active','live','rec','save'].indexOf(mode) < 0) mode = 'off';
+    if (SCREEN_MODES.indexOf(mode) < 0) mode = 'off';
     var sceneName = SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
     var scrClass = 'screenbox m-' + mode +
       (state.scenePlayback === 'waiting' && ['active','live','rec','save'].indexOf(mode) >= 0 ? ' scene-waiting' : '');
@@ -3284,6 +3322,9 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
     if (mode === 'save') scrOvl += '<span class="ovl banner">' + esc(state.banner || 'SAVING CLIP') + '</span>';
     if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
+    if (mode === 'unavailable') scrOvl += '<div class="ovl screen-unavailable" role="status">' +
+      '<svg viewBox="0 0 40 32" aria-hidden="true"><rect x="6" y="9" width="24" height="17" rx="4"/><path d="M12 9 L15 5 H23 L26 9 M3 3 L36 30"/><circle cx="18" cy="17" r="5"/></svg>' +
+      '<strong>Camera unavailable</strong><span>' + esc(typeof state.reason === 'string' && state.reason.trim() ? state.reason : 'Video is temporarily unavailable.') + '</span></div>';
     h += '<div class="' + scrClass + '">';
     if (mode === 'boot') h += SCENES['static-noise'];
     else if (mode === 'active' || mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
@@ -3626,9 +3667,14 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     h += '</div>';
   } else if (type === 'homemap'){
     var hm = homemapModel(panel, state);
+    var hmThermalPrev = host._hmThermal || Object.create(null), hmThermalNow = Object.create(null), hmClearing = Object.create(null);
     var hmPrev = host._hmStates || Object.create(null), hmNow = Object.create(null);
     var hmFresh = Object.create(null), hmHasFresh = false, hmDoors = Object.create(null);
     hm.devices.forEach(function(d){
+      hmThermalNow[d.id] = d.thermal;
+      if (animate && d.thermal === 'normal' && hmThermalPrev[d.id] && hmThermalPrev[d.id] !== 'normal'){
+        hmClearing[d.id] = hmThermalPrev[d.id]; hmHasFresh = true;
+      }
       hmNow[d.id] = d.state;
       if (animate && d.kind === 'entry' && hmPrev[d.id] !== undefined &&
           ((d.state === 'open') !== (hmPrev[d.id] === 'open'))){
@@ -3642,6 +3688,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
       }
     });
     host._hmStates = hmNow;
+    host._hmThermal = hmThermalNow;
     var hmSubjPrev = host._hmSubjPrev || Object.create(null), hmSubjNow = Object.create(null);
     var hmMoved = Object.create(null), hmHasMoved = false;
     hm.subjects.forEach(function(sub){
@@ -3708,9 +3755,10 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
         s += '</g>';
       });
       hm.devices.forEach(function(d){
-        if (d.display === 'door'){ s += homemapDoorHTML(d, transient ? hmDoors[d.id] : null, hm.outline); return; }
+        if (d.display === 'door'){ s += homemapDoorHTML(d, transient ? hmDoors[d.id] : null, hm.outline, transient ? hmClearing[d.id] : null); return; }
         s += '<g class="hmdev hm-' + esc(d.kind) + ' hm-' + esc(d.state) + '" data-device="' + esc(d.id) + '" transform="translate(0 ' + (d.y * (sy - 1)).toFixed(3) + ')">' +
-          '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>';
+          '<title>' + esc(d.label) + ': ' + esc(d.state) + (d.thermal !== 'normal' ? ' · ' + d.thermal : '') + '</title>';
+        s += homemapThermalHTML(d, 1, transient ? hmClearing[d.id] : null);
         s += '<circle class="hmdevice-aura" cx="' + d.x + '" cy="' + d.y + '" r="13"/>';
         if (transient && hmFresh[d.id]) s += '<circle class="' + (d.kind === 'hub' ? 'hmglow' : 'hmripple') +
           '" cx="' + d.x + '" cy="' + d.y + '" r="6"/>';

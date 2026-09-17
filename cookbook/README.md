@@ -37,6 +37,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | canary promotion, traffic rollback, firmware trial/confirmation, or held rollout waves | `rollout-decisions.md` |
 | a Honeycomb trace turned into an editable diagram | [`../docs/trace-import.md`](../docs/trace-import.md) (input and CLI guide) |
 | a temperature readout with warning / shutdown thresholds | `temperature.md` |
+| a hot or frozen Home device, charging pause, camera unavailability and thermal recovery | [thermal-protection.md](thermal-protection.md) — complete interactive teaching flow |
 | a battery / charge level that drains and raises a low event | `battery-level.md` |
 | motion detection — a sensor cone, an approach, a trip | `motion-detection.md` |
 | radar range, zones, targets, or occupancy | `radar-range.md` |

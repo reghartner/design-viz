@@ -2338,6 +2338,29 @@ function builderHomemapLayoutScene(panel){
   return {state:state, model:homemapModel(panel, state), hidden:hidden};
 }
 
+/* Change one device attribute without capturing the inherited other attribute. */
+function planHomemapDeviceAttribute(text, raw, sectionIdx, stepIdx, panelId, key, attribute, value){
+  if (['state','thermal'].indexOf(attribute) < 0) return {error:'Unknown device attribute.'};
+  var got = stepIdx === null ? builderDiagram(text, raw, sectionIdx) : builderStepAt(raw, sectionIdx, stepIdx);
+  if (!got || got.error) return got || {error:'Step not found.'};
+  var pi = (got.d.panels || []).findIndex(function(p){return p && p.type === 'homemap' && p.id === panelId;});
+  if (pi < 0) return {error:'Homemap not found.'};
+  var panel = got.d.panels[pi], device = (panel.devices || []).find(function(d){return homemapDeviceValid(d) && d.id === key;});
+  if (!device) return {error:'Device not found.'};
+  var allowed = attribute === 'state' ? HOMEMAP_STATES[device.kind] : HOMEMAP_THERMAL;
+  if (value !== undefined && allowed.indexOf(value) < 0) return {error:'Choose a valid ' + attribute + '.'};
+  var patch = stepIdx === null ? panel.initial : (stepPanelPatch(got.st) || {})[panelId];
+  var current = patch && patch[key];
+  var next = panelObject(current) ? Object.assign({}, current) : typeof current === 'string' ? {state:current} : {};
+  if (value === undefined) delete next[attribute]; else next[attribute] = value;
+  var result = Object.keys(next).length ? next : undefined;
+  if (stepIdx !== null) return planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, result);
+  return builderRewrite(text, raw, got.path.concat(['panels',pi]), function(p){
+    var initial = Object.assign(Object.create(null),p.initial || {});
+    if (result === undefined) delete initial[key]; else initial[key] = result;
+    if (Object.keys(initial).length) p.initial = initial; else delete p.initial;
+  });
+}
 function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, value){
   var got = builderStepAt(raw, sectionIdx, stepIdx);
   if (!got) return {error:'Step not found — reselect and try again.'};
@@ -2347,7 +2370,7 @@ function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, valu
   var subject = model.subjects.find(function(s){ return s.id === key; });
   if (!device && !subject && key !== 'signals') return {error:'Unknown homemap field.'};
   if (value !== undefined){
-    if (device && HOMEMAP_STATES[device.kind].indexOf(value) < 0) return {error:'Choose a valid device state.'};
+    if (device && !homemapDevicePatchValid(device.kind, value)) return {error:'Choose a valid device state or thermal condition.'};
     if (subject && value !== null && (!homemapSubjectPosition(value) || value.x < 0 || value.x > 320 || value.y < 0 || value.y > 180))
       return {error:'Use a position within the map: x 0–320, y 0–180.'};
     if (key === 'signals' && (!Array.isArray(value) || value.some(function(s){
@@ -2444,6 +2467,7 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
             {kind:'engine', label:'No signals at this step', inputs:[]};
         }
         var subject = homemapSubjects(p).some(function(s){ return s.id === key; });
+        if (!subject && panelObject(snapshot[key])) return history([key],true,'Device state + thermal history');
         return assignment(key, subject ? function(v){ return v === null || homemapSubjectPosition(v); } : null, false);
       }
       if (p.type==='inflight'){
@@ -2506,7 +2530,7 @@ var PANEL_SETUP_FIELDS = {
   xray:      [['layers', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'holder'}]}], ['initial', 'json']],
   queue:     [['initial', 'json']],
   pir:       [['cone', 'json'], ['sensor', 'json'], ['path', 'jsonArr'], ['initial', 'json']],
-  thermo:    [['unit', 'text'], ['min', 'num'], ['max', 'num'], ['warn', 'num'], ['crit', 'num'], ['initial', 'json']],
+  thermo:    [['unit', 'text'], ['min', 'num'], ['max', 'num'], ['warn', 'num'], ['crit', 'num'], ['lowWarn', 'num'], ['lowCrit', 'num'], ['initial', 'json']],
   battery:   [['low', 'num'], ['crit', 'num'], ['initial', 'json']],
   buffer:    [['segments', 'num'], ['capacity', 'text'], ['initial', 'json']],
   radar:     [['sensor', 'json'], ['facing', 'num'], ['spread', 'num'], ['range', 'num'],
@@ -2554,8 +2578,8 @@ var PANEL_PATCH_FIELDS = {
   leds:      [],
   gauge:     [['value', 'num']],
   log:       [['log', 'jsonArr']],
-  screen:    [['mode', 'enum', ['off', 'boot', 'active', 'live', 'rec', 'save']],
-              ['scenePlayback', 'enum', ['waiting', 'playing']], ['banner', 'text']],
+  screen:    [['mode', 'enum', SCREEN_MODES],
+              ['scenePlayback', 'enum', ['waiting', 'playing']], ['banner', 'text'], ['reason', 'text']],
   waterfall: [['reveal', 'num'], ['highlight', 'text'], ['total', 'text']],
   orbit:     [['state', 'text'], ['via', 'text']],
   zoneframe: [['zones', 'jsonArr'], ['subject', 'json'],
@@ -2605,7 +2629,7 @@ function panelPatchFields(decl){
       seen[d.id] = true;
       return d.id !== 'signals' && typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(vocab, d.kind) &&
         typeof d.x === 'number' && isFinite(d.x) && typeof d.y === 'number' && isFinite(d.y);
-    }).map(function(d){ return [d.id, 'enum', vocab[d.kind]]; });
+    }).map(function(d){ return [d.id, 'jsonAny']; });
     (Array.isArray(decl.subjects) ? decl.subjects : []).forEach(function(sub){
       if (!sub || typeof sub.id !== 'string' || !sub.id || seen[sub.id]) return;
       seen[sub.id] = true;
@@ -4292,11 +4316,12 @@ function initWorkbenchBuilder(opts){
     var snapshot = builderHomemapStep(diagram, target.index, panel.id, target.pathId || (sp && sp.path()));
     if (snapshot.error){ box.textContent = snapshot.error; return box; }
     var indexedText = src.value, own = function(k){ return Object.prototype.hasOwnProperty.call(snapshot.patch, k); };
-    function commit(key, value, layoutKind){
+    function commit(key, value, layoutKind, attribute){
       if (src.value !== indexedText){ formError('The source changed. Reselect this step before editing its map.'); return false; }
       if (addToStep){ formError('Finish ADD TO STEP before editing the map.'); return false; }
       return commitCascade(function(raw){
         if (layoutKind) return planHomemapLayoutPosition(src.value, raw, target.section, panel.id, layoutKind, key, value);
+        if (attribute) return planHomemapDeviceAttribute(src.value, raw, target.section, target.index, panel.id, key, attribute, value);
         return planStepHomemapField(src.value, raw, target.section, target.index, panel.id, key, value);
       }, {after:function(){ renderInspector(); }});
     }
@@ -4310,7 +4335,7 @@ function initWorkbenchBuilder(opts){
       pairs.forEach(function(pair){ var o = document.createElement('option'); o.value = pair[0]; o.textContent = pair[1]; select.appendChild(o); });
       select.value = value; select.addEventListener('change', function(){ action(select.value); }); return select;
     }
-    note('Device states and subject positions carry forward. Inherit removes only this step’s change. Signals last for this step only.');
+    note('Operating state and temperature condition carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.');
     var body = document.createElement('div'); body.className = 'home-edit-body'; box.appendChild(body);
     var map = document.createElement('div'); map.className = 'home-edit-map sk-daylight'; map.tabIndex = 0;
     map.setAttribute('aria-label', 'Home step placement map'); body.appendChild(map);
@@ -4320,9 +4345,14 @@ function initWorkbenchBuilder(opts){
     snapshot.model.devices.forEach(function(d, i){
       var before = snapshot.before.devices[i];
       var pairs = [['', 'Inherit · ' + before.state]].concat(HOMEMAP_STATES[d.kind].map(function(v){ return [v, v]; }));
-      var ctl = choice(pairs, own(d.id) ? d.state : '', d.label + ' state', function(v){ commit(d.id, v === '' ? undefined : v); });
+      var ownPatch = snapshot.patch[d.id];
+      var hasState = own(d.id) && (!panelObject(ownPatch) || Object.prototype.hasOwnProperty.call(ownPatch,'state'));
+      var ctl = choice(pairs, hasState ? d.state : '', d.label + ' state', function(v){ commit(d.id, v === '' ? undefined : v, null, 'state'); });
       deviceControls[d.id] = ctl;
       fields.appendChild(frow(d.label, ctl));
+      var thermalPairs = [['','Inherit · ' + before.thermal]].concat(HOMEMAP_THERMAL.map(function(v){return [v,v];}));
+      fields.appendChild(frow('Temperature', choice(thermalPairs, panelObject(ownPatch) && Object.prototype.hasOwnProperty.call(ownPatch,'thermal') ? d.thermal : '',
+        d.label + ' temperature', function(v){commit(d.id, v === '' ? undefined : v, null, 'thermal');})));
     });
     var armedSubject = null;
     var placementHint = 'Drag devices or room borders/labels to change the layout for all steps. Rooms move independently of their contents. Click a device to edit its state.';
@@ -4593,7 +4623,7 @@ function initWorkbenchBuilder(opts){
     var fields = panelPatchFields(decl);
     if (decl && decl.type === 'screen'){
       var sceneNote = document.createElement('p'); sceneNote.className = 'home-note';
-      sceneNote.textContent = 'Active means the camera is on without livestreaming or recording. Camera mode and the scene event are independent. Choose Before event for a quiet scene, then Play event in a later step. Both settings carry forward until changed.';
+      sceneNote.textContent = 'Active means on without livestreaming or recording. Unavailable hides the scene and shows the reason (for example, protective shutdown). Mode, reason and scene event carry independently; the reason is visible only in Unavailable mode.';
       body.appendChild(sceneNote);
     }
     if (fields === null){
@@ -5042,6 +5072,19 @@ function initWorkbenchBuilder(opts){
         selectTarget({section:t.section, kind:'step', index:current.sourceIndex()}, false);
       }); rows.push(editStep);
       rows.push(homemapLayoutControl(val,t));
+      var conditions = document.createElement('details'); conditions.className = 'rawjson';
+      var conditionsTitle = document.createElement('summary'); conditionsTitle.textContent = 'Starting device conditions'; conditions.appendChild(conditionsTitle);
+      homemapModel(val, val.initial).devices.forEach(function(device){
+        ['state','thermal'].forEach(function(attribute){
+          var options = attribute === 'state' ? HOMEMAP_STATES[device.kind] : HOMEMAP_THERMAL;
+          var input = selectControl(options, device[attribute], function(v){
+            return commitCascade(function(raw){return planHomemapDeviceAttribute(src.value,raw,t.section,null,val.id,device.id,attribute,v);}, {after:function(){renderInspector();}});
+          });
+          input.setAttribute('aria-label', device.label + ' initial ' + attribute);
+          conditions.appendChild(frow(device.label + ' · ' + (attribute === 'thermal' ? 'temperature' : 'state'), input));
+        });
+      });
+      rows.push(conditions);
     }
     return rows.concat(panelSetupRows(val));
   }

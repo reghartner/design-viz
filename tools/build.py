@@ -19,6 +19,7 @@ SRC = ROOT / "src"
 # Reuse the canonical demo so its gallery entry cannot drift.
 STARTERS = [
     ("home story", "A large home scene with rooms, a visitor, local signals, and an internet outage alternate.", "starters/homemap-story.json"),
+    ("thermal protection", "Proposed doorbell flow: heat, frost, charging pause, unavailable video and recovery.", "../docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json"),
     ("whole home & outdoors", "A centered house with garden and driveway cameras, perimeter sensors, and swinging doors.", "starters/whole-home-outdoors.json"),
     ("across the front door", "Half outside, half inside: welcome a visitor through the door or leave a parcel outside.", "starters/front-door-threshold.json"),
     ("alternate paths", "One shared command diagram: happy path or a dropped signal after step 3.", "starters/alternate-paths.json"),

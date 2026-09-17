@@ -15,6 +15,10 @@ Key facts:
   the value renders as NO DATA.
 - A step with no finite value shows a dash and leaves a GAP in the sparkline
   (the line does not bridge it).
+- Optional `lowWarn` / `lowCrit` add inclusive cold limits and a safe interval
+  between cold and hot ranges. These do not set device operation or charging;
+  see [thermal protection](thermal-protection.md) for coordinated Home effects,
+  unavailable video and recovery with separate restart gates.
 
 Complete working spec:
 

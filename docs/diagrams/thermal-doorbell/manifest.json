@@ -1,0 +1,24 @@
+{
+  "pages": [
+    {
+      "file": "thermal-doorbell.html",
+      "spec": "thermal-doorbell.spec.json",
+      "title": "When the doorbell gets too hot—or too cold",
+      "family": "thermal-doorbell",
+      "description": "Proposed hot and cold doorbell protection, notices, missed visits and recovery on one timeline.",
+      "tags": [
+        "home",
+        "thermal",
+        "alternates"
+      ],
+      "widgets": [
+        "battery",
+        "homemap",
+        "phone",
+        "screen",
+        "table",
+        "thermo"
+      ]
+    }
+  ]
+}

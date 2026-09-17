@@ -113,9 +113,12 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .doc-sec{container:diagram-section / inline-size;}
 
 .board{--dv-board-ground:#0B1220; margin-top:12px; border-radius:12px; overflow-x:auto;
-  border:1px solid color-mix(in srgb, var(--acc) 30%, transparent);}
+  background:var(--dv-board-ground);border:1px solid color-mix(in srgb, var(--acc) 30%, transparent);}
 .sk-daylight .board{--dv-board-ground:#FBFAF6;}
-.board.stepmode{border-bottom-left-radius:0; border-bottom-right-radius:0;}
+/* Square the seam only when visible playback controls share this outline.
+   Without panels, the legacy transport follows the enclosing boardgrid. */
+.board.stepmode:has(+ .termbar:not([hidden])),
+.boardgrid:has(+ .termbar:not([hidden]))>.board.stepmode{border-bottom-left-radius:0; border-bottom-right-radius:0;}
 .boardcanvas{position:relative;}
 .board svg{display:block; min-width:980px; width:100%; height:auto;}
 /* when a panel column shares the row the board is only ~670-860px wide, so the
@@ -1623,7 +1626,6 @@ body.sk-editorial .board{
   background:var(--ed-sheet);
   box-shadow:none;
 }
-body.sk-editorial .board.stepmode{border-bottom-left-radius:0; border-bottom-right-radius:0;}
 body.sk-editorial .board svg > rect:nth-of-type(2){opacity:.075;}
 body.sk-editorial .lg,
 body.sk-editorial .sk-aurora .lg,
@@ -2897,14 +2899,10 @@ body.sk-editorial .errbox{
   body.sk-pastel .board {
     --dv-board-ground:#FAFBFE;
     margin-top:15px;
-    background:#FBFCFE;
+    background:var(--dv-board-ground);
     border:1px solid #DCE4EF;
     border-radius:17px;
     box-shadow:inset 0 1px 0 #FFFFFF, 0 8px 22px rgba(64,78,111,.055);
-  }
-  body.sk-pastel .board.stepmode {
-    border-bottom-left-radius:0;
-    border-bottom-right-radius:0;
   }
   body.sk-pastel .board svg pattern circle { fill:#D9E2F0; opacity:.58; }
   body.sk-pastel .edge,
@@ -3689,7 +3687,6 @@ body.sk-editorial .errbox{
     border-radius:0;
     background:#052956;
   }
-  body.sk-blueprint .board.stepmode{border-radius:0;}
   body.sk-blueprint .board svg > rect[fill^="url"]{opacity:.7;}
   body.sk-blueprint .lg{
     gap:10px;

@@ -34,12 +34,13 @@ and playback have separate checkpoints. A local clip can survive a cloud failure
 a cloud clip can exist while delivery remains held. The queue panel represents
 this story's delivery item, not an invented total backlog.
 
-**Readable detail.** The engineering graph uses reserved connector lanes and
+**Readable detail.** Desktop and the intended Backstage/Confluence content widths
+are the target surfaces. The engineering graph uses reserved connector lanes and
 short, source-defined component names. Auto / Fit width / Readable remain
-available on narrow screens. The story arrangement has a large Home tile,
+available as the content area narrows. The story arrangement has a large Home tile,
 playback immediately below, and supporting panels before the complete graph.
 Its controls tile reserves enough height for three branch rows and a wrapped
-caption on a phone; checking page overflow alone will not catch a clipped caption.
+caption; checking page overflow alone will not catch a clipped caption.
 Use the reader's Hide data flow control if a meeting needs to focus on people;
 that does not remove any steps or edit the topology.
 
@@ -60,5 +61,6 @@ python3 <VIZ>/tools/page_build.py <your.spec.json> --root <absolute-OUT> \
 The linked seed has a dedicated `tests/authoring-seed.test.js` drift check using
 the real state-folding code. It verifies quiet recording, notification causality,
 door/subject positions, local media survival, and held delivery. Browser checks
-must additionally cover every path in both views, narrow layouts and reduced
-motion; schema validation cannot prove those presentation properties.
+must additionally cover every path in both views at the intended desktop/embed
+widths and with reduced motion; schema validation cannot prove those presentation
+properties. Mobile optimization is optional unless explicitly requested.

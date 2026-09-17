@@ -83,8 +83,9 @@ no separate Home choice. Optional `diagram.layoutName` names the arrangement
 Hide/Show data flow within that arrangement while keeping panels and playback.
 Visibility is temporary and does not remove diagram tiles from the spec.
 Preserve panel IDs and story state; tile geometry is not evidence. Do not change
-Home coordinates, steps or paths to fit a host. Verify a narrow stacked preview
-and the real installed host separately.
+Home coordinates, steps or paths to fit a host. Verify the intended desktop/embed
+width in preview, and the real installed host separately when available. Phone
+layouts are optional unless the user requests mobile support.
 
 **Facts vs authoring geometry.** Story numbers — anything the reader sees
 or that drives a computed outcome: durations, thresholds, counts,

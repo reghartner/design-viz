@@ -24,6 +24,9 @@ For a small edit, update the affected story/ledger rows rather than restarting.
 
 - State the audience, the question the diagram answers, its initiating event,
   and meaningful outcomes. Respect the user's chosen scope and presentation.
+- Target desktop and the intended Backstage/Confluence content widths by default.
+  Preserve readable detail for those surfaces. Mobile optimization and phone
+  acceptance checks are required only when the user requests them.
 - Identify **proposed design**, **reviewed canonical behavior**, and **observed
   execution** separately, including when one page compares them. An incident
   trace does not silently replace the canonical design.
@@ -152,8 +155,8 @@ Use a wire-contract card only for a sourced payload schema. Configuration such
 as retry limits and mechanism facts such as SQL belong in prose or an explanatory
 table; true facts under an invented “on the wire” heading still imply a false contract.
 
-Render the built page with available browser tools. Inspect a wide and narrow
-viewport, exercise every branch and switch from success to failure, and try the
+Render the built page with available browser tools. Inspect the intended desktop
+and host/embed widths, exercise every branch and switch from success to failure, and try the
 requested primary/alternate view. Check readability, clipping, usable controls,
 and whether the visual state actually supports the caption. Fix and rebuild
 affected content. If browser tools or a host are unavailable, state precisely

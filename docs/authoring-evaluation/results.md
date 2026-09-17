@@ -41,6 +41,10 @@ This is a small qualitative tuning exercise: no repeated seeds, blinded graders,
 statistical confidence, latency/cost comparison, or complete instruction-version
 archive. Two cases were reused for tuning. Checkout was a single held-out case.
 Scores are the coordinating agent's judgment, not a model benchmark.
+The user subsequently clarified that desktop, Backstage and Confluence are the
+target surfaces. The 390px checks remain recorded as exploratory evidence, but
+phone readability is not a grading gate. Future runs should check the actual
+desktop/embed widths; mobile optimization is required only when requested.
 
 ## Rubric
 
@@ -54,7 +58,7 @@ communication, outcome, or evidence claim requires revision regardless of total.
 | B — Branches and coverage | Complete source flow, shared prefix, distinct first divergence and honest endpoints |
 | C — Causality and state | Effects follow supported causes; independent path folding; no stale success/error or inferred receipt |
 | R — Richness and meaningful motion | Coordinated physical movement, recording/event timing, handoffs and outcomes where supported; useful software transitions count equally |
-| V — Readability and visual checks | Usable wide/narrow controls and labels, coherent rendered widgets, inspected branches |
+| V — Readability and visual checks | Usable controls and labels at intended desktop/embed widths, coherent rendered widgets, inspected branches |
 | A — Auditable handoff | Storyboard/ledger, real build, traceable output, honest limits and reproducible checks |
 
 Richness does not mean a widget quota. A webhook need not have a Home panel. A
@@ -72,7 +76,7 @@ the author itself completed that inspection.
 | 2 [Doorbell](artifacts/round2-doorbell.spec.json) | 2 | 4 | 3 | 2 | 3 | 3 | 17 | Revise: unsupported Home relay, wrong signal destination and entry position |
 | 2 [Webhook](artifacts/round2-webhook.spec.json) | 1 | 4 | 2 | 2 | 3 | 3 | 15 | Revise: SQL shown as internal; autoplay and recovery-state defects |
 | 3 [Doorbell](artifacts/round3-doorbell.spec.json) | 1 | 4 | 2 | 3 | 3 | 3 | 16 | Revise: timeout shown as response and send treated as receipt |
-| 3 [Checkout](artifacts/round3-checkout.spec.json) | 2 | 4 | 2 | 3 | 2 | 3 | 16 | Revise: UI error given unsupported response cause; tiny mobile graph |
+| 3 [Checkout](artifacts/round3-checkout.spec.json) | 2 | 4 | 2 | 3 | 3 | 3 | 17 | Revise: UI error given unsupported response cause |
 | 3 [Webhook](artifacts/round3-webhook.spec.json) | 2 | 4 | 4 | 3 | 3 | 4 | 20 | Revise: configuration/mechanism facts presented as wire-contract fields |
 
 ### Round 1: baseline
@@ -129,7 +133,8 @@ Orders outcomes in the partial incident trace. It then activated
 `checkout->browser` for a generic UI error, although no backend response was
 observed. Its “Browser outcome observed” check failed even though an error was
 observed, conflating an undesirable outcome with missing evidence. Its entire
-graph was also too small to read comfortably on mobile.
+graph was also too small to read comfortably on mobile; that exploratory finding
+does not lower the grade under the clarified desktop/embed target.
 
 The last webhook run declared SQL explicitly, removed the invented operator
 network edge, opened paused, cleared the recovered Sender tone, and preserved
@@ -191,6 +196,6 @@ python3 -m unittest discover -s tests -p 'test_widget_doc.py'
 ```
 
 For future instruction changes, use fresh cases and repeat the same evidence,
-branch, motion and viewport checks. Retain raw outputs, grade semantic defects
+branch, motion and intended desktop/embed viewport checks. Retain raw outputs, grade semantic defects
 even when validation passes, and keep review mandatory for ambiguous traces,
 failure causality or claims of canonical company behavior.

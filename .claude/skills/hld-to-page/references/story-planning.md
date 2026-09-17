@@ -140,3 +140,6 @@ service/dependency detail in Data flow, and people/place/outcomes in the story
 layout. Both must cover the complete sequence and keep the selected step/path
 when switching. Do not simplify the business story by silently dropping failure
 beats. See `docs/section-layouts.md`; no parallel mutable copies of the story.
+Optimize readability for desktop and the intended Backstage/Confluence content
+area. Keep necessary engineering detail; fitting an entire dense flow on a phone
+is not a default requirement. Test mobile only when it is part of the request.

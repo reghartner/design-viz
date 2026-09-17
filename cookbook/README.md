@@ -1,12 +1,14 @@
 # Cookbook — recipes for authoring agents
 
-One file per common request. Each recipe contains a COMPLETE page spec in a
+One file per common request. Small recipes contain a COMPLETE page spec in a
 ```json fence that renders standalone — copy it, adapt ids/labels/values, and
 run the loop below. `tests/test_cookbook.py` extracts every ```json fence in
 this directory and requires the real validator to report **0 errors and
 0 warnings** on it, so a recipe cannot drift from the engine. Partial
 fragments (per-step patches, single panels) use plain fences and are not
 standalone specs.
+Larger teaching seeds link their complete spec, source and ledger instead of
+duplicating the JSON; their dedicated checks are named in the recipe.
 
 ## The loop (every recipe ends here)
 
@@ -26,6 +28,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | a Confluence-ready export or JSON to paste into the Flowview macro | [Confluence handoff](../docs/confluence.md) |
 | happy and failure outcomes on one diagram, shared steps, or a dropped/blocked communication | [alternate-paths.md](alternate-paths.md) |
 | a large home map, live Home / Data flow switching, device states, or draggable placement | [home-story.md](home-story.md) |
+| a detailed engineering flow and rich business-user story sharing every step and alternate | [two-perspectives.md](two-perspectives.md) — annotated source, storyboard and complete seed |
 | outdoor cameras/sensors around a house, a porch/entry split, or doors in walls | [outdoor-home.md](outdoor-home.md) |
 | a color camera clip, doorbell runners, or recording before the visible event | [camera-events.md](camera-events.md) |
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |

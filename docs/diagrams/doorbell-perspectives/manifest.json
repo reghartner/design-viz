@@ -1,0 +1,26 @@
+{
+  "pages": [
+    {
+      "file": "doorbell-perspectives.html",
+      "spec": "doorbell-perspectives.spec.json",
+      "title": "A visitor at the door — one flow, two perspectives",
+      "family": "doorbell-perspectives",
+      "description": "One doorbell flow in engineering and resident-story perspectives, including rejected storage and delayed notification.",
+      "tags": [
+        "doorbell",
+        "home",
+        "engineering",
+        "business",
+        "alternate-paths"
+      ],
+      "widgets": [
+        "checks",
+        "homemap",
+        "phone",
+        "queue",
+        "screen",
+        "state"
+      ]
+    }
+  ]
+}

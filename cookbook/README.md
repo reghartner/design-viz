@@ -26,6 +26,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | You were asked for… | Recipe |
 |---|---|
 | a Confluence-ready export or JSON to paste into the Flowview macro | [Confluence handoff](../docs/confluence.md) |
+| small screenshots or illustrations stored inside the spec | [embedded-images.md](embedded-images.md) |
 | happy and failure outcomes on one diagram, shared steps, or a dropped/blocked communication | [alternate-paths.md](alternate-paths.md) |
 | a large home map, live Home / Data flow switching, device states, or draggable placement | [home-story.md](home-story.md) |
 | a detailed engineering flow and rich business-user story sharing every step and alternate | [two-perspectives.md](two-perspectives.md) — annotated source, storyboard and complete seed |

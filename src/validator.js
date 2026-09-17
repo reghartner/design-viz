@@ -10,7 +10,16 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget','trace','replicas'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','image','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget','trace','replicas'];
+var EMBEDDED_IMAGE_MAX_BYTES = 512 * 1024;
+/* Raster data only: images travel with the spec and never fetch remote assets. */
+function embeddedImageSource(value){
+  if (typeof value !== 'string' || value.length > Math.ceil(EMBEDDED_IMAGE_MAX_BYTES / 3) * 4 + 32) return null;
+  var match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match || match[2].length % 4 !== 0) return null;
+  var bytes = match[2].length * 3 / 4 - (match[2].endsWith('==') ? 2 : match[2].endsWith('=') ? 1 : 0);
+  return bytes <= EMBEDDED_IMAGE_MAX_BYTES ? value : null;
+}
 var TABLE_STATUSES = ['neutral','added','changed','removed'];
 var CHECK_STATUSES = ['pending','pass','fail','warn','skip'];
 
@@ -1291,6 +1300,15 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (p.type === 'screen' && p.scene && SCENE_NAMES.indexOf(p.scene) < 0)
       warnings.push(PP + '.scene: unknown scene "' + p.scene + '" — using "static-noise" (valid: ' + SCENE_NAMES.join(' ') + ')');
     if (p.type === 'screen') screenPatchWarnings(p.initial, PP + '.initial', warnings);
+    if (p.type === 'image'){
+      if (p.src != null && p.src !== '' && !embeddedImageSource(p.src))
+        errors.push(PP + '.src: use an embedded PNG, JPEG or WebP data URL up to 512 KiB; remote URLs and SVG are not supported');
+      if (p.src && (typeof p.alt !== 'string' || !p.alt.trim()))
+        warnings.push(PP + '.alt: describe the image for readers who cannot see it');
+      ['alt','caption'].forEach(function(key){if(p[key] != null && typeof p[key] !== 'string')warnings.push(PP + '.' + key + ': expected text');});
+      if (p.link != null && (typeof FlowCanon === 'undefined' || !FlowCanon.http(p.link)))
+        warnings.push(PP + '.link: expected an HTTP(S) URL without credentials');
+    }
     if (p.type === 'waterfall' && !(Array.isArray(p.spans) && p.spans.length))
       warnings.push(PP + '.spans: waterfall needs spans:[{id, label, ms}] — panel renders empty');
     if (p.type === 'waterfall' && Array.isArray(p.spans)) p.spans.forEach(function(span, si){

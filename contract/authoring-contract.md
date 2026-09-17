@@ -410,6 +410,18 @@ on edges. Undeclared kinds fall back to `int` with a warning.
 a column beside the board and driven by the same steps (the "different
 perspectives" of one timeline). Types:
 
+- `image` — a static embedded screenshot or illustration:
+  `{"id":"ui","type":"image","title":"Backstage preview","src":"data:image/jpeg;base64,...","alt":"Service page showing its inline diagram","caption":"Local preview with fictional data","link":"https://example.com/source"}`.
+  `src` accepts only base64 PNG, JPEG or WebP data URLs, up to 512 KiB decoded
+  per image; omit it for an empty upload placeholder. Remote URLs and SVG are
+  rejected. `alt` describes the image; `caption` is optional plain text.
+  Optional HTTP(S) `link` opens a reference in a new tab, never in the rendering
+  frame. Images preserve aspect ratio and fit their tile. These fields are
+  shared setup, with no step patches. Use the workbench's **Image file** upload
+  to encode a local image; it accepts dimensions up to 4096 × 4096. Use small
+  captures: base64 adds about one third to file size, and the existing 128 KiB
+  Confluence snapshot limit applies to the entire spec. Hosted HTML has no such
+  snapshot limit. Label mocked interfaces and provide actual capture provenance.
 - `state` — a state-machine readout plus a chip rail:
   `{"id":"hp","type":"state","title":"...","states":["OFF","BOOT","RUN"],
   "colors":{"RUN":"#38E1FF"},"initial":{"state":"OFF"}}`. Patched via

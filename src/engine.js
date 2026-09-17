@@ -3105,6 +3105,15 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     h = replicaPanelHTML(panel,state);
   } else if (['table','checks','budget'].indexOf(type) >= 0){
     h = softwarePanelHTML(panel, state);
+  } else if (type === 'image'){
+    var imageSrc = embeddedImageSource(panel.src);
+    h = '<figure class="pimage">';
+    if (imageSrc) h += '<img src="' + esc(imageSrc) + '" alt="' + esc(panel.alt || '') + '" decoding="async">';
+    else h += '<div class="pimage-empty">Add an embedded PNG, JPEG or WebP image</div>';
+    if (panel.caption) h += '<figcaption>' + esc(panel.caption) + '</figcaption>';
+    var imageLink = typeof FlowCanon !== 'undefined' && FlowCanon.http(panel.link);
+    if (imageLink) h += '<a class="pimage-link" href="' + esc(imageLink) + '" target="_blank" rel="noopener noreferrer">Open reference ↗</a>';
+    h += '</figure>';
   } else if (type === 'state'){
     var cur = state.state != null ? String(state.state) : '—';
     pulseSelector = '.pchip.cur';

@@ -5188,6 +5188,24 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
   .thermal-clearing{display:none;}
   .screenbox.m-unavailable{print-color-adjust:exact;}
 }
+
+/* Embedded reference images keep their aspect ratio in every host layout. */
+.pimage{margin:0;display:flex;flex-direction:column;gap:10px;align-items:center;min-width:0}
+.pimage img{display:block;max-width:100%;width:auto;height:auto;max-height:560px;object-fit:contain;border-radius:8px}
+.pimage figcaption{flex:none;align-self:stretch;font-size:12px;line-height:1.5;color:var(--dtext);overflow-wrap:anywhere}
+.pimage-link{flex:none;align-self:flex-start;font-size:12px;color:var(--acc);text-decoration:underline}
+.pimage-empty{padding:28px 12px;border:1px dashed var(--dfaint);border-radius:8px;font-size:12px;text-align:center;color:var(--dtext)}
+
+.docview .section-layout-tile>.pt-image{display:flex;flex-direction:column;}
+.section-layout-tile>.pt-image>.ptitle{flex:none;}
+.section-layout-tile>.pt-image>.pbody{display:flex;flex:1;min-height:0;}
+.section-layout-tile .pimage{width:100%;height:100%;}
+.section-layout-tile .pimage img{flex:1;min-height:40px;height:0;width:100%;max-height:none;}
+@media print{
+  .panelcol .pwidget.pt-image{display:block !important;break-inside:avoid;}
+  .section-layout-tile .pimage{height:auto;}
+  .section-layout-tile .pimage img{flex:none;height:auto;max-height:560px;}
+}
 </style>
 
 <svg aria-hidden="true" style="position:absolute; width:0; height:0; overflow:hidden">
@@ -5457,7 +5475,16 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget','trace','replicas'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','image','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget','trace','replicas'];
+var EMBEDDED_IMAGE_MAX_BYTES = 512 * 1024;
+/* Raster data only: images travel with the spec and never fetch remote assets. */
+function embeddedImageSource(value){
+  if (typeof value !== 'string' || value.length > Math.ceil(EMBEDDED_IMAGE_MAX_BYTES / 3) * 4 + 32) return null;
+  var match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match || match[2].length % 4 !== 0) return null;
+  var bytes = match[2].length * 3 / 4 - (match[2].endsWith('==') ? 2 : match[2].endsWith('=') ? 1 : 0);
+  return bytes <= EMBEDDED_IMAGE_MAX_BYTES ? value : null;
+}
 var TABLE_STATUSES = ['neutral','added','changed','removed'];
 var CHECK_STATUSES = ['pending','pass','fail','warn','skip'];
 
@@ -6738,6 +6765,15 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (p.type === 'screen' && p.scene && SCENE_NAMES.indexOf(p.scene) < 0)
       warnings.push(PP + '.scene: unknown scene "' + p.scene + '" — using "static-noise" (valid: ' + SCENE_NAMES.join(' ') + ')');
     if (p.type === 'screen') screenPatchWarnings(p.initial, PP + '.initial', warnings);
+    if (p.type === 'image'){
+      if (p.src != null && p.src !== '' && !embeddedImageSource(p.src))
+        errors.push(PP + '.src: use an embedded PNG, JPEG or WebP data URL up to 512 KiB; remote URLs and SVG are not supported');
+      if (p.src && (typeof p.alt !== 'string' || !p.alt.trim()))
+        warnings.push(PP + '.alt: describe the image for readers who cannot see it');
+      ['alt','caption'].forEach(function(key){if(p[key] != null && typeof p[key] !== 'string')warnings.push(PP + '.' + key + ': expected text');});
+      if (p.link != null && (typeof FlowCanon === 'undefined' || !FlowCanon.http(p.link)))
+        warnings.push(PP + '.link: expected an HTTP(S) URL without credentials');
+    }
     if (p.type === 'waterfall' && !(Array.isArray(p.spans) && p.spans.length))
       warnings.push(PP + '.spans: waterfall needs spans:[{id, label, ms}] — panel renders empty');
     if (p.type === 'waterfall' && Array.isArray(p.spans)) p.spans.forEach(function(span, si){
@@ -10492,6 +10528,15 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     h = replicaPanelHTML(panel,state);
   } else if (['table','checks','budget'].indexOf(type) >= 0){
     h = softwarePanelHTML(panel, state);
+  } else if (type === 'image'){
+    var imageSrc = embeddedImageSource(panel.src);
+    h = '<figure class="pimage">';
+    if (imageSrc) h += '<img src="' + esc(imageSrc) + '" alt="' + esc(panel.alt || '') + '" decoding="async">';
+    else h += '<div class="pimage-empty">Add an embedded PNG, JPEG or WebP image</div>';
+    if (panel.caption) h += '<figcaption>' + esc(panel.caption) + '</figcaption>';
+    var imageLink = typeof FlowCanon !== 'undefined' && FlowCanon.http(panel.link);
+    if (imageLink) h += '<a class="pimage-link" href="' + esc(imageLink) + '" target="_blank" rel="noopener noreferrer">Open reference ↗</a>';
+    h += '</figure>';
   } else if (type === 'state'){
     var cur = state.state != null ? String(state.state) : '—';
     pulseSelector = '.pchip.cur';

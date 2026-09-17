@@ -1067,6 +1067,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var DP = P + '.diagram';
   validatePaths(d, DP, errors);
   sectionLayoutWarnings(d, DP, warnings);
+  if(d.layoutName != null && (typeof d.layoutName!=='string' || !d.layoutName.trim() || d.layoutName.trim().length>40))
+    warnings.push(DP+'.layoutName: use a nonempty layout name of up to 40 characters');
   if (d.primaryPanel != null && (typeof d.primaryPanel !== 'string' ||
       !(Array.isArray(d.panels) && d.panels.some(function(p){ return p && p.id === d.primaryPanel; }))))
     warnings.push(DP + '.primaryPanel: must name an existing panel — using the standard flow layout');

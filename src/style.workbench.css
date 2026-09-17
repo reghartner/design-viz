@@ -607,8 +607,10 @@ body.sk-aurora.sk-blueprint{
 .section-arrange-fields{padding:10px 0;}
 .section-arrange-fields[hidden]{display:none;}
 .section-arrange-fields input{width:60px;}
+.section-arrange-fields input[type="text"]{width:180px;}
 .section-arrange-fields select{max-width:190px;}
 .section-arranging .section-layout-tile{outline:1px dashed var(--acc);padding-top:30px;box-sizing:border-box;}
+.section-arranging .layout-flow-toggle{display:none;}
 .section-arranging .section-layout-tile.layout-selected{outline:2px solid var(--acc);}
 .section-tile-move,.section-tile-resize{display:none;position:absolute;z-index:4;touch-action:none;user-select:none;background:var(--card);color:var(--ink);border:1px solid var(--line);font:12px 'IBM Plex Sans',sans-serif;cursor:grab;}
 .section-arranging .section-tile-move{display:block;top:0;left:0;right:0;height:28px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

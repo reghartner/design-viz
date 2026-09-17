@@ -4693,7 +4693,22 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
 }
 
 /* Saved section composition moves the existing live widgets, never their state.
-   Home/Data flow remain available and restore the original DOM placement. */
+   Its named layout replaces Home; Data flow restores the standard placement. */
+function sectionLayoutWithoutFlow(items,controlsRows){
+  var diagram=items.find(function(it){return sectionLayoutKey(it)==='diagram';});
+  var kept=items.filter(function(it){return it!==diagram || controlsRows>0;}).map(function(it){
+    var copy=Object.assign({},it);if(it===diagram)copy.h=Math.min(it.h,Math.max(3,controlsRows));return copy;
+  });
+  if(!diagram)return kept;
+  /* Remove only rows vacated by the diagram. Side-by-side panels retain their
+     sizes/columns, and intentional spacing elsewhere stays authored. */
+  var empty=[];
+  for(var row=diagram.y;row<diagram.y+diagram.h;row++){
+    if(!kept.some(function(it){return row>=it.y && row<it.y+it.h;}))empty.push(row);
+  }
+  kept.forEach(function(it){it.y-=empty.filter(function(row){return row<it.y;}).length;});
+  return kept;
+}
 function createSectionComposition(box, layout, d, board, bar, base, target, changed){
   var items=sectionLayoutItems(d,target || 'default');
   if(!items)return null;
@@ -4705,12 +4720,34 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     toolbar.appendChild(group);box.insertBefore(toolbar,layout.grid);
   }
   var button=document.createElement('button');button.type='button';button.className='mbtn';
-  button.textContent='Layout';button.setAttribute('data-view-layout','');group.insertBefore(button,group.firstChild);
+  button.textContent=typeof d.layoutName==='string' && d.layoutName.trim() ? d.layoutName.trim() : 'Layout';
+  button.setAttribute('data-view-layout','');group.insertBefore(button,group.firstChild);
+  var homeChoice=group.querySelector('[data-view-focus="panel"]');if(homeChoice)homeChoice.remove();
+  var flowToggle=document.createElement('button');flowToggle.type='button';flowToggle.className='mbtn layout-flow-toggle';
+  flowToggle.setAttribute('data-layout-flow','');group.parentNode.insertBefore(flowToggle,group.nextSibling);
   var standard;
   if(!base){standard=document.createElement('button');standard.type='button';standard.className='mbtn';standard.textContent='Data flow';group.appendChild(standard);}
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
+  grid.id=box.id+'-layout';flowToggle.setAttribute('aria-controls',grid.id);
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
-  var active=false, saved=[], oldHidden, flowHidden;
+  var active=false, saved=[], oldHidden, flowHidden,showDiagram=true,boardHidden=board.hidden;
+  function paintFlow(){
+    flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
+    flowToggle.setAttribute('aria-expanded',String(showDiagram));
+    board.hidden=active && !showDiagram ? true : boardHidden;
+    if(!active)return;
+    var controlsRows=bar && !bar.hidden && !separateSteps ? Math.max((d.paths || []).length>1?6:4,Math.ceil((bar.scrollHeight+8)/40) || 0) : 0;
+    var visible=showDiagram?items:sectionLayoutWithoutFlow(items,controlsRows);
+    grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
+      var key=tile.getAttribute('data-layout-key'),it=visible.find(function(v){return sectionLayoutKey(v)===key;});
+      tile.hidden=!it;tile.classList.toggle('layout-controls-only',key==='diagram' && !showDiagram && !!it);
+      if(it){tile.style.setProperty('--tile-y',it.y+1);tile.style.setProperty('--tile-h',it.h);}
+    });
+  }
+  function setDiagramVisible(value){if(typeof value!=='boolean')return;showDiagram=value;paintFlow();}
+  flowToggle.addEventListener('click',function(){setDiagramVisible(!showDiagram);});
+  var visibilityObserver=bar && typeof MutationObserver!=='undefined' ? new MutationObserver(function(){if(active && !showDiagram)paintFlow();}) : null;
+  if(visibilityObserver)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
   function move(node,host){
     if(!node)return;
     var anchor=document.createComment('layout position');node.parentNode.insertBefore(anchor,node);
@@ -4722,6 +4759,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     saved=[];grid.replaceChildren();grid.hidden=true;layout.grid.hidden=oldHidden;
     if(layout.flowDisclosure)layout.flowDisclosure.hidden=flowHidden;
     active=false;button.setAttribute('aria-pressed','false');
+    paintFlow();
     if(standard)standard.setAttribute('aria-pressed','true');
     if(changed)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
     if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
@@ -4751,19 +4789,24 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
         move(board,col);if(!separateSteps && bar)move(bar,col);
       }
     });
+    /* A board without a primary panel owns the Ambient/Step buttons. Keep
+       them reachable when the board is hidden, then restore on Data flow. */
+    var boardModes=board.querySelector('.mtoggle');if(boardModes)move(boardModes,group.parentNode);
     layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;
     grid.hidden=false;active=true;button.setAttribute('aria-pressed','true');
+    paintFlow();
     if(changed)changed(grid);
     if(standard)standard.setAttribute('aria-pressed','false');
     group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed','false');});
   }
-  function setMode(value){if(value==='layout')activate();else{restore();if(base)base.setMode(value);}}
+  function setMode(value){if(value==='layout'||value==='panel')activate();else{restore();if(base)base.setMode(value);}}
   button.addEventListener('click',activate);
   if(standard)standard.addEventListener('click',restore);
   group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]'))restore();},true);
   activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
-    destroy:function(){if(base)base.destroy();}};
+    diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
+    destroy:function(){if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 
 function sectionHasProse(sec){

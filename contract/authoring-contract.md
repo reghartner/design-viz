@@ -748,6 +748,12 @@ perspectives" of one timeline). Types:
   precedence (other widget types use their title instead of Home). The spec
   sets the opening layout; switching does not mutate it. The timeline follows
   the main view, and secondary panels stack below it on narrow screens.
+  With a saved `diagram.sectionLayout`, the custom arrangement replaces the
+  Home choice. Set `diagram.layoutName` to a nonempty string of up to 40
+  characters to name that view (default **Layout**); **Data flow** remains the
+  second choice. Hide/Show data flow is a temporary reader control within the
+  arrangement and keeps panels and step controls visible. See
+  [section layouts](../docs/section-layouts.md) for the tile/profile contract.
   Example panel:
   `{"id":"home","type":"homemap","outline":{"w":300,"h":164},
   "devices":[{"id":"cam","kind":"camera","label":"Porch cam",

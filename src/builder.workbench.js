@@ -5798,6 +5798,9 @@ function initWorkbenchBuilder(opts){
     locked:function(){return !!addToStep || !!connect;},
     commit:function(section,target,items){
       return commitCascade(function(raw){return planSectionLayout(src.value,raw,section,target,items);});
+    },
+    rename:function(section,name){
+      return commitCascade(function(raw){return planSectionLayoutName(src.value,raw,section,name);});
     }
   }) : null;
   view.addEventListener('dv:pathrender',applyRowGrabs);

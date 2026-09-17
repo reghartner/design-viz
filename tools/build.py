@@ -10,6 +10,7 @@
 Deterministic: same src -> byte-identical output. Run from anywhere.
 """
 import json
+import base64
 import pathlib
 import sys
 
@@ -48,6 +49,18 @@ def js_bundle(*names: str) -> str:
     return "\n".join(parts)
 
 
+def font_css() -> str:
+    """Self-contained pages: no font CDN or authenticated asset requests."""
+    licenses = "\n\n".join(p.read_text() for p in sorted((SRC / "fonts").glob("*-LICENSE.txt")))
+    rules = ["/* Bundled font licenses\n" + licenses.replace("*/", "* /") + "\n*/"]
+    for font in json.loads(read("fonts/manifest.json")):
+        data = base64.b64encode((SRC / "fonts" / font["file"]).read_bytes()).decode("ascii")
+        rules.append("@font-face{font-family:'%s';font-style:normal;font-weight:%s;"
+                     "font-display:swap;src:url(data:font/woff2;base64,%s) format('woff2');}"
+                     % (font["family"], font["weight"], data))
+    return "\n".join(rules)
+
+
 def fill(skel: str, mapping: dict) -> str:
     out = skel
     for key, val in mapping.items():
@@ -65,7 +78,7 @@ def main() -> int:
     core_css = read("style.core.css").rstrip()
 
     flowview = fill(read("flowview.skel.html"), {
-        "STYLE_PAGE": read("style.flowview.css").rstrip(),
+        "STYLE_PAGE": font_css() + "\n" + read("style.flowview.css").rstrip(),
         "STYLE_CORE": core_css,
         "ICONS": icons,
         "DEMO_SPEC": read("flowview.demo.json").strip(),

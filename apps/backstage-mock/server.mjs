@@ -85,15 +85,25 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
         }
         return send(200,{simulated:true,catalog,spec,revision});
       }
-      if(url.pathname.startsWith('/api/canon/specs/'))return send(200,find(decodeURIComponent(url.pathname.slice('/api/canon/specs/'.length))));
+      if(url.pathname.startsWith('/api/canon/specs/')){
+        const spec=find(decodeURIComponent(url.pathname.slice('/api/canon/specs/'.length)));
+        if(url.searchParams.has('revision') && url.searchParams.get('revision')!==digest(spec))
+          return send(409,{error:'Diagram changed. Refresh the association list.'});
+        return send(200,spec);
+      }
       if(url.pathname==='/api/canon/report')return send(200,reportMarkdown(Object.values(state.reviews)),'text/markdown; charset=utf-8');
       let file;
       if(url.pathname==='/' || /^\/(catalog|apis|issues)\//.test(url.pathname))file=path.join(root,'apps/backstage-mock/public/index.html');
       else if(/^\/(app\.mjs|entity-view\.mjs|style\.css)$/.test(url.pathname))file=path.join(root,'apps/backstage-mock/public',url.pathname.slice(1));
       else if(/^\/(template|workbench)\/[^/]+\.html$/.test(url.pathname))file=path.join(root,url.pathname.slice(1));
+      else if(/^\/backstage-preview\/(index\.html|app\.js)$/.test(url.pathname)){
+        file=path.join(root,'.local/backstage-preview',url.pathname.split('/').pop());
+        const policy=await readFile(path.join(root,'.local/backstage-preview/csp.txt'),'utf8');
+        res.setHeader('Content-Security-Policy',policy.trim());
+      }
       else if(/^\/src\/starters\/[a-z0-9-]+\.json$/.test(url.pathname))file=path.join(root,url.pathname.slice(1));
       else return send(404,{error:'Not found.'});
-      const ext=path.extname(file),mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json'}[ext];
+      const ext=path.extname(file),mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json'}[ext];
       return send(200,await readFile(file),mime);
     }catch(e){send(e.code==='ENOENT'?404:400,{error:e.message});}
   });

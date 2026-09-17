@@ -104,8 +104,8 @@ inherited layout saves an independent profile; it does not alter the fallback.
 The Forge app automatically selects `confluence` for both configuration and
 published viewing. Its updated app bundle must be deployed by the company
 integrator. The Backstage association index adds `layout=backstage` to viewer
-and editor URLs. The current plugin links to this viewer; it does not embed a
-new renderer inside Backstage. Standalone viewers accept `?layout=backstage`
+and editor URLs. The plugin also renders an inline bundled viewer with the
+`backstage` profile selected. Standalone viewers accept `?layout=backstage`
 or `?layout=confluence` (append with `&` if the URL already has a query).
 The width control is for preview only; actual iframe/page width belongs to
 Confluence or Backstage. Check the installed host after deployment.

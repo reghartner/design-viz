@@ -62,6 +62,10 @@ function sectionLayoutSwap(items,from,to){
   ['x','y','w','h','hidden'].forEach(function(k){var value=a[k];if(b[k]===undefined)delete a[k];else a[k]=b[k];if(value===undefined)delete b[k];else b[k]=value;});
   return sectionLayoutPack(next);
 }
+function sectionLayoutOptimize(d,target,items){
+  var hidden=(items || []).filter(function(it){return it.hidden===true && it.controls==null;});
+  return sectionLayoutPreset(d,target,hidden.map(sectionLayoutKey)).concat(hidden.map(function(it){return Object.assign({},it);}));
+}
 function sectionLayoutGesture(items,key,dx,dy,resize){
   var next=items.map(function(it){return Object.assign({},it);}),item=next.find(function(it){return sectionLayoutKey(it)===key;});
   if(!item)return next;
@@ -78,6 +82,29 @@ function sectionLayoutDetachSteps(d,items){
   diagram.h=Math.max(3,diagram.h-height);
   next.push({controls:'steps',x:diagram.x,y:diagram.y+diagram.h,w:diagram.w,h:height});
   return sectionLayoutPack(next,'steps');
+}
+/* Bind visibility to explicit tile identities, independently of the placement
+   selector. Labels identify both the element and the layout being edited. */
+function sectionLayoutVisibilityControl(doc,d,items,name,onChange){
+  var group=doc.createElement('fieldset');group.className='layout-visibility';
+  var legend=doc.createElement('legend');legend.textContent='Visible elements · '+name;group.appendChild(legend);
+  var tiles=sectionLayoutTiles(d);
+  tiles.forEach(function(tile){
+    var item=items.find(function(it){return sectionLayoutKey(it)===tile.key;});
+    if(!item || tile.key==='steps')return;
+    var title=tile.title;
+    if(tile.panel && tiles.filter(function(t){return t.title===title;}).length>1)title+=' ('+tile.panel+')';
+    var label=doc.createElement('label'),input=doc.createElement('input'),text=doc.createElement('span');
+    input.type='checkbox';input.checked=!item.hidden;
+    input.setAttribute('data-layout-visibility',tile.key);
+    input.setAttribute('aria-label','Show '+title+' in '+name);
+    input.addEventListener('change',function(){onChange(tile.key,input.checked);});
+    text.textContent=title;label.appendChild(input);label.appendChild(text);group.appendChild(label);
+  });
+  if(tiles.some(function(tile){return tile.key==='steps';})){
+    var note=doc.createElement('span');note.className='layout-visibility-note';note.textContent='Step controls stay visible.';group.appendChild(note);
+  }
+  return group;
 }
 function initSectionLayoutEditor(opts){
   var view=opts.view,editing=null,drag=null,selected='diagram',widths={backstage:1080,confluence:760};
@@ -107,8 +134,9 @@ function initSectionLayoutEditor(opts){
     if(opts.locked && opts.locked()){feedback('Finish the current diagram editing action first.');return false;}
     return true;
   }
-  function persist(index,items){
+  function persist(index,items,expectedLayout){
     if(!ready())return false;
+    if(expectedLayout!==undefined && expectedLayout!==activeLayout(index)){feedback('The selected layout changed. Use its current visibility controls.');return false;}
     var ok=opts.commit(index,target.value,items,activeLayout(index));if(ok)feedback('Saved '+target.options[target.selectedIndex].text+' layout · Undo restores the previous arrangement.');
     return ok;
   }
@@ -163,11 +191,11 @@ function initSectionLayoutEditor(opts){
       if(warnings.length){feedback(warnings[0]);return;}
       persist(Number(section.getAttribute('data-dv-section')),sectionLayoutPack(next,selected));
     }));
-    var showLabel=el('label',null,'Show in this layout '),show=el('input');show.type='checkbox';show.checked=!item.hidden;show.disabled=selected==='steps';
-    show.setAttribute('aria-label','Show element in this layout');showLabel.appendChild(show);row.appendChild(showLabel);
-    show.addEventListener('change',function(){
-      var next=items.map(function(it){var copy=Object.assign({},it);if(sectionLayoutKey(it)===selected){if(show.checked)delete copy.hidden;else copy.hidden=true;}return copy;});persist(index,next);
+    var visibility=sectionLayoutVisibilityControl(document,d,items,definition?definition.name:'Layout',function(key,visible){
+      var next=items.map(function(it){var copy=Object.assign({},it);if(sectionLayoutKey(it)===key){if(visible)delete copy.hidden;else copy.hidden=true;}return copy;});
+      persist(index,next,id);
     });
+    row.insertBefore(visibility,row.firstChild);
     if(selected!=='steps'){
       var swap=el('select');swap.setAttribute('aria-label','Swap places with');
       sectionLayoutTiles(d).filter(function(t){return t.key!==selected && t.key!=='steps';}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;swap.appendChild(o);});
@@ -210,7 +238,10 @@ function initSectionLayoutEditor(opts){
           if(!ready())return;editing=index;if(opts.pause)opts.pause();forceLayout(index);refresh();
           var name=section.querySelector('[aria-label="Layout name"]');if(name){name.focus();name.select();}
         });rename.setAttribute('data-layout-rename','');controls.appendChild(rename);
-        controls.appendChild(button('Optimize layout',function(){if(!ready())return;editing=index;persist(index,sectionLayoutPreset(rawDiagram(index),target.value));}));
+        controls.appendChild(button('Optimize layout',function(){
+          if(!ready())return;editing=index;
+          var current=rawDiagram(index);persist(index,sectionLayoutOptimize(current,target.value,currentItems(index,current)));
+        }));
         controls.appendChild(button('Reset layout',function(){if(!ready())return;editing=null;persist(index,null);}));
         var caption=el('span','fnote');caption.setAttribute('data-arrange-target','');controls.appendChild(caption);
         actions.appendChild(el('div','section-arrange-fields'));
@@ -220,7 +251,8 @@ function initSectionLayoutEditor(opts){
       actions.querySelector('[data-arrange-toggle]').textContent=editing===index?'Done arranging':'Arrange section';
       actions.querySelector('[data-arrange-toggle]').setAttribute('aria-pressed',String(editing===index));
       actions.querySelector('[data-layout-rename]').disabled=!currentItems(index,d);
-      actions.querySelector('[data-arrange-target]').textContent='Editing '+target.options[target.selectedIndex].text+' layout';
+      var definition=sectionLayoutDefinition(d,activeLayout(index));
+      actions.querySelector('[data-arrange-target]').textContent='Editing '+(definition?'“'+definition.name+'” · ':'')+target.options[target.selectedIndex].text;
       actions.querySelector('.section-arrange-fields').hidden=editing!==index;
       section.classList.toggle('section-arranging',editing===index);
       if(editing===index){

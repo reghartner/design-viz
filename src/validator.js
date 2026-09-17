@@ -980,8 +980,9 @@ function sectionLayoutPack(items, priority){
   });
   return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
 }
-function sectionLayoutPreset(d, target){
-  var tiles=sectionLayoutTiles(d), narrow=target==='confluence', items=[];
+function sectionLayoutPreset(d, target, excludedKeys){
+  var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
+  var tiles=sectionLayoutTiles(d).filter(function(t){return excluded.indexOf(t.key)<0;}), narrow=target==='confluence', items=[];
   var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
   var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
   var controls=tiles.find(function(t){return t.key==='steps';});

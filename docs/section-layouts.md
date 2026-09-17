@@ -30,6 +30,9 @@ controls tile prompts you to choose Step; switching views keeps its position.
   **Width**, and **Height** for precise placement or phone editing. Column and
   Row are displayed starting at 1. Width is in columns; height is in grid rows.
 - **Optimize layout** saves a starting arrangement for the selected target.
+  It arranges only visible elements and preserves hidden panels and Data flow
+  in that layout/profile. Hidden tiles retain their saved size and position and
+  reserve no space; if all supporting panels are hidden, the main tile fills the row.
   Responsive and Backstage use an eight-column main tile with supporting
   panels in four columns; without supporting panels, main tiles fill the row.
   Confluence gives the diagram and Home a full row,
@@ -77,9 +80,12 @@ To build that from an existing arrangement:
 2. Select **Data flow** in **Layout element**, choose your Home panel in
    **Swap places with**, then click **Swap places**. Position, size and visibility
    exchange; other elements keep their places unless a collision needs packing.
-3. Use **Show in this layout** to hide the Home panel or any other panel in this
-   view. To replace a visible Home with a hidden diagram directly, hide the
-   diagram in the original layout before duplicating and swapping.
+3. In **Visible elements**, uncheck **Home** (or its authored title) to hide the
+   Home panel in this view. Every panel and **Data flow** has its own checkbox;
+   the checklist names the selected layout. These checkboxes are independent of
+   the **Layout element** dropdown, which selects what to move, size or swap.
+   To replace a visible Home with a hidden diagram directly, hide the diagram
+   in the original layout before duplicating and swapping.
 4. Choose **Make default** for the view that should open on a fresh page, then
    **Done arranging**. Readers switch using the named buttons above the section.
 
@@ -93,8 +99,8 @@ its panels, diagram or steps. Deleting the default selects the first remaining
 layout; deleting the last named layout restores the automatic presentation.
 
 **Reset layout** removes the active host profile. A named layout with no profiles
-left receives an automatic Responsive arrangement. **Optimize layout** also
-resets visibility in that profile and places all elements again.
+left receives an automatic Responsive arrangement. **Optimize layout** preserves
+visibility and rearranges only visible elements in that profile.
 
 The first duplication converts an older `sectionLayout` / `layoutName` pair into
 named layouts as one undoable edit. Existing specs keep working unchanged.

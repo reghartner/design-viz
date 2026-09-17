@@ -1276,6 +1276,7 @@ var NODE_PRESETS = [
 ];
 
 var PANEL_TEMPLATES = {
+  image:     {title:'Reference image',alt:'Embedded reference image'},
   replicas:  {title:'Replica positions',unit:'records',replicas:[{id:'primary',label:'Primary'},{id:'follower',label:'Follower'}],
               initial:{reference:{series:'example/log-a',position:104},replicas:{
                 primary:{series:'example/log-a',position:104,role:'primary',status:'online',lagMs:0,observedAt:'example t=0'},
@@ -2512,6 +2513,7 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
              and an optional max; unknown keys on existing items survive edits
      objf  — one fixed-shape object edited inline (timeline cadence) */
 var PANEL_SETUP_FIELDS = {
+  image:     [['src','image'],['alt','text'],['caption','text'],['link','text']],
   replicas:  [['unit','text'],['replicas','rows',{cols:[{k:'id',req:true},{k:'label'}],max:8}],['initial','json']],
   trace:     [['spans','json'],['initial','json']],
   table:     [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 4}], ['initial', 'json']],
@@ -2569,6 +2571,7 @@ var PANEL_SETUP_FIELDS = {
 
 /* Dynamic-key types are expanded from their declarations by panelPatchFields. */
 var PANEL_PATCH_FIELDS = {
+  image:     [],
   replicas:  [['reference','json'],['replicas','json'],['note','text']],
   trace:     [['selected','text']],
   table:     [['rows', 'jsonArr'], ['note', 'text']],
@@ -4992,6 +4995,36 @@ function initWorkbenchBuilder(opts){
     var fields = PANEL_SETUP_FIELDS[val.type] || [['initial', 'json']];
     return fields.map(function(f){
       var key = f[0], kind = f[1], cur = val[key];
+      if (kind === 'image'){
+        var wrap=document.createElement('div'),input=document.createElement('input'),note=document.createElement('p'),uploadVersion=0;
+        input.type='file'; input.accept='image/png,image/jpeg,image/webp'; input.setAttribute('aria-label','Embedded image file');
+        note.className='fnote';note.textContent='PNG, JPEG or WebP, up to 512 KiB. Stored inside the spec; no external image request.';
+        input.addEventListener('change',function(){
+          var epoch=++uploadVersion,file=input.files && input.files[0];if(!file)return;
+          if(file.size > EMBEDDED_IMAGE_MAX_BYTES){formError('Image is larger than 512 KiB. Use a smaller capture.');input.value='';return;}
+          if(['image/png','image/jpeg','image/webp'].indexOf(file.type)<0){formError('Choose a PNG, JPEG or WebP image.');input.value='';return;}
+          var original=src.value,selection=JSON.stringify(currentTarget),reader=new FileReader();
+          function current(){return epoch===uploadVersion && wrap.isConnected && src.value===original && JSON.stringify(currentTarget)===selection;}
+          reader.onerror=function(){if(current())formError('Could not read the image. Existing content is unchanged.');};
+          reader.onload=function(){
+            if(!current())return;
+            var data=embeddedImageSource(reader.result);
+            if(!data){formError('Invalid embedded image. Existing content is unchanged.');return;}
+            var probe=new Image();
+            probe.onload=function(){
+              if(!current())return;
+              if(!probe.naturalWidth || !probe.naturalHeight || probe.naturalWidth>4096 || probe.naturalHeight>4096){formError('Use an image no larger than 4096 × 4096 pixels.');return;}
+              if(commitSimple(key,JSON.stringify(data)))refreshFormSoon();
+            };
+            probe.onerror=function(){if(current())formError('The file is not a readable image. Existing content is unchanged.');};
+            probe.src=data;
+          };reader.readAsDataURL(file);
+        });
+        wrap.appendChild(input);wrap.appendChild(note);
+        if(cur){var remove=document.createElement('button');remove.type='button';remove.className='bbtn';remove.textContent='Remove image';
+          remove.addEventListener('click',function(){if(commitSimple(key,null))refreshFormSoon();});wrap.appendChild(remove);}
+        return frowBlock('Image file',wrap);
+      }
       if (kind === 'text')
         return frow(key, textControl(cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }));
       if (kind === 'num')

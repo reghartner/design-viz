@@ -23,6 +23,17 @@ inside service/API pages, with in-place step jumps and external editing. Its
 bundled iframe makes no background network requests; the Backstage parent reads
 specs through the authenticated proxy. The plugin guide includes a local preview.
 
+The [system walkthrough](docs/diagrams/backstage/backstage.html) now includes
+**Deployment** and **Inline viewer** tabs: repository ownership, external editing,
+authenticated reads, private frame messages and stale-revision handling, alongside
+the existing GitHub drift and trace flows. Its embedded screenshot shows the
+actual plugin with local fictional data.
+
+[Embedded image panels](cookbook/embedded-images.md) store small PNG/JPEG/WebP
+captures inside the spec, with alt text, captions and optional reference links.
+Add an **image** panel in the workbench and upload its **Image file**; placement,
+resizing, copy/paste and Undo use the existing editor controls.
+
 
 ## The pipeline
 

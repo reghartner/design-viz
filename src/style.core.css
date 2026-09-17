@@ -4477,3 +4477,21 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
   .thermal-clearing{display:none;}
   .screenbox.m-unavailable{print-color-adjust:exact;}
 }
+
+/* Embedded reference images keep their aspect ratio in every host layout. */
+.pimage{margin:0;display:flex;flex-direction:column;gap:10px;align-items:center;min-width:0}
+.pimage img{display:block;max-width:100%;width:auto;height:auto;max-height:560px;object-fit:contain;border-radius:8px}
+.pimage figcaption{flex:none;align-self:stretch;font-size:12px;line-height:1.5;color:var(--dtext);overflow-wrap:anywhere}
+.pimage-link{flex:none;align-self:flex-start;font-size:12px;color:var(--acc);text-decoration:underline}
+.pimage-empty{padding:28px 12px;border:1px dashed var(--dfaint);border-radius:8px;font-size:12px;text-align:center;color:var(--dtext)}
+
+.docview .section-layout-tile>.pt-image{display:flex;flex-direction:column;}
+.section-layout-tile>.pt-image>.ptitle{flex:none;}
+.section-layout-tile>.pt-image>.pbody{display:flex;flex:1;min-height:0;}
+.section-layout-tile .pimage{width:100%;height:100%;}
+.section-layout-tile .pimage img{flex:1;min-height:40px;height:0;width:100%;max-height:none;}
+@media print{
+  .panelcol .pwidget.pt-image{display:block !important;break-inside:avoid;}
+  .section-layout-tile .pimage{height:auto;}
+  .section-layout-tile .pimage img{flex:none;height:auto;max-height:560px;}
+}

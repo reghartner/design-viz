@@ -1467,7 +1467,7 @@ test('patchFieldsCollect builds whole tile and link replacements and omits all-e
 
 test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known control kinds', () => {
   assert.deepStrictEqual(Object.keys(B.PANEL_SETUP_FIELDS).sort(), [...V.PANEL_TYPES].sort());
-  const kinds = new Set(['text', 'num', 'csv', 'scene', 'json', 'jsonArr', 'jsonAny',
+  const kinds = new Set(['text', 'num', 'csv', 'scene', 'image', 'json', 'jsonArr', 'jsonAny',
                          'clock', 'rows', 'map', 'objf']);
   for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
     assert.ok(fields.length >= 1, type);
@@ -1475,8 +1475,8 @@ test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known contro
       assert.ok(typeof key === 'string' && key.length, type + '.' + key);
       assert.ok(kinds.has(kind), type + '.' + key + ' kind ' + kind);
     }
-    /* initial — THE setup field — is exposed for every type */
-    assert.ok(fields.some(f => f[0] === 'initial'), type + ' exposes initial');
+    /* Static reference images have no time-varying state. */
+    if (type !== 'image') assert.ok(fields.some(f => f[0] === 'initial'), type + ' exposes initial');
   }
 });
 
@@ -1607,7 +1607,7 @@ test('objFieldsCollect keeps unknown keys, removes on all-empty, and validates l
 });
 
 test('every PANEL_SETUP_FIELDS entry uses a known control kind with a sane shape', () => {
-  const known = ['text', 'num', 'csv', 'scene', 'json', 'jsonArr', 'jsonAny',
+  const known = ['text', 'num', 'csv', 'scene', 'image', 'json', 'jsonArr', 'jsonAny',
                  'clock', 'rows', 'map', 'objf'];
   Object.keys(B.PANEL_SETUP_FIELDS).forEach(type => {
     B.PANEL_SETUP_FIELDS[type].forEach(f => {
@@ -1618,7 +1618,7 @@ test('every PANEL_SETUP_FIELDS entry uses a known control kind with a sane shape
       }
     });
     const last = B.PANEL_SETUP_FIELDS[type][B.PANEL_SETUP_FIELDS[type].length - 1];
-    assert.strictEqual(last[0], 'initial', type + ' ends with initial');
+    if (type !== 'image') assert.strictEqual(last[0], 'initial', type + ' ends with initial');
   });
 });
 

@@ -3,7 +3,7 @@
     {
       "file": "backstage.html",
       "spec": "backstage.spec.json",
-      "title": "Backstage + GitHub — from service catalog to reviewed canon",
+      "title": "Flowview + Backstage — ownership, rendering and reviewed canon",
       "family": "backstage",
       "description": "Seven guided diagrams covering Backstage discovery, spec authoring, GitHub source drift, human dispositions, refusal gates and incident evidence.",
       "tags": [
@@ -15,6 +15,7 @@
       ],
       "widgets": [
         "checks",
+        "image",
         "log",
         "state",
         "table"

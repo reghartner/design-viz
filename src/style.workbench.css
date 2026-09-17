@@ -358,6 +358,13 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .home-elements>.rowsedit{padding:0 8px 8px;gap:6px;}
 .home-element>.rowcard{border:0;padding:6px 10px 10px;}
 .home-element-kind{font-weight:400;color:var(--sub);margin-left:8px;font-size:11px;}
+.home-icon-cell{grid-column:1 / -1;gap:5px;}
+.home-icon-choice{display:flex;align-items:center;gap:8px;min-width:0;}
+.home-icon-choice[hidden]{display:none;}
+.home-icon-preview{flex:none;width:32px;height:32px;color:var(--ink);}
+.home-icon-preview svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.rowline.rowcard .home-icon-choice .fctl{flex:1;min-width:0;width:0;}
+.home-icon-note{font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--sub);}
 .rowx{flex:none; padding:4px 7px;}
 .rowadd{justify-self:start; padding:4px 9px;}
 .rawjson > summary{cursor:pointer; font:600 10px 'IBM Plex Mono',monospace; color:var(--sub); user-select:none;}

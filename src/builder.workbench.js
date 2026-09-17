@@ -2546,11 +2546,11 @@ var PANEL_SETUP_FIELDS = {
                 {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
                 {k: 'display', kind: 'enum', options: ['marker', 'door']},
                 {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
-                {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon'},
+                {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon', kind: 'icon'},
                 {k: 'doorWidth', kind: 'num'}, {k: 'doorSwing', kind: 'num'}],
               max: 12}], ['subjects', 'rows', {cols: [
                 {k: 'id', req: true}, {k: 'label'}, {k: 'x', kind: 'num', req: true},
-                {k: 'y', kind: 'num', req: true}, {k: 'icon'}], max: 6}], ['initial', 'json']],
+                {k: 'y', kind: 'num', req: true}, {k: 'icon', kind: 'icon'}], max: 6}], ['initial', 'json']],
   signal:    [['links', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'},
                 {k: 'transport', kind: 'enum',
                  options: ['wifi', 'subghz', 'thread', 'zigbee', 'zwave', 'cellular', 'poe', 'ethernet', 'ble']}],
@@ -2754,9 +2754,10 @@ function builderRowMerge(shape, base, values){
     }
     /* an unknown enum value already ON the item passes through unchanged —
        editing a sibling column must never delete or reject it */
-    if (col.kind === 'enum' && (col.options || []).indexOf(raw) < 0 &&
+    var options = col.kind === 'icon' ? ICON_SET : (col.options || []);
+    if ((col.kind === 'enum' || col.kind === 'icon') && options.indexOf(raw) < 0 &&
         !(base && base[col.k] === raw)){
-      error = col.k + ': "' + raw + '" is not one of ' + (col.options || []).join(' | '); return;
+      error = col.k + ': "' + raw + '" is not one of ' + options.join(' | '); return;
     }
     item[col.k] = raw;
   });
@@ -4726,13 +4727,14 @@ function initWorkbenchBuilder(opts){
   }
   function colInput(col, value){
     var input;
-    if (col.kind === 'enum'){
+    var options = col.kind === 'icon' ? ICON_SET : (col.options || []);
+    if (col.kind === 'enum' || col.kind === 'icon'){
       input = document.createElement('select');
       input.className = 'fctl';
       var none = document.createElement('option');
       none.value = ''; none.textContent = '(' + col.k + ')';
       input.appendChild(none);
-      (col.options || []).forEach(function(o){
+      options.forEach(function(o){
         var op = document.createElement('option');
         op.value = o; op.textContent = o;
         input.appendChild(op);
@@ -4740,7 +4742,7 @@ function initWorkbenchBuilder(opts){
       /* an unknown existing value keeps a selectable option (same pattern
          as selectControl) — coercing it to '' would delete it on the next
          sibling-column commit */
-      if (typeof value === 'string' && value !== '' && (col.options || []).indexOf(value) < 0){
+      if (typeof value === 'string' && value !== '' && options.indexOf(value) < 0){
         var extra = document.createElement('option');
         extra.value = value; extra.textContent = value + ' (unknown)';
         input.appendChild(extra);
@@ -4823,6 +4825,7 @@ function initWorkbenchBuilder(opts){
       var line = document.createElement('div');
       line.className = wide ? 'rowline rowcard' : 'rowline';
       var ref = {base: base, inputs: {}};
+      var syncIcon;
       (shape.cols || []).forEach(function(col){
         var input = colInput(col, base ? base[col.k] : null);
         wireCommit(input, commitRows);
@@ -4834,10 +4837,39 @@ function initWorkbenchBuilder(opts){
           cap.className = 'rowk';
           cap.textContent = col.k + (col.req ? ' *' : '');
           cell.appendChild(cap);
-          cell.appendChild(input);
+          if (col.kind === 'icon'){
+            cell.classList.add('home-icon-cell');
+            var choice = document.createElement('span'); choice.className = 'home-icon-choice';
+            var preview = document.createElement('span'); preview.className = 'home-icon-preview';
+            preview.setAttribute('aria-hidden', 'true');
+            var note = document.createElement('span'); note.className = 'home-icon-note';
+            input.setAttribute('aria-label', (base && (base.label || base.id) || key.slice(0,-1)) + ' icon');
+            input.options[0].textContent = key === 'subjects' ? 'Default (person)' : 'Default (gear)';
+            choice.appendChild(preview); choice.appendChild(input);
+            cell.appendChild(choice); cell.appendChild(note);
+            syncIcon = function(){
+              var subject = key === 'subjects', deviceKind = ref.inputs.kind && ref.inputs.kind.value;
+              var editable = subject || deviceKind === 'sensor';
+              input.disabled = !editable; choice.hidden = !editable;
+              note.textContent = editable ? (subject ? 'Moving actor: person by default; choose an icon for a car or another subject.' :
+                'Sensor also serves as a generic device marker. Choose cloud for a cloud service.') :
+                (deviceKind === 'camera' ? 'Cameras use a fixed camera icon.' : deviceKind === 'hub' ? 'Hubs use a fixed router icon.' :
+                  deviceKind === 'entry' ? 'Entry devices use the entry marker or door drawing.' : 'Choose a device kind first.') +
+                ' For a custom icon, choose kind sensor.';
+              var icon = ICON_SET.indexOf(input.value) >= 0 ? input.value : 'gear';
+              preview.innerHTML = subject && input.value === '' ?
+                '<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>' :
+                '<svg viewBox="0 0 24 24"><use href="#i-' + icon + '"/></svg>';
+            };
+            input.addEventListener('change', syncIcon);
+          } else cell.appendChild(input);
           line.appendChild(cell);
         } else line.appendChild(input);
       });
+      if (syncIcon){
+        syncIcon();
+        if (ref.inputs.kind) ref.inputs.kind.addEventListener('change', syncIcon);
+      }
       var acts = line;
       if (wide){
         acts = document.createElement('div');

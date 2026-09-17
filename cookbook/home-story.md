@@ -81,6 +81,11 @@ its **icon** dropdown lists all supported symbols with a preview. Subjects have
 the same picker and default to a person; cameras, hubs and entry devices use
 fixed symbols. See [icon choices](../docs/homemap-workbench.md#choose-a-device-or-subject-icon).
 
+For several views with the same supporting panels, use **Arrange section →
+Duplicate layout**, then **Swap places** to exchange Home and Data flow.
+**Show in this layout** sets visibility independently. Start from **named layouts**
+or read [multiple layouts](../docs/section-layouts.md#multiple-named-layouts-of-one-story).
+
 For a cramped workbench, use **Focus workspace**, the draggable divider,
 **Expand editor**, and the **Inspect / Steps / JSON** panes. Supporting panels
 stack below the main diagram when its usable section width is 1000px or

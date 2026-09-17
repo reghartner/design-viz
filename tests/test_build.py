@@ -77,8 +77,8 @@ class BuildTests(unittest.TestCase):
         self.assertIsNotNone(match)
         starters = json.loads(match.group(1))
         self.assertEqual([entry["name"] for entry in starters],
-                         ["home story", "thermal protection", "whole home & outdoors", "across the front door", "alternate paths", "blank flow", "screen clips", "panel showcase", "software & IoT", "retries & circuits", "replica positions", "rollout decisions", "Honeycomb trace", "complex trace", "full demo"])
-        for entry, source in zip(starters, ["starters/homemap-story.json", "../docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json", "starters/whole-home-outdoors.json", "starters/front-door-threshold.json", "starters/alternate-paths.json", "starters/minimal.json", "starters/screen-clips.json", "starters/panels-tour.json",
+                         ["home story", "named layouts", "thermal protection", "whole home & outdoors", "across the front door", "alternate paths", "blank flow", "screen clips", "panel showcase", "software & IoT", "retries & circuits", "replica positions", "rollout decisions", "Honeycomb trace", "complex trace", "full demo"])
+        for entry, source in zip(starters, ["starters/homemap-story.json", "starters/named-layouts.json", "../docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json", "starters/whole-home-outdoors.json", "starters/front-door-threshold.json", "starters/alternate-paths.json", "starters/minimal.json", "starters/screen-clips.json", "starters/panels-tour.json",
                                           "starters/software-systems.json", "starters/resilience.json", "starters/replication.json", "starters/rollout.json", "starters/honeycomb-trace.json", "starters/complex-trace.json",
                                           "flowview.demo.json"]):
             self.assertTrue(entry["desc"])

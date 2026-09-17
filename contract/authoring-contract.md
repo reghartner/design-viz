@@ -787,7 +787,11 @@ perspectives" of one timeline). Types:
   Home choice. Set `diagram.layoutName` to a nonempty string of up to 40
   characters to name that view (default **Layout**); **Data flow** remains the
   second choice. Hide/Show data flow is a temporary reader control within the
-  arrangement and keeps panels and step controls visible. See
+  arrangement and keeps panels and step controls visible. For several named
+  arrangements, use `diagram.layouts:[{id,name,sectionLayout}]` and optional
+  `diagram.defaultLayout` (an ID, otherwise the first layout). Each view owns
+  its host profiles; tile `hidden:true` hides a panel or diagram in that view.
+  All views share the same steps, paths and live widget state. See
   [section layouts](../docs/section-layouts.md) for the tile/profile contract.
   Example panel:
   `{"id":"home","type":"homemap","outline":{"w":300,"h":164},

@@ -249,3 +249,24 @@ test('named layouts hide only the diagram, retain playback, and restore exact po
     assert.equal(JSON.stringify(raw),specJson);
   }
 });
+
+test('multiple layouts replace Home with the diagram while retaining the same live alternate, controls and supporting widgets',async t=>{
+  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  const map={panel:'home',x:0,y:0,w:8,h:12},board={x:0,y:18,w:8,h:12,hidden:true},steps={controls:'steps',x:0,y:12,w:8,h:6};
+  const supporting=d.panels.filter(p=>p.id!=='home').map((p,i)=>({panel:p.id,x:8,y:i*10,w:4,h:10}));
+  d.layouts=[{id:'resident',name:'Resident <safe>',sectionLayout:{default:[map,board,steps,...supporting]}},{id:'engineer',name:'Engineering',sectionLayout:{default:[{...board,y:0,hidden:false},{...map,y:18,hidden:true},steps,...supporting],confluence:[{...board,y:0,h:10,hidden:false},{...map,y:18,hidden:true},{...steps,y:10},...supporting]}}];
+  d.defaultLayout='resident';const json=JSON.stringify(raw),s=await setup(t,{configuring:false,config:{specJson:json}}),view=s.el('docview');
+  const grid=view.querySelector('.section-layout-grid'),boardEl=view.querySelector('.board'),mapEl=view.querySelector('.pt-homemap'),bar=view.querySelector('.termbar');
+  const tile=key=>[...grid.children].find(e=>e.dataset.layoutKey===key);
+  view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();const caption=bar.querySelector('.stepline').textContent;
+  assert.equal(tile('diagram').hidden,true);assert.equal(tile('panel:home').hidden,false);
+  for(let i=0;i<3;i++){
+    view.querySelector('[data-layout-id="engineer"]').click();
+    assert.equal(tile('diagram').hidden,false);assert.equal(tile('diagram').style.getPropertyValue('--tile-y'),'1');assert.equal(tile('diagram').style.getPropertyValue('--tile-h'),'10');
+    assert.equal(tile('panel:home').hidden,true);assert.equal(bar.querySelector('.stepline').textContent,caption);
+    assert.equal(view.querySelector('.board'),boardEl);assert.equal(view.querySelector('.pt-homemap'),mapEl);assert.equal(view.querySelectorAll('.termbar').length,1);
+    view.querySelector('[data-view-focus="flow"]').click();assert.equal(grid.hidden,true);
+    view.querySelector('[data-layout-id="resident"]').click();assert.equal(grid.hidden,false);assert.equal(tile('diagram').hidden,true);assert.equal(tile('panel:home').hidden,false);
+  }
+  assert.equal(view.querySelector('safe'),null);assert.equal(s.calls.submits.length,0);assert.equal(JSON.stringify(raw),json);
+});

@@ -43,28 +43,69 @@ The selected preview host and width are temporary workspace state. At section
 widths of 640 pixels or less, tiles stack in reading order; use the numeric
 controls or widen the preview to drag. Maps fit their tiles; dense panels scroll
 internally. Diagram Auto / Fit width / Readable controls remain available.
-For saved arrangements there are two view choices: **Layout** (or your chosen
-name) and **Data flow**. The named arrangement replaces the separate Home
-choice. Both reuse the live widgets and preserve the selected alternate, step
-and playback state. Sections without saved arrangements retain Home / Data flow.
+Saved arrangements appear as named view buttons alongside **Data flow**, which
+returns to the automatic diagram-first placement. Named layouts replace the
+separate Home choice. All views reuse the live widgets and preserve the selected
+alternate, step and playback state. Sections without saved arrangements retain
+Home / Data flow.
 
-Choose **Arrange section → Layout name** to name the view, for example
-**Front door** or **Home**. Names are up to 40 characters, apply across the
-section's host profiles, and save as `diagram.layoutName`. Clearing the name
-restores **Layout**. Renaming is one undoable edit and survives JSON/HTML export.
+Choose **Rename layout** beside **Arrange section** to name the selected view, for example
+**Front door** or **Home**. Names are up to 40 characters and apply across that layout's host profiles. A legacy single view
+stores its name as `diagram.layoutName`; clearing it restores **Layout**. Named
+views store it in `layouts[].name` and require a nonempty name. Renaming is one undoable edit and survives JSON/HTML export.
 
 In the named layout, **Hide data flow** hides only the diagram. Panels and step
 controls remain available, including controls in an older combined tile.
 Rows occupied only by the diagram are reclaimed; panels sharing its rows keep
 their dimensions and columns. **Show data flow** restores the exact saved
 arrangement. This visibility choice is temporary: it survives view switches
-and workbench edits, but does not rewrite the spec. Arrange section shows all
-tiles so editing always uses the saved coordinates.
+and workbench edits, but does not rewrite the spec. Arrange section returns the diagram to its authored visibility. Hidden elements
+remain selectable in **Layout element**, so they can be shown or swapped without
+removing their declarations.
+
+## Multiple named layouts of one story
+
+Choose **starters… → named layouts** to try **Home story** and **Service flow**.
+The second view replaces Home with the service diagram; the outcome panel,
+camera screen, controls, selected step and alternate remain the same.
+
+To build that from an existing arrangement:
+
+1. Choose **Arrange section**, then **Duplicate layout**. The copy becomes the
+   active view. Give it a **Layout name**, such as **Service flow**. The name
+   field is first in the controls; **Rename layout** also opens and focuses it.
+2. Select **Data flow** in **Layout element**, choose your Home panel in
+   **Swap places with**, then click **Swap places**. Position, size and visibility
+   exchange; other elements keep their places unless a collision needs packing.
+3. Use **Show in this layout** to hide the Home panel or any other panel in this
+   view. To replace a visible Home with a hidden diagram directly, hide the
+   diagram in the original layout before duplicating and swapping.
+4. Choose **Make default** for the view that should open on a fresh page, then
+   **Done arranging**. Readers switch using the named buttons above the section.
+
+Each layout owns its Responsive, Backstage and Confluence profiles. Duplication
+copies all profiles independently; swapping, moving, sizing and visibility edit
+only the selected host profile in the active layout. Repeat a swap in other
+explicit host profiles as needed. Step controls stay available and have their
+own placement; they cannot be hidden or swapped with a panel. All authoring
+operations support Undo/Redo. **Delete layout** removes the arrangement, never
+its panels, diagram or steps. Deleting the default selects the first remaining
+layout; deleting the last named layout restores the automatic presentation.
+
+**Reset layout** removes the active host profile. A named layout with no profiles
+left receives an automatic Responsive arrangement. **Optimize layout** also
+resets visibility in that profile and places all elements again.
+
+The first duplication converts an older `sectionLayout` / `layoutName` pair into
+named layouts as one undoable edit. Existing specs keep working unchanged.
+Reader view switches do not write JSON or create undo entries. The workbench
+retains the active named view across edits and skin/host preview changes.
 
 ## Spec contract
 
-Each diagram can declare `sectionLayout`. No schema-version switch is needed.
-Omitting it preserves the existing presentation.
+A diagram can declare one legacy `sectionLayout`, or a `layouts` array of named
+arrangements. No schema-version switch is needed. Omitting both preserves the
+existing presentation.
 
 ```json
 "sectionLayout": {
@@ -109,3 +150,42 @@ and editor URLs. The plugin also renders an inline bundled viewer with the
 or `?layout=confluence` (append with `&` if the URL already has a query).
 The width control is for preview only; actual iframe/page width belongs to
 Confluence or Backstage. Check the installed host after deployment.
+
+### Named-layout fields
+
+```json
+"defaultLayout": "home-story",
+"layouts": [
+  {"id":"home-story", "name":"Home story", "sectionLayout":{"default":[
+    {"panel":"home","x":0,"y":0,"w":8,"h":12},
+    {"x":0,"y":18,"w":8,"h":12,"hidden":true},
+    {"controls":"steps","x":0,"y":12,"w":8,"h":6},
+    {"panel":"phone","x":8,"y":0,"w":4,"h":12}
+  ]}},
+  {"id":"service-flow", "name":"Service flow", "sectionLayout":{"default":[
+    {"x":0,"y":0,"w":8,"h":12},
+    {"panel":"home","x":0,"y":18,"w":8,"h":12,"hidden":true},
+    {"controls":"steps","x":0,"y":12,"w":8,"h":6},
+    {"panel":"phone","x":8,"y":0,"w":4,"h":12}
+  ]}}
+]
+```
+
+Layout IDs are unique within the diagram, begin with a letter and contain at
+most 64 letters, digits, underscores or hyphens. Names are nonempty, at most
+40 characters. `defaultLayout` is a layout ID; when omitted the first valid
+layout opens. Valid named layouts take precedence over legacy layout fields.
+Each uses the same host-profile and tile contract as `sectionLayout` above.
+When a named view lacks both the requested host and a default profile, it uses
+an automatic arrangement for that host. Invalid entries warn and are ignored.
+
+A diagram or panel tile may declare `hidden:true`. It retains its geometry and
+live widget state but does not occupy grid space or push other tiles down.
+Step-control tiles cannot be hidden. Unspecified/new elements are still appended
+visibly; omission never means hidden. In a legacy combined diagram/controls tile,
+hiding the diagram keeps its live controls visible. Prefer a separate controls
+tile in new layouts. Panel rename/delete updates every view and host profile.
+
+Named layouts require the updated viewer bundle: re-export standalone HTML or
+update the Backstage/Forge app. Backstage's exported script hash changes with
+this renderer upgrade; update the host CSP alongside the plugin.

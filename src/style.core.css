@@ -4301,7 +4301,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 
 /* Readers can give the same scene or flow the main space. */
 .diagram-views{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin:8px 0 12px;}
-.diagram-view-choice{display:flex;gap:4px;max-width:100%;padding:3px;border:1px solid var(--dfaint);border-radius:10px;}
+.diagram-view-choice{display:flex;flex-wrap:wrap;gap:4px;max-width:100%;padding:3px;border:1px solid var(--dfaint);border-radius:10px;}
 .diagram-view-choice .mbtn{min-width:0;min-height:34px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .diagram-views .primary-modes{margin:0 0 0 auto;}
 @media(max-width:640px){.diagram-view-choice .mbtn{min-height:40px;}}

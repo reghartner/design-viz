@@ -632,6 +632,8 @@ body.sk-aurora.sk-blueprint{
 .section-tile-move,.section-tile-resize{display:none;position:absolute;z-index:4;touch-action:none;user-select:none;background:var(--card);color:var(--ink);border:1px solid var(--line);font:12px 'IBM Plex Sans',sans-serif;cursor:grab;}
 .section-arranging .section-tile-move{display:block;top:0;left:0;right:0;height:28px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .section-arranging .section-tile-resize{display:block;right:1px;bottom:1px;width:32px;height:32px;cursor:nwse-resize;border-radius:6px 0 0 0;}
+.section-controls-resize{display:none;}
+.section-arranging .section-controls-resize{display:block;position:absolute;bottom:2px;right:38px;width:32px;height:24px;z-index:4;touch-action:none;user-select:none;cursor:ns-resize;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:5px;}
 .layout-dragging{user-select:none;}
 .layout-dragging .section-layout-tile{transition:none;}
-@media print{.section-arranger,.section-tile-move,.section-tile-resize,.layout-preview-tools{display:none !important;}}
+@media print{.section-arranger,.section-tile-move,.section-tile-resize,.section-controls-resize,.layout-preview-tools{display:none !important;}}

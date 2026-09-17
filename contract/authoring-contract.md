@@ -797,6 +797,9 @@ perspectives" of one timeline). Types:
   steps still contribute state on the active path, and story order is preserved.
   A `controls:"steps"` tile may use `attachTo:"diagram"` or `attachTo:"panel:<homemap ID>"`
   to share its host's outline and geometry. Omit `attachTo` for detached controls.
+  The controls tile's `h` reserves a stable height inside that host, so long
+  captions scroll without resizing the visualization. Include both heights in
+  the host tile; the editor's attached-controls resize does this automatically.
   Hidden attachment hosts fall back to a detached transport; Optimize preserves
   attachments and hidden tiles. See
   [section layouts](../docs/section-layouts.md) for the tile/profile contract.

@@ -86,7 +86,11 @@ selected layout and provides a separate checkbox for Data flow and each panel.
 **Optimize layout** preserves hidden tiles and arranges only visible elements
 in the selected view/host profile. Add `attachTo:"diagram"` or
 `attachTo:"panel:<homemap ID>"` to a controls tile to share that host's outline;
-omit for detached controls. Optional `layouts[].steps:[IDs]` selects playback
+omit for detached controls. The controls tile's `h` reserves its height inside
+the host; size the host for both the visualization and controls. Long captions
+scroll without moving that boundary. In Arrange section, resize the attached
+controls with their ↕ handle or **Attached controls height**; Optimize retains it.
+Optional `layouts[].steps:[IDs]` selects playback
 stops while retaining full-path state folding, so a business view can skip
 technical detail. The workbench exposes **Steps shown in this view** and
 **Step controls** attachment. See `src/starters/named-layouts.json`. Saved arrangements

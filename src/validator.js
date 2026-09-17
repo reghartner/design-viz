@@ -987,6 +987,10 @@ function sectionLayoutDock(items){
   var steps=items.find(function(it){return it.controls==='steps';});
   return steps && typeof steps.attachTo==='string' && items.some(function(it){return sectionLayoutKey(it)===steps.attachTo && !it.hidden && !it.controls;}) ? steps.attachTo : null;
 }
+function sectionLayoutControlsRows(d,items){
+  var steps=(items || []).find(function(it){return it.controls==='steps';});
+  return steps?steps.h:(d.paths || []).length>1?6:4;
+}
 function sectionLayoutPreset(d, target, excludedKeys){
   var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
   var tiles=sectionLayoutTiles(d).filter(function(t){return excluded.indexOf(t.key)<0;}), narrow=target==='confluence', items=[];

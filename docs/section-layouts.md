@@ -19,6 +19,14 @@ or **Detached**. Attached controls share their host's outline and move/resize
 with it. Arrange section preserves that coupling; it no longer detaches controls
 automatically. New arrangements attach to the primary Home map when present,
 otherwise to Data flow. To drag the controls separately, choose **Detached**.
+While attached, drag the **↕** handle at the bottom of the controls, use Up/Down
+on that handle, or set **Attached controls height** (grid rows) and choose
+**Apply controls height**. The host grows or shrinks by the same amount, keeping
+the visualization's allotted height. The combined tile is limited to 40 rows.
+Long captions scroll inside the saved controls height instead of moving the
+bar upward or shrinking the visualization. Data-flow controls follow the drawing
+directly; unused tile space stays below the combined drawing and controls.
+Optimize preserves this controls height as well as the attachment.
 If the attachment panel is hidden, the controls use their saved detached
 position so navigation remains reachable. Optimize preserves the attachment
 and hidden set. Sections without steps, or with `view:"ambient-only"`, have no
@@ -162,8 +170,12 @@ existing presentation.
 A tile without `panel` or `controls` is the data-flow diagram. `panel` names a
 declared panel ID; `controls:"steps"` identifies the step-controls tile. Add
 `attachTo:"diagram"` or `attachTo:"panel:home"` (using a Home map ID) to dock it.
-Its saved x/y/w/h remain the fallback when detached or its host is hidden; a
-docked tile reserves no separate grid space. Omit `attachTo` for a detached tile. Do not
+Its saved x/y/w/h remain the fallback when detached or its host is hidden. While
+attached, `h` also sets the controls height (`h * 40 - 8` pixels), inside the
+host's total height; it reserves no separate grid space. Allow enough host height
+for both the visualization and controls. An undersized host scrolls. Legacy
+combined tiles with no controls entry reserve 4 rows, or 6 with alternate paths.
+Omit `attachTo` for a detached tile. Do not
 combine `panel` and `controls` on one tile. Omitting the controls tile preserves
 the previous combined diagram-and-controls presentation. A saved controls
 position is ignored while no steps are available and reused if steps return.

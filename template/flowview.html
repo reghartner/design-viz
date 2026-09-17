@@ -788,9 +788,18 @@ body.sk-daylight{background:#F4F2EC;}
 .docview .section-layout-tile>.pt-homemap{display:flex;flex-direction:column;}
 .section-layout-tile>.pt-homemap>.ptitle{flex:none;}
 .section-layout-tile>.pt-homemap>.pbody{flex:1;min-height:0;}
-.docview .section-layout-tile>.layout-docked-card{display:flex;flex-direction:column;overflow:hidden;}
+.docview .section-layout-tile>.layout-docked-card{display:flex;flex-direction:column;overflow:auto;}
 .section-layout-tile>.layout-docked-card>.pbody{flex:1;min-height:80px;overflow:auto;}
 body .docview .section-layout-tile>.layout-docked-card>.termbar{border:0;border-top:1px solid var(--dfaint);border-radius:0;box-shadow:none;padding:10px 0 0;margin-top:10px;max-height:60%;}
+/* Caption wrapping must not steal space from the host. The saved controls
+   height is also used while attached; overflowing content remains scrollable. */
+body .docview .layout-has-attached-controls>.diagramcol>.termbar,
+body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
+  box-sizing:border-box;flex:none;height:var(--attached-controls-height);max-height:none;align-content:flex-start;
+}
+/* Keep the transport next to the actual drawing instead of stretching blank
+   board space to the bottom of an oversized tile. Large drawings still scroll. */
+.layout-has-attached-controls>.diagramcol:has(>.termbar:not([hidden]))>.board{flex:0 1 auto;}
 .section-layout-tile .hmframe{height:100%;max-height:100%;}
 @container diagram-section (max-width:640px){
   .section-layout-grid{display:flex;flex-direction:column;}
@@ -802,6 +811,8 @@ body .docview .section-layout-tile>.layout-docked-card>.termbar{border:0;border-
   .section-layout-grid{display:block;}
   .section-steps-placeholder{display:none;}
   .section-layout-tile,.section-layout-tile>.diagramcol,.section-layout-tile[data-layout-key="steps"]>.termbar,.docview .section-layout-tile>.pwidget{height:auto;overflow:visible;margin-bottom:12px;}
+  body .docview .layout-has-attached-controls>.diagramcol>.termbar,
+  body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{height:auto;overflow:visible;}
 }
 .boardgrid.haspanels{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:12px; align-items:start;}
 .boardgrid.haspanels > .diagramcol{min-width:0;}
@@ -6455,6 +6466,10 @@ function sectionLayoutPack(items, priority){
 function sectionLayoutDock(items){
   var steps=items.find(function(it){return it.controls==='steps';});
   return steps && typeof steps.attachTo==='string' && items.some(function(it){return sectionLayoutKey(it)===steps.attachTo && !it.hidden && !it.controls;}) ? steps.attachTo : null;
+}
+function sectionLayoutControlsRows(d,items){
+  var steps=(items || []).find(function(it){return it.controls==='steps';});
+  return steps?steps.h:(d.paths || []).length>1?6:4;
 }
 function sectionLayoutPreset(d, target, excludedKeys){
   var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
@@ -12341,7 +12356,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     flowToggle.setAttribute('aria-expanded',String(showDiagram));
     board.hidden=active && !showDiagram ? true : boardHidden;
     if(!active)return;
-    var controlsRows=bar && !bar.hidden && !separateSteps ? Math.max((d.paths || []).length>1?6:4,Math.ceil((bar.scrollHeight+8)/40) || 0) : 0;
+    var controlsRows=bar && !bar.hidden && !separateSteps ? sectionLayoutControlsRows(d,items) : 0;
     var visible=items.filter(function(it){return !(dock && it.controls==='steps') && (!it.hidden || sectionLayoutKey(it)==='diagram');});
     if(!showDiagram)visible=sectionLayoutWithoutFlow(visible,controlsRows);
     grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
@@ -12381,6 +12396,10 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',key==='steps' ? 'Step controls' : panel ? panel.title || panel.id : 'Data flow');
       tile.style.setProperty('--tile-x',it.x+1);tile.style.setProperty('--tile-y',it.y+1);
       tile.style.setProperty('--tile-w',it.w);tile.style.setProperty('--tile-h',it.h);
+      if(bar && (dock===key || key==='diagram' && !separateSteps)){
+        tile.classList.add('layout-has-attached-controls');
+        tile.style.setProperty('--attached-controls-height',(sectionLayoutControlsRows(d,items)*40-8)+'px');
+      }
       grid.appendChild(tile);
       if(key==='steps'){
         move(bar,tile);

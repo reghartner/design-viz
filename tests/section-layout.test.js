@@ -294,3 +294,44 @@ test('attachments follow panel renames and detach on deletion across view profil
   const warnings=[];d.layouts[0].steps=['missing'];d.layouts[0].sectionLayout.default.find(t=>t.controls).attachTo='panel:phone';ctx.sectionLayoutWarnings(d,'diagram',warnings);
   assert.ok(warnings.some(s=>s.includes('.steps:')));assert.ok(warnings.some(s=>s.includes('.attachTo:')));
 });
+
+test('resizing attached controls preserves visualization space, packs following tiles and clamps at the combined limit',()=>{
+  const d=diagram();
+  for(const key of ['diagram','panel:home']){
+    const original=plain(ctx.sectionLayoutAttach(d,ctx.sectionLayoutPreset(d,'default'),key)),before=JSON.stringify(original);
+    const oldHost=original.find(t=>ctx.sectionLayoutKey(t)===key),oldBar=original.find(t=>t.controls);
+    const resized=plain(ctx.sectionLayoutResizeControls(d,original,oldBar.h+3));
+    const host=resized.find(t=>ctx.sectionLayoutKey(t)===key),bar=resized.find(t=>t.controls);
+    assert.equal(bar.h,oldBar.h+3);assert.equal(host.h,oldHost.h+3);
+    assert.equal(host.h-bar.h,oldHost.h-oldBar.h);assert.equal(ctx.sectionLayoutDock(resized),key);
+    noOverlap(resized.filter(t=>!t.hidden && !t.controls));assert.equal(JSON.stringify(original),before);
+    const max=plain(ctx.sectionLayoutResizeControls(d,resized,100));
+    assert.equal(max.find(t=>ctx.sectionLayoutKey(t)===key).h,40);
+    assert.equal(max.find(t=>t.controls).h,40-(oldHost.h-oldBar.h));
+    const min=plain(ctx.sectionLayoutResizeControls(d,resized,-100));assert.equal(min.find(t=>t.controls).h,3);
+    assert.equal(min.find(t=>ctx.sectionLayoutKey(t)===key).h-3,oldHost.h-oldBar.h);
+    for(const target of ['default','backstage','confluence']){
+      const optimized=plain(ctx.sectionLayoutOptimize(d,target,resized));
+      assert.equal(optimized.find(t=>t.controls).h,bar.h);assert.equal(ctx.sectionLayoutDock(optimized),key);
+    }
+  }
+});
+test('legacy combined controls gain a saved height without subtracting their height twice',()=>{
+  const d=diagram(),original=[board,phone];
+  const resized=plain(ctx.sectionLayoutResizeControls(d,original,6));
+  assert.equal(ctx.sectionLayoutControlsRows(d,original),4);assert.equal(ctx.sectionLayoutControlsRows(d,resized),6);
+  assert.equal(resized.find(t=>t.controls).attachTo,'diagram');assert.equal(resized.find(t=>ctx.sectionLayoutKey(t)==='diagram').h,14);
+  const named={...d,layouts:[{id:'one',name:'One',sectionLayout:{default:original}},{id:'two',name:'Two',sectionLayout:{default:original}}]};
+  const p=ctx.planSectionLayout(JSON.stringify(named),named,0,'confluence',resized,'two');assert.ok(!p.error,p.error);
+  const next=JSON.parse(p.text);assert.deepEqual(next.layouts[0],named.layouts[0]);assert.deepEqual(next.layouts[1].sectionLayout.default,original);
+  assert.deepEqual(next.layouts[1].sectionLayout.confluence,resized);
+});
+test('hidden attachment fallback and detached controls retain their custom height during optimization',()=>{
+  const d=diagram(),attached=plain(ctx.sectionLayoutAttach(d,ctx.sectionLayoutPreset(d,'default'),'panel:home'));
+  attached.find(t=>t.controls).h=9;attached.find(t=>t.panel==='home').hidden=true;
+  for(const detach of [false,true]){
+    const items=plain(attached);if(detach)delete items.find(t=>t.controls).attachTo;
+    const optimized=plain(ctx.sectionLayoutOptimize(d,'confluence',items));
+    assert.equal(optimized.find(t=>t.controls).h,9);assert.equal(ctx.sectionLayoutDock(optimized),null);noOverlap(optimized.filter(t=>!t.hidden));
+  }
+});

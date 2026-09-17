@@ -975,7 +975,7 @@ function sectionLayoutPack(items, priority){
   order.forEach(function(it){
     function overlaps(p){return it.x < p.x+p.w && it.x+it.w > p.x && it.y < p.y+p.h && it.y+it.h > p.y;}
     var hits;
-    while ((hits = placed.filter(overlaps)).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+    while (!it.hidden && (hits = placed.filter(function(p){return !p.hidden && overlaps(p);})).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
     placed.push(it);
   });
   return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
@@ -1000,9 +1000,26 @@ function sectionLayoutPreset(d, target){
   });
   return items;
 }
-function sectionLayoutItems(d, target){
-  var layouts = d.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
-  if (!Array.isArray(saved)) return null;
+function diagramLayoutViews(d){
+  var used=Object.create(null), views=[];
+  (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
+    if(!v || typeof v.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v.id) || used[v.id] ||
+      typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
+      !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
+      !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),sectionLayout:v.sectionLayout});
+  });
+  if(views.length)return views;
+  return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
+    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',sectionLayout:d.sectionLayout,legacy:true}] : [];
+}
+function sectionLayoutDefinition(d, id){
+  var views=diagramLayoutViews(d);
+  return views.find(function(v){return v.id===id;}) || views.find(function(v){return v.id===d.defaultLayout;}) || views[0];
+}
+function sectionLayoutItems(d, target, id){
+  var definition=sectionLayoutDefinition(d,id), layouts = definition && definition.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
+  if (!Array.isArray(saved)) return definition && !definition.legacy ? sectionLayoutPreset(d,target) : null;
   var items = [], used = Object.create(null);
   saved.forEach(function(it){
     if (!it || typeof it !== 'object') return;
@@ -1013,9 +1030,10 @@ function sectionLayoutItems(d, target){
     var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
     if (it.panel != null) copy.panel=it.panel;
     if (it.controls==='steps') copy.controls='steps';
+    if(it.hidden===true && it.controls==null)copy.hidden=true;
     used[key]=true;items.push(copy);
   });
-  var y = items.reduce(function(n,it){return Math.max(n,it.y+it.h);},0);
+  var y = items.reduce(function(n,it){return it.hidden?n:Math.max(n,it.y+it.h);},0);
   tiles.forEach(function(t){
     if (used[t.key] || t.key==='steps') return; /* Old layouts keep controls attached. */
     var item={x:0,y:y,w:12,h:t.key==='diagram'||t.type==='homemap'?12:6};
@@ -1024,8 +1042,7 @@ function sectionLayoutItems(d, target){
   });
   return sectionLayoutPack(items);
 }
-function sectionLayoutWarnings(d, path, warnings){
-  var v=d.sectionLayout;
+function sectionLayoutProfileWarnings(d, v, path, warnings){
   if(v == null)return;
   if(typeof v!=='object'||Array.isArray(v)){warnings.push(path+'.sectionLayout: expected default/backstage/confluence grid layouts');return;}
   Object.keys(v).forEach(function(target){
@@ -1036,11 +1053,32 @@ function sectionLayoutWarnings(d, path, warnings){
       var p=path+'.sectionLayout.'+target+'['+i+']',key=sectionLayoutKey(it);
       if(!it||typeof it!=='object'||Array.isArray(it)||!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);})||it.x<0||it.y<0||it.w<1||it.h<3||it.x+it.w>12||it.y>500||it.h>40)
         warnings.push(p+': use integer x/y/w/h; 12 columns, y 0–500, h 3–40');
+      if(it && it.hidden!=null && (typeof it.hidden!=='boolean' || it.controls!=null))warnings.push(p+': hidden must be a boolean on a diagram or panel tile; step controls stay available');
       if(it && it.controls!=null && (it.controls!=='steps'||it.panel!=null))warnings.push(p+': controls must be "steps", without a panel ID');
       if(used[key]||(key!=='steps'&&!tiles.some(function(t){return t.key===key;})))warnings.push(p+': duplicate or unknown diagram/panel tile');
       used[key]=true;
     });
   });
+}
+function sectionLayoutWarnings(d, path, warnings){
+  sectionLayoutProfileWarnings(d,d.sectionLayout,path,warnings);
+  if(d.layouts!=null){
+    if(!Array.isArray(d.layouts)||!d.layouts.length)warnings.push(path+'.layouts: expected a nonempty array of named layouts');
+    else{
+      var used=Object.create(null);
+      d.layouts.forEach(function(v,i){
+        var p=path+'.layouts['+i+']';
+        if(!v || typeof v!=='object' || Array.isArray(v)){warnings.push(p+': expected a named layout');return;}
+        if(typeof v.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v.id) || used[v.id])warnings.push(p+'.id: use a unique ID starting with a letter, followed by letters, digits, _ or - (up to 64 characters)');
+        if(typeof v.id==='string')used[v.id]=true;
+        if(typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40)warnings.push(p+'.name: use a nonempty name of up to 40 characters');
+        if(!v.sectionLayout || !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))warnings.push(p+'.sectionLayout: declare at least one host profile');
+        sectionLayoutProfileWarnings(d,v.sectionLayout,p,warnings);
+      });
+    }
+  }
+  if(d.defaultLayout!=null && !(Array.isArray(d.layouts) && diagramLayoutViews(d).some(function(v){return !v.legacy && v.id===d.defaultLayout;})))
+    warnings.push(path+'.defaultLayout: name an existing layout ID');
 }
 function normalize(raw){
   if (raw && raw.page) return raw.page;

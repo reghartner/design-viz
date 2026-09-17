@@ -77,8 +77,12 @@ existing combined controls in one undoable edit. The workbench's Arrange section
 and Optimize layout controls author these profiles; its host/width preview is
 temporary. Forge selects Confluence automatically; catalog viewer links select
 Backstage. Missing profiles fall back to default, then the existing layout.
-Saved arrangements have two view choices: their name and Data flow; there is
-no separate Home choice. Optional `diagram.layoutName` names the arrangement
+Use `diagram.layouts:[{id,name,sectionLayout}]` for several named views of one
+story; `defaultLayout` selects the opening ID. Duplicate layout and Swap places
+can replace Home with the diagram while retaining supporting panels and controls.
+Use explicit tile `hidden:true` for per-view visibility; all views share one set
+of steps and paths. See `src/starters/named-layouts.json`. Saved arrangements
+have a button for each name plus Data flow; there is no separate Home choice. For a legacy single layout, optional `diagram.layoutName` names the arrangement
 (1–40 characters; default Layout), shared across host profiles. Readers can
 Hide/Show data flow within that arrangement while keeping panels and playback.
 Visibility is temporary and does not remove diagram tiles from the spec.

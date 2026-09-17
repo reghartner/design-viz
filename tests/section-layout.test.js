@@ -155,3 +155,53 @@ test('layout names are independent of host tiles and survive one-field edits and
     assert.ok(warnings.some(w=>w.includes('layoutName')));
   }
 });
+
+test('named views resolve independently, with per-view host fallback and an authored default',()=>{
+  const d=diagram();d.layouts=[{id:'home',name:'Resident',sectionLayout:{default:[{panel:'home',x:0,y:0,w:8,h:12},{...board,hidden:true},phone]}},{id:'engineering',name:'Engineering',sectionLayout:{default:[board,phone],confluence:[{...board,w:12,h:10}]}}];
+  d.defaultLayout='engineering';const before=JSON.stringify(d);
+  assert.equal(ctx.sectionLayoutItems(d,'confluence')[0].w,12);
+  assert.equal(ctx.sectionLayoutItems(d,'backstage')[0].w,8);
+  assert.equal(ctx.sectionLayoutItems(d,'confluence','home')[0].panel,'home');
+  const resident=ctx.sectionLayoutItems(d,'default','home');
+  assert.equal(resident.find(t=>ctx.sectionLayoutKey(t)==='diagram').hidden,true);
+  assert.equal(resident.find(t=>t.panel==='home').y,0);
+  assert.equal(resident.find(t=>t.panel==='phone').y,0,'hidden diagram does not displace the phone');
+  assert.equal(JSON.stringify(d),before);
+  const warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);assert.deepEqual(warnings,[]);
+  d.layouts[1].sectionLayout={confluence:[board]};assert.ok(ctx.sectionLayoutItems(d,'backstage','engineering').length);
+});
+test('duplicate migrates the old arrangement once and makes all host profiles independently editable',()=>{
+  const d=diagram();d.layoutName='Resident';d.sectionLayout={default:[board,phone],confluence:[{...board,w:12},phone]};
+  const original=JSON.stringify(d),copy=ctx.planDuplicateSectionLayout(original,d,0,'default');assert.ok(!copy.error,copy.error);
+  const next=JSON.parse(copy.text),id=copy.layoutId;assert.equal(next.layouts.length,2);assert.equal(next.defaultLayout,'layout-1');assert.equal(next.sectionLayout,undefined);
+  assert.deepEqual(next.layouts[0].sectionLayout,d.sectionLayout);assert.deepEqual(next.steps,d.steps);assert.deepEqual(next.paths,d.paths);
+  assert.ok(next.layouts[1].sectionLayout.default.some(t=>t.controls==='steps'));
+  let p=ctx.planSectionLayout(copy.text,next,0,'backstage',[phone,board],id);assert.ok(!p.error,p.error);
+  let changed=JSON.parse(p.text);assert.deepEqual(changed.layouts[0],next.layouts[0]);assert.deepEqual(changed.layouts[1].sectionLayout.confluence,next.layouts[1].sectionLayout.confluence);
+  p=ctx.planSectionLayoutName(p.text,changed,0,'Engineering',id);changed=JSON.parse(p.text);assert.equal(changed.layouts[1].name,'Engineering');assert.equal(changed.layouts[0].name,'Resident');
+  p=ctx.planDefaultSectionLayout(p.text,changed,0,id);changed=JSON.parse(p.text);assert.equal(changed.defaultLayout,id);
+  p=ctx.planDeleteSectionLayout(p.text,changed,0,id);changed=JSON.parse(p.text);assert.equal(changed.layouts.length,1);assert.equal(changed.defaultLayout,'layout-1');
+  assert.equal(JSON.stringify(d),original);
+});
+test('swapping Home with the diagram exchanges geometry and visibility while preserving neighbors and controls',()=>{
+  const home={panel:'home',x:0,y:0,w:8,h:12},hidden={...board,y:16,hidden:true},controls={controls:'steps',x:0,y:12,w:8,h:4};
+  const items=[home,phone,controls,hidden],before=JSON.stringify(items),swapped=plain(ctx.sectionLayoutSwap(items,'panel:home','diagram'));
+  assert.deepEqual(swapped[0],{panel:'home',...hidden});assert.deepEqual(swapped[3],board);
+  assert.deepEqual(swapped[1],phone);assert.deepEqual(swapped[2],controls);assert.equal(JSON.stringify(items),before);
+  assert.deepEqual(plain(ctx.sectionLayoutSwap(swapped,'diagram','panel:home')),items);
+});
+test('panel renames and deletions update every named layout and host without touching other views',()=>{
+  const d=diagram();d.layouts=['resident','engineer'].map(id=>({id,name:id,sectionLayout:{default:[board,phone],confluence:[phone]}}));
+  const renamed=ctx.planRenamePanel(JSON.stringify(d),d,0,1,'mobile');assert.ok(!renamed.error,renamed.error);
+  const next=JSON.parse(renamed.text);for(const v of next.layouts)for(const items of Object.values(v.sectionLayout))assert.ok(items.some(it=>it.panel==='mobile'));
+  const removed=ctx.planDeletePanel(renamed.text,next,0,1);for(const v of JSON.parse(removed.text).layouts)for(const items of Object.values(v.sectionLayout))assert.ok(items.every(it=>!it.panel));
+});
+test('malformed names, IDs, defaults and hidden controls warn safely; stale edit IDs cannot target another layout',()=>{
+  const base={id:'resident',name:'Resident',sectionLayout:{default:[board]}};
+  for(const layouts of [[],[null],[{...base,id:{toString:null}}],[{...base,name:''}],[{...base,id:'bad id'}],[base,base],[{...base,sectionLayout:{default:[{...board,hidden:'yes'}]}}],[{...base,sectionLayout:{default:[{controls:'steps',x:0,y:0,w:12,h:4,hidden:true}]}}]]){
+    const warnings=[];ctx.sectionLayoutWarnings({...diagram(),layouts},'diagram',warnings);assert.ok(warnings.length,JSON.stringify(layouts));
+  }
+  const d={...diagram(),layouts:[base],defaultLayout:'missing'},warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);assert.match(warnings.join(),/defaultLayout/);
+  assert.ok(ctx.planSectionLayout(JSON.stringify(d),d,0,'default',[phone],'deleted-id').error);
+  assert.ok(ctx.planSectionLayoutName(JSON.stringify(d),d,0,'New name','deleted-id').error);
+});

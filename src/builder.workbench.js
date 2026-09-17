@@ -879,8 +879,10 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
   return builderRewrite(text, raw, got.path, function(d){
     d.panels[panelIdx].id = newId;
     if (d.primaryPanel === oldId) d.primaryPanel = newId;
-    if(d.sectionLayout)Object.keys(d.sectionLayout).forEach(function(target){
-      if(Array.isArray(d.sectionLayout[target]))d.sectionLayout[target].forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});
+    [d].concat(Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
+      if(v && v.sectionLayout)Object.keys(v.sectionLayout).forEach(function(target){
+        if(Array.isArray(v.sectionLayout[target]))v.sectionLayout[target].forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});
+      });
     });
     (d.steps || []).forEach(function(st){
       if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, oldId)){
@@ -956,8 +958,10 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
   var id = p.id;
   return builderRewrite(text, raw, got.path, function(d){
     if (d.primaryPanel === id) delete d.primaryPanel;
-    if(d.sectionLayout)Object.keys(d.sectionLayout).forEach(function(target){
-      if(Array.isArray(d.sectionLayout[target]))d.sectionLayout[target]=d.sectionLayout[target].filter(function(it){return !it || it.panel!==id;});
+    [d].concat(Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
+      if(v && v.sectionLayout)Object.keys(v.sectionLayout).forEach(function(target){
+        if(Array.isArray(v.sectionLayout[target]))v.sectionLayout[target]=v.sectionLayout[target].filter(function(it){return !it || it.panel!==id;});
+      });
     });
     d.panels.splice(panelIdx, 1);
     if (!d.panels.length) delete d.panels;
@@ -5904,12 +5908,18 @@ function initWorkbenchBuilder(opts){
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
     view:view,src:src,ctl:opts.ctl,render:render,renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!addToStep || !!connect;},
-    commit:function(section,target,items){
-      return commitCascade(function(raw){return planSectionLayout(src.value,raw,section,target,items);});
+    commit:function(section,target,items,id){
+      return commitCascade(function(raw){return planSectionLayout(src.value,raw,section,target,items,id);});
     },
-    rename:function(section,name){
-      return commitCascade(function(raw){return planSectionLayoutName(src.value,raw,section,name);});
-    }
+    rename:function(section,name,id){
+      return commitCascade(function(raw){return planSectionLayoutName(src.value,raw,section,name,id);});
+    },
+    duplicate:function(section,id){
+      var nextId,ok=commitCascade(function(raw){var plan=planDuplicateSectionLayout(src.value,raw,section,id);nextId=plan.layoutId;return plan;});return ok?nextId:null;
+    },
+    remove:function(section,id){return commitCascade(function(raw){return planDeleteSectionLayout(src.value,raw,section,id);});},
+    makeDefault:function(section,id){return commitCascade(function(raw){return planDefaultSectionLayout(src.value,raw,section,id);});}
+
   }) : null;
   view.addEventListener('dv:pathrender',applyRowGrabs);
   view.addEventListener('dv:pathchange',function(ev){

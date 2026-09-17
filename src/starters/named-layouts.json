@@ -1,0 +1,524 @@
+{
+  "page": {
+    "title": "One story, two layouts",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "A visitor, from home to cloud",
+        "text": [
+          "A fictional doorbell story. Home story shows the place and the visitor; Service flow replaces the map with the same live service diagram. Supporting panels and step controls stay in place. Try Internet down, then switch layouts at step 3."
+        ],
+        "diagram": {
+          "primaryPanel": "home",
+          "view": "step",
+          "routing": "lanes",
+          "nodes": {
+            "camera": {
+              "title": "Porch camera",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "hub": {
+              "title": "Home hub",
+              "icon": "antenna",
+              "tint": "mqtt"
+            },
+            "cloud": {
+              "title": "Event service",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "phone": {
+              "title": "Home app",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "hub"
+            ],
+            [
+              "cloud",
+              "phone"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "hub",
+              "kind": "mqtt",
+              "label": "local detection"
+            },
+            {
+              "from": "hub",
+              "to": "cloud",
+              "kind": "https",
+              "label": "upload event"
+            },
+            {
+              "from": "cloud",
+              "to": "phone",
+              "kind": "https",
+              "label": "notify resident"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "The home",
+              "outline": {
+                "w": 300,
+                "h": 164
+              },
+              "rooms": [
+                {
+                  "label": "PORCH",
+                  "x": 10,
+                  "y": 8,
+                  "w": 65,
+                  "h": 164
+                },
+                {
+                  "label": "ENTRY",
+                  "x": 75,
+                  "y": 8,
+                  "w": 75,
+                  "h": 164
+                },
+                {
+                  "label": "LIVING ROOM",
+                  "x": 150,
+                  "y": 8,
+                  "w": 160,
+                  "h": 164
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Porch cam",
+                  "x": 40,
+                  "y": 42,
+                  "facing": 70,
+                  "spread": 60,
+                  "range": 72
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "label": "Front door",
+                  "x": 102,
+                  "y": 90
+                },
+                {
+                  "id": "hub",
+                  "kind": "hub",
+                  "label": "Home hub",
+                  "x": 205,
+                  "y": 58
+                },
+                {
+                  "id": "motion",
+                  "kind": "sensor",
+                  "label": "Motion",
+                  "icon": "gear",
+                  "x": 262,
+                  "y": 130
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "visitor",
+                  "label": "Visitor",
+                  "x": 35,
+                  "y": 130
+                }
+              ],
+              "initial": {
+                "cam": "scan",
+                "door": "closed",
+                "hub": "idle",
+                "motion": "ok"
+              }
+            },
+            {
+              "id": "outcome",
+              "type": "state",
+              "title": "What the resident knows",
+              "states": [
+                "Quiet",
+                "Motion detected",
+                "Uploading",
+                "Resident notified",
+                "Local recording only"
+              ],
+              "initial": {
+                "state": "Quiet"
+              }
+            },
+            {
+              "id": "clip",
+              "type": "screen",
+              "title": "Porch camera \u00b7 simulated clip",
+              "scene": "person-through-door",
+              "initial": {
+                "mode": "off",
+                "scenePlayback": "waiting"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "quiet",
+              "text": "A quiet home. The camera scans the porch; the door is closed.",
+              "nodes": [
+                "camera",
+                "hub"
+              ],
+              "panels": {
+                "clip": {
+                  "mode": "off",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "detect",
+              "edge": "camera->hub",
+              "text": "A visitor approaches. The porch camera detects motion and signals the local hub.",
+              "panels": {
+                "home": {
+                  "cam": "detect",
+                  "hub": "rx",
+                  "visitor": {
+                    "x": 56,
+                    "y": 113
+                  },
+                  "signals": [
+                    {
+                      "from": "cam",
+                      "to": "hub"
+                    }
+                  ]
+                },
+                "outcome": {
+                  "state": "Motion detected"
+                },
+                "clip": {
+                  "mode": "rec",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "upload",
+              "edge": "hub->cloud",
+              "text": "The visitor reaches the door. The camera records while the hub uploads the event.",
+              "panels": {
+                "home": {
+                  "cam": "rec",
+                  "hub": "tx",
+                  "visitor": {
+                    "x": 94,
+                    "y": 140
+                  }
+                },
+                "outcome": {
+                  "state": "Uploading"
+                },
+                "clip": {
+                  "mode": "rec",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "notify",
+              "edge": "cloud->phone",
+              "text": "The resident is notified and opens the front door.",
+              "panels": {
+                "home": {
+                  "door": "open",
+                  "visitor": {
+                    "x": 132,
+                    "y": 124
+                  }
+                },
+                "outcome": {
+                  "state": "Resident notified"
+                },
+                "clip": {
+                  "mode": "rec",
+                  "scenePlayback": "playing"
+                }
+              }
+            },
+            {
+              "id": "inside",
+              "nodes": [
+                "hub"
+              ],
+              "text": "The visitor enters. Local motion sensing remains active; the camera returns to scanning.",
+              "panels": {
+                "home": {
+                  "visitor": {
+                    "x": 198,
+                    "y": 129
+                  },
+                  "door": "closed",
+                  "cam": "scan",
+                  "hub": "rx",
+                  "motion": "warn",
+                  "signals": [
+                    {
+                      "from": "motion",
+                      "to": "hub"
+                    }
+                  ]
+                },
+                "clip": {
+                  "mode": "off",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "offline",
+              "failures": {
+                "hub->cloud": "dropped"
+              },
+              "text": "Internet service is down. Local detection and recording still work, but the resident receives no notification.",
+              "panels": {
+                "home": {
+                  "cam": "rec",
+                  "hub": "alert",
+                  "visitor": {
+                    "x": 94,
+                    "y": 140
+                  }
+                },
+                "outcome": {
+                  "state": "Local recording only"
+                },
+                "clip": {
+                  "mode": "rec",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "leave",
+              "nodes": [
+                "camera"
+              ],
+              "text": "With no response, the visitor leaves. The door stays closed; the recording remains local.",
+              "panels": {
+                "home": {
+                  "visitor": null,
+                  "cam": "scan",
+                  "hub": "alert"
+                },
+                "clip": {
+                  "mode": "off",
+                  "scenePlayback": "waiting"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Happy path",
+              "color": "#43D98B",
+              "steps": [
+                "quiet",
+                "detect",
+                "upload",
+                "notify",
+                "inside"
+              ]
+            },
+            {
+              "id": "offline",
+              "label": "Internet down",
+              "color": "#E6A044",
+              "steps": [
+                "quiet",
+                "detect",
+                "offline",
+                "leave"
+              ]
+            }
+          ],
+          "layouts": [
+            {
+              "id": "home-story",
+              "name": "Home story",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 8,
+                    "h": 14
+                  },
+                  {
+                    "x": 0,
+                    "y": 20,
+                    "w": 8,
+                    "h": 14,
+                    "hidden": true
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 14,
+                    "w": 8,
+                    "h": 6
+                  },
+                  {
+                    "panel": "outcome",
+                    "x": 8,
+                    "y": 0,
+                    "w": 4,
+                    "h": 4
+                  },
+                  {
+                    "panel": "clip",
+                    "x": 8,
+                    "y": 4,
+                    "w": 4,
+                    "h": 10
+                  }
+                ],
+                "confluence": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 12
+                  },
+                  {
+                    "x": 0,
+                    "y": 26,
+                    "w": 12,
+                    "h": 12,
+                    "hidden": true
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 12,
+                    "w": 12,
+                    "h": 6
+                  },
+                  {
+                    "panel": "outcome",
+                    "x": 0,
+                    "y": 18,
+                    "w": 6,
+                    "h": 4
+                  },
+                  {
+                    "panel": "clip",
+                    "x": 6,
+                    "y": 18,
+                    "w": 6,
+                    "h": 8
+                  }
+                ]
+              }
+            },
+            {
+              "id": "service-flow",
+              "name": "Service flow",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 20,
+                    "w": 8,
+                    "h": 14,
+                    "hidden": true
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 8,
+                    "h": 14
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 14,
+                    "w": 8,
+                    "h": 6
+                  },
+                  {
+                    "panel": "outcome",
+                    "x": 8,
+                    "y": 0,
+                    "w": 4,
+                    "h": 4
+                  },
+                  {
+                    "panel": "clip",
+                    "x": 8,
+                    "y": 4,
+                    "w": 4,
+                    "h": 10
+                  }
+                ],
+                "confluence": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 26,
+                    "w": 12,
+                    "h": 12,
+                    "hidden": true
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 12
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 12,
+                    "w": 12,
+                    "h": 6
+                  },
+                  {
+                    "panel": "outcome",
+                    "x": 0,
+                    "y": 18,
+                    "w": 6,
+                    "h": 4
+                  },
+                  {
+                    "panel": "clip",
+                    "x": 6,
+                    "y": 18,
+                    "w": 6,
+                    "h": 8
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "home-story"
+        }
+      }
+    ]
+  }
+}

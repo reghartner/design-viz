@@ -72,20 +72,25 @@ panels and data-flow diagrams, use `diagram.sectionLayout` with `default`,
 `backstage`, and/or `confluence` profiles. Read `docs/section-layouts.md` for the
 12-column tile contract and a complete example. Use `{controls:"steps",x,y,w,h}`
 for an independent playback/path/caption tile;
-omitting it keeps controls attached to the diagram. Arrange section detaches
-existing combined controls in one undoable edit. The workbench's Arrange section
+omitting it keeps controls attached to the diagram. Arrange section preserves
+existing combined controls; choosing Detached separates them. The workbench's Arrange section
 and Optimize layout controls author these profiles; its host/width preview is
 temporary. Forge selects Confluence automatically; catalog viewer links select
 Backstage. Missing profiles fall back to default, then the existing layout.
 Use `diagram.layouts:[{id,name,sectionLayout}]` for several named views of one
-story; `defaultLayout` selects the opening ID. Duplicate layout and Swap places
+story; `defaultLayout` selects the opening ID. Duplicate view and Swap places
 can replace Home with the diagram while retaining supporting panels and controls.
 Use explicit tile `hidden:true` for per-view visibility; all views share one set
 of steps and paths. The workbench's **Visible elements** checklist names the
 selected layout and provides a separate checkbox for Data flow and each panel.
 **Optimize layout** preserves hidden tiles and arranges only visible elements
-in the selected view/host profile. See `src/starters/named-layouts.json`. Saved arrangements
-have a button for each name plus Data flow; there is no separate Home choice. For a legacy single layout, optional `diagram.layoutName` names the arrangement
+in the selected view/host profile. Add `attachTo:"diagram"` or
+`attachTo:"panel:<homemap ID>"` to a controls tile to share that host's outline;
+omit for detached controls. Optional `layouts[].steps:[IDs]` selects playback
+stops while retaining full-path state folding, so a business view can skip
+technical detail. The workbench exposes **Steps shown in this view** and
+**Step controls** attachment. See `src/starters/named-layouts.json`. Saved arrangements
+have only their named view buttons; Data flow can be an ordinary named view. For a legacy single layout, optional `diagram.layoutName` names the arrangement
 (1–40 characters; default Layout), shared across host profiles. Readers can
 Hide/Show data flow within that arrangement while keeping panels and playback.
 Visibility is temporary and does not remove diagram tiles from the spec.

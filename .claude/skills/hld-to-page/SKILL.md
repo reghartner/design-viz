@@ -101,7 +101,7 @@ Do not copy its latency, topology, notification, or outcome without evidence.
 | Honeycomb import or measured service timing | `docs/trace-import.md` |
 | Backstage/catalog/code bindings, canon or incident overlay | [Integrations](references/integrations.md) → company evidence |
 | Confluence export | [Integrations](references/integrations.md) → Confluence |
-| Host arrangements or movable playback controls | `docs/section-layouts.md` |
+| Named views, selected playback stops, attached/detached controls or host arrangements | `docs/section-layouts.md` |
 | Small screenshots or illustrations inside a diagram | `cookbook/embedded-images.md` and image widget docs |
 | Workbench interactions or non-obvious field mechanics | Relevant section of [authoring details](references/authoring-details.md) |
 | Existing source changed or paired source/spec correction | [Evidence and updates](references/evidence-and-updates.md) |

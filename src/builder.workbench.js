@@ -881,7 +881,7 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
     if (d.primaryPanel === oldId) d.primaryPanel = newId;
     [d].concat(Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
       if(v && v.sectionLayout)Object.keys(v.sectionLayout).forEach(function(target){
-        if(Array.isArray(v.sectionLayout[target]))v.sectionLayout[target].forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});
+        if(Array.isArray(v.sectionLayout[target]))v.sectionLayout[target].forEach(function(it){if(it && it.panel===oldId)it.panel=newId;if(it && it.attachTo==='panel:'+oldId)it.attachTo='panel:'+newId;});
       });
     });
     (d.steps || []).forEach(function(st){
@@ -960,7 +960,7 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
     if (d.primaryPanel === id) delete d.primaryPanel;
     [d].concat(Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
       if(v && v.sectionLayout)Object.keys(v.sectionLayout).forEach(function(target){
-        if(Array.isArray(v.sectionLayout[target]))v.sectionLayout[target]=v.sectionLayout[target].filter(function(it){return !it || it.panel!==id;});
+        if(Array.isArray(v.sectionLayout[target]))v.sectionLayout[target]=v.sectionLayout[target].filter(function(it){return !it || it.panel!==id;}).map(function(it){if(it && it.attachTo==='panel:'+id)delete it.attachTo;return it;});
       });
     });
     d.panels.splice(panelIdx, 1);
@@ -974,22 +974,25 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
   });
 }
 
+function builderViewStepsError(d){
+  var view=(d.layouts || []).find(function(v){return Array.isArray(v.steps) && !sectionViewStepsReachable(d,v.steps);});
+  return view?{error:'Choose another step in view "'+view.name+'" before removing its last reachable step or path.'}:null;
+}
 function planDeleteStep(text, raw, sectionIdx, stepIdx){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   if (!Array.isArray(got.d.steps) || !got.d.steps[stepIdx])
     return {error: 'step not found — reselect and try again'};
+  var id=got.d.steps[stepIdx].id;
+  if((got.d.layouts || []).some(function(v){return Array.isArray(v.steps) && v.steps.length===1 && v.steps[0]===id;}))return {error:'This is the only selected step in a view. Choose another step in that view first.'};
   if (got.d.paths){
-    var id = got.d.steps[stepIdx].id;
     if (got.d.paths.some(function(p){return p.steps.length === 1 && p.steps[0] === id;}))
       return {error:'This is the only step in a path. Remove that path or add another step first.'};
-    return builderRewrite(text,raw,got.path,function(d){
-      d.steps.splice(stepIdx,1);
-      d.paths.forEach(function(p){p.steps=p.steps.filter(function(ref){return ref !== id;});});
-    });
   }
-  return builderRewrite(text, raw, got.path.concat(['steps']), function(steps){
-    steps.splice(stepIdx, 1);
+  return builderRewrite(text, raw, got.path, function(d){
+    d.steps.splice(stepIdx,1);
+    (d.paths || []).forEach(function(p){p.steps=p.steps.filter(function(ref){return ref!==id;});});
+    (d.layouts || []).forEach(function(v){if(Array.isArray(v.steps))v.steps=v.steps.filter(function(ref){return ref!==id;});});
   });
 }
 
@@ -1074,6 +1077,7 @@ function planPathStepEdit(text,raw,section,pathId,index,action,metadata){
     } else return {error:'Unknown path edit.'};
     var errors=[];validatePaths(d,'diagram',errors);
     if(errors.length) return {error:errors.join('\n')};
+    return builderViewStepsError(d);
   });
   if(r.error) return r;
   r.kind='step';r.index=resultIndex;r.pathId=resultPath;
@@ -5914,6 +5918,13 @@ function initWorkbenchBuilder(opts){
     rename:function(section,name,id){
       return commitCascade(function(raw){return planSectionLayoutName(src.value,raw,section,name,id);});
     },
+    ensureView:function(section,target){return commitCascade(function(raw){return planEnsureSectionView(src.value,raw,section,target);});},
+    steps:function(section,id,indices){
+      var prior=currentTarget;currentTarget=null;
+      var ok=commitCascade(function(raw){return planSectionViewSteps(src.value,raw,section,id,indices);});
+      if(!ok)currentTarget=prior;else{clearMultiSelect();clearStepMarkers();if(guide)guide.hidden=true;}
+      return ok;
+    },
     duplicate:function(section,id){
       var nextId,ok=commitCascade(function(raw){var plan=planDuplicateSectionLayout(src.value,raw,section,id);nextId=plan.layoutId;return plan;});return ok?nextId:null;
     },
@@ -5922,6 +5933,12 @@ function initWorkbenchBuilder(opts){
 
   }) : null;
   view.addEventListener('dv:pathrender',applyRowGrabs);
+  view.addEventListener('click',function(ev){
+    if(!ev.target.closest('[data-view-layout]') || !currentTarget || currentTarget.kind!=='step')return;
+    var section=ev.target.closest('.doc-sec'),index=section && Number(section.getAttribute('data-dv-section'));
+    var player=section && stepperFor(index);
+    if(player && currentTarget.section===index){currentTarget={kind:'step',section:index,index:player.sourceIndex(),pathId:player.path()};renderInspector();applyStepMarkers();}
+  });
   view.addEventListener('dv:pathchange',function(ev){
     var followStep = currentTarget && currentTarget.kind === 'step';
     currentTarget=null;clearMultiSelect();if(guide) guide.hidden=true;

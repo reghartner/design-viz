@@ -791,7 +791,14 @@ perspectives" of one timeline). Types:
   arrangements, use `diagram.layouts:[{id,name,sectionLayout}]` and optional
   `diagram.defaultLayout` (an ID, otherwise the first layout). Each view owns
   its host profiles; tile `hidden:true` hides a panel or diagram in that view.
-  All views share the same steps, paths and live widget state. See
+  Named views are the complete button set; there is no extra automatic Data flow
+  view. All views share step definitions, paths and live widget state. Optional
+  `layouts[].steps:[step IDs]` chooses a nonempty subset of playback stops; omitted
+  steps still contribute state on the active path, and story order is preserved.
+  A `controls:"steps"` tile may use `attachTo:"diagram"` or `attachTo:"panel:<homemap ID>"`
+  to share its host's outline and geometry. Omit `attachTo` for detached controls.
+  Hidden attachment hosts fall back to a detached transport; Optimize preserves
+  attachments and hidden tiles. See
   [section layouts](../docs/section-layouts.md) for the tile/profile contract.
   Example panel:
   `{"id":"home","type":"homemap","outline":{"w":300,"h":164},

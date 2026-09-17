@@ -20,6 +20,7 @@ function builderReuseResult(text, raw, context, pathId, mutate){
     if (error) return {error:error};
     var errors = []; validatePaths(d, 'diagram', errors);
     if (errors.length) return {error:errors.join('\n')};
+    return builderViewStepsError(d);
   });
   if (plan.error) return plan;
   plan.kind = 'step'; plan.pathId = pathId; plan.index = result.index;
@@ -75,6 +76,7 @@ function planPathOccurrenceEdit(text, raw, section, pathId, index, action){
       var taken = Object.create(null); d.steps.forEach(function(s){ if (s && s.id) taken[s.id] = true; });
       var copy = builderClone(d.steps[index]); copy.id = builderUniqueKey(taken, copy.id + '-copy');
       result.index = d.steps.length; d.steps.push(copy); route.steps[ctx.position] = copy.id;
+      (d.layouts || []).forEach(function(v){if(Array.isArray(v.steps) && v.steps.indexOf(ctx.step.id)>=0)v.steps.push(copy.id);});
       result.position = ctx.position;
     } else if (action === 'remove'){
       if (route.steps.length === 1) return 'Keep at least one step in this path. Add a step or remove the alternate instead.';

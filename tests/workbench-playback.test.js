@@ -334,3 +334,14 @@ test('live view focus survives edits but authored presentation changes and diffe
   delete diagramOf(after).primaryPanel;next.sections[0].presentation=presentation('p','panel');
   h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(next.sections[0].presentation.mode(),'panel');
 });
+
+
+test('layout diagram visibility survives editor rerenders without writing a spec field',()=>{
+  const h=previewHarness(),before=pageFixture(),old=h.controller(before,1,'step');
+  old.sections[0].presentation={mode:()=> 'layout',diagramVisible:()=>false};
+  const saved=h.context.workbenchPreviewSnapshot(before,old),after=copy(before),source=JSON.stringify(after);
+  const next=h.controller(after,0,'ambient');let visible=true;
+  next.sections[0].presentation={setMode:()=>{},setDiagramVisible:v=>{visible=v;}};
+  h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(visible,false);
+  assert.equal(next.sections[0].stepper.current().n,1);assert.equal(JSON.stringify(after),source);
+});

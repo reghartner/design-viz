@@ -43,8 +43,23 @@ The selected preview host and width are temporary workspace state. At section
 widths of 640 pixels or less, tiles stack in reading order; use the numeric
 controls or widen the preview to drag. Maps fit their tiles; dense panels scroll
 internally. Diagram Auto / Fit width / Readable controls remain available.
-Reader **Layout**, **Home**, and **Data flow** choices reuse the live widgets
-and preserve the selected alternate, step and playback state.
+For saved arrangements there are two view choices: **Layout** (or your chosen
+name) and **Data flow**. The named arrangement replaces the separate Home
+choice. Both reuse the live widgets and preserve the selected alternate, step
+and playback state. Sections without saved arrangements retain Home / Data flow.
+
+Choose **Arrange section → Layout name** to name the view, for example
+**Front door** or **Home**. Names are up to 40 characters, apply across the
+section's host profiles, and save as `diagram.layoutName`. Clearing the name
+restores **Layout**. Renaming is one undoable edit and survives JSON/HTML export.
+
+In the named layout, **Hide data flow** hides only the diagram. Panels and step
+controls remain available, including controls in an older combined tile.
+Rows occupied only by the diagram are reclaimed; panels sharing its rows keep
+their dimensions and columns. **Show data flow** restores the exact saved
+arrangement. This visibility choice is temporary: it survives view switches
+and workbench edits, but does not rewrite the spec. Arrange section shows all
+tiles so editing always uses the saved coordinates.
 
 ## Spec contract
 

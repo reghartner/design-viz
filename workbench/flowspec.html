@@ -613,8 +613,10 @@ body.sk-aurora.sk-blueprint{
 .section-arrange-fields{padding:10px 0;}
 .section-arrange-fields[hidden]{display:none;}
 .section-arrange-fields input{width:60px;}
+.section-arrange-fields input[type="text"]{width:180px;}
 .section-arrange-fields select{max-width:190px;}
 .section-arranging .section-layout-tile{outline:1px dashed var(--acc);padding-top:30px;box-sizing:border-box;}
+.section-arranging .layout-flow-toggle{display:none;}
 .section-arranging .section-layout-tile.layout-selected{outline:2px solid var(--acc);}
 .section-tile-move,.section-tile-resize{display:none;position:absolute;z-index:4;touch-action:none;user-select:none;background:var(--card);color:var(--ink);border:1px solid var(--line);font:12px 'IBM Plex Sans',sans-serif;cursor:grab;}
 .section-arranging .section-tile-move{display:block;top:0;left:0;right:0;height:28px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -688,6 +690,8 @@ body.sk-aurora.sk-blueprint{
 .docview .boardgrid[hidden],.section-layout-grid[hidden]{display:none !important;}
 .section-layout-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:32px;gap:8px;margin-top:12px;}
 .section-layout-tile{grid-column:var(--tile-x)/span var(--tile-w);grid-row:var(--tile-y)/span var(--tile-h);min-width:0;min-height:0;position:relative;}
+.section-layout-tile[hidden],.section-layout-tile .board[hidden],.layout-flow-toggle[hidden]{display:none !important;}
+.section-layout-tile.layout-controls-only .termbar{height:100%;max-height:100%;box-sizing:border-box;}
 .docview .section-layout-tile>.pwidget{box-sizing:border-box;width:100%;height:100%;max-width:none;margin:0;overflow:auto;}
 .section-layout-tile>.diagramcol{display:flex;flex-direction:column;height:100%;min-height:0;overflow:auto;}
 .section-layout-tile .board{flex:1;min-height:80px;margin:0;}
@@ -6660,6 +6664,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var DP = P + '.diagram';
   validatePaths(d, DP, errors);
   sectionLayoutWarnings(d, DP, warnings);
+  if(d.layoutName != null && (typeof d.layoutName!=='string' || !d.layoutName.trim() || d.layoutName.trim().length>40))
+    warnings.push(DP+'.layoutName: use a nonempty layout name of up to 40 characters');
   if (d.primaryPanel != null && (typeof d.primaryPanel !== 'string' ||
       !(Array.isArray(d.panels) && d.panels.some(function(p){ return p && p.id === d.primaryPanel; }))))
     warnings.push(DP + '.primaryPanel: must name an existing panel — using the standard flow layout');
@@ -12171,7 +12177,22 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
 }
 
 /* Saved section composition moves the existing live widgets, never their state.
-   Home/Data flow remain available and restore the original DOM placement. */
+   Its named layout replaces Home; Data flow restores the standard placement. */
+function sectionLayoutWithoutFlow(items,controlsRows){
+  var diagram=items.find(function(it){return sectionLayoutKey(it)==='diagram';});
+  var kept=items.filter(function(it){return it!==diagram || controlsRows>0;}).map(function(it){
+    var copy=Object.assign({},it);if(it===diagram)copy.h=Math.min(it.h,Math.max(3,controlsRows));return copy;
+  });
+  if(!diagram)return kept;
+  /* Remove only rows vacated by the diagram. Side-by-side panels retain their
+     sizes/columns, and intentional spacing elsewhere stays authored. */
+  var empty=[];
+  for(var row=diagram.y;row<diagram.y+diagram.h;row++){
+    if(!kept.some(function(it){return row>=it.y && row<it.y+it.h;}))empty.push(row);
+  }
+  kept.forEach(function(it){it.y-=empty.filter(function(row){return row<it.y;}).length;});
+  return kept;
+}
 function createSectionComposition(box, layout, d, board, bar, base, target, changed){
   var items=sectionLayoutItems(d,target || 'default');
   if(!items)return null;
@@ -12183,12 +12204,34 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     toolbar.appendChild(group);box.insertBefore(toolbar,layout.grid);
   }
   var button=document.createElement('button');button.type='button';button.className='mbtn';
-  button.textContent='Layout';button.setAttribute('data-view-layout','');group.insertBefore(button,group.firstChild);
+  button.textContent=typeof d.layoutName==='string' && d.layoutName.trim() ? d.layoutName.trim() : 'Layout';
+  button.setAttribute('data-view-layout','');group.insertBefore(button,group.firstChild);
+  var homeChoice=group.querySelector('[data-view-focus="panel"]');if(homeChoice)homeChoice.remove();
+  var flowToggle=document.createElement('button');flowToggle.type='button';flowToggle.className='mbtn layout-flow-toggle';
+  flowToggle.setAttribute('data-layout-flow','');group.parentNode.insertBefore(flowToggle,group.nextSibling);
   var standard;
   if(!base){standard=document.createElement('button');standard.type='button';standard.className='mbtn';standard.textContent='Data flow';group.appendChild(standard);}
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
+  grid.id=box.id+'-layout';flowToggle.setAttribute('aria-controls',grid.id);
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
-  var active=false, saved=[], oldHidden, flowHidden;
+  var active=false, saved=[], oldHidden, flowHidden,showDiagram=true,boardHidden=board.hidden;
+  function paintFlow(){
+    flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
+    flowToggle.setAttribute('aria-expanded',String(showDiagram));
+    board.hidden=active && !showDiagram ? true : boardHidden;
+    if(!active)return;
+    var controlsRows=bar && !bar.hidden && !separateSteps ? Math.max((d.paths || []).length>1?6:4,Math.ceil((bar.scrollHeight+8)/40) || 0) : 0;
+    var visible=showDiagram?items:sectionLayoutWithoutFlow(items,controlsRows);
+    grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
+      var key=tile.getAttribute('data-layout-key'),it=visible.find(function(v){return sectionLayoutKey(v)===key;});
+      tile.hidden=!it;tile.classList.toggle('layout-controls-only',key==='diagram' && !showDiagram && !!it);
+      if(it){tile.style.setProperty('--tile-y',it.y+1);tile.style.setProperty('--tile-h',it.h);}
+    });
+  }
+  function setDiagramVisible(value){if(typeof value!=='boolean')return;showDiagram=value;paintFlow();}
+  flowToggle.addEventListener('click',function(){setDiagramVisible(!showDiagram);});
+  var visibilityObserver=bar && typeof MutationObserver!=='undefined' ? new MutationObserver(function(){if(active && !showDiagram)paintFlow();}) : null;
+  if(visibilityObserver)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
   function move(node,host){
     if(!node)return;
     var anchor=document.createComment('layout position');node.parentNode.insertBefore(anchor,node);
@@ -12200,6 +12243,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     saved=[];grid.replaceChildren();grid.hidden=true;layout.grid.hidden=oldHidden;
     if(layout.flowDisclosure)layout.flowDisclosure.hidden=flowHidden;
     active=false;button.setAttribute('aria-pressed','false');
+    paintFlow();
     if(standard)standard.setAttribute('aria-pressed','true');
     if(changed)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
     if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
@@ -12229,19 +12273,24 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
         move(board,col);if(!separateSteps && bar)move(bar,col);
       }
     });
+    /* A board without a primary panel owns the Ambient/Step buttons. Keep
+       them reachable when the board is hidden, then restore on Data flow. */
+    var boardModes=board.querySelector('.mtoggle');if(boardModes)move(boardModes,group.parentNode);
     layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;
     grid.hidden=false;active=true;button.setAttribute('aria-pressed','true');
+    paintFlow();
     if(changed)changed(grid);
     if(standard)standard.setAttribute('aria-pressed','false');
     group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed','false');});
   }
-  function setMode(value){if(value==='layout')activate();else{restore();if(base)base.setMode(value);}}
+  function setMode(value){if(value==='layout'||value==='panel')activate();else{restore();if(base)base.setMode(value);}}
   button.addEventListener('click',activate);
   if(standard)standard.addEventListener('click',restore);
   group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]'))restore();},true);
   activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
-    destroy:function(){if(base)base.destroy();}};
+    diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
+    destroy:function(){if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 
 function sectionHasProse(sec){
@@ -19447,6 +19496,9 @@ function initWorkbenchBuilder(opts){
     locked:function(){return !!addToStep || !!connect;},
     commit:function(section,target,items){
       return commitCascade(function(raw){return planSectionLayout(src.value,raw,section,target,items);});
+    },
+    rename:function(section,name){
+      return commitCascade(function(raw){return planSectionLayoutName(src.value,raw,section,name);});
     }
   }) : null;
   view.addEventListener('dv:pathrender',applyRowGrabs);
@@ -21375,6 +21427,7 @@ function workbenchPreviewSnapshot(page, ctl){
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
     if (rec.presentation){ prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId; }
+    if (rec.presentation && rec.presentation.diagramVisible) prior.layoutFlowVisible = rec.presentation.diagramVisible();
     saved.push(prior);
     if (!stepper) return;
     if (stepper.path) prior.path = stepper.path();
@@ -21398,6 +21451,7 @@ function restoreWorkbenchPreview(page, ctl, saved){
     var matches = saved.sections.filter(function(s){ return s.key === section.key; });
     if (matches.length !== 1) return;
     var prior = matches[0];
+    if (rec.presentation && rec.presentation.setDiagramVisible) rec.presentation.setDiagramVisible(prior.layoutFlowVisible);
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
       rec.flowDisclosure.open = prior.flowOpen;
@@ -21622,6 +21676,11 @@ function planSectionLayout(text,raw,section,target,items){
   if(warnings.length)return {error:warnings.join('\n')};
   return planSetField(text,raw,got.path,'sectionLayout',Object.keys(layouts).length?JSON.stringify(layouts):null);
 }
+function planSectionLayoutName(text,raw,section,name){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(typeof name!=='string' || name.trim().length>40)return {error:'Use a layout name of up to 40 characters.'};
+  return planSetField(text,raw,got.path,'layoutName',name.trim()?JSON.stringify(name.trim()):null);
+}
 function sectionLayoutGesture(items,key,dx,dy,resize){
   var next=items.map(function(it){return Object.assign({},it);}),item=next.find(function(it){return sectionLayoutKey(it)===key;});
   if(!item)return next;
@@ -21674,7 +21733,10 @@ function initSectionLayoutEditor(opts){
   }
   function forceLayout(index){
     var ctl=opts.ctl && opts.ctl(),rec=ctl && ctl.sections.find(function(r){return r.number===index+1;});
-    if(rec && rec.presentation)rec.presentation.setMode('layout');
+    if(rec && rec.presentation){
+      rec.presentation.setMode('layout');
+      if(rec.presentation.setDiagramVisible)rec.presentation.setDiagramVisible(true);
+    }
   }
   function updateTarget(){
     cancel();editing=null;setFrame();opts.render();
@@ -21715,6 +21777,10 @@ function initSectionLayoutEditor(opts){
       if(warnings.length){feedback(warnings[0]);return;}
       persist(Number(section.getAttribute('data-dv-section')),sectionLayoutPack(next,selected));
     }));
+    var nameLabel=el('label',null,'Layout name '),name=el('input');name.type='text';name.maxLength=40;
+    name.value=typeof d.layoutName==='string'?d.layoutName:'';name.placeholder='Layout';name.setAttribute('aria-label','Layout name');
+    name.addEventListener('change',function(){if(ready())opts.rename(Number(section.getAttribute('data-dv-section')),name.value);});
+    nameLabel.appendChild(name);row.appendChild(nameLabel);
     section.querySelectorAll('.section-layout-tile').forEach(function(tile){tile.classList.toggle('layout-selected',tile.getAttribute('data-layout-key')===selected);});
   }
   function refresh(){

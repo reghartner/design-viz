@@ -140,3 +140,18 @@ test('control tile declarations reject invalid or ambiguous identities and dupli
     assert.ok(valid.filter(t=>t.controls).length<=1);
   }
 });
+
+
+test('layout names are independent of host tiles and survive one-field edits and clearing',()=>{
+  const raw={page:{sections:[{diagram:diagram()}]}},d=raw.page.sections[0].diagram;
+  d.sectionLayout={default:[board],confluence:[phone]};const text=JSON.stringify(raw);
+  const named=ctx.planSectionLayoutName(text,raw,0,'  Front door  ');assert.ok(!named.error,named.error);
+  const next=JSON.parse(named.text);assert.equal(next.page.sections[0].diagram.layoutName,'Front door');
+  delete next.page.sections[0].diagram.layoutName;assert.deepEqual(next,raw);
+  const cleared=ctx.planSectionLayoutName(named.text,JSON.parse(named.text),0,' ');assert.deepEqual(JSON.parse(cleared.text),raw);
+  for(const bad of [null,42,'x'.repeat(41)])assert.ok(ctx.planSectionLayoutName(text,raw,0,bad).error);
+  for(const bad of ['',42,'x'.repeat(41)]){
+    const warnings=ctx.validate({sections:[{diagram:{...diagram(),layoutName:bad}}]}).warnings;
+    assert.ok(warnings.some(w=>w.includes('layoutName')));
+  }
+});

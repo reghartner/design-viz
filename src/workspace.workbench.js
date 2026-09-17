@@ -22,6 +22,7 @@ function workbenchPreviewSnapshot(page, ctl){
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
     if (rec.presentation){ prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId; }
+    if (rec.presentation && rec.presentation.diagramVisible) prior.layoutFlowVisible = rec.presentation.diagramVisible();
     saved.push(prior);
     if (!stepper) return;
     if (stepper.path) prior.path = stepper.path();
@@ -45,6 +46,7 @@ function restoreWorkbenchPreview(page, ctl, saved){
     var matches = saved.sections.filter(function(s){ return s.key === section.key; });
     if (matches.length !== 1) return;
     var prior = matches[0];
+    if (rec.presentation && rec.presentation.setDiagramVisible) rec.presentation.setDiagramVisible(prior.layoutFlowVisible);
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
       rec.flowDisclosure.open = prior.flowOpen;

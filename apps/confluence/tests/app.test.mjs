@@ -133,9 +133,9 @@ test('Forge selects the Confluence composition and preserves alternate state thr
   const bar=view.querySelector('.termbar'),map=view.querySelector('.pt-homemap'),board=view.querySelector('.board');
   view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();
   const caption=bar.querySelector('.stepline').textContent;
+  assert.equal(view.querySelectorAll('.diagram-view-choice button').length,2);
+  assert.equal(view.querySelector('[data-view-focus="panel"]'),null,'the custom layout replaces Home');
   for(let i=0;i<2;i++){
-    view.querySelector('[data-view-focus="panel"]').click();assert.equal(grid.hidden,true);
-    assert.equal(map.closest('.boardgrid').hidden,false);assert.equal(bar.querySelector('.stepline').textContent,caption);
     view.querySelector('[data-view-focus="flow"]').click();assert.equal(grid.hidden,true);
     view.querySelector('[data-view-layout]').click();assert.equal(grid.hidden,false);
     assert.equal(view.querySelector('.pt-homemap'),map);assert.equal(view.querySelector('.board'),board);
@@ -176,7 +176,6 @@ test('detached step controls retain one live transport across layout focus, alte
     detached();view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();
     const caption=bar.querySelector('.stepline').textContent;assert.match(caption,/STEP 3\/4/);
     for(let i=0;i<2;i++){
-      if(panels){view.querySelector('[data-view-focus="panel"]').click();assert.ok(bar.closest('.primary-panel'));}
       [...view.querySelectorAll('.diagram-view-choice button')].find(b=>b.textContent==='Data flow').click();
       assert.equal(grid.hidden,true);assert.equal(bar.querySelector('.stepline').textContent,caption);
       view.querySelector('[data-view-layout]').click();detached();assert.equal(bar.querySelector('.stepline').textContent,caption);
@@ -221,4 +220,32 @@ test('nodes without references retain native context menus and path replacement 
   view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();assert.equal(old.isConnected,false);
   const next=view.querySelector('.node-link-menu');assert.notEqual(next,old);assert.equal(next.hidden,true);
   view.querySelector('[data-dv-node="cloud"] .nrefs-trigger').dispatchEvent(new s.win.MouseEvent('click',{bubbles:true,cancelable:true}));assert.equal(next.hidden,false);
+});
+
+
+test('named layouts hide only the diagram, retain playback, and restore exact positions',async t=>{
+  for(const detached of [true,false])for(const panels of [true,false]){
+    const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+    if(!panels){delete d.panels;delete d.primaryPanel;d.steps.forEach(st=>delete st.panels);}
+    d.layoutName='Front door <safe>';
+    d.sectionLayout={confluence:[{x:0,y:0,w:12,h:12},...(detached?[{controls:'steps',x:0,y:12,w:12,h:6}]:[])]};
+    const specJson=JSON.stringify(raw),s=await setup(t,{configuring:false,config:{specJson}}),view=s.el('docview');
+    const choices=view.querySelector('.diagram-view-choice'),layout=choices.querySelector('[data-view-layout]'),toggle=view.querySelector('[data-layout-flow]');
+    assert.equal(choices.children.length,2);assert.equal(layout.textContent,'Front door <safe>');assert.equal(layout.querySelector('safe'),null);
+    const grid=view.querySelector('.section-layout-grid'),board=view.querySelector('.board'),bar=view.querySelector('.termbar');
+    const positions=[...grid.children].map(el=>el.getAttribute('style'));
+    view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();const caption=bar.querySelector('.stepline').textContent;
+    toggle.click();assert.equal(board.hidden,true);assert.equal(toggle.textContent,'Show data flow');assert.equal(toggle.getAttribute('aria-expanded'),'false');
+    assert.equal(bar.hidden,false);assert.equal(bar.closest('.section-layout-tile').hidden,false);assert.equal(bar.querySelector('.stepline').textContent,caption);
+    assert.equal(grid.querySelector('[data-layout-key="diagram"]').hidden,detached);
+    if(detached)assert.equal(grid.querySelector('[data-layout-key="steps"]').style.getPropertyValue('--tile-y'),'1');
+    choices.querySelector('button:not([data-view-layout])').click();assert.equal(board.hidden,false);assert.equal(toggle.hidden,true);
+    layout.click();assert.equal(board.hidden,true);assert.equal(toggle.hidden,false);assert.equal(view.querySelector('.termbar'),bar);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='AMBIENT').click();await settle();assert.equal(bar.hidden,true);
+    if(!detached)assert.equal(grid.querySelector('[data-layout-key="diagram"]').hidden,true);
+    [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();await settle();assert.equal(bar.hidden,false);assert.equal(bar.closest('.section-layout-tile').hidden,false);
+    toggle.click();assert.equal(board.hidden,false);assert.deepEqual([...grid.children].map(el=>el.getAttribute('style')),positions);
+    assert.equal(view.querySelector('.board'),board);assert.equal(view.querySelectorAll('.termbar').length,1);assert.equal(s.calls.submits.length,0);
+    assert.equal(JSON.stringify(raw),specJson);
+  }
 });

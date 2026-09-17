@@ -11,6 +11,11 @@ function planSectionLayout(text,raw,section,target,items){
   if(warnings.length)return {error:warnings.join('\n')};
   return planSetField(text,raw,got.path,'sectionLayout',Object.keys(layouts).length?JSON.stringify(layouts):null);
 }
+function planSectionLayoutName(text,raw,section,name){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(typeof name!=='string' || name.trim().length>40)return {error:'Use a layout name of up to 40 characters.'};
+  return planSetField(text,raw,got.path,'layoutName',name.trim()?JSON.stringify(name.trim()):null);
+}
 function sectionLayoutGesture(items,key,dx,dy,resize){
   var next=items.map(function(it){return Object.assign({},it);}),item=next.find(function(it){return sectionLayoutKey(it)===key;});
   if(!item)return next;
@@ -63,7 +68,10 @@ function initSectionLayoutEditor(opts){
   }
   function forceLayout(index){
     var ctl=opts.ctl && opts.ctl(),rec=ctl && ctl.sections.find(function(r){return r.number===index+1;});
-    if(rec && rec.presentation)rec.presentation.setMode('layout');
+    if(rec && rec.presentation){
+      rec.presentation.setMode('layout');
+      if(rec.presentation.setDiagramVisible)rec.presentation.setDiagramVisible(true);
+    }
   }
   function updateTarget(){
     cancel();editing=null;setFrame();opts.render();
@@ -104,6 +112,10 @@ function initSectionLayoutEditor(opts){
       if(warnings.length){feedback(warnings[0]);return;}
       persist(Number(section.getAttribute('data-dv-section')),sectionLayoutPack(next,selected));
     }));
+    var nameLabel=el('label',null,'Layout name '),name=el('input');name.type='text';name.maxLength=40;
+    name.value=typeof d.layoutName==='string'?d.layoutName:'';name.placeholder='Layout';name.setAttribute('aria-label','Layout name');
+    name.addEventListener('change',function(){if(ready())opts.rename(Number(section.getAttribute('data-dv-section')),name.value);});
+    nameLabel.appendChild(name);row.appendChild(nameLabel);
     section.querySelectorAll('.section-layout-tile').forEach(function(tile){tile.classList.toggle('layout-selected',tile.getAttribute('data-layout-key')===selected);});
   }
   function refresh(){

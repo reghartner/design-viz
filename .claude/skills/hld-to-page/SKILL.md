@@ -306,6 +306,11 @@ existing combined controls in one undoable edit. The workbench's Arrange section
 and Optimize layout controls author these profiles; its host/width preview is
 temporary. Forge selects Confluence automatically; catalog viewer links select
 Backstage. Missing profiles fall back to default, then the existing layout.
+Saved arrangements have two view choices: their name and Data flow; there is
+no separate Home choice. Optional `diagram.layoutName` names the arrangement
+(1–40 characters; default Layout), shared across host profiles. Readers can
+Hide/Show data flow within that arrangement while keeping panels and playback.
+Visibility is temporary and does not remove diagram tiles from the spec.
 Preserve panel IDs and story state; tile geometry is not evidence. Do not change
 Home coordinates, steps or paths to fit a host. Verify a narrow stacked preview
 and the real installed host separately.

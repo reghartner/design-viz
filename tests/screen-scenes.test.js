@@ -32,7 +32,7 @@ test('screen registry, validator and workbench agree, and every clip renders in 
     const valid = C.validate(C.normalize({nodes:{a:{}},rows:[['a']],panels:[panel]}));
     assert.equal(valid.errors.length, 0, valid.errors.join('; '));
     assert.equal(valid.warnings.length, 0, valid.warnings.join('; '));
-    for (const mode of ['off', 'boot', 'live', 'rec', 'save']){
+    for (const mode of ['off', 'boot', 'active', 'live', 'rec', 'save']){
       const h = host(); C.renderPanelBody(h, panel, {mode}, 'aurora');
       if (mode === 'off') assert.ok(!h.innerHTML.includes('<svg'));
       else assert.ok(h.innerHTML.includes(C.SCENES[mode === 'boot' ? 'static-noise' : scene]));
@@ -40,18 +40,18 @@ test('screen registry, validator and workbench agree, and every clip renders in 
   }
 });
 
-test('same clip survives live, record, save and banner changes; a different clip replaces it', () => {
+test('same clip survives active, live, record, save and banner changes; a different clip replaces it', () => {
   for (const scene of names){
     const h = host(), panel = {id:'cam',type:'screen',scene};
     C.renderPanelBody(h, panel, {mode:'live'}, 'aurora');
-    for (const mode of ['rec', 'save', 'live']){
+    for (const mode of ['active', 'rec', 'save', 'live', 'active']){
       C.renderPanelBody(h, panel, {mode,banner:'<new clip>'}, 'aurora');
       assert.equal(h.writes, 1, scene + ' scene must survive ' + mode);
       assert.equal(h.box.className, 'screenbox m-' + mode);
       if (mode === 'save') assert.ok(h.box.overlays.includes('&lt;new clip&gt;'));
     }
     const replacement = scene === 'kitchen-fire' ? 'person-through-door' : 'kitchen-fire';
-    for (const mode of ['live', 'rec', 'save']){
+    for (const mode of ['active', 'live', 'rec', 'save']){
       const swap = host();
       C.renderPanelBody(swap, panel, {mode:'live'}, 'aurora');
       C.renderPanelBody(swap, {...panel,scene:replacement}, {mode}, 'aurora');
@@ -176,4 +176,22 @@ test('screen clip starter records before each scene event begins', () => {
     assert.deepEqual(Array.from(states,s=>s.scenePlayback), ['waiting','waiting','waiting','playing','playing']);
     assert.deepEqual(s.diagram.steps[3].panels['camera-view'],{scenePlayback:'playing'});
   }
+});
+
+
+test('active camera mode shows the clip with a text-only status and supports independent scene events',()=>{
+  const panel={id:'cam',type:'screen',scene:'person-through-door'},h=host();
+  C.renderPanelBody(h,panel,{mode:'active',scenePlayback:'waiting'},'pastel');
+  assert.match(h.innerHTML,/screenbox m-active scene-waiting/);
+  assert.ok(h.innerHTML.includes(C.SCENES['person-through-door']));
+  assert.match(h.innerHTML,/<span class="ovl activechip">ACTIVE<\/span>/);
+  assert.doesNotMatch(h.innerHTML,/recdot|recchip|livechip|offlabel/);
+  C.renderPanelBody(h,panel,{mode:'active',scenePlayback:'playing'},'pastel');
+  assert.equal(h.writes,1);assert.equal(h.box.className,'screenbox m-active');assert.equal(h.box.overlayWrites,0);
+  const fields=C.panelPatchFields(panel);
+  assert.equal(C.patchFieldsCollect(fields,{mode:'active'}).item.mode,'active');
+  const d={nodes:{a:{}},rows:[['a']],panels:[{...panel,initial:{mode:'active'}}],steps:[{panels:{cam:{mode:'rec'}}},{panels:{cam:{mode:'active'}}}]};
+  assert.equal(C.validate(C.normalize(d)).errors.length,0);
+  const before=JSON.stringify(d),edit=C.planStepSetPanelPatch(before,d,0,0,'cam',JSON.stringify({mode:'active'}));
+  assert.ok(!edit.error,edit.error);assert.equal(JSON.parse(edit.text).steps[0].panels.cam.mode,'active');assert.equal(JSON.stringify(d),before);
 });

@@ -1095,18 +1095,18 @@ body.sk-aurora.sk-blueprint{
 /* screen widget (viewfinder) */
 .screenbox{position:relative; border-radius:8px; overflow:hidden; aspect-ratio:16/9; background:#05080B;}
 .screenbox .scene{display:block; width:100%; height:100%;}
-.screenbox.m-live .walker, .screenbox.m-rec .walker, .screenbox.m-save .walker{animation:walkin 3.2s ease-out forwards;}
+.screenbox.m-active .walker, .screenbox.m-live .walker, .screenbox.m-rec .walker, .screenbox.m-save .walker{animation:walkin 3.2s ease-out forwards;}
 @keyframes walkin{from{transform:translateX(40px);} to{transform:translateX(160px);}}
 .screenbox .walker{transform:translateX(160px);}
 /* package-drop choreography: the courier walks in carrying the box, the
    package appears at the drop beat, the courier leaves. Defaults are the
    reduced-motion end state: courier off-canvas, package delivered. */
 .screenbox .courier{transform:translateX(-40px);}
-.screenbox.m-live .courier, .screenbox.m-rec .courier, .screenbox.m-save .courier{animation:courierrun 5s ease-in-out forwards;}
+.screenbox.m-active .courier, .screenbox.m-live .courier, .screenbox.m-rec .courier, .screenbox.m-save .courier{animation:courierrun 5s ease-in-out forwards;}
 @keyframes courierrun{0%{transform:translateX(-30px);} 42%{transform:translateX(238px);} 58%{transform:translateX(238px);} 100%{transform:translateX(-40px);}}
-.screenbox.m-live .courier .carried, .screenbox.m-rec .courier .carried, .screenbox.m-save .courier .carried{animation:carrydrop 5s step-end forwards;}
+.screenbox.m-active .courier .carried, .screenbox.m-live .courier .carried, .screenbox.m-rec .courier .carried, .screenbox.m-save .courier .carried{animation:carrydrop 5s step-end forwards;}
 @keyframes carrydrop{0%{opacity:1;} 50%{opacity:0;} 100%{opacity:0;}}
-.screenbox.m-live .pkg, .screenbox.m-rec .pkg, .screenbox.m-save .pkg{animation:pkgdrop 5s ease-out forwards;}
+.screenbox.m-active .pkg, .screenbox.m-live .pkg, .screenbox.m-rec .pkg, .screenbox.m-save .pkg{animation:pkgdrop 5s ease-out forwards;}
 @keyframes pkgdrop{0%,49%{opacity:0; transform:translateY(-6px);} 56%{opacity:1; transform:translateY(0);} 100%{opacity:1;}}
 /* Door entry: all tracks share a clock and persist through live/rec/save.
    Unanimated defaults show the visitor crossing an open threshold. */
@@ -1114,13 +1114,13 @@ body.sk-aurora.sk-blueprint{
 .screenbox .entry-door{transform-origin:174px 28px;transform:skewY(-12deg) scaleX(.24);}
 .screenbox .entry-leg{transform-origin:0 127px;}
 .screenbox .entry-arm{transform-origin:0 106px;}
-.screenbox:is(.m-live,.m-rec,.m-save) .entry-person{animation:entrycross 6.8s linear forwards;}
-.screenbox:is(.m-live,.m-rec,.m-save) .entry-door{animation:entryopen 6.8s ease-in-out forwards;}
-.screenbox:is(.m-live,.m-rec,.m-save) .entry-light{animation:entrylight 6.8s ease-in-out forwards;}
-.screenbox:is(.m-live,.m-rec,.m-save) .entry-leg,
-.screenbox:is(.m-live,.m-rec,.m-save) .entry-arm{animation:entrystride .68s ease-in-out 8 alternate;}
-.screenbox:is(.m-live,.m-rec,.m-save) .entry-leg-back,
-.screenbox:is(.m-live,.m-rec,.m-save) .entry-arm:not(.entry-arm-back){animation-direction:alternate-reverse;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-person{animation:entrycross 6.8s linear forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-door{animation:entryopen 6.8s ease-in-out forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-light{animation:entrylight 6.8s ease-in-out forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-leg,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-arm{animation:entrystride .68s ease-in-out 8 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-leg-back,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-arm:not(.entry-arm-back){animation-direction:alternate-reverse;}
 @keyframes entrycross{
   0%{transform:translate(22px,0) scale(1);opacity:1;}
   38%{transform:translate(185px,0) scale(1);opacity:1;}
@@ -1143,13 +1143,13 @@ body.sk-aurora.sk-blueprint{
 .screenbox .doorbell-leg-back{transform:rotate(12deg);}
 .screenbox .doorbell-arm{transform-origin:8px -46px;transform:rotate(-18deg);}
 .screenbox .doorbell-arm-back{transform-origin:-8px -46px;transform:rotate(18deg);}
-.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-runner{animation:doorbellaway 7.2s linear var(--runner-delay) both;}
-.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-runner-second{animation-name:doorbellawaysecond;}
-.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-bounce{animation:doorbellbounce .32s ease-in-out var(--runner-delay) 23;}
-.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-leg{animation:doorbellstride .16s ease-in-out var(--runner-delay) 46 alternate;}
-.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-arm{animation:doorbellarms .16s ease-in-out var(--runner-delay) 46 alternate;}
-.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-leg-back,
-.screenbox:is(.m-live,.m-rec,.m-save) .doorbell-arm:not(.doorbell-arm-back){animation-direction:alternate-reverse;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-runner{animation:doorbellaway 7.2s linear var(--runner-delay) both;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-runner-second{animation-name:doorbellawaysecond;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-bounce{animation:doorbellbounce .32s ease-in-out var(--runner-delay) 23;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-leg{animation:doorbellstride .16s ease-in-out var(--runner-delay) 46 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-arm{animation:doorbellarms .16s ease-in-out var(--runner-delay) 46 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-leg-back,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-arm:not(.doorbell-arm-back){animation-direction:alternate-reverse;}
 @keyframes doorbellaway{
   0%{transform:translate(105px,180px) scale(1.35);}
   16%{transform:translate(130px,146px) scale(.98);}
@@ -1175,15 +1175,15 @@ body.sk-aurora.sk-blueprint{
 .screenbox .fire-flame{transform-origin:239px 105px;}
 .screenbox .fire-glow{filter:blur(10px);}
 .screenbox .fire-smoke{transform-origin:233px 72px;filter:blur(3px);}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-flame{animation:firebreathe 1.1s ease-in-out infinite alternate;}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-middle{animation-duration:.83s;animation-delay:-.4s;}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-core{animation-duration:.67s;animation-delay:-.2s;}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-glow{animation:fireglow 2.2s ease-in-out infinite alternate;}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-smoke{animation:firerise 3.8s ease-out infinite;}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-smoke-late{animation-delay:-1.9s;}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-ember{animation:fireember 2.6s ease-out infinite;}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-ember-late{animation-delay:-1.3s;}
-.screenbox:is(.m-live,.m-rec,.m-save) .fire-alarm{animation:fireglow 1.5s ease-in-out infinite alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-flame{animation:firebreathe 1.1s ease-in-out infinite alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-middle{animation-duration:.83s;animation-delay:-.4s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-core{animation-duration:.67s;animation-delay:-.2s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-glow{animation:fireglow 2.2s ease-in-out infinite alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-smoke{animation:firerise 3.8s ease-out infinite;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-smoke-late{animation-delay:-1.9s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-ember{animation:fireember 2.6s ease-out infinite;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-ember-late{animation-delay:-1.3s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-alarm{animation:fireglow 1.5s ease-in-out infinite alternate;}
 @keyframes firebreathe{from{transform:scale(.96,.87) skewX(-3deg);}to{transform:scale(1.04,1.05) skewX(3deg);}}
 @keyframes fireglow{from{opacity:.55;}to{opacity:1;}}
 @keyframes firerise{0%{transform:translate(0,0) scale(.7);opacity:0;}20%{opacity:.9;}100%{transform:translate(-28px,-57px) scale(1.9);opacity:0;}}
@@ -1206,6 +1206,7 @@ body.sk-aurora.sk-blueprint{
 @keyframes flicker{50%{opacity:.3; transform:translateY(3px);}}
 .ovl{position:absolute; font:700 10.5px 'IBM Plex Mono',monospace; letter-spacing:.08em;}
 .offlabel{inset:0; display:flex; align-items:center; justify-content:center; color:#2E3A46;}
+.activechip{top:8px;left:8px;color:#FFF;text-shadow:0 1px 3px #000,0 0 2px #000;}
 .livechip{top:8px; left:8px; color:#0B1220; background:#4ADE80; padding:2px 7px; border-radius:4px;}
 .recchip{top:8px; left:8px; color:#FFB0A6; background:rgba(8,20,35,.8); padding:3px 6px; border-radius:5px; display:flex; align-items:center; gap:5px;}
 .recdot{width:8px; height:8px; border-radius:50%; background:#FF3B30; animation:recblink 1s steps(1) infinite;}
@@ -10755,21 +10756,22 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     h += '</div>';
   } else if (type === 'screen'){
     var mode = String(state.mode || 'off');
-    if (['off','boot','live','rec','save'].indexOf(mode) < 0) mode = 'off';
+    if (['off','boot','active','live','rec','save'].indexOf(mode) < 0) mode = 'off';
     var sceneName = SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
     var scrClass = 'screenbox m-' + mode +
-      (state.scenePlayback === 'waiting' && ['live','rec','save'].indexOf(mode) >= 0 ? ' scene-waiting' : '');
+      (state.scenePlayback === 'waiting' && ['active','live','rec','save'].indexOf(mode) >= 0 ? ' scene-waiting' : '');
     /* overlays are built separately from the scene so a mode change between
        two scene-showing modes can swap ONLY the overlays (surgical path
        below) and keep the scene subtree's animation state (the walker) */
     var scrOvl = '';
+    if (mode === 'active') scrOvl += '<span class="ovl activechip">ACTIVE</span>';
     if (mode === 'live') scrOvl += '<span class="ovl livechip">LIVE</span>';
     if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
     if (mode === 'save') scrOvl += '<span class="ovl banner">' + esc(state.banner || 'SAVING CLIP') + '</span>';
     if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
     h += '<div class="' + scrClass + '">';
     if (mode === 'boot') h += SCENES['static-noise'];
-    else if (mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
+    else if (mode === 'active' || mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
     h += scrOvl + '</div>';
   } else if (type === 'timeline' && Array.isArray(panel.lanes) && panel.lanes.length){
     var lnm = timelineLanesModel(panel, state);
@@ -11472,11 +11474,11 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
   if (host._lastHTML === h) return;
 
   /* screen surgical path: consecutive modes that both show the SAME scene
-     (live / rec / save) swap only the mode class and the overlay chips,
+     (active / live / rec / save) swap only the mode class and the overlay chips,
      keeping the scene subtree — the walker's animation state survives.
      Any other transition (off/boot involved, or a first render) rebuilds. */
   var surgical = false;
-  var SCENE_SHOWING = {live: true, rec: true, save: true};
+  var SCENE_SHOWING = {active: true, live: true, rec: true, save: true};
   if (type === 'screen' && host._lastHTML != null &&
       sceneName === host._scrScene && SCENE_SHOWING[mode] && SCENE_SHOWING[host._scrMode]){
     var scrBox = host.querySelector('.screenbox');
@@ -16252,7 +16254,7 @@ var PANEL_PATCH_FIELDS = {
   leds:      [],
   gauge:     [['value', 'num']],
   log:       [['log', 'jsonArr']],
-  screen:    [['mode', 'enum', ['off', 'boot', 'live', 'rec', 'save']],
+  screen:    [['mode', 'enum', ['off', 'boot', 'active', 'live', 'rec', 'save']],
               ['scenePlayback', 'enum', ['waiting', 'playing']], ['banner', 'text']],
   waterfall: [['reveal', 'num'], ['highlight', 'text'], ['total', 'text']],
   orbit:     [['state', 'text'], ['via', 'text']],
@@ -18291,7 +18293,7 @@ function initWorkbenchBuilder(opts){
     var fields = panelPatchFields(decl);
     if (decl && decl.type === 'screen'){
       var sceneNote = document.createElement('p'); sceneNote.className = 'home-note';
-      sceneNote.textContent = 'Recording and the scene event are independent. Choose Before event for a quiet scene, then Play event in a later step. Both settings carry forward until changed.';
+      sceneNote.textContent = 'Active means the camera is on without livestreaming or recording. Camera mode and the scene event are independent. Choose Before event for a quiet scene, then Play event in a later step. Both settings carry forward until changed.';
       body.appendChild(sceneNote);
     }
     if (fields === null){

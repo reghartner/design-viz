@@ -2554,7 +2554,7 @@ var PANEL_PATCH_FIELDS = {
   leds:      [],
   gauge:     [['value', 'num']],
   log:       [['log', 'jsonArr']],
-  screen:    [['mode', 'enum', ['off', 'boot', 'live', 'rec', 'save']],
+  screen:    [['mode', 'enum', ['off', 'boot', 'active', 'live', 'rec', 'save']],
               ['scenePlayback', 'enum', ['waiting', 'playing']], ['banner', 'text']],
   waterfall: [['reveal', 'num'], ['highlight', 'text'], ['total', 'text']],
   orbit:     [['state', 'text'], ['via', 'text']],
@@ -4593,7 +4593,7 @@ function initWorkbenchBuilder(opts){
     var fields = panelPatchFields(decl);
     if (decl && decl.type === 'screen'){
       var sceneNote = document.createElement('p'); sceneNote.className = 'home-note';
-      sceneNote.textContent = 'Recording and the scene event are independent. Choose Before event for a quiet scene, then Play event in a later step. Both settings carry forward until changed.';
+      sceneNote.textContent = 'Active means the camera is on without livestreaming or recording. Camera mode and the scene event are independent. Choose Before event for a quiet scene, then Play event in a later step. Both settings carry forward until changed.';
       body.appendChild(sceneNote);
     }
     if (fields === null){

@@ -295,3 +295,18 @@ test('views dock one live transport to Home or diagram and filter stops without 
   view.querySelector('[data-layout-id="hidden"]').click();assert.equal(view.querySelector('[data-layout-key="steps"]>.termbar'),firstBar);assert.equal(view.querySelector('[data-layout-key="panel:home"]').hidden,true);
   assert.equal(view.querySelectorAll('.termbar').length,1);
 });
+
+test('attached transport heights follow the active host profile and hiding the drawing ignores caption scroll height',async t=>{
+  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  d.layouts=[{id:'map',name:'Map',sectionLayout:{default:[{panel:'home',x:0,y:0,w:8,h:20},{controls:'steps',attachTo:'panel:home',x:0,y:20,w:8,h:7}]}},
+    {id:'flow',name:'Flow',sectionLayout:{default:[{x:0,y:0,w:8,h:20},{controls:'steps',attachTo:'diagram',x:0,y:20,w:8,h:6}],confluence:[{x:0,y:0,w:12,h:20},{controls:'steps',attachTo:'diagram',x:0,y:20,w:12,h:8}]}},
+    {id:'detached',name:'Detached',sectionLayout:{default:[{x:0,y:0,w:8,h:12},{controls:'steps',x:0,y:12,w:8,h:5}]}}];
+  const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview'),bar=view.querySelector('.termbar');
+  const host=()=>bar.closest('.section-layout-tile');
+  assert.ok(host().classList.contains('layout-has-attached-controls'));assert.equal(host().style.getPropertyValue('--attached-controls-height'),'272px');
+  view.querySelector('[data-layout-id="flow"]').click();assert.equal(host().style.getPropertyValue('--attached-controls-height'),'312px');
+  Object.defineProperty(bar,'scrollHeight',{value:1200,configurable:true});
+  view.querySelector('[data-layout-flow]').click();assert.equal(host().style.getPropertyValue('--tile-h'),'8');assert.equal(host().hidden,false);
+  view.querySelector('[data-layout-id="detached"]').click();assert.equal(host().classList.contains('layout-has-attached-controls'),false);assert.equal(host().style.getPropertyValue('--attached-controls-height'),'');
+  view.querySelector('[data-layout-id="map"]').click();assert.equal(host().style.getPropertyValue('--attached-controls-height'),'272px');
+});

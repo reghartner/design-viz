@@ -77,9 +77,18 @@
 .docview .section-layout-tile>.pt-homemap{display:flex;flex-direction:column;}
 .section-layout-tile>.pt-homemap>.ptitle{flex:none;}
 .section-layout-tile>.pt-homemap>.pbody{flex:1;min-height:0;}
-.docview .section-layout-tile>.layout-docked-card{display:flex;flex-direction:column;overflow:hidden;}
+.docview .section-layout-tile>.layout-docked-card{display:flex;flex-direction:column;overflow:auto;}
 .section-layout-tile>.layout-docked-card>.pbody{flex:1;min-height:80px;overflow:auto;}
 body .docview .section-layout-tile>.layout-docked-card>.termbar{border:0;border-top:1px solid var(--dfaint);border-radius:0;box-shadow:none;padding:10px 0 0;margin-top:10px;max-height:60%;}
+/* Caption wrapping must not steal space from the host. The saved controls
+   height is also used while attached; overflowing content remains scrollable. */
+body .docview .layout-has-attached-controls>.diagramcol>.termbar,
+body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
+  box-sizing:border-box;flex:none;height:var(--attached-controls-height);max-height:none;align-content:flex-start;
+}
+/* Keep the transport next to the actual drawing instead of stretching blank
+   board space to the bottom of an oversized tile. Large drawings still scroll. */
+.layout-has-attached-controls>.diagramcol:has(>.termbar:not([hidden]))>.board{flex:0 1 auto;}
 .section-layout-tile .hmframe{height:100%;max-height:100%;}
 @container diagram-section (max-width:640px){
   .section-layout-grid{display:flex;flex-direction:column;}
@@ -91,6 +100,8 @@ body .docview .section-layout-tile>.layout-docked-card>.termbar{border:0;border-
   .section-layout-grid{display:block;}
   .section-steps-placeholder{display:none;}
   .section-layout-tile,.section-layout-tile>.diagramcol,.section-layout-tile[data-layout-key="steps"]>.termbar,.docview .section-layout-tile>.pwidget{height:auto;overflow:visible;margin-bottom:12px;}
+  body .docview .layout-has-attached-controls>.diagramcol>.termbar,
+  body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{height:auto;overflow:visible;}
 }
 .boardgrid.haspanels{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:12px; align-items:start;}
 .boardgrid.haspanels > .diagramcol{min-width:0;}

@@ -101,11 +101,14 @@ function sectionLayoutOptimize(d,target,items){
   if(dock){
     var host=next.find(function(it){return sectionLayoutKey(it)===attachment;});
     if(host){
-      var height=(d.paths || []).length>1?6:4;
+      var height=sectionLayoutControlsRows(d,items);
       next.push({controls:'steps',attachTo:attachment,x:host.x,y:host.y+host.h,w:host.w,h:height});
       host.h=Math.min(40,host.h+height);
     }
-  }else if(attachment){var stepTile=next.find(function(it){return it.controls==='steps';});if(stepTile)stepTile.attachTo=attachment;}
+  }else{
+    var stepTile=next.find(function(it){return it.controls==='steps';});
+    if(stepTile){if(attachment)stepTile.attachTo=attachment;if(previous)stepTile.h=previous.h;}
+  }
   return sectionLayoutPack(next.concat(hidden.map(function(it){return Object.assign({},it);})));
 }
 function sectionLayoutGesture(items,key,dx,dy,resize){
@@ -125,6 +128,24 @@ function sectionLayoutAttach(d,items,key){
     if(host && key!==prior){host.h=Math.min(40,host.h+step.h);step.x=host.x;step.y=host.y+host.h;step.w=host.w;}
   }else delete step.attachTo;
   return sectionLayoutPack(next);
+}
+/* Grow the combined tile by the same amount, leaving the visualization's
+   allotted height intact. Legacy combined tiles gain an explicit transport. */
+function sectionLayoutResizeControls(d,items,height){
+  var next=items.map(function(it){return Object.assign({},it);});
+  var step=next.find(function(it){return it.controls==='steps';});
+  if(!step){
+    var diagram=next.find(function(it){return sectionLayoutKey(it)==='diagram';});
+    if(!diagram)return next;
+    step={controls:'steps',attachTo:'diagram',x:diagram.x,y:diagram.y+diagram.h,w:diagram.w,h:sectionLayoutControlsRows(d,items)};next.push(step);
+  }
+  var dock=sectionLayoutDock(next),host=dock && next.find(function(it){return sectionLayoutKey(it)===dock;});
+  var maximum=host?Math.min(40,step.h+40-host.h):40;
+  var value=Math.max(3,Math.min(maximum,Math.round(height)));
+  if(!Number.isFinite(value))return items;
+  if(host)host.h=Math.max(3,host.h+value-step.h);
+  step.h=value;
+  return sectionLayoutPack(next,dock || 'steps');
 }
 /* Separating a legacy combined tile is an explicit, undoable authoring edit. */
 function sectionLayoutDetachSteps(d,items){
@@ -215,9 +236,11 @@ function initSectionLayoutEditor(opts){
     widths[target.value]=Math.max(320,Math.min(1920,Math.round(n)));setFrame();
   });
   function paint(grid,items){
+    var d=rawDiagram(Number(grid.closest('.doc-sec').getAttribute('data-dv-section')));
     grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
       var item=items.find(function(it){return sectionLayoutKey(it)===tile.getAttribute('data-layout-key');});if(!item)return;
       tile.style.setProperty('--tile-x',item.x+1);tile.style.setProperty('--tile-y',item.y+1);tile.style.setProperty('--tile-w',item.w);tile.style.setProperty('--tile-h',item.h);
+      if(d && tile.classList.contains('layout-has-attached-controls'))tile.style.setProperty('--attached-controls-height',(sectionLayoutControlsRows(d,items)*40-8)+'px');
     });
   }
   function cancel(){
@@ -255,6 +278,17 @@ function initSectionLayoutEditor(opts){
       [{key:'',title:'Detached'}].concat(sectionLayoutTiles(d).filter(function(t){return t.key==='diagram' || t.type==='homemap';})).forEach(function(t){var o=el('option',null,t.key?'Attached to '+t.title:t.title);o.value=t.key;attach.appendChild(o);});
       var controls=items.find(function(it){return it.controls==='steps';});attach.value=controls?controls.attachTo || '':'diagram';
       attach.addEventListener('change',function(){persist(index,sectionLayoutAttach(d,items,attach.value),id);});coupling.appendChild(attach);row.appendChild(coupling);
+      if(dock || !controls){
+        var heightLabel=el('label',null,'Attached controls height '),height=el('input');
+        var host=items.find(function(it){return sectionLayoutKey(it)===(dock || 'diagram');}),current=sectionLayoutControlsRows(d,items);
+        height.type='number';height.min='3';height.max=String(host?Math.min(40,current+40-host.h):40);height.step='1';height.value=current;height.setAttribute('aria-label','Attached controls height in rows');
+        heightLabel.appendChild(height);row.appendChild(heightLabel);
+        row.appendChild(button('Apply controls height',function(){
+          if(!height.checkValidity() || !height.value){feedback('Use a whole number from 3 to '+height.max+' rows for the attached controls.');return;}
+          persist(index,sectionLayoutResizeControls(d,items,Number(height.value)),id);
+        }));
+        row.appendChild(el('span','fnote','Controls scroll when text is longer. Resizing them preserves the visualization height.'));
+      }
       if(controls && controls.attachTo && !dock)row.appendChild(el('span','fnote','Attachment panel is hidden; controls are shown separately.'));
       if(definition && !definition.legacy){
         var detail=el('details','layout-step-selection');detail.open=stepsOpen;
@@ -336,13 +370,19 @@ function initSectionLayoutEditor(opts){
       actions.querySelector('[data-arrange-target]').textContent='Editing '+(definition?'“'+definition.name+'” · ':'')+target.options[target.selectedIndex].text;
       actions.querySelector('.section-arrange-fields').hidden=editing!==index;
       section.classList.toggle('section-arranging',editing===index);
+      section.querySelectorAll('.section-controls-resize').forEach(function(handle){handle.remove();});
       if(editing===index){
         forceLayout(index);fields(section,d);
         section.querySelectorAll('.section-layout-tile').forEach(function(tile){
-          if(tile.querySelector('.section-tile-move'))return;
-          var name=tile.getAttribute('data-layout-label');
-          var move=el('button','section-tile-move','⠿ '+name);move.type='button';move.setAttribute('aria-label','Move '+name);move.title='Drag to move. Arrow keys move; Shift + arrows resize.';tile.appendChild(move);
-          var resize=el('button','section-tile-resize','↘');resize.type='button';resize.setAttribute('aria-label','Resize '+name);resize.title='Drag to resize; arrow keys also resize.';tile.appendChild(resize);
+          if(!tile.querySelector('.section-tile-move')){
+            var name=tile.getAttribute('data-layout-label');
+            var move=el('button','section-tile-move','⠿ '+name);move.type='button';move.setAttribute('aria-label','Move '+name);move.title='Drag to move. Arrow keys move; Shift + arrows resize.';tile.appendChild(move);
+            var resize=el('button','section-tile-resize','↘');resize.type='button';resize.setAttribute('aria-label','Resize '+name);resize.title='Drag to resize; arrow keys also resize.';tile.appendChild(resize);
+          }
+          var bar=tile.querySelector('.termbar');
+          if(bar && tile.classList.contains('layout-has-attached-controls')){
+            var grip=el('button','section-controls-resize','↕');grip.type='button';grip.setAttribute('aria-label','Resize attached step controls');grip.title='Drag vertically, or use Up / Down, to resize controls without shrinking the visualization.';bar.appendChild(grip);
+          }
         });
       }
     });
@@ -352,18 +392,19 @@ function initSectionLayoutEditor(opts){
     else if(ev.target.closest('[data-view-focus]')){cancel();editing=null;refresh();}
   });
   view.addEventListener('pointerdown',function(ev){
-    var handle=ev.target.closest('.section-tile-move,.section-tile-resize');if(!handle || ev.button!==0 || ev.isPrimary===false)return;
+    var handle=ev.target.closest('.section-tile-move,.section-tile-resize,.section-controls-resize');if(!handle || ev.button!==0 || ev.isPrimary===false)return;
     var section=handle.closest('.doc-sec'),index=Number(section.getAttribute('data-dv-section'));if(editing!==index||!ready())return;
     var grid=handle.closest('.section-layout-grid');if(getComputedStyle(grid).display!=='grid'){feedback('Use size / position fields on narrow screens, or widen the preview to drag.');return;}
-    ev.preventDefault();ev.stopPropagation();cancel();selected=handle.parentNode.getAttribute('data-layout-key');
+    ev.preventDefault();ev.stopPropagation();cancel();selected=handle.closest('.section-layout-tile').getAttribute('data-layout-key');
     var items=currentItems(index),rect=grid.getBoundingClientRect();
-    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),cell:(grid.clientWidth+8)/12};
+    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)/12};
     handle.setPointerCapture(ev.pointerId);grid.classList.add('layout-dragging');
   },true);
   view.addEventListener('pointermove',function(ev){
     if(!drag||ev.pointerId!==drag.pointer)return;ev.preventDefault();
     var rect=drag.grid.getBoundingClientRect();
-    drag.next=sectionLayoutGesture(drag.items,drag.key,(ev.clientX-drag.x+drag.left-rect.left)/drag.cell,(ev.clientY-drag.y+drag.top-rect.top)/40,drag.resize);paint(drag.grid,drag.next);
+    var dy=(ev.clientY-drag.y+drag.top-rect.top)/40,d=rawDiagram(drag.section);
+    drag.next=drag.controls?sectionLayoutResizeControls(d,drag.items,sectionLayoutControlsRows(d,drag.items)+dy):sectionLayoutGesture(drag.items,drag.key,(ev.clientX-drag.x+drag.left-rect.left)/drag.cell,dy,drag.resize);paint(drag.grid,drag.next);
   },true);
   view.addEventListener('pointerup',function(ev){
     if(!drag||ev.pointerId!==drag.pointer)return;ev.preventDefault();ev.stopPropagation();var finished=drag;cancel();
@@ -373,21 +414,23 @@ function initSectionLayoutEditor(opts){
   },true);
   ['pointercancel','lostpointercapture'].forEach(function(type){view.addEventListener(type,cancel,true);});
   view.addEventListener('keydown',function(ev){
-    var handle=ev.target.closest('.section-tile-move,.section-tile-resize');if(!handle)return;
+    var handle=ev.target.closest('.section-tile-move,.section-tile-resize,.section-controls-resize');if(!handle)return;
     if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();return;}
     if(ev.altKey||ev.metaKey||ev.ctrlKey||['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(ev.key)<0)return;
     ev.preventDefault();ev.stopPropagation();if(!ready())return;
-    var section=handle.closest('.doc-sec'),index=Number(section.getAttribute('data-dv-section')),key=handle.parentNode.getAttribute('data-layout-key');
+    var section=handle.closest('.doc-sec'),index=Number(section.getAttribute('data-dv-section')),key=handle.closest('.section-layout-tile').getAttribute('data-layout-key'),controls=handle.classList.contains('section-controls-resize');
+    if(controls && (ev.key==='ArrowLeft' || ev.key==='ArrowRight'))return;
     selected=key;var delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[ev.key];
     var resize=ev.shiftKey||handle.classList.contains('section-tile-resize');
-    if(persist(index,sectionLayoutGesture(currentItems(index),key,delta[0],delta[1],resize)))setTimeout(function(){
+    var items=currentItems(index),d=rawDiagram(index),next=controls?sectionLayoutResizeControls(d,items,sectionLayoutControlsRows(d,items)+delta[1]):sectionLayoutGesture(items,key,delta[0],delta[1],resize);
+    if(persist(index,next))setTimeout(function(){
       if(editing!==index)return;refresh();
       var sec=view.querySelector('[data-dv-section="'+index+'"]');if(!sec)return;
       var tile=Array.prototype.find.call(sec.querySelectorAll('.section-layout-tile'),function(t){return t.getAttribute('data-layout-key')===key;});
-      var focus=tile && tile.querySelector(resize?'.section-tile-resize':'.section-tile-move');if(focus)focus.focus({preventScroll:true});
+      var focus=tile && tile.querySelector(controls?'.section-controls-resize':resize?'.section-tile-resize':'.section-tile-move');if(focus)focus.focus({preventScroll:true});
     },0);
   },true);
-  view.addEventListener('click',function(ev){if(ev.target.closest('.section-tile-move,.section-tile-resize')){ev.preventDefault();ev.stopPropagation();}},true);
+  view.addEventListener('click',function(ev){if(ev.target.closest('.section-tile-move,.section-tile-resize,.section-controls-resize')){ev.preventDefault();ev.stopPropagation();}},true);
   document.addEventListener('keydown',function(ev){if(drag&&ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();}},true);
   window.addEventListener('blur',cancel);window.addEventListener('resize',cancel);opts.src.addEventListener('input',cancel);
   var query=new URLSearchParams(window.location.search).get('layout');if(['backstage','confluence'].indexOf(query)>=0)target.value=query;

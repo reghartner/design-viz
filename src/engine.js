@@ -4856,7 +4856,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     flowToggle.setAttribute('aria-expanded',String(showDiagram));
     board.hidden=active && !showDiagram ? true : boardHidden;
     if(!active)return;
-    var controlsRows=bar && !bar.hidden && !separateSteps ? Math.max((d.paths || []).length>1?6:4,Math.ceil((bar.scrollHeight+8)/40) || 0) : 0;
+    var controlsRows=bar && !bar.hidden && !separateSteps ? sectionLayoutControlsRows(d,items) : 0;
     var visible=items.filter(function(it){return !(dock && it.controls==='steps') && (!it.hidden || sectionLayoutKey(it)==='diagram');});
     if(!showDiagram)visible=sectionLayoutWithoutFlow(visible,controlsRows);
     grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
@@ -4896,6 +4896,10 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',key==='steps' ? 'Step controls' : panel ? panel.title || panel.id : 'Data flow');
       tile.style.setProperty('--tile-x',it.x+1);tile.style.setProperty('--tile-y',it.y+1);
       tile.style.setProperty('--tile-w',it.w);tile.style.setProperty('--tile-h',it.h);
+      if(bar && (dock===key || key==='diagram' && !separateSteps)){
+        tile.classList.add('layout-has-attached-controls');
+        tile.style.setProperty('--attached-controls-height',(sectionLayoutControlsRows(d,items)*40-8)+'px');
+      }
       grid.appendChild(tile);
       if(key==='steps'){
         move(bar,tile);

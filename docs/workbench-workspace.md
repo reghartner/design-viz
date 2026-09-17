@@ -77,7 +77,8 @@ available. Focus mode still hides reference material. The JSON
 textarea keeps native text editing and vertical resizing where the browser
 supports it. This is a browser layout, not an operating-system fullscreen mode.
 
-Routed diagrams have their own **Auto / Fit width / Readable** controls.
+All row diagrams have their own **Auto / Fit width / Readable** controls,
+including default curved edges, explicit `routing:"curves"`, and lane routing.
 Auto uses full-size labels on narrow diagram columns with horizontal scrolling;
 Fit width shows the whole graph. Tab to the diagram region to pan with arrow
 keys. Phone gutters and larger view buttons leave more room for the content.

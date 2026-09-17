@@ -12925,9 +12925,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 
   var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks);
   lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
-  if (d.routing === 'lanes'){
-    result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
-  }
+  result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
 
   var view = VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient';
   var hasSteps = (d.steps || []).length > 0;

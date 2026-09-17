@@ -316,8 +316,13 @@ Unsupported layouts fall back to curves with a warning. Authored edge bends
 are ignored in lanes mode; label offsets remain available. Omit routing or use
 `"curves"` for existing behavior. Honeycomb imports generate dependency rows
 (at most four cards per row), retaining service cycles and all relationships.
-Their row order describes dependencies, not elapsed time. A **Readable size**
-button enlarges the board for horizontal scrolling; **Fit width** restores it.
+Their row order describes dependencies, not elapsed time.
+
+All row diagrams expose **Auto**, **Fit width**, and **Readable**, independent
+of routing. Auto fits wider columns and uses the 1180-pixel readable minimum
+at column widths of 640 pixels or less. Readable keeps that minimum and enables
+horizontal scrolling; Fit width fits the available column. These are temporary
+viewing choices, not spec fields; they do not change rows or edge routes.
 
 `rows` is an array of rows; each row is an array of slots **in flow order**.
 The engine computes all positions:

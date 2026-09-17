@@ -22,6 +22,33 @@ function planSectionLayoutName(text,raw,section,name,layoutId){
   }
   return planSetField(text,raw,got.path,'layoutName',name.trim()?JSON.stringify(name.trim()):null);
 }
+function planEnsureSectionView(text,raw,section,optimizeTarget){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(Array.isArray(got.d.layouts))return {error:'This diagram already has named views.'};
+  return builderRewrite(text,raw,got.path,function(d){
+    var source=sectionLayoutDefinition(d),name=source?source.name:(d.primaryPanel?'Home':'Data flow');
+    d.layouts=[{id:'view-1',name:name,sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutOptimize(d,'default',null)})}];
+    if(optimizeTarget)d.layouts[0].sectionLayout[optimizeTarget]=sectionLayoutOptimize(got.d,optimizeTarget,sectionLayoutItems(got.d,optimizeTarget));
+    d.defaultLayout='view-1';delete d.sectionLayout;delete d.layoutName;
+  });
+}
+function planSectionViewSteps(text,raw,section,layoutId,indices){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var index=(got.d.layouts || []).findIndex(function(v){return v.id===layoutId;});
+  if(index<0)return {error:'Select a named view before choosing its steps.'};
+  if(indices!==null && (!Array.isArray(indices) || !indices.length || indices.some(function(i,n){return !Number.isInteger(i) || !got.d.steps[i] || indices.indexOf(i)!==n;})))return {error:'Choose at least one step for this view.'};
+  if(indices && !diagramPathList(got.d).some(function(p){return p.indices.some(function(i){return indices.indexOf(i)>=0;});}))return {error:'Choose at least one step that belongs to a story path.'};
+  return builderRewrite(text,raw,got.path,function(d){
+    if(indices===null){delete d.layouts[index].steps;return;}
+    var taken=new Set((d.steps || []).map(function(st){return st.id;}));
+    (d.steps || []).forEach(function(st,i){
+      if(st.id)return;var n=i+1,id='step-'+n;while(taken.has(id))id='step-'+(++n);
+      st.id=id;taken.add(id);
+    });
+    d.layouts[index].steps=indices.map(function(i){return d.steps[i].id;});
+    if(d.layouts[index].steps.some(function(id){return d.steps.filter(function(st){return st.id===id;}).length!==1;}))return {error:'Selected steps need unique IDs. Fix duplicate step IDs first.'};
+  });
+}
 function planDuplicateSectionLayout(text,raw,section,layoutId){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   var warnings=[];sectionLayoutWarnings(got.d,'diagram',warnings);if(warnings.length)return {error:warnings.join('\n')};
@@ -36,9 +63,10 @@ function planDuplicateSectionLayout(text,raw,section,layoutId){
   var suffix=2;while(d.layouts.some(function(v){return v.name===name;}))name=source.name.slice(0,28)+' copy '+suffix++;
   var profiles=builderClone(source.sectionLayout);
   Object.keys(profiles).forEach(function(target){
-    profiles[target]=sectionLayoutDetachSteps(d,sectionLayoutItems(Object.assign({},d,{layouts:undefined,defaultLayout:undefined,sectionLayout:profiles}),target));
+    profiles[target]=sectionLayoutItems(Object.assign({},d,{layouts:undefined,defaultLayout:undefined,sectionLayout:profiles}),target);
   });
-  d.layouts.push({id:id,name:name,sectionLayout:profiles});
+  var copy={id:id,name:name,sectionLayout:profiles};if(source.steps)copy.steps=builderClone(source.steps);
+  d.layouts.push(copy);
   var plan=planReplaceValue(text,raw,got.path,JSON.stringify(d));plan.layoutId=id;return plan;
 }
 function planDeleteSectionLayout(text,raw,section,layoutId){
@@ -64,7 +92,21 @@ function sectionLayoutSwap(items,from,to){
 }
 function sectionLayoutOptimize(d,target,items){
   var hidden=(items || []).filter(function(it){return it.hidden===true && it.controls==null;});
-  return sectionLayoutPreset(d,target,hidden.map(sectionLayoutKey)).concat(hidden.map(function(it){return Object.assign({},it);}));
+  var previous=(items || []).find(function(it){return it.controls==='steps';});
+  var attachment=previous?previous.attachTo:items?'diagram':d.primaryPanel && (d.panels || []).some(function(p){return p.id===d.primaryPanel && p.type==='homemap';})?'panel:'+d.primaryPanel:'diagram';
+  var excluded=hidden.map(sectionLayoutKey),dock=attachment && excluded.indexOf(attachment)<0 && sectionLayoutTiles(d).some(function(t){return t.key==='steps';});
+  if(dock)excluded.push('steps');
+  var presetDiagram=attachment?Object.assign({},d,{primaryPanel:attachment==='diagram'?undefined:attachment.slice(6)}):d;
+  var next=sectionLayoutPreset(presetDiagram,target,excluded);
+  if(dock){
+    var host=next.find(function(it){return sectionLayoutKey(it)===attachment;});
+    if(host){
+      var height=(d.paths || []).length>1?6:4;
+      next.push({controls:'steps',attachTo:attachment,x:host.x,y:host.y+host.h,w:host.w,h:height});
+      host.h=Math.min(40,host.h+height);
+    }
+  }else if(attachment){var stepTile=next.find(function(it){return it.controls==='steps';});if(stepTile)stepTile.attachTo=attachment;}
+  return sectionLayoutPack(next.concat(hidden.map(function(it){return Object.assign({},it);})));
 }
 function sectionLayoutGesture(items,key,dx,dy,resize){
   var next=items.map(function(it){return Object.assign({},it);}),item=next.find(function(it){return sectionLayoutKey(it)===key;});
@@ -72,6 +114,17 @@ function sectionLayoutGesture(items,key,dx,dy,resize){
   if(resize){item.w=Math.max(1,Math.min(12-item.x,item.w+Math.round(dx)));item.h=Math.max(3,Math.min(40,item.h+Math.round(dy)));}
   else{item.x=Math.max(0,Math.min(12-item.w,item.x+Math.round(dx)));item.y=Math.max(0,Math.min(500,item.y+Math.round(dy)));}
   return sectionLayoutPack(next,key);
+}
+function sectionLayoutAttach(d,items,key){
+  var next=sectionLayoutDetachSteps(d,items).map(function(it){return Object.assign({},it);});
+  var step=next.find(function(it){return it.controls==='steps';});if(!step)return next;
+  var prior=sectionLayoutDock(next);
+  if(key){
+    step.attachTo=key;
+    var host=next.find(function(it){return sectionLayoutKey(it)===key;});
+    if(host && key!==prior){host.h=Math.min(40,host.h+step.h);step.x=host.x;step.y=host.y+host.h;step.w=host.w;}
+  }else delete step.attachTo;
+  return sectionLayoutPack(next);
 }
 /* Separating a legacy combined tile is an explicit, undoable authoring edit. */
 function sectionLayoutDetachSteps(d,items){
@@ -107,7 +160,7 @@ function sectionLayoutVisibilityControl(doc,d,items,name,onChange){
   return group;
 }
 function initSectionLayoutEditor(opts){
-  var view=opts.view,editing=null,drag=null,selected='diagram',widths={backstage:1080,confluence:760};
+  var view=opts.view,editing=null,drag=null,selected='diagram',stepsOpen=false,widths={backstage:1080,confluence:760};
   function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text)n.textContent=text;return n;}
   function button(label,fn){var b=el('button','bbtn',label);b.type='button';b.addEventListener('click',fn);return b;}
   var toolbar=el('div','layout-preview-tools'),label=el('label',null,'Preview '),target=el('select');
@@ -176,8 +229,9 @@ function initSectionLayoutEditor(opts){
     var row=section.querySelector('.section-arrange-fields');if(!row)return;row.replaceChildren();
     var index=Number(section.getAttribute('data-dv-section')),id=activeLayout(index),definition=sectionLayoutDefinition(d,id);
     var items=currentItems(index,d);if(!items)return;
+    var dock=sectionLayoutDock(items);if(dock && selected==='steps')selected=dock;
     var choose=el('select');choose.setAttribute('aria-label','Layout element');
-    sectionLayoutTiles(d).filter(function(t){return items.some(function(it){return sectionLayoutKey(it)===t.key;});}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;choose.appendChild(o);});
+    sectionLayoutTiles(d).filter(function(t){return !(dock && t.key==='steps') && items.some(function(it){return sectionLayoutKey(it)===t.key;});}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;choose.appendChild(o);});
     if(!items.some(function(it){return sectionLayoutKey(it)===selected;}))selected='diagram';choose.value=selected;
     choose.addEventListener('change',function(){selected=choose.value;fields(section,d);});row.appendChild(choose);
     var item=items.find(function(it){return sectionLayoutKey(it)===selected;}),inputs={};
@@ -196,24 +250,50 @@ function initSectionLayoutEditor(opts){
       persist(index,next,id);
     });
     row.insertBefore(visibility,row.firstChild);
+    if(sectionLayoutTiles(d).some(function(t){return t.key==='steps';})){
+      var coupling=el('label',null,'Step controls '),attach=el('select');attach.setAttribute('aria-label','Attach step controls to');
+      [{key:'',title:'Detached'}].concat(sectionLayoutTiles(d).filter(function(t){return t.key==='diagram' || t.type==='homemap';})).forEach(function(t){var o=el('option',null,t.key?'Attached to '+t.title:t.title);o.value=t.key;attach.appendChild(o);});
+      var controls=items.find(function(it){return it.controls==='steps';});attach.value=controls?controls.attachTo || '':'diagram';
+      attach.addEventListener('change',function(){persist(index,sectionLayoutAttach(d,items,attach.value),id);});coupling.appendChild(attach);row.appendChild(coupling);
+      if(controls && controls.attachTo && !dock)row.appendChild(el('span','fnote','Attachment panel is hidden; controls are shown separately.'));
+      if(definition && !definition.legacy){
+        var detail=el('details','layout-step-selection');detail.open=stepsOpen;
+        var count=definition.steps?definition.steps.length:(d.steps || []).length;
+        detail.appendChild(el('summary',null,'Steps shown in this view · '+(definition.steps?count+' selected':'All '+count)));
+        detail.addEventListener('toggle',function(){if(detail.isConnected)stepsOpen=detail.open;});
+        detail.appendChild(el('p','fnote','Skipped steps still affect the story. Each path plays only its selected stops, in story order.'));
+        detail.appendChild(button('Show all steps',function(){if(ready() && activeLayout(index)===id)opts.steps(index,id,null);}));
+        var list=el('div','layout-step-options');
+        (d.steps || []).forEach(function(st,i){
+          var label=el('label'),input=el('input');input.type='checkbox';input.checked=!definition.steps || definition.steps.indexOf(st.id)>=0;
+          input.disabled=input.checked && count===1;input.setAttribute('data-view-step',String(i));input.setAttribute('aria-label','Show step '+(i+1)+' in '+definition.name);
+          label.appendChild(input);label.appendChild(el('span',null,(i+1)+'. '+(st.text || st.id || 'Untitled step')));
+          input.addEventListener('change',function(){
+            if(!ready() || activeLayout(index)!==id)return;
+            var indices=Array.prototype.filter.call(list.querySelectorAll('input'),function(box){return box.checked;}).map(function(box){return Number(box.getAttribute('data-view-step'));});
+            if(!opts.steps(index,id,indices))fields(section,d);
+          });list.appendChild(label);
+        });detail.appendChild(list);row.appendChild(detail);
+      }
+    }
     if(selected!=='steps'){
       var swap=el('select');swap.setAttribute('aria-label','Swap places with');
       sectionLayoutTiles(d).filter(function(t){return t.key!==selected && t.key!=='steps';}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;swap.appendChild(o);});
       row.appendChild(swap);var swapButton=button('Swap places',function(){persist(index,sectionLayoutSwap(items,selected,swap.value));});
       swapButton.disabled=!swap.options.length;swapButton.title='Exchange position, size and visibility with the selected element.';row.appendChild(swapButton);
     }
-    var nameLabel=el('label',null,'Layout name '),name=el('input');name.type='text';name.maxLength=40;
-    name.value=definition?definition.name:'';name.placeholder='Layout';name.setAttribute('aria-label','Layout name');
+    var nameLabel=el('label',null,'View name '),name=el('input');name.type='text';name.maxLength=40;
+    name.value=definition?definition.name:'';name.placeholder='View';name.setAttribute('aria-label','View name');
     name.addEventListener('change',function(){if(ready())opts.rename(index,name.value,id);});
     nameLabel.appendChild(name);row.insertBefore(nameLabel,row.firstChild);
-    row.appendChild(button('Duplicate layout',function(){
+    row.appendChild(button('Duplicate view',function(){
       if(!ready())return;var nextId=opts.duplicate(index,id);
       if(nextId){var p=presentation(index);if(p && p.setLayout)p.setLayout(nextId);refresh();}
     }));
     if(definition && !definition.legacy){
-      var makeDefault=button(sectionLayoutDefinition(d).id===id?'Default layout':'Make default',function(){if(ready())opts.makeDefault(index,id);});
+      var makeDefault=button(sectionLayoutDefinition(d).id===id?'Default view':'Make default',function(){if(ready())opts.makeDefault(index,id);});
       makeDefault.disabled=sectionLayoutDefinition(d).id===id;row.appendChild(makeDefault);
-      row.appendChild(button('Delete layout',function(){if(ready()){editing=null;opts.remove(index,id);refresh();}}));
+      row.appendChild(button('Delete view',function(){if(ready()){editing=null;opts.remove(index,id);refresh();}}));
     }
     section.querySelectorAll('.section-layout-tile').forEach(function(tile){tile.classList.toggle('layout-selected',tile.getAttribute('data-layout-key')===selected);});
   }
@@ -229,18 +309,19 @@ function initSectionLayoutEditor(opts){
           if(editing===index){editing=null;refresh();return;}
           editing=index;selected='diagram';if(opts.pause)opts.pause();
           var current=rawDiagram(index),items=currentItems(index,current);
-          if(!items)persist(index,sectionLayoutPreset(current,target.value));else{
-            var detached=sectionLayoutDetachSteps(current,items);
-            if(detached!==items)persist(index,detached);else{forceLayout(index);refresh();}
-          }
+          if(!Array.isArray(current.layouts)){opts.ensureView(index);return;}
+          forceLayout(index);refresh();
         });arrange.setAttribute('data-arrange-toggle','');controls.appendChild(arrange);
-        var rename=button('Rename layout',function(){
+        var rename=button('Rename view',function(){
           if(!ready())return;editing=index;if(opts.pause)opts.pause();forceLayout(index);refresh();
-          var name=section.querySelector('[aria-label="Layout name"]');if(name){name.focus();name.select();}
+          var name=section.querySelector('[aria-label="View name"]');if(name){name.focus();name.select();}
         });rename.setAttribute('data-layout-rename','');controls.appendChild(rename);
         controls.appendChild(button('Optimize layout',function(){
           if(!ready())return;editing=index;
-          var current=rawDiagram(index);persist(index,sectionLayoutOptimize(current,target.value,currentItems(index,current)));
+          if(!Array.isArray(rawDiagram(index).layouts)){opts.ensureView(index,target.value);return;}
+          var current=rawDiagram(index),items=currentItems(index,current),p=presentation(index);
+          if(p && p.mode()==='layout' && p.diagramVisible && !p.diagramVisible())items=items.map(function(it){return sectionLayoutKey(it)==='diagram'?Object.assign({},it,{hidden:true}):it;});
+          persist(index,sectionLayoutOptimize(current,target.value,items));
         }));
         controls.appendChild(button('Reset layout',function(){if(!ready())return;editing=null;persist(index,null);}));
         var caption=el('span','fnote');caption.setAttribute('data-arrange-target','');controls.appendChild(caption);

@@ -970,15 +970,22 @@ function sectionLayoutTiles(d){
   return tiles;
 }
 function sectionLayoutPack(items, priority){
+  var dock=sectionLayoutDock(items);
   var placed = [], order = items.map(function(it){return Object.assign({},it);});
   if (priority) order.sort(function(a,b){return (sectionLayoutKey(a) === priority ? -1 : 0) - (sectionLayoutKey(b) === priority ? -1 : 0);});
   order.forEach(function(it){
     function overlaps(p){return it.x < p.x+p.w && it.x+it.w > p.x && it.y < p.y+p.h && it.y+it.h > p.y;}
     var hits;
-    while (!it.hidden && (hits = placed.filter(function(p){return !p.hidden && overlaps(p);})).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+    while (!it.hidden && !(dock && it.controls==='steps') && (hits = placed.filter(function(p){return !p.hidden && !(dock && p.controls==='steps') && overlaps(p);})).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
     placed.push(it);
   });
   return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
+}
+/* A docked transport shares its host's geometry. Its saved standalone position
+   is retained for detaching, or used as a fallback if that host is hidden. */
+function sectionLayoutDock(items){
+  var steps=items.find(function(it){return it.controls==='steps';});
+  return steps && typeof steps.attachTo==='string' && items.some(function(it){return sectionLayoutKey(it)===steps.attachTo && !it.hidden && !it.controls;}) ? steps.attachTo : null;
 }
 function sectionLayoutPreset(d, target, excludedKeys){
   var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
@@ -1008,7 +1015,7 @@ function diagramLayoutViews(d){
       typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
       !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
       !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),sectionLayout:v.sectionLayout});
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
   if(views.length)return views;
   return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
@@ -1017,6 +1024,9 @@ function diagramLayoutViews(d){
 function sectionLayoutDefinition(d, id){
   var views=diagramLayoutViews(d);
   return views.find(function(v){return v.id===id;}) || views.find(function(v){return v.id===d.defaultLayout;}) || views[0];
+}
+function sectionViewStepsReachable(d,ids){
+  return diagramPathList(d).some(function(p){return p.indices.some(function(i){return ids.indexOf(d.steps[i].id)>=0;});});
 }
 function sectionLayoutItems(d, target, id){
   var definition=sectionLayoutDefinition(d,id), layouts = definition && definition.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
@@ -1030,7 +1040,10 @@ function sectionLayoutItems(d, target, id){
     if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
     var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
     if (it.panel != null) copy.panel=it.panel;
-    if (it.controls==='steps') copy.controls='steps';
+    if (it.controls==='steps'){
+      copy.controls='steps';
+      if(it.attachTo==='diagram' || tiles.some(function(t){return t.key===it.attachTo && t.type==='homemap';}))copy.attachTo=it.attachTo;
+    }
     if(it.hidden===true && it.controls==null)copy.hidden=true;
     used[key]=true;items.push(copy);
   });
@@ -1056,6 +1069,7 @@ function sectionLayoutProfileWarnings(d, v, path, warnings){
         warnings.push(p+': use integer x/y/w/h; 12 columns, y 0–500, h 3–40');
       if(it && it.hidden!=null && (typeof it.hidden!=='boolean' || it.controls!=null))warnings.push(p+': hidden must be a boolean on a diagram or panel tile; step controls stay available');
       if(it && it.controls!=null && (it.controls!=='steps'||it.panel!=null))warnings.push(p+': controls must be "steps", without a panel ID');
+      if(it && it.attachTo!=null && (it.controls!=='steps' || !(it.attachTo==='diagram' || tiles.some(function(t){return t.key===it.attachTo && t.type==='homemap';}))))warnings.push(p+'.attachTo: attach step controls to "diagram" or "panel:<homemap ID>"');
       if(used[key]||(key!=='steps'&&!tiles.some(function(t){return t.key===key;})))warnings.push(p+': duplicate or unknown diagram/panel tile');
       used[key]=true;
     });
@@ -1075,6 +1089,11 @@ function sectionLayoutWarnings(d, path, warnings){
         if(typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40)warnings.push(p+'.name: use a nonempty name of up to 40 characters');
         if(!v.sectionLayout || !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))warnings.push(p+'.sectionLayout: declare at least one host profile');
         sectionLayoutProfileWarnings(d,v.sectionLayout,p,warnings);
+        if(v.steps!=null){
+          var ids=(d.steps || []).map(function(st){return st && st.id;});
+          if(!Array.isArray(v.steps) || !v.steps.length || v.steps.some(function(id,i){return typeof id!=='string' || ids.filter(function(s){return s===id;}).length!==1 || v.steps.indexOf(id)!==i;}))warnings.push(p+'.steps: use a nonempty list of unique existing step IDs; omit for all steps');
+          else if(!sectionViewStepsReachable(d,v.steps))warnings.push(p+'.steps: select at least one step used by a story path');
+        }
       });
     }
   }

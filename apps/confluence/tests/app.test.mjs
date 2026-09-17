@@ -265,8 +265,33 @@ test('multiple layouts replace Home with the diagram while retaining the same li
     assert.equal(tile('diagram').hidden,false);assert.equal(tile('diagram').style.getPropertyValue('--tile-y'),'1');assert.equal(tile('diagram').style.getPropertyValue('--tile-h'),'10');
     assert.equal(tile('panel:home').hidden,true);assert.equal(bar.querySelector('.stepline').textContent,caption);
     assert.equal(view.querySelector('.board'),boardEl);assert.equal(view.querySelector('.pt-homemap'),mapEl);assert.equal(view.querySelectorAll('.termbar').length,1);
-    view.querySelector('[data-view-focus="flow"]').click();assert.equal(grid.hidden,true);
+    assert.equal(view.querySelector('[data-view-focus="flow"]'),null,'named views have no extra automatic Data flow mode');
     view.querySelector('[data-layout-id="resident"]').click();assert.equal(grid.hidden,false);assert.equal(tile('diagram').hidden,true);assert.equal(tile('panel:home').hidden,false);
   }
   assert.equal(view.querySelector('safe'),null);assert.equal(s.calls.submits.length,0);assert.equal(JSON.stringify(raw),json);
+});
+
+test('views dock one live transport to Home or diagram and filter stops without losing skipped state',async t=>{
+  const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
+  d.panels.push({id:'proof',type:'state',title:'Carry-forward proof',states:['Initial','Skipped update'],initial:{state:'Initial'}});
+  d.steps[1].panels.proof={state:'Skipped update'};
+  const common=[{panel:'home',x:0,y:0,w:8,h:18},{x:0,y:18,w:8,h:18,hidden:true},{controls:'steps',attachTo:'panel:home',x:0,y:18,w:8,h:6}];
+  d.layouts=[{id:'resident',name:'Resident',steps:['quiet','notify','inside','offline','leave'],sectionLayout:{default:common}},
+    {id:'engineer',name:'Engineering',sectionLayout:{default:[{panel:'home',x:0,y:18,w:8,h:18,hidden:true},{x:0,y:0,w:8,h:18},{controls:'steps',attachTo:'diagram',x:0,y:18,w:8,h:6}]}},
+    {id:'hidden',name:'All hidden',sectionLayout:{default:[{panel:'home',x:0,y:0,w:8,h:18,hidden:true},{x:0,y:0,w:8,h:18,hidden:true},{controls:'steps',attachTo:'panel:home',x:0,y:0,w:8,h:6}]}}];
+  const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview'),bar=view.querySelector('.termbar'),homeCard=view.querySelector('.pt-homemap');
+  assert.equal(homeCard.querySelector('.termbar'),bar);assert.equal(view.querySelector('[data-layout-key="steps"]'),null);
+  const firstBar=bar;view.querySelector('[aria-label="Go to step 2 on Happy path"]').click();
+  assert.match(bar.querySelector('.stepline').textContent,/notified/);assert.equal(bar.querySelector('.stepid').textContent,'notify');
+  assert.equal(view.querySelector('.coin[data-dv-step="3"] text').textContent,'2');
+  assert.ok(view.querySelector('.coin[data-dv-step="1"]').classList.contains('view-step-hidden'));
+  assert.match(view.querySelector('.pwidget[data-dv-panel="2"] .pbody').textContent,/Skipped update/);
+  view.querySelector('[data-layout-id="engineer"]').click();
+  assert.equal(view.querySelector('[data-layout-key="diagram"] .termbar'),firstBar);assert.match(bar.querySelector('.stepline').textContent,/STEP 4\/5/);
+  assert.equal(homeCard.querySelector('.termbar'),null);assert.equal(homeCard.classList.contains('layout-docked-card'),false);
+  view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();
+  view.querySelector('[data-layout-id="resident"]').click();assert.equal(homeCard.querySelector('.termbar'),firstBar);assert.match(bar.querySelector('.stepline').textContent,/STEP 2\/3/);
+  assert.equal(bar.querySelector('.stepid').textContent,'offline');
+  view.querySelector('[data-layout-id="hidden"]').click();assert.equal(view.querySelector('[data-layout-key="steps"]>.termbar'),firstBar);assert.equal(view.querySelector('[data-layout-key="panel:home"]').hidden,true);
+  assert.equal(view.querySelectorAll('.termbar').length,1);
 });

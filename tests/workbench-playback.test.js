@@ -9,7 +9,7 @@ const copy = value => JSON.parse(JSON.stringify(value));
 
 function element(){
   const attrs = {}, events = {}, classes = new Set();
-  return {attrs, events, style:{}, children:[],
+  return {attrs, events, style:{setProperty(){}}, children:[],
     classList:{add:k=>classes.add(k), remove:k=>classes.delete(k), contains:k=>classes.has(k),
       toggle(k,on){if(on) classes.add(k);else classes.delete(k);}},
     appendChild(el){ if(el.parentNode) el.parentNode.removeChild(el); this.children.push(el); el.parentNode=this; return el; },
@@ -18,6 +18,7 @@ function element(){
     setAttribute(k,v){ attrs[k]=String(v); }, getAttribute:k=>attrs[k] ?? null,
     querySelectorAll(){ return []; }, getBoundingClientRect(){ return {left:0,top:0,width:100,height:20}; },
     cloneNode(){ return element(); },
+    dispatchEvent(){},
     addEventListener(k,fn){ (events[k] ||= []).push(fn); },
     fire(k){ for(const fn of events[k] || []) fn({}); }
   };
@@ -26,7 +27,7 @@ function stepperHarness(options, reducedMotion=false, diagramSettings={}){
   let sequence=0;
   const intervals=new Map(), timeouts=new Map(), ids={}, paints=[];
   const visibilityListeners=new Set();
-  const context={document:{createElement:element, getElementById:id=>ids[id] || null,
+  const context={CustomEvent:class {constructor(type){this.type=type;}},document:{createElement:element, getElementById:id=>ids[id] || null,
       addEventListener(type,fn){ if(type==='visibilitychange') visibilityListeners.add(fn); },
       removeEventListener(type,fn){ if(type==='visibilitychange') visibilityListeners.delete(fn); }},
     window:{matchMedia:()=>({matches:reducedMotion}),
@@ -356,4 +357,32 @@ test('named layout selection survives a story edit but saved visibility edits ta
   h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(id,'flow');assert.equal(visible,true);
   diagramOf(after).layouts[1].sectionLayout.default[0].hidden=true;visible=false;
   h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(id,'flow');assert.equal(visible,false,'authored visibility wins');
+});
+
+test('view steps skip playback stops while keeping full-path indices for state, source editing and links',()=>{
+  const h=stepperHarness({autoplay:false}),s=h.stepper;s.enterStep(false);
+  s.setVisibleSteps(['first','third']);assert.equal(h.term.stepN.textContent,'STEP 1/2');
+  h.term.btnNext.fire('click');assert.equal(s.current().id,'third');assert.equal(s.current().n,2);assert.equal(s.sourceIndex(),2);assert.equal(h.paints.at(-1).index,2);assert.equal(h.term.stepN.textContent,'STEP 2/2');
+  h.term.btnPrev.fire('click');assert.equal(s.current().id,'first');
+  s.toggleAuto();h.tick();assert.equal(s.current().id,'third');h.tick();assert.equal(s.current().id,'first');
+  s.pause();s.setVisibleSteps(['third']);assert.equal(s.current().id,'third');assert.equal(h.term.btnPlay.disabled,true);assert.equal(h.term.stepN.textContent,'STEP 1/1');
+  s.setVisibleSteps(null);assert.equal(s.current().id,'third');assert.equal(h.term.stepN.textContent,'STEP 3/3');assert.equal(h.term.btnPlay.disabled,false);
+});
+test('filtered alternates play only their own selected stops and empty paths cannot be selected',()=>{
+  const h=stepperHarness({autoplay:false},false,{steps:[{id:'start',text:'Start'},{id:'middle',text:'Middle'},{id:'done',text:'Done'},{id:'failed',text:'Failed'}],paths:[{id:'happy',steps:['start','middle','done']},{id:'failed',steps:['start','failed']}]});
+  const s=h.stepper;s.enterStep(false);s.setVisibleSteps(['start','done','failed']);
+  h.term.btnNext.fire('click');assert.equal(s.current().id,'done');assert.equal(h.term.btnNext.disabled,true);
+  assert.equal(s.selectPath('failed'),true);assert.equal(s.current().id,'start');h.term.btnNext.fire('click');assert.equal(s.current().id,'failed');assert.equal(s.sourceIndex(),3);
+  s.setVisibleSteps(['done']);assert.equal(s.path(),'happy');assert.equal(s.current().id,'done');assert.equal(s.selectPath('failed'),false);
+});
+test('inspecting a hidden step previews the exact source without changing the view filter',()=>{
+  const h=stepperHarness({autoplay:false}),s=h.stepper;s.enterStep(false);s.setVisibleSteps(['first','third']);
+  s.jumpSource(1);assert.equal(s.sourceIndex(),1);assert.match(h.term.playbackStatus.textContent,/Previewing a hidden step/);
+  s.setVisibleSteps(['first','third']);assert.equal(s.sourceIndex(),2);assert.equal(h.term.stepN.textContent,'STEP 2/2');
+});
+
+test('switching to a shorter view at its final stop finishes without replaying the path',()=>{
+  const h=stepperHarness({autoplay:false},false,{paths:[{id:'happy',steps:['first','second','third']}]});
+  h.stepper.enterStep(false);h.stepper.toggleAuto();h.tick();assert.equal(h.stepper.current().id,'second');
+  h.stepper.setVisibleSteps(['first','second']);assert.equal(h.stepper.current().id,'second');assert.equal(h.intervals.size,0);assert.equal(h.term.playbackStatus.textContent,'Finished');
 });

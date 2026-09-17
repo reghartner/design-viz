@@ -5,9 +5,7 @@
     "sections": [
       {
         "heading": "A visitor, from home to cloud",
-        "text": [
-          "A fictional doorbell story. Home story shows the place and the visitor; Service flow replaces the map with the same live service diagram. Supporting panels and step controls stay in place. Try Internet down, then switch layouts at step 3."
-        ],
+        "text": "Switch between Home story and Service flow. Home story shows the resident-facing moments; Service flow includes every technical stop. Both follow the same story, including state changes during skipped steps. Playback stays attached to the main view.",
         "diagram": {
           "primaryPanel": "home",
           "view": "step",
@@ -365,7 +363,7 @@
                     "x": 0,
                     "y": 0,
                     "w": 8,
-                    "h": 14
+                    "h": 20
                   },
                   {
                     "x": 0,
@@ -379,7 +377,8 @@
                     "x": 0,
                     "y": 14,
                     "w": 8,
-                    "h": 6
+                    "h": 6,
+                    "attachTo": "panel:home"
                   },
                   {
                     "panel": "outcome",
@@ -402,7 +401,7 @@
                     "x": 0,
                     "y": 0,
                     "w": 12,
-                    "h": 12
+                    "h": 18
                   },
                   {
                     "x": 0,
@@ -416,7 +415,8 @@
                     "x": 0,
                     "y": 12,
                     "w": 12,
-                    "h": 6
+                    "h": 6,
+                    "attachTo": "panel:home"
                   },
                   {
                     "panel": "outcome",
@@ -433,7 +433,14 @@
                     "h": 8
                   }
                 ]
-              }
+              },
+              "steps": [
+                "quiet",
+                "notify",
+                "inside",
+                "offline",
+                "leave"
+              ]
             },
             {
               "id": "service-flow",
@@ -452,14 +459,15 @@
                     "x": 0,
                     "y": 0,
                     "w": 8,
-                    "h": 14
+                    "h": 20
                   },
                   {
                     "controls": "steps",
                     "x": 0,
                     "y": 14,
                     "w": 8,
-                    "h": 6
+                    "h": 6,
+                    "attachTo": "diagram"
                   },
                   {
                     "panel": "outcome",
@@ -489,14 +497,15 @@
                     "x": 0,
                     "y": 0,
                     "w": 12,
-                    "h": 12
+                    "h": 18
                   },
                   {
                     "controls": "steps",
                     "x": 0,
                     "y": 12,
                     "w": 12,
-                    "h": 6
+                    "h": 6,
+                    "attachTo": "diagram"
                   },
                   {
                     "panel": "outcome",

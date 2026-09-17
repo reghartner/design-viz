@@ -82,9 +82,11 @@ the same picker and default to a person; cameras, hubs and entry devices use
 fixed symbols. See [icon choices](../docs/homemap-workbench.md#choose-a-device-or-subject-icon).
 
 For several views with the same supporting panels, use **Arrange section →
-Duplicate layout**, then **Swap places** to exchange Home and Data flow.
+Duplicate view**, then **Swap places** to exchange Home and Data flow.
 **Visible elements** has a separate visibility checkbox for Data flow and each
-panel in the selected layout. Start from **named layouts**
+panel in the selected view. Use **Step controls → Attached to** to keep playback
+inside Home or Data flow. **Steps shown in this view** can skip technical stops
+while retaining their state changes. Start from **named layouts**
 or read [multiple layouts](../docs/section-layouts.md#multiple-named-layouts-of-one-story).
 
 For a cramped workbench, use **Focus workspace**, the draggable divider,

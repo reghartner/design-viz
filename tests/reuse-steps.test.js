@@ -185,3 +185,12 @@ test('large source paths use bounded pages and retain selection across pages',()
   const next=JSON.parse(h.src.value);assert.equal(next.paths[1].steps.length,102);
   assert.equal(next.paths[1].steps[1],'s0-copy1');assert.equal(next.paths[1].steps.at(-1),'s100-copy1');
 });
+
+test('making a shared step independent carries view membership, and path removal cannot strand a view',()=>{
+  const d=fixture();d.layouts=[{id:'brief',name:'Brief',steps:['start'],sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];
+  const independent=c.planPathOccurrenceEdit(JSON.stringify(d),d,0,'offline',0,'independent');const next=check(independent);
+  assert.deepEqual(next.layouts[0].steps,['start',next.paths[1].steps[0]]);
+  d.layouts[0].steps=['lost'];
+  assert.match(c.planPathStepEdit(JSON.stringify(d),d,0,'offline',4,'remove').error,/view/);
+  assert.match(c.planPathOccurrenceEdit(JSON.stringify(d),d,0,'offline',4,'remove').error,/view/);
+});

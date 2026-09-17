@@ -6,7 +6,7 @@ pixels initially). They simulate available space; they do not connect to a host
 or reproduce its navigation, theme, permissions, or enclosing macro. Horizontal
 scrolling lets you inspect a preview wider than your editor split.
 
-In a section, choose **Arrange section**. Each panel, the data-flow diagram, and the step controls
+In a section, choose **Arrange section**. Each panel, the data-flow diagram, and any detached step controls
 get a grab bar and a lower-right resize handle. Drag either handle to snap to
 a twelve-column grid. Overlapping tiles move down to remain visible. Click
 **Done arranging** to see the reader view. Diagram nodes and Home elements
@@ -14,12 +14,15 @@ retain their existing separate editing controls. Drag **Step controls** to put
 play/pause, alternate-path chips, step buttons, and the caption beside the Home
 map or elsewhere in the section. They move as one live group.
 
-Existing saved layouts retain controls attached to their diagram until you
-choose **Arrange section**. That action separates the combined tile into a
-diagram and a controls tile as one undoable edit. Optimize also creates separate
-controls, initially below the centerpiece (or diagram). Sections without steps,
-or with `view:"ambient-only"`, have no controls tile. In Ambient mode a saved
-controls tile prompts you to choose Step; switching views keeps its position.
+**Step controls** can be **Attached to Data flow**, **Attached to** a Home map,
+or **Detached**. Attached controls share their host's outline and move/resize
+with it. Arrange section preserves that coupling; it no longer detaches controls
+automatically. New arrangements attach to the primary Home map when present,
+otherwise to Data flow. To drag the controls separately, choose **Detached**.
+If the attachment panel is hidden, the controls use their saved detached
+position so navigation remains reachable. Optimize preserves the attachment
+and hidden set. Sections without steps, or with `view:"ambient-only"`, have no
+controls tile. In Ambient mode a detached tile prompts you to choose Step.
 
 - A completed move or resize is one **Undo** / **Redo** operation. Escape,
   pointer cancellation, losing focus, or resizing the window cancels a drag.
@@ -46,13 +49,13 @@ The selected preview host and width are temporary workspace state. At section
 widths of 640 pixels or less, tiles stack in reading order; use the numeric
 controls or widen the preview to drag. Maps fit their tiles; dense panels scroll
 internally. Diagram Auto / Fit width / Readable controls remain available.
-Saved arrangements appear as named view buttons alongside **Data flow**, which
-returns to the automatic diagram-first placement. Named layouts replace the
-separate Home choice. All views reuse the live widgets and preserve the selected
-alternate, step and playback state. Sections without saved arrangements retain
-Home / Data flow.
+Saved named views appear as the complete set of view buttons. All views reuse
+the live widgets and preserve the selected alternate, step and playback state
+when included in the destination view. Legacy single arrangements still have
+an automatic **Data flow** choice; sections without saved arrangements retain
+Home / Data flow until Arrange section converts them into named views.
 
-Choose **Rename layout** beside **Arrange section** to name the selected view, for example
+Choose **Rename view** beside **Arrange section** to name the selected view, for example
 **Front door** or **Home**. Names are up to 40 characters and apply across that layout's host profiles. A legacy single view
 stores its name as `diagram.layoutName`; clearing it restores **Layout**. Named
 views store it in `layouts[].name` and require a nonempty name. Renaming is one undoable edit and survives JSON/HTML export.
@@ -69,14 +72,15 @@ removing their declarations.
 ## Multiple named layouts of one story
 
 Choose **starters… → named layouts** to try **Home story** and **Service flow**.
-The second view replaces Home with the service diagram; the outcome panel,
-camera screen, controls, selected step and alternate remain the same.
+Home story shows a shorter resident-facing sequence with controls attached to
+Home; Service flow includes every technical stop and attaches controls to the
+diagram. Both share the same step definitions, panels and execution paths.
 
 To build that from an existing arrangement:
 
-1. Choose **Arrange section**, then **Duplicate layout**. The copy becomes the
-   active view. Give it a **Layout name**, such as **Service flow**. The name
-   field is first in the controls; **Rename layout** also opens and focuses it.
+1. Choose **Arrange section**, then **Duplicate view**. The copy becomes the
+   active view. Give it a **View name**, such as **Service flow**. The name
+   field is first in the controls; **Rename view** also opens and focuses it.
 2. Select **Data flow** in **Layout element**, choose your Home panel in
    **Swap places with**, then click **Swap places**. Position, size and visibility
    exchange; other elements keep their places unless a collision needs packing.
@@ -92,9 +96,9 @@ To build that from an existing arrangement:
 Each layout owns its Responsive, Backstage and Confluence profiles. Duplication
 copies all profiles independently; swapping, moving, sizing and visibility edit
 only the selected host profile in the active layout. Repeat a swap in other
-explicit host profiles as needed. Step controls stay available and have their
-own placement; they cannot be hidden or swapped with a panel. All authoring
-operations support Undo/Redo. **Delete layout** removes the arrangement, never
+explicit host profiles as needed. Step controls stay available, attached or detached; they cannot be hidden or
+swapped with a panel. All authoring
+operations support Undo/Redo. **Delete view** removes the arrangement, never
 its panels, diagram or steps. Deleting the default selects the first remaining
 layout; deleting the last named layout restores the automatic presentation.
 
@@ -102,10 +106,35 @@ layout; deleting the last named layout restores the automatic presentation.
 left receives an automatic Responsive arrangement. **Optimize layout** preserves
 visibility and rearranges only visible elements in that profile.
 
-The first duplication converts an older `sectionLayout` / `layoutName` pair into
-named layouts as one undoable edit. Existing specs keep working unchanged.
+Arrange section, Optimize, or the first duplication converts an older
+`sectionLayout` / `layoutName` pair into named views as one undoable edit. Existing specs keep working unchanged.
 Reader view switches do not write JSON or create undo entries. The workbench
 retains the active named view across edits and skin/host preview changes.
+
+## Steps shown in each view
+
+Under **Arrange section**, expand **Steps shown in this view** and check the
+stops its audience needs. **Show all steps** clears the filter and includes
+future steps automatically. Selecting a subset stores stable step IDs, assigning
+IDs to anonymous steps as part of the same undoable edit. At least one step must
+remain selected; a path with no selected steps is disabled in that view.
+
+Skipped stops still execute in the story: panel state and node tones are folded
+through the full selected path. Navigation, playback, captions and the printed
+step list show only selected stops, in path order. Alternate paths fold their
+own state independently. Switching views retains the current step when included;
+otherwise it selects the next included stop, or the last if there is no next.
+If the entire path is excluded, it selects the first available path. Step links
+and editor references retain the original step identity.
+
+The editor's Steps inspector can temporarily preview a hidden step for editing;
+the playback status says **Previewing a hidden step**. Arrows, Play or clicking
+the view button return to its saved selection. This does not change the spec.
+
+Named views are the complete set of view buttons; there is no additional automatic
+Data flow mode. Name any view **Data flow** and choose the diagram, panels and
+attachment it should show. **Make default** chooses the view that opens first.
+Older specs without named views keep their automatic Home/Data flow behavior.
 
 ## Spec contract
 
@@ -131,7 +160,10 @@ existing presentation.
 ```
 
 A tile without `panel` or `controls` is the data-flow diagram. `panel` names a
-declared panel ID; `controls:"steps"` identifies the step-controls tile. Do not
+declared panel ID; `controls:"steps"` identifies the step-controls tile. Add
+`attachTo:"diagram"` or `attachTo:"panel:home"` (using a Home map ID) to dock it.
+Its saved x/y/w/h remain the fallback when detached or its host is hidden; a
+docked tile reserves no separate grid space. Omit `attachTo` for a detached tile. Do not
 combine `panel` and `controls` on one tile. Omitting the controls tile preserves
 the previous combined diagram-and-controls presentation. A saved controls
 position is ignored while no steps are available and reused if steps return.
@@ -189,9 +221,26 @@ A diagram or panel tile may declare `hidden:true`. It retains its geometry and
 live widget state but does not occupy grid space or push other tiles down.
 Step-control tiles cannot be hidden. Unspecified/new elements are still appended
 visibly; omission never means hidden. In a legacy combined diagram/controls tile,
-hiding the diagram keeps its live controls visible. Prefer a separate controls
-tile in new layouts. Panel rename/delete updates every view and host profile.
+hiding the diagram keeps its live controls visible. Use an explicit controls tile with `attachTo` in new coupled layouts. Panel rename/delete updates every view and host profile.
 
 Named layouts require the updated viewer bundle: re-export standalone HTML or
 update the Backstage/Forge app. Backstage's exported script hash changes with
 this renderer upgrade; update the host CSP alongside the plugin.
+
+Optional `layouts[].steps` is a nonempty list of unique existing step IDs. Omit
+it for all steps; list order does not reorder the story. The selection belongs
+to the view across all host profiles. For example:
+
+```json
+{"id":"resident", "name":"Resident story",
+ "steps":["quiet","notify","inside","offline","leave"],
+ "sectionLayout":{"default":[
+   {"panel":"home","x":0,"y":0,"w":8,"h":18},
+   {"controls":"steps","attachTo":"panel:home","x":0,"y":18,"w":8,"h":6},
+   {"x":0,"y":0,"w":8,"h":12,"hidden":true}
+ ]}}
+```
+
+Deleting a selected step updates all view selections; the editor prevents deleting
+the only selected step in a view until another is selected. Panel rename updates
+attachments across profiles; deleting a Home map detaches its controls.

@@ -4288,6 +4288,14 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   var destroyed = false;
   var hidden = false, resumeOnShow = false;
   var source = d, paths = diagramPathList(source), selectedPath = paths[0];
+  var visibleStepIds=null,editingStep=null;
+  function viewPath(path){
+    return Object.assign({},path,{indices:path.indices.filter(function(index){return index===editingStep || !visibleStepIds || visibleStepIds.indexOf(source.steps[index].id)>=0;})});
+  }
+  function stops(path){
+    path=path || selectedPath;
+    return path.indices.map(function(index,i){return index===editingStep || !visibleStepIds || visibleStepIds.indexOf(source.steps[index].id)>=0?i:-1;}).filter(function(i){return i>=0;});
+  }
   var explicitPaths = Array.isArray(source.paths) && source.paths.length > 0;
   d = diagramForPath(source, selectedPath.id);
   var toneStates = foldNodeTones(d);
@@ -4315,11 +4323,21 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
   var chipButtons = [], pathButtons = [];
+  function paintStepCoins(){
+    var visible=stops();
+    svg.querySelectorAll('.coin[data-dv-step]').forEach(function(coin){
+      var index=selectedPath.indices.indexOf(Number(coin.getAttribute('data-dv-step'))),position=visible.indexOf(index);
+      coin.classList.toggle('view-step-hidden',position<0);
+      var text=coin.querySelector('text');if(text && position>=0)text.textContent=String(position+1);
+    });
+  }
   function paintChips(){
+    paintStepCoins();
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
     chipButtons = []; pathButtons = [];
     function appendStep(parent,path,idx,rowNumber,sharedWith){
       var step = source.steps[path.indices[idx]], b = document.createElement('button');
+      var fullPath=paths.find(function(p){return p.id===path.id;}),fullIndex=fullPath.indices.indexOf(path.indices[idx]);
       b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '') + (sharedWith ? ' shared-step-shadow' : '');
       b.textContent = idx + 1;
       b.setAttribute('data-step-source',path.indices[idx]);
@@ -4336,21 +4354,22 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       b.addEventListener('click',function(){
         stopAuto();
         if (path.id !== selectedPath.id){
-          selectPath(path.id,idx);
+          selectPath(path.id,fullIndex);
           secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
-        } else setStep(idx);
+        } else setStep(fullIndex);
       });
       parent.appendChild(b);
-      chipButtons.push({button:b, path:path, index:idx});
+      chipButtons.push({button:b, path:path, index:fullIndex});
     }
     if (paths.length < 2){
-      selectedPath.indices.forEach(function(unused,idx){appendStep(chipsBox,selectedPath,idx,0);});
+      var only=viewPath(selectedPath);only.indices.forEach(function(unused,idx){appendStep(chipsBox,only,idx,0);});
       return;
     }
     var matrix = document.createElement('div'); matrix.className = 'path-matrix';
     matrix.setAttribute('role','group'); matrix.setAttribute('aria-label','Execution paths');
-    matrix.style.setProperty('--path-step-count',Math.max.apply(null,paths.map(function(p){return p.indices.length;})));
-    pathStepRows(paths).forEach(function(row,rowNumber){
+    var shownPaths=paths.map(viewPath);
+    matrix.style.setProperty('--path-step-count',Math.max(1,Math.max.apply(null,shownPaths.map(function(p){return p.indices.length;}))));
+    pathStepRows(shownPaths).forEach(function(row,rowNumber){
       var path = row.path, line = document.createElement('div'); line.className = 'path-row';
       line.setAttribute('role','group');
       line.setAttribute('aria-label',path.label + ', steps 1 through ' + (row.end + 1) +
@@ -4358,16 +4377,18 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       line.setAttribute('data-path-row',path.id); line.style.setProperty('--path-color',path.color);
       var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
       choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);
+      choice.disabled=!path.indices.length;
+      if(choice.disabled)choice.title='No steps from this path are shown in this view.';
       choice.style.gridColumn = 1; choice.style.gridRow = rowNumber + 1;
       choice.addEventListener('click',function(ev){
-        ev.stopPropagation(); selectPath(path.id,0);
+        ev.stopPropagation();clearEditingPreview();selectPath(path.id,0);
         secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
       });
       line.appendChild(choice); pathButtons.push({button:choice,path:path,row:line});
       for (var i = 0; i <= row.end; i++){
         /* Copy only real shared beats. Nested forks inherit each beat's
            earliest matching path color, including another alternate. */
-        var sharedWith = i < row.start ? paths.slice(0,rowNumber).find(function(prior){
+        var sharedWith = i < row.start ? shownPaths.slice(0,rowNumber).find(function(prior){
           return prior.indices[i] === path.indices[i];
         }) : null;
         appendStep(line,path,i,rowNumber,sharedWith);
@@ -4429,7 +4450,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       captionGhost.style.height = lineRect.height + 'px';
       bar.appendChild(captionGhost);
     }
-    stepN.textContent = 'STEP ' + (cur + 1) + '/' + N;
+    var visible=stops();stepN.textContent = 'STEP ' + (visible.indexOf(cur) + 1) + '/' + visible.length;
     termbar.lanePill.hidden = !s.lane;
     if (s.lane){
       var lm = lanes[s.lane] || {label: s.lane, color: LANE_FALLBACK};
@@ -4459,7 +4480,13 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function setStep(i, claimAddressBar, narrativePath){
     if (destroyed || !N) return;
-    var target = explicitPaths ? Math.max(0,Math.min(N - 1,i)) : ((i % N) + N) % N;
+    var visible=stops();if(!visible.length)return;
+    var first=visible[0],last=visible[visible.length-1];
+    var target=i;
+    if(!visibleStepIds && !explicitPaths)target=((i%N)+N)%N;
+    else if(i>last)target=explicitPaths || narrativePath===false?last:first;
+    else if(i<first)target=explicitPaths || narrativePath===false?first:last;
+    else if(visible.indexOf(i)<0)target=i<cur?visible.filter(function(n){return n<i;}).pop():visible.find(function(n){return n>i;});
     var tween = shouldTweenStep(paintedStep, target, RM, narrativePath);
     var tonePulses = tonePulseNodes(toneStates, paintedStep, target, RM, narrativePath);
     if (tween) boardDiv.classList.add('dv-step-tween');
@@ -4492,19 +4519,22 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     updateCaption(s, tween);
     if (panelCtl) panelCtl.setStep(cur, tween);
     if (explicitPaths){
-      termbar.btnPrev.disabled = cur === 0; termbar.btnNext.disabled = cur === N - 1;
-      if (cur === N - 1) stopAuto();
+      termbar.btnPrev.disabled = cur === first; termbar.btnNext.disabled = cur === last;
+      if (cur === last) stopAuto();
     }
     syncPlayback();
     paintedStep = cur;
     if (onChange) onChange(claimAddressBar !== false);
   }
   function startAuto(){
-    if (destroyed || timer || RM || N < 2 || mode !== 'step' || hidden || document.hidden) return;
-    if (explicitPaths && cur === N - 1) setStep(0, false, false);
+    clearEditingPreview();
+    if(!stops().length)selectPath(paths.find(function(p){return stops(p).length;}).id);
+    var visible=stops(),last=visible[visible.length-1];
+    if (destroyed || timer || RM || visible.length < 2 || mode !== 'step' || hidden || document.hidden) return;
+    if (explicitPaths && cur === last) setStep(visible[0], false, false);
     /* the modulo wrap back to step 0 is a jump, not a narrative move */
     var id = window.setInterval(function(){
-      if (timer === id) setStep(cur + 1, false, cur + 1 < N ? undefined : false);
+      if (timer === id) setStep(cur < last ? cur + 1 : explicitPaths ? last : visible[0], false, cur < last ? undefined : false);
     }, 3000);
     timer = id;
     syncPlayback();
@@ -4515,17 +4545,19 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     syncPlayback();
   }
   function syncPlayback(){
-    var ended = explicitPaths && N > 1 && cur === N - 1;
+    var visible=stops(),count=visible.length;
+    var ended = explicitPaths && count > 1 && cur === visible[count-1];
     var state = timer ? 'playing' : ended ? 'finished' : 'paused';
     var action = timer ? 'Pause' : ended ? 'Replay' : 'Play';
     btnPlay.innerHTML = '<span aria-hidden="true">' + (timer ? '&#10074;&#10074;' : '&#9654;') + '</span> ' + action;
     btnPlay.setAttribute('aria-label', action);
-    btnPlay.disabled = RM || N < 2;
+    btnPlay.disabled = RM || count < 2;
     btnPlay.title = RM ? 'Automatic steps are disabled by reduced motion. Use the step arrows.' :
-      N < 2 ? 'This path has only one step.' : timer ? 'Pause automatic step advancement' :
+      count < 2 ? 'This view shows only one step on this path.' : timer ? 'Pause automatic step advancement' :
       ended ? 'Play this path again from step 1' : 'Advance one step every 3 seconds';
     bar.setAttribute('data-playback', state);
-    var label = timer ? 'Playing · 3s / step' : N < 2 ? 'Single step' : RM ? 'Paused · reduced motion' : ended ? 'Finished' : 'Paused';
+    var label = timer ? 'Playing · 3s / step' : count < 2 ? 'Single step' : RM ? 'Paused · reduced motion' : ended ? 'Finished' : 'Paused';
+    if(editingStep!==null)label+=' · Previewing a hidden step';
     if (termbar.playbackStatus && termbar.playbackStatus.textContent !== label) termbar.playbackStatus.textContent = label;
   }
   function visibilityChanged(){
@@ -4534,19 +4566,20 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   function selectPath(id, at){
     if (destroyed) return false;
     var next = paths.find(function(p){ return p.id === id; });
-    if (!next) return false;
+    if (!next || !stops(next).length) return false;
     if (next === selectedPath){
       if (mode !== 'step') enterStep(false);
-      stopAuto(); setStep(at == null ? 0 : at,true,false);
+      stopAuto(); setStep(at == null || at===0 ? stops(next)[0] : at,true,false);
       return true;
     }
     stopAuto(); clearLit(); clearCaptionTween();
     selectedPath = next; d = diagramForPath(source,id);
     steps = playbackSteps(d); N = steps.length; toneStates = foldNodeTones(d); paintedStep = null;
     if (options && options.renderPath){ board = options.renderPath(d); svg = board.svg; }
+    paintStepCoins();
     if (panelCtl && panelCtl.setDiagram) panelCtl.setDiagram(d);
     mode = 'step'; boardDiv.classList.add('stepmode'); bar.hidden = false; syncToggle();
-    setStep(at == null ? 0 : at, true, false);
+    setStep(at == null || at===0 ? stops(next)[0] : at, true, false);
     if (secBox.dispatchEvent) secBox.dispatchEvent(new CustomEvent('dv:pathrender',{bubbles:true}));
     return true;
   }
@@ -4567,12 +4600,13 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function enterStep(auto){
     if (destroyed) return;
+    clearEditingPreview();
     stopAuto();
     mode = 'step';
     boardDiv.classList.add('stepmode');
     bar.hidden = false;
     paintedStep = null;
-    setStep(0, undefined, false);
+    setStep(stops()[0], undefined, false);
     if (auto && autoplay) startAuto();
     syncToggle();
   }
@@ -4600,8 +4634,10 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     if (timer) stopAuto(); else startAuto();
     if (onChange) onChange(true);
   });
-  termbar.btnPrev.addEventListener('click', function(){ stopAuto(); setStep(cur - 1); });
-  termbar.btnNext.addEventListener('click', function(){ stopAuto(); setStep(cur + 1); });
+  function clearEditingPreview(){if(editingStep!==null){editingStep=null;paintChips();}}
+  function advanceTo(n){stopAuto();clearEditingPreview();if(!stops().length)selectPath(paths.find(function(p){return stops(p).length;}).id);else setStep(n);}
+  termbar.btnPrev.addEventListener('click', function(){advanceTo(cur-1);});
+  termbar.btnNext.addEventListener('click', function(){advanceTo(cur+1);});
   secBox.addEventListener('click',function(event){
     var button=event.target.closest && event.target.closest('button[data-dv-trace-step]');
     if (!button || !secBox.contains(button)) return;
@@ -4637,21 +4673,39 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     path: function(){ return selectedPath.id; },
     paths: function(){ return paths; },
     selectPath: selectPath,
+    setVisibleSteps:function(ids){
+      var next=Array.isArray(ids)?ids.filter(function(id){return paths.some(function(p){return p.indices.some(function(i){return source.steps[i].id===id;});});}):null;
+      if(next && !next.length)next=null; /* malformed filters never strand the viewer */
+      if(JSON.stringify(next)===JSON.stringify(visibleStepIds) && editingStep===null)return;
+      var playing=!!timer,wasMode=mode;stopAuto();visibleStepIds=next;editingStep=null;paintChips();
+      var visible=stops();
+      if(!visible.length){selectPath(paths.find(function(p){return stops(p).length;}).id);}
+      else if(mode==='step'){
+        if(visible.indexOf(cur)<0)setStep(visible.find(function(n){return n>=cur;}) ?? visible[visible.length-1],false,false);
+        else{syncPathControls();updateCaption(steps[cur],false);termbar.btnPrev.disabled=explicitPaths && cur===visible[0];termbar.btnNext.disabled=explicitPaths && cur===visible[visible.length-1];}
+      }
+      syncPlayback();if(playing && (!explicitPaths || cur!==stops().slice(-1)[0]))startAuto();
+      if(wasMode==='ambient' && mode!=='ambient')enterAmbient();
+      if(options && options.viewSteps)options.viewSteps(visibleStepIds);
+    },
     sourceIndex: function(n){ return selectedPath.indices[n == null ? cur : n]; },
     jumpSource: function(index, pathId){
       var path = paths.find(function(p){ return p.id === (pathId || selectedPath.id) && p.indices.indexOf(index) >= 0; }) ||
         paths.find(function(p){ return p.indices.indexOf(index) >= 0; });
       if (!path) return false;
+      if(mode!=='step')enterStep(false);
+      var preview=visibleStepIds && visibleStepIds.indexOf(source.steps[index].id)<0?index:null;
+      if(preview!==editingStep){editingStep=preview;paintChips();}
       if (path.id !== selectedPath.id) selectPath(path.id, path.indices.indexOf(index));
       /* a step pick is a narrative move — it tweens like the arrows */
-      else { if (mode !== 'step') enterStep(false); stopAuto(); setStep(path.indices.indexOf(index),true); }
+      else { stopAuto(); setStep(path.indices.indexOf(index),true); }
       return true;
     },
     current: function(){ return {n: cur, id: steps[cur] ? steps[cur].id : null}; },
     ids: function(){ return steps.map(function(s){ return s.id; }); },
     stepIndexOf: function(sref){ return stepIndexOf(steps.map(function(s){ return s.id; }), sref); },
     jump: function(n){ stopAuto(); setStep(n, undefined, false); },
-    advance: function(n){ stopAuto(); setStep(n); },
+    advance: advanceTo,
     toggleAuto: function(){ if (timer) stopAuto(); else startAuto(); },
     /* Pausing must not replace panel contents: an editor may have focus there. */
     pause: stopAuto,
@@ -4767,11 +4821,12 @@ function sectionLayoutWithoutFlow(items,controlsRows){
   kept.forEach(function(it){it.y-=empty.filter(function(row){return row<it.y;}).length;});
   return kept;
 }
-function createSectionComposition(box, layout, d, board, bar, base, target, changed){
+function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
   var items=sectionLayoutItems(d,target || 'default',layoutId);
   if(!items)return null;
-  var separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';});
+  var dock=sectionLayoutDock(items),separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
+  var named=definition && !definition.legacy;
   var group=layout.viewChoicesHost;
   if(!group){
     var toolbar=document.createElement('div');toolbar.className='diagram-views';
@@ -4787,10 +4842,11 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   /* Keep authored choices before the standard Data flow button. */
   Object.keys(buttons).reverse().forEach(function(id){group.insertBefore(buttons[id],group.firstChild);});
   var homeChoice=group.querySelector('[data-view-focus="panel"]');if(homeChoice)homeChoice.remove();
+  if(named)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.remove();});
   var flowToggle=document.createElement('button');flowToggle.type='button';flowToggle.className='mbtn layout-flow-toggle';
   flowToggle.setAttribute('data-layout-flow','');group.parentNode.insertBefore(flowToggle,group.nextSibling);
   var standard;
-  if(!base){standard=document.createElement('button');standard.type='button';standard.className='mbtn';standard.textContent='Data flow';standard.setAttribute('data-view-focus','flow');group.appendChild(standard);}
+  if(!base && !named){standard=document.createElement('button');standard.type='button';standard.className='mbtn';standard.textContent='Data flow';standard.setAttribute('data-view-focus','flow');group.appendChild(standard);}
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
   grid.id=box.id+'-layout';flowToggle.setAttribute('aria-controls',grid.id);
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
@@ -4801,7 +4857,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     board.hidden=active && !showDiagram ? true : boardHidden;
     if(!active)return;
     var controlsRows=bar && !bar.hidden && !separateSteps ? Math.max((d.paths || []).length>1?6:4,Math.ceil((bar.scrollHeight+8)/40) || 0) : 0;
-    var visible=items.filter(function(it){return !it.hidden || sectionLayoutKey(it)==='diagram';});
+    var visible=items.filter(function(it){return !(dock && it.controls==='steps') && (!it.hidden || sectionLayoutKey(it)==='diagram');});
     if(!showDiagram)visible=sectionLayoutWithoutFlow(visible,controlsRows);
     grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
       var key=tile.getAttribute('data-layout-key'),it=visible.find(function(v){return sectionLayoutKey(v)===key;});
@@ -4820,7 +4876,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   }
   function restore(){
     if(!active)return;
-    saved.forEach(function(rec){if(rec.anchor.parentNode){rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);}});
+    saved.forEach(function(rec){rec.node.classList.remove('layout-docked-card');if(rec.anchor.parentNode){rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);}});
     saved=[];grid.replaceChildren();grid.hidden=true;layout.grid.hidden=oldHidden;
     if(layout.flowDisclosure)layout.flowDisclosure.hidden=flowHidden;
     active=false;Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed','false');});
@@ -4834,6 +4890,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     oldHidden=layout.grid.hidden;flowHidden=layout.flowDisclosure && layout.flowDisclosure.hidden;
     var cards=Array.prototype.slice.call(box.querySelectorAll('.pwidget[data-dv-panel]'));
     items.slice().sort(function(a,b){return a.y-b.y || a.x-b.x;}).forEach(function(it){
+      if(dock && it.controls==='steps')return;
       var tile=document.createElement('div');tile.className='section-layout-tile';
       var key=sectionLayoutKey(it),panel=(d.panels || []).find(function(p){return p.id===it.panel;});
       tile.setAttribute('data-layout-key',key);tile.setAttribute('data-layout-label',key==='steps' ? 'Step controls' : panel ? panel.title || panel.id : 'Data flow');
@@ -4846,6 +4903,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       }else if(it.panel != null){
         var index=(d.panels || []).indexOf(panel),card=cards.find(function(c){return Number(c.getAttribute('data-dv-panel'))===index;});
         move(card,tile);
+        if(dock===key && bar && card){card.classList.add('layout-docked-card');move(bar,card);}
       }else if(layout.diagramCol){
         move(layout.diagramCol,tile);
         if(!separateSteps && bar && !layout.diagramCol.contains(bar))move(bar,layout.diagramCol);
@@ -4859,24 +4917,26 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     var boardModes=board.querySelector('.mtoggle');if(boardModes)move(boardModes,group.parentNode);
     layout.grid.hidden=true;if(layout.flowDisclosure)layout.flowDisclosure.hidden=true;
     grid.hidden=false;active=true;grid.setAttribute('data-layout-id',layoutId);
+    if(stepper)stepper.setVisibleSteps(sectionLayoutDefinition(d,layoutId).steps);
     Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed',String(id===layoutId));});
     paintFlow();
     if(changed)changed(grid);
     if(standard)standard.setAttribute('aria-pressed','false');
     group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed','false');});
   }
-  function setMode(value){if(value==='layout'||value==='panel')activate();else{restore();if(base)base.setMode(value);}}
+  function setMode(value){if(named || value==='layout'||value==='panel')activate();else{restore();if(stepper)stepper.setVisibleSteps(null);if(base)base.setMode(value);}}
   function setLayout(id){
     if(!views.some(function(v){return v.id===id;}))return;
     if(id!==layoutId){
       restore();layoutId=id;items=sectionLayoutItems(d,target || 'default',id);
-      separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';});
+      dock=sectionLayoutDock(items);separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
       showDiagram=Object.prototype.hasOwnProperty.call(visibility,id)?visibility[id]:!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
     }
+    if(active && stepper)stepper.setVisibleSteps(sectionLayoutDefinition(d,id).steps);
     activate();
   }
-  if(standard)standard.addEventListener('click',restore);
-  group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]'))restore();},true);
+  if(standard)standard.addEventListener('click',function(){setMode('flow');});
+  group.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus]')){restore();if(stepper)stepper.setVisibleSteps(null);}},true);
   activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
     layoutId:function(){return layoutId;},setLayout:setLayout,
@@ -5153,7 +5213,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       });
     var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,function(host){
       if(result.stepper)result.stepper.scrollTargetEl=host;
-    });
+    },result.stepper);
     if(composition)result.presentation=composition;
   }
   if (hasDelta){
@@ -5226,9 +5286,12 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   /* print-only numbered caption list (C4) */
   var ol = document.createElement('ol');
   ol.className = 'printsteps';
+  var printDiagram=activeDiagram,printFilter=null;
   function printSteps(diagram){
+    printDiagram=diagram;
     ol.innerHTML = '';
     (diagram.steps || []).forEach(function(st){
+      if(printFilter && printFilter.indexOf(st.id)<0)return;
       var li = document.createElement('li');
       li.textContent = (st && st.lane ? '[' + st.lane + '] ' : '') + ((st && st.text) || '') +
         (Object.keys(stepFailures(st)).length ? ' [' + communicationFailureText(diagram,stepFailures(st)) + ']' : '');
@@ -5241,7 +5304,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
-  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {renderPath:function(next){
+  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {viewSteps:function(ids){printFilter=ids;printSteps(printDiagram);},renderPath:function(next){
     printSteps(next);
     return renderBoard(bwrap, next, prefix, skin, protos, backlinks);
   }}));

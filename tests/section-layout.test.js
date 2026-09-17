@@ -175,7 +175,7 @@ test('duplicate migrates the old arrangement once and makes all host profiles in
   const original=JSON.stringify(d),copy=ctx.planDuplicateSectionLayout(original,d,0,'default');assert.ok(!copy.error,copy.error);
   const next=JSON.parse(copy.text),id=copy.layoutId;assert.equal(next.layouts.length,2);assert.equal(next.defaultLayout,'layout-1');assert.equal(next.sectionLayout,undefined);
   assert.deepEqual(next.layouts[0].sectionLayout,d.sectionLayout);assert.deepEqual(next.steps,d.steps);assert.deepEqual(next.paths,d.paths);
-  assert.ok(next.layouts[1].sectionLayout.default.some(t=>t.controls==='steps'));
+  assert.ok(!next.layouts[1].sectionLayout.default.some(t=>t.controls==='steps'),'duplicating retains the legacy diagram/control coupling');
   let p=ctx.planSectionLayout(copy.text,next,0,'backstage',[phone,board],id);assert.ok(!p.error,p.error);
   let changed=JSON.parse(p.text);assert.deepEqual(changed.layouts[0],next.layouts[0]);assert.deepEqual(changed.layouts[1].sectionLayout.confluence,next.layouts[1].sectionLayout.confluence);
   p=ctx.planSectionLayoutName(p.text,changed,0,'Engineering',id);changed=JSON.parse(p.text);assert.equal(changed.layouts[1].name,'Engineering');assert.equal(changed.layouts[0].name,'Resident');
@@ -250,4 +250,47 @@ test('optimization of a Home-only layout leaves the diagram hidden and keeps con
   assert.deepEqual(optimized.filter(t=>!t.hidden).map(t=>[ctx.sectionLayoutKey(t),t.w,t.y]),[['panel:home',12,0],['steps',12,12]]);
   items.forEach(t=>{if(!t.controls)t.hidden=true;});
   assert.deepEqual(plain(ctx.sectionLayoutOptimize(d,'confluence',items)).filter(t=>!t.hidden).map(t=>[ctx.sectionLayoutKey(t),t.y]),[['steps',0]]);
+});
+
+test('attached controls share geometry, survive Optimize, and fall back to detached when the host is hidden',()=>{
+  const d=diagram(),original=plain(ctx.sectionLayoutPreset(d,'default'));
+  const attached=plain(ctx.sectionLayoutAttach(d,original,'panel:home'));
+  assert.equal(ctx.sectionLayoutDock(attached),'panel:home');
+  assert.equal(attached.find(t=>t.panel==='home').h,16);
+  const normalized=plain(ctx.sectionLayoutItems({...d,sectionLayout:{default:attached}},'default'));
+  assert.equal(normalized.find(t=>t.controls).attachTo,'panel:home');
+  normalized.find(t=>ctx.sectionLayoutKey(t)==='diagram').hidden=true;
+  const optimized=plain(ctx.sectionLayoutOptimize(d,'default',normalized));
+  assert.equal(ctx.sectionLayoutDock(optimized),'panel:home');
+  assert.equal(optimized.find(t=>ctx.sectionLayoutKey(t)==='diagram').hidden,true);
+  noOverlap(optimized.filter(t=>!t.hidden && !t.controls));
+  optimized.find(t=>t.panel==='home').hidden=true;
+  const fallback=plain(ctx.sectionLayoutOptimize(d,'default',optimized));
+  assert.equal(ctx.sectionLayoutDock(fallback),null);
+  assert.equal(fallback.find(t=>t.controls).attachTo,'panel:home');
+  noOverlap(fallback.filter(t=>!t.hidden));
+  const detached=plain(ctx.sectionLayoutAttach(d,attached,''));assert.equal(ctx.sectionLayoutDock(detached),null);noOverlap(detached);
+  assert.equal(original.find(t=>t.controls).attachTo,undefined);
+  const flow=plain(ctx.sectionLayoutOptimize(d,'default',ctx.sectionLayoutAttach(d,original,'diagram')));
+  assert.equal(flow.find(t=>ctx.sectionLayoutKey(t)==='diagram').y,0,'the coupled diagram leads a view even when Home is also visible');
+});
+test('named view conversion and step selection preserve story definitions, generate stable IDs, and copy filters',()=>{
+  const d=diagram();delete d.paths;d.steps.push({text:'Second'},{id:'third',text:'Third'});
+  const conversion=ctx.planEnsureSectionView(JSON.stringify(d),d,0);assert.ok(!conversion.error,conversion.error);
+  const named=JSON.parse(conversion.text);assert.equal(named.layouts[0].name,'Home');assert.equal(named.layouts[0].sectionLayout.default.find(t=>t.controls).attachTo,'panel:home');
+  const selection=ctx.planSectionViewSteps(conversion.text,named,0,'view-1',[0,2]);assert.ok(!selection.error,selection.error);
+  const selected=JSON.parse(selection.text);assert.deepEqual(selected.layouts[0].steps,['one','third']);assert.ok(selected.steps[1].id);assert.deepEqual(selected.steps[0],d.steps[0]);
+  const duplicate=ctx.planDuplicateSectionLayout(selection.text,selected,0,'view-1');assert.deepEqual(JSON.parse(duplicate.text).layouts[1].steps,['one','third']);
+  const all=ctx.planSectionViewSteps(selection.text,selected,0,'view-1',null);assert.equal(JSON.parse(all.text).layouts[0].steps,undefined);
+  assert.ok(ctx.planSectionViewSteps(selection.text,selected,0,'view-1',[]).error);
+  const removed=ctx.planDeleteStep(selection.text,selected,0,0);assert.deepEqual(JSON.parse(removed.text).layouts[0].steps,['third']);
+  assert.ok(ctx.planDeleteStep(removed.text,JSON.parse(removed.text),0,1).error);
+});
+test('attachments follow panel renames and detach on deletion across view profiles',()=>{
+  const d=diagram();d.layouts=[{id:'home',name:'Home',sectionLayout:{default:plain(ctx.sectionLayoutAttach(d,ctx.sectionLayoutPreset(d,'default'),'panel:home'))}}];
+  const rename=ctx.planRenamePanel(JSON.stringify(d),d,0,0,'house'),next=JSON.parse(rename.text);
+  assert.equal(next.layouts[0].sectionLayout.default.find(t=>t.controls).attachTo,'panel:house');
+  const remove=ctx.planDeletePanel(rename.text,next,0,0);assert.equal(JSON.parse(remove.text).layouts[0].sectionLayout.default.find(t=>t.controls).attachTo,undefined);
+  const warnings=[];d.layouts[0].steps=['missing'];d.layouts[0].sectionLayout.default.find(t=>t.controls).attachTo='panel:phone';ctx.sectionLayoutWarnings(d,'diagram',warnings);
+  assert.ok(warnings.some(s=>s.includes('.steps:')));assert.ok(warnings.some(s=>s.includes('.attachTo:')));
 });

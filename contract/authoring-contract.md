@@ -519,7 +519,10 @@ perspectives" of one timeline). Types:
   state shows the label and the reason line.
 - `screen` — a camera viewfinder: `{"id":"cam","type":"screen",
   "scene":"person-at-door-night","initial":{"mode":"off"}}`. Patched via
-  `{"mode":"off|boot|live|rec|save", "banner":"<save-banner text>"}`. Stock
+  `{"mode":"off|boot|active|live|rec|save", "banner":"<save-banner text>"}`.
+  `active` shows the scene with plain white **ACTIVE** text, without a colored
+  badge or recording dot: the camera is on, but is not livestreaming or recording.
+  Use `live` for livestreaming and `rec` for recording. Stock
   scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`,
   `doorbell-runners`, `package-drop`, `kitchen-fire`, `static-noise`. `rec` shows
   a blinking REC dot; `save` shows the banner. All stock scenes use full-color
@@ -540,7 +543,7 @@ perspectives" of one timeline). Types:
   `kitchen-fire` loops layered flames, rising smoke, embers, and reflected
   light around a stove. These are simulated SVG clips, with no video assets
   or external requests. Reduced motion and print hold a readable still of
-  the entry or fire. LIVE → REC → SAVE preserves the same clip's animation;
+  the entry or fire. ACTIVE → LIVE → REC → SAVE preserves the same clip's animation;
   returning from OFF/BOOT restarts it. A different scene replaces the clip.
   Scene timing is independent of recording: patch `scenePlayback:"waiting"`
   to show the quiet setting before an event (empty doorway or porch, no delivered
@@ -551,6 +554,8 @@ perspectives" of one timeline). Types:
   `{"panels":{"cam":{"mode":"rec","scenePlayback":"waiting"}}}` then
   `{"panels":{"cam":{"scenePlayback":"playing"}}}`.
   Omitted `scenePlayback` defaults to `playing`, preserving existing specs.
+  Active mode uses the same independent scene timing, for example
+  `{"panels":{"cam":{"mode":"active","scenePlayback":"waiting"}}}`.
   `waiting` resets the event; returning to `playing` starts it again. Further
   playing steps and mode/banner changes keep the current clip running.
   Direct jumps into a waiting step show the quiet scene; direct jumps into

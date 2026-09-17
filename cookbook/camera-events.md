@@ -58,8 +58,12 @@ off. Scene selection is a panel declaration, shared by all steps and paths.
 
 ## Timing rules
 
-- `off` is standby; `boot` shows the static pattern; `live`, `rec`, and
-  `save` show the chosen scene. `rec` adds REC; `save` adds the banner.
+- `off` is standby; `boot` shows the static pattern; `active`, `live`, `rec`,
+  and `save` show the chosen scene. `active` means the camera is on without
+  livestreaming or recording, with plain white ACTIVE text and no colored
+  badge/dot. `live` adds LIVE; `rec` adds REC; `save` adds the banner.
+  For a quiet camera before recording begins, use
+  `{"panels":{"clip":{"mode":"active","scenePlayback":"waiting"}}}`.
 - `scenePlayback:"waiting"` shows the quiet setting: no visitor, runners,
   delivered parcel, or fire. It leaves REC running. The static pattern has
   no person/event to hide and remains a signal placeholder.
@@ -67,7 +71,7 @@ off. Scene selection is a panel declaration, shared by all steps and paths.
   the selected path independently, so later steps only patch what changed.
   Omission defaults to playing, preserving older specs.
 - Waiting resets the event; returning to playing replays it. Additional
-  playing steps, banner edits, and LIVE → REC → SAVE keep the same clip
+  playing steps, banner edits, and ACTIVE → LIVE → REC → SAVE keep the same clip
   running. OFF/BOOT or changing the scene creates a fresh clip.
 - In the step patch inspector, **Scene event → Before event / Play event**
   edits this field; **Inherit** removes only the current override.

@@ -3271,21 +3271,22 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     h += '</div>';
   } else if (type === 'screen'){
     var mode = String(state.mode || 'off');
-    if (['off','boot','live','rec','save'].indexOf(mode) < 0) mode = 'off';
+    if (['off','boot','active','live','rec','save'].indexOf(mode) < 0) mode = 'off';
     var sceneName = SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
     var scrClass = 'screenbox m-' + mode +
-      (state.scenePlayback === 'waiting' && ['live','rec','save'].indexOf(mode) >= 0 ? ' scene-waiting' : '');
+      (state.scenePlayback === 'waiting' && ['active','live','rec','save'].indexOf(mode) >= 0 ? ' scene-waiting' : '');
     /* overlays are built separately from the scene so a mode change between
        two scene-showing modes can swap ONLY the overlays (surgical path
        below) and keep the scene subtree's animation state (the walker) */
     var scrOvl = '';
+    if (mode === 'active') scrOvl += '<span class="ovl activechip">ACTIVE</span>';
     if (mode === 'live') scrOvl += '<span class="ovl livechip">LIVE</span>';
     if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
     if (mode === 'save') scrOvl += '<span class="ovl banner">' + esc(state.banner || 'SAVING CLIP') + '</span>';
     if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
     h += '<div class="' + scrClass + '">';
     if (mode === 'boot') h += SCENES['static-noise'];
-    else if (mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
+    else if (mode === 'active' || mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
     h += scrOvl + '</div>';
   } else if (type === 'timeline' && Array.isArray(panel.lanes) && panel.lanes.length){
     var lnm = timelineLanesModel(panel, state);
@@ -3988,11 +3989,11 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
   if (host._lastHTML === h) return;
 
   /* screen surgical path: consecutive modes that both show the SAME scene
-     (live / rec / save) swap only the mode class and the overlay chips,
+     (active / live / rec / save) swap only the mode class and the overlay chips,
      keeping the scene subtree — the walker's animation state survives.
      Any other transition (off/boot involved, or a first render) rebuilds. */
   var surgical = false;
-  var SCENE_SHOWING = {live: true, rec: true, save: true};
+  var SCENE_SHOWING = {active: true, live: true, rec: true, save: true};
   if (type === 'screen' && host._lastHTML != null &&
       sceneName === host._scrScene && SCENE_SHOWING[mode] && SCENE_SHOWING[host._scrMode]){
     var scrBox = host.querySelector('.screenbox');

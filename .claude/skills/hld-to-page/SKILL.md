@@ -370,8 +370,10 @@ named in the step text/bullet of the beat where it acts.
   not sent. A received error response or timeout alone does not prove loss.
   Failures are step-local; repeat them on a later beat if the break should
   remain. Focus, node tones, and panel outcomes are authored separately.
-- `screen.mode` describes the camera (`off|boot|live|rec|save`), while
+- `screen.mode` describes the camera (`off|boot|active|live|rec|save`), while
   `scenePlayback:"waiting"|"playing"` controls the simulated event separately.
+  Use `active` for a camera that is on without livestreaming or recording:
+  the scene stays visible with white ACTIVE text and no colored badge/dot.
   Record with `mode:"rec",scenePlayback:"waiting"`, then patch only
   `scenePlayback:"playing"` when the action happens. Both carry along the
   selected path; omission defaults to playing for existing specs. Stock

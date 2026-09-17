@@ -205,3 +205,49 @@ test('malformed names, IDs, defaults and hidden controls warn safely; stale edit
   assert.ok(ctx.planSectionLayout(JSON.stringify(d),d,0,'default',[phone],'deleted-id').error);
   assert.ok(ctx.planSectionLayoutName(JSON.stringify(d),d,0,'New name','deleted-id').error);
 });
+
+test('visibility checklist binds each checkbox to its own tile, exposes hidden panels and names the edited layout',()=>{
+  const changes=[],d=diagram();d.panels[0].title='Home';d.panels[1].title='Home';
+  const items=ctx.sectionLayoutPreset(d,'default');items.find(t=>ctx.sectionLayoutKey(t)==='diagram').hidden=true;
+  function element(tag){return {tag,children:[],attrs:{},events:{},appendChild(child){this.children.push(child);},setAttribute(k,v){this.attrs[k]=v;},addEventListener(k,fn){this.events[k]=fn;}};}
+  const before=JSON.stringify(items),group=ctx.sectionLayoutVisibilityControl({createElement:element},d,items,'Service flow',(key,visible)=>changes.push({key,visible}));
+  assert.equal(group.children[0].textContent,'Visible elements · Service flow');
+  const controls=group.children.filter(e=>e.tag==='label').map(label=>label.children[0]);
+  assert.equal(controls.length,4);
+  const input=key=>controls.find(e=>e.attrs['data-layout-visibility']===key);
+  assert.equal(input('diagram').checked,false);assert.equal(input('panel:home').checked,true);
+  assert.equal(input('panel:home').attrs['aria-label'],'Show Home (home) in Service flow');
+  assert.equal(input('panel:phone').attrs['aria-label'],'Show Home (phone) in Service flow');
+  input('panel:home').checked=false;input('panel:home').events.change();
+  input('diagram').checked=true;input('diagram').events.change();
+  assert.deepEqual(changes,[{key:'panel:home',visible:false},{key:'diagram',visible:true}]);
+  assert.equal(input('panel:phone').checked,true);assert.equal(input('steps'),undefined);
+  assert.equal(JSON.stringify(items),before,'UI changes are committed by the owning layout editor, never mutated in place');
+});
+
+test('optimization preserves hidden elements without reserving their space or changing other views/profiles',()=>{
+  for(const target of ['default','backstage','confluence']){
+    const d=diagram(),items=plain(ctx.sectionLayoutPreset(d,target));
+    items.forEach(t=>{if(t.panel)t.hidden=true;});
+    d.layouts=[{id:'home',name:'Home',sectionLayout:{default:plain(ctx.sectionLayoutPreset(d,'default'))}},{id:'flow',name:'Flow',sectionLayout:{default:items,backstage:items,confluence:items}}];
+    const before=JSON.stringify(d),optimized=plain(ctx.sectionLayoutOptimize(d,target,items));
+    const visible=optimized.filter(t=>!t.hidden);noOverlap(visible);
+    assert.deepEqual(optimized.filter(t=>t.hidden),items.filter(t=>t.hidden));
+    assert.equal(visible.find(t=>ctx.sectionLayoutKey(t)==='diagram').w,12);
+    assert.equal(visible.find(t=>ctx.sectionLayoutKey(t)==='diagram').y,0);
+    assert.equal(visible.find(t=>t.controls).y,12);
+    const plan=ctx.planSectionLayout(before,d,0,target,optimized,'flow');assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text);assert.deepEqual(next.layouts[0],d.layouts[0]);
+    for(const profile of ['default','backstage','confluence'].filter(p=>p!==target))assert.deepEqual(next.layouts[1].sectionLayout[profile],d.layouts[1].sectionLayout[profile]);
+    assert.equal(JSON.stringify(d),before);
+  }
+});
+test('optimization of a Home-only layout leaves the diagram hidden and keeps controls below the map',()=>{
+  const d=diagram(),items=plain(ctx.sectionLayoutPreset(d,'default'));
+  items.forEach(t=>{if(ctx.sectionLayoutKey(t)!=='panel:home' && !t.controls)t.hidden=true;});
+  const optimized=plain(ctx.sectionLayoutOptimize(d,'default',items));
+  assert.deepEqual(optimized.filter(t=>t.hidden),items.filter(t=>t.hidden));
+  assert.deepEqual(optimized.filter(t=>!t.hidden).map(t=>[ctx.sectionLayoutKey(t),t.w,t.y]),[['panel:home',12,0],['steps',12,12]]);
+  items.forEach(t=>{if(!t.controls)t.hidden=true;});
+  assert.deepEqual(plain(ctx.sectionLayoutOptimize(d,'confluence',items)).filter(t=>!t.hidden).map(t=>[ctx.sectionLayoutKey(t),t.y]),[['steps',0]]);
+});

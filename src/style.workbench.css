@@ -616,6 +616,11 @@ body.sk-aurora.sk-blueprint{
 .section-arrange-fields input{width:60px;}
 .section-arrange-fields input[type="text"]{width:180px;}
 .section-arrange-fields select{max-width:190px;}
+.layout-visibility{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;flex-basis:100%;min-width:0;margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;}
+.layout-visibility legend{padding:0 5px;font-weight:600;overflow-wrap:anywhere;}
+.section-arrange-fields .layout-visibility label{cursor:pointer;min-width:0;max-width:100%;overflow-wrap:anywhere;}
+.section-arrange-fields .layout-visibility input{width:16px;min-height:16px;height:16px;flex:none;margin:0;accent-color:var(--accent);}
+.layout-visibility-note{color:var(--sub);font-size:11px;}
 .section-arranging .section-layout-tile{outline:1px dashed var(--acc);padding-top:30px;box-sizing:border-box;}
 .section-arranging .layout-flow-toggle{display:none;}
 .section-arranging .section-layout-tile.layout-selected{outline:2px solid var(--acc);}

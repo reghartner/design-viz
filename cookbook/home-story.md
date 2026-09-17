@@ -83,7 +83,8 @@ fixed symbols. See [icon choices](../docs/homemap-workbench.md#choose-a-device-o
 
 For several views with the same supporting panels, use **Arrange section →
 Duplicate layout**, then **Swap places** to exchange Home and Data flow.
-**Show in this layout** sets visibility independently. Start from **named layouts**
+**Visible elements** has a separate visibility checkbox for Data flow and each
+panel in the selected layout. Start from **named layouts**
 or read [multiple layouts](../docs/section-layouts.md#multiple-named-layouts-of-one-story).
 
 For a cramped workbench, use **Focus workspace**, the draggable divider,

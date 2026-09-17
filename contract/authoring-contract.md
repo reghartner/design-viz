@@ -519,7 +519,14 @@ perspectives" of one timeline). Types:
   state shows the label and the reason line.
 - `screen` — a camera viewfinder: `{"id":"cam","type":"screen",
   "scene":"person-at-door-night","initial":{"mode":"off"}}`. Patched via
-  `{"mode":"off|boot|active|live|rec|save", "banner":"<save-banner text>"}`.
+  `{"mode":"off|boot|active|live|rec|save|unavailable", "banner":"<save-banner text>"}`.
+  `unavailable` hides the scene and shows a crossed-camera symbol with
+  “Camera unavailable” and the authored `reason` text. For example:
+  `{"mode":"unavailable","reason":"Protective shutdown · too hot"}`.
+  `reason` carries independently, is escaped as plain text, and is shown only in
+  unavailable mode. `reason:null` restores the default explanation. Returning to
+  `boot` or `active` removes the unavailable explanation; this does not generate
+  a recovery event or notification. Legacy `off` still shows STANDBY.
   `active` shows the scene with plain white **ACTIVE** text, without a colored
   badge or recording dot: the camera is on, but is not livestreaming or recording.
   Use `live` for livestreaming and `rec` for recording. Stock
@@ -660,6 +667,17 @@ perspectives" of one timeline). Types:
   `crit` (both inclusive; reversed thresholds are swapped with a validator
   warning) — and colors the readout, the fill bar, and the zone chip
   accordingly; `label` replaces only the chip text, never the computed zone.
+  Optional `lowWarn` and `lowCrit` add cold limits, inclusive at-or-below:
+  cyan COLD WARNING and blue TOO COLD. Example scale:
+  `{"min":-30,"max":90,"lowCrit":-15,"lowWarn":0,"warn":50,"crit":65}`.
+  Those values are illustrative, not product limits. The gauge shades cold,
+  safe and hot intervals and includes cold thresholds in its history plot.
+  Reversed cold thresholds are swapped with a warning. The innermost cold limit
+  must be lower than the innermost hot limit; overlapping ranges warn and ignore
+  the cold pair. Non-finite limits are ignored with warnings. With no cold limits,
+  existing high-is-dangerous behavior is unchanged. Temperature never changes
+  another panel automatically: author Camera, charging and thermal effects
+  separately. A restart gate may differ from the warning boundary.
   The bar shades the warn/crit bands and marks both thresholds with ticks and
   scale numbers. A sparkline plots EVERY step's folded `value` as a faint
   frame and reveals the bright line + dots up to the current step, so
@@ -777,8 +795,22 @@ perspectives" of one timeline). Types:
   `scan` (default), `sleep`, `detect`, `rec` (sweep stays live and a red recording light blinks), `off`; entry `closed` (default),
   `open`, `alert`; sensor `ok` (default), `warn`, `alert`, `off`; hub
   `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`. Sensors accept an `icon` from the shared
-  icon set (default/fallback `gear`). Devices have a marker and label;
-  state is conveyed by its appearance and animation, with name/state text in
+  icon set (default/fallback `gear`). A device patch may be a legacy state string, or a sparse object such as
+  `{"cam":{"state":"off","thermal":"hot"}}`. `thermal` accepts
+  `normal` (default), `warm`, `hot`, `cold`, or `freezing`. Warm/hot add rising
+  heat waves and a thermometer; cold/freezing add frost and a snowflake.
+  The condition is independent of operation, so its overlay survives shutdown.
+  Object attributes carry independently: `{"cam":{"thermal":"normal"}}`
+  clears heat without restarting Camera; `{"cam":"scan"}` changes operation
+  without clearing an inherited thermal condition. Unknown object attributes or
+  values warn and are ignored. No new panel-level key is reserved. Subjects still
+  use position objects, and signals still last for one step only. Initial states
+  accept the same device objects. The step inspector offers separate State and
+  Temperature selectors, each with Inherit; shared settings offer Starting device
+  conditions. Heat/frost are symbolic illustrations, not claims of fire or ice.
+  Reduced motion and print keep the stable overlay and suppress its motion.
+  Each device has a marker and label; its state is conveyed by appearance and
+  animation, with name/state text in
   its hover title instead of a visible state chip. Optional `rooms:[{label,x,y,w,h}]` adds named rectangular
   areas behind the devices. Room coordinates use the same frame; rectangles
   must have positive size and fit inside 320×180, otherwise they warn and are

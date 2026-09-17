@@ -37,6 +37,11 @@ The skill now plans evidence and state before JSON; the
 [authoring trials](docs/authoring-evaluation/results.md) record the smaller-model
 tests, observed failures, instruction changes, and remaining review needs.
 
+The [thermal-protection example](cookbook/thermal-protection.md) adds hot/cold
+Home effects, independent camera shutdown and charging, temperature limits on
+both ends, and explicit unavailable-video explanations. Open it from the
+workbench's **thermal protection** starter.
+
 For repository PRs, use the [PR-handling skill](.claude/skills/design-viz-pr/SKILL.md).
 It starts with the diff and loads only the review guidance for the affected surfaces.
 

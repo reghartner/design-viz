@@ -1,6 +1,8 @@
 # Homemap stories in the workbench
 
 Start with **starters… → home story** for a visitor-at-the-door scene with an internet-outage alternate.
+For temperature effects, choose **thermal protection**. It demonstrates heat,
+frost, charging pauses, unavailable video and recovery with two alternate paths.
 For the grounds around a house, choose **whole home & outdoors**. For a porch
 and entry separated by a working door, choose **across the front door**.
 
@@ -40,6 +42,13 @@ authored default again; changing Presentation in the inspector takes precedence
 over the current reading preference.
 
 ## Edit the shared layout
+
+Temperature condition is independent of operating state. The step inspector's
+**Temperature** selector offers normal, warm, hot, cold and freezing alongside
+the device's usual state selector. Each has its own Inherit option. An off
+camera can remain visibly hot or frozen; clearing the temperature does not turn
+it back on. **Starting device conditions** in the shared inspector sets initial
+state and temperature for all paths. See the [thermal recipe](../cookbook/thermal-protection.md).
 
 Use **Edit layout** in the map header from either ambient or step view. The
 inspector opens the homemap panel's shared settings, including the **outline**

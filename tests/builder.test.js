@@ -38,7 +38,7 @@ function loadBuilder(extraGlobals){
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
   const core = {};
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8'), core);
-  const sandbox = {console, sanitizedGroupParents: core.sanitizedGroupParents, stepFailures: core.stepFailures};
+  const sandbox = {console, SCREEN_MODES: core.SCREEN_MODES, sanitizedGroupParents: core.sanitizedGroupParents, stepFailures: core.stepFailures};
   if (extraGlobals) Object.assign(sandbox, extraGlobals);
   vm.runInNewContext(code, sandbox);
   return sandbox.__exports;
@@ -987,7 +987,7 @@ function galleryHarness(){
   let renderCount = 0;
   let arm;
   const code = fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8');
-  const sandbox = {console, document, window: {addEventListener(){}},
+  const sandbox = {console, SCREEN_MODES: B.PANEL_PATCH_FIELDS.screen[0][2], document, window: {addEventListener(){}},
     MutationObserver: class {observe(){}}, setTimeout(){},
     captureArm(fn){ arm = fn; }};
   // Expose only the existing mode state to exercise capture-phase blocking.
@@ -1367,7 +1367,7 @@ test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and none
     }
   }
   const expected = {
-    state: ['state'], leds: [], gauge: ['value'], log: ['log'], screen: ['mode', 'scenePlayback', 'banner'],
+    state: ['state'], leds: [], gauge: ['value'], log: ['log'], screen: ['mode', 'scenePlayback', 'banner', 'reason'],
     waterfall: ['reveal', 'highlight', 'total'], orbit: ['state', 'via'],
     zoneframe: ['zones', 'subject', 'verdict'], xray: ['layers', 'hop'],
     queue: ['state', 'label', 'from', 'to', 'reason'], pir: ['subject', 'tripped', 'status', 'banner'],
@@ -2187,7 +2187,7 @@ function diffWorkbench(storage = new Map(), options = {}){
       listeners.get(type).push({fn, capture});
     }
   };
-  const sandbox = {console, document, window: {addEventListener(){}}, Blob,
+  const sandbox = {console, SCREEN_MODES: B.PANEL_PATCH_FIELDS.screen[0][2], document, window: {addEventListener(){}}, Blob,
     URL: {createObjectURL(){ return 'blob:test'; }, revokeObjectURL(){}},
     getComputedStyle(){ return {}; },
     setTimeout(fn){ timers.set(++timerId, fn); return timerId; }, clearTimeout(id){ timers.delete(id); },
@@ -3087,8 +3087,7 @@ test('homemap setup and dynamic patch fields follow declared devices', () => {
   ]);
   const decl = {type: 'homemap', devices: ['camera', 'entry', 'sensor', 'hub'].map((kind, i) => ({id: 'd' + i, kind, x: 20, y: 40}))};
   assert.deepStrictEqual(plain(B.panelPatchFields(decl)), [
-    ['d0', 'enum', ['sleep', 'scan', 'detect', 'rec', 'off']], ['d1', 'enum', ['closed', 'open', 'alert']],
-    ['d2', 'enum', ['ok', 'warn', 'alert', 'off']], ['d3', 'enum', ['idle', 'rx', 'tx', 'alert']], ['signals', 'jsonArr']
+    ['d0', 'jsonAny'], ['d1', 'jsonAny'], ['d2', 'jsonAny'], ['d3', 'jsonAny'], ['signals', 'jsonArr']
   ]);
   decl.devices.push(null, {}, {...decl.devices[0]}, {id: 'signals', kind: 'camera', x: 1, y: 2},
     {id: 'bad', kind: 'dragon', x: 1, y: 2}, {id: 'nan', kind: 'camera', x: NaN, y: 1});

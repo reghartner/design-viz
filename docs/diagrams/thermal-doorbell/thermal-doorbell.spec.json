@@ -1,0 +1,1573 @@
+{
+  "page": {
+    "title": "When the doorbell gets too hot\u2014or too cold",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Protect the camera. Explain the missed moment.",
+        "accent": "amber",
+        "text": [
+          "Proposed teaching design \u00b7 not Ring firmware behavior. Temperatures and restart gates are illustrative device-body values, not outdoor-weather limits.",
+          "The doorbell contains Camera and an always-on Controller. Health telemetry survives camera shutdown in this design, enabling the illustrated notices. Both views follow the same complete steps. Source: docs/hlds/thermal-doorbell.md."
+        ],
+        "diagram": {
+          "id": "thermal-doorbell",
+          "view": "step",
+          "autoplay": false,
+          "routing": "lanes",
+          "primaryPanel": "home",
+          "layoutName": "At the door",
+          "nodes": {
+            "controller": {
+              "title": "Controller",
+              "sub": "always-on health",
+              "icon": "chip",
+              "tint": "dev"
+            },
+            "camera": {
+              "title": "Camera",
+              "sub": "gated video power",
+              "icon": "doorbell",
+              "tint": "dev"
+            },
+            "health": {
+              "title": "Health",
+              "sub": "Health Service",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "clips": {
+              "title": "Clips",
+              "sub": "Clip Service",
+              "icon": "db",
+              "tint": "data"
+            },
+            "notify": {
+              "title": "Notifications",
+              "sub": "delivery service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "phone": {
+              "title": "Phone",
+              "sub": "Resident Phone",
+              "icon": "phone",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "controller",
+              "camera"
+            ],
+            [
+              "health",
+              "clips"
+            ],
+            [
+              "notify",
+              "phone"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "controller",
+              "to": "camera",
+              "kind": "int",
+              "label": "capture / gate"
+            },
+            {
+              "from": "controller",
+              "to": "health",
+              "kind": "mqtt",
+              "label": "health report"
+            },
+            {
+              "from": "camera",
+              "to": "clips",
+              "kind": "https",
+              "label": "upload clip"
+            },
+            {
+              "from": "clips",
+              "to": "notify",
+              "kind": "https",
+              "label": "clip ready"
+            },
+            {
+              "from": "health",
+              "to": "notify",
+              "kind": "https",
+              "label": "temperature alert"
+            },
+            {
+              "from": "notify",
+              "to": "phone",
+              "kind": "https",
+              "label": "deliver notice"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "At the front door",
+              "outline": {
+                "x": 164,
+                "y": 16,
+                "w": 148,
+                "h": 155
+              },
+              "rooms": [
+                {
+                  "label": "OUTSIDE \u00b7 PORCH",
+                  "kind": "outdoor",
+                  "x": 8,
+                  "y": 16,
+                  "w": 147,
+                  "h": 155
+                },
+                {
+                  "label": "ENTRY",
+                  "x": 166,
+                  "y": 18,
+                  "w": 64,
+                  "h": 151
+                },
+                {
+                  "label": "LIVING ROOM",
+                  "x": 232,
+                  "y": 18,
+                  "w": 78,
+                  "h": 151
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Doorbell camera",
+                  "x": 132,
+                  "y": 88,
+                  "facing": 120,
+                  "spread": 150,
+                  "range": 100
+                },
+                {
+                  "id": "controller",
+                  "kind": "sensor",
+                  "icon": "chip",
+                  "label": "Health controller",
+                  "x": 67,
+                  "y": 61
+                },
+                {
+                  "id": "cloud",
+                  "kind": "sensor",
+                  "icon": "cloud",
+                  "label": "Cloud services",
+                  "x": 62,
+                  "y": 145
+                },
+                {
+                  "id": "phone",
+                  "kind": "sensor",
+                  "icon": "phone",
+                  "label": "Resident phone",
+                  "x": 276,
+                  "y": 48
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "display": "door",
+                  "label": "Front door",
+                  "x": 164,
+                  "y": 99,
+                  "facing": 90,
+                  "doorWidth": 27,
+                  "doorSwing": -90
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "visitor",
+                  "label": "Visitor",
+                  "x": 34,
+                  "y": 114
+                },
+                {
+                  "id": "resident",
+                  "label": "Resident",
+                  "x": 273,
+                  "y": 116
+                }
+              ],
+              "initial": {
+                "cam": {
+                  "state": "scan",
+                  "thermal": "normal"
+                },
+                "controller": "ok",
+                "cloud": "ok",
+                "phone": "ok",
+                "door": "closed",
+                "visitor": null,
+                "resident": {
+                  "x": 273,
+                  "y": 116
+                }
+              }
+            },
+            {
+              "id": "screen",
+              "type": "screen",
+              "title": "Camera \u00b7 current availability",
+              "scene": "person-at-door-night",
+              "initial": {
+                "mode": "active",
+                "scenePlayback": "waiting"
+              }
+            },
+            {
+              "id": "temp",
+              "type": "thermo",
+              "title": "Device body \u00b7 example thresholds",
+              "unit": "\u00b0C",
+              "min": -30,
+              "max": 90,
+              "lowCrit": -15,
+              "lowWarn": 0,
+              "warn": 50,
+              "crit": 65,
+              "initial": {
+                "value": 22
+              }
+            },
+            {
+              "id": "phone",
+              "type": "phone",
+              "title": "Resident notices",
+              "brand": {
+                "app": "Demo Home",
+                "accent": "#5275B9"
+              },
+              "initial": {}
+            },
+            {
+              "id": "cap",
+              "type": "table",
+              "title": "What still works?",
+              "columns": [
+                {
+                  "id": "feature",
+                  "label": "Capability"
+                },
+                {
+                  "id": "status",
+                  "label": "Current state"
+                }
+              ],
+              "initial": {
+                "rows": [
+                  {
+                    "id": "video",
+                    "cells": {
+                      "feature": "Camera",
+                      "status": "Active"
+                    }
+                  },
+                  {
+                    "id": "charging",
+                    "cells": {
+                      "feature": "Wired charge",
+                      "status": "Charging"
+                    }
+                  },
+                  {
+                    "id": "health",
+                    "cells": {
+                      "feature": "Health telemetry",
+                      "status": "Connected"
+                    }
+                  },
+                  {
+                    "id": "visit",
+                    "cells": {
+                      "feature": "Visitor outcome",
+                      "status": "No visitor yet"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "battery",
+              "type": "battery",
+              "title": "Battery \u00b7 charging is separate",
+              "low": 20,
+              "crit": 10,
+              "initial": {
+                "charge": 82,
+                "source": "wired",
+                "trend": "charging",
+                "cold": false,
+                "note": "Illustrative charge; no drain model"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "ready",
+              "text": "The porch is quiet. Camera and health telemetry are available; the device reads 22\u00b0C.",
+              "nodes": [
+                "controller"
+              ]
+            },
+            {
+              "id": "approach",
+              "text": "A visitor approaches the working doorbell. The device stays in the safe interval.",
+              "panels": {
+                "temp": {
+                  "value": 24
+                },
+                "home": {
+                  "visitor": {
+                    "x": 68,
+                    "y": 118
+                  }
+                },
+                "screen": {
+                  "scenePlayback": "playing"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Active"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Charging"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Visitor approaching"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "camera"
+              ]
+            },
+            {
+              "id": "record",
+              "text": "The visitor presses the button. Controller requests recording; Camera begins capturing the visit.",
+              "panels": {
+                "home": {
+                  "cam": "rec",
+                  "visitor": {
+                    "x": 143,
+                    "y": 106
+                  }
+                },
+                "screen": {
+                  "mode": "rec"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Recording"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Charging"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Being captured"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "controller->camera"
+            },
+            {
+              "id": "upload",
+              "text": "Recording ends. Camera uploads the saved clip to Clip Service.",
+              "panels": {
+                "home": {
+                  "cam": "scan",
+                  "signals": [
+                    {
+                      "from": "cam",
+                      "to": "cloud"
+                    }
+                  ]
+                },
+                "screen": {
+                  "mode": "save",
+                  "banner": "SAVED CLIP \u00b7 VISITOR APPROACH"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Active"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Charging"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Clip retained"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edge": "camera->clips"
+            },
+            {
+              "id": "notify",
+              "text": "Clip Service requests a notice; the resident receives \u201cVisitor at the front door.\u201d",
+              "panels": {
+                "phone": {
+                  "notify": {
+                    "app": "Demo Home",
+                    "title": "Visitor at the front door",
+                    "text": "A clip is available."
+                  }
+                },
+                "home": {
+                  "resident": {
+                    "x": 211,
+                    "y": 108
+                  },
+                  "signals": [
+                    {
+                      "from": "cloud",
+                      "to": "phone"
+                    }
+                  ]
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Active"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Charging"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Recorded \u00b7 resident notified"
+                      }
+                    }
+                  ]
+                }
+              },
+              "edges": [
+                "clips->notify",
+                "notify->phone"
+              ]
+            },
+            {
+              "id": "welcome",
+              "text": "The resident opens the door and welcomes the visitor. The saved clip remains available.",
+              "panels": {
+                "home": {
+                  "door": "open",
+                  "visitor": {
+                    "x": 190,
+                    "y": 113
+                  },
+                  "resident": {
+                    "x": 214,
+                    "y": 133
+                  }
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Active"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Charging"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Visitor welcomed"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "phone"
+              ]
+            },
+            {
+              "id": "hot-warning",
+              "text": "At 55\u00b0C Camera reduces video capability while staying active.",
+              "panels": {
+                "temp": {
+                  "value": 55
+                },
+                "home": {
+                  "cam": {
+                    "thermal": "warm"
+                  }
+                },
+                "battery": {
+                  "trend": "charging",
+                  "cold": false,
+                  "note": "Camera capability reduced"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Reduced video"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Charging"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "No visitor yet"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "camera",
+                "controller"
+              ]
+            },
+            {
+              "id": "hot-shutdown",
+              "text": "At 70\u00b0C Controller disables Camera. Health telemetry stays connected; charging is paused.",
+              "panels": {
+                "temp": {
+                  "value": 70
+                },
+                "home": {
+                  "cam": {
+                    "state": "off",
+                    "thermal": "hot"
+                  }
+                },
+                "screen": {
+                  "mode": "unavailable",
+                  "reason": "Protective shutdown \u00b7 too hot. Video is unavailable while the doorbell cools."
+                },
+                "battery": {
+                  "trend": "idle",
+                  "cold": false,
+                  "note": "Camera off; health controller stays on"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Unavailable \u00b7 too hot"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "No visitor yet"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "controller",
+                "camera"
+              ],
+              "tone": {
+                "camera": "warn"
+              }
+            },
+            {
+              "id": "hot-report",
+              "text": "Controller reports thermal protection to Health Service over MQTT; the camera remains off.",
+              "panels": {
+                "home": {
+                  "signals": [
+                    {
+                      "from": "controller",
+                      "to": "cloud"
+                    }
+                  ]
+                }
+              },
+              "edge": "controller->health"
+            },
+            {
+              "id": "hot-notify",
+              "text": "Health Service requests a notice. The resident learns that the camera is too hot.",
+              "panels": {
+                "home": {
+                  "signals": [
+                    {
+                      "from": "cloud",
+                      "to": "phone"
+                    }
+                  ]
+                },
+                "phone": {
+                  "notify": {
+                    "app": "Demo Home",
+                    "title": "Camera paused: too hot",
+                    "text": "Video is unavailable while the doorbell cools."
+                  }
+                }
+              },
+              "edges": [
+                "health->notify",
+                "notify->phone"
+              ]
+            },
+            {
+              "id": "hot-missed",
+              "text": "A visitor presses the button. Controller refuses capture while Camera is off: no recording and no clip upload.",
+              "panels": {
+                "home": {
+                  "visitor": {
+                    "x": 143,
+                    "y": 106
+                  }
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Unavailable \u00b7 too hot"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "controller",
+                "camera"
+              ],
+              "failures": {
+                "camera->clips": "blocked"
+              }
+            },
+            {
+              "id": "hot-cooling",
+              "text": "The reading falls to 55\u00b0C. Camera stays off while the device continues cooling.",
+              "panels": {
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Waiting for restart"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                },
+                "battery": {
+                  "cold": false,
+                  "note": "Charging paused until camera recovery"
+                },
+                "temp": {
+                  "value": 55
+                },
+                "home": {
+                  "cam": {
+                    "thermal": "warm"
+                  }
+                },
+                "screen": {
+                  "reason": "Cooling \u00b7 waiting for the below-40\u00b0C restart gate."
+                }
+              },
+              "nodes": [
+                "controller",
+                "camera"
+              ]
+            },
+            {
+              "id": "hot-safe",
+              "text": "At 35\u00b0C the restart gate is satisfied. Camera remains off until Controller starts it.",
+              "panels": {
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Restart pending"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                },
+                "temp": {
+                  "value": 35
+                },
+                "home": {
+                  "cam": {
+                    "thermal": "normal"
+                  }
+                },
+                "screen": {
+                  "reason": "Safe temperature reached \u00b7 restart has not begun."
+                }
+              },
+              "nodes": [
+                "controller"
+              ]
+            },
+            {
+              "id": "hot-boot",
+              "text": "Controller powers Camera up. It boots while the unrecorded visitor leaves.",
+              "panels": {
+                "home": {
+                  "cam": "sleep",
+                  "visitor": {
+                    "x": 22,
+                    "y": 124
+                  }
+                },
+                "screen": {
+                  "mode": "boot"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Booting"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "controller",
+                "camera"
+              ],
+              "tone": {
+                "camera": "base"
+              }
+            },
+            {
+              "id": "hot-restored",
+              "text": "Camera is active and charging resumes. The missed visit remains missed; no retroactive clip or recovery notice appears.",
+              "panels": {
+                "home": {
+                  "cam": "scan",
+                  "visitor": null
+                },
+                "screen": {
+                  "mode": "active",
+                  "scenePlayback": "waiting",
+                  "reason": null
+                },
+                "battery": {
+                  "trend": "charging",
+                  "cold": false,
+                  "note": "Charging resumed"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Active"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Charging"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "camera"
+              ],
+              "tone": {
+                "camera": "ok"
+              }
+            },
+            {
+              "id": "cold-warning",
+              "text": "At -5\u00b0C charging pauses, while Camera remains active.",
+              "panels": {
+                "temp": {
+                  "value": -5
+                },
+                "home": {
+                  "cam": {
+                    "thermal": "cold"
+                  }
+                },
+                "battery": {
+                  "trend": "idle",
+                  "cold": true,
+                  "note": "Charging paused below the cold limit"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Active"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "No visitor yet"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "camera",
+                "controller"
+              ]
+            },
+            {
+              "id": "cold-shutdown",
+              "text": "At -18\u00b0C Controller disables Camera. Health telemetry stays connected; charging is paused.",
+              "panels": {
+                "temp": {
+                  "value": -18
+                },
+                "home": {
+                  "cam": {
+                    "state": "off",
+                    "thermal": "freezing"
+                  }
+                },
+                "screen": {
+                  "mode": "unavailable",
+                  "reason": "Protective shutdown \u00b7 too cold. Video is unavailable while the doorbell warms."
+                },
+                "battery": {
+                  "trend": "idle",
+                  "cold": true,
+                  "note": "Camera off; health controller stays on"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Unavailable \u00b7 too cold"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "No visitor yet"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "controller",
+                "camera"
+              ],
+              "tone": {
+                "camera": "warn"
+              }
+            },
+            {
+              "id": "cold-report",
+              "text": "Controller reports thermal protection to Health Service over MQTT; the camera remains off.",
+              "panels": {
+                "home": {
+                  "signals": [
+                    {
+                      "from": "controller",
+                      "to": "cloud"
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "controller",
+                "health"
+              ]
+            },
+            {
+              "id": "cold-notify",
+              "text": "Health Service requests a notice. The resident learns that the camera is too cold.",
+              "panels": {
+                "home": {
+                  "signals": [
+                    {
+                      "from": "cloud",
+                      "to": "phone"
+                    }
+                  ]
+                },
+                "phone": {
+                  "notify": {
+                    "app": "Demo Home",
+                    "title": "Camera paused: too cold",
+                    "text": "Video is unavailable until the doorbell warms."
+                  }
+                }
+              },
+              "nodes": [
+                "health",
+                "notify",
+                "phone"
+              ]
+            },
+            {
+              "id": "cold-missed",
+              "text": "A visitor presses the button. Controller refuses capture while Camera is off: no recording and no clip upload.",
+              "panels": {
+                "home": {
+                  "visitor": {
+                    "x": 143,
+                    "y": 106
+                  }
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Unavailable \u00b7 too cold"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "controller",
+                "camera"
+              ],
+              "failures": {
+                "camera->clips": "blocked"
+              }
+            },
+            {
+              "id": "cold-cooling",
+              "text": "The reading is 3\u00b0C: nominal on the gauge, but still below the above-5\u00b0C restart gate.",
+              "panels": {
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Waiting for restart"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                },
+                "battery": {
+                  "cold": false,
+                  "note": "Charging paused until camera recovery"
+                },
+                "temp": {
+                  "value": 3
+                },
+                "home": {
+                  "cam": {
+                    "thermal": "normal"
+                  }
+                },
+                "screen": {
+                  "reason": "Waiting for the above-5\u00b0C restart gate."
+                }
+              },
+              "nodes": [
+                "controller",
+                "camera"
+              ]
+            },
+            {
+              "id": "cold-safe",
+              "text": "At 8\u00b0C the restart gate is satisfied. Camera remains off until Controller starts it.",
+              "panels": {
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Restart pending"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                },
+                "temp": {
+                  "value": 8
+                },
+                "home": {
+                  "cam": {
+                    "thermal": "normal"
+                  }
+                },
+                "screen": {
+                  "reason": "Safe temperature reached \u00b7 restart has not begun."
+                }
+              },
+              "nodes": [
+                "controller"
+              ]
+            },
+            {
+              "id": "cold-boot",
+              "text": "Controller powers Camera up. It boots while the unrecorded visitor leaves.",
+              "panels": {
+                "home": {
+                  "cam": "sleep",
+                  "visitor": {
+                    "x": 22,
+                    "y": 124
+                  }
+                },
+                "screen": {
+                  "mode": "boot"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Booting"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Paused"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "controller",
+                "camera"
+              ],
+              "tone": {
+                "camera": "base"
+              }
+            },
+            {
+              "id": "cold-restored",
+              "text": "Camera is active and charging resumes. The missed visit remains missed; no retroactive clip or recovery notice appears.",
+              "panels": {
+                "home": {
+                  "cam": "scan",
+                  "visitor": null
+                },
+                "screen": {
+                  "mode": "active",
+                  "scenePlayback": "waiting",
+                  "reason": null
+                },
+                "battery": {
+                  "trend": "charging",
+                  "cold": false,
+                  "note": "Charging resumed"
+                },
+                "cap": {
+                  "rows": [
+                    {
+                      "id": "video",
+                      "cells": {
+                        "feature": "Camera",
+                        "status": "Active"
+                      }
+                    },
+                    {
+                      "id": "charging",
+                      "cells": {
+                        "feature": "Wired charge",
+                        "status": "Charging"
+                      }
+                    },
+                    {
+                      "id": "health",
+                      "cells": {
+                        "feature": "Health telemetry",
+                        "status": "Connected"
+                      }
+                    },
+                    {
+                      "id": "visit",
+                      "cells": {
+                        "feature": "Visitor outcome",
+                        "status": "Missed \u00b7 no recording"
+                      }
+                    }
+                  ]
+                }
+              },
+              "nodes": [
+                "camera"
+              ],
+              "tone": {
+                "camera": "ok"
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Visitor welcomed",
+              "color": "#28946A",
+              "steps": [
+                "ready",
+                "approach",
+                "record",
+                "upload",
+                "notify",
+                "welcome"
+              ]
+            },
+            {
+              "id": "hot",
+              "label": "Overheating",
+              "color": "#D36B31",
+              "steps": [
+                "ready",
+                "hot-warning",
+                "hot-shutdown",
+                "hot-report",
+                "hot-notify",
+                "hot-missed",
+                "hot-cooling",
+                "hot-safe",
+                "hot-boot",
+                "hot-restored"
+              ]
+            },
+            {
+              "id": "cold",
+              "label": "Too cold",
+              "color": "#557BE2",
+              "steps": [
+                "ready",
+                "cold-warning",
+                "cold-shutdown",
+                "cold-report",
+                "cold-notify",
+                "cold-missed",
+                "cold-cooling",
+                "cold-safe",
+                "cold-boot",
+                "cold-restored"
+              ]
+            }
+          ],
+          "sectionLayout": {
+            "default": [
+              {
+                "panel": "home",
+                "x": 0,
+                "y": 0,
+                "w": 8,
+                "h": 13
+              },
+              {
+                "panel": "screen",
+                "x": 8,
+                "y": 0,
+                "w": 4,
+                "h": 7
+              },
+              {
+                "panel": "temp",
+                "x": 8,
+                "y": 7,
+                "w": 4,
+                "h": 6
+              },
+              {
+                "controls": "steps",
+                "x": 0,
+                "y": 13,
+                "w": 12,
+                "h": 7
+              },
+              {
+                "panel": "phone",
+                "x": 0,
+                "y": 20,
+                "w": 4,
+                "h": 10
+              },
+              {
+                "panel": "cap",
+                "x": 4,
+                "y": 20,
+                "w": 4,
+                "h": 10
+              },
+              {
+                "panel": "battery",
+                "x": 8,
+                "y": 20,
+                "w": 4,
+                "h": 10
+              },
+              {
+                "x": 0,
+                "y": 30,
+                "w": 12,
+                "h": 16
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -24,13 +24,24 @@ The guide distinguishes portable implementation from company deployment.
 
 ## Mount the company experience
 
+Keep the company deployment in two repositories: the existing Backstage repository
+owns this frontend plugin, and `flowview-diagrams` owns the authoritative specs,
+registry, traces, drift workflow and company backend/deployment configuration.
+That backend hosts the read API and external workbench/standalone viewer. This
+`design-viz` repository supplies versioned runtime and integration code for both.
+Splitting specs from the service is optional access-policy work, not required by
+this implementation. The company's proper HTTP/auth backend remains authoritative.
+
 Host the generated `template/flowview.html`, `workbench/flowspec.html`, and portal
 assets behind company authentication. Install the [Flowview entity plugin](../apps/backstage/README.md)
 for a **Diagrams** tab on Component and API pages, or mount the mock portal as a
 development preview. `tools/canon/entity-diagrams.mjs` derives associations from
 `nodes.*.binding.entityRef` and explicit API bindings across every section/tab.
-The tab lists canonical flows and HLD designs with links to relevant happy and
-alternate steps, and refreshes automatically. No per-service annotation or
+The tab renders canonical flows and HLD designs inline with jumps to relevant happy
+and alternate steps, and refreshes automatically. Editing stays external. The
+Backstage parent fetches JSON through its authenticated proxy and gives it to a
+bundled, network-disabled rendering frame; it does not iframe the hosted viewer
+URL. See the plugin guide's parent CSP/hash requirements. No per-service annotation or
 manually maintained list is needed. Company installation, authenticated proxy
 configuration and per-viewer diagram visibility are described in the plugin guide.
 
@@ -48,7 +59,7 @@ The browser contract is same-origin `/api/canon/`:
 | GET `context?id=…&review=…` | `{catalog,spec,revision,simulated:false}`; optional review draft |
 | GET `entity-diagrams?entityRef=…` | Version-1 derived associations for a full entity reference, with diagram/section/path/step links |
 | GET `services` | Mock catalog services with derived diagram counts |
-| GET `specs/:id` | Current approved spec |
+| GET `specs/:id?revision=…` | Requested approved spec, or 409 if unavailable; without revision, current approved spec |
 | POST `proposals` | `{id,spec,baseRevision,review?}` → proposal/PR ID |
 | POST `scan` | Queue/report a source scan under an authorized service identity |
 | POST `decisions` | Explicit disposition, reason, authenticated actor, issue URL |
@@ -115,7 +126,9 @@ PRs. Scan evidence alone cannot establish a regression's root cause.
 4. Map a sanitized happy trace, approve it, then import partial/error/latency/queue
    traces. Verify branch position, independent IDs, unknown outcomes and links.
 5. Run the app's permission checks for readers, authors and reviewers, then exercise
-   the embedded Backstage route and manual Confluence export on a phone/desktop.
+   the embedded Backstage route and manual Confluence export at desktop and real
+   embed widths. Confirm the parent alone reads specs, the frame has no network
+   requests, service step jumps work, and external links/editor open new tabs.
 
 Local validation covers core algorithms, HTTP adapter doubles, persistence,
 renderer regression suites and browser interaction. It does not establish company

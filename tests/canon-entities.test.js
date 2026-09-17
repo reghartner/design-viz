@@ -59,6 +59,8 @@ test('portal entity lists reflect approved changes and registry additions/remova
   const lookup='entity-diagrams?entityRef='+encodeURIComponent('component:default/recording-service');
   try{
     const first=await get(lookup);assert.equal(first.diagrams.length,1);assert.equal((await get('services')).services.find(s=>s.entityRef==='component:default/recording-service').diagramCount,1);
+    assert.equal((await get('specs/doorbell?revision='+first.diagrams[0].revision)).page.canon.id,'doorbell');
+    assert.equal((await fetch(base+'specs/doorbell?revision=stale')).status,409);
     assert.equal((await fetch(base+'entity-diagrams?entityRef=recording-service')).status,400);
     const current=await get('context?id=doorbell'),draft=C.clone(current.spec);
     delete draft.page.sections[0].diagram.nodes.cloud.binding;

@@ -4,8 +4,10 @@ This source workspace plugin adds a **Diagrams** tab to Component and API entity
 pages. It discovers published diagrams from explicit spec bindings; no per-service
 list, catalog annotation, or manual Backstage link maintenance is required.
 
-The tab shows canonical/design status, owner, design-document links, matched nodes,
-and links to matching steps on each happy/alternate path. It refreshes every
+The tab renders the selected diagram inline with playback, alternate paths, Home,
+panels and node evidence links. Service step buttons jump inside that viewer.
+It also shows canonical/design status, owner and design-document links. **Edit in
+workbench** opens the external editor in a new tab. The list refreshes every
 60 seconds while visible, on focus, and on demand. Changing services cancels old
 requests. Failed refreshes retain the last result with a visible warning.
 
@@ -14,6 +16,12 @@ service discovery, GitHub scans, human decisions, refusal gates and trace eviden
 The guide distinguishes portable implementation from company deployment.
 
 ## Try the mock
+
+To try the actual React plugin against fictional data, run `npm ci` and
+`npm run preview:build` in this directory, then start the mock server below and
+open `http://localhost:8766/backstage-preview/index.html`. This local shell runs
+with a restrictive parent CSP including the exact viewer script hash. It is a
+plugin preview, not proof of company authentication or an installed Backstage app.
 
 Run `node apps/backstage-mock/server.mjs` from the repository root and open:
 
@@ -88,10 +96,11 @@ a substitute for diagram-level authorization. Authoring/viewer URLs must also
 have the company's normal access controls. Do not point a production proxy at
 the no-auth mock server.
 
-Expose this GET endpoint from the company adapter:
+Expose these GET endpoints from the company adapter:
 
 ```
 /api/canon/entity-diagrams?entityRef=component%3Adefault%2Frecording-service
+/api/canon/specs/doorbell?revision=<opaque-published-revision>
 ```
 
 After obtaining the published specs the requesting viewer can read:
@@ -120,6 +129,39 @@ a `url`, and paths with numbered, linked steps. Empty results are HTTP 200 with
 an empty array; an invalid/unavailable index must be an error, not an empty list.
 `src/api.ts` contains the frontend contract and response checks.
 
+The spec route must apply the same per-viewer authorization as the association
+list. Return the requested approved revision, or HTTP 409 when it is no longer
+available. Do not silently return a newer spec: the service step index belongs to
+the listed revision. The response is the original JSON spec with matching
+`page.canon.id`, at most 2 MiB UTF-8. Selection changes cancel pending reads and
+remove the old viewer. Read/render failures show an explicit retry; a stale
+revision asks the reader to refresh diagrams.
+
+## Rendering and browser policy
+
+The plugin parent uses Backstage `FetchApi` through the authenticated backend
+proxy to read JSON. It passes that data over a private transferred `MessagePort`
+to a bundled `srcDoc` iframe. The frame never loads a hosted Flowview URL, obtains
+credentials, calls a service API, or fetches fonts/scripts/specs. Its sandbox omits
+`allow-same-origin`; its own CSP includes `connect-src 'none'`. Explicit HTTP(S)
+evidence links open separate tabs. Playback starts paused, pauses when hidden,
+and the frame reports content height to the parent.
+
+**Parent CSP still applies to `srcDoc`.** In the company Backstage backend policy,
+allow the generated exact script hash exported as `viewerScriptCsp` from this
+package (also in `src/generated/viewerDocument.ts`), inline styles, `font-src data:`,
+`img-src data:` and the local frame. Merge these sources with the existing host
+policy; do not replace its other directives or enable blanket inline scripts.
+If the host uses `script-src-elem`, it must also allow the hash. Refresh the hash
+when upgrading the bundled viewer. A blocked script reports a startup error
+after ten seconds. Verify the installed host's CSP, links and SSO separately.
+
+`src/generated/viewerDocument.ts` and `FONT-LICENSES.txt` travel with the plugin,
+so company builds do not need this repository's source tree. To update the shared
+runtime here, run `npm run build:viewer`; CI checks freshness with
+`npm run check:viewer`. This snapshot includes the shared engine, validation,
+styles, icons and licensed Latin fonts. No workbench code is included.
+
 Refresh the repository provider when approved Git changes land, or read its current
 snapshot per request. Cache by published revision and authorization scope if
 needed. Never share an all-diagram index with a viewer who can only read a subset.
@@ -133,7 +175,7 @@ approved local decisions; unapproved proposals never appear.
 - Fully qualified kind/namespace/name is compared case-insensitively. The same
   name in another namespace or kind is a different entity.
 - Every section/tab is indexed. Multiple matching nodes/sections become one
-  diagram card. Nodes without steps still associate the diagram.
+  diagram entry. Nodes without steps still associate the diagram.
 - Matching steps include explicit node focus, edge endpoints (including failed
   sends), tones, conditions, and `traceMatch.nodeId`. Links preserve each path's
   actual step number, including shared steps and independent alternate steps.
@@ -151,7 +193,8 @@ npm run verify
 
 CI typechecks against real Backstage packages and tests rendering, automatic
 refresh/error states, request cancellation, link safety and the authenticated
-proxy client. Root Node tests cover indexing, alternate links and registry/review
+proxy client, revision-pinned reads, private frame messages, SVG links and CSP hash
+integrity. Root Node tests cover indexing, alternate links and registry/review
 updates. Company SSO, authorization and mounting the tab in the company's actual
 Backstage app remain the final integration checks.
 

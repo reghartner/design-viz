@@ -36,6 +36,14 @@ class BuildTests(unittest.TestCase):
             self.assertGreater(len(text), 10000, name)
             self.assertIn("GENERATED FILE", text, name)
 
+    def test_standalone_bundles_every_skin_font_without_remote_stylesheets(self):
+        text = self.texts["flowview.html"]
+        self.assertNotIn('fonts.googleapis.com', text)
+        self.assertNotRegex(text, r'<(?:link|script)[^>]+(?:href|src)="https?://')
+        for font in json.loads((ROOT / "src/fonts/manifest.json").read_text()):
+            self.assertIn("font-family:'%s'" % font["family"], text)
+        self.assertIn('data:font/woff2;base64,', text)
+
     def test_flowview_carries_the_host_skin_message_listener(self):
         # An iframe shell posts {type:'dv_skin', skin} on theme change; the
         # listener must ship inside every built page so an inject.py rebuild

@@ -13,6 +13,24 @@ export interface AssociatedDiagram {
 }
 export interface EntityDiagrams { version: 1; entityRef: string; revision: string; diagrams: AssociatedDiagram[] }
 export type DiagramLoader = (entityRef: string, signal: AbortSignal) => Promise<EntityDiagrams>;
+export type SpecLoader = (diagram: Pick<AssociatedDiagram,'id'|'revision'>, signal: AbortSignal) => Promise<unknown>;
+export const SPEC_MAX_BYTES = 2 * 1024 * 1024;
+
+export function createSpecLoader(discovery: DiscoveryApi, fetchApi: FetchApi, proxyPath='/flowview'): SpecLoader {
+  if(!/^\/[a-z0-9/_-]+$/i.test(proxyPath))throw new Error('Configure flowview.proxyPath as a Backstage proxy route.');
+  return async(diagram,signal)=>{
+    if(!/^[a-z0-9][a-z0-9._-]*$/i.test(diagram.id))throw new Error('Invalid diagram ID.');
+    const base=await discovery.getBaseUrl('proxy');
+    const response=await fetchApi.fetch(base+proxyPath.replace(/\/$/,'')+'/specs/'+encodeURIComponent(diagram.id)+'?revision='+encodeURIComponent(diagram.revision),{signal});
+    if(response.status===409)throw new Error('This diagram changed. Refresh diagrams to load its current revision.');
+    if(!response.ok)throw new Error('Diagram read failed ('+response.status+').');
+    const text=await response.text();
+    if(new TextEncoder().encode(text).length>SPEC_MAX_BYTES)throw new Error('Diagram exceeds the 2 MiB viewer limit.');
+    const spec=JSON.parse(text);
+    if(!spec || !spec.page || spec.page.canon?.id!==diagram.id)throw new Error('The server returned a different diagram.');
+    return spec;
+  };
+}
 
 export function createDiagramLoader(discovery: DiscoveryApi, fetchApi: FetchApi, proxyPath='/flowview'): DiagramLoader {
   if(!/^\/[a-z0-9/_-]+$/i.test(proxyPath))throw new Error('Configure flowview.proxyPath as a Backstage proxy route.');
@@ -25,7 +43,7 @@ export function createDiagramLoader(discovery: DiscoveryApi, fetchApi: FetchApi,
     const data=await response.json();
     if(data?.version!==1 || data.entityRef!==entityRef || typeof data.revision!=='string' || !Array.isArray(data.diagrams))throw new Error('Invalid entity diagram response.');
     for(const diagram of data.diagrams){
-      if(!diagram || typeof diagram.id!=='string' || typeof diagram.title!=='string' || !['canonical','design'].includes(diagram.kind) || typeof diagram.owner!=='string' || typeof diagram.viewerUrl!=='string' || typeof diagram.editUrl!=='string' || !Array.isArray(diagram.sections))throw new Error('Invalid diagram entry.');
+      if(!diagram || typeof diagram.id!=='string' || typeof diagram.revision!=='string' || !diagram.revision || typeof diagram.title!=='string' || !['canonical','design'].includes(diagram.kind) || typeof diagram.owner!=='string' || typeof diagram.viewerUrl!=='string' || typeof diagram.editUrl!=='string' || !Array.isArray(diagram.sections))throw new Error('Invalid diagram entry.');
       for(const section of diagram.sections){
         if(!section || typeof section.reference!=='string' || typeof section.title!=='string' || typeof section.url!=='string' || !Array.isArray(section.nodes) || !Array.isArray(section.paths))throw new Error('Invalid diagram section.');
         if(section.nodes.some((node: {id?: unknown; title?: unknown} | null)=>!node || typeof node.id!=='string' || typeof node.title!=='string'))throw new Error('Invalid diagram node.');

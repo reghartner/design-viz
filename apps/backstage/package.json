@@ -11,7 +11,10 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "verify": "npm run check && npm test"
+    "verify": "npm run check && npm test",
+    "build:viewer": "node build-viewer.mjs",
+    "check:viewer": "node build-viewer.mjs --check",
+    "preview:build": "node preview.mjs"
   },
   "dependencies": {
     "@backstage/catalog-model": "1.10.1",
@@ -24,15 +27,16 @@
     "react-router-dom": "^6.30.2"
   },
   "devDependencies": {
+    "@testing-library/react": "16.3.0",
     "@types/react": "18.3.24",
     "@types/react-dom": "18.3.7",
+    "esbuild": "0.28.2",
+    "jsdom": "26.1.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "6.30.2",
     "typescript": "5.9.3",
-    "vitest": "3.2.4",
-    "jsdom": "26.1.0",
-    "@testing-library/react": "16.3.0"
+    "vitest": "3.2.4"
   },
   "backstage": {
     "role": "frontend-plugin",

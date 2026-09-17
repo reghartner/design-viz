@@ -1,12 +1,14 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import type {DiagramLoader, EntityDiagrams} from './api';
+import type {DiagramLoader, SpecLoader, EntityDiagrams} from './api';
+import {InlineFlowview,type ViewerTarget} from './InlineFlowview';
 
 function EvidenceLink({url,children}: {url: string; children: React.ReactNode}){
   let safe: string | undefined;
   try{const parsed=new URL(url);if(['https:','http:'].includes(parsed.protocol) && !parsed.username && !parsed.password)safe=parsed.href;}catch{/* Invalid evidence is readable text, not an active link. */}
   return safe?<a href={safe} target="_blank" rel="noopener noreferrer">{children}</a>:<span>{children}</span>;
 }
-export function FlowviewEntityDiagrams({entityRef,loadDiagrams,refreshMs=60000}: {entityRef: string; loadDiagrams: DiagramLoader; refreshMs?: number}){
+export function FlowviewEntityDiagrams({entityRef,loadDiagrams,loadSpec,refreshMs=60000}: {entityRef: string; loadDiagrams: DiagramLoader; loadSpec:SpecLoader; refreshMs?: number}){
+  const [selection,setSelection]=useState<{ref:string;id:string;target?:ViewerTarget}>();
   const [state,setState]=useState<{ref: string; data?: EntityDiagrams; error?: string; loading: boolean}>({ref:entityRef,loading:true});
   const refresh=useRef<()=>void>(()=>{});
   useEffect(()=>{
@@ -27,6 +29,9 @@ export function FlowviewEntityDiagrams({entityRef,loadDiagrams,refreshMs=60000}:
   },[entityRef,loadDiagrams,refreshMs]);
   const onRefresh=useCallback(()=>refresh.current(),[]);
   const current=state.ref===entityRef?state:{ref:entityRef,loading:true},data=current.data;
+  const selected=data?.diagrams.find(diagram=>selection?.ref===entityRef && diagram.id===selection.id) || data?.diagrams[0];
+  const target=selected && selection?.ref===entityRef && selection.id===selected.id ? selection.target : undefined;
+  function navigate(next:ViewerTarget){if(selected)setSelection({ref:entityRef,id:selected.id,target:{...next,request:(target?.request || 0)+1}});}
   return <section aria-label="Associated diagrams" style={{padding:24}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
       <h2>Associated diagrams{data?' ('+data.diagrams.length+')':''}</h2>
@@ -37,21 +42,35 @@ export function FlowviewEntityDiagrams({entityRef,loadDiagrams,refreshMs=60000}:
     {current.loading && <p role="status">Refreshing diagrams…</p>}
     {current.error && <p role="alert">{current.error} {data?'Showing the last successful results; they may be out of date.':'No results are available yet.'}</p>}
     {data?.diagrams.length===0 && <p>No diagrams reference this entity yet. Bind a node to this catalog entity in the Flowview builder and approve the spec in the central repository. It will appear automatically.</p>}
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,320px),1fr))',gap:20}}>
-      {data?.diagrams.map(diagram=><article key={diagram.id} style={{border:'1px solid #8296a966',borderRadius:12,padding:20,minWidth:0}}>
-        <p><strong>{diagram.kind==='canonical'?'CANONICAL':'HLD / DESIGN'}</strong> · {diagram.owner}</p>
-        <h3>{diagram.title}</h3>
-        <p style={{display:'flex',flexWrap:'wrap',gap:16}}><EvidenceLink url={diagram.viewerUrl}>Open diagram</EvidenceLink><EvidenceLink url={diagram.editUrl}>Open in builder</EvidenceLink>{diagram.designDocument && <EvidenceLink url={diagram.designDocument.url}>{diagram.designDocument.label}</EvidenceLink>}</p>
-        {diagram.sections.map(section=><details key={section.reference} open>
-          <summary>{section.title}</summary>
-          <p>Appears as {section.nodes.map(n=>n.title).join(', ')}</p>
-          {!section.paths.length && <EvidenceLink url={section.url}>Open this flow</EvidenceLink>}
-          {section.paths.map(path=><div key={path.id}>
-            <p><strong>{path.label}</strong></p>
-            <ul>{path.steps.map(step=><li key={step.id+'-'+step.position}><EvidenceLink url={step.url}>{step.position}. {step.title}</EvidenceLink></li>)}</ul>
-          </div>)}
-        </details>)}
-      </article>)}
-    </div>
+    {selected && <>
+      <label style={{display:'block',marginBottom:16}}>Diagram{' '}
+        <select aria-label="Diagram" value={selected.id} onChange={event=>setSelection({ref:entityRef,id:event.target.value})}
+          style={{maxWidth:'100%',padding:8,font:'inherit'}}>
+          {data?.diagrams.map(diagram=><option key={diagram.id} value={diagram.id}>{diagram.title}</option>)}
+        </select>
+      </label>
+      <article style={{minWidth:0}}>
+        <p><strong>{selected.kind==='canonical'?'CANONICAL':'HLD / DESIGN'}</strong> · {selected.owner}</p>
+        <p style={{display:'flex',flexWrap:'wrap',gap:16}}>
+          <EvidenceLink url={selected.viewerUrl}>Open standalone viewer</EvidenceLink>
+          <EvidenceLink url={selected.editUrl}>Edit in workbench</EvidenceLink>
+          {selected.designDocument && <EvidenceLink url={selected.designDocument.url}>{selected.designDocument.label}</EvidenceLink>}
+        </p>
+        <details style={{marginBottom:16}}>
+          <summary>Where this service appears · jump within the diagram</summary>
+          {selected.sections.map(section=><section key={section.reference}>
+            <h3><button onClick={()=>navigate({section:section.reference})}>{section.title}</button></h3>
+            <p>Appears as {section.nodes.map(node=>node.title).join(', ')}</p>
+            {section.paths.map(path=><div key={path.id}>
+              <p><strong>{path.label}</strong></p>
+              <ul>{path.steps.map(step=><li key={step.id+'-'+step.position}>
+                <button onClick={()=>navigate({section:section.reference,path:path.id,step:step.id})}>{step.position}. {step.title}</button>
+              </li>)}</ul>
+            </div>)}
+          </section>)}
+        </details>
+        <InlineFlowview key={entityRef+'|'+selected.id+'|'+selected.revision} diagram={selected} loadSpec={loadSpec} target={target}/>
+      </article>
+    </>}
   </section>;
 }

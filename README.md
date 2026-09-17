@@ -18,8 +18,10 @@ and [Backstage/company handoff](docs/backstage-integration.md). The
 breaking source changes against actual local Git commits and fixed contract tests.
 For unattended GitHub scans, use the [automation setup](docs/github-drift-automation.md):
 weekday runs, report-only previews, saved evidence, and human-reviewed drift PRs.
-The [Backstage entity plugin](apps/backstage/README.md) automatically lists related
-diagrams and steps on service/API pages. Try the mock portal's **Services** directory.
+The [Backstage entity plugin](apps/backstage/README.md) renders related diagrams
+inside service/API pages, with in-place step jumps and external editing. Its
+bundled iframe makes no background network requests; the Backstage parent reads
+specs through the authenticated proxy. The plugin guide includes a local preview.
 
 
 ## The pipeline
@@ -398,6 +400,15 @@ the embed. A section living inside a tab is revealed automatically.
 The flag composes with the other hash fields and is read once at load;
 everything else about the page (deep links, skins, the step player) works
 unchanged without it.
+
+For a **hosted HTML file embedded in Confluence**, export the page from the updated
+workbench or regenerate it with `tools/page_build.py`, then replace the hosted
+file. Exported HTML embeds its spec, runtime, icons, styles and licensed fonts for
+every skin: after the document loads it needs no font CDN or spec fetch. Previously
+exported files do not update automatically. An explicit `?spec=...` URL still asks
+the standalone bootloader to load that external spec when no spec is embedded;
+use an exported/injected page for a self-contained embed. The HTML host's own
+login, CSP and iframe permissions remain deployment requirements.
 
 ## Validating a spec (the agent loop)
 

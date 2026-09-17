@@ -1,0 +1,112 @@
+[
+  {
+    "family": "IBM Plex Sans",
+    "weight": 400,
+    "file": "ibm-plex-sans-latin-400-normal.woff2"
+  },
+  {
+    "family": "IBM Plex Sans",
+    "weight": 500,
+    "file": "ibm-plex-sans-latin-500-normal.woff2"
+  },
+  {
+    "family": "IBM Plex Sans",
+    "weight": 600,
+    "file": "ibm-plex-sans-latin-600-normal.woff2"
+  },
+  {
+    "family": "IBM Plex Mono",
+    "weight": 400,
+    "file": "ibm-plex-mono-latin-400-normal.woff2"
+  },
+  {
+    "family": "IBM Plex Mono",
+    "weight": 500,
+    "file": "ibm-plex-mono-latin-500-normal.woff2"
+  },
+  {
+    "family": "IBM Plex Mono",
+    "weight": 600,
+    "file": "ibm-plex-mono-latin-600-normal.woff2"
+  },
+  {
+    "family": "IBM Plex Mono",
+    "weight": 700,
+    "file": "ibm-plex-mono-latin-700-normal.woff2"
+  },
+  {
+    "family": "Sora",
+    "weight": 600,
+    "file": "sora-latin-600-normal.woff2"
+  },
+  {
+    "family": "Sora",
+    "weight": 700,
+    "file": "sora-latin-700-normal.woff2"
+  },
+  {
+    "family": "Newsreader",
+    "weight": 500,
+    "file": "newsreader-latin-500-normal.woff2"
+  },
+  {
+    "family": "Newsreader",
+    "weight": 600,
+    "file": "newsreader-latin-600-normal.woff2"
+  },
+  {
+    "family": "Newsreader",
+    "weight": 700,
+    "file": "newsreader-latin-700-normal.woff2"
+  },
+  {
+    "family": "Source Sans 3",
+    "weight": 400,
+    "file": "source-sans-3-latin-400-normal.woff2"
+  },
+  {
+    "family": "Source Sans 3",
+    "weight": 500,
+    "file": "source-sans-3-latin-500-normal.woff2"
+  },
+  {
+    "family": "Source Sans 3",
+    "weight": 600,
+    "file": "source-sans-3-latin-600-normal.woff2"
+  },
+  {
+    "family": "Source Sans 3",
+    "weight": 700,
+    "file": "source-sans-3-latin-700-normal.woff2"
+  },
+  {
+    "family": "Plus Jakarta Sans",
+    "weight": 600,
+    "file": "plus-jakarta-sans-latin-600-normal.woff2"
+  },
+  {
+    "family": "Plus Jakarta Sans",
+    "weight": 700,
+    "file": "plus-jakarta-sans-latin-700-normal.woff2"
+  },
+  {
+    "family": "Plus Jakarta Sans",
+    "weight": 800,
+    "file": "plus-jakarta-sans-latin-800-normal.woff2"
+  },
+  {
+    "family": "Barlow Condensed",
+    "weight": 500,
+    "file": "barlow-condensed-latin-500-normal.woff2"
+  },
+  {
+    "family": "Barlow Condensed",
+    "weight": 600,
+    "file": "barlow-condensed-latin-600-normal.woff2"
+  },
+  {
+    "family": "Barlow Condensed",
+    "weight": 700,
+    "file": "barlow-condensed-latin-700-normal.woff2"
+  }
+]

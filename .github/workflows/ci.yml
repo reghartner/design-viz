@@ -18,6 +18,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/backstage/package-lock.json
       - run: npm ci --no-fund --no-audit
+      - run: npm run check:viewer
       - run: npm run verify
 
   confluence-app:

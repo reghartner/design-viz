@@ -95,6 +95,7 @@ Do not copy its latency, topology, notification, or outcome without evidence.
 | Confirmed dropped or prevented communication | `docs/failed-communications.md` |
 | Physical home, outside grounds, doors | `cookbook/home-story.md` or `cookbook/outdoor-home.md` |
 | Camera state versus scene event | `cookbook/camera-events.md` and screen widget docs |
+| Phone UX values sourced from several backends; independent loading, cached or failed fields | `cookbook/device-app-sources.md` and `deviceapp` widget docs |
 | Hot/cold devices, protective shutdown or temperature recovery | `cookbook/thermal-protection.md`; Home, thermo, screen and battery widget docs |
 | Detailed engineering and business-story perspectives on one timeline | `cookbook/two-perspectives.md` and its source/ledger/spec seed |
 | Queue/buffer, retry, replicas, rollout, or other state | Matching recipe in `cookbook/README.md` and widget docs |

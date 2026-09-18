@@ -124,7 +124,9 @@ function planPasteBuilderClipboard(text,raw,data,destination){
         if (!Array.isArray(value.panels) || !value.panels.length || value.panels.some(function(p){return !builderClipboardObject(p) || PANEL_TYPES.indexOf(p.type)<0;})) throw new Error('Invalid clipboard panels.');
         var panels = d.panels || (d.panels=[]), taken = Object.create(null);
         panels.forEach(function(p){taken[p.id]=true;});
-        value.panels.forEach(function(p){var copy=builderClone(p);copy.id=builderClipboardFresh(taken,p.id || p.type);panels.push(copy);});
+        value.panels.forEach(function(p){var copy=builderClone(p);copy.id=builderClipboardFresh(taken,p.id || p.type);
+          if(copy.type==='deviceapp' && Array.isArray(copy.sources))copy.sources.forEach(function(s){if(s && !Object.prototype.hasOwnProperty.call(d.nodes,s.node))delete s.node;});
+          panels.push(copy);});
         target = {kind:'panel',section:destination.section,index:panels.length-value.panels.length};
       } else if (data.kind === 'home'){
         var home = (d.panels || [])[destination.index];

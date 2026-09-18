@@ -1,0 +1,400 @@
+{
+  "page": {
+    "title": "One doorbell screen, three backend sources",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Doorbell app \u00b7 where each value comes from",
+        "text": "Fictional API contracts and values. Select a source badge to connect the phone UI to its backend. Compare a complete refresh with a telemetry outage; switch to End-to-end for the service diagram.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "routing": "lanes",
+          "nodes": {
+            "app": {
+              "title": "Camera app",
+              "icon": "phone",
+              "tint": "cmd"
+            },
+            "api": {
+              "title": "App API",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "health": {
+              "title": "Device telemetry",
+              "icon": "antenna",
+              "tint": "data"
+            },
+            "registry": {
+              "title": "Device registry",
+              "icon": "db",
+              "tint": "data"
+            },
+            "media": {
+              "title": "Recording service",
+              "icon": "server",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "app",
+              "api"
+            ],
+            [
+              "health",
+              "registry",
+              "media"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "app",
+              "to": "api",
+              "kind": "https",
+              "label": "refresh details"
+            },
+            {
+              "from": "api",
+              "to": "health",
+              "kind": "https",
+              "label": "battery / power / Wi-Fi"
+            },
+            {
+              "from": "api",
+              "to": "registry",
+              "kind": "https",
+              "label": "model / firmware"
+            },
+            {
+              "from": "api",
+              "to": "media",
+              "kind": "https",
+              "label": "latest clip"
+            }
+          ],
+          "panels": [
+            {
+              "id": "camera-app",
+              "type": "deviceapp",
+              "title": "Camera details \u00b7 field-level data sources",
+              "device": "Front door doorbell",
+              "subtitle": "My home / device health",
+              "sources": [
+                {
+                  "id": "health",
+                  "label": "Device telemetry",
+                  "color": "#5865d8",
+                  "node": "health",
+                  "endpoint": "GET /devices/{id}/health",
+                  "detail": "Battery, power accessory, and Wi-Fi are reported by the camera."
+                },
+                {
+                  "id": "registry",
+                  "label": "Device registry",
+                  "color": "#168878",
+                  "node": "registry",
+                  "endpoint": "GET /devices/{id}",
+                  "detail": "Model and firmware come from the registered device record."
+                },
+                {
+                  "id": "media",
+                  "label": "Recording service",
+                  "color": "#bd6716",
+                  "node": "media",
+                  "endpoint": "GET /devices/{id}/recordings/latest",
+                  "detail": "The recording catalog supplies the last saved clip."
+                }
+              ],
+              "fields": [
+                {
+                  "id": "battery",
+                  "label": "Battery level",
+                  "kind": "battery",
+                  "source": "health"
+                },
+                {
+                  "id": "power",
+                  "label": "Charging source",
+                  "source": "health",
+                  "icon": "bulb"
+                },
+                {
+                  "id": "wifi",
+                  "label": "Connection",
+                  "source": "health",
+                  "icon": "antenna"
+                },
+                {
+                  "id": "model",
+                  "label": "Camera model",
+                  "source": "registry",
+                  "icon": "camera"
+                },
+                {
+                  "id": "firmware",
+                  "label": "Firmware",
+                  "source": "registry",
+                  "icon": "chip"
+                },
+                {
+                  "id": "clip",
+                  "label": "Last recording",
+                  "source": "media",
+                  "icon": "package"
+                }
+              ],
+              "initial": {
+                "clock": "9:41",
+                "battery": {
+                  "value": 67,
+                  "status": "stale",
+                  "detail": "Last report: 2 minutes ago"
+                },
+                "power": {
+                  "value": "Solar panel",
+                  "status": "stale",
+                  "detail": "Last known: charging"
+                },
+                "wifi": {
+                  "value": "Good \u00b7 \u221256 dBm",
+                  "status": "stale"
+                },
+                "model": {
+                  "value": "Doorbell Pro",
+                  "status": "stale"
+                },
+                "firmware": {
+                  "value": "v2.4.1",
+                  "status": "stale"
+                },
+                "clip": {
+                  "value": "9:38 AM",
+                  "status": "stale"
+                }
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "open",
+              "text": "The resident opens Device health. Cached values remain visible while refresh begins.",
+              "nodes": [
+                "app"
+              ],
+              "panels": {
+                "camera-app": {
+                  "note": "Cached does not mean current. Each field keeps its own freshness."
+                }
+              }
+            },
+            {
+              "id": "refresh",
+              "text": "The app asks its API to refresh three independent data sources.",
+              "edge": "app->api",
+              "panels": {
+                "camera-app": {
+                  "battery": {
+                    "status": "loading"
+                  },
+                  "power": {
+                    "status": "loading"
+                  },
+                  "wifi": {
+                    "status": "loading"
+                  },
+                  "model": {
+                    "status": "loading"
+                  },
+                  "firmware": {
+                    "status": "loading"
+                  },
+                  "clip": {
+                    "status": "loading"
+                  }
+                }
+              }
+            },
+            {
+              "id": "identity",
+              "text": "Device registry responds. Model and firmware are current while other fields are still loading.",
+              "edge": "api->registry",
+              "panels": {
+                "camera-app": {
+                  "model": {
+                    "status": "ready"
+                  },
+                  "firmware": {
+                    "status": "ready"
+                  },
+                  "note": "B \u00b7 Registry completed. A and C are still pending."
+                }
+              }
+            },
+            {
+              "id": "health",
+              "text": "Telemetry returns 68% battery, solar charging, and current Wi-Fi strength.",
+              "edge": "api->health",
+              "panels": {
+                "camera-app": {
+                  "battery": {
+                    "value": 68,
+                    "status": "ready",
+                    "detail": "Reported just now"
+                  },
+                  "power": {
+                    "status": "ready",
+                    "detail": "Charging now"
+                  },
+                  "wifi": {
+                    "status": "ready"
+                  },
+                  "note": "A \u00b7 One telemetry response populates three separate parts of the screen."
+                }
+              }
+            },
+            {
+              "id": "recording",
+              "text": "The recording catalog returns the newest saved clip. Every field is now current.",
+              "edge": "api->media",
+              "panels": {
+                "camera-app": {
+                  "clip": {
+                    "value": "9:40 AM",
+                    "status": "ready"
+                  },
+                  "note": "C \u00b7 Recording time is independent of the battery and device registry responses."
+                }
+              }
+            },
+            {
+              "id": "timeout",
+              "text": "The telemetry request times out. Keep the last known battery and power values, clearly marked as cached.",
+              "tone": {
+                "health": "warn"
+              },
+              "panels": {
+                "camera-app": {
+                  "battery": {
+                    "status": "stale"
+                  },
+                  "power": {
+                    "status": "stale"
+                  },
+                  "wifi": {
+                    "status": "stale"
+                  },
+                  "note": "A \u00b7 Telemetry unavailable. The battery is still the cached 67%, not a new reading."
+                }
+              },
+              "nodes": [
+                "health"
+              ]
+            },
+            {
+              "id": "partial",
+              "text": "The recording service still succeeds. The UI is partially current; a telemetry outage does not imply the camera stopped recording.",
+              "edge": "api->media",
+              "panels": {
+                "camera-app": {
+                  "clip": {
+                    "value": "9:40 AM",
+                    "status": "ready"
+                  },
+                  "note": "B and C are current. Only A is cached. Retry health without blanking the whole screen."
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Happy path",
+              "color": "#168878",
+              "steps": [
+                "open",
+                "refresh",
+                "identity",
+                "health",
+                "recording"
+              ]
+            },
+            {
+              "id": "telemetry-down",
+              "label": "Telemetry timeout",
+              "color": "#d58121",
+              "steps": [
+                "open",
+                "refresh",
+                "identity",
+                "timeout",
+                "partial"
+              ]
+            }
+          ],
+          "layouts": [
+            {
+              "id": "app-sources",
+              "name": "App + sources",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "camera-app",
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 19
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 19,
+                    "w": 12,
+                    "h": 6
+                  },
+                  {
+                    "x": 0,
+                    "y": 25,
+                    "w": 12,
+                    "h": 12,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "end-to-end",
+              "name": "End-to-end",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "camera-app",
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 19
+                  },
+                  {
+                    "x": 0,
+                    "y": 19,
+                    "w": 12,
+                    "h": 20
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 33,
+                    "w": 12,
+                    "h": 6,
+                    "attachTo": "diagram"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

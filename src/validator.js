@@ -10,7 +10,7 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','image','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget','trace','replicas'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','image','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','deviceapp','timeline','table','checks','budget','trace','replicas'];
 var EMBEDDED_IMAGE_MAX_BYTES = 512 * 1024;
 /* Raster data only: images travel with the spec and never fetch remote assets. */
 function embeddedImageSource(value){
@@ -670,6 +670,84 @@ function phoneBrandIsPlainObject(obj){
     Function.prototype.toString.call(proto.constructor) === Function.prototype.toString.call(Object));
 }
 
+/* Device app values are authored UI data, with explicit per-field provenance.
+   A source node is a diagram reference, never an instruction to fetch an API. */
+var DEVICEAPP_STATUSES = ['unknown','loading','ready','stale','error'];
+function deviceAppItems(panel,key){
+  var seen=Object.create(null),reserved=['clock','note','constructor','prototype'];
+  return (Array.isArray(panel && panel[key])?panel[key]:[]).filter(function(item){
+    if(!panelObject(item) || typeof item.id!=='string' || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(item.id) || seen[item.id] || reserved.indexOf(item.id)>=0)return false;
+    seen[item.id]=true;return true;
+  }).slice(0,key==='sources'?6:12);
+}
+function deviceAppPatchWarnings(obj,path,panel,warnings){
+  if(obj==null)return;
+  if(!panelObject(obj)){warnings.push(path+': expected an object — ignored');return;}
+  var fields=deviceAppItems(panel,'fields'),sources=deviceAppItems(panel,'sources');
+  Object.keys(obj).forEach(function(key){
+    if(key==='clock' || key==='note'){
+      if(typeof obj[key]!=='string')warnings.push(path+'.'+key+': expected text — ignored');return;
+    }
+    var f=fields.find(function(field){return field.id===key;}),v=obj[key],p=path+'.'+key;
+    if(!f){warnings.push(p+': unknown deviceapp field — ignored');return;}
+    if(v===null)return;
+    if(!panelObject(v)){warnings.push(p+': expected {value, status?, source?, detail?} or null — ignored');return;}
+    Object.keys(v).forEach(function(k){if(['value','status','source','detail'].indexOf(k)<0)warnings.push(p+'.'+k+': unknown field property — ignored');});
+    if(panelOwn(v,'value') && v.value!==null && !(typeof v.value==='string' || isFiniteNum(v.value) || typeof v.value==='boolean'))warnings.push(p+'.value: expected text, finite number, boolean or null — ignored');
+    if(f.kind==='battery' && v.value!=null && (!isFiniteNum(v.value) || v.value<0 || v.value>100))warnings.push(p+'.value: battery expects 0–100 — invalid values display as unknown');
+    if(panelOwn(v,'status') && DEVICEAPP_STATUSES.indexOf(v.status)<0)warnings.push(p+'.status: expected '+DEVICEAPP_STATUSES.join(', ')+' — ignored');
+    if(panelOwn(v,'source') && v.source!==null && !sources.some(function(s){return s.id===v.source;}))warnings.push(p+'.source: unknown source ID — ignored');
+    if(panelOwn(v,'detail') && v.detail!==null && typeof v.detail!=='string')warnings.push(p+'.detail: expected text or null — ignored');
+  });
+}
+function deviceAppWarnings(panel,d,path,warnings){
+  ['device','subtitle'].forEach(function(k){if(panel[k]!=null && typeof panel[k]!=='string')warnings.push(path+'.'+k+': expected text — ignored');});
+  ['sources','fields'].forEach(function(key){
+    var items=deviceAppItems(panel,key),raw=panel[key];
+    if(!Array.isArray(raw) || !raw.length)warnings.push(path+'.'+key+': declare '+(key==='sources'?'1–6 data sources':'1–12 phone fields'));
+    else if(items.length!==raw.length)warnings.push(path+'.'+key+': use unique letter-led IDs and at most '+(key==='sources'?6:12)+' entries; clock/note/constructor/prototype are reserved — invalid entries ignored');
+    items.forEach(function(item,i){
+      var p=path+'.'+key+'['+i+']';
+      ['label','detail','endpoint','unit'].forEach(function(k){if(item[k]!=null && typeof item[k]!=='string')warnings.push(p+'.'+k+': expected text — ignored');});
+      if(key==='sources'){
+        if(item.color!=null && (typeof item.color!=='string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(item.color)))warnings.push(p+'.color: use #RGB or #RRGGBB — using palette color');
+        if(item.node!=null && (typeof item.node!=='string' || !panelOwn(d.nodes,item.node)))warnings.push(p+'.node: unknown diagram node — no node highlight');
+      }else{
+        if(item.kind!=null && ['text','battery'].indexOf(item.kind)<0)warnings.push(p+'.kind: expected text or battery — using text');
+        if(item.icon!=null && ICON_SET.indexOf(item.icon)<0)warnings.push(p+'.icon: unknown icon — ignored');
+        if(item.source!=null && !deviceAppItems(panel,'sources').some(function(s){return s.id===item.source;}))warnings.push(p+'.source: unknown source ID — shown as unmapped');
+      }
+    });
+  });
+  deviceAppPatchWarnings(panel.initial,path+'.initial',panel,warnings);
+}
+function foldDeviceAppStates(panel,steps){
+  var fields=deviceAppItems(panel,'fields'),sources=deviceAppItems(panel,'sources'),carried=Object.create(null),states=[];
+  function apply(patch){
+    var updated=[];if(!panelObject(patch))return updated;
+    ['clock','note'].forEach(function(k){if(typeof patch[k]==='string')carried[k]=patch[k];});
+    fields.forEach(function(f){
+      if(!panelOwn(patch,f.id))return;
+      var v=patch[f.id],next=Object.assign({},carried[f.id] || {});
+      if(v===null)next={value:null,status:'unknown',detail:'',source:null};
+      else if(panelObject(v)){
+        if(panelOwn(v,'value') && (v.value===null || typeof v.value==='string' || isFiniteNum(v.value) || typeof v.value==='boolean'))next.value=v.value;
+        if(DEVICEAPP_STATUSES.indexOf(v.status)>=0)next.status=v.status;
+        if(panelOwn(v,'source') && (v.source===null || sources.some(function(s){return s.id===v.source;})))next.source=v.source;
+        if(v.detail===null || typeof v.detail==='string')next.detail=v.detail || '';
+      }else return;
+      if(JSON.stringify(next)!==JSON.stringify(carried[f.id] || {}))updated.push(f.id);
+      carried[f.id]=next;
+    });return updated;
+  }
+  function snapshot(updated){
+    var out=Object.create(null);Object.keys(carried).forEach(function(k){out[k]=panelObject(carried[k])?Object.assign({},carried[k]):carried[k];});out._updated=updated;return out;
+  }
+  apply(panel.initial);
+  (steps || []).forEach(function(st){states.push(snapshot(apply((stepPanelPatch(st) || {})[panel.id])));});
+  if(!states.length)states.push(snapshot([]));return states;
+}
+
 function phoneBrandWarnings(panel, path, warnings){
   if (!Object.prototype.hasOwnProperty.call(panel, 'brand')) return;
   var brand = panel.brand;
@@ -998,9 +1076,9 @@ function sectionLayoutPreset(d, target, excludedKeys){
   var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
   var controls=tiles.find(function(t){return t.key==='steps';});
   if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
-  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && t.type!=='homemap';});
+  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && t.type!=='homemap' && t.type!=='deviceapp';});
   ordered.forEach(function(t){
-    var large=t.key==='diagram'||t.key==='steps'||t.type==='homemap'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=t.key==='steps'?((d.paths || []).length>1?6:4):large?12:t.type==='phone'?10:t.type==='screen'?8:6;
+    var large=t.key==='diagram'||t.key==='steps'||t.type==='homemap'||t.type==='deviceapp'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=t.key==='steps'?((d.paths || []).length>1?6:4):t.type==='deviceapp'?23:large?12:t.type==='phone'?10:t.type==='screen'?8:6;
     var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
       var it={x:x,y:0,w:w,h:h}, hits;
       while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
@@ -1307,6 +1385,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       phoneBrandWarnings(p, PP, warnings);
       phonePatchWarnings(p.initial, PP + '.initial', warnings);
     }
+    if (p.type === 'deviceapp') deviceAppWarnings(p,d,PP,warnings);
     if (p.type === 'timeline'){
       timelinePanels[p.id] = true;
       if (p.span == null)
@@ -1603,6 +1682,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (timelinePanels[pid] && patch[pid]){
         timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
+      } else if (panelDeclById[pid].type === 'deviceapp'){
+        deviceAppPatchWarnings(patch[pid],DP+'.steps['+ti+'].panels.'+pid,panelDeclById[pid],warnings);
       } else if (panelDeclById[pid].type === 'trace'){
         tracePanelPatchWarnings(patch[pid],DP+'.steps['+ti+'].panels.'+pid,panelDeclById[pid],warnings);
       } else if (panelDeclById[pid].type === 'replicas'){
@@ -1847,6 +1928,10 @@ function foldPanelStates(d){
     }
     if (p.type === 'phone'){
       out[p.id] = foldPhoneStates(p, steps);
+      return;
+    }
+    if (p.type === 'deviceapp'){
+      out[p.id] = foldDeviceAppStates(p, steps);
       return;
     }
     var carried = {};

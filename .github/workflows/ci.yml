@@ -61,10 +61,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: committed pages match src (build is fresh + deterministic)
+      - name: committed pages and Node runtime match src (build is fresh + deterministic)
         run: |
           python3 tools/build.py
-          git diff --exit-code template/ workbench/
+          git diff --exit-code template/ workbench/ tools/canon/generated-runtime.cjs
       - name: example pages inject cleanly
         run: |
           python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json template/flowview.html /tmp/cumulus.html

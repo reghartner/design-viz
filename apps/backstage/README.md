@@ -37,7 +37,11 @@ Backstage frontend integration, ready for the company agent to install.
 Copy this directory into your Backstage workspace as `plugins/flowview`, or bring
 it into that workspace through your normal internal package process. Keep
 `tools/canon/entity-diagrams.mjs` and its dependencies in the central repository
-backend. Align the Backstage dependency versions with the host app's release;
+backend, including the committed `tools/canon/generated-runtime.cjs`. Its static
+import makes the shared runtime available to production bundlers without a
+runtime `src/` directory; see [backend production packaging](../../docs/backstage-integration.md#backend-production-packaging)
+for the company image acceptance check. Align the Backstage dependency versions
+with the host app's release;
 this package is typechecked against the versions pinned in `package-lock.json`.
 It is private source code, not a published npm package.
 

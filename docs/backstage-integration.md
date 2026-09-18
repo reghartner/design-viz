@@ -50,6 +50,28 @@ reuse the data-only modules in `tools/canon/`. The mock's serialized local JSON
 store intentionally stands in for Git proposals and durable review records.
 Do not promote that no-auth development server into the company environment.
 
+### Backend production packaging
+
+`tools/canon/core.cjs` imports the committed `generated-runtime.cjs` through a
+static CommonJS dependency. It contains the shared catalog, validation and lazy
+viewer-routing code. Backend bundlers can include it without copying `src/` into
+the image, and it never uses `fs.readFileSync` or `vm` to load renderer source.
+Keep the generated module when vendoring `tools/canon/`; existing import paths
+and the `validateSpec()` / `viewerRouting()` API stay the same.
+
+Runtime maintainers regenerate it with `python3 tools/build.py` whenever the shared
+sources change, and commit the output. CI checks freshness and runs standalone
+CommonJS and ESM backend bundles with filesystem access restricted to the bundle
+directory. Those tests exercise validation and service links into happy/alternate
+steps. Consumers of the committed runtime do not need Python or the source tree
+at runtime.
+
+The company integration must still build its actual backend image and smoke-test
+the authenticated association/spec routes from that image. A development
+`backstage-cli package start` run alone does not verify production packaging. If
+the host externalizes a Flowview workspace package instead of bundling its code,
+include that package and `generated-runtime.cjs` in the production dependencies.
+
 The browser contract is same-origin `/api/canon/`:
 
 | Route | Contract |

@@ -171,7 +171,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 
 | path | what it is |
 |---|---|
-| `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both committed single-file pages from `src/` (validator, engine, boot files, CSS, icons, skeletons). Edit `src/`, run `python3 tools/build.py`, commit the outputs with it — CI fails if they drift. |
+| `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both committed single-file pages and `tools/canon/generated-runtime.cjs` for Node backends from `src/`. Edit `src/`, run `python3 tools/build.py`, commit the outputs with it — CI fails if they drift. |
 | `tests/` + `.github/workflows/ci.yml` | Python + Node unit tests (zero dependencies): injection anchoring, build determinism, spec validation, lint rules, layout math, panel-state folding, tool exports, and end-to-end CLI checks over seeded fixtures. CI runs them plus an examples-build and spec-validation check on every push and PR. |
 | `tools/validate.js` | Validator + lint CLI: `node tools/validate.js <spec.json>` prints errors, warnings, and lint findings with field paths; exit 1 on errors. `--quiet` for CI. Loads the same validator the pages ship, so CLI and in-page results cannot drift. |
 | `template/flowview.html` | The render target (GENERATED — edit `src/`). Self-contained single file: layout engine, six skins, protocol-keyed legend, tabs, step player, containment groups, synchronized inspector panels (state machine, LEDs, gauge, log, camera screen), permalink affordances. Reads its spec from an embedded JSON block. |

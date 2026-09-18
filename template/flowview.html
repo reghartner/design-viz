@@ -5289,14 +5289,14 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
   </defs>
 </svg>
 
-<div class="docview sk-aurora" id="docview"></div>
+<div class="docview sk-aurora sk-pastel" id="docview"></div>
 
 <script type="application/json" id="flowspec">
 {
   "page": {
     "__demo": true,
     "title": "Flowview template — demo spec",
-    "skin": "aurora",
+    "skin": "pastel",
     "sections": [
       {
         "heading": "Replace this spec",
@@ -6322,6 +6322,7 @@ function phonePatchWarnings(obj, path, warnings){
   });
 }
 var SKIN_NAMES = ['aurora','daylight','editorial','terminal','pastel','blueprint'];
+var DEFAULT_SKIN = 'pastel';
 var SKINS = {
   aurora:   {bg:'#0B1220', grid:'#16233C', halos:true,  glow:true,  retNeutral:'#93A7C9'},
   daylight: {bg:'#FBFAF6', grid:'',        halos:false, glow:false, retNeutral:'#6B6F7A'},
@@ -7232,7 +7233,7 @@ function validate(page){
     return {errors:errors, warnings:warnings};
   }
   if (page.skin && SKIN_NAMES.indexOf(page.skin) < 0)
-    warnings.push('page.skin: unknown skin "' + page.skin + '" — using "aurora" (valid: ' + SKIN_NAMES.join(', ') + ')');
+    warnings.push('page.skin: unknown skin "' + page.skin + '" — using "' + DEFAULT_SKIN + '" (valid: ' + SKIN_NAMES.join(', ') + ')');
   if (Object.prototype.hasOwnProperty.call(page, 'generatedFrom')){
     var gf = page.generatedFrom;
     if (!gf || typeof gf !== 'object' || Array.isArray(gf)){
@@ -7657,7 +7658,7 @@ function resolveSkin(cookieText, specSkin){
     });
   }
   if (cookieSkin) return cookieSkin;
-  return SKIN_NAMES.indexOf(specSkin) >= 0 ? specSkin : 'aurora';
+  return SKIN_NAMES.indexOf(specSkin) >= 0 ? specSkin : DEFAULT_SKIN;
 }
 
 function skinBase(name){
@@ -13018,6 +13019,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 }
 
 function renderPage(view, page, skin, backlinks, options){
+  skin = resolveSkin('', skin == null ? page.skin : skin);
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);
   backlinks = backlinks || Object.create(null);
@@ -13737,7 +13739,7 @@ function readCookieText(){
 function fail(msgs){
   bootFailed = true;
   pendingLinkBase = null;
-  applySkinClasses(document.body, view, 'aurora');
+  applySkinClasses(document.body, view, DEFAULT_SKIN);
   var pre = document.createElement('pre');
   pre.className = 'errbox';
   pre.textContent = 'Flowview: the spec did not render.\n\n' + msgs.map(function(m){ return '- ' + m; }).join('\n');

@@ -690,7 +690,7 @@ test('contract version: mismatch warns, match and absence do not', () => {
   assert.strictEqual(warnOf(noField).length, 0);
 });
 
-test('all six skin tokens validate; an unknown skin keeps the existing Aurora warning fallback', () => {
+test('all six skin tokens validate; an unknown skin uses the Pastel warning fallback', () => {
   const mk = skin => C.normalize({page: {skin,
     blocks: [{diagram: {nodes: {a: {}}, rows: [['a']]}}]}});
   assert.deepStrictEqual(Array.from(C.SKIN_NAMES),
@@ -700,7 +700,7 @@ test('all six skin tokens validate; an unknown skin keeps the existing Aurora wa
   }
   const warnings = C.validate(mk('sepia')).warnings.filter(w => w.includes('page.skin'));
   assert.strictEqual(warnings.length, 1);
-  assert.ok(warnings[0].includes('using "aurora"'));
+  assert.ok(warnings[0].includes('using "pastel"'));
 });
 
 test('resolveSkin gives a plain dv_skin cookie precedence over the spec default', () => {
@@ -714,13 +714,13 @@ test('resolveSkin URL-decodes an encoded valid dv_skin cookie token', () => {
 
 test('resolveSkin leaves malformed cookie encoding to normal invalid-token fallback', () => {
   assert.strictEqual(C.resolveSkin('dv_skin=%E0%A4%A', 'terminal'), 'terminal');
-  assert.strictEqual(C.resolveSkin('dv_skin=%', undefined), 'aurora');
+  assert.strictEqual(C.resolveSkin('dv_skin=%', undefined), 'pastel');
 });
 
-test('resolveSkin ignores invalid cookie tokens, then uses a valid spec default or Aurora', () => {
+test('resolveSkin ignores invalid cookie tokens, then uses a valid spec default or Pastel', () => {
   assert.strictEqual(C.resolveSkin('dv_skin=sepia; session=x', 'editorial'), 'editorial');
-  assert.strictEqual(C.resolveSkin('dv_skin=sepia', 'sepia'), 'aurora');
-  assert.strictEqual(C.resolveSkin('', undefined), 'aurora');
+  assert.strictEqual(C.resolveSkin('dv_skin=sepia', 'sepia'), 'pastel');
+  assert.strictEqual(C.resolveSkin('', undefined), 'pastel');
 });
 
 test('applySkinClasses layers overlays on Aurora and rejects unknown tokens without a change', () => {

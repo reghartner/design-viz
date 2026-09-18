@@ -31,7 +31,7 @@ function resolveSkin(cookieText, specSkin){
     });
   }
   if (cookieSkin) return cookieSkin;
-  return SKIN_NAMES.indexOf(specSkin) >= 0 ? specSkin : 'aurora';
+  return SKIN_NAMES.indexOf(specSkin) >= 0 ? specSkin : DEFAULT_SKIN;
 }
 
 function skinBase(name){
@@ -5392,6 +5392,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 }
 
 function renderPage(view, page, skin, backlinks, options){
+  skin = resolveSkin('', skin == null ? page.skin : skin);
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);
   backlinks = backlinks || Object.create(null);

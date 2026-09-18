@@ -9,7 +9,7 @@ const preview = process.argv.includes('--preview');
 const outdir = path.join(app, preview ? 'preview' : 'static/viewer');
 const exports = ['buildConfluenceExport', 'buildConfluenceConfig', 'confluenceSections',
   'confluenceDisplayPage', 'confluenceSourceUrl', 'CONFLUENCE_INPUT_BYTES',
-  'SKIN_NAMES', 'renderPage', 'applySkinClasses'];
+  'SKIN_NAMES', 'DEFAULT_SKIN', 'renderPage', 'applySkinClasses'];
 const core = (await Promise.all(['canon.js','validator.js','engine.js','confluence.js'].map(name =>
   readFile(path.join(root, 'src', name), 'utf8')))).join('\n') + '\nexport {' + exports.join(',') + '};';
 

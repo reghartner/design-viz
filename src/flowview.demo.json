@@ -2,7 +2,7 @@
   "page": {
     "__demo": true,
     "title": "Flowview template — demo spec",
-    "skin": "aurora",
+    "skin": "pastel",
     "sections": [
       {
         "heading": "Replace this spec",

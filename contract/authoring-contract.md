@@ -36,7 +36,7 @@ guessing silently.
   "page": {
     "title": "Page title",
     "contract": "1",
-    "skin": "aurora",
+    "skin": "pastel",
     "generatedFrom": {"url": "https://confluence.example.com/...", "label": "Doorbell HLD", "version": "v12", "at": "09-07-2026 14:30"},
     "protocols": { "kindName": { "label": "Legend label", "color": "#RRGGBB" } },
     "lanes": { "NET": { "color": "#38E1FF", "label": "NET" } },
@@ -58,10 +58,10 @@ guessing silently.
   middle dots when present. The timestamp convention is `month-day-year hh:mm`
   (for example, `09-07-2026 14:30`); it is documented but not enforced beyond
   requiring a string.
-- `skin` — optional page default. One of `"aurora"` (dark, default),
+- `skin` — optional page default. One of `"aurora"` (dark),
   `"daylight"` (light, print-friendly), `"editorial"`, `"terminal"`,
-  `"pastel"`, or `"blueprint"`. On load, a valid `dv_skin` cookie overrides
-  this field; otherwise this field wins; otherwise the page uses `"aurora"`.
+  `"pastel"` (default), or `"blueprint"`. On load, a valid `dv_skin` cookie overrides
+  this field; otherwise this field wins; otherwise the page uses `"pastel"`.
   A consuming site can then switch live with `window.dvSetSkin(name)`; it does
   not change the cookie. Omit `skin` unless the request says otherwise.
 - `protocols` — optional; only needed to ADD edge kinds beyond the built-ins

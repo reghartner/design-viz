@@ -801,6 +801,7 @@ function phonePatchWarnings(obj, path, warnings){
   });
 }
 var SKIN_NAMES = ['aurora','daylight','editorial','terminal','pastel','blueprint'];
+var DEFAULT_SKIN = 'pastel';
 var SKINS = {
   aurora:   {bg:'#0B1220', grid:'#16233C', halos:true,  glow:true,  retNeutral:'#93A7C9'},
   daylight: {bg:'#FBFAF6', grid:'',        halos:false, glow:false, retNeutral:'#6B6F7A'},
@@ -1711,7 +1712,7 @@ function validate(page){
     return {errors:errors, warnings:warnings};
   }
   if (page.skin && SKIN_NAMES.indexOf(page.skin) < 0)
-    warnings.push('page.skin: unknown skin "' + page.skin + '" — using "aurora" (valid: ' + SKIN_NAMES.join(', ') + ')');
+    warnings.push('page.skin: unknown skin "' + page.skin + '" — using "' + DEFAULT_SKIN + '" (valid: ' + SKIN_NAMES.join(', ') + ')');
   if (Object.prototype.hasOwnProperty.call(page, 'generatedFrom')){
     var gf = page.generatedFrom;
     if (!gf || typeof gf !== 'object' || Array.isArray(gf)){

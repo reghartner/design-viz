@@ -428,9 +428,9 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                 _, _, rgb = export_gif.decode_png(shots[0].read_bytes())
                 corners.append(bytes(rgb[0:3]))
             # The margin ring is the page ground for BOTH accents — identical
-            # color, and dark on the aurora default.
+            # color, and light on the Pastel default for an unspecified skin.
             self.assertEqual(corners[0], corners[1])
-            self.assertLess(sum(corners[0]), 240)
+            self.assertGreater(sum(corners[0]), 500)
 
     def test_unknown_skin_fails_with_the_page_token_list(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:

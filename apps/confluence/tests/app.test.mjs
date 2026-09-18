@@ -9,7 +9,7 @@ const html=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
 const home=await readFile(new URL('src/starters/homemap-story.json',root),'utf8');
 const trace=await readFile(new URL('src/starters/complex-trace.json',root),'utf8');
 const names=['buildConfluenceExport','buildConfluenceConfig','confluenceSections','confluenceDisplayPage',
-  'confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','renderPage','applySkinClasses'];
+  'confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','DEFAULT_SKIN','renderPage','applySkinClasses'];
 const source=(await Promise.all(['canon','validator','engine','confluence'].map(n=>readFile(new URL('src/'+n+'.js',root),'utf8')))).join('\n');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,5));
 async function setup(t,{config={},configuring=true,submit,contextError=false,reducedMotion=true}={}){

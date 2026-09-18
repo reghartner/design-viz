@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Complex checkout — shared dependencies and service cycles",
-    "skin": "aurora",
+    "skin": "pastel",
     "protocols": {
       "trace": {
         "label": "Span parent relationship",

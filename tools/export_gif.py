@@ -13,8 +13,9 @@ sections never overwrites. --out takes an exact .gif path, or a directory
 (existing, or marked by a trailing slash) to receive the derived name.
 
 Chrome/Chromium captures one PNG for every canonical heading-slug step deep
-link, clipped to the section's diagram: the board with its legend, the
-widget panels, and the step bar, plus a --margin background border. --scale
+link, clipped to the section's visible composition: the Home/custom layout
+or the board with its legend, the widget panels, and the step bar, plus a
+--margin background border. --scale
 renders each CSS pixel as that many device pixels (default 2), so text
 stays sharp; layout is unchanged. --skin renders with that theme instead of
 the page's own default (validated against the page's skin list), and
@@ -359,21 +360,20 @@ def find_chrome(explicit: str | None = None) -> str | None:
 def clip_expression(section_reference: str, margin: int) -> str:
     """JS that returns the diagram clip rect for a section, in page coordinates.
 
-    The rect is the union of the section's ``.boardgrid`` (board, legend, and
-    widget panels) and its visible ``.termbar`` (step readout and transport
-    buttons — a sibling of the grid on panel-less sections), expanded by
-    ``margin`` CSS pixels on every side and clamped to the document. Returns
-    null when the section or its diagram is missing.
+    The rect covers the visible custom composition or legacy board grid,
+    plus step controls wherever they are attached or detached. Custom layouts
+    relocate panels out of ``.boardgrid`` and hide that old container, so both
+    grid types must be considered. Zero-area hidden elements contribute nothing.
+    Expand by ``margin`` CSS pixels and clamp to the document. Return null when
+    the section has no visible diagram, panels or controls.
     """
     return (
         "(function(){"
         "var sec = document.getElementById('section-' + %s);"
         "if (!sec) return null;"
-        "var pad = %d, parts = [];"
-        "var grid = sec.querySelector('.boardgrid');"
-        "if (grid) parts.push(grid);"
-        "var bar = sec.querySelector('.termbar');"
-        "if (bar && !bar.hidden) parts.push(bar);"
+        "var pad = %d;"
+        "var parts = Array.prototype.slice.call(sec.querySelectorAll("
+        "'.section-layout-grid, .boardgrid, .termbar'));"
         "var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;"
         "parts.forEach(function(el){"
         "var r = el.getBoundingClientRect();"

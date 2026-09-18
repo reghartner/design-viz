@@ -305,6 +305,67 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             check=True, capture_output=True)
         return page
 
+    def test_custom_home_layout_clip_includes_visible_tiles_and_step_controls(self):
+        # Layout views relocate Home/panels out of .boardgrid. That legacy
+        # container remains in the DOM but is hidden; it cannot define a crop.
+        spec = json.loads((ROOT / "src/starters/named-layouts.json").read_text())
+        diagram = spec["page"]["sections"][0]["diagram"]
+        diagram["defaultLayout"] = "home-story"
+        layout = diagram["layouts"][0]
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            temp_path = pathlib.Path(temp)
+            for attached in (True, False):
+                with self.subTest(attached=attached):
+                    tiles = layout["sectionLayout"]["default"]
+                    controls = next(t for t in tiles if t.get("controls") == "steps")
+                    if not attached:
+                        controls.pop("attachTo", None)
+                        controls.update(x=0, y=24, w=12, h=6)
+                    # A hidden panel far from the composition must not expand
+                    # the capture, even though its element still exists.
+                    hidden = next(t for t in tiles if t.get("panel") == "clip")
+                    hidden.update(hidden=True, y=70)
+                    source = temp_path / "layout.json"
+                    source.write_text(json.dumps(spec))
+                    page = temp_path / "layout.html"
+                    subprocess.run(
+                        [sys.executable, str(ROOT / "tools/inject.py"),
+                         str(source), str(ROOT / "template/flowview.html"), str(page)],
+                        check=True, capture_output=True)
+                    target = export_gif.choose_target(spec)
+                    state = self.inspect_page(page, target.fragments[0], """
+                      (function(){
+                        var sec = document.getElementById('section-' + %s);
+                        function rect(el){
+                          var r = el.getBoundingClientRect();
+                          return {top:r.top+scrollY, bottom:r.bottom+scrollY,
+                                  left:r.left+scrollX, right:r.right+scrollX,
+                                  height:r.height};
+                        }
+                        return {clip:%s,
+                          grid:rect(sec.querySelector('.section-layout-grid')),
+                          oldGrid:rect(sec.querySelector('.boardgrid')),
+                          home:rect(sec.querySelector('.pt-homemap')),
+                          bar:rect(sec.querySelector('.termbar')),
+                          hidden:rect(sec.querySelector('[data-layout-key="panel:clip"]')),
+                          heading:rect(sec.querySelector('.sec-h'))};
+                      })()
+                    """ % (json.dumps(target.section_reference),
+                           export_gif.clip_expression(target.section_reference, 16)))
+                    self.assertEqual(state["oldGrid"]["height"], 0)
+                    self.assertEqual(state["hidden"]["height"], 0)
+                    clip = state["clip"]
+                    self.assertIsNotNone(clip)
+                    for part in ("grid", "home", "bar"):
+                        r = state[part]
+                        self.assertGreater(r["height"], 0, part)
+                        self.assertLessEqual(clip["x"], r["left"], part)
+                        self.assertLessEqual(clip["y"], r["top"], part)
+                        self.assertGreaterEqual(clip["x"] + clip["width"], r["right"], part)
+                        self.assertGreaterEqual(clip["y"] + clip["height"], r["bottom"], part)
+                    self.assertGreater(clip["y"], state["heading"]["bottom"])
+                    self.assertLessEqual(clip["height"], state["grid"]["height"] + 33)
+
     def test_skin_switch_and_dim_alpha_change_the_captured_frame(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)

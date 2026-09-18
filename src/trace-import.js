@@ -278,7 +278,7 @@ function traceToSpec(input, options){
     'This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success.'],
     bullets: warnings.slice(), diagram: {view: 'step', routing: 'lanes', nodes: nodes, rows: rows, edges: edges, panels: [timing, internal, details], steps: steps}};
   if (source) section.source = source;
-  var result={spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'aurora',
+  var result={spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'pastel',
     protocols: edges.length ? {trace: {label: 'Span parent relationship', color: '#38BDF8'}} : {}, blocks: [section]}},
     warnings: warnings, stats: plan.stats};
   if (plan.focus){

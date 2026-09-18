@@ -46,7 +46,7 @@
         <span id="skinbtns"><!-- one button per skin, built by boot from SKIN_NAMES --></span>
       </div>
 
-      <div class="docview sk-aurora" id="docview" aria-label="Rendered documentation page"></div>
+      <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
     </div>
 
     <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
@@ -227,7 +227,7 @@
     <div style="overflow-x:auto">
     <table>
       <tr><th>key</th><th>shape</th><th>meaning</th></tr>
-      <tr><td>page</td><td><code>{title, skin?, protocols?, lanes?, blocks}</code></td><td>The whole doc page. <code>skin</code>: <code>aurora daylight editorial terminal pastel blueprint</code> (<code>aurora</code> default). <code>sections</code> is accepted as an alias for a blocks list with no tabs.</td></tr>
+      <tr><td>page</td><td><code>{title, skin?, protocols?, lanes?, blocks}</code></td><td>The whole doc page. <code>skin</code>: <code>aurora daylight editorial terminal pastel blueprint</code> (<code>pastel</code> default). <code>sections</code> is accepted as an alias for a blocks list with no tabs.</td></tr>
       <tr><td>page.blocks[n]</td><td><code>section | {tabs:[...]}</code></td><td>Ordered content. A block is either a section object (below) or a tabs container.</td></tr>
       <tr><td>tabs[n]</td><td><code>{label, sections:[...]}</code></td><td>One tab: a label and its sections. All tabs render; inactive panels are hidden (their ambient animation stops painting). Arrow keys move between tabs.</td></tr>
       <tr><td>page.protocols</td><td><code>{kind: {label, color}}</code></td><td>Extends the built-in kind table (<code>https</code>, <code>int</code>, <code>mqtt</code>). <code>color</code> is one hex, or <code>{aurora, daylight}</code>. Edges, packets, arrowheads, and the legend all read this one table, so they cannot drift.</td></tr>

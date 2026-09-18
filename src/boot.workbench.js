@@ -93,7 +93,7 @@ CMD_STEP.view = "step";
 var DEMO = {
   page: {
     title: "Cumulus IoT — device messaging",
-    skin: "aurora",
+    skin: DEFAULT_SKIN,
     lanes: {
       NET: {color: "#38E1FF"},
       DEV: {color: "#4ADE80"}
@@ -165,7 +165,7 @@ var CONTRACT = [
   '{',
   '  "page": {',
   '    "title": "<page title>",',
-  '    "skin": "aurora",                      // aurora|daylight|editorial|terminal|pastel|blueprint',
+  '    "skin": "pastel",                      // pastel (default)|aurora|daylight|editorial|terminal|blueprint',
   '    "protocols": {                         // optional: add new edge kinds',
   '      "<kind>": {"label": "<legend label>", "color": "#RRGGBB"}',
   '    },',
@@ -379,8 +379,8 @@ var skinBtns = {};
     var b = document.createElement('button');
     b.className = 'skbtn';
     b.id = 'sk-' + name;
-    b.setAttribute('aria-pressed', name === 'aurora' ? 'true' : 'false');
-    b.textContent = name.toUpperCase() + (name === 'aurora' ? ' (default)' : '');
+    b.setAttribute('aria-pressed', name === DEFAULT_SKIN ? 'true' : 'false');
+    b.textContent = name.toUpperCase() + (name === DEFAULT_SKIN ? ' (default)' : '');
     b.addEventListener('click', function(){
       activeSkin = name; setSkinButtons(name);
       if (lastPage){

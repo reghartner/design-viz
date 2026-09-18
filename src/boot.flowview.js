@@ -45,7 +45,7 @@ function readCookieText(){
 function fail(msgs){
   bootFailed = true;
   pendingLinkBase = null;
-  applySkinClasses(document.body, view, 'aurora');
+  applySkinClasses(document.body, view, DEFAULT_SKIN);
   var pre = document.createElement('pre');
   pre.className = 'errbox';
   pre.textContent = 'Flowview: the spec did not render.\n\n' + msgs.map(function(m){ return '- ' + m; }).join('\n');

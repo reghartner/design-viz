@@ -67,7 +67,7 @@
     try{
       var page=normalize(event.data.spec), result=validate(page);
       if(result.errors.length) throw new Error(result.errors.join('\n'));
-      var skin=SKIN_NAMES.indexOf(page.skin)>=0 ? page.skin : 'aurora';
+      var skin=SKIN_NAMES.indexOf(page.skin)>=0 ? page.skin : DEFAULT_SKIN;
       applySkinClasses(document.body,view,skin);
       controller=renderPage(view,page,skin,{}, {autoplay:false,layoutTarget:'backstage'});
       controller.onChange=function(){protectLinks();size();};

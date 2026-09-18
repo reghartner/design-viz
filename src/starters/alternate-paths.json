@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "One command, two outcomes",
-    "skin": "aurora",
+    "skin": "pastel",
     "sections": [{
       "heading": "Command delivery",
       "text": ["The same command can reach the device or lose its radio signal. In the Dropped signal row, faded steps 1–3 show the shared lead-in; the distinct failure is step 4. The diagram stays in place; the selected path controls playback and every panel."],

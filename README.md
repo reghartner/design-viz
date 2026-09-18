@@ -569,6 +569,9 @@ Linux install paths, opens each canonical heading-slug
 `#d=delivery-flow&m=step&s=…` deep link headlessly, and captures one frame per
 step clipped to the diagram itself — the board with its legend, the widget
 panels, and the step bar — with a `--margin` background border (default 16 px).
+Custom and named layouts use the page's authored default view: the Home map,
+visible panels and attached or detached step controls are captured together
+in their arranged positions. Hidden tiles stay hidden and do not enlarge the crop.
 Section headings, prose, and whatever follows the diagram stay out of frame,
 and a diagram taller than the viewport is captured in full. `--width` still
 sets the layout viewport width the page renders at, and `--scale` (default 2)

@@ -975,6 +975,34 @@ perspectives" of one timeline). Types:
   Steps may then also patch `{"miss":[{"lane":"hb","at":"3h"}]}` (appends) to
   flag an expected beat that never arrived (red marker on that lane), and
   events may carry `"lane":"hb"` to sit on a lane's row.
+- `deviceapp` — camera-details phone UI beside a field-level backend source map.
+  Declare `device` and optional `subtitle`; `sources` is 1–6 objects with unique
+  `id`, `label`, optional hex `color`, diagram `node` ID, `endpoint` and `detail`.
+  `fields` is 1–12 objects with unique `id`, `label`, `source` ID, optional
+  `kind` (`text` default or `battery`), `icon` and `unit`. IDs must begin with a
+  letter and contain only letters, digits, `_` or `-`; `clock`, `note`,
+  `constructor` and `prototype` are reserved. Sources receive stable A–F
+  markers as well as colors. Selecting a source or field highlights all fields
+  using that source and its optional diagram node. Selection is viewer state.
+  Initial and step state use field IDs directly, e.g. `{"battery":{"value":68,
+  "status":"ready","detail":"Reported just now"},"power":{"value":"Solar
+  panel","status":"ready"}}`. Status is explicit: `unknown` (default, No data),
+  `loading`, `ready` (Current), `stale` (Cached), `error` (Unavailable). A value
+  does not imply freshness. Battery values are numeric 0–100; other values can
+  be text, finite numbers or booleans. Missing/null values show `—`. Invalid
+  battery values warn and show `—`, never a fabricated zero reading.
+  Patches MERGE each field's `value`, `status`, `detail`, and optional `source`
+  override. Thus `{"battery":{"status":"stale"}}` preserves its last value.
+  A field set to `null` resets its value/detail/status and restores its declared
+  source; `source:null` alone restores that source without clearing the value.
+  Optional `clock` and `note` strings carry forward. Changed fields show an
+  Updated cue; adjacent forward transitions may animate once. Backward/jump
+  navigation and reduced motion render the absolute state without entry effects.
+  Values, endpoints and freshness text are authored, never fetched or timed.
+  Replacing field/source IDs requires updating their references and step patches.
+  Use a wide named-layout tile for the phone and source map side by side; narrow
+  tiles stack the map below the phone. See `cookbook/device-app-sources.md` and
+  the **camera app sources** starter for a doorbell refresh/outage example.
 - `phone` — a small generic smartphone frame for flows that end by notifying
   a resident's phone: `{"id":"resident","type":"phone","title":"Resident
   phone","initial":{"clock":"9:41"}}`. `clock` is optional status-bar time

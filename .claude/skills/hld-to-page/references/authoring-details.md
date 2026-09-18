@@ -19,6 +19,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | A large home map, live Home / Data flow switching, or per-step placement | `cookbook/home-story.md`, `docs/homemap-workbench.md` |
 | Outside grounds, a centered whole house, a porch/entry split, or doors in walls | `cookbook/outdoor-home.md`, `docs/homemap-workbench.md` |
 | Camera recording before an event, color clips, doorbell runners, fire, or delivery | `cookbook/camera-events.md` plus `tools/widget_doc.py screen` |
+| Phone app battery/charging/camera fields with backend provenance and partial refresh | `cookbook/device-app-sources.md`; use `deviceapp`, source IDs and independent per-field states |
 | Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
 | A crowded editor, resizing, focus, or diagram fit controls | `docs/workbench-workspace.md` |
 | Database/payload state, checks, budgets, retry/circuit behavior, replicas, or rollout decisions | Matching recipes in `cookbook/README.md` and the corresponding widget docs |

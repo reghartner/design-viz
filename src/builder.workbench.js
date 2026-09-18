@@ -839,6 +839,7 @@ function planRenameNode(text, raw, sectionIdx, oldId, newId){
     var nodes = Object.create(null);
     Object.keys(d.nodes).forEach(function(k){ nodes[k === oldId ? newId : k] = d.nodes[k]; });
     d.nodes = nodes;
+    (d.panels || []).forEach(function(p){if(p && p.type==='deviceapp')(Array.isArray(p.sources)?p.sources:[]).forEach(function(s){if(s && s.node===oldId)s.node=newId;});});
     d.rows = (d.rows || []).map(function(row){
       return row.map(function(slot){
         if (Array.isArray(slot)) return slot.map(function(s){ return s === oldId ? newId : s; });
@@ -904,6 +905,7 @@ function planDeleteNode(text, raw, sectionIdx, id){
     return {error: 'node "' + id + '" not found'};
   return builderRewrite(text, raw, got.path, function(d){
     delete d.nodes[id];
+    (d.panels || []).forEach(function(p){if(p && p.type==='deviceapp')(Array.isArray(p.sources)?p.sources:[]).forEach(function(s){if(s && s.node===id)delete s.node;});});
     d.rows = (d.rows || []).map(function(row){
       return row.map(function(slot){
         return Array.isArray(slot) ? slot.filter(function(s){ return s !== id; }) : slot;
@@ -1284,6 +1286,14 @@ var NODE_PRESETS = [
 ];
 
 var PANEL_TEMPLATES = {
+  deviceapp: {title:'Camera app · data sources',device:'Front door camera',subtitle:'Device health',
+    sources:[{id:'telemetry',label:'Device telemetry',detail:'Battery and charging reports'},{id:'registry',label:'Device registry',detail:'Camera configuration'}],
+    fields:[{id:'battery',label:'Battery',kind:'battery',source:'telemetry'},
+      {id:'power',label:'Charging source',source:'telemetry'},
+      {id:'model',label:'Camera model',icon:'camera',source:'registry'},
+      {id:'firmware',label:'Firmware',icon:'chip',source:'registry'}],
+    initial:{battery:{value:68,status:'ready'},power:{value:'Solar panel',status:'ready'},
+      model:{value:'Doorbell camera',status:'ready'},firmware:{value:'v2.4.1',status:'ready'},note:'Illustrative values. Select a field to see its source.'}},
   image:     {title:'Reference image',alt:'Embedded reference image'},
   replicas:  {title:'Replica positions',unit:'records',replicas:[{id:'primary',label:'Primary'},{id:'follower',label:'Follower'}],
               initial:{reference:{series:'example/log-a',position:104},replicas:{
@@ -2469,6 +2479,11 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
         {kind:'engine',label:'Engine default',inputs:[]};
     }
     function origin(key){
+      if(p.type==='deviceapp'){
+        if(key==='_updated')return {kind:'engine',label:'Engine · fields changed at this step',inputs:[]};
+        if(key==='clock' || key==='note')return assignment(key,function(v){return typeof v==='string';},false);
+        return history([key],true,'Field value and source history');
+      }
       if (p.type === 'homemap'){
         if (key === 'signals'){
           var signalPatch = (stepPanelPatch(d.steps[stepIndex]) || {})[p.id];
@@ -2521,6 +2536,10 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
              and an optional max; unknown keys on existing items survive edits
      objf  — one fixed-shape object edited inline (timeline cadence) */
 var PANEL_SETUP_FIELDS = {
+  deviceapp: [['device','text'],['subtitle','text'],
+    ['sources','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'color'},{k:'node'},{k:'endpoint'},{k:'detail'}],max:6}],
+    ['fields','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:['text','battery']},
+      {k:'source'},{k:'icon',kind:'icon'},{k:'unit'}],max:12}],['initial','json']],
   image:     [['src','image'],['alt','text'],['caption','text'],['link','text']],
   replicas:  [['unit','text'],['replicas','rows',{cols:[{k:'id',req:true},{k:'label'}],max:8}],['initial','json']],
   trace:     [['spans','json'],['initial','json']],
@@ -2579,6 +2598,7 @@ var PANEL_SETUP_FIELDS = {
 
 /* Dynamic-key types are expanded from their declarations by panelPatchFields. */
 var PANEL_PATCH_FIELDS = {
+  deviceapp: [['clock','text'],['note','text']],
   image:     [],
   replicas:  [['reference','json'],['replicas','json'],['note','text']],
   trace:     [['selected','text']],
@@ -2629,6 +2649,15 @@ function patchSummaryLine(patchObj){
 
 function panelPatchFields(decl){
   if (!decl || !Object.prototype.hasOwnProperty.call(PANEL_PATCH_FIELDS, decl.type)) return null;
+  if(decl.type==='deviceapp'){
+    var sourceIds=(Array.isArray(decl.sources)?decl.sources:[]).filter(function(s){return s && typeof s.id==='string';}).map(function(s){return s.id;});
+    var appFields=(Array.isArray(decl.fields)?decl.fields:[]).filter(function(f){return f && typeof f.id==='string';}).map(function(f){
+      return [f.id,'objf',[['value',f.kind==='battery'?'num':'text'],
+        ['status','enum',['unknown','loading','ready','stale','error']],
+        ['source','enum',sourceIds],['detail','text']]];
+    });
+    return appFields.concat(PANEL_PATCH_FIELDS.deviceapp);
+  }
   var states = Array.isArray(decl.states) ? decl.states.map(String) : [];
   var stateField = states.length ? ['state', 'enum', states] : ['state', 'text'];
   if (decl.type === 'homemap'){

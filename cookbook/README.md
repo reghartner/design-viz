@@ -25,6 +25,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 
 | You were asked for… | Recipe |
 |---|---|
+| a camera phone UX whose fields come from different backend services | [Device app sources](device-app-sources.md) — doorbell refresh and partial outage |
 | a Confluence-ready export or JSON to paste into the Flowview macro | [Confluence handoff](../docs/confluence.md) |
 | small screenshots or illustrations stored inside the spec | [embedded-images.md](embedded-images.md) |
 | happy and failure outcomes on one diagram, shared steps, or a dropped/blocked communication | [alternate-paths.md](alternate-paths.md) |

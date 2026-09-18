@@ -19,6 +19,7 @@ SRC = ROOT / "src"
 
 # Reuse the canonical demo so its gallery entry cannot drift.
 STARTERS = [
+    ("camera app sources", "A camera-details phone screen with per-field backend provenance, refresh, and a telemetry outage alternate.", "starters/device-app-sources.json"),
     ("home story", "A large home scene with rooms, a visitor, local signals, and an internet outage alternate.", "starters/homemap-story.json"),
     ("named layouts", "Switch between a Home story and service diagram in the same arrangement, with shared steps and alternate paths.", "starters/named-layouts.json"),
     ("thermal protection", "Proposed doorbell flow: heat, frost, charging pause, unavailable video and recovery.", "../docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json"),

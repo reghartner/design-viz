@@ -1141,6 +1141,49 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .ifgrid{background:#D6D0C3;}
 .sk-daylight .ifnow{background:rgba(73,86,201,.08);}
 
+/* Camera app + explicit data provenance. A compact tile stacks the source map. */
+.pt-deviceapp{container-type:inline-size;}
+.deviceapp{display:grid;grid-template-columns:minmax(240px,330px) minmax(220px,1fr);gap:30px;max-width:930px;margin:auto;padding:12px;color:var(--dink);font:13px/1.45 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
+.da-phone{position:relative;box-sizing:border-box;border:3px solid #9ba7bd;border-radius:34px;padding:14px 15px 30px;background:#f5f7fc;color:#24324b;box-shadow:0 14px 30px #23324b12;}
+.da-phone::before{content:"";position:absolute;top:13px;left:43%;width:14%;height:5px;border-radius:5px;background:#8a96ac;}
+.da-statusbar{display:flex;justify-content:space-between;font:600 10px 'IBM Plex Mono',monospace;padding:0 5px 18px;}
+.da-heading{padding:5px 4px 16px;}
+.da-eyebrow{font:600 10px/1.5 'IBM Plex Mono',monospace;letter-spacing:.12em;opacity:.7;}
+.da-heading h3,.da-provenance h3{font:600 21px/1.2 'Sora',sans-serif;margin:7px 0 5px;letter-spacing:-.5px;}
+.da-heading>span:last-child{font-size:12px;color:#65728a;}
+.da-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+.deviceapp button{appearance:none;font:inherit;text-align:left;cursor:pointer;min-width:0;}
+.da-field{display:flex;flex-direction:column;gap:7px;border:1px solid #dfe4ef;border-top:3px solid var(--da-color);border-radius:12px;padding:10px;background:#fff;color:#24324b;transition:box-shadow .16s;}
+.da-field:first-child{grid-column:1/-1;}
+.da-field:last-child:nth-child(even){grid-column:1/-1;}
+.da-field-top{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px;color:#59677f;}
+.da-badge{display:inline-flex;flex:none;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;border:1px solid var(--da-color);color:var(--da-color);font:700 11px 'IBM Plex Mono',monospace;}
+.da-value{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:600;line-height:1.2;}
+.da-field:first-child .da-value{font-size:29px;}
+.da-icon{width:19px;height:19px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;}
+.da-meter{display:block;height:7px;border-radius:5px;background:#e7ecf4;overflow:hidden;}
+.da-meter i{display:block;height:100%;background:var(--da-color);border-radius:5px;}
+.da-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:9px;}
+.da-state{border-radius:4px;padding:2px 5px;background:#edf0f6;color:#53617a;}
+.da-ready .da-state{background:#e0f3ec;color:#17694c;}.da-stale .da-state{background:#fff0d6;color:#915209;}.da-error .da-state{background:#fde4e7;color:#a62f46;}.da-loading .da-state{background:#e4edff;color:#325dab;}
+.da-update-label{color:#626f87;}.da-detail{display:block;font-size:11px;line-height:1.4;opacity:.78;}
+.da-updated{box-shadow:0 0 0 1px color-mix(in srgb,var(--da-color) 35%,transparent);}
+.da-field[aria-pressed="true"],.da-source[aria-pressed="true"]{outline:2px solid var(--da-color);outline-offset:2px;}
+.deviceapp button:focus-visible{outline:3px solid var(--da-color);outline-offset:3px;}
+.da-field.fresh{animation:da-arrive .6s ease-out;}
+@keyframes da-arrive{from{transform:translateY(4px);background:#e8f1ff;}to{transform:none;background:#fff;}}
+.da-home{position:absolute;bottom:10px;left:37%;width:26%;height:4px;border-radius:4px;background:#8694ab;}
+.da-provenance{align-self:center;min-width:0;}.da-help{color:var(--dtext);font-size:12px;margin:10px 0 20px;}
+.da-sources{display:grid;gap:12px;}
+.da-source{display:block;width:100%;border:1px solid color-mix(in srgb,var(--dtext) 22%,transparent);border-left:4px solid var(--da-color);border-radius:12px;padding:13px 15px;color:var(--dink);background:color-mix(in srgb,var(--da-color) 4%,transparent);}
+.da-source-title{display:flex;gap:9px;align-items:center;}.da-source code{display:block;font:10px/1.5 'IBM Plex Mono',monospace;margin:8px 0;}
+.da-source .da-detail{margin-top:6px;}.da-source-fields{display:block;border-top:1px solid color-mix(in srgb,var(--dtext) 16%,transparent);margin-top:9px;padding-top:9px;font-size:11px;color:var(--dtext);}
+.da-note{font-size:12px;border-left:3px solid var(--acc);padding:9px 13px;background:color-mix(in srgb,var(--acc) 6%,transparent);margin:18px 0 0;}
+.node.da-node-focus .card{stroke:var(--acc)!important;stroke-width:4px!important;stroke-dasharray:5 3!important;}
+@container (max-width:560px){.deviceapp{grid-template-columns:minmax(0,1fr);gap:22px;padding:5px;}.da-phone{width:100%;max-width:330px;margin:auto;}.da-provenance h3{font-size:17px;}}
+@media(prefers-reduced-motion:reduce){.da-field.fresh{animation:none;}.da-field{transition:none;}}
+@media print{.da-field.fresh{animation:none;}.da-provenance{color:#222;--dink:#222;--dtext:#444;}.da-phone{box-shadow:none;}}
+
 /* phone widget: generic lock-screen notification stack (no OS branding) */
 .phoneframe{position:relative;box-sizing:border-box;width:178px;min-height:252px;margin:0 auto;padding:30px 11px 19px;
   overflow:hidden;border:2px solid;border-radius:25px;font:500 9px/1.25 'IBM Plex Mono',monospace;}
@@ -2092,7 +2135,8 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
   .panelcol .pwidget{display:none !important;}
   .panelcol .pwidget.pt-queue,
   .panelcol .pwidget.pt-phone{display:block !important; background:#FFFFFF; border-color:#BBBBBB;}
-  .panelcol:not(:has(.pt-queue)):not(:has(.pt-phone)){display:none;}
+  .panelcol .pwidget.pt-deviceapp{display:block !important;background:#fff;border-color:#bbb;}
+  .panelcol:not(:has(.pt-queue)):not(:has(.pt-phone)):not(:has(.pt-deviceapp)){display:none;}
   .pt-queue .ptitle{color:#555555;}
   .qmsg{animation:none !important; background:#FFFFFF; color:#111111; border-color:#555555;}
   .qslot{border-color:#999999;}
@@ -5487,7 +5531,7 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-var PANEL_TYPES = ['state','leds','gauge','log','screen','image','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','timeline','table','checks','budget','trace','replicas'];
+var PANEL_TYPES = ['state','leds','gauge','log','screen','image','waterfall','orbit','zoneframe','xray','queue','pir','thermo','battery','buffer','radar','homemap','signal','tiles','inflight','phone','deviceapp','timeline','table','checks','budget','trace','replicas'];
 var EMBEDDED_IMAGE_MAX_BYTES = 512 * 1024;
 /* Raster data only: images travel with the spec and never fetch remote assets. */
 function embeddedImageSource(value){
@@ -6147,6 +6191,84 @@ function phoneBrandIsPlainObject(obj){
     Function.prototype.toString.call(proto.constructor) === Function.prototype.toString.call(Object));
 }
 
+/* Device app values are authored UI data, with explicit per-field provenance.
+   A source node is a diagram reference, never an instruction to fetch an API. */
+var DEVICEAPP_STATUSES = ['unknown','loading','ready','stale','error'];
+function deviceAppItems(panel,key){
+  var seen=Object.create(null),reserved=['clock','note','constructor','prototype'];
+  return (Array.isArray(panel && panel[key])?panel[key]:[]).filter(function(item){
+    if(!panelObject(item) || typeof item.id!=='string' || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(item.id) || seen[item.id] || reserved.indexOf(item.id)>=0)return false;
+    seen[item.id]=true;return true;
+  }).slice(0,key==='sources'?6:12);
+}
+function deviceAppPatchWarnings(obj,path,panel,warnings){
+  if(obj==null)return;
+  if(!panelObject(obj)){warnings.push(path+': expected an object — ignored');return;}
+  var fields=deviceAppItems(panel,'fields'),sources=deviceAppItems(panel,'sources');
+  Object.keys(obj).forEach(function(key){
+    if(key==='clock' || key==='note'){
+      if(typeof obj[key]!=='string')warnings.push(path+'.'+key+': expected text — ignored');return;
+    }
+    var f=fields.find(function(field){return field.id===key;}),v=obj[key],p=path+'.'+key;
+    if(!f){warnings.push(p+': unknown deviceapp field — ignored');return;}
+    if(v===null)return;
+    if(!panelObject(v)){warnings.push(p+': expected {value, status?, source?, detail?} or null — ignored');return;}
+    Object.keys(v).forEach(function(k){if(['value','status','source','detail'].indexOf(k)<0)warnings.push(p+'.'+k+': unknown field property — ignored');});
+    if(panelOwn(v,'value') && v.value!==null && !(typeof v.value==='string' || isFiniteNum(v.value) || typeof v.value==='boolean'))warnings.push(p+'.value: expected text, finite number, boolean or null — ignored');
+    if(f.kind==='battery' && v.value!=null && (!isFiniteNum(v.value) || v.value<0 || v.value>100))warnings.push(p+'.value: battery expects 0–100 — invalid values display as unknown');
+    if(panelOwn(v,'status') && DEVICEAPP_STATUSES.indexOf(v.status)<0)warnings.push(p+'.status: expected '+DEVICEAPP_STATUSES.join(', ')+' — ignored');
+    if(panelOwn(v,'source') && v.source!==null && !sources.some(function(s){return s.id===v.source;}))warnings.push(p+'.source: unknown source ID — ignored');
+    if(panelOwn(v,'detail') && v.detail!==null && typeof v.detail!=='string')warnings.push(p+'.detail: expected text or null — ignored');
+  });
+}
+function deviceAppWarnings(panel,d,path,warnings){
+  ['device','subtitle'].forEach(function(k){if(panel[k]!=null && typeof panel[k]!=='string')warnings.push(path+'.'+k+': expected text — ignored');});
+  ['sources','fields'].forEach(function(key){
+    var items=deviceAppItems(panel,key),raw=panel[key];
+    if(!Array.isArray(raw) || !raw.length)warnings.push(path+'.'+key+': declare '+(key==='sources'?'1–6 data sources':'1–12 phone fields'));
+    else if(items.length!==raw.length)warnings.push(path+'.'+key+': use unique letter-led IDs and at most '+(key==='sources'?6:12)+' entries; clock/note/constructor/prototype are reserved — invalid entries ignored');
+    items.forEach(function(item,i){
+      var p=path+'.'+key+'['+i+']';
+      ['label','detail','endpoint','unit'].forEach(function(k){if(item[k]!=null && typeof item[k]!=='string')warnings.push(p+'.'+k+': expected text — ignored');});
+      if(key==='sources'){
+        if(item.color!=null && (typeof item.color!=='string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(item.color)))warnings.push(p+'.color: use #RGB or #RRGGBB — using palette color');
+        if(item.node!=null && (typeof item.node!=='string' || !panelOwn(d.nodes,item.node)))warnings.push(p+'.node: unknown diagram node — no node highlight');
+      }else{
+        if(item.kind!=null && ['text','battery'].indexOf(item.kind)<0)warnings.push(p+'.kind: expected text or battery — using text');
+        if(item.icon!=null && ICON_SET.indexOf(item.icon)<0)warnings.push(p+'.icon: unknown icon — ignored');
+        if(item.source!=null && !deviceAppItems(panel,'sources').some(function(s){return s.id===item.source;}))warnings.push(p+'.source: unknown source ID — shown as unmapped');
+      }
+    });
+  });
+  deviceAppPatchWarnings(panel.initial,path+'.initial',panel,warnings);
+}
+function foldDeviceAppStates(panel,steps){
+  var fields=deviceAppItems(panel,'fields'),sources=deviceAppItems(panel,'sources'),carried=Object.create(null),states=[];
+  function apply(patch){
+    var updated=[];if(!panelObject(patch))return updated;
+    ['clock','note'].forEach(function(k){if(typeof patch[k]==='string')carried[k]=patch[k];});
+    fields.forEach(function(f){
+      if(!panelOwn(patch,f.id))return;
+      var v=patch[f.id],next=Object.assign({},carried[f.id] || {});
+      if(v===null)next={value:null,status:'unknown',detail:'',source:null};
+      else if(panelObject(v)){
+        if(panelOwn(v,'value') && (v.value===null || typeof v.value==='string' || isFiniteNum(v.value) || typeof v.value==='boolean'))next.value=v.value;
+        if(DEVICEAPP_STATUSES.indexOf(v.status)>=0)next.status=v.status;
+        if(panelOwn(v,'source') && (v.source===null || sources.some(function(s){return s.id===v.source;})))next.source=v.source;
+        if(v.detail===null || typeof v.detail==='string')next.detail=v.detail || '';
+      }else return;
+      if(JSON.stringify(next)!==JSON.stringify(carried[f.id] || {}))updated.push(f.id);
+      carried[f.id]=next;
+    });return updated;
+  }
+  function snapshot(updated){
+    var out=Object.create(null);Object.keys(carried).forEach(function(k){out[k]=panelObject(carried[k])?Object.assign({},carried[k]):carried[k];});out._updated=updated;return out;
+  }
+  apply(panel.initial);
+  (steps || []).forEach(function(st){states.push(snapshot(apply((stepPanelPatch(st) || {})[panel.id])));});
+  if(!states.length)states.push(snapshot([]));return states;
+}
+
 function phoneBrandWarnings(panel, path, warnings){
   if (!Object.prototype.hasOwnProperty.call(panel, 'brand')) return;
   var brand = panel.brand;
@@ -6475,9 +6597,9 @@ function sectionLayoutPreset(d, target, excludedKeys){
   var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
   var controls=tiles.find(function(t){return t.key==='steps';});
   if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
-  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && t.type!=='homemap';});
+  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && t.type!=='homemap' && t.type!=='deviceapp';});
   ordered.forEach(function(t){
-    var large=t.key==='diagram'||t.key==='steps'||t.type==='homemap'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=t.key==='steps'?((d.paths || []).length>1?6:4):large?12:t.type==='phone'?10:t.type==='screen'?8:6;
+    var large=t.key==='diagram'||t.key==='steps'||t.type==='homemap'||t.type==='deviceapp'||t===main, w=large?(narrow||!supporting?12:8):(narrow?6:4), h=t.key==='steps'?((d.paths || []).length>1?6:4):t.type==='deviceapp'?23:large?12:t.type==='phone'?10:t.type==='screen'?8:6;
     var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
       var it={x:x,y:0,w:w,h:h}, hits;
       while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
@@ -6784,6 +6906,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       phoneBrandWarnings(p, PP, warnings);
       phonePatchWarnings(p.initial, PP + '.initial', warnings);
     }
+    if (p.type === 'deviceapp') deviceAppWarnings(p,d,PP,warnings);
     if (p.type === 'timeline'){
       timelinePanels[p.id] = true;
       if (p.span == null)
@@ -7080,6 +7203,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         phonePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, warnings);
       } else if (timelinePanels[pid] && patch[pid]){
         timelinePatchWarnings(patch[pid], DP + '.steps[' + ti + '].panels.' + pid, panelDeclById[pid], warnings);
+      } else if (panelDeclById[pid].type === 'deviceapp'){
+        deviceAppPatchWarnings(patch[pid],DP+'.steps['+ti+'].panels.'+pid,panelDeclById[pid],warnings);
       } else if (panelDeclById[pid].type === 'trace'){
         tracePanelPatchWarnings(patch[pid],DP+'.steps['+ti+'].panels.'+pid,panelDeclById[pid],warnings);
       } else if (panelDeclById[pid].type === 'replicas'){
@@ -7324,6 +7449,10 @@ function foldPanelStates(d){
     }
     if (p.type === 'phone'){
       out[p.id] = foldPhoneStates(p, steps);
+      return;
+    }
+    if (p.type === 'deviceapp'){
+      out[p.id] = foldDeviceAppStates(p, steps);
       return;
     }
     var carried = {};
@@ -10270,6 +10399,74 @@ function phonePanelHTML(panel, state, fresh){
   return h + '<span class="phonehome" aria-hidden="true"></span></div>';
 }
 
+/* Camera-details UI with field-level provenance. Everything is authored data;
+   even endpoint labels are inert text. Source selection is local viewer state. */
+function deviceAppModel(panel,state){
+  panel=panel || {};state=state || {};
+  var str=function(v,fallback){return typeof v==='string'?v:(fallback || '');};
+  var palette=['#5865d8','#168878','#bd6716','#a354b5','#287fbe','#b95164'];
+  var sources=deviceAppItems(panel,'sources').map(function(s,i){return {
+    id:s.id,label:str(s.label,s.id),letter:String.fromCharCode(65+i),
+    color:typeof s.color==='string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(s.color)?s.color:palette[i],
+    node:str(s.node),endpoint:str(s.endpoint),detail:str(s.detail)
+  };});
+  var fields=deviceAppItems(panel,'fields').map(function(f){
+    var v=panelObject(state[f.id])?state[f.id]:{},battery=f.kind==='battery';
+    var source=sources.find(function(s){return s.id===(v.source==null?f.source:v.source);});
+    var valid=v.value!=null && (typeof v.value==='string' || isFiniteNum(v.value) || typeof v.value==='boolean');
+    if(battery)valid=isFiniteNum(v.value) && v.value>=0 && v.value<=100;
+    return {id:f.id,label:str(f.label,f.id),source:source || null,battery:battery,
+      icon:ICON_SET.indexOf(f.icon)>=0?f.icon:null,value:valid?String(v.value)+(battery?'%':str(f.unit)): '—',
+      pct:battery && valid?v.value:0,status:DEVICEAPP_STATUSES.indexOf(v.status)>=0?v.status:'unknown',
+      detail:str(v.detail),updated:Array.isArray(state._updated) && state._updated.indexOf(f.id)>=0};
+  });
+  return {device:str(panel.device,'Camera'),subtitle:str(panel.subtitle,'Device health'),clock:str(state.clock,'9:41'),note:str(state.note),sources:sources,fields:fields};
+}
+function deviceAppPanelHTML(panel,state,fresh){
+  var m=deviceAppModel(panel,state),labels={unknown:'No data',loading:'Loading',ready:'Current',stale:'Cached',error:'Unavailable'};
+  function badge(s){return '<span class="da-badge" aria-hidden="true">'+(s?s.letter:'?')+'</span>';}
+  function props(s){return ' data-da-source="'+esc(s?s.id:'')+'" style="--da-color:'+(s?s.color:'#78808d')+'"';}
+  var h='<div class="deviceapp"><div class="da-phone"><div class="da-statusbar"><span>'+esc(m.clock)+'</span><span aria-hidden="true">▂▄▆ · ▰</span></div>'+
+    '<div class="da-heading"><span class="da-eyebrow">CAMERA DETAILS</span><h3>'+esc(m.device)+'</h3><span>'+esc(m.subtitle)+'</span></div><div class="da-fields">';
+  m.fields.forEach(function(f){
+    h+='<button type="button" class="da-field da-'+f.status+(f.updated?' da-updated':'')+(fresh && f.updated?' fresh':'')+'" data-da-field="'+esc(f.id)+'"'+props(f.source)+' aria-pressed="false" aria-label="'+esc(f.label+': '+f.value+'. '+labels[f.status]+'. Source: '+(f.source?f.source.label:'Unmapped'))+'">'+
+      '<span class="da-field-top"><span>'+esc(f.label)+'</span>'+badge(f.source)+'</span>'+
+      '<span class="da-value">'+(f.icon?'<svg class="da-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-'+f.icon+'"/></svg>':'')+esc(f.value)+'</span>'+
+      (f.battery?'<span class="da-meter" aria-hidden="true"><i style="width:'+f.pct+'%"></i></span>':'')+
+      '<span class="da-meta"><span class="da-state">'+labels[f.status]+'</span>'+(f.updated?'<span class="da-update-label">Updated</span>':'')+'</span>'+
+      (f.detail?'<span class="da-detail">'+esc(f.detail)+'</span>':'')+'</button>';
+  });
+  h+='</div><div class="da-home" aria-hidden="true"></div></div><div class="da-provenance"><div class="da-eyebrow">WHERE THE DATA COMES FROM</div>'+
+    '<h3>One screen. Multiple sources.</h3><p class="da-help">Select a field or source to trace its data'+(m.sources.some(function(s){return s.node;})?' and highlight its service in the diagram':'')+'.</p><div class="da-sources">';
+  m.sources.forEach(function(s){
+    var fields=m.fields.filter(function(f){return f.source && f.source.id===s.id;});
+    h+='<button type="button" class="da-source"'+props(s)+' aria-pressed="false"><span class="da-source-title">'+badge(s)+'<strong>'+esc(s.label)+'</strong></span>'+
+      (s.endpoint?'<code>'+esc(s.endpoint)+'</code>':'')+(s.detail?'<span class="da-detail">'+esc(s.detail)+'</span>':'')+
+      '<span class="da-source-fields">'+esc(fields.length?fields.map(function(f){return f.label+' · '+labels[f.status];}).join(' / '):'No fields in this step')+'</span></button>';
+  });
+  return h+'</div>'+(m.note?'<p class="da-note">'+esc(m.note)+'</p>':'')+'</div></div>';
+}
+function bindDeviceAppSources(host,panel,state){
+  if(typeof host.querySelectorAll!=='function')return;
+  if(host._daClear)host._daClear();
+  var nodes=[],m=deviceAppModel(panel,state);
+  var buttons=Array.from(host.querySelectorAll('[data-da-source]'));
+  function clearNodes(){nodes.forEach(function(n){if(n._daOwners){n._daOwners.delete(host);if(!n._daOwners.size)n.classList.remove('da-node-focus');}});nodes=[];}
+  host._daClear=clearNodes;
+  function select(id){
+    clearNodes();host._daSource=id;
+    buttons.forEach(function(b){var on=!!id && b.getAttribute('data-da-source')===id;b.setAttribute('aria-pressed',String(on));});
+    var source=m.sources.find(function(s){return s.id===id;});
+    var section=host.closest && host.closest('.doc-sec');
+    if(section && source && source.node)Array.from(section.querySelectorAll('[data-dv-node]')).forEach(function(n){
+      if(n.getAttribute('data-dv-node')!==source.node)return;
+      if(!n._daOwners)n._daOwners=new Set();n._daOwners.add(host);n.classList.add('da-node-focus');nodes.push(n);
+    });
+  }
+  buttons.forEach(function(b){b.addEventListener('click',function(){var id=b.getAttribute('data-da-source');select(host._daSource===id?null:id);});});
+  select(host._daSource);
+}
+
 /* queue widget: mailbox — a message enqueued, held, dequeued. Pure model +
    markup builder so node tests cover them without a DOM. Directional context:
    `from` shows during enqueue (arrival side), `to` during dequeue (departure
@@ -11455,6 +11652,11 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
     host._ifFrames = {};
     inflightFramesNow.forEach(function(frame){ host._ifFrames[frame.key] = frame.width; });
     h += inflightPanelHTML(panel, state, Array.isArray(states) ? states.length : state.stepCount, stepIdx);
+  } else if (type === 'deviceapp'){
+    var daFresh=animate && validRevealIndex(host._daStep) && validRevealIndex(stepIdx) && stepIdx===host._daStep+1;
+    host._daStep=validRevealIndex(stepIdx)?stepIdx:null;
+    h+=deviceAppPanelHTML(panel,state,daFresh);
+    hBaseline=daFresh?deviceAppPanelHTML(panel,state,false):null;
   } else if (type === 'phone'){
     var phm = phoneModel(state);
     /* Like pir/radar, entry is derived from the transition we actually
@@ -11567,6 +11769,7 @@ function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePrese
   host._scrOverlay = (type === 'screen') ? scrOvl : undefined;
   host._lastHTML = (hBaseline != null) ? hBaseline : h;
   if (!surgical) host.innerHTML = h;
+  if (type === 'deviceapp') bindDeviceAppSources(host,panel,state);
 
   /* Release each subject offset after a painted frame to start its glide. */
   if ((type === 'pir' || type === 'radar' || type === 'homemap') && animate){

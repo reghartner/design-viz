@@ -1,4 +1,4 @@
-"""Tests for tools/build.py: deterministic assembly of the two committed pages.
+"""Tests for tools/build.py: deterministic page and backend runtime assembly.
 Run: python3 -m unittest discover -s tests"""
 import json
 import pathlib
@@ -10,6 +10,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD = ROOT / "tools" / "build.py"
 PAGES = [ROOT / "template" / "flowview.html", ROOT / "workbench" / "flowspec.html"]
+OUTPUTS = PAGES + [ROOT / "tools" / "canon" / "generated-runtime.cjs"]
 
 BLOCK_RE = re.compile(r'^(<script type="application/json" id="flowspec">)\n(.*?)\n(</script>)',
                       re.S | re.M)
@@ -99,10 +100,10 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(chunks[0], chunks[1])
 
     def test_build_is_deterministic(self):
-        before = {p: p.read_text() for p in PAGES}
+        before = {p: p.read_text() for p in OUTPUTS}
         r = subprocess.run([sys.executable, str(BUILD)], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
-        for p in PAGES:
+        for p in OUTPUTS:
             self.assertEqual(before[p], p.read_text(), f"{p} changed on rebuild")
 
 

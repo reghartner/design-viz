@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Assemble the two committed single-file pages from src/.
+"""Assemble the committed single-file pages and Node runtime from src/.
 
   template/flowview.html   = flowview.skel.html  + core/flowview CSS + icons
                              + demo spec + (validator.js, engine.js, boot.flowview.js)
   workbench/flowspec.html  = workbench.skel.html + core/workbench CSS + icons
                              + (validator.js, engine.js, builder.workbench.js,
                                 boot.workbench.js)
+  tools/canon/generated-runtime.cjs = canon.js + validator.js + lazy engine.js
 
 Deterministic: same src -> byte-identical output. Run from anywhere.
 """
@@ -49,6 +50,29 @@ def js_bundle(*names: str) -> str:
         parts.append("/* ---- src/" + n + " ---- */")
         parts.append(read(n).rstrip())
     return "\n".join(parts)
+
+
+def canon_runtime() -> str:
+    """Static module for backend bundlers; never read/evaluate source at runtime."""
+    return (
+        "// GENERATED FILE — python3 tools/build.py; edit src/, not this file.\n"
+        "'use strict';\n"
+        + js_bundle("canon.js", "validator.js")
+        + "\nmodule.exports = FlowCanon;\n"
+        "module.exports.validateSpec = raw => validate(normalize(raw));\n"
+        "var viewerRoutingCache;\n"
+        "module.exports.viewerRouting = () => {\n"
+        "  if (!viewerRoutingCache) viewerRoutingCache = createViewerRouting();\n"
+        "  return viewerRoutingCache;\n"
+        "};\n"
+        "// Scanners initialize only the evidence/validation code. The viewer's\n"
+        "// routing helpers share that scope and initialize on first use.\n"
+        "function createViewerRouting(){\n"
+        + js_bundle("engine.js")
+        + "\nreturn {blocksOf, sectionReferences, buildHash, diagramPathList,\n"
+        "  stepKeys, stepFailures, stepReference};\n"
+        "}\n"
+    )
 
 
 def font_css() -> str:
@@ -100,8 +124,12 @@ def main() -> int:
     })
     (ROOT / "workbench" / "flowspec.html").write_text(workbench)
 
+    runtime = canon_runtime()
+    (ROOT / "tools" / "canon" / "generated-runtime.cjs").write_text(runtime)
+
     print("built template/flowview.html (%d bytes) and workbench/flowspec.html (%d bytes)"
           % (len(flowview), len(workbench)))
+    print("built tools/canon/generated-runtime.cjs (%d bytes)" % len(runtime))
     return 0
 
 

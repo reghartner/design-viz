@@ -61,6 +61,24 @@ test('unknown panels retain generic warnings and folding, and malformed patches 
   assert.deepEqual(plain(c.foldPanelStates(diagram(d.panels)).p), [{value:1,log:['initial']}]);
 });
 
+test('validation contexts preserve primitive values for every authored panel ID', () => {
+  const c=core(), seen=[];
+  c.PanelRegistry.extend('context-value-probe', {
+    validateDeclaration(panel){return panel.context;},
+    validatePatch(patch,path,panel,warnings,context){seen.push([panel.id,context]);}
+  });
+  const panels=[{id:'__proto__',context:42},{id:'constructor',context:null},{id:'ordinary',context:false}]
+    .map(panel=>({...panel,type:'context-value-probe'}));
+  const patches=Object.fromEntries(panels.map(panel=>[panel.id,{}]));
+  const result=c.validate(c.normalize(diagram(panels,[{nodes:['node'],panels:patches}])));
+  // These two names already receive legacy duplicate-ID errors. A diagnostic
+  // must still complete without corrupting the panel callback's context.
+  assert.equal(result.errors.length,2);
+  assert.ok(result.errors.every(error=>error.includes('duplicate panel id')));
+  assert.deepEqual(plain(result.warnings),[]);
+  assert.deepEqual(seen,[['__proto__',42],['constructor',null],['ordinary',false]]);
+});
+
 test('panel fold callbacks receive only the selected path and handle the ambient snapshot', () => {
   const c = core();
   c.PanelRegistry.extend('fold-contract-probe', {

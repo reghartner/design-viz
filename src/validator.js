@@ -523,7 +523,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   });
   var panelIds = {};
   var panelDeclById = {};
-  var panelContexts = {};
+  var panelContexts = Object.create(null);
   (d.panels || []).forEach(function(p, pi){
     var PP = DP + '.panels[' + pi + ']';
     if (!p || typeof p !== 'object'){ errors.push(PP + ': must be an object {id, type, ...}'); return; }

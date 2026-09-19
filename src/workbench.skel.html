@@ -128,7 +128,7 @@
             <button class="bbtn" id="add-node">+ node</button>
             <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
             <button class="bbtn" id="add-step">+ step</button>
-            <button class="bbtn" id="add-panel">+ panel</button>
+            <button class="bbtn" id="add-panel" aria-haspopup="dialog" aria-controls="panel-picker">+ panel</button>
           </span>
           <span class="bgroup" role="group" aria-label="add page structure">
             <button class="bbtn" id="add-section">+ section</button>
@@ -354,6 +354,29 @@
 
 
 
+<dialog id="panel-picker" class="panel-picker" aria-labelledby="panel-picker-title" aria-describedby="panel-picker-intro">
+  <header class="panel-picker-header">
+    <div><div class="panel-picker-eyebrow">The panel library</div><h2 id="panel-picker-title">Give your story another dimension.</h2><p id="panel-picker-intro">Choose a panel to preview it, then add it to your diagram.</p></div>
+    <button type="button" id="panel-picker-close" class="panel-picker-close" aria-label="Close panel picker">×</button>
+  </header>
+  <div class="panel-picker-content">
+    <section class="panel-picker-catalog" aria-label="Panel catalog">
+      <label class="panel-picker-search"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg><input id="panel-picker-search" type="search" placeholder="Find a panel…" aria-label="Search panels" autocomplete="off"></label>
+      <div id="panel-picker-filters" class="panel-picker-filters" role="group" aria-label="Panel categories"></div>
+      <div class="panel-picker-catalog-label"><span id="panel-picker-count" role="status"></span><span>Select to explore</span></div>
+      <div id="panel-picker-grid" class="panel-picker-grid"></div>
+      <div id="panel-picker-empty" class="panel-picker-empty" hidden>No panels match that search.<button type="button" id="panel-picker-clear" class="panel-picker-secondary">Show all panels</button></div>
+    </section>
+    <section class="panel-picker-detail" aria-label="Selected panel">
+      <div id="panel-picker-category" class="panel-picker-eyebrow"></div><h3 id="panel-picker-name"></h3>
+      <div id="panel-picker-preview"></div><div class="panel-picker-preview-caption">Illustrative preview · editable after adding</div>
+      <p id="panel-picker-description" aria-live="polite"></p>
+      <div class="panel-picker-detail-note">Starts with a simple, editable setup. Use the inspector to make it yours.<br>Panel type <code id="panel-picker-type"></code></div>
+    </section>
+  </div>
+  <p id="panel-picker-status" class="panel-picker-status" role="status" hidden></p>
+  <footer class="panel-picker-footer"><div class="panel-picker-destination"><span>Add to</span><strong id="panel-picker-destination"></strong></div><div class="panel-picker-footer-actions"><button type="button" id="panel-picker-cancel" class="panel-picker-secondary">Cancel</button><button type="button" id="panel-picker-add" class="panel-picker-primary"><span aria-hidden="true">+</span>Add panel</button></div></footer>
+</dialog>
 <dialog class="object-clipboard-dialog" id="object-clipboard" aria-labelledby="object-clipboard-title">
   <h2 id="object-clipboard-title">Paste objects</h2>
   <p id="object-clipboard-destination"></p>

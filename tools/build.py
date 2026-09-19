@@ -122,7 +122,7 @@ def main() -> int:
         "STYLE_PAGE": font_css() + "\n" + read("style.workbench.css").rstrip(),
         "STYLE_CORE": core_css,
         "ICONS": icons,
-        "JS": js_bundle("compatibility.js", "canon.js", "validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "clipboard.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "layout.workbench.js", "canon.workbench.js", "welcome.workbench.js", "boot.workbench.js"),
+        "JS": js_bundle("compatibility.js", "canon.js", "validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "panel-picker.workbench.js", "clipboard.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "layout.workbench.js", "canon.workbench.js", "welcome.workbench.js", "boot.workbench.js"),
         "WORKBENCH_TEMPLATES": workbench_templates(),
     })
     (ROOT / "workbench" / "flowspec.html").write_text(workbench)

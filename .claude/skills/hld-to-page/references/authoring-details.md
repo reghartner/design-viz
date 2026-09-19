@@ -22,6 +22,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Phone app battery/charging/camera fields with backend provenance and partial refresh | `cookbook/device-app-sources.md`; use `deviceapp`, source IDs and independent per-field states |
 | Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
 | Starting a project, importing spec JSON, templates, or copyable agent prompts | `docs/workbench-welcome.md`; the welcome screen replaces the old Starters gallery |
+| Choosing a workbench panel from visual previews, explicit Add, or insertion destination | `docs/workbench-panel-picker.md` |
 | A crowded editor, resizing, focus, or diagram fit controls | `docs/workbench-workspace.md` |
 | Database/payload state, checks, budgets, retry/circuit behavior, replicas, or rollout decisions | Matching recipes in `cookbook/README.md` and the corresponding widget docs |
 

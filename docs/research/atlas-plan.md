@@ -5,6 +5,10 @@ camera / doorbell / sensor space — fictional high-level design docs (HLDs)
 modeled on real market offerings, each rendered as a design-viz page,
 under one index.
 
+This records the original atlas campaign. Its sequencing and branch names below
+are historical context; current maintenance follows the authoring skill and
+`docs/panel-modularity.md`.
+
 ## Phases
 
 1. **Research** (parallel, running): `iot-device-catalog.md` (Codex, from
@@ -12,18 +16,21 @@ under one index.
    use-case enumeration + interaction patterns worth diagramming.
 2. **Matrix + gap analysis**: merge research into `usecase-matrix.md` — every
    use case × the widget(s) that can carry it × gap (widget missing). The
-   current widget set: state, leds, gauge, log, screen, waterfall, orbit,
-   zoneframe, xray, queue, pir, thermo.
+   supported set now comes from `src/panels/types/` and the authoring contract.
+   Use Radar for sensing geometry and explicitly author its alert transitions;
+   preserve factual PIR hardware names in the source.
 3. **Fake HLDs** (parallel by device family): `docs/hlds/<family>/<device>.md`.
    RULES: fictional company + product names (the repo precedent is
    doorbuzz-cloud/chime — never real brands); every permalink is a fake
    `https://github.com/<fictional-org>/<repo>/blob/main/...` path; every
    backend service invented but architecturally plausible; each HLD names the
    flows a diagram must show and carries at least one wire-contract table.
-4. **Missing widgets** (SERIALIZED — one editor at a time on `src/engine.js`):
-   pure model + render branch + CSS (both skins + reduced motion) + validator
-   checks + node tests + contract entry + cookbook recipe, per widget; Codex
-   review to NO MAJORS per batch.
+4. **Panel implementation**: one complete definition per
+   `src/panels/types/<type>.js`, using the shared lifecycle and editor services.
+   Include focused tests, a contract entry, an authored example and appropriate
+   skin/print/reduced-motion behavior. Discovery, CSS and compatibility metadata
+   are assembled automatically; coordinate edits to shared primitives separately.
+   See `docs/panel-modularity.md`; do not add a central renderer switch.
 5. **Specs + pages** (parallel by family): one spec JSON per HLD →
    `node tools/validate.js` clean → inject → `examples/<family>/`. Each page's
    entry added to `examples/manifest.json`.
@@ -38,8 +45,8 @@ under one index.
 
 - Authoring contract (`contract/authoring-contract.md`) is law; `cookbook/`
   has the worked recipes, including `adjustments.md` for geometry.
-- Specs must validate with 0 errors; keep lint warnings near zero and justify
-  any that remain.
+- Specs must validate with zero errors and warnings; follow the current
+  authoring skill for any explicitly authorized exception.
 - Fictional-universe consistency: one fictional company per real-world
   archetype, reused across its whole family (devices, services, permalinks).
 - Every diagram argues something (a flow, a tradeoff, a failure mode) — no

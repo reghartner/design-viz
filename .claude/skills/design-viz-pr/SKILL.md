@@ -26,7 +26,7 @@ authorization; a review request alone does not authorize fixes or merging.
 
 | Diff affects | Read |
 |---|---|
-| Spec normalization/validation, renderer, panels, paths, playback, layout, skins, icons, trace import (`validator.js`, `engine.js`, shared viewer assets) | [Viewer and spec](references/viewer-and-spec.md) |
+| Spec normalization/validation, renderer, panels, paths, playback, layout, skins, icons, trace import (`src/panels/types/*.js`, `src/panels/shared.js`, `validator.js`, `engine.js`, shared viewer assets) | [Viewer and spec](references/viewer-and-spec.md) |
 | Editor selection, inspectors, commands, persistence, step editing or clipboard (`*.workbench.js`, workbench styles/skeleton) | [Editor](references/editor.md) |
 | Forge export/host, Backstage plugin/catalog adapter or mock portal (`confluence*`, `apps/*`, `tools/canon/backstage.mjs`) | [Integrations](references/integrations.md) |
 | Canon bindings, registry, code references, incident mapping, drift scans/decisions/reports (`canon*`, `tools/canon/*`, `.flowview/*`, `canon-drift.yml`) | [Canon and drift](references/canon-and-drift.md) |

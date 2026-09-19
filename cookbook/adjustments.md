@@ -21,9 +21,9 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 | "that label is sitting on the line / hanging off" | shorten the label, or nudge with `edges[i].labelDx` / `labelDy` (px) | budget ≈ 6.4 px per character vs the edge's length; the lint prints both numbers |
 | "curve that arrow / it cuts through a box" | `edges[i].bend` | positive/negative bows the path to either side |
 | "two step numbers are on top of each other" | give the steps distinct FIRST edges in `edges`; keep true firing order with explicit `packets` | the coin lands on the first edge's midpoint |
-| "zoom the sensor cone out — I can't see all of it" | `cone.range` (px in the 320×180 frame) | guaranteed fit when `range` ≤ distance from sensor to the NEAREST frame edge (any facing/spread); a larger range may still fit — verify with the arc-bounds snippet in `motion-detection.md` |
-| "have the sensor face up instead of left" | `cone.facing` | degrees clockwise from +x: 0 right, 90 down, 180 left, 270 up |
-| "the person should trip it one step later" | move the per-step `subject` points | verify with the pirModel snippet in `motion-detection.md` — never assert `tripped` |
+| "zoom the sensing wedge out — I can't see all of it" | Radar `range`, or `scale.pxPerUnit` when using physical units | keep sourced range unchanged; adjust display scale/placement and inspect wedge fit in the 320×180 frame |
+| "have the sensor face up instead of left" | Radar `facing` | degrees clockwise from +x: 0 right, 90 down, 180 left, 270 up |
+| "the alert should happen one step later" | Radar step `alert:false`, then `alert:true` at the intended beat | preserve the source event timing; subject movement and geometric occupancy do not trigger alerts |
 | "make the warning kick in sooner" | thermo `warn` / `crit` | zones are computed at render; also move the step values so the crossing lands on the intended step |
 | "put the temperature panel above the state panel" | order of the `panels` array | render order = array order |
 | "show the failure beside the happy path on this same diagram" | `diagram.paths` with ordered step IDs | share the prefix; the first DIFFERING beat needs a different ID; see `alternate-paths.md` |
@@ -50,9 +50,10 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 3. Re-validate. The lint is layout-aware — it will name label overflows,
    crowded corridors, and coin collisions with the numbers that justify the
    fix.
-4. Re-inject and reload. For a pir geometry change, run the verification
-   snippet BEFORE injecting: the engine computes tripped/clear, so a moved
-   sensor can silently change the story.
+4. Re-inject and reload. For Radar geometry changes, use the model check in
+   `motion-detection.md` to verify distance and occupancy, then inspect wedge
+   fit. Check the separately authored alert transitions against the source;
+   moving a sensor or subject does not change them automatically.
 5. If no row of the table fits the request, check
    `contract/authoring-contract.md` for the field; if the knob truly does not
    exist, report that it is engine-level (a change to `src/`, not to the

@@ -660,28 +660,6 @@ perspectives" of one timeline). Types:
   across the frame. NOTE: a `zones` patch REPLACES the whole zones state
   array (list only the zones you set; unlisted zones revert to their declared
   state).
-- `pir` — an IR/PIR sensor's field-of-view cone with a subject, for
-  line-of-sight / wake-on-motion arguments (does an approach trip the sensor?):
-  `{"id":"los","type":"pir","title":"IR line of sight","sensor":{"x":298,"y":78},
-  "cone":{"facing":175,"spread":66,"range":250},"path":[[285,176],[285,92]],
-  "initial":{"subject":{"x":285,"y":170}}}`. The frame is 320×180. `sensor` is
-  the mount point (default right-mid). `cone.facing` is degrees measured
-  clockwise from +x in screen space (y down): 0=right, 90=down, 180=left,
-  270=up; `spread` is the full cone angle in degrees; `range` is its reach.
-  Optional `path` draws a faint dashed walkway. Patched via `{"subject":{"x":..,
-  "y":..}, "banner":"...", "status":"...", "tripped":true|false}`. The engine
-  COMPUTES whether the subject falls inside the cone and colors it and the
-  status pill (amber "IR TRIPPED" vs gray "IR CLEAR") accordingly — move the
-  subject across steps to animate an approach. `status` overrides the pill
-  text; `banner` renders a message across the ground strip; `tripped` forces
-  the computed result when you need to assert it. Use it to show an approach
-  from the side that never enters the cone, or one that trips it. The widget
-  is animated: the subject GLIDES from its previous position on a step change
-  (leaving a fading trail), a sweep beam scans the cone, the sensor emits
-  ping rings, and the moment the subject first trips the cone flashes and a
-  ripple fires at the subject (one-shot on the clear→tripped transition, not
-  on every step while tripped). All motion is suppressed under
-  prefers-reduced-motion.
 - `thermo` — a temperature readout against warning / critical-shutdown
   thresholds, with a per-step history sparkline:
   `{"id":"die","type":"thermo","title":"Vision HP — die temp","unit":"°C",
@@ -754,19 +732,23 @@ perspectives" of one timeline). Types:
   store-and-forward that back-fills (`buffered` → `uploading` → `uploaded`
   after reconnect), or rotation sparing `protected` events.
 - `radar` — a top-down range view for radar/mmWave arguments: distance
-  rings inside a wedge, an alert-threshold arc, named zone polygons, and a
+  rings inside a wedge, a reference-threshold arc, named zone polygons, and a
   tracked subject: `{"id":"rng","type":"radar","title":"Radar — approach",
   "sensor":{"x":160,"y":168},"facing":270,"spread":120,"range":150,
   "threshold":80,"rings":3,"zones":[{"id":"porch","label":"porch",
   "points":[[120,100],[200,100],[200,160],[120,160]]}]}`. The frame is
-  320×180 (y down); `facing`/`spread` follow the `pir` convention (degrees
-  clockwise from +x; `spread` ≥ 360 draws full circles). Patched via
+  320×180 (y down); `facing` is degrees clockwise from +x (0 right, 90 down,
+  180 left, 270 up), and `spread` is the full wedge angle (360 draws full circles). Patched via
   `{"subject":{"x":..,"y":..}, "banner":"...", "status":"...",
-  "alert":true|false, "threshold": <re-tuned alert distance, same units as
-  the declaration>}`. The engine COMPUTES the subject's distance, whether
-  it is inside `threshold` (amber RANGE ALERT pill vs gray CLEAR; `alert`
-  forces it), and which zones contain the subject (point-in-polygon —
-  occupied zones light up). POLAR AUTHORING: declare
+  "alert":true|false, "threshold": <re-tuned reference distance, same units as
+  the declaration>}`. **Alerts are manual state:** omitted state starts false;
+  `initial.alert` and step `alert` booleans carry through sparse patches along
+  the selected path. Set `alert:true` on the alarm beat and `alert:false` when
+  it clears. Distance, threshold crossings, wedge entry, zone occupancy and
+  `subject:null` never set or clear the alert automatically. The engine computes
+  distance and geometric occupancy (point-in-polygon); occupied zones light up
+  independently of alarm state. `threshold` only draws the reference arc.
+  POLAR AUTHORING: declare
   `"scale":{"pxPerUnit":18,"unit":"m"}` and write real units instead of
   pixels — `range`, `threshold`, and a `rings` ARRAY (e.g. `[1,2,3,4]`) are
   then unit distances, a zone may be an annular sector
@@ -776,12 +758,21 @@ perspectives" of one timeline). Types:
   `pxPerUnit` so `range × pxPerUnit` fits the frame from the sensor
   position. The subject's positions across steps draw an
   engine-derived dotted track (revealed up to the current step; a step with
-  no subject breaks it; a parked subject adds nothing), and the subject
+  folded `subject:null` breaks it; an omitted patch carries the position, and a
+  parked subject adds nothing), and the subject
   GLIDES between steps with a one-shot ripple on the clear→alert
-  transition. Use it for: distance-gated alerting (nearer than N), a visit
-  path map, multi-zone room presence, or approach-before-camera-wake
-  sequencing — pair with `pir` when the argument is a binary cone trip
-  instead of distance.
+  transition. Use it for sensing geometry, a visit path, multi-zone room presence,
+  or an explicitly authored alert alongside an approach-before-camera-wake story.
+  Preserve the source's hardware names; the panel does not simulate a physical
+  sensor's detection or alarm policy.
+  Migration from the removed PIR panel: change its type to `radar`, lift
+  `cone.facing`, `cone.spread` and `cone.range` onto the panel while preserving
+  `sensor`. For omitted legacy fields, preserve the PIR defaults explicitly:
+  `sensor:{x:298,y:78}`, `facing:180`, `spread:66`, `range:250` (unscaled pixels).
+  Author `alert` booleans for the intended events (including any former `tripped`
+  states). Review geometry-only old steps explicitly; there is
+  no automatic migration or geometry-inferred alarm. Replace declared `path`
+  artwork with the track generated from subject history.
 - `homemap` — a 320×180 top-down home with independently patched devices.
   Set `diagram.primaryPanel` to this panel's id (for example `"home"`) to
   make it the centerpiece: a large map, playback directly underneath, other
@@ -1282,7 +1273,7 @@ contract stays the authority; a recipe shows the working subset for one task.
    | temperature against warning / shutdown thresholds | `thermo` |
    | battery / charge level (LOW is bad), energy budget | `battery` |
    | a pre-roll ring, store-and-forward queue, or storage rotation | `buffer` |
-   | distance-gated alerts, visit paths, room presence (radar/mmWave) | `radar` |
+   | sensing geometry, authored alerts, visit paths, room presence | `radar` |
    | link health: wifi / cellular / mesh state, failover, jamming | `signal` |
    | a fleet of devices or rollout cohorts, each with a state | `tiles` |
    | an ordered event stream (firmware log, audit trail) | `log` |
@@ -1290,7 +1281,7 @@ contract stays the authority; a recipe shows the working subset for one task.
    | a latency / timing budget across spans | `waterfall` |
    | replica or consumer positions, lag, and incomparable histories | `replicas` |
    | which regions of a frame are armed / ignored / masked | `zoneframe` |
-   | line of sight / wake-on-motion (does an approach trip a sensor?) | `pir` |
+   | line of sight / wake-on-motion (show geometry and the reported event) | `radar` with explicit `alert` |
    | who can decrypt a payload at which hop | `xray` |
    | a message parked between producer and consumer | `queue` |
    | concurrent operations overlapping on one step axis | `inflight` |

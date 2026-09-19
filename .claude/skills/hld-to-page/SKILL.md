@@ -94,6 +94,7 @@ Do not copy its latency, topology, notification, or outcome without evidence.
 | Shared happy/failure paths | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
 | Confirmed dropped or prevented communication | `docs/failed-communications.md` |
 | Physical home, outside grounds, doors | `cookbook/home-story.md` or `cookbook/outdoor-home.md` |
+| Sensing geometry, motion events, range or room presence | `cookbook/motion-detection.md` or `cookbook/radar-range.md`; use Radar with explicit `alert` transitions |
 | Camera state versus scene event | `cookbook/camera-events.md` and screen widget docs |
 | Phone UX values sourced from several backends; independent loading, cached or failed fields | `cookbook/device-app-sources.md` and `deviceapp` widget docs |
 | Hot/cold devices, protective shutdown or temperature recovery | `cookbook/thermal-protection.md`; Home, thermo, screen and battery widget docs |
@@ -151,8 +152,10 @@ Reopen the source and verify the ledger against actual spec locations. Walk
 every path from its initial state, checking the shared lead-in, first divergence,
 and endpoint. Check causal ordering, evidence strength, carried panel/tonal
 state, and all stated quantities. A rejoined step must work with its actual
-incoming state. Computed sensor outcomes must agree with the story; do not force
-an alert just to obtain the desired picture.
+incoming state. Check computed distance/occupancy against the geometry and
+Radar's explicitly authored `alert:true` / `alert:false` transitions against
+the source event. Proximity and occupancy never decide an alarm. Do not invent
+an event just to obtain a desired picture.
 Also audit in reverse: for each edge kind, Home marker/signal, asserted outcome,
 wire field and provenance URL in the spec, locate its supporting source fact.
 This catches extra claims even when every source row is marked covered. For a

@@ -20,6 +20,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Outside grounds, a centered whole house, a porch/entry split, or doors in walls | `cookbook/outdoor-home.md`, `docs/homemap-workbench.md` |
 | Camera recording before an event, color clips, doorbell runners, fire, or delivery | `cookbook/camera-events.md` plus `tools/widget_doc.py screen` |
 | Phone app battery/charging/camera fields with backend provenance and partial refresh | `cookbook/device-app-sources.md`; use `deviceapp`, source IDs and independent per-field states |
+| Sensing geometry, motion events, range, or room presence | `cookbook/motion-detection.md`, `cookbook/radar-range.md`; Radar alerts are authored separately from geometry |
 | Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
 | Starting a project, importing spec JSON, templates, or copyable agent prompts | `docs/workbench-welcome.md`; the welcome screen replaces the old Starters gallery |
 | Choosing a workbench panel from visual previews, explicit Add, or insertion destination | `docs/workbench-panel-picker.md` |
@@ -116,22 +117,24 @@ capacities, temperatures, stated geometry like a 130° field of view — go in
 VERBATIM with a ledger row. Where a widget takes real units, enter them in
 the HLD's units (radar `scale:{pxPerUnit,unit}`; sector zones in real
 units; polygon `points` stay pixels — prefer sectors when the HLD gives
-real geometry). Where a field is pixel-space with no scale (pir cone reach,
-subject positions), draw proportionally and put the stated figure verbatim
-in visible text — never type feet into a pixel field. Authoring geometry is
-only what the HLD does NOT state (pixel placement, sensor origin, subject
-paths): yours to choose, under one constraint — it must make the engine
-COMPUTE the outcome the HLD narrates. Never invent business identifiers,
+real geometry). Cartesian subject positions and polygon points remain in
+pixels; draw them proportionally and put any sourced physical figure verbatim
+in visible text. Never type feet into a pixel field. Authoring geometry is what
+the HLD does NOT state (pixel placement, sensor origin, subject paths): choose
+it to represent the source faithfully. Geometric occupancy is not evidence
+that a real sensor detected a person or raised an alarm. Never invent business identifiers,
 sequence numbers, or finer breakdowns than the document gives. Internal
 node/panel/step/path IDs are authoring references: choose stable, unique
 ones without presenting them as identifiers from the source system.
 
-**Computed outcomes stay computed.** `pir` trips, `radar` alerts/occupancy,
-`thermo`/`battery` zones are computed from your inputs — choose inputs that
-produce the HLD's outcome and do not use the force-flags the widget docs
-advertise (`tripped`, `alert`): they bypass exactly this. `zoneframe` is
-the authored exception — you place zones AND set the `verdict`, so check by
-eye that they agree.
+**Distinguish geometry from authored decisions.** Radar computes distance and
+zone occupancy. Its `alert` is manual state: default false, explicitly true
+at the alarm beat and false at the clearing beat, with normal sparse-state
+inheritance on each path. Threshold arcs, wedge entry, occupied zones and
+subject removal never change it automatically. Thermo/battery bands compute
+from sourced values and limits. `zoneframe.verdict` is authored as well; check
+its scene and decision against the source. Preserve factual PIR hardware
+labels when present, but use the supported Radar panel for the sensing view.
 
 **Prose restates, never derives.** Step text and bullets may carry what
 edges can't (acks, repeats, relay hops) — that is legitimate and

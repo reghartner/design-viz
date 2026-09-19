@@ -1,70 +1,81 @@
-# Recipe — motion detection: a sensor cone, an approach, a trip
+# Recipe — motion detection with a Radar sensing view
 
-Widget: `pir`. You declare the sensor mount point, the cone (facing / spread /
-range), and per-step subject positions; the ENGINE computes tripped vs clear
-from that geometry and colors the subject and the status pill. Never assert
-the trip — place the points so the geometry produces it.
+Widget: `radar`. Declare the sensor position, viewing wedge and per-step subject
+positions to show an approach. Author the detection event with `alert:true` and
+clear it with `alert:false`. The engine computes distance and zone occupancy;
+it never turns proximity, wedge entry or occupancy into an alert.
 
-## Geometry rules (the part agents get wrong)
+Radar is the visualization type. Preserve the source's actual hardware names,
+including PIR sensors when present; choosing this panel does not establish that
+the device measures range. This example uses schematic coordinates and an
+illustrative motion event, not measured sensor performance.
 
-- The frame is **320 × 180**, and **y grows DOWNWARD** (screen coordinates).
-  "Up" means a SMALLER y.
-- `cone.facing` is degrees CLOCKWISE from +x: **0 = right, 90 = down,
-  180 = left, 270 = up.**
-- `cone.spread` is the FULL cone angle (half on each side of facing);
-  `cone.range` is its reach in frame pixels.
-- Tripped = subject within `range` AND within `spread / 2` of the facing
-  direction. So a subject can be clear two ways: too far (outside range) or
-  off to the side (outside the angle).
-- Whole cone visible ("zoomed out"): the GUARANTEED rule is `range` no larger
-  than the distance from the sensor to the NEAREST frame edge — the cone lies
-  inside a circle of that radius, so it fits for any facing and spread. A
-  larger `range` can still fit (the guaranteed rule is conservative), but a
-  ray at the cone's side angle can exit a nearer edge even when the facing
-  direction has room — so verify it EXACTLY by testing the cone's own arc
-  points (the snippet below prints the arc bounds). Plan view with the sensor
-  at bottom-center facing up: sensor `{160,146}`, `facing 270`, `range 130`
-  fits by the exact check (arc spans x 89–231, y 16–146). Elevation view with
-  the sensor at right-mid facing left (`{298,78}`, `facing 175`, `range 250`)
-  deliberately runs past the frame edge — use it when the argument is about
-  direction, not reach.
-- The widget animates by itself: the subject glides between step positions,
-  a beam sweeps the cone, and the first clear→tripped transition fires a
-  one-shot flash/ripple. You only move the subject.
+## Existing PIR specs
 
-## Verify the choreography AND the cone fit before injecting
+The `pir` panel type has been removed; migrate saved specs explicitly:
 
-Prints tripped/clear for each planned subject point, then the cone's bounding
-box (rounded for display) and a WHOLE CONE VISIBLE / CONE EXITS THE FRAME
-verdict computed on the UNROUNDED coordinates — trust the verdict, not the
-rounded numbers. The verdict is exact for the drawn polygon's GEOMETRY: the
-engine renders the cone as a polygon over these same sampled points
-(`conePoints`), and a polygon's bounds are determined by its vertices — the
-ideal circular arc between two samples is never drawn. One caveat: the
-outline is a 1.5 px stroke centered on the path, and at a sharp vertex its
-default miter join can spike farther than half the stroke width — the SVG
-default miter limit of 4 caps the spike at 3 px (miter limit × stroke width
-÷ 2); beyond that the join is beveled. So keep the reported bounds at least
-3 px inside 0–320 / 0–180 if a clipped outline would matter — the example
-above (x 89–231, y 16–146) does.
+- Change `type:"pir"` to `type:"radar"`; preserve `sensor` and lift
+  `cone.facing`, `cone.spread` and `cone.range` to top-level fields.
+- For omitted legacy fields, write the old defaults explicitly:
+  `sensor:{x:298,y:78}`, `facing:180`, `spread:66`, `range:250` (unscaled pixels).
+- Replace `tripped` with explicit `alert:true` or `alert:false` at the intended
+  initial state or step. Review old geometry-driven events and author their alert
+  transitions; the Radar panel never infers them.
+- Remove declared `path` artwork and use the track generated from subject history.
 
+See the [Radar contract](../contract/authoring-contract.md#panels--synchronized-inspector-widgets)
+for the complete field and state rules. There is no automatic runtime migration.
+
+## Geometry and event rules
+
+- The frame is **320 × 180**, with **y increasing downward**.
+- `facing` is degrees clockwise from +x: **0 right, 90 down, 180 left, 270 up**.
+  `spread` is the full wedge angle; `range` is its reach. These are top-level
+  panel fields.
+- Without `scale`, distances are frame pixels. For sourced physical dimensions,
+  declare `scale:{pxPerUnit,unit}` and use that unit for `range`, `threshold`,
+  ring distances and polar subject positions. Cartesian `{x,y}` stays in pixels.
+- `threshold` draws a reference arc. Moving it or crossing it never changes
+  `alert`. Zone occupancy is a point-in-polygon result, independent of alert state.
+- Omitted alert state starts false. Explicit `initial.alert` and step patches
+  carry along the selected path; author `alert:false` at the clearing beat.
+  A subject leaving the frame or becoming `null` does not clear the alert.
+- The subject glides between positions, with a dotted track from its folded
+  history and a ripple on a clear-to-alert transition. A step with folded
+  `subject:null` breaks the track; merely omitting the patch carries its position.
+- Check the wedge and all subject positions in the built preview. With a scaled
+  view, the drawn reach is `range * pxPerUnit`; leave room for labels and strokes.
+
+## Check geometry separately from the authored event
+
+Load the assembled validator and engine through the source loader. Panel models
+live in their type modules, so reading the two raw files alone is incomplete.
+Run this from the repository root:
+
+```sh
+node <<'JS'
+const vm=require('node:vm');
+const {readSource}=require('./tools/source-loader.cjs');
+const context={};
+vm.runInNewContext(readSource('validator.js')+'\n'+readSource('engine.js'),context);
+const panel={sensor:{x:160,y:146},facing:270,spread:66,range:130,
+  zones:[{id:'walk',points:[[110,60],[200,60],[200,160],[110,160]]}]};
+for(const state of [
+  {subject:{x:30,y:30},alert:false},
+  {subject:{x:60,y:40},alert:false},
+  {subject:{x:135,y:70},alert:true},
+  {subject:{x:135,y:70},alert:false}
+]) {
+  const model=context.radarModel(panel,state);
+  console.log({distance:model.dist,occupied:model.occupied,authoredAlert:model.alert});
+}
+JS
 ```
-node -e "
-const fs=require('fs'),vm=require('vm');
-const code=fs.readFileSync('src/validator.js','utf8')+'\n'+fs.readFileSync('src/engine.js','utf8')+';__x={pirModel};';
-const sb={console};vm.runInNewContext(code,sb);
-const cone={sensor:{x:160,y:146},cone:{facing:270,spread:66,range:130}};
-[[30,30],[60,40],[135,70]].forEach(p=>
-  console.log(p, sb.__x.pirModel(cone,{subject:{x:p[0],y:p[1]}}).tripped?'TRIPPED':'clear'));
-const pts=sb.__x.pirModel(cone,{}).conePoints;
-const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
-const visible=xs.every(x=>x>=0&&x<=320)&&ys.every(y=>y>=0&&y<=180);
-console.log('cone bounds x', Math.min(...xs).toFixed(0), '-', Math.max(...xs).toFixed(0),
-            ' y', Math.min(...ys).toFixed(0), '-', Math.max(...ys).toFixed(0),
-            visible?'— WHOLE CONE VISIBLE':'— CONE EXITS THE FRAME');"
-```
 
-Complete working spec (plan view, approach from the top-left):
+The last two states have the same geometry and different authored alerts.
+Verify each decision against the source or mark it as illustrative.
+
+Complete working spec:
 
 ```json
 {
@@ -77,48 +88,50 @@ Complete working spec (plan view, approach from the top-left):
     },
     "blocks": [
       {
-        "heading": "PIR cone — approach, trip, wake",
+        "heading": "Sensing view — approach, event, wake",
         "accent": "cyan",
         "text": [
-          "Plan view: the sensor sits at the door (bottom center) facing up the walkway. The subject is clear by RANGE on the first two steps and inside the cone on the third — the engine computes the trip."
+          "Illustrative sequence: the sensor sits at the door facing up the walkway. Subject positions show the approach; an explicit motion event sets the alert and wakes the camera. Geometry does not decide the alert."
         ],
         "diagram": {
           "view": "step",
           "groups": {"device": {"title": "Device"}},
           "nodes": {
-            "lp":     {"title": "LP Chip", "sub": "PIR · mqtt", "icon": "chip", "tint": "dev", "group": "device"},
-            "soc":    {"title": "SoC", "sub": "camera", "icon": "chip", "tint": "dev", "group": "device"},
+            "lp": {"title": "LP Chip", "sub": "PIR sensor input", "icon": "chip", "tint": "dev", "group": "device"},
+            "soc": {"title": "SoC", "sub": "camera", "icon": "chip", "tint": "dev", "group": "device"},
             "broker": {"title": "Broker", "sub": "MQTT", "icon": "antenna", "tint": "mqtt"}
           },
-          "rows": [
-            [["lp", "soc"], "broker"]
-          ],
+          "rows": [[["lp", "soc"], "broker"]],
           "edges": [
             {"from": "lp", "to": "soc", "kind": "int"},
             {"from": "lp", "to": "broker", "kind": "mqtt", "label": "PUB motion"}
           ],
           "panels": [
-            {"id": "fov", "type": "pir", "title": "PIR — field of view (plan)",
+            {"id": "fov", "type": "radar", "title": "Sensing view — approach",
              "sensor": {"x": 160, "y": 146},
-             "cone": {"facing": 270, "spread": 66, "range": 130},
-             "path": [[30, 30], [60, 40], [135, 70]],
-             "initial": {"subject": {"x": 30, "y": 30}}}
+             "facing": 270, "spread": 66, "range": 130,
+             "zones": [{"id": "walk", "label": "walkway",
+                        "points": [[110, 60], [200, 60], [200, 160], [110, 160]]}],
+             "initial": {"subject": {"x": 30, "y": 30}, "alert": false}}
           ],
           "steps": [
             {"nodes": ["lp"], "lane": "DEV",
-             "text": "Someone at the street — outside sensor range"},
+             "text": "Someone at the street — no motion event"},
             {"nodes": ["lp"], "lane": "DEV",
-             "text": "Coming up the walk — still outside range",
-             "panels": {"fov": {"subject": {"x": 60, "y": 40}}}},
+             "text": "Coming up the walk — no motion event yet",
+             "panels": {"fov": {"subject": {"x": 60, "y": 40}, "alert": false}}},
             {"nodes": ["lp"], "lane": "DEV",
-             "text": "Inside the cone — the PIR trips",
-             "panels": {"fov": {"subject": {"x": 135, "y": 70},
+             "text": "The sensor reports motion — author the alert at this beat",
+             "panels": {"fov": {"subject": {"x": 135, "y": 70}, "alert": true,
                                 "banner": "MOTION DETECTED"}}},
             {"edge": "lp->soc", "lane": "DEV",
              "text": "LP chip raises the wake line to the SoC",
              "panels": {"fov": {"banner": ""}}},
             {"edge": "lp->broker", "lane": "NET",
-             "text": "Motion event published over MQTT"}
+             "text": "Motion event published over MQTT"},
+            {"nodes": ["lp"], "lane": "DEV",
+             "text": "Event handled — clear the alert while the walkway remains occupied",
+             "panels": {"fov": {"alert": false}}}
           ]
         }
       }
@@ -129,9 +142,9 @@ Complete working spec (plan view, approach from the top-left):
 
 Adaptation notes:
 
-- Miss story ("the side approach never wakes it"): route the subject points
-  outside the angle instead — same cone, subject sliding past at a wide angle;
-  the status pill stays IR CLEAR the whole way.
-- Camera ZONES (armed / ignored / masked regions of a frame) are a different
-  widget: `zoneframe` — see its entry in `contract/authoring-contract.md`.
-- Remove the subject entirely with `"subject": null` (the dot disappears).
+- For an approach that never triggers an event, keep `alert:false` on that path.
+  Subject placement alone neither proves nor suppresses a real detection.
+- Camera-frame armed, ignored and masked regions use `zoneframe`; its `verdict`
+  is authored separately. See the authoring contract.
+- `subject:null` hides the dot and breaks the history track. Patch `alert:false`
+  separately if the source says the alarm clears at that moment.

@@ -8,6 +8,7 @@ function qualify(value,kind,ns='default'){
   return (typed.includes('/')?typed:typed.replace(':',':'+ns+'/')).toLowerCase();
 }
 export function catalogFromEntities(entities,baseUrl){
+  if(!Array.isArray(entities) || !C.http(baseUrl))throw new Error('Expected catalog entities and a Backstage app URL.');
   const warnings=[],apis=new Map(entities.filter(e=>e.kind?.toLowerCase()==='api').map(a=>[ref(a),a]));
   const entityUrl=e=>baseUrl.replace(/\/$/,'')+'/catalog/'+encodeURIComponent(e.metadata.namespace || 'default')+'/'+e.kind.toLowerCase()+'/'+encodeURIComponent(e.metadata.name);
   const services=entities.filter(e=>e.kind?.toLowerCase()==='component').map(e=>{

@@ -17,12 +17,18 @@ Nodes may have `binding` containing `entityRef`, `label`, `owner`, `catalogUrl`,
 environment. These are metadata and links; the viewer never invokes an API.
 Snapshots travel with exports; catalog IDs remain the durable identities.
 
-In the workbench, expand **Company repository**, paste a version-1 catalog JSON
+The hosted workbench automatically loads the approved `catalog.json` beside its
+HTML. [Repository catalog sync](workbench-catalog-sync.md) creates review PRs from
+company repository descriptors; merging and deploying bundles the new choices.
+New projects receive these choices without contacting Backstage.
+
+For a manual override, expand **Company repository**, paste a version-1 catalog JSON
 (see `examples/canon/catalog.json`) and choose **Load catalog**. Select a node:
 **Company service**, **Service API**, and **API operation** constrain choices to
 the selected service. Labels and narrative remain authored. Binding JSON is
 editable without a catalog. A hosted repository can initialize the controls
-through the same-origin `/api/canon/context` adapter.
+through the same-origin `/api/canon/context` adapter when no bundled catalog is
+configured. Manual imports take precedence over either automatic source.
 
 Nodes and steps may contain `codeRefs` arrays:
 

@@ -1,16 +1,39 @@
-/* Optional same-origin company repository adapter. Static/offline authoring
-   remains available; catalog snapshots can also be pasted without a server. */
+/* The approved catalog ships beside the editor. The optional company backend
+   supplies spec/review context; manual imports remain available offline. */
 function initCanonWorkbench(opts){
-  var context={catalog:null,revision:null}, host=document.querySelector('.workspace-tools');
+  var context={catalog:null,revision:null}, catalogPriority=0, host=document.querySelector('.workspace-tools');
   if(!host) return context;
   var details=document.createElement('details');details.className='canon-tools';
   var summary=document.createElement('summary');summary.textContent='Company repository';details.appendChild(summary);
-  var status=document.createElement('p');status.setAttribute('role','status');status.textContent='Import a catalog snapshot to enable service and API dropdowns.';details.appendChild(status);
+  var status=document.createElement('p');status.setAttribute('role','status');status.textContent='Service and API choices come from the catalog bundled with this editor.';details.appendChild(status);
   var label=document.createElement('label');label.textContent='Catalog JSON';
-  var input=document.createElement('textarea');input.rows=4;input.setAttribute('aria-label','Catalog JSON');label.appendChild(input);details.appendChild(label);
+  var input=document.createElement('textarea'),inputDirty=false;input.rows=4;input.setAttribute('aria-label','Catalog JSON');label.appendChild(input);details.appendChild(label);
+  input.addEventListener('input',function(){inputDirty=true;});
   function button(text,fn){var b=document.createElement('button');b.type='button';b.className='bbtn';b.textContent=text;b.addEventListener('click',fn);details.appendChild(b);return b;}
-  button('Load catalog',function(){try{context.catalog=FlowCanon.catalog(JSON.parse(input.value));status.textContent=context.catalog.services.length+' services loaded. Select a node to bind it.';}catch(e){status.textContent=e.message;}});
+  var catalogStatus=document.createElement('p');catalogStatus.setAttribute('role','status');catalogStatus.className='canon-catalog-status';
+  /* Manual choice wins over the bundled snapshot, which wins over a legacy
+     live context. Late responses never replace a user's imported catalog. */
+  function acceptCatalog(raw,priority,origin){
+    if(priority<catalogPriority)return;
+    var next=FlowCanon.catalog(raw);
+    if(priority===2 && !next.source && !next.services.length){
+      if(!catalogPriority)catalogStatus.textContent='No company catalog configured. You can import a catalog JSON snapshot below.';
+      return;
+    }
+    context.catalog=next;catalogPriority=priority;
+    if(priority===3 || !inputDirty){input.value=JSON.stringify(next,null,2);inputDirty=false;}
+    catalogStatus.textContent=next.services.length+' services · '+origin+'. Select a node to bind it.';
+    if(opts.catalogChanged)opts.catalogChanged();
+  }
+  button('Load catalog',function(){try{acceptCatalog(JSON.parse(input.value),3,'imported catalog');}catch(e){catalogStatus.textContent=e.message;}});
+  details.appendChild(catalogStatus);
   host.appendChild(details);
+  if(location.protocol!=='file:'){
+    context.catalogReady=fetch('catalog.json',{cache:'no-cache'})
+      .then(function(r){if(!r.ok)throw new Error('Bundled catalog unavailable ('+r.status+').');return r.json();})
+      .then(function(raw){acceptCatalog(raw,2,'bundled catalog');})
+      .catch(function(){if(!catalogPriority)catalogStatus.textContent='Bundled catalog unavailable. Existing bindings are preserved; you can import a catalog JSON snapshot.';});
+  }else catalogStatus.textContent='Offline editor · import a catalog JSON snapshot to choose company services.';
   var params=new URLSearchParams(location.search), id=params.get('canon');
   if(!id) return context;
   var review=params.get('review'), attached=true;
@@ -38,7 +61,7 @@ function initCanonWorkbench(opts){
   });save.disabled=true;
   fetch('/api/canon/context?id='+encodeURIComponent(id)+(review?'&review='+encodeURIComponent(review):''))
     .then(function(r){if(!r.ok)throw new Error('Company repository unavailable. Use the local portal or import a catalog snapshot.');return r.json();})
-    .then(function(data){if(!attached)return;context.catalog=FlowCanon.catalog(data.catalog);context.revision=data.revision;input.value=JSON.stringify(data.catalog,null,2);opts.loadSpec(data.spec);status.textContent=(data.simulated?'SIMULATED · ':'')+context.catalog.services.length+' services · '+id+' · changes are submitted for review.';save.disabled=false;})
+    .then(function(data){if(!attached)return;acceptCatalog(data.catalog,1,'company context');context.revision=data.revision;opts.loadSpec(data.spec);status.textContent=(data.simulated?'SIMULATED · ':'')+id+' · changes are submitted for review.';save.disabled=false;})
     .catch(function(e){if(!attached)return;status.textContent=e.message;details.open=true;});
   return context;
 }

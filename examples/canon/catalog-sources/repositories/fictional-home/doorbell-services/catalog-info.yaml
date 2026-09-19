@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: doorbell-catalog
+spec:
+  targets:
+    - catalog/services.yaml
+    - catalog/apis.yaml

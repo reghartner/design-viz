@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "backstageAppUrl": "https://backstage.example.test",
+  "sources": [
+    {"repository": "fictional-home/doorbell-services", "ref": "main", "paths": ["catalog-info.yaml"]}
+  ]
+}

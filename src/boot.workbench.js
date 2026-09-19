@@ -350,7 +350,7 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   ctl: function(){ return lastCtl; }});
 var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,
   workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
-canonContext=initCanonWorkbench({src:src,loadSpec:function(raw){
+canonContext=initCanonWorkbench({src:src,catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){
   loadingCanon=true;
   try{var result=workbenchBuilder.loadSpec(raw);welcome.enterEditor();return result;}
   finally{loadingCanon=false;}

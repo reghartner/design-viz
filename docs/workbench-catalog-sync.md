@@ -1,0 +1,152 @@
+# Bundle company service choices with the editor
+
+The designs repository keeps an approved `workbench/catalog.json`. A GitHub job
+reads the same repository catalog files used by Backstage, opens or updates a PR
+when the exported choices change, and leaves review/merge to your normal process.
+After merge, your existing editor image build copies that file into nginx. Every
+fresh workbench launch loads it automatically, including **Start new project**.
+Neither the sync job nor the static editor needs to contact Backstage.
+
+## Source list
+
+Copy `.flowview/catalog-sources.example.json` to `.flowview/catalog-sources.json`
+in the company designs repository and replace its example values:
+
+```json
+{
+  "version": 1,
+  "backstageAppUrl": "https://backstage.company.example",
+  "sources": [
+    {"repository": "company/doorbell-services", "paths": ["catalog-info.yaml"]},
+    {"repository": "company/shared-apis", "ref": "main", "paths": ["catalog/apis.yaml"]}
+  ]
+}
+```
+
+An omitted `ref` uses that repository’s default branch. Each run resolves every
+ref to one immutable commit before reading its files. `backstageAppUrl` is used
+to construct links; it is never fetched. For GitHub Enterprise, set `githubUrl`
+in the manifest and `FLOWVIEW_CATALOG_GITHUB_API_URL` in repository variables.
+
+Use the same explicit sources and refs as the company Backstage configuration.
+This is a declared subset of catalog ingestion, not a second running Backstage:
+company processors that synthesize or rename entities need equivalent mapping
+before export. Adding a source repository requires updating this list and the
+source token’s access. Being in the same GitHub organization alone grants no access.
+
+Supported input:
+
+- JSON or YAML entity documents, including multi-document YAML.
+- Component identities, namespace, title, owner, `providesApis`, and the optional
+  `flowview.io/telemetry-service` annotation.
+- API entities with inline OpenAPI JSON/YAML or repository `$text`, `$json`, and
+  `$yaml` substitutions. Operations with `operationId` and declared server URLs
+  become dropdown choices and links.
+- Location `target` / `targets`, resolved relative to the descriptor. GitHub
+  `blob/<ref>/...` targets can refer to another explicitly listed repository/ref.
+
+No arbitrary remote URLs, repository scripts, environment substitutions, or
+custom YAML tags are executed. Bundle external OpenAPI `$ref` dependencies and
+resolve path/operation `$ref` values before syncing. Schema-local references are
+allowed. Missing files, unreadable repositories, cycles, duplicate identities,
+invalid data, empty catalogs, and conversion warnings fail the ordinary run
+without replacing the approved snapshot. Manual overrides for an intentional
+empty catalog or accepted metadata warnings are available in workflow dispatch.
+Limits are 500 files, 2 MB per file, and 50 MB in one run.
+
+## Enable the GitHub job
+
+Install `.github/workflows/catalog-sync.yml`, `tools/catalog-sync/`, and
+`tools/canon/` from the pinned Flowview release in the designs repository.
+
+Configure:
+
+| Setting | Value |
+| --- | --- |
+| Variable `FLOWVIEW_CATALOG_SYNC_ENABLED` | `true` |
+| Secret `FLOWVIEW_CATALOG_SOURCE_TOKEN` | Read-only Contents access to all listed source repositories |
+| Secret `FLOWVIEW_CATALOG_PR_TOKEN` | Bot token with Contents and Pull requests write access to the designs repository |
+| Optional variable `FLOWVIEW_CATALOG_SOURCES` | Manifest path; default `.flowview/catalog-sources.json` |
+| Optional variable `FLOWVIEW_CATALOG_GITHUB_API_URL` | GitHub API base; default `https://api.github.com` |
+| Optional variable `FLOWVIEW_CATALOG_RUNNER` | Runner label able to reach the company GitHub host; default `ubuntu-latest` |
+
+Fresh GitHub App tokens can replace either long-lived token:
+
+- Source reads: `FLOWVIEW_SOURCE_APP_CLIENT_ID`, secret
+  `FLOWVIEW_SOURCE_APP_PRIVATE_KEY`, `FLOWVIEW_SOURCE_OWNER`, and
+  `FLOWVIEW_SOURCE_REPOSITORIES` (the explicit list of source repository names).
+  Only Contents read permission is requested.
+- PR writes: `FLOWVIEW_CATALOG_APP_CLIENT_ID` and secret
+  `FLOWVIEW_CATALOG_APP_PRIVATE_KEY`. The installation token is scoped to the
+  current designs repository with Contents and Pull requests write permission.
+
+The workflow deliberately uses a bot/App identity for normal PR CI rather than
+depending on the default Actions token’s workflow-trigger behavior. See
+[GitHub’s trigger rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+
+It runs hourly at minute 17, manually, or on a `flowview-catalog-changed`
+repository-dispatch event sent to the designs repository. A source-repository
+workflow can send that event after catalog/API changes merge; hourly runs also
+catch changes without requiring modifications to every service workflow. Dispatch
+payloads never choose the checkout, host, files, or output path.
+
+Exports sort services, APIs, operations, and object keys. Unrelated source commits,
+ordering changes, and repeated runs produce no new snapshot diff. Changes update
+one bot-maintained `flowview/catalog-sync` branch/PR, restricted to
+`workbench/catalog.json`. Corrections belong in source repositories; do not edit
+the bot branch. The job does not auto-merge or deploy. Review removed services and
+changed API operations, then let the normal merge deployment publish the image.
+Keep company catalogs in the company designs repository, not the public fork.
+
+## Editor image
+
+The reference image copies the committed catalog alongside the generated editor:
+
+```sh
+docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
+docker run --rm -p 8080:80 flowview-workbench
+```
+
+Open `http://localhost:8080/`. The image contains the generated workbench/viewer
+and starter assets and serves catalog JSON with revalidation. Place it behind the
+company’s existing authentication. Connect your normal main-branch image build
+and deployment to catalog PR merges; the reference files do not configure your
+registry or production deployment. Preserve the designs-owned catalog when
+updating HTML/assets from a newer Flowview release.
+
+The workbench requests `catalog.json` relative to its own page, so it also works
+under a hosting path prefix. The loaded catalog populates **Company service**,
+**Service API**, and **API operation** in node inspectors. Existing specs are never
+rewritten by a catalog refresh. A removed service can remain in an older spec’s
+binding until an author explicitly updates it.
+
+Manual **Company repository → Load catalog** overrides the bundled snapshot for
+the session. A valid bundled snapshot takes precedence over a legacy live
+`?canon=…` context catalog. The empty, unconfigured file shipped by Flowview allows
+that legacy fallback; it contains no sample company services. Catalog arrival
+does not change the current project, undo history, or the spec/review revision.
+Static files provide choices only: existing spec/proposal routes still need the
+company backend if used, and the reference nginx config does not proxy them.
+
+## Local rehearsal
+
+No company credentials or network are required for the fake source repositories:
+
+```sh
+npm ci --prefix tools/catalog-sync --ignore-scripts
+node tools/canon/catalog-sync.mjs \
+  --sources examples/canon/catalog-sources/sources.json \
+  --local-root examples/canon/catalog-sources/repositories \
+  --output /tmp/flowview-catalog.json --report /tmp/flowview-catalog.md
+npm test --prefix tools/catalog-sync
+```
+
+Run twice to see `Catalog unchanged`. In a temporary copy of the fake repository,
+change the recording API operation or remove the notification component and rerun:
+the report names the changed/removed service. The tests exercise these changes,
+failed reads, stable identity, pinned GitHub reads and data-only imports. Company
+acceptance still requires actual source-token permissions, a bot-created PR with
+passing checks, and the merged nginx deployment serving the approved snapshot.
+
+Input contracts follow Backstage’s [descriptor format](https://backstage.io/docs/features/software-catalog/descriptor-format/)
+and [repository-backed catalog](https://backstage.io/docs/features/software-catalog/).

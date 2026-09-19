@@ -101,6 +101,15 @@ retention/access rules for uploaded operational evidence and incident artifacts.
 
 ## Connect the catalog
 
+For the nginx-hosted editor, use [repository catalog sync](workbench-catalog-sync.md).
+A checked-in source list points at the same company repository catalog/API files
+as Backstage. CI reads them through GitHub, proposes `workbench/catalog.json`, and
+the approved snapshot ships with the editor image. Fresh/new projects load it
+automatically. This path requires no Backstage backend access. Keep the source
+list and any company-specific entity mapping aligned with Backstage ingestion.
+
+The following live adapter remains available for existing backend integrations:
+
 `fetchBackstageCatalog({backendUrl,appUrl,token})` in
 `tools/canon/backstage.mjs` calls the catalog's paginated entities API and maps
 Components, ownership, provided APIs, resolved OpenAPI JSON operations and server

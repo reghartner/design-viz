@@ -23,6 +23,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
 | Starting a project, importing spec JSON, templates, or copyable agent prompts | `docs/workbench-welcome.md`; the welcome screen replaces the old Starters gallery |
 | Choosing a workbench panel from visual previews, explicit Add, or insertion destination | `docs/workbench-panel-picker.md` |
+| Company service/API choices, repository catalog sync, or nginx-bundled service references | `docs/workbench-catalog-sync.md`; use the approved `workbench/catalog.json` identities, never infer bindings from display labels |
 | A crowded editor, resizing, focus, or diagram fit controls | `docs/workbench-workspace.md` |
 | Database/payload state, checks, budgets, retry/circuit behavior, replicas, or rollout decisions | Matching recipes in `cookbook/README.md` and the corresponding widget docs |
 

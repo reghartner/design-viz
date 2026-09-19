@@ -7018,6 +7018,13 @@ function initWorkbenchBuilder(opts){
   }
   return {
     loadSpec:function(raw){ return loadText(JSON.stringify(raw, null, 2)); },
+    refreshCatalog:function(){
+      if(!currentTarget || currentTarget.kind!=='node')return;
+      var active=document.activeElement;
+      if(active && guide && guide.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)){
+        active.addEventListener('blur',refreshFormSoon,{once:true});
+      }else refreshFormSoon();
+    },
     loadText:loadText, restoreDraft:restoreDraft, prepareWelcome:prepareWelcome,
     isProjectOpen:function(){ return projectOpen; },
     draft:function(){ return initialDraft ? {text:initialDraft.text, at:initialDraft.at} : null; },

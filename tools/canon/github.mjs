@@ -7,6 +7,7 @@ import path from 'node:path';
 import {registry,stateFile} from './registry.mjs';
 import {scan,decide,effectiveSpecs,GitHubSources,reportMarkdown} from './drift.mjs';
 import C from './core.cjs';
+import {LocalGitSources} from './local-git.mjs';
 
 const env=process.env,repo=env.GITHUB_REPOSITORY,token=env.GITHUB_TOKEN;
 const api=(env.GITHUB_API_URL || 'https://api.github.com').replace(/\/$/,'');
@@ -40,7 +41,12 @@ async function run(){
   const reg=await registry(env.FLOWVIEW_REGISTRY),statePath='.flowview/drift-state.json',state=await stateFile(statePath);
   if(!reg.specs.length)throw new Error('The registry contains no diagrams.');
   report.diagrams=reg.specs.length;report.references=reg.specs.reduce((n,s)=>n+C.references(s).length,0);
-  const source=new GitHubSources({token:env.FLOWVIEW_SOURCE_TOKEN || token,host:new URL(env.GITHUB_SERVER_URL || 'https://github.com').host,apiBase:api});
+  let source;
+  if(env.FLOWVIEW_LOCAL_SOURCES){
+    const configured=JSON.parse(await readFile(env.FLOWVIEW_LOCAL_SOURCES,'utf8'));
+    if(configured.version!==1 || !configured.repositories || typeof configured.repositories!=='object' || Array.isArray(configured.repositories))throw new Error('Local sources require version 1 and a repository mapping.');
+    source=new LocalGitSources(configured.repositories);
+  }else source=new GitHubSources({token:env.FLOWVIEW_SOURCE_TOKEN || token,host:new URL(env.GITHUB_SERVER_URL || 'https://github.com').host,apiBase:api});
   const result=await scan(reg.specs,source,state);report.findings=result.findings;
 
   async function commitFiles(files,message,parent=base){

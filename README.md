@@ -101,6 +101,9 @@ The workbench's **document outline** (⌘/Ctrl K) searches sections, hidden tabs
 nodes, groups, edges, panels, and steps and opens the matching inspector.
 See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions.
 
+The [visual panel library](docs/workbench-panel-picker.md) opens from **+ panel**:
+browse actual panel previews, select a type, and confirm with **Add panel**.
+
 The [effective-state inspector](docs/workbench-state-inspector.md) explains
 the panel values at a selected step, including inherited and transient values,
 with links to their authored JSON and read-only snapshots.

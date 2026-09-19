@@ -3108,6 +3108,7 @@ function initWorkbenchBuilder(opts){
     scrollTextareaTo(loc.start);
   }
   function updateTargetLabel(raw){
+    if (panelPicker) panelPicker.refresh();
     if (!targetLabel) return;
     if (addToStep){ addToStepStatus(); return; } /* armed mode owns the label */
     var desc = builderInsertTargetText(raw || {}, insertSection);
@@ -6011,7 +6012,7 @@ function initWorkbenchBuilder(opts){
   document.addEventListener('click', addModeBlocker, true);
   document.addEventListener('keydown', function(ev){
     if (opts.isActive && !opts.isActive()) return;
-    if(document.querySelector('#object-clipboard[open]'))return;
+    if(document.querySelector('#object-clipboard[open], #panel-picker[open]'))return;
     /* the tab bar switches tabs on Arrow/Home/End — pause that too
        while the mode is armed (capture phase beats the engine's
        tab-bar listener) */
@@ -6754,6 +6755,7 @@ function initWorkbenchBuilder(opts){
      clear the state synchronously before this observer runs, so only
      stale arming is cancelled. */
   new MutationObserver(function(){
+    if (panelPicker) panelPicker.invalidate();
     cancelNodeDrag(); /* the dragged elements just got detached */
     cancelGroupDrag();
     cancelRowDrag();  /* row handles and the drop line got detached too */
@@ -6780,7 +6782,7 @@ function initWorkbenchBuilder(opts){
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
     if (opts.isActive && !opts.isActive()) return;
-    if(document.querySelector('#object-clipboard[open]'))return;
+    if(document.querySelector('#object-clipboard[open], #panel-picker[open]'))return;
     if (ev.key === 'Escape'){
       if (rowDrag){ cancelRowDrag(); return; }
       if (nodeDrag){ cancelNodeDrag(); return; }
@@ -6891,7 +6893,7 @@ function initWorkbenchBuilder(opts){
     doUndo();
   });
 
-  /* ---- insert palettes: + node picks a preset, + panel picks a type ---- */
+  /* ---- node presets and the visual panel library ---- */
   var palette = document.getElementById('palette');
   function closePalette(){
     if (palette && !palette.hidden){ palette.hidden = true; palette.innerHTML = ''; }
@@ -6916,6 +6918,7 @@ function initWorkbenchBuilder(opts){
   }
   function openPalette(kind){
     hideDiff();
+    if (kind === 'panel'){ closePalette(); if (panelPicker) panelPicker.open(); return; }
     if (!palette) return;
     if (!palette.hidden && palette.getAttribute('data-kind') === kind){ closePalette(); return; }
     palette.setAttribute('data-kind', kind);
@@ -6926,17 +6929,25 @@ function initWorkbenchBuilder(opts){
           runInsert('node', function(text, raw, si){ return planAddNode(text, raw, si, pr); });
         }));
       });
-    } else {
-      Object.keys(PANEL_TEMPLATES).forEach(function(type){
-        palette.appendChild(paletteButton(null, type, function(){
-          runInsert('panel', function(text, raw, si){ return planAddPanel(text, raw, si, type); });
-        }));
-      });
     }
     palette.hidden = false;
   }
   var nodeBtn = document.getElementById('add-node');
   if (nodeBtn) nodeBtn.addEventListener('click', function(){ openPalette('node'); });
+  var panelPicker = typeof initPanelPicker === 'function' ? initPanelPicker({
+    src:src, pause:pausePreview, error:inspectorMessage,
+    context:function(){
+      if (addToStep || connect) return {error:'Finish ' + (addToStep ? 'ADD TO STEP' : 'connecting nodes') + ' first (Done or Esc).'};
+      var parsed = parseEditor();
+      if (parsed.error) return {error:parsed.error + ' — fix it before inserting'};
+      var findings = validate(normalize(parsed.raw));
+      if (findings.errors.length) return {error:'Fix the diagram’s validation errors before adding a panel.'};
+      var rec = specSectionPaths(parsed.raw)[insertSection];
+      if (!rec || !specValueAt(parsed.raw,rec.diagram)) return {error:'Choose a section with a diagram before adding a panel.'};
+      return {text:src.value,section:insertSection,label:builderInsertTargetText(parsed.raw,insertSection).replace(/^into /,'')};
+    },
+    insert:function(type){runInsert('panel',function(text,raw,si){return planAddPanel(text,raw,si,type);});}
+  }) : null;
   var panelBtn = document.getElementById('add-panel');
   if (panelBtn) panelBtn.addEventListener('click', function(){ openPalette('panel'); });
   document.addEventListener('click', function(ev){
@@ -6963,7 +6974,7 @@ function initWorkbenchBuilder(opts){
     if (addToStep) cancelAddToStep(null);
     if (connect) cancelConnect(null);
     cancelNodeDrag(); cancelGroupDrag(); cancelRowDrag();
-    closePalette(); hideDiff(); clearMultiSelect(); clearStepMarkers();
+    closePalette(); if (panelPicker) panelPicker.close(); hideDiff(); clearMultiSelect(); clearStepMarkers();
     setSelected(null); currentTarget = null; retireInspector();
     if (importBox) importBox.hidden = true;
     if (traceBox) traceBox.hidden = true;

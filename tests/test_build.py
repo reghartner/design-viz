@@ -3,6 +3,7 @@ Run: python3 -m unittest discover -s tests"""
 import json
 import pathlib
 import re
+import runpy
 import subprocess
 import sys
 import unittest
@@ -71,19 +72,27 @@ class BuildTests(unittest.TestCase):
     def test_workbench_has_no_spec_block(self):
         self.assertEqual(len(BLOCK_RE.findall(self.texts["flowspec.html"])), 0)
 
-    def test_workbench_embeds_starters_inside_boot_iife(self):
+    def test_workbench_embeds_curated_templates_and_replaces_old_gallery(self):
         text = self.texts["flowspec.html"]
-        self.assertNotIn("{{STARTERS}}", text)
-        match = re.search(r"\(function\(\)\{\s*'use strict';\s*var STARTERS = (.*);", text)
+        match = re.search(r"\(function\(\)\{\s*'use strict';\s*var WORKBENCH_TEMPLATES = (.*);", text)
         self.assertIsNotNone(match)
-        starters = json.loads(match.group(1))
-        self.assertEqual([entry["name"] for entry in starters],
-                         ["camera app sources", "home story", "named layouts", "thermal protection", "whole home & outdoors", "across the front door", "alternate paths", "blank flow", "screen clips", "panel showcase", "software & IoT", "retries & circuits", "replica positions", "rollout decisions", "Honeycomb trace", "complex trace", "full demo"])
-        for entry, source in zip(starters, ["starters/device-app-sources.json", "starters/homemap-story.json", "starters/named-layouts.json", "../docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json", "starters/whole-home-outdoors.json", "starters/front-door-threshold.json", "starters/alternate-paths.json", "starters/minimal.json", "starters/screen-clips.json", "starters/panels-tour.json",
-                                          "starters/software-systems.json", "starters/resilience.json", "starters/replication.json", "starters/rollout.json", "starters/honeycomb-trace.json", "starters/complex-trace.json",
-                                          "flowview.demo.json"]):
+        templates = json.loads(match.group(1))
+        metadata = runpy.run_path(str(BUILD))["WORKBENCH_TEMPLATES"]
+        self.assertEqual(len(templates), 8)
+        for entry, info in zip(templates, metadata):
+            expected = json.loads((ROOT / "src" / info["source"]).read_text())
+            if "title" in info:
+                expected["page"]["title"] = info["title"]
+            expected.get("page", expected)["skin"] = "pastel"
+            self.assertEqual(entry["spec"], expected)
+            self.assertEqual(entry["name"], info["name"])
             self.assertTrue(entry["desc"])
-            self.assertEqual(entry["spec"], json.loads((ROOT / "src" / source).read_text()))
+        self.assertIn('id="workbench-welcome"', text)
+        self.assertIn('id="workbench-workspace" hidden', text)
+        self.assertNotIn('id="starters"', text)
+        self.assertNotIn('id="gallery"', text)
+        self.assertNotIn('fonts.googleapis.com', text)
+        self.assertIn('/* ---- src/welcome.workbench.js ---- */', text)
 
     def test_flowview_has_separate_empty_derived_backlink_block(self):
         blocks = BACKLINK_RE.findall(self.texts["flowview.html"])

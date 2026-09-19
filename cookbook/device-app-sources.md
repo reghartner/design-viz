@@ -5,8 +5,8 @@ screen. Use `phone` for accumulating notifications and `screen` for camera clips
 These are separate views of the resident experience.
 
 The complete [doorbell example](../src/starters/device-app-sources.json) is also
-in the workbench starter gallery as **camera app sources**. Its APIs and values
-are fictional. Replace those assumptions with company evidence for a real flow.
+available from welcome under **Start new project → Behind the app**. Its APIs
+and values are fictional. Replace those assumptions with company evidence for a real flow.
 `tests/deviceapp.test.js` validates the starter and checks both paths.
 
 ## Storyboard

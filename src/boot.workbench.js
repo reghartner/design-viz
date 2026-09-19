@@ -1,160 +1,4 @@
-/* boot.workbench.js — demo spec, contract text, and editor wiring for the
-   workbench page. Browser-only fragment, concatenated last by tools/build.py. */
-
-var CMD_DIAGRAM = {
-  nodes: {
-    console:  {title:"Ops Console", sub:"operator UI", icon:"terminal", tint:"cmd"},
-    api:      {title:"Nimbus API", sub:"api gateway", icon:"cloud", tint:"cmd"},
-    sentinel: {title:"Sentinel Auth", sub:"tokens", icon:"shield", tint:"auth"},
-    dispatch: {title:"Dispatch", sub:"command svc", icon:"gear", tint:"cmd", link:"https://example.com/hld/cumulus#dispatch"},
-    registry: {title:"Registry", sub:"device shadows", icon:"db", tint:"data"},
-    broker:   {title:"Relay Broker", sub:"MQTT · TLS :8883", icon:"antenna", tint:"mqtt", link:"https://example.com/hld/cumulus#relay-broker"},
-    d1:       {title:"Thermostat T-100", sub:"cmd/site-4/hvac-2", icon:"thermo", tint:"dev"},
-    d2:       {title:"Pump P-7", sub:"cmd/site-4/pump-7", icon:"pump", tint:"dev"},
-    d3:       {title:"Edge Gateway", sub:"cmd/site-4/#", icon:"router", tint:"dev"}
-  },
-  rows: [
-    ["console", "api", "dispatch", "registry"],
-    ["broker", ["d1", "d2", "d3"]]
-  ],
-  floats: [ {id:"sentinel", side:"above"} ],
-  edges: [
-    {from:"console", to:"api", kind:"https", label:"POST /commands"},
-    {from:"api", to:"sentinel", kind:"int", label:"verify JWT", labelDx:-40},
-    {from:"sentinel", to:"dispatch", kind:"int", ret:true, label:"scope ok", labelDx:34},
-    {from:"api", to:"dispatch", kind:"int", label:"authorized"},
-    {from:"dispatch", to:"registry", kind:"int", label:"shadow write"},
-    {from:"registry", to:"broker", kind:"mqtt", label:"PUBLISH cmd/site-4/pump-7"},
-    {from:"broker", to:"d1", kind:"mqtt"},
-    {from:"broker", to:"d2", kind:"mqtt", label:"SUBSCRIBE cmd/site-4/#", labelDy:-4},
-    {from:"broker", to:"d3", kind:"mqtt"},
-    {from:"d2", to:"broker", kind:"mqtt", ret:true, label:"PUBACK · QoS 1", bend:30, labelDy:24},
-    {from:"broker", to:"dispatch", kind:"mqtt", ret:true, label:"ack/site-4/pump-7", labelDx:60}
-  ],
-  panels: [
-    {id:"mbx", type:"queue", title:"Relay — pump-7 queue", initial:{state:"empty"}}
-  ],
-  steps: [
-    {edge:"console->api", text:"Operator sends the command over HTTPS", lane:"NET"},
-    {edges:["api->sentinel", "sentinel->dispatch"], text:"Token verified with Sentinel; scope approved", lane:"NET"},
-    {edge:"api->dispatch", text:"Authorized command handed to Dispatch", lane:"NET"},
-    {edge:"dispatch->registry", text:"Desired state written to the device shadow", lane:"NET"},
-    {edge:"registry->broker", text:"Published to the broker; QoS 1 queues it for the pump", lane:"NET", link:"https://example.com/hld/cumulus#qos-policy",
-     panels:{mbx:{state:"enqueue", label:"cmd pump-7 v41", from:"Registry · MQTT"}}},
-    {edges:["broker->d1", "broker->d2", "broker->d3"], text:"Fan-out to every subscriber on cmd/site-4/#", lane:"DEV",
-     panels:{mbx:{state:"dequeue", to:"→ Pump P-7"}}},
-    {edges:["d2->broker", "broker->dispatch"], text:"Pump P-7 acknowledges; ack topic returns to Dispatch", lane:"DEV",
-     panels:{mbx:{state:"empty"}}}
-  ]
-};
-
-var OTA_DIAGRAM = {
-  nodes: {
-    portal:   {title:"Release Portal", sub:"ops UI", icon:"terminal", tint:"cmd"},
-    builder:  {title:"Build Pipeline", sub:"CI runner", icon:"gear", tint:"cmd"},
-    signer:   {title:"Signing Service", sub:"HSM-backed", icon:"key", tint:"auth"},
-    store:    {title:"Artifact Store", sub:"fw images", icon:"db", tint:"data"},
-    campaign: {title:"Campaign Svc", sub:"staged rollout", icon:"server", tint:"cmd"},
-    broker:   {title:"Relay Broker", sub:"MQTT · ota topics", icon:"antenna", tint:"mqtt"},
-    gw:       {title:"Edge Gateway", sub:"ota/site-4/gw", icon:"router", tint:"dev"},
-    sensor:   {title:"Sensor Node S-12", sub:"ota/site-4/s12", icon:"chip", tint:"dev"}
-  },
-  rows: [
-    ["portal", "builder", "store", "campaign"],
-    ["broker", ["gw", "sensor"]]
-  ],
-  floats: [ {id:"signer", side:"above"} ],
-  edges: [
-    {from:"portal", to:"builder", kind:"https", label:"release v2.4.1"},
-    {from:"builder", to:"signer", kind:"int", label:"sign image", labelDx:-40},
-    {from:"signer", to:"store", kind:"int", label:"signed fw", labelDx:34},
-    {from:"builder", to:"store", kind:"int", label:"upload"},
-    {from:"store", to:"campaign", kind:"int", label:"manifest"},
-    {from:"campaign", to:"broker", kind:"mqtt", label:"PUBLISH ota/site-4/notify"},
-    {from:"broker", to:"gw", kind:"mqtt", label:"SUBSCRIBE ota/site-4/#", labelDy:-4},
-    {from:"broker", to:"sensor", kind:"mqtt"},
-    {from:"gw", to:"broker", kind:"mqtt", ret:true, label:"status: applied", bend:30, labelDy:24},
-    {from:"broker", to:"campaign", kind:"mqtt", ret:true, label:"status/ota/site-4", labelDx:60}
-  ],
-  steps: [
-    {edge:"portal->builder", text:"Release cut from the portal", lane:"NET"},
-    {edge:"builder->signer", text:"Image sent for HSM signing", lane:"NET"},
-    {edges:["signer->store", "builder->store"], text:"Signed image lands in the artifact store", lane:"NET"},
-    {edge:"store->campaign", text:"Campaign staged from the manifest", lane:"NET"},
-    {edge:"campaign->broker", text:"Devices notified over MQTT", lane:"NET"},
-    {edges:["broker->gw", "broker->sensor"], text:"Fan-out to the rollout ring", lane:"DEV"},
-    {edges:["gw->broker", "broker->campaign"], text:"Install status returns to the campaign", lane:"DEV"}
-  ]
-};
-
-var CMD_STEP = JSON.parse(JSON.stringify(CMD_DIAGRAM));
-CMD_STEP.view = "step";
-
-var DEMO = {
-  page: {
-    title: "Cumulus IoT — device messaging",
-    skin: DEFAULT_SKIN,
-    lanes: {
-      NET: {color: "#38E1FF"},
-      DEV: {color: "#4ADE80"}
-    },
-    blocks: [
-      {
-        tabs: [
-          {
-            label: "Command flow",
-            sections: [{
-              heading: "Command delivery",
-              accent: "green",
-              source: "https://example.com/hld/cumulus#command-delivery",
-              text: ["An operator command leaves the console over HTTPS, is authorized and written as desired state, then rides MQTT to every subscribed device. The acknowledgment returns over the same broker."],
-              bullets: [
-                "Sentinel Auth is a branch — the command never passes through it",
-                "The Registry write lands before the publish, so a device that misses the message can reconcile later",
-                "QoS 1: the broker retries until Pump P-7 sends PUBACK"
-              ],
-              contract: {
-                title: "On the wire: command publish (MQTT)",
-                source: "https://example.com/hld/cumulus#command-envelope",
-                fields: [
-                  {k:"topic", v:"cmd/site-4/pump-7", g:"per-device command topic"},
-                  {k:"version", v:"41", g:"shadow document version — the device rejects stale writes", hot:true,
-                   link:"https://example.com/hld/cumulus#shadow-versioning"},
-                  {k:"desired.flow", v:"12.5", g:"target flow rate, L/min"},
-                  {k:"ttl", v:"30s", g:"broker message-expiry"}
-                ],
-                note: "The ack on ack/site-4/pump-7 echoes the same version so Dispatch can match request to report."
-              },
-              diagram: CMD_DIAGRAM
-            }]
-          },
-          {
-            label: "OTA rollout",
-            sections: [{
-              heading: "Firmware OTA rollout",
-              accent: "blue",
-              text: ["A release is cut, signed, and stored; the campaign service notifies devices over MQTT and collects install status on the return topics."],
-              bullets: [
-                "Images are signed before storage — devices verify the signature offline",
-                "Rollout is staged: the campaign service controls the notify fan-out"
-              ],
-              diagram: OTA_DIAGRAM
-            }]
-          },
-          {
-            label: "Guided walkthrough",
-            sections: [{
-              heading: "Command delivery, step by step",
-              accent: "violet",
-              text: ["The exact same diagram spec as the first tab — the only difference is view: \"step\", which opens it as a click-through. One config, both flavors."],
-              diagram: CMD_STEP
-            }]
-          }
-        ]
-      }
-    ]
-  }
-};
+/* Workbench contract reference and editor/welcome wiring. */
 
 var CONTRACT = [
   'You are generating a Flowspec page: one JSON document that renders as a',
@@ -466,7 +310,7 @@ function go(fromText){
   var raw;
   msgs.innerHTML = '';
   try {
-    raw = fromText ? JSON.parse(src.value) : DEMO;
+    raw = JSON.parse(src.value);
   } catch (ex){
     showMsgs({errors:['JSON parse: ' + ex.message], warnings:[]});
     return;
@@ -486,15 +330,28 @@ function go(fromText){
 
 document.getElementById('go').addEventListener('click', function(){ go(true); });
 
-src.value = JSON.stringify(DEMO, null, 2);
-go(false);
+src.value = JSON.stringify(welcomeBlankSpec(), null, 2);
+setSkinButtons(currentSkin(null));
+applySkinClasses(document.body, view, currentSkin(null));
 
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
 var workspace = initWorkbenchWorkspace();
-var canonContext;
+var canonContext, loadingCanon=false;
 var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }, workspace:workspace,
   catalog:function(){return canonContext && canonContext.catalog;},
-  starters: STARTERS, renderedText: function(){ return lastRenderedText; },
+  deferInitialSave:true,
+  isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
+  beforeProjectLoad:function(){
+    lastPage=null;
+    if(canonContext && canonContext.detach && !loadingCanon)canonContext.detach();
+  },
+  renderedText: function(){ return lastRenderedText; },
   ctl: function(){ return lastCtl; }});
-canonContext=initCanonWorkbench({src:src,loadSpec:function(raw){return workbenchBuilder.loadSpec(raw);}});
+var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,
+  workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
+canonContext=initCanonWorkbench({src:src,loadSpec:function(raw){
+  loadingCanon=true;
+  try{var result=workbenchBuilder.loadSpec(raw);welcome.enterEditor();return result;}
+  finally{loadingCanon=false;}
+}});

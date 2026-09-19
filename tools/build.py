@@ -18,26 +18,31 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 
-# Reuse the canonical demo so its gallery entry cannot drift.
-STARTERS = [
-    ("camera app sources", "A camera-details phone screen with per-field backend provenance, refresh, and a telemetry outage alternate.", "starters/device-app-sources.json"),
-    ("home story", "A large home scene with rooms, a visitor, local signals, and an internet outage alternate.", "starters/homemap-story.json"),
-    ("named layouts", "Switch between a Home story and service diagram in the same arrangement, with shared steps and alternate paths.", "starters/named-layouts.json"),
-    ("thermal protection", "Proposed doorbell flow: heat, frost, charging pause, unavailable video and recovery.", "../docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json"),
-    ("whole home & outdoors", "A centered house with garden and driveway cameras, perimeter sensors, and swinging doors.", "starters/whole-home-outdoors.json"),
-    ("across the front door", "Half outside, half inside: welcome a visitor through the door or leave a parcel outside.", "starters/front-door-threshold.json"),
-    ("alternate paths", "One shared command diagram: happy path or a dropped signal after step 3.", "starters/alternate-paths.json"),
-    ("blank flow", "Three nodes and two hops to make your own.", "starters/minimal.json"),
-    ("screen clips", "Doorbell runners, a visitor, or a kitchen fire: start recording, then trigger the event.", "starters/screen-clips.json"),
-    ("panel showcase", "Five panels updated across four steps.", "starters/panels-tour.json"),
-    ("software & IoT", "Data state, decision checks, and resource budgets across two design stories.", "starters/software-systems.json"),
-    ("retries & circuits", "Bounded retry success, deadline admission, and open/half-open recovery across three scenarios.", "starters/resilience.json"),
-    ("replica positions", "Read-your-writes, lag, offline replicas and incomparable histories on one position ruler.", "starters/replication.json"),
-    ("rollout decisions", "Canary promotion, traffic rollback and firmware trial confirmation with explicit evidence and held waves.", "starters/rollout.json"),
-    ("Honeycomb trace", "A fictional checkout trace with concurrent spans and a recorded payment error.", "starters/honeycomb-trace.json"),
-    ("complex trace", "Shared dependencies, service cycles and concurrent branches in reserved routing lanes.", "starters/complex-trace.json"),
-    ("full demo", "The complete Flowview demo page.", "flowview.demo.json"),
+# Embed curated source specs: built-ins also work from a downloaded HTML file.
+# Keep metadata here, and the example itself in its existing authored location.
+WORKBENCH_TEMPLATES = [
+    {"name": "Simple service flow", "desc": "A client, a service, and a store. Start with the essentials and make them yours.", "category": "engineering", "tag": "The essentials", "art": "flow", "source": "starters/minimal.json", "title": "Simple service flow"},
+    {"name": "Retries & recovery", "desc": "Follow a request through retries, deadlines, and a circuit that opens and recovers.", "category": "engineering", "tag": "Alternate outcomes", "art": "branch", "source": "starters/resilience.json"},
+    {"name": "A trace, explained", "desc": "Unpack a checkout request with concurrent spans and a recorded payment error.", "category": "engineering", "tag": "Observed execution · fictional", "art": "trace", "source": "starters/honeycomb-trace.json"},
+    {"name": "Backstage architecture", "desc": "Explore service ownership, the inline viewer, and reviewed diagrams across repositories.", "category": "engineering", "tag": "Platform architecture", "art": "layers", "source": "../docs/diagrams/backstage/backstage.spec.json"},
+    {"name": "Rollout decisions", "desc": "Explain when to promote a release, hold a wave, or roll back—with visible evidence.", "category": "business", "categories": ["engineering"], "tag": "Decisions & evidence", "art": "branch", "source": "starters/rollout.json"},
+    {"name": "One story, two perspectives", "desc": "Connect the engineering detail to a visitor’s experience. Same steps, two ways to understand.", "category": "business", "categories": ["engineering", "devices"], "tag": "Engineering + business", "art": "perspectives", "source": "../docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json"},
+    {"name": "A connected home", "desc": "Tell a story across rooms, devices, and people—including an internet outage.", "category": "devices", "tag": "Physical interactions", "art": "home", "source": "starters/homemap-story.json"},
+    {"name": "Behind the app", "desc": "See where each camera-app value comes from, and what changes when telemetry fails.", "category": "devices", "tag": "App & backend", "art": "phone", "source": "starters/device-app-sources.json"},
 ]
+
+
+def workbench_templates() -> str:
+    entries = []
+    for template in WORKBENCH_TEMPLATES:
+        entry = {key: value for key, value in template.items() if key not in ("source", "title")}
+        entry["spec"] = json.loads(read(template["source"]))
+        # The legacy minimal example calls itself blank, but contains 3 nodes.
+        if "title" in template:
+            entry["spec"]["page"]["title"] = template["title"]
+        entry["spec"].get("page", entry["spec"])["skin"] = "pastel"
+        entries.append(entry)
+    return json.dumps(entries, ensure_ascii=True).replace("<", "\\u003c")
 
 
 def read(name: str) -> str:
@@ -114,14 +119,11 @@ def main() -> int:
     (ROOT / "template" / "flowview.html").write_text(flowview)
 
     workbench = fill(read("workbench.skel.html"), {
-        "STYLE_PAGE": read("style.workbench.css").rstrip(),
+        "STYLE_PAGE": font_css() + "\n" + read("style.workbench.css").rstrip(),
         "STYLE_CORE": core_css,
         "ICONS": icons,
-        "JS": js_bundle("compatibility.js", "canon.js", "validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "clipboard.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "layout.workbench.js", "canon.workbench.js", "boot.workbench.js"),
-        "STARTERS": json.dumps([
-            {"name": name, "desc": desc, "spec": json.loads(read(source))}
-            for name, desc, source in STARTERS
-        ], ensure_ascii=True).replace("<", "\\u003c"),
+        "JS": js_bundle("compatibility.js", "canon.js", "validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "clipboard.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "layout.workbench.js", "canon.workbench.js", "welcome.workbench.js", "boot.workbench.js"),
+        "WORKBENCH_TEMPLATES": workbench_templates(),
     })
     (ROOT / "workbench" / "flowspec.html").write_text(workbench)
 

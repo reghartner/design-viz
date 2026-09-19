@@ -86,7 +86,7 @@ test('pasting into a bare diagram preserves it inside a page and carries custom 
 });
 
 function harness(clipboard){
-  const events={},elements={};let selectedText=false;
+  const events={},elements={};let selectedText=false,active=true;
   const document={activeElement:null,defaultView:{navigator:{clipboard},getSelection:()=>({isCollapsed:!selectedText})},
     addEventListener(type,fn){(events[type] ||= []).push(fn);},getElementById(id){return elements[id];},
     createElement:()=>element('temporary'),execCommand:()=>false,body:{appendChild(){}}};
@@ -97,9 +97,9 @@ function harness(clipboard){
   function fire(map,type,target,extra){const ev={target,preventDefault(){this.prevented=true;},stopPropagation(){},...extra};for(const fn of map[type] || [])fn(ev);return ev;}
   for(const id of ['object-clipboard','object-clipboard-text','object-clipboard-feedback','object-clipboard-status','object-clipboard-destination','object-copy','object-duplicate','object-paste','object-clipboard-cancel','object-clipboard-apply','object-clipboard-read'])elements[id]=element(id);
   let raw=fixture(),text=JSON.stringify(raw),targets=[homeTarget('devices')],dest={section:1,index:0},blocked=false;const undo=[];
-  const c=context(),ctl=c.initBuilderClipboard(document,{text:()=>text,selection:()=>targets,destination:()=>({...dest}),destinationLabel:()=> 'Destination Home',blocked:()=>blocked,
+  const c=context(),ctl=c.initBuilderClipboard(document,{isActive:()=>active,text:()=>text,selection:()=>targets,destination:()=>({...dest}),destinationLabel:()=> 'Destination Home',blocked:()=>blocked,
     apply(plan){undo.push(text);text=plan.text;return true;}});
-  return {elements,document,ctl,undo,event:(type,extra={})=>fire(events,type,elements['object-copy'],extra),get text(){return text;},set text(v){text=v;},set targets(v){targets=v;},set blocked(v){blocked=v;},selectedText(v){selectedText=v;}};
+  return {elements,document,ctl,undo,set active(v){active=v;},event:(type,extra={})=>fire(events,type,elements['object-copy'],extra),get text(){return text;},set text(v){text=v;},set targets(v){targets=v;},set blocked(v){blocked=v;},selectedText(v){selectedText=v;}};
 }
 test('native object copy/paste works without Clipboard API and makes exactly one undoable edit',()=>{
   const h=harness();let clipboard='';
@@ -133,4 +133,25 @@ test('late system clipboard responses cannot replace newly typed or closed-dialo
   await Promise.resolve();await Promise.resolve();assert.equal(h.elements['object-clipboard-text'].value,'my pasted text');
   h.elements['object-clipboard-read'].fire('click');h.elements['object-clipboard-cancel'].fire('click');finish('late');
   await Promise.resolve();await Promise.resolve();assert.equal(h.elements['object-clipboard-text'].value,'my pasted text');
+});
+
+test('welcome screen leaves clipboard and duplicate keys native while the editor is hidden',()=>{
+  const h=harness();let clipboard='';
+  h.event('copy',{clipboardData:{setData(type,text){clipboard=text;}}});
+  h.active=false;
+  for(const [type,extra] of [
+    ['copy',{clipboardData:{setData(){throw Error('hidden editor copied');}}}],
+    ['paste',{clipboardData:{getData:()=>clipboard}}],
+    ['keydown',{metaKey:true,key:'d'}]
+  ]) assert.equal(h.event(type,extra).prevented,undefined);
+  assert.equal(h.undo.length,0);
+  h.active=true;h.event('paste',{clipboardData:{getData:()=>clipboard}});
+  assert.equal(h.undo.length,1);
+});
+
+test('a copy failure after leaving the project does not open an obsolete fallback dialog',async()=>{
+  let reject;const h=harness({writeText:()=>new Promise((resolve,no)=>{reject=no;})});
+  h.ctl.copy();h.ctl.cancelPending();h.active=false;
+  reject(new Error('Clipboard denied'));await Promise.resolve();await Promise.resolve();
+  assert.equal(h.elements['object-clipboard'].open,false);
 });

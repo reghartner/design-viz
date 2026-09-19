@@ -29,8 +29,9 @@ It does not fetch trace URLs or connect to an account.
    a successful import replaces it in one builder undo step. Use the numbered
    step chips to inspect each span, edit the story, then save/export normally.
 
-For an immediate example, choose **starters… → Honeycomb trace**. Its six
-fictional spans include overlapping identity/inventory work and a recorded
+For an immediate example, choose **Start new project → A trace, explained**
+from welcome. Its six fictional spans include overlapping identity/inventory
+work and a recorded
 payment error. The trace lasts 300 ms even though its span durations sum to
 565 ms. The raw input is `examples/traces/checkout.events.json`.
 
@@ -135,8 +136,9 @@ Dense or non-planar graphs can still cross. Numbered coins and authored edge
 labels can still crowd a dense view. Step selection highlights the relevant
 relationship; the complete graph remains available for context.
 
-Choose **starters… → complex trace** for a fictional request with shared
-dependencies and a service cycle. Long service labels are abbreviated on
+Use **Open file** with
+[`src/starters/complex-trace.json`](../src/starters/complex-trace.json)
+for a fictional request with shared dependencies and a service cycle. Long service labels are abbreviated on
 cards, with the complete name in the card tooltip and span details.
 
 The diagram's **View** controls select **Auto**, **Fit width** or **Readable**.

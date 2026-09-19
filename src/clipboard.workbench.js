@@ -205,7 +205,7 @@ function initBuilderClipboard(document, options){
     memory=data;var text=JSON.stringify(data,null,2), sequence=++request;
     say('Copied '+builderClipboardLabel(data)+'.');
     function fallback(){
-      if(sequence!==request)return;
+      if(sequence!==request || (options.isActive && !options.isActive()))return;
       var textarea=document.createElement('textarea'), previous=document.activeElement;
       textarea.value=text;textarea.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(textarea);textarea.select();writing=true;
       var ok=false;try{ok=!!document.execCommand('copy');}catch(ex){}finally{writing=false;textarea.remove();if(previous && previous.isConnected)previous.focus({preventScroll:true});}
@@ -249,19 +249,22 @@ function initBuilderClipboard(document, options){
   dialog.addEventListener('cancel',function(ev){ev.preventDefault();close();});
   dialog.addEventListener('keydown',function(ev){if(ev.key==='Escape')ev.stopPropagation();});
   document.addEventListener('copy',function(ev){
+    if(options.isActive && !options.isActive())return;
     if(writing || editable(ev.target) || selectedText() || !ev.clipboardData)return;
     var result=pack();if(result.error){say(result.error);return;}
     ev.clipboardData.setData('text/plain',JSON.stringify(result.data));ev.preventDefault();memory=result.data;
     say('Copied '+builderClipboardLabel(result.data)+'.');
   });
   document.addEventListener('paste',function(ev){
+    if(options.isActive && !options.isActive())return;
     if(editable(ev.target) || !ev.clipboardData)return;
     var result=builderClipboardParse(ev.clipboardData.getData('text/plain'));if(result.error)return;
     ev.preventDefault();var dest=options.destination();dest.text=options.text();paste(result.data,dest);
   });
   document.addEventListener('keydown',function(ev){
+    if(options.isActive && !options.isActive())return;
     if(editable(ev.target) || !(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase()!=='d')return;
     if(!options.selection().length)return;ev.preventDefault();duplicate();
   });
-  return {copy:copy,duplicate:duplicate,open:open};
+  return {copy:copy,duplicate:duplicate,open:open,cancelPending:function(){request++;}};
 }

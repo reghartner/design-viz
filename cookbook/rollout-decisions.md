@@ -1,6 +1,7 @@
 # Canary and firmware rollout decisions
 
-Use **starters… → rollout decisions**, or open
+Choose **Start new project → Rollout decisions** from welcome, or use
+**Open file** with
 [`src/starters/rollout.json`](../src/starters/rollout.json). Three independent
 stories use existing tiles, tables, budgets and authored decision checks:
 

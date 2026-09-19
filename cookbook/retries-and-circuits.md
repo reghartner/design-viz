@@ -1,6 +1,7 @@
 # Retries, deadlines and circuit recovery
 
-Use **starters… → retries & circuits** in the workbench, or open
+Choose **Start new project → Retries & recovery** from welcome, or use
+**Open file** with
 [`src/starters/resilience.json`](../src/starters/resilience.json). It contains
 three independent scenarios:
 

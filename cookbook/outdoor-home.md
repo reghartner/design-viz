@@ -5,12 +5,12 @@ of the map frame. Outdoor rectangles go in `rooms` with `kind:"outdoor"`;
 indoor rectangles omit kind or use `"room"`. Outdoor areas draw behind the
 house, and indoor activity does not tint them.
 
-Two complete examples are available in the workbench starter gallery:
+Use **Open file** in the workbench to load either complete example:
 
-- **whole home & outdoors** — [source](../src/starters/whole-home-outdoors.json):
+- **Whole home & outdoors** — [`src/starters/whole-home-outdoors.json`](../src/starters/whole-home-outdoors.json):
   a centered house, garden and driveway cameras, perimeter and indoor sensors,
   front/back doors, and a visitor approaching from outside.
-- **across the front door** — [source](../src/starters/front-door-threshold.json):
+- **Across the front door** — [`src/starters/front-door-threshold.json`](../src/starters/front-door-threshold.json):
   outside on the left, inside on the right; Welcome in opens the door and moves
   the visitor inside, while Leave outside keeps it closed and leaves a parcel.
 

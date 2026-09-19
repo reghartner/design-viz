@@ -67,15 +67,21 @@ async function main(args) {
   const options = {appUrl:process.env.FLOWVIEW_BACKSTAGE_APP_URL};
   for (let i=0;i<args.length;i++) {
     const key = args[i];
-    if (key === '--allow-empty') options.allowEmpty = true;
+    if (key === '--backstage') options.backstage = true;
+    else if (key === '--allow-empty') options.allowEmpty = true;
     else if (key === '--allow-warnings') options.allowWarnings = true;
     else if (['--output','--report','--entities','--sources','--local-root'].includes(key)) {
       if (!args[i+1] || args[i+1].startsWith('--')) throw new Error('Missing value for '+key);
       options[key.slice(2)] = args[++i];
     } else throw new Error('Unknown option '+key);
   }
-  if (!!options.entities === !!options.sources) throw new Error('Choose --sources <manifest.json> or --entities <resolved-entities.json>.');
-  if (options.entities) options.entities = JSON.parse(await readFile(options.entities,'utf8'));
+  if ([options.entities,options.sources,options.backstage].filter(Boolean).length!==1) throw new Error('Choose --backstage, --sources <manifest.json> or --entities <resolved-entities.json>.');
+  if (options.backstage) {
+    const {loadBackstageCatalog}=await import('../catalog-sync/backstage.mjs');
+    const loaded=await loadBackstageCatalog({backendUrl:process.env.FLOWVIEW_BACKSTAGE_BACKEND_URL,appUrl:options.appUrl,token:process.env.FLOWVIEW_BACKSTAGE_TOKEN});
+    options.entities=loaded.entities;options.appUrl=loaded.appUrl;
+    console.log('Read '+loaded.entities.length+' processed Backstage entities.');
+  } else if (options.entities) options.entities = JSON.parse(await readFile(options.entities,'utf8'));
   else {
     const {loadRepositoryCatalog,githubReader,localReader} = await import('../catalog-sync/repositories.mjs');
     const config=JSON.parse(await readFile(options.sources,'utf8'));

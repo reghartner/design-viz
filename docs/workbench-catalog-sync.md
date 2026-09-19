@@ -1,13 +1,49 @@
 # Bundle company service choices with the editor
 
 The designs repository keeps an approved `workbench/catalog.json`. A GitHub job
-reads the same repository catalog files used by Backstage, opens or updates a PR
+reads the processed Backstage catalog API or the same repository catalog files
+used by Backstage, opens or updates a PR
 when the exported choices change, and leaves review/merge to your normal process.
 After merge, your existing editor image build copies that file into nginx. Every
 fresh workbench launch loads it automatically, including **Start new project**.
-Neither the sync job nor the static editor needs to contact Backstage.
+The static editor never needs to contact Backstage. API mode contacts Backstage
+only from CI; repository mode does not contact it at all.
 
-## Source list
+## Seed from the processed Backstage API
+
+Prefer API mode when a runner can reach the company Backstage backend. It uses
+`GET /api/catalog/entities/by-query`, paginates Component and API entities, and
+exports the final entity identities and `providesApi` relationships. OpenAPI
+JSON and YAML definitions are normalized for operation pickers. It does not fetch
+API server URLs, follow arbitrary definition references, or execute service code.
+
+Set `FLOWVIEW_CATALOG_SOURCE=backstage`, `FLOWVIEW_BACKSTAGE_BACKEND_URL` (backend
+base URL), `FLOWVIEW_BACKSTAGE_APP_URL` (public UI base URL), and secret
+`FLOWVIEW_BACKSTAGE_TOKEN`. Configure a machine identity with catalog read access
+and a runner able to reach the backend. Repository-source credentials and the
+source list are unused in this mode; PR credentials are still required.
+
+```sh
+npm ci --prefix tools/catalog-sync --ignore-scripts
+node tools/canon/catalog-sync.mjs --backstage \
+  --output workbench/catalog.json --report /tmp/catalog-sync.md
+```
+
+HTTP failures, repeated pagination cursors, duplicate entities, malformed OpenAPI,
+and unresolved path/operation references stop the export. Missing API entities
+and other conversion warnings also block normal publication. The last approved
+snapshot remains available after a failed sync. Empty exports need explicit
+approval via the existing manual override. Endpoint/operation choices can only
+reflect metadata actually present in Backstage. Non-OpenAPI API identities link
+to their catalog pages; operation extraction currently supports OpenAPI only.
+
+Service/API identity is **seeding**. Code anchors and reviewed source revisions
+are a separate **authoring** concern and are never inferred by this sync.
+
+See Backstage's [Catalog API](https://backstage.io/docs/features/software-catalog/software-catalog-api/)
+and [machine authentication](https://backstage.io/docs/auth/service-to-service-auth/).
+
+## Repository source list
 
 Copy `.flowview/catalog-sources.example.json` to `.flowview/catalog-sources.json`
 in the company designs repository and replace its example values:

@@ -36,12 +36,12 @@ jobs:
           node-version: 24
       - run: npm ci --prefix tools/catalog-sync --ignore-scripts --no-fund --no-audit
       - name: Require explicit source App repository scope
-        if: vars.FLOWVIEW_SOURCE_APP_CLIENT_ID != ''
+        if: vars.FLOWVIEW_CATALOG_SOURCE != 'backstage' && vars.FLOWVIEW_SOURCE_APP_CLIENT_ID != ''
         env:
           SOURCE_REPOSITORIES: ${{ vars.FLOWVIEW_SOURCE_REPOSITORIES }}
         run: test -n "$SOURCE_REPOSITORIES" || { echo 'Set FLOWVIEW_SOURCE_REPOSITORIES to the listed source repositories.'; exit 1; }
       - name: Create a read-only source token
-        if: vars.FLOWVIEW_SOURCE_APP_CLIENT_ID != ''
+        if: vars.FLOWVIEW_CATALOG_SOURCE != 'backstage' && vars.FLOWVIEW_SOURCE_APP_CLIENT_ID != ''
         id: source-token
         uses: actions/create-github-app-token@v3
         with:
@@ -51,8 +51,12 @@ jobs:
           repositories: ${{ vars.FLOWVIEW_SOURCE_REPOSITORIES }}
           github-api-url: ${{ vars.FLOWVIEW_CATALOG_GITHUB_API_URL || github.api_url }}
           permission-contents: read
-      - name: Export and validate repository catalog files
+      - name: Export and validate catalog
         env:
+          FLOWVIEW_CATALOG_SOURCE: ${{ vars.FLOWVIEW_CATALOG_SOURCE || 'repositories' }}
+          FLOWVIEW_BACKSTAGE_BACKEND_URL: ${{ vars.FLOWVIEW_BACKSTAGE_BACKEND_URL }}
+          FLOWVIEW_BACKSTAGE_APP_URL: ${{ vars.FLOWVIEW_BACKSTAGE_APP_URL }}
+          FLOWVIEW_BACKSTAGE_TOKEN: ${{ secrets.FLOWVIEW_BACKSTAGE_TOKEN }}
           FLOWVIEW_CATALOG_SOURCES: ${{ vars.FLOWVIEW_CATALOG_SOURCES || '.flowview/catalog-sources.json' }}
           FLOWVIEW_CATALOG_SOURCE_TOKEN: ${{ steps.source-token.outputs.token || secrets.FLOWVIEW_CATALOG_SOURCE_TOKEN }}
           FLOWVIEW_CATALOG_GITHUB_API_URL: ${{ vars.FLOWVIEW_CATALOG_GITHUB_API_URL || 'https://api.github.com' }}
@@ -63,7 +67,12 @@ jobs:
           options=()
           if [[ "$ALLOW_EMPTY" == true ]]; then options+=(--allow-empty); fi
           if [[ "$ALLOW_WARNINGS" == true ]]; then options+=(--allow-warnings); fi
-          node tools/canon/catalog-sync.mjs --sources "$FLOWVIEW_CATALOG_SOURCES" --output workbench/catalog.json --report "$RUNNER_TEMP/catalog-sync.md" "${options[@]}"
+          case "$FLOWVIEW_CATALOG_SOURCE" in
+            backstage) options+=(--backstage) ;;
+            repositories) options+=(--sources "$FLOWVIEW_CATALOG_SOURCES") ;;
+            *) echo 'FLOWVIEW_CATALOG_SOURCE must be backstage or repositories'; exit 1 ;;
+          esac
+          node tools/canon/catalog-sync.mjs --output workbench/catalog.json --report "$RUNNER_TEMP/catalog-sync.md" "${options[@]}"
       - name: Create a repository-scoped PR token
         if: vars.FLOWVIEW_CATALOG_APP_CLIENT_ID != ''
         id: pr-token

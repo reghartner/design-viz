@@ -34,14 +34,26 @@ export function catalogFromEntities(entities,baseUrl){
   });
   return {catalog:C.catalog({version:1,source:baseUrl,services}),warnings};
 }
-export async function fetchBackstageCatalog({backendUrl,appUrl,token,fetchImpl=fetch}){
-  if(!C.http(backendUrl) || !C.http(appUrl) || !token)throw new Error('Configure Backstage backend/app URLs and a server-side token.');
-  const entities=[];let cursor;
+export async function fetchBackstageEntities({backendUrl,token,fetchImpl=fetch}){
+  if(!C.http(backendUrl) || !token)throw new Error('Configure the Backstage backend URL and a server-side token.');
+  const base=new URL(backendUrl);
+  if(base.search || base.hash)throw new Error('Backstage backend URL must not contain query or fragment.');
+  const entities=[],seenCursors=new Set();let cursor,bytes=0;
   for(let page=0;page<100;page++){
     const url=new URL(backendUrl.replace(/\/$/,'')+'/api/catalog/entities/by-query');url.searchParams.set('limit','500');if(cursor)url.searchParams.set('cursor',cursor);else{url.searchParams.append('filter','kind=component');url.searchParams.append('filter','kind=api');}
-    const r=await fetchImpl(url,{headers:{Authorization:'Bearer '+token}});if(!r.ok)throw new Error('Backstage catalog read failed ('+r.status+').');
-    const data=await r.json();if(!Array.isArray(data.items))throw new Error('Invalid catalog response.');entities.push(...data.items);cursor=data.pageInfo?.nextCursor;
-    if(!cursor)return catalogFromEntities(entities,appUrl);
+    const r=await fetchImpl(url,{redirect:'error',signal:AbortSignal.timeout(30000),headers:{Authorization:'Bearer '+token,Accept:'application/json'}});if(!r.ok)throw new Error('Backstage catalog read failed ('+r.status+').');
+    const data=await r.json();
+    bytes+=Buffer.byteLength(JSON.stringify(data));
+    if(bytes>50_000_000)throw new Error('Backstage catalog exceeds 50 MB.');
+    if(!Array.isArray(data.items))throw new Error('Invalid catalog response.');
+    entities.push(...data.items);cursor=data.pageInfo?.nextCursor;
+    if(!cursor)return entities;
+    if(typeof cursor!=='string'||seenCursors.has(cursor))throw new Error('Invalid or repeated catalog cursor.');
+    seenCursors.add(cursor);
   }
   throw new Error('Catalog exceeds the configured paging bound.');
+}
+
+export async function fetchBackstageCatalog(options){
+  return catalogFromEntities(await fetchBackstageEntities(options),options.appUrl);
 }

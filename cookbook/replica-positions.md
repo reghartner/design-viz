@@ -1,6 +1,8 @@
 # Replica positions, lag and read outcomes
 
-Use **starters… → replica positions** for a read-your-writes walkthrough.
+Use **Open file** with
+[`src/starters/replication.json`](../src/starters/replication.json)
+for a read-your-writes walkthrough.
 The `replicas` panel aligns numeric positions; `checks` explains the authored
 read/write policy, and `table` shows the request's selected target and result.
 The existing [Mirrorline example](../examples/halovista-mirrorline/mirrorline.spec.json)

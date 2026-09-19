@@ -82,4 +82,5 @@ off. Scene selection is a panel declaration, shared by all steps and paths.
 Run the [cookbook build loop](README.md#the-loop-every-recipe-ends-here),
 then choose step 2 and confirm an empty porch with REC. Step 3 should start
 the run while recording continues. Return to 2, then 3, to replay. For
-several examples, load **starters… → screen clips**.
+several examples, use **Open file** with
+[`src/starters/screen-clips.json`](../src/starters/screen-clips.json).

@@ -79,7 +79,9 @@ removing their declarations.
 
 ## Multiple named layouts of one story
 
-Choose **starters… → named layouts** to try **Home story** and **Service flow**.
+Use **Open file** with
+[`src/starters/named-layouts.json`](../src/starters/named-layouts.json)
+to try **Home story** and **Service flow**.
 Home story shows a shorter resident-facing sequence with controls attached to
 Home; Service flow includes every technical stop and attaches controls to the
 diagram. Both share the same step definitions, panels and execution paths.

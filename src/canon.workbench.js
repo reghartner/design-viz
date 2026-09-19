@@ -13,8 +13,18 @@ function initCanonWorkbench(opts){
   host.appendChild(details);
   var params=new URLSearchParams(location.search), id=params.get('canon');
   if(!id) return context;
-  var review=params.get('review');
+  var review=params.get('review'), attached=true;
+  context.detach=function(){
+    attached=false;context.revision=null;save.disabled=true;save.hidden=true;
+    status.textContent='Local project · not attached to a repository review.';
+    /* Reload must resume this local draft, not silently reopen the old design. */
+    if(typeof history !== 'undefined' && history.replaceState){
+      var localUrl=new URL(location.href);localUrl.searchParams.delete('canon');localUrl.searchParams.delete('review');
+      history.replaceState(history.state,'',localUrl.pathname+localUrl.search+localUrl.hash);
+    }
+  };
   var save=button('Propose spec update',async function(){
+    if(!attached)return;
     save.disabled=true;
     try{
       var raw=JSON.parse(opts.src.value), errors=FlowCanon.validate(raw).concat(validate(normalize(raw)).errors);
@@ -22,12 +32,13 @@ function initCanonWorkbench(opts){
       if(typeof FlowviewCompatibility !== 'undefined')raw=FlowviewCompatibility.stamp(raw);
       var response=await fetch('/api/canon/proposals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,review:review,spec:raw,baseRevision:context.revision})});
       var result=await response.json();if(!response.ok)throw new Error(result.error);
+      if(!attached)return;
       status.textContent='Review '+result.id+' saved. Open the company repository to review it.';
-    }catch(e){status.textContent=e.message;}finally{save.disabled=false;}
+    }catch(e){status.textContent=e.message;}finally{save.disabled=!attached;}
   });save.disabled=true;
   fetch('/api/canon/context?id='+encodeURIComponent(id)+(review?'&review='+encodeURIComponent(review):''))
     .then(function(r){if(!r.ok)throw new Error('Company repository unavailable. Use the local portal or import a catalog snapshot.');return r.json();})
-    .then(function(data){context.catalog=FlowCanon.catalog(data.catalog);context.revision=data.revision;input.value=JSON.stringify(data.catalog,null,2);opts.loadSpec(data.spec);status.textContent=(data.simulated?'SIMULATED · ':'')+context.catalog.services.length+' services · '+id+' · changes are submitted for review.';save.disabled=false;})
-    .catch(function(e){status.textContent=e.message;details.open=true;});
+    .then(function(data){if(!attached)return;context.catalog=FlowCanon.catalog(data.catalog);context.revision=data.revision;input.value=JSON.stringify(data.catalog,null,2);opts.loadSpec(data.spec);status.textContent=(data.simulated?'SIMULATED · ':'')+context.catalog.services.length+' services · '+id+' · changes are submitted for review.';save.disabled=false;})
+    .catch(function(e){if(!attached)return;status.textContent=e.message;details.open=true;});
   return context;
 }

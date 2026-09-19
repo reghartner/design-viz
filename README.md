@@ -53,7 +53,7 @@ tests, observed failures, instruction changes, and remaining review needs.
 The [thermal-protection example](cookbook/thermal-protection.md) adds hot/cold
 Home effects, independent camera shutdown and charging, temperature limits on
 both ends, and explicit unavailable-video explanations. Open it from the
-workbench's **thermal protection** starter.
+workbench's **Open file** using [the thermal spec](docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json).
 
 For repository PRs, use the [PR-handling skill](.claude/skills/design-viz-pr/SKILL.md).
 It starts with the diff and loads only the review guidance for the affected surfaces.
@@ -67,7 +67,7 @@ The company's agent can finish deployment using the
 **[Alternate paths](docs/alternate-paths.md):** show a happy path and failure
 outcomes on one diagram. Colored path rows align their step numbers beneath the transport controls; playback
 and panel state follow the selected sequence and stop at its own ending.
-Try **starters… → alternate paths**, or fork a beat in the **Steps** tab.
+Open the [alternate paths example](src/starters/alternate-paths.json), or fork a beat in the **Steps** tab.
 
 **[Failed communications](docs/failed-communications.md):** show a packet
 dropped in transit or a communication that was never sent, using broken
@@ -76,8 +76,8 @@ edges on the same diagram. Choose an outcome with each step's **Delivery** contr
 **New: [Honeycomb trace → diagram](docs/trace-import.md).** In the workbench,
 choose **import trace…**, paste or open event JSON, and **Build diagram**.
 The result is a service board, an offset-aware waterfall, and a step for each
-span. No account connection is required. **starters… → Honeycomb trace** opens
-a fictional example immediately. Agents use `node tools/trace2spec.js`.
+span. No account connection is required. **Start new project → A trace, explained** opens
+a fictional trace example. Agents use `node tools/trace2spec.js`.
 All row diagrams offer **Auto**, **Fit width** and **Readable** views, with
 curved edges or lane routing. In a narrow diagram column, Auto keeps labels
 legible and lets you scroll sideways; Fit width shows the complete graph.
@@ -85,15 +85,15 @@ These controls also work in published pages; no routing setting is required.
 
 **Broader design panels:** `table` shows data snapshots, `checks` shows
 authored decisions and invariants, and `budget` compares resource usage with
-explicit limits. Try **starters… → software & IoT** for both domains.
-Try **starters… → retries & circuits** for retry success, deadline admission,
+explicit limits. Open the [software & IoT example](src/starters/software-systems.json) for both domains.
+Use the [retries & circuits example](src/starters/resilience.json) for retry success, deadline admission,
 and circuit recovery; the [recipe](cookbook/retries-and-circuits.md) explains
 how to adapt their authored policies and timing.
-The **replica positions** starter compares applied positions against a session
+The [replica positions example](src/starters/replication.json) compares applied positions against a session
 token while keeping reported lag, offline state and unrelated histories
 distinct. Its [recipe](cookbook/replica-positions.md) also covers device/cloud
 configuration copies.
-The **rollout decisions** starter separates configured traffic, sampled health,
+The [rollout decisions example](src/starters/rollout.json) separates configured traffic, sampled health,
 firmware trial boots and persistent confirmation. Its
 [recipe](cookbook/rollout-decisions.md) covers promotion, holds, traffic rollback
 and missing device reports.
@@ -329,9 +329,12 @@ staleness is acceptable. For fully fresh links use this loop:
 Skipping step 3 simply leaves those pages one catalog run behind; no authoring
 field or agent-authored cross-reference data is required.
 
-For rapid trial-and-error, `workbench/flowspec.html` is the same engine with
-an editable JSON panel and a Render button: paste your spec, tweak, render,
-and copy the result back into the `.spec.json` when it looks right. Clicking
+Open `workbench/flowspec.html` to **Paste JSON**, **Open file**, or start a **New project**
+from a curated template or a blank diagram. The [welcome guide](docs/workbench-welcome.md)
+also covers saved drafts and copyable instructions for building with your agent.
+Use **New / open** to return here from the editor; the previous project stays
+available through Resume and Undo. Once open, tweak the live preview or use the
+JSON pane and Render button, then save the result back to your `.spec.json`. Clicking
 a rendered node, edge, edge label, step coin, panel widget, or section box
 opens an **inspector form** for it, with a link to select its exact JSON:
 every common field is an editable control (selects for icon, tint,
@@ -389,11 +392,11 @@ is one undo step, and Esc or DONE ends the mode. **Tabs are managed
 in place**: clicking a tab button switches to it AND selects it — the
 form edits its label and highlight, **+ tab** inserts a ready-made
 sibling after it, arrows reorder it, delete removes it (the last tab of
-a block is refused with instructions instead). **Hosted starter
+a block is refused with instructions instead). **Hosted template
 collections**: when the workbench is served from a web host, it fetches
 `starters.json` from beside the page (same directory as
-`workbench/flowspec.html`) and shows those entries in the **starters…**
-gallery under a "from starters.json" divider, below the built-in ones.
+`workbench/flowspec.html`) and shows those entries in the welcome screen's
+**Start new project** picker alongside the curated built-ins.
 The file is a JSON array (or a `{"starters": [...]}` wrapper) of
 `{"name": ..., "spec": {...}}` entries with an optional `desc`;
 malformed entries are skipped and counted rather than hiding the rest.

@@ -45,7 +45,8 @@ field carries the prior snapshot. To clear a table use `rows:[]`; to reset
 checks or budgets use `results:{}` or `values:{}`. A transient `enterOnce`
 override affects only its step.
 
-Use the **software & IoT** workbench starter for multi-node checkout and device
-reconciliation stories. Use **Honeycomb trace** for observed input instead of
-design-authored examples. Trace timing is an offset-aware waterfall; a sum of
+Use **Open file** with
+[`src/starters/software-systems.json`](../src/starters/software-systems.json)
+for multi-node checkout and device reconciliation stories. Use the workbench’s
+**import trace…** control for observed input instead of design-authored examples. Trace timing is an offset-aware waterfall; a sum of
 nested durations would overstate elapsed time.

@@ -273,7 +273,8 @@ function starterCountLine(spec){
     steps += (d.steps || []).length;
     panels += (d.panels || []).length;
   });
-  return nodes + ' nodes · ' + steps + ' steps · ' + panels + ' panels';
+  return nodes + (nodes === 1 ? ' node · ' : ' nodes · ') +
+    steps + (steps === 1 ? ' step · ' : ' steps · ') + panels + (panels === 1 ? ' panel' : ' panels');
 }
 function builderTargetPath(raw, target){
   /* target: {section:<zero-based ordinal>, kind, id?, index?} → path array
@@ -3158,6 +3159,7 @@ function initWorkbenchBuilder(opts){
   /* ---- draft autosave + recovery offer ---- */
   var DRAFT_KEY = 'dv-workbench-draft', BASELINE_KEY = 'dv-workbench-baseline';
   var baselineText = src.value;
+  var projectOpen = !opts.deferInitialSave, projectUndoText = null;
   var initialDraft = readDraft(), recoveredBaseline = null;
   try {
     var savedBaseline = JSON.parse(localStorage.getItem(BASELINE_KEY));
@@ -3167,6 +3169,7 @@ function initWorkbenchBuilder(opts){
   if (initialDraft && initialDraft.text === src.value && recoveredBaseline != null)
     baselineText = recoveredBaseline;
   function autosaveDraft(){
+    projectOpen = true;
     try {
       localStorage.setItem(BASELINE_KEY, JSON.stringify({text: baselineText, draftText: src.value}));
       localStorage.setItem(DRAFT_KEY, JSON.stringify({text: src.value, at: Date.now()}));
@@ -3184,6 +3187,7 @@ function initWorkbenchBuilder(opts){
   }
   var draftTimer = null;
   src.addEventListener('input', function(){
+    projectOpen = true; /* an edit is live before the debounced disk snapshot */
     if (invalidateEffectiveState) invalidateEffectiveState();
     importedText = null;
     hideDiff();
@@ -3200,31 +3204,23 @@ function initWorkbenchBuilder(opts){
     var restore = document.createElement('button');
     restore.type = 'button'; restore.className = 'bbtn'; restore.textContent = 'restore';
     restore.addEventListener('click', function(){
-      pushUndo(); /* restoring is one undoable action */
-      src.value = draft.text;
-      baselineText = recoveredBaseline == null ? draft.text : recoveredBaseline;
-      render();
-      setSelected(null); currentTarget = null;
-      clearMultiSelect(); /* identities in the restored draft may coincide */
-      if (guide) guide.hidden = true;
-      retireInspector();
-      bar.hidden = true;
-      autosaveDraft();
-      if (recoveredBaseline == null) inspectorMessage('original baseline unavailable — diff starts from the recovered draft');
+      restoreDraft();
     });
     var discard = document.createElement('button');
     discard.type = 'button'; discard.className = 'bbtn'; discard.textContent = 'discard';
     discard.addEventListener('click', function(){
       clearDraft();
+      initialDraft = null;
       autosaveDraft();
       bar.hidden = true;
     });
     bar.appendChild(label); bar.appendChild(restore); bar.appendChild(discard);
     bar.hidden = false;
   })();
-  if (!initialDraft || initialDraft.text === src.value) autosaveDraft();
+  if (!opts.deferInitialSave && (!initialDraft || initialDraft.text === src.value)) autosaveDraft();
 
   /* ---- open a .spec.json / save the editor to disk ---- */
+  var fileReadVersion = 0;
   var fileInput = document.getElementById('file-input');
   var openBtn = document.getElementById('file-open');
   var saveBtn = document.getElementById('file-save');
@@ -3233,19 +3229,13 @@ function initWorkbenchBuilder(opts){
     fileInput.addEventListener('change', function(){
       var f = fileInput.files && fileInput.files[0];
       if (!f) return;
-      var reader = new FileReader();
+      var readVersion = ++fileReadVersion, reader = new FileReader();
       reader.onload = function(){
-        pushUndo(); /* opening replaces the editor — undoable */
-        src.value = String(reader.result);
-        baselineText = src.value;
-        render(); /* parse/validation errors surface in the message list */
-        setSelected(null); currentTarget = null;
-        clearMultiSelect(); /* ids in the new file may coincide — never carry a selection over */
-        if (guide) guide.hidden = true;
-        retireInspector();
-        autosaveDraft();
+        if (readVersion !== fileReadVersion) return;
+        replaceProject(String(reader.result)); /* invalid source remains repairable in the editor */
       };
       reader.onerror = function(){
+        if (readVersion !== fileReadVersion) return;
         inspectorMessage('could not read "' + f.name + '" — the editor is unchanged');
       };
       reader.readAsText(f);
@@ -3451,6 +3441,7 @@ function initWorkbenchBuilder(opts){
       if (spec.todos.length) importMessage('w', spec.todos.length + ' todo(s) added to the spec — enrich by hand');
     });
     document.addEventListener('keydown', function(ev){
+      if (opts.isActive && !opts.isActive()) return;
       /* Programmatic replacement has no native textarea undo entry. */
       if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
       if (addToStep || importedText == null || src.value !== importedText) return;
@@ -3549,7 +3540,7 @@ function initWorkbenchBuilder(opts){
     traceBtn.addEventListener('click', function(){
       traceBox.hidden = !traceBox.hidden;
       traceBtn.setAttribute('aria-expanded', String(!traceBox.hidden));
-      if (!traceBox.hidden){ closePalette(); closeGallery(); traceText.focus(); }
+      if (!traceBox.hidden){ closePalette(); traceText.focus(); }
     });
     document.getElementById('trace-cancel').addEventListener('click', closeTrace);
     traceBox.addEventListener('keydown', function(ev){ if (ev.key === 'Escape'){ ev.stopPropagation(); closeTrace(); } });
@@ -3815,6 +3806,7 @@ function initWorkbenchBuilder(opts){
     }});
   }
   var objectClipboard = typeof initBuilderClipboard === 'function' ? initBuilderClipboard(document,{
+    isActive:opts.isActive,
     text:function(){return src.value;},selection:clipboardSelection,destination:clipboardDestination,
     blocked:function(){return !!(addToStep || connect || rowDrag || nodeDrag || groupDrag || view.querySelector('.home-edit-map.moving') || (guide && guide.querySelector('.home-edit-map.moving')));},
     destinationLabel:function(dest){
@@ -5883,6 +5875,7 @@ function initWorkbenchBuilder(opts){
     src.addEventListener('input', function(){ clearTimeout(outlineTimer); outlineTimer = setTimeout(refreshOutline, 200); });
     new MutationObserver(refreshOutline).observe(view, {childList: true});
     document.addEventListener('keydown', function(ev){
+      if (opts.isActive && !opts.isActive()) return;
       if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || addToStep) return;
       ev.preventDefault();
       if (specbox) specbox.open = true;
@@ -6001,7 +5994,7 @@ function initWorkbenchBuilder(opts){
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .path-chip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
-    '#starters, #gallery button, #import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
+    '#import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
        step, re-render from outside the mode, or leave the page state
@@ -6017,6 +6010,7 @@ function initWorkbenchBuilder(opts){
   }
   document.addEventListener('click', addModeBlocker, true);
   document.addEventListener('keydown', function(ev){
+    if (opts.isActive && !opts.isActive()) return;
     if(document.querySelector('#object-clipboard[open]'))return;
     /* the tab bar switches tabs on Arrow/Home/End — pause that too
        while the mode is armed (capture phase beats the engine's
@@ -6785,6 +6779,7 @@ function initWorkbenchBuilder(opts){
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
+    if (opts.isActive && !opts.isActive()) return;
     if(document.querySelector('#object-clipboard[open]'))return;
     if (ev.key === 'Escape'){
       if (rowDrag){ cancelRowDrag(); return; }
@@ -6792,7 +6787,6 @@ function initWorkbenchBuilder(opts){
       if (groupDrag){ cancelGroupDrag(); return; }
       if (importBox && !importBox.hidden){ importBox.hidden = true; if (importBtn) importBtn.focus(); return; }
       if (diffbox && !diffbox.hidden){ hideDiff(); diffBtn.focus(); return; }
-      if (gallery && !gallery.hidden){ closeGallery(); startersBtn.focus(); return; }
       if (palette && !palette.hidden){ closePalette(); return; }
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }
@@ -6885,114 +6879,15 @@ function initWorkbenchBuilder(opts){
     selectRange(plan);
   });
 
-  /* ---- starter gallery: whole-editor replacement is one undo action ---- */
-  var gallery = document.getElementById('gallery');
-  var startersBtn = document.getElementById('starters');
-  var starterUndoText = null;
-  function closeGallery(){
-    if (!gallery) return;
-    gallery.hidden = true;
-    gallery.innerHTML = '';
-    if (startersBtn) startersBtn.setAttribute('aria-expanded', 'false');
-  }
-  function loadStarter(entry){
-    if (addToStep) return;
-    pushUndo();
-    src.value = JSON.stringify(entry.spec, null, 2);
-    starterUndoText = src.value;
-    setSelected(null); currentTarget = null; insertSection = 0;
-    if (connect) cancelConnect();
-    clearStepMarkers();
-    render();
-    updateTargetLabel(entry.spec);
-    if (guide) guide.hidden = true;
-    autosaveDraft();
-    closeGallery();
-    src.focus();
-  }
-  /* the external manifest is fetched once at boot; editing starters.json
-     and reloading the page picks up additions (no rebuild anywhere) */
-  var externalStarters = null; /* {entries, skipped} or {error} once loaded */
-  if (typeof fetch === 'function'){
-    fetch('starters.json', {cache: 'no-store'}).then(function(resp){
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      return resp.text();
-    }).then(function(text){
-      externalStarters = parseStarterManifest(text);
-    })['catch'](function(){ /* no manifest beside the page: baked-ins only */ });
-  }
-  function starterCard(entry){
-    var card = document.createElement('button');
-    card.type = 'button'; card.className = 'pbtn starter-card';
-    var name = document.createElement('strong'); name.textContent = entry.name;
-    var desc = document.createElement('span'); desc.textContent = entry.desc;
-    var count = document.createElement('span'); count.textContent = starterCountLine(entry.spec);
-    card.appendChild(name); card.appendChild(desc); card.appendChild(count);
-    card.addEventListener('click', function(){
-      if (addToStep) return;
-      if (opts.renderedText && src.value === opts.renderedText()){ loadStarter(entry); return; }
-      showGallery();
-      var row = document.createElement('div'); row.className = 'starter-confirm';
-      var label = document.createElement('span');
-      label.textContent = 'unrendered edits — replace with ' + entry.name + '?';
-      var load = document.createElement('button');
-      load.type = 'button'; load.className = 'bbtn'; load.textContent = 'load & replace';
-      load.addEventListener('click', function(){ loadStarter(entry); });
-      var cancel = document.createElement('button');
-      cancel.type = 'button'; cancel.className = 'bbtn'; cancel.textContent = 'cancel';
-      cancel.addEventListener('click', function(){ showGallery(); gallery.querySelector('button').focus(); });
-      row.appendChild(label); row.appendChild(load); row.appendChild(cancel);
-      gallery.appendChild(row);
-      cancel.focus();
-    });
-    return card;
-  }
-  function showGallery(){
-    gallery.innerHTML = '';
-    (opts.starters || []).forEach(function(entry){
-      gallery.appendChild(starterCard(entry));
-    });
-    if (externalStarters){
-      var divider = document.createElement('div');
-      divider.className = 'gallery-note';
-      divider.textContent = 'from starters.json';
-      gallery.appendChild(divider);
-      if (externalStarters.error){
-        var bad = document.createElement('div');
-        bad.className = 'gallery-note gallery-bad';
-        bad.textContent = externalStarters.error;
-        gallery.appendChild(bad);
-      } else {
-        externalStarters.entries.forEach(function(entry){
-          gallery.appendChild(starterCard(entry));
-        });
-        if (externalStarters.skipped){
-          var skip = document.createElement('div');
-          skip.className = 'gallery-note gallery-bad';
-          skip.textContent = externalStarters.skipped +
-            ' entr' + (externalStarters.skipped === 1 ? 'y' : 'ies') +
-            ' skipped — each needs a name and a spec object';
-          gallery.appendChild(skip);
-        }
-      }
-    }
-    gallery.hidden = false;
-    startersBtn.setAttribute('aria-expanded', 'true');
-  }
-  if (startersBtn && gallery) startersBtn.addEventListener('click', function(){
-    if (addToStep) return;
-    if (!gallery.hidden){ closeGallery(); return; }
-    closePalette();
-    showGallery();
-  });
+  /* Whole-project imports are undoable even when the source has focus. */
   document.addEventListener('keydown', function(ev){
-    /* Programmatic textarea replacements do not enter native undo history. */
+    if (opts.isActive && !opts.isActive()) return;
     if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
-    if (addToStep || starterUndoText === null || src.value !== starterUndoText || !undoStack.length) return;
+    if (addToStep || projectUndoText === null || src.value !== projectUndoText || !undoStack.length) return;
     var ae = document.activeElement;
     if (ae && ae !== src && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
     ev.preventDefault();
-    starterUndoText = null;
+    projectUndoText = null;
     doUndo();
   });
 
@@ -7022,7 +6917,6 @@ function initWorkbenchBuilder(opts){
   function openPalette(kind){
     hideDiff();
     if (!palette) return;
-    closeGallery();
     if (!palette.hidden && palette.getAttribute('data-kind') === kind){ closePalette(); return; }
     palette.setAttribute('data-kind', kind);
     palette.innerHTML = '';
@@ -7062,9 +6956,65 @@ function initWorkbenchBuilder(opts){
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);
   applyRowGrabs(); /* the boot render happened before this wiring ran */
-  return {loadSpec:function(raw){
-    var next=normalize(raw), findings=validate(next);
-    if(findings.errors.length) throw new Error(findings.errors.join('\n'));
-    return applyPlan({text:JSON.stringify(raw,null,2)});
-  }};
+  function prepareWelcome(){
+    fileReadVersion++;
+    if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();
+    pausePreview();
+    if (addToStep) cancelAddToStep(null);
+    if (connect) cancelConnect(null);
+    cancelNodeDrag(); cancelGroupDrag(); cancelRowDrag();
+    closePalette(); hideDiff(); clearMultiSelect(); clearStepMarkers();
+    setSelected(null); currentTarget = null; retireInspector();
+    if (importBox) importBox.hidden = true;
+    if (traceBox) traceBox.hidden = true;
+  }
+  function replaceProject(text, baseline){
+    prepareWelcome();
+    if (draftTimer){ clearTimeout(draftTimer); draftTimer = null; }
+    /* Keep a pending recovered draft as the undo target, never the boot demo. */
+    if (!projectOpen && initialDraft) src.value = initialDraft.text;
+    pushUndo();
+    src.value = text;
+    baselineText = baseline == null ? text : baseline;
+    projectUndoText = text;
+    initialDraft = null;
+    insertSection = 0;
+    if (opts.beforeProjectLoad) opts.beforeProjectLoad();
+    render();
+    var parsed = parseEditor();
+    updateTargetLabel(parsed.error ? null : parsed.raw);
+    if (guide) guide.hidden = true;
+    var bar = document.getElementById('draftbar');
+    if (bar) bar.hidden = true;
+    autosaveDraft();
+    if (stepList) stepList.sync();
+    return true;
+  }
+  function loadText(text){
+    var raw;
+    try { raw = JSON.parse(text); }
+    catch (ex){ throw new Error('JSON parse: ' + ex.message); }
+    var findings = validate(normalize(raw));
+    if (findings.errors.length) throw new Error(findings.errors.join('\n'));
+    return replaceProject(text);
+  }
+  function restoreDraft(){
+    if (!initialDraft) return false;
+    var draft = initialDraft, missingBaseline = recoveredBaseline == null;
+    replaceProject(draft.text, missingBaseline ? draft.text : recoveredBaseline);
+    if (missingBaseline) inspectorMessage('original baseline unavailable — diff starts from the recovered draft');
+    return true;
+  }
+  return {
+    loadSpec:function(raw){ return loadText(JSON.stringify(raw, null, 2)); },
+    loadText:loadText, restoreDraft:restoreDraft, prepareWelcome:prepareWelcome,
+    isProjectOpen:function(){ return projectOpen; },
+    draft:function(){ return initialDraft ? {text:initialDraft.text, at:initialDraft.at} : null; },
+    draftInfo:function(){
+      if (!initialDraft) return null;
+      var title = 'Unfinished diagram';
+      try { var raw = JSON.parse(initialDraft.text); title = (raw.page || raw).title || 'Untitled diagram'; } catch (ex){}
+      return {title:title, savedAt:initialDraft.at};
+    }
+  };
 }

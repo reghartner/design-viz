@@ -1,6 +1,8 @@
 # Thermal protection — hot/cold Home devices and unavailable video
 
-Start with **starters… → thermal protection**, or use the complete teaching seed:
+Use **Open file** with
+[`docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json`](../docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json).
+The complete teaching seed includes:
 
 - [Source design](../docs/hlds/thermal-doorbell.md)
 - [Storyboard and coverage ledger](../docs/diagrams/thermal-doorbell/thermal-doorbell.ledger.md)

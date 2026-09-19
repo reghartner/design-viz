@@ -915,9 +915,9 @@ test('starter specs parse and validate with zero errors and warnings', () => {
 });
 
 test('starterCountLine totals all sections and tabs, skipping prose-only sections', () => {
-  assert.strictEqual(B.starterCountLine(SPEC), '4 nodes · 1 steps · 1 panels');
-  assert.strictEqual(B.starterCountLine({sections: SPEC.page.blocks}), '4 nodes · 1 steps · 1 panels');
-  assert.strictEqual(B.starterCountLine(SPEC.page.blocks[0].diagram), '2 nodes · 1 steps · 0 panels');
+  assert.strictEqual(B.starterCountLine(SPEC), '4 nodes · 1 step · 1 panel');
+  assert.strictEqual(B.starterCountLine({sections: SPEC.page.blocks}), '4 nodes · 1 step · 1 panel');
+  assert.strictEqual(B.starterCountLine(SPEC.page.blocks[0].diagram), '2 nodes · 1 step · 0 panels');
   assert.strictEqual(B.starterCountLine({}), '0 nodes · 0 steps · 0 panels');
 });
 
@@ -937,147 +937,6 @@ test('starter scaffolds have the promised nodes, steps, panels and timeline lane
   }
   assert.strictEqual(d.panels[4].lanes.length, 2);
   assert.ok(d.panels[4].lanes.every(lane => lane.id && lane.label && lane.every));
-});
-
-/* Small event/element stub for gallery wiring; rendering is counted separately. */
-function galleryHarness(){
-  const handlers = {};
-  const elements = {};
-  const document = {
-    activeElement: null,
-    getElementById: id => elements[id] || null,
-    querySelector: () => null,
-    addEventListener(type, fn, capture){
-      (handlers[type] || (handlers[type] = [])).push({fn, capture});
-    },
-    createElement: tag => new Element(tag)
-  };
-  class Element {
-    constructor(tag){
-      this.tagName = tag.toUpperCase(); this.children = []; this.listeners = {};
-      this.attributes = {}; this.hidden = true; this.value = ''; this.className = '';
-    }
-    set innerHTML(value){ this.children = []; }
-    setAttribute(key, value){ this.attributes[key] = value; }
-    getAttribute(key){ return this.attributes[key]; }
-    appendChild(child){ this.children.push(child); child.parent = this; return child; }
-    addEventListener(type, fn){ (this.listeners[type] || (this.listeners[type] = [])).push(fn); }
-    focus(){ document.activeElement = this; }
-    querySelector(selector){
-      return this.children.find(child => selector === 'button' && child.tagName === 'BUTTON') || null;
-    }
-    querySelectorAll(){ return []; }
-    closest(selectors){
-      for (const selector of selectors.split(',').map(s => s.trim())){
-        if (selector === '#' + this.id) return this;
-        if (selector === '#gallery button' && this.tagName === 'BUTTON'){
-          for (let p = this.parent; p; p = p.parent) if (p.id === 'gallery') return this;
-        }
-      }
-      return null;
-    }
-  }
-  for (const id of ['src', 'docview', 'starters', 'gallery', 'undo-builder', 'redo-builder']){
-    elements[id] = new Element(id === 'src' ? 'textarea' : id.includes('builder') || id === 'starters' ? 'button' : 'div');
-    elements[id].id = id;
-  }
-  const src = elements.src;
-  src.value = TEXT;
-  let renderedText = TEXT;
-  let renderCount = 0;
-  let arm;
-  const code = fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8');
-  const sandbox = {console, SCREEN_MODES: B.PANEL_PATCH_FIELDS.screen[0][2], document, window: {addEventListener(){}},
-    MutationObserver: class {observe(){}}, setTimeout(){},
-    captureArm(fn){ arm = fn; }};
-  // Expose only the existing mode state to exercise capture-phase blocking.
-  vm.runInNewContext(code.replace('  var initial = parseEditor();',
-    '  captureArm(function(){ addToStep = {section: 0, step: 0}; });\n  var initial = parseEditor();'), sandbox);
-  const starter = {name: 'blank flow', desc: 'a starting point',
-    spec: JSON.parse(fs.readFileSync(path.join(ROOT, 'src/starters/minimal.json'), 'utf8'))};
-  sandbox.initWorkbenchBuilder({src, view: elements.docview, starters: [starter],
-    renderedText: () => renderedText, render(){ renderCount++; renderedText = src.value; }});
-  function fire(target, type = 'click', extra = {}){
-    const ev = {target, preventDefault(){ this.defaultPrevented = true; },
-      stopPropagation(){ this.stopped = true; }, ...extra};
-    for (const h of handlers[type] || []) if (h.capture) h.fn(ev);
-    if (!ev.stopped){
-      for (const fn of target.listeners[type] || []) fn.call(target, ev);
-      for (const h of handlers[type] || []) if (!h.capture) h.fn(ev);
-    }
-    return ev;
-  }
-  return {elements, src, starter, fire, arm, document, renders: () => renderCount};
-}
-
-test('gallery toggles, shows counts, loads a rendered editor and preserves undo/redo', () => {
-  const h = galleryHarness(), e = h.elements;
-  h.fire(e.starters);
-  assert.strictEqual(e.gallery.hidden, false);
-  assert.strictEqual(e.starters.getAttribute('aria-expanded'), 'true');
-  assert.strictEqual(e.gallery.children[0].children[2].textContent, '3 nodes · 2 steps · 0 panels');
-  h.fire(e.starters);
-  assert.strictEqual(e.gallery.hidden, true);
-  h.fire(e.starters);
-  h.fire(e.gallery.children[0]);
-  assert.strictEqual(h.src.value, JSON.stringify(h.starter.spec, null, 2));
-  assert.strictEqual(h.renders(), 1);
-  assert.strictEqual(e.gallery.hidden, true);
-  h.fire(e['undo-builder']);
-  assert.strictEqual(h.src.value, TEXT);
-  h.fire(e['redo-builder']);
-  assert.deepStrictEqual(JSON.parse(h.src.value), h.starter.spec);
-});
-
-test('gallery protects unrendered invalid text, cancels or confirms, and undo restores exact edits', () => {
-  const h = galleryHarness(), e = h.elements;
-  const dirty = ' { unfinished JSON\n';
-  h.src.value = dirty;
-  h.fire(e.starters);
-  h.fire(e.gallery.children[0]);
-  assert.strictEqual(h.src.value, dirty);
-  assert.strictEqual(h.renders(), 0);
-  h.fire(e.gallery.children[1].children[2]); // cancel
-  assert.strictEqual(e.gallery.children.length, 1);
-  assert.strictEqual(h.src.value, dirty);
-  h.fire(e.gallery.children[0]);
-  h.src.value += 'newer edit';
-  h.fire(e.gallery.children[1].children[1]); // load & replace
-  assert.deepStrictEqual(JSON.parse(h.src.value), h.starter.spec);
-  h.fire(e['undo-builder']);
-  assert.strictEqual(h.src.value, dirty + 'newer edit');
-});
-
-test('gallery Escape dismisses confirmation and Ctrl/Cmd-Z undoes a starter load', () => {
-  for (const modifier of ['ctrlKey', 'metaKey']){
-    const h = galleryHarness(), e = h.elements;
-    h.src.value = TEXT + '\n';
-    h.fire(e.starters);
-    h.fire(e.gallery.children[0]);
-    h.fire(e.gallery, 'keydown', {key: 'Escape'});
-    assert.strictEqual(e.gallery.hidden, true);
-    assert.strictEqual(h.document.activeElement, e.starters);
-    h.fire(e.starters);
-    h.fire(e.gallery.children[0]);
-    h.fire(e.gallery.children[1].children[1]);
-    const ev = h.fire(h.src, 'keydown', {key: 'z', [modifier]: true});
-    assert.strictEqual(ev.defaultPrevented, true);
-    assert.strictEqual(h.src.value, TEXT + '\n');
-  }
-});
-
-test('ADD TO STEP blocks gallery toggle, cards and pending replacement controls', () => {
-  const h = galleryHarness(), e = h.elements;
-  h.src.value = 'unfinished';
-  h.fire(e.starters);
-  h.fire(e.gallery.children[0]);
-  const controls = [e.starters, e.gallery.children[0], ...e.gallery.children[1].children.slice(1)];
-  h.arm();
-  for (const control of controls){
-    assert.strictEqual(h.fire(control).defaultPrevented, true);
-    assert.strictEqual(h.src.value, 'unfinished');
-    assert.strictEqual(h.renders(), 0);
-  }
 });
 
 test('node presets cover distinct icons with legal icon and tint tokens', () => {
@@ -2161,6 +2020,7 @@ test('diffSpecTexts reports only the first unparseable side and otherwise return
 function diffWorkbench(storage = new Map(), options = {}){
   const listeners = new Map(), timers = new Map();
   let timerId = 0, observer;
+  const readers = [];
   function element(tag = 'div'){
     const events = new Map();
     return {tagName: tag.toUpperCase(), hidden: true, children: [], style: {}, attributes: {},
@@ -2192,17 +2052,19 @@ function diffWorkbench(storage = new Map(), options = {}){
     getComputedStyle(){ return {}; },
     setTimeout(fn){ timers.set(++timerId, fn); return timerId; }, clearTimeout(id){ timers.delete(id); },
     MutationObserver: class {constructor(fn){ observer = fn; } observe(){}},
-    FileReader: class {readAsText(file){ this.result = file.text; this.onload(); }},
+    FileReader: class {readAsText(file){ this.result = file.text; readers.push(this); if(!options.deferredFileRead)this.onload(); }},
     localStorage: {
       getItem(k){ if (options.storageThrows) throw Error('blocked'); return storage.get(k) || null; },
       setItem(k, v){ if (options.storageThrows) throw Error('blocked'); storage.set(k, v); },
       removeItem(k){ if (options.storageThrows) throw Error('blocked'); storage.delete(k); }
     }
   };
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/validator.js'), 'utf8'), sandbox);
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8'), sandbox);
   ids.src.value = JSON.stringify(diffFixture());
-  sandbox.initWorkbenchBuilder({view: element(), src: ids.src, render(){ observer(); }});
-  return {ids, storage, sandbox,
+  const builder = sandbox.initWorkbenchBuilder({view: element(), src: ids.src,
+    deferInitialSave: options.deferInitialSave, isActive:options.isActive, render(){ observer(); }});
+  return {ids, storage, sandbox, builder, readers,
     lines(){ return ids.diffbox.children.map(c => c.textContent); },
     diff(){ ids['spec-diff'].click(); return this.lines(); },
     flush(){ const fns = [...timers.values()]; timers.clear(); fns.forEach(fn => fn()); },
@@ -2264,6 +2126,85 @@ test('legacy draft recovery falls back visibly, discard keeps demo baseline, and
   assert.deepStrictEqual(blocked.diff(), ['no changes']);
   blocked.ids.src.fire('input'); blocked.flush();
   blocked.ids['file-save'].click();
+});
+
+test('welcome does not autosave a boot demo or replace an existing draft before a choice', () => {
+  const empty = diffWorkbench(new Map(), {deferInitialSave:true});
+  assert.strictEqual(empty.storage.has('dv-workbench-draft'), false);
+  assert.strictEqual(empty.builder.isProjectOpen(), false);
+  const saved = {text:'{ unfinished', at:123};
+  const storage = new Map([['dv-workbench-draft', JSON.stringify(saved)]]);
+  const w = diffWorkbench(storage, {deferInitialSave:true});
+  assert.deepStrictEqual(plain(w.builder.draft()), saved);
+  assert.deepStrictEqual(plain(w.builder.draftInfo()), {title:'Unfinished diagram',savedAt:123});
+  assert.strictEqual(storage.get('dv-workbench-draft'), JSON.stringify(saved));
+  assert.strictEqual(w.builder.restoreDraft(), true);
+  assert.strictEqual(w.ids.src.value, saved.text);
+  assert.strictEqual(w.builder.isProjectOpen(), true);
+  assert.strictEqual(w.builder.draft(), null);
+});
+
+test('welcome imports validate before mutation and preserve the pending draft in one undo', () => {
+  const saved = {text:'  { unfinished JSON\n', at:123};
+  const storage = new Map([['dv-workbench-draft', JSON.stringify(saved)]]);
+  const w = diffWorkbench(storage, {deferInitialSave:true});
+  const source = w.ids.src.value;
+  assert.throws(() => w.builder.loadText('{'), /JSON parse/);
+  const invalid = diffFixture(); invalid.page.blocks[0].diagram.rows = [['missing-node']];
+  assert.throws(() => w.builder.loadSpec(invalid), /missing-node/);
+  assert.strictEqual(w.ids.src.value, source);
+  assert.strictEqual(storage.get('dv-workbench-draft'), JSON.stringify(saved));
+  const text = JSON.stringify(diffFixture(), null, 4) + '\n';
+  w.builder.loadText(text);
+  assert.strictEqual(w.ids.src.value, text);
+  assert.strictEqual(w.ids.draftbar.hidden, true);
+  assert.deepStrictEqual(w.diff(), ['no changes']);
+  w.ids['undo-builder'].click();
+  assert.strictEqual(w.ids.src.value, saved.text);
+  w.ids['redo-builder'].click();
+  assert.strictEqual(w.ids.src.value, text);
+});
+
+test('superseded editor file reads cannot replace the project selected from welcome', () => {
+  const w = diffWorkbench(new Map(), {deferredFileRead:true});
+  const first = diffFixture(); first.page.title = 'Slow old file';
+  w.ids['file-input'].files = [{text:JSON.stringify(first)}];
+  w.ids['file-input'].fire('change');
+  w.builder.prepareWelcome();
+  const current = diffFixture(); current.page.title = 'New template';
+  w.builder.loadSpec(current);
+  const saved = w.storage.get('dv-workbench-draft');
+  w.readers[0].onload();w.readers[0].onerror();
+  assert.equal(JSON.parse(w.ids.src.value).page.title, 'New template');
+  assert.equal(w.storage.get('dv-workbench-draft'), saved);
+  assert.equal(w.ids.guide.hidden, true);
+});
+
+test('typing before first autosave is preserved by undo when a canonical response arrives', () => {
+  const saved = diffFixture(); saved.page.title = 'Saved old draft';
+  const w = diffWorkbench(new Map([['dv-workbench-draft',JSON.stringify({text:JSON.stringify(saved),at:1})]]), {deferInitialSave:true});
+  const typed = diffFixture(); typed.page.title = 'Typed while canonical link loads';
+  w.ids.src.value = JSON.stringify(typed); w.ids.src.fire('input');
+  const canonical = diffFixture(); canonical.page.title = 'Canonical response';
+  w.builder.loadSpec(canonical);
+  w.ids['undo-builder'].click();
+  assert.equal(w.ids.src.value, JSON.stringify(typed));
+});
+
+test('new projects and pasted JSON are exact, independent undoable replacements', () => {
+  const w = diffWorkbench(new Map(), {deferInitialSave:true});
+  const first = diffFixture(); first.page.title = 'First project';
+  const second = diffFixture(); second.page.title = 'Second project';
+  w.builder.loadSpec(first);
+  w.ids.src.value += '\n  ';
+  const firstText = w.ids.src.value;
+  w.builder.prepareWelcome();
+  w.builder.loadSpec(second);
+  assert.strictEqual(w.builder.isProjectOpen(), true);
+  w.ids['undo-builder'].click();
+  assert.strictEqual(w.ids.src.value, firstText);
+  w.ids['redo-builder'].click();
+  assert.strictEqual(JSON.parse(w.ids.src.value).page.title, 'Second project');
 });
 
 test('removed sections stay in their tab list across reordered tabs and page aliases', () => {

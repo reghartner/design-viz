@@ -1,7 +1,9 @@
 # Alternate paths on one diagram
 
-Use **starters… → alternate paths** in the workbench for a six-step happy
-path and a four-step **Dropped signal** path on the same command diagram.
+Use **Open file** with
+[`src/starters/alternate-paths.json`](../src/starters/alternate-paths.json)
+in the workbench for a six-step happy path and a four-step **Dropped signal**
+path on the same command diagram.
 The transport controls stay at the upper left. Below them, each path has a
 colored chip on the left and a row of aligned step numbers on the right. Both
 paths share steps 1–3. The alternate row shows all three as shadows at 35%

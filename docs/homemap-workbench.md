@@ -1,10 +1,14 @@
 # Homemap stories in the workbench
 
-Start with **starters… → home story** for a visitor-at-the-door scene with an internet-outage alternate.
-For temperature effects, choose **thermal protection**. It demonstrates heat,
-frost, charging pauses, unavailable video and recovery with two alternate paths.
-For the grounds around a house, choose **whole home & outdoors**. For a porch
-and entry separated by a working door, choose **across the front door**.
+Choose **Start new project → A connected home** from welcome for a
+visitor-at-the-door scene with an internet-outage alternate.
+For temperature effects, use **Open file** with
+[`docs/diagrams/thermal-doorbell/thermal-doorbell.spec.json`](diagrams/thermal-doorbell/thermal-doorbell.spec.json).
+It demonstrates heat, frost, charging pauses, unavailable video and recovery
+with two alternate paths. For the grounds around a house, open
+[`src/starters/whole-home-outdoors.json`](../src/starters/whole-home-outdoors.json).
+For a porch and entry separated by a working door, open
+[`src/starters/front-door-threshold.json`](../src/starters/front-door-threshold.json).
 
 ## Make the map the centerpiece
 

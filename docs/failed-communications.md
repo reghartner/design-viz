@@ -1,6 +1,8 @@
 # Failed communications
 
-Choose **starters… → alternate paths**, then step 4 on **Dropped signal**.
+Use **Open file** with
+[`src/starters/alternate-paths.json`](../src/starters/alternate-paths.json),
+then choose step 4 on **Dropped signal**.
 An orange packet travels partway from the broker toward the pump, stops at
 a visible break, and fades. The remaining route is dim and disconnected;
 the pump stays dim. The caption explicitly says **Dropped: Broker → Pump P-7**.

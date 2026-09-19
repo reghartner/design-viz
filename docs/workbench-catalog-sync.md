@@ -84,9 +84,10 @@ The workflow deliberately uses a bot/App identity for normal PR CI rather than
 depending on the default Actions token’s workflow-trigger behavior. See
 [GitHub’s trigger rules](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
 
-It runs hourly at minute 17, manually, or on a `flowview-catalog-changed`
-repository-dispatch event sent to the designs repository. A source-repository
-workflow can send that event after catalog/API changes merge; hourly runs also
+It runs daily at 8:17 a.m. America/New_York (including weekends), manually, or on
+a `flowview-catalog-changed` repository-dispatch event sent to the designs
+repository. A source-repository
+workflow can send that event after catalog/API changes merge; daily runs also
 catch changes without requiring modifications to every service workflow. Dispatch
 payloads never choose the checkout, host, files, or output path.
 

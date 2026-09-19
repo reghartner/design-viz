@@ -21,10 +21,11 @@ const ROOT = path.join(__dirname, '..');
 
 function loadCore(){
   const code =
+    fs.readFileSync(path.join(ROOT, 'src', 'compatibility.js'), 'utf8') + '\n' +
     fs.readFileSync(path.join(ROOT, 'src', 'canon.js'), 'utf8') + '\n' +
     fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
     fs.readFileSync(path.join(ROOT, 'src', 'engine.js'), 'utf8') + '\n' +
-    ';__exports = {normalize, validate, lintPage};';
+    ';__exports = {normalize, validate, lintPage, compatibility:FlowviewCompatibility};';
   const sandbox = {console, URL};
   vm.runInNewContext(code, sandbox);
   return sandbox.__exports;
@@ -53,6 +54,8 @@ function main(argv){
     }
     const page = C.normalize(raw);
     const v = C.validate(page);
+    for (const message of C.compatibility.check(raw).messages)
+      if (!quiet) console.log(file + ': compatibility: ' + message);
     const lint = v.errors.length ? [] : C.lintPage(page);
     for (const e of v.errors) console.log(file + ': ERROR ' + e);
     if (!quiet){

@@ -7,6 +7,7 @@ import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {InlineFlowview} from '../src/InlineFlowview';
 import {createSpecLoader,type AssociatedDiagram} from '../src/api';
 import {viewerDocument,viewerScriptCsp} from '../src/generated/viewerDocument';
+import {FlowviewCompatibility} from '../src/generated/compatibility';
 const diagram:AssociatedDiagram={id:'doorbell',revision:'r1',title:'Doorbell',kind:'canonical',owner:'group:default/home',viewerUrl:'https://flows.test/view',editUrl:'https://flows.test/edit',sections:[]};
 const spec={page:{canon:{id:'doorbell'},title:'</script><img src="https://untrusted.test/">'}};
 class Channel {
@@ -17,6 +18,32 @@ class Channel {
 }
 beforeEach(()=>{Channel.all=[];vi.stubGlobal('MessageChannel',Channel);});
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.useRealTimers();});
+it('warns before rendering a newer spec, lists unavailable features, and preserves the original spec',async()=>{
+  const future={...spec,page:{...spec.page,contract:'1',flowview:{minVersion:'9.0.0',features:['panel.future']}}};
+  const load=vi.fn().mockResolvedValue(future);
+  render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
+  const notice=await screen.findByRole('alert',{name:'Flowview compatibility'});
+  expect(notice.textContent).toContain('9.0.0');expect(notice.textContent).toContain(FlowviewCompatibility.version);
+  expect(notice.textContent).toContain('panel.future');expect(notice.textContent).toContain('Backstage administrator');
+  const frame=await screen.findByTitle('Flowview: Doorbell') as HTMLIFrameElement;
+  const post=vi.spyOn(frame.contentWindow!,'postMessage');fireEvent.load(frame);
+  expect(post).toHaveBeenCalledWith({type:'flowview:init',spec:future,target:undefined},'*',[Channel.all.at(-1)!.port2]);
+  act(()=>Channel.all.at(-1)!.port1.onmessage?.({data:{type:'error',message:'Unknown future panel'}} as MessageEvent));
+  expect(screen.getByRole('alert',{name:'Flowview compatibility'})).toBeTruthy();
+});
+it('blocks an unsupported spec contract with an upgrade message and clears it on a different diagram',async()=>{
+  const load=vi.fn().mockResolvedValueOnce({page:{...spec.page,contract:'2'}}).mockResolvedValue(spec);
+  const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
+  expect((await screen.findByRole('alert',{name:'Flowview compatibility'})).textContent).toContain('upgrade required');
+  expect(screen.queryByTitle('Flowview: Doorbell')).toBeNull();
+  view.rerender(<InlineFlowview diagram={{...diagram,revision:'r2'}} loadSpec={load}/>);
+  await screen.findByTitle('Flowview: Doorbell');expect(screen.queryByRole('alert',{name:'Flowview compatibility'})).toBeNull();
+});
+it('does not warn just because a compatible spec was authored in a newer editor',async()=>{
+  const load=vi.fn().mockResolvedValue({page:{...spec.page,contract:'1',flowview:{authoredWith:'9.0.0',minVersion:FlowviewCompatibility.version}}});
+  render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
+  await screen.findByTitle('Flowview: Doorbell');expect(screen.queryByRole('alert',{name:'Flowview compatibility'})).toBeNull();
+});
 it('passes data through the private channel and preserves sandbox isolation with no external assets',async()=>{
   const load=vi.fn().mockResolvedValue(spec);
   const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);

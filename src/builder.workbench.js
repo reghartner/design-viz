@@ -3254,10 +3254,11 @@ function initWorkbenchBuilder(opts){
   }
   if (saveBtn){
     saveBtn.addEventListener('click', function(){
-      /* saves the editor text as-is — un-renderable work is still work */
+      /* Stamp the downloaded snapshot; preserve the live source and unfinished JSON. */
       var parsed = parseEditor();
       var name = specFileName(parsed.error ? null : parsed.raw);
-      var blob = new Blob([src.value], {type: 'application/json'});
+      var savedText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(src.value) : src.value;
+      var blob = new Blob([savedText], {type: 'application/json'});
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url; a.download = name;
@@ -3325,7 +3326,9 @@ function initWorkbenchBuilder(opts){
   var confluenceClose = document.getElementById('confluence-close');
   var confluenceCopyRun = 0;
   function confluenceHandoff(copy){
-    var run = ++confluenceCopyRun, built = buildConfluenceExport(src.value);
+    var run = ++confluenceCopyRun;
+    var handoffText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(src.value) : src.value;
+    var built = buildConfluenceExport(handoffText);
     if (built.error){
       if (confluenceBox) confluenceBox.hidden = true;
       inspectorMessage('Confluence export: ' + built.error); return;
@@ -3363,6 +3366,7 @@ function initWorkbenchBuilder(opts){
   if (exportBtn) exportBtn.addEventListener('click', function(){
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage('export needs valid JSON — ' + parsed.error); return; }
+    var exportText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(src.value) : src.value;
     var jsonName = specFileName(parsed.raw);
     var htmlName = jsonName.replace(/\.spec\.json$/, '') + '.html';
     /* the folder picker needs the click's transient activation, which a
@@ -3372,9 +3376,9 @@ function initWorkbenchBuilder(opts){
       window.showDirectoryPicker({mode: 'readwrite'}).then(function(dir){
         fetchExportTemplate(function(err, tplText){
           if (err){ inspectorMessage(err); return; }
-          var built = buildExportHtml(tplText, src.value.trim());
+          var built = buildExportHtml(tplText, exportText.trim());
           if (built.error){ inspectorMessage(built.error); return; }
-          writeIntoDirectory(dir, jsonName, src.value)
+          writeIntoDirectory(dir, jsonName, exportText)
             .then(function(){ return writeIntoDirectory(dir, htmlName, built.html); })
             .then(function(){ inspectorMessage('exported ' + jsonName + ' and ' + htmlName + ' (overwritten in place)'); })
             ['catch'](function(ex){
@@ -3389,9 +3393,9 @@ function initWorkbenchBuilder(opts){
       /* no folder picker in this browser: plain downloads instead */
       fetchExportTemplate(function(err, tplText){
         if (err){ inspectorMessage(err); return; }
-        var built = buildExportHtml(tplText, src.value.trim());
+        var built = buildExportHtml(tplText, exportText.trim());
         if (built.error){ inspectorMessage(built.error); return; }
-        downloadTextFile(jsonName, src.value, 'application/json');
+        downloadTextFile(jsonName, exportText, 'application/json');
         downloadTextFile(htmlName, built.html, 'text/html');
         inspectorMessage('no folder picker here — downloaded ' + jsonName + ' and ' + htmlName);
       });

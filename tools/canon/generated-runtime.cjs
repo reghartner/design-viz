@@ -1,5 +1,129 @@
 // GENERATED FILE — python3 tools/build.py; edit src/, not this file.
 'use strict';
+/* ---- src/compatibility.js ---- */
+/* Release identity and compatibility are independent of the spec's revision.
+   Fork maintainers bump version on releases and register each new capability
+   with its first release. 0.1.0 is the compatibility-aware baseline, not a
+   claim about which historical release introduced the existing features. */
+var FlowviewCompatibility = (function(){
+  'use strict';
+  var version = '0.1.0', contract = '1', baseline = '0.1.0';
+  var features = Object.create(null);
+  var panelLabels = {
+    state:'State', leds:'LEDs', gauge:'Gauge', log:'Log', screen:'Camera screen',
+    image:'Embedded image', waterfall:'Waterfall', orbit:'Orbit', zoneframe:'Zone frame',
+    xray:'Device internals', queue:'Queue', pir:'Motion sensor', thermo:'Temperature',
+    battery:'Battery', buffer:'Buffer', radar:'Radar', homemap:'Home map', signal:'Signal',
+    tiles:'Tiles', inflight:'In-flight activity', phone:'Phone', deviceapp:'Camera app',
+    timeline:'Timeline', table:'Table', checks:'Checks', budget:'Budget', trace:'Trace', replicas:'Replicas'
+  };
+  Object.keys(panelLabels).forEach(function(type){features['panel.'+type]={label:panelLabels[type]+' panel',since:baseline};});
+  var extraLabels={ 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
+    'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
+    'layout.step-subsets':'View-specific step stops' };
+  Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
+  // Register future capabilities here with their actual first release, e.g.
+  // features['panel.example']={label:'Example panel',since:'1.2.0'};
+  function object(v){return !!v && typeof v==='object' && !Array.isArray(v);}
+  function pageOf(raw){return object(raw) && object(raw.page) ? raw.page : raw;}
+  function parseVersion(value){
+    if(typeof value!=='string')return null;
+    var m=/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(value);
+    if(!m)return null;
+    var pre=m[4] ? m[4].split('.') : [];
+    if(pre.some(function(v){return /^\d+$/.test(v) && v.length>1 && v[0]==='0';}))return null;
+    return {core:m.slice(1,4),pre:pre};
+  }
+  function numeric(a,b){return a.length!==b.length ? (a.length>b.length?1:-1) : a===b?0:a>b?1:-1;}
+  function compare(a,b){
+    a=parseVersion(a);b=parseVersion(b);if(!a || !b)return null;
+    for(var i=0;i<3;i++){var n=numeric(a.core[i],b.core[i]);if(n)return n;}
+    if(!a.pre.length || !b.pre.length)return a.pre.length===b.pre.length?0:a.pre.length?-1:1;
+    for(var j=0;j<Math.max(a.pre.length,b.pre.length);j++){
+      var x=a.pre[j],y=b.pre[j];if(x===y)continue;if(x==null)return -1;if(y==null)return 1;
+      var xn=/^\d+$/.test(x),yn=/^\d+$/.test(y);
+      if(xn && yn)return numeric(x,y);if(xn!==yn)return xn?-1:1;return x>y?1:-1;
+    }
+    return 0;
+  }
+  function detect(raw){
+    var page=pageOf(raw),used=Object.create(null);
+    function diagram(d){
+      if(!object(d))return;
+      (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){if(p && typeof p.type==='string')used['panel.'+p.type]=true;});
+      if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
+      if(d.sectionLayout)used['layout.arranged']=true;
+      if(Array.isArray(d.layouts) && d.layouts.length){
+        used['layout.named']=true;
+        if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;
+      }
+    }
+    if(!object(page))return [];
+    if(page.nodes && page.rows)diagram(page);
+    var blocks=page.blocks || page.sections;
+    (Array.isArray(blocks)?blocks:[]).forEach(function(b){
+      if(!object(b))return;
+      diagram(b.diagram);
+      (Array.isArray(b.tabs)?b.tabs:[]).forEach(function(t){
+        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){diagram(s && s.diagram);});
+      });
+    });
+    return Object.keys(used).sort();
+  }
+  function metadataWarnings(raw){
+    var p=pageOf(raw),m=p && p.flowview,out=[];
+    if(m==null)return out;
+    if(!object(m))return ['page.flowview: expected {authoredWith?, minVersion?, features?}'];
+    ['authoredWith','minVersion'].forEach(function(k){if(m[k]!=null && !parseVersion(m[k]))out.push('page.flowview.'+k+': expected a semantic version such as 1.2.3');});
+    if(m.features!=null && (!Array.isArray(m.features) || m.features.some(function(id){return typeof id!=='string' || !/^[a-z][a-z0-9.-]*$/.test(id);})))
+      out.push('page.flowview.features: expected feature IDs such as panel.homemap');
+    return out;
+  }
+  function check(raw,runtime){
+    runtime=runtime || {version:version,contract:contract,features:features};
+    var p=pageOf(raw),m=p && object(p.flowview)?p.flowview:{},issues=metadataWarnings(raw);
+    var required=detect(raw);
+    (Array.isArray(m.features)?m.features:[]).forEach(function(id){if(typeof id==='string' && required.indexOf(id)<0)required.push(id);});
+    var supported=runtime.features || {},missing=required.filter(function(id){return !Object.prototype.hasOwnProperty.call(supported,id);});
+    var minimum=parseVersion(m.minVersion)?m.minVersion:null;
+    required.forEach(function(id){var f=features[id];if(f && (!minimum || compare(f.since,minimum)>0))minimum=f.since;});
+    var tooOld=minimum!=null && compare(runtime.version,minimum)<0;
+    var schemaMismatch=p && p.contract!=null && String(p.contract).split('.')[0]!==runtime.contract;
+    var labels=missing.map(function(id){return features[id]?features[id].label:id;});
+    var messages=[];
+    if(schemaMismatch)messages.push('This diagram uses spec contract '+String(p.contract)+'. This viewer supports contract '+runtime.contract+'. Upgrade Flowview before relying on this diagram.');
+    if(tooOld)messages.push('This diagram requires Flowview '+minimum+' or newer. This viewer uses '+runtime.version+'. Some features may be unavailable or displayed incorrectly until Flowview is upgraded.');
+    if(labels.length)messages.push('Unavailable features: '+labels.join(', ')+'. Upgrade the installed Flowview renderer for the complete diagram.');
+    if(issues.length)messages.push('The diagram has invalid compatibility metadata; compatibility cannot be confirmed. '+issues.join(' '));
+    return {runtimeVersion:runtime.version,minVersion:minimum,missingFeatures:missing,messages:messages,
+      status:schemaMismatch?'unsupported':messages.length?'partial':p && p.flowview?'compatible':'unversioned'};
+  }
+  function stamp(raw){
+    var copy=JSON.parse(JSON.stringify(raw)),p=pageOf(copy);
+    if(!object(p) || metadataWarnings(copy).length)return copy;
+    if(p.nodes && p.rows){copy={page:{sections:[{diagram:p}]}};p=copy.page;}
+    var m=object(p.flowview)?p.flowview:{},required=detect(copy);
+    (m.features || []).forEach(function(id){if(required.indexOf(id)<0)required.push(id);});
+    var minimum=m.minVersion || baseline;
+    required.forEach(function(id){var f=features[id];if(f && compare(f.since,minimum)>0)minimum=f.since;});
+    p.flowview=Object.assign(Object.create(null),m,{authoredWith:version,minVersion:minimum,features:required.sort()});
+    if(p.contract==null)p.contract=contract;
+    return copy;
+  }
+  function stampText(text){
+    try{
+      var raw=JSON.parse(text,function(key,value){
+        if(typeof value==='number' && !Number.isFinite(value))throw new Error('Preserve overflowing numeric input.');
+        return value;
+      });
+      return JSON.stringify(stamp(raw),null,2).replace(/</g,'\\u003c');
+    }
+    catch(ex){return text;} // Saving unfinished JSON must remain possible.
+  }
+  return {version:version,contract:contract,features:features,compare:compare,detect:detect,
+    metadataWarnings:metadataWarnings,check:check,stamp:stamp,stampText:stampText};
+})();
 /* ---- src/canon.js ---- */
 /* Portable, data-only catalog/code evidence. No credentials or network access.
    Also loaded by the Node scanners and the simulated company portal. */
@@ -1887,6 +2011,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
 function validate(page){
   var errors = [], warnings = [];
   if (!page){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
+  if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   var blocks = blocksOf(page);
   if (!blocks.length){
@@ -2286,6 +2411,7 @@ function lintPage(page){
   return warnings;
 }
 module.exports = FlowCanon;
+module.exports.compatibility = FlowviewCompatibility;
 module.exports.validateSpec = raw => validate(normalize(raw));
 var viewerRoutingCache;
 module.exports.viewerRouting = () => {
@@ -7697,6 +7823,15 @@ function renderPage(view, page, skin, backlinks, options){
   var renderSkin = skinBase(skin);
   view.className = 'docview ' + skinClasses(skin).join(' ');
   view.innerHTML = '';
+  if (typeof FlowviewCompatibility !== 'undefined' && !(options && options.compatibilityNotice === false)){
+    var compatibility = FlowviewCompatibility.check(page);
+    if (compatibility.messages.length){
+      var notice = document.createElement('aside');
+      notice.className = 'flowview-compatibility'; notice.setAttribute('role','alert');
+      notice.textContent = compatibility.messages.join(' ');
+      view.appendChild(notice);
+    }
+  }
   if (page.title){
     var h = document.createElement('h2');
     h.className = 'doc-title'; h.textContent = page.title;

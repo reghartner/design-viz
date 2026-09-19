@@ -4551,3 +4551,5 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
   .section-layout-tile .pimage{height:auto;}
   .section-layout-tile .pimage img{flex:none;height:auto;max-height:560px;}
 }
+/* Host-independent compatibility notice; text is supplied through textContent. */
+.docview .flowview-compatibility{padding:14px 18px;margin:0 0 18px;border:1px solid #b7791f;border-radius:8px;background:#fff5d6;color:#59400a;font:14px/1.5 sans-serif;}

@@ -69,7 +69,7 @@
       if(result.errors.length) throw new Error(result.errors.join('\n'));
       var skin=SKIN_NAMES.indexOf(page.skin)>=0 ? page.skin : DEFAULT_SKIN;
       applySkinClasses(document.body,view,skin);
-      controller=renderPage(view,page,skin,{}, {autoplay:false,layoutTarget:'backstage'});
+      controller=renderPage(view,page,skin,{}, {autoplay:false,layoutTarget:'backstage',compatibilityNotice:false});
       controller.onChange=function(){protectLinks();size();};
       protectLinks();
       if(event.data.target)navigate(event.data.target);

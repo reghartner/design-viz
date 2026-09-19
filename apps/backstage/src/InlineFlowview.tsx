@@ -1,12 +1,14 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import type {AssociatedDiagram,SpecLoader} from './api';
 import {viewerDocument} from './generated/viewerDocument';
+import {FlowviewCompatibility} from './generated/compatibility';
 
 export interface ViewerTarget {section:string;path?:string;step?:string;request?:number}
 export function InlineFlowview({diagram,loadSpec,target}:{diagram:AssociatedDiagram;loadSpec:SpecLoader;target?:ViewerTarget}){
   const [attempt,setAttempt]=useState(0),[state,setState]=useState<{spec?:unknown;error?:string;loading:boolean}>({loading:true});
   const [height,setHeight]=useState(640),[renderError,setRenderError]=useState(''),[rendered,setRendered]=useState(false);
   const iframe=useRef<HTMLIFrameElement>(null),channel=useRef<MessageChannel>(),timer=useRef<ReturnType<typeof setTimeout>>();
+  const compatibility=state.spec===undefined?undefined:FlowviewCompatibility.check(state.spec);
   const targetRef=useRef(target);targetRef.current=target;
   const disconnect=useCallback(()=>{clearTimeout(timer.current);channel.current?.port1.close();channel.current?.port2.close();channel.current=undefined;},[]);
   useEffect(()=>{
@@ -46,7 +48,13 @@ export function InlineFlowview({diagram,loadSpec,target}:{diagram:AssociatedDiag
   return <div aria-label="Inline diagram viewer">
     {state.loading && <p role="status">Loading diagram…</p>}
     {(state.error || renderError) && <div role="alert"><p>{state.error || renderError}</p><button onClick={()=>setAttempt(value=>value+1)}>Retry diagram</button></div>}
-    {state.spec!==undefined && <>
+    {compatibility && compatibility.messages.length>0 && <aside role="alert" aria-label="Flowview compatibility"
+      style={{padding:16,marginBottom:16,border:'1px solid #b7791f',borderRadius:8,background:'#fff5d6',color:'#59400a'}}>
+      <strong>{compatibility.status==='unsupported'?'Flowview upgrade required':'This diagram may be incomplete'}</strong>
+      {compatibility.messages.map(message=><p key={message}>{message}</p>)}
+      <p>Backstage has Flowview {compatibility.runtimeVersion}. Contact your Backstage administrator to upgrade Flowview.</p>
+    </aside>}
+    {state.spec!==undefined && compatibility?.status!=='unsupported' && <>
       {!rendered && !renderError && <p role="status">Starting diagram viewer…</p>}
       <iframe ref={iframe} key={attempt} title={'Flowview: '+diagram.title} srcDoc={viewerDocument} onLoad={connect}
         sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer"

@@ -101,6 +101,7 @@ Do not copy its latency, topology, notification, or outcome without evidence.
 | Queue/buffer, retry, replicas, rollout, or other state | Matching recipe in `cookbook/README.md` and widget docs |
 | Honeycomb import or measured service timing | `docs/trace-import.md` |
 | Backstage/catalog/code bindings, canon or incident overlay | [Integrations](references/integrations.md) → company evidence |
+| Renderer release requirements or a newer spec in an older Backstage deployment | `docs/runtime-compatibility.md` |
 | Confluence export | [Integrations](references/integrations.md) → Confluence |
 | Named views, selected playback stops, attached/detached controls or host arrangements | `docs/section-layouts.md` |
 | Small screenshots or illustrations inside a diagram | `cookbook/embedded-images.md` and image widget docs |
@@ -124,8 +125,11 @@ does not arrive; `blocked` is not sent. HTTP 500 is a received error response.
 Failure marks are step-local; panel and tone patches carry forward.
 
 Keep layout stable between beats. Open guided stories paused (`view:"step"`);
-set `autoplay:true` only when requested. Current features require a current
-renderer, not a made-up schema-version field.
+set `autoplay:true` only when requested. Before publishing, stamp the spec with
+`node <VIZ>/tools/compatibility.js --stamp <spec.json> > <versioned.spec.json>`
+and use the successful output as the final spec. Input/output must be different
+files. This derives `page.flowview` requirements and preserves declared future
+requirements; do not invent or lower minimum versions to silence an upgrade notice.
 “Animated” does not request automatic step advancement: motion inside a paused
 step still runs. Do not copy an example's autoplay setting into a guided story.
 

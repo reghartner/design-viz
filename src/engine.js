@@ -5399,6 +5399,15 @@ function renderPage(view, page, skin, backlinks, options){
   var renderSkin = skinBase(skin);
   view.className = 'docview ' + skinClasses(skin).join(' ');
   view.innerHTML = '';
+  if (typeof FlowviewCompatibility !== 'undefined' && !(options && options.compatibilityNotice === false)){
+    var compatibility = FlowviewCompatibility.check(page);
+    if (compatibility.messages.length){
+      var notice = document.createElement('aside');
+      notice.className = 'flowview-compatibility'; notice.setAttribute('role','alert');
+      notice.textContent = compatibility.messages.join(' ');
+      view.appendChild(notice);
+    }
+  }
   if (page.title){
     var h = document.createElement('h2');
     h.className = 'doc-title'; h.textContent = page.title;

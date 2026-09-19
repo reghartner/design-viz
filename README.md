@@ -193,6 +193,12 @@ python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json \
 
 ## Using this repo as a tool from another project
 
+Company forks can publish internal engine releases, with the designs repo and
+Backstage pinning releases independently. [Spec/runtime compatibility](docs/runtime-compatibility.md)
+records the minimum renderer and required features, with upgrade notices in the
+viewer. Workbench Save/Export stamps metadata; agents can use
+`node tools/compatibility.js --stamp input.spec.json > versioned.spec.json`.
+
 This repo is designed to be pulled in (cloned or vendored) and driven from a
 consuming project. An agent converting a design document follows the full
 runbook at `.claude/skills/hld-to-page/SKILL.md` — it establishes three

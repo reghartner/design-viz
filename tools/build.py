@@ -14,6 +14,8 @@ import json
 import base64
 import pathlib
 import sys
+import subprocess
+from functools import lru_cache
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
@@ -59,8 +61,20 @@ def js_bundle(*names: str) -> str:
     parts = []
     for n in [file for name in names for file in source_files(name)]:
         parts.append("/* ---- src/" + n + " ---- */")
-        parts.append(read(n).rstrip())
+        source = read(n).rstrip()
+        if n == 'compatibility.js':
+            source = source.replace('/* @panel-features */ {}', json.dumps(panel_assets()['features'], separators=(',', ':')))
+        parts.append(source)
     return "\n".join(parts)
+
+
+@lru_cache(maxsize=1)
+def panel_assets() -> dict:
+    return json.loads(subprocess.check_output(['node', str(ROOT / 'tools/source-loader.cjs'), '--assets'], text=True))
+
+
+def panel_css(name: str) -> str:
+    return subprocess.check_output(['node', str(ROOT / 'tools/source-loader.cjs'), '--styles', name], text=True)
 
 
 def canon_runtime() -> str:
@@ -113,7 +127,7 @@ def fill(skel: str, mapping: dict) -> str:
 
 def main() -> int:
     icons = read("icons.svg").rstrip()
-    core_css = read("style.core.css").rstrip()
+    core_css = panel_css("style.core.css").rstrip()
 
     flowview = fill(read("flowview.skel.html"), {
         "STYLE_PAGE": font_css() + "\n" + read("style.flowview.css").rstrip(),
@@ -125,7 +139,7 @@ def main() -> int:
     (ROOT / "template" / "flowview.html").write_text(flowview)
 
     workbench = fill(read("workbench.skel.html"), {
-        "STYLE_PAGE": font_css() + "\n" + read("style.workbench.css").rstrip(),
+        "STYLE_PAGE": font_css() + "\n" + panel_css("style.workbench.css").rstrip(),
         "STYLE_CORE": core_css,
         "ICONS": icons,
         "JS": js_bundle("compatibility.js", "canon.js", "validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "panel-picker.workbench.js", "clipboard.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "layout.workbench.js", "canon.workbench.js", "welcome.workbench.js", "boot.workbench.js"),

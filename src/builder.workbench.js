@@ -1,3 +1,24 @@
+/* Registry-backed compatibility views. No editor caches a list of panel types. */
+function panelAuthoring(type){
+  var definition = PanelRegistry.get(type);
+  return definition && definition.authoring || {};
+}
+function panelAuthoringMap(key){
+  return new Proxy(Object.create(null), {
+    get:function(_,type){return panelAuthoring(type)[key];},
+    ownKeys:function(){return PanelRegistry.types().filter(function(type){return Object.prototype.hasOwnProperty.call(panelAuthoring(type),key);});},
+    getOwnPropertyDescriptor:function(_,type){
+      var value=panelAuthoring(type)[key];
+      return value === undefined ? undefined : {configurable:true,enumerable:true,value:value};
+    }
+  });
+}
+function panelAuthoringCatalog(){
+  return PanelRegistry.types().filter(function(type){return !!panelAuthoring(type).picker;}).map(function(type){
+    return Object.assign({type:type},panelAuthoring(type).picker);
+  }).sort(function(a,b){return (a.order || 0)-(b.order || 0) || a.type.localeCompare(b.type);});
+}
+
 /* builder.workbench.js — workbench builder: click a rendered element to jump
    to its definition in the spec editor (with per-element authoring guidance),
    and insert ready-made node/edge/step/panel/section snippets.
@@ -840,7 +861,8 @@ function planRenameNode(text, raw, sectionIdx, oldId, newId){
     var nodes = Object.create(null);
     Object.keys(d.nodes).forEach(function(k){ nodes[k === oldId ? newId : k] = d.nodes[k]; });
     d.nodes = nodes;
-    (d.panels || []).forEach(function(p){if(p && p.type==='deviceapp')(Array.isArray(p.sources)?p.sources:[]).forEach(function(s){if(s && s.node===oldId)s.node=newId;});});
+    var panelNodes=Object.create(null);panelNodes[oldId]=newId;
+    (d.panels || []).forEach(function(p){panelRemapReferences(p,'nodes',panelNodes);});
     d.rows = (d.rows || []).map(function(row){
       return row.map(function(slot){
         if (Array.isArray(slot)) return slot.map(function(s){ return s === oldId ? newId : s; });
@@ -906,7 +928,8 @@ function planDeleteNode(text, raw, sectionIdx, id){
     return {error: 'node "' + id + '" not found'};
   return builderRewrite(text, raw, got.path, function(d){
     delete d.nodes[id];
-    (d.panels || []).forEach(function(p){if(p && p.type==='deviceapp')(Array.isArray(p.sources)?p.sources:[]).forEach(function(s){if(s && s.node===id)delete s.node;});});
+    var panelNodes=Object.create(null);panelNodes[id]=null;
+    (d.panels || []).forEach(function(p){panelRemapReferences(p,'nodes',panelNodes);});
     d.rows = (d.rows || []).map(function(row){
       return row.map(function(slot){
         return Array.isArray(slot) ? slot.filter(function(s){ return s !== id; }) : slot;
@@ -1286,64 +1309,7 @@ var NODE_PRESETS = [
   {icon: 'phone',    tint: 'dev',  title: 'Phone'}
 ];
 
-var PANEL_TEMPLATES = {
-  deviceapp: {title:'Camera app · data sources',device:'Front door camera',subtitle:'Device health',
-    sources:[{id:'telemetry',label:'Device telemetry',detail:'Battery and charging reports'},{id:'registry',label:'Device registry',detail:'Camera configuration'}],
-    fields:[{id:'battery',label:'Battery',kind:'battery',source:'telemetry'},
-      {id:'power',label:'Charging source',source:'telemetry'},
-      {id:'model',label:'Camera model',icon:'camera',source:'registry'},
-      {id:'firmware',label:'Firmware',icon:'chip',source:'registry'}],
-    initial:{battery:{value:68,status:'ready'},power:{value:'Solar panel',status:'ready'},
-      model:{value:'Doorbell camera',status:'ready'},firmware:{value:'v2.4.1',status:'ready'},note:'Illustrative values. Select a field to see its source.'}},
-  image:     {title:'Reference image',alt:'Embedded reference image'},
-  replicas:  {title:'Replica positions',unit:'records',replicas:[{id:'primary',label:'Primary'},{id:'follower',label:'Follower'}],
-              initial:{reference:{series:'example/log-a',position:104},replicas:{
-                primary:{series:'example/log-a',position:104,role:'primary',status:'online',lagMs:0,observedAt:'example t=0'},
-                follower:{series:'example/log-a',position:101,role:'follower',status:'online',lagMs:null,observedAt:'example t=0'}},
-                note:'Fictional positions. Replace with evidence; report lag independently.'}},
-  trace:     {title:'Inside the service',spans:[
-              {id:'request',service:'api',name:'handle request',startMs:0,ms:100},
-              {id:'parse',parentId:'request',service:'api',name:'parse input',startMs:5,ms:20},
-              {id:'query',parentId:'request',service:'database',name:'query',startMs:30,ms:50}],initial:{selected:'request'}},
-  table:     {title: 'Data state', columns: [{id: 'key', label: 'Key'}, {id: 'value', label: 'Value'}],
-              initial: {rows: [{id: 'item', cells: {key: 'order.status', value: 'pending'}, status: 'added'}]}},
-  checks:    {title: 'Decision checks', checks: [{id: 'auth', label: 'Authorized'}, {id: 'unique', label: 'Idempotency key is new'}],
-              initial: {results: {auth: {status: 'pending'}, unique: {status: 'pending'}}}},
-  budget:    {title: 'Resource budgets', metrics: [{id: 'latency', label: 'Latency', unit: 'ms', max: 300, warn: 240}],
-              initial: {values: {latency: null}, note: 'Example limit — replace with the design’s target.'}},
-  state:     {title: 'Device state', states: ['OFF', 'BOOT', 'LIVE'], initial: {state: 'OFF'}},
-  leds:      {title: 'Indicators', leds: [{id: 'power', label: 'PWR'}, {id: 'radio', label: 'RADIO'}],
-              initial: {power: 'on'}},
-  gauge:     {title: 'Draw', unit: 'mA', max: 400, initial: {value: 12}},
-  log:       {title: 'Event log', tags: {NET: '#38E1FF'}, initial: {log: [{tag: 'NET', text: 'panel added'}]}},
-  screen:    {title: 'Camera', scene: 'static-noise', initial: {mode: 'off'}},
-  waterfall: {title: 'Latency budget', spans: [{id: 'net', label: 'network', ms: 40},
-              {id: 'work', label: 'processing', ms: 120}]},
-  orbit:     {title: 'Lifecycle', states: ['IDLE', 'ACTIVE', 'DONE'], initial: {state: 'IDLE'}},
-  zoneframe: {title: 'Zones', zones: [{id: 'porch', points: [[20, 40], [150, 40], [150, 160], [20, 160]]}]},
-  xray:      {title: 'Layers', layers: [{id: 'case', label: 'Case', holder: true},
-              {id: 'board', label: 'Board'}]},
-  queue:     {title: 'Queue', initial: {state: 'empty'}},
-  pir:       {title: 'Motion cone'},
-  thermo:    {title: 'Temperature', min: 0, max: 100, warn: 60, crit: 85, initial: {value: 21}},
-  battery:   {title: 'Battery', low: 30, crit: 10, initial: {charge: 80}},
-  buffer:    {title: 'Buffer', initial: {}},
-  radar:     {title: 'Radar'},
-  homemap:   {title: 'Home', outline: {w: 300, h: 164}, devices: [
-              {id: 'cam1', kind: 'camera', label: 'Porch cam', x: 46, y: 40, facing: 35, spread: 80, range: 70},
-              {id: 'cam2', kind: 'camera', label: 'Yard cam', x: 274, y: 40, facing: 145, spread: 80, range: 70},
-              {id: 'door', kind: 'entry', label: 'Front door', x: 160, y: 158},
-              {id: 'attic', kind: 'sensor', label: 'Attic temp', icon: 'thermo', x: 46, y: 132},
-              {id: 'hub', kind: 'hub', label: 'Hub', x: 160, y: 92}],
-              subjects: [{id: 'walker', label: 'Visitor', x: 20, y: 150}],
-              initial: {cam1: 'scan', cam2: 'sleep', door: 'closed', attic: 'ok', hub: 'idle'}},
-  signal:    {title: 'Links', links: [{id: 'up', label: 'uplink', transport: 'wifi'}]},
-  tiles:     {title: 'Fleet', tiles: [{id: 't1', label: 'UNIT 1'}, {id: 't2', label: 'UNIT 2'}]},
-  inflight:  {title: 'In flight', lanes: [{id: 'op', label: 'operation'}]},
-  phone:     {title: 'Phone', initial: {clock: '9:41'}},
-  timeline:  {title: 'Heartbeat', span: '6h', cadence: {every: '30m', label: 'heartbeat'},
-              initial: {now: '0m'}}
-};
+var PANEL_TEMPLATES = panelAuthoringMap('template');
 
 /* ---------------- pass 3: direct-manipulation planners ---------------- */
 
@@ -2262,153 +2228,6 @@ function planPrimaryPanel(text, raw, sectionIdx, panelId){
   });
 }
 
-/* Layout selection must remain available even when a diagram has a stepper. */
-function builderHomemapClickTarget(element, getStepper, currentTarget){
-  var card = element.closest && element.closest('.pt-homemap[data-dv-panel]');
-  var section = card && card.closest('.doc-sec[data-dv-section]');
-  if (!section) return null;
-  var explicitLayout = element.closest('[data-home-layout]');
-  if (!explicitLayout && element.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
-  var ordinal = Number(section.getAttribute('data-dv-section')), index = Number(card.getAttribute('data-dv-panel'));
-  if (!Number.isInteger(ordinal) || !Number.isInteger(index)) return null;
-  var player = getStepper(ordinal);
-  var editingLayout = currentTarget && currentTarget.kind === 'panel' && currentTarget.section === ordinal && currentTarget.index === index;
-  var marker = element.closest('[data-device], [data-subject], [data-home-room]');
-  if (!explicitLayout && !editingLayout && marker && player && player.mode() === 'step')
-    return {section:ordinal, kind:'step', index:player.sourceIndex()};
-  return {section:ordinal, kind:'panel', index:index, el:card};
-}
-
-/* Read both snapshots through the engine, following the selected branch.
-   Removing one authored key restores its inherited value, never a copied
-   snapshot that would freeze unrelated devices or people. */
-function builderHomemapStep(d, stepIndex, panelId, pathId){
-  var panel = (d.panels || []).find(function(p){ return p && p.id === panelId && p.type === 'homemap'; });
-  var route = diagramPathList(d).find(function(p){ return p.id === pathId && p.indices.indexOf(stepIndex) >= 0; }) ||
-    diagramPathList(d).find(function(p){ return p.indices.indexOf(stepIndex) >= 0; });
-  if (!panel || !route) return {error:'Select a homemap and a step in this path.'};
-  var localIndex = route.indices.indexOf(stepIndex), active = diagramForPath(d, route.id);
-  var states = foldHomemapStates(panel, active.steps), state = states[localIndex];
-  var initial = Object.assign(Object.create(null), panel.initial || {}, {signals:[]});
-  var patch = (stepPanelPatch(d.steps[stepIndex]) || {})[panelId] || {};
-  return {panel:panel, patch:patch, state:state, position:localIndex,
-    model:homemapModel(panel, state), before:homemapModel(panel, localIndex ? states[localIndex - 1] : initial)};
-}
-
-/* Shared geometry edits never write step patches or move room occupants. */
-function planHomemapLayoutPosition(text, raw, sectionIdx, panelId, kind, key, point){
-  var got = builderDiagram(text, raw, sectionIdx);
-  if (got.error) return got;
-  var panels = got.d.panels || [], pi = panels.findIndex(function(p){ return p && p.id === panelId && p.type === 'homemap'; });
-  if (pi < 0) return {error:'Homemap not found — reselect and try again.'};
-  var panel = panels[pi], index = -1, item, list;
-  var panelPath = got.path.concat(['panels', pi]);
-  if (kind === 'outline'){
-    if (!homemapSubjectPosition(point)) return {error:'Choose a finite house position.'};
-    item = Object.assign({}, panel.outline, homemapModel(panel).outline, point);
-    if (!homemapSubjectPosition(item) || !isFiniteNum(item.w) || !isFiniteNum(item.h) ||
-        item.w < 20 || item.h < 20 || item.x < 0 || item.y < 0 || item.x + item.w > 320 || item.y + item.h > 180)
-      return {error:'Keep the house inside the frame, at least 20×20.'};
-    return planSetField(text, raw, panelPath, 'outline', JSON.stringify(item));
-  }
-  if (kind === 'device'){
-    list = 'devices';
-    if (homemapModel(panel).devices.some(function(d){ return d.id === key; }))
-      index = panel.devices.findIndex(function(d){ return d && d.id === key; });
-  } else if (kind === 'room'){
-    list = 'rooms';
-    if (Number.isInteger(key) && Array.isArray(panel.rooms) && homemapRooms(panel).indexOf(panel.rooms[key]) >= 0) index = key;
-  } else if (kind === 'subject'){
-    list = 'subjects';
-    if (homemapSubjects(panel).some(function(s){return s.id === key;}))
-      index = panel.subjects.findIndex(function(s){return s && s.id === key;});
-  }
-  if (index < 0) return {error:'Choose an existing device, room, or subject.'};
-  item = panel[list][index];
-  var resize = kind === 'room' && point && (point.w !== undefined || point.h !== undefined);
-  var w = resize ? point.w : item.w, h = resize ? point.h : item.h;
-  if (resize && (!isFiniteNum(w) || !isFiniteNum(h) || w <= 0 || h <= 0)) return {error:'Rooms need a positive width and height.'};
-  var maxX = 320 - (kind === 'room' ? w : 0), maxY = 180 - (kind === 'room' ? h : 0);
-  if (!homemapSubjectPosition(point) || point.x < 0 || point.y < 0 || point.x > maxX || point.y > maxY)
-    return {error:'Keep the whole item inside the 320×180 map.'};
-  var fields = [['x', JSON.stringify(point.x)], ['y', JSON.stringify(point.y)]];
-  if (resize) fields.push(['w', JSON.stringify(w)], ['h', JSON.stringify(h)]);
-  var plan = planSetFields(text, raw, panelPath.concat([list, index]), fields);
-  if (!plan.error && kind === 'subject' && panel.initial && homemapSubjectPosition(panel.initial[key]))
-    return planSetFields(plan.text, JSON.parse(plan.text), panelPath.concat(['initial', key]), fields);
-  return plan;
-}
-
-function builderHomemapLayoutDrag(item, start, at, resize, minimum){
-  var dx = at.x - start.x, dy = at.y - start.y;
-  if (resize) return {x:item.x, y:item.y,
-    w:clamp(Math.round(item.w + dx), minimum || 1, 320 - item.x),
-    h:clamp(Math.round(item.h + dy), minimum || 1, 180 - item.y)};
-  return {x:clamp(Math.round(item.x + dx), 0, 320 - (item.w || 0)),
-    y:clamp(Math.round(item.y + dy), 0, 180 - (item.h || 0))};
-}
-
-function builderHomemapLayoutScene(panel){
-  var state = Object.assign(Object.create(null), panel.initial || {}), hidden = [];
-  var model = homemapModel(panel, state);
-  model.subjects.forEach(function(s){
-    if (s.hidden) hidden.push(s.id);
-    state[s.id] = {x:s.x, y:s.y}; /* hidden subjects still have draggable starting positions */
-  });
-  return {state:state, model:homemapModel(panel, state), hidden:hidden};
-}
-
-/* Change one device attribute without capturing the inherited other attribute. */
-function planHomemapDeviceAttribute(text, raw, sectionIdx, stepIdx, panelId, key, attribute, value){
-  if (['state','thermal'].indexOf(attribute) < 0) return {error:'Unknown device attribute.'};
-  var got = stepIdx === null ? builderDiagram(text, raw, sectionIdx) : builderStepAt(raw, sectionIdx, stepIdx);
-  if (!got || got.error) return got || {error:'Step not found.'};
-  var pi = (got.d.panels || []).findIndex(function(p){return p && p.type === 'homemap' && p.id === panelId;});
-  if (pi < 0) return {error:'Homemap not found.'};
-  var panel = got.d.panels[pi], device = (panel.devices || []).find(function(d){return homemapDeviceValid(d) && d.id === key;});
-  if (!device) return {error:'Device not found.'};
-  var allowed = attribute === 'state' ? HOMEMAP_STATES[device.kind] : HOMEMAP_THERMAL;
-  if (value !== undefined && allowed.indexOf(value) < 0) return {error:'Choose a valid ' + attribute + '.'};
-  var patch = stepIdx === null ? panel.initial : (stepPanelPatch(got.st) || {})[panelId];
-  var current = patch && patch[key];
-  var next = panelObject(current) ? Object.assign({}, current) : typeof current === 'string' ? {state:current} : {};
-  if (value === undefined) delete next[attribute]; else next[attribute] = value;
-  var result = Object.keys(next).length ? next : undefined;
-  if (stepIdx !== null) return planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, result);
-  return builderRewrite(text, raw, got.path.concat(['panels',pi]), function(p){
-    var initial = Object.assign(Object.create(null),p.initial || {});
-    if (result === undefined) delete initial[key]; else initial[key] = result;
-    if (Object.keys(initial).length) p.initial = initial; else delete p.initial;
-  });
-}
-function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, value){
-  var got = builderStepAt(raw, sectionIdx, stepIdx);
-  if (!got) return {error:'Step not found — reselect and try again.'};
-  var p = (got.d.panels || []).find(function(p){ return p && p.id === panelId && p.type === 'homemap'; });
-  if (!p) return {error:'Homemap not found — reselect and try again.'};
-  var model = homemapModel(p), device = model.devices.find(function(d){ return d.id === key; });
-  var subject = model.subjects.find(function(s){ return s.id === key; });
-  if (!device && !subject && key !== 'signals') return {error:'Unknown homemap field.'};
-  if (value !== undefined){
-    if (device && !homemapDevicePatchValid(device.kind, value)) return {error:'Choose a valid device state or thermal condition.'};
-    if (subject && value !== null && (!homemapSubjectPosition(value) || value.x < 0 || value.x > 320 || value.y < 0 || value.y > 180))
-      return {error:'Use a position within the map: x 0–320, y 0–180.'};
-    if (key === 'signals' && (!Array.isArray(value) || value.some(function(s){
-      return !s || !model.devices.some(function(d){ return d.id === s.from; }) ||
-        !model.devices.some(function(d){ return d.id === s.to; });
-    }))) return {error:'Each signal needs two existing devices.'};
-  }
-  return builderRewrite(text, raw, got.path, function(st){
-    var containerKey = st.panels && typeof st.panels === 'object' && !Array.isArray(st.panels) ? 'panels' :
-      st.patch && typeof st.patch === 'object' && !Array.isArray(st.patch) ? 'patch' : 'panels';
-    var panels = Object.assign(Object.create(null), st[containerKey] || {});
-    var patch = Object.assign(Object.create(null), panels[panelId] || {});
-    if (value === undefined) delete patch[key]; else patch[key] = value;
-    if (Object.keys(patch).length) panels[panelId] = patch; else delete panels[panelId];
-    if (Object.keys(panels).length) st[containerKey] = panels; else delete st[containerKey];
-  });
-}
-
 function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchText){
   /* replace one panel patch with operator-supplied JSON (an object) */
   var got = builderStepAt(raw, sectionIdx, stepIdx);
@@ -2480,36 +2299,13 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
         {kind:'engine',label:'Engine default',inputs:[]};
     }
     function origin(key){
-      if(p.type==='deviceapp'){
-        if(key==='_updated')return {kind:'engine',label:'Engine · fields changed at this step',inputs:[]};
-        if(key==='clock' || key==='note')return assignment(key,function(v){return typeof v==='string';},false);
-        return history([key],true,'Field value and source history');
-      }
-      if (p.type === 'homemap'){
-        if (key === 'signals'){
-          var signalPatch = (stepPanelPatch(d.steps[stepIndex]) || {})[p.id];
-          return own(signalPatch, key) ? {kind:'transient', label:'This step only', inputs:[input(stepIndex,key,false)]} :
-            {kind:'engine', label:'No signals at this step', inputs:[]};
-        }
-        var subject = homemapSubjects(p).some(function(s){ return s.id === key; });
-        if (!subject && panelObject(snapshot[key])) return history([key],true,'Device state + thermal history');
-        return assignment(key, subject ? function(v){ return v === null || homemapSubjectPosition(v); } : null, false);
-      }
-      if (p.type==='inflight'){
-        if (key==='bars') return history(['start','end','mark'],false,'Computed start/end/mark history');
-        return {kind:'engine',label:key==='currentStep'?'Engine · current step':'Engine · total steps',inputs:[]};
-      }
-      if (p.type==='phone'){
-        if (key==='notifications') return history(['notify','clear'],true,'Computed notification history');
-        if (key==='clock') return assignment(key,function(v){ return typeof v==='string'; },false);
-        return {kind:'engine',label:'Engine · presentation metadata',inputs:[]};
-      }
-      if (key==='log') return history(['log'],true,'Accumulated log history');
-      if (p.type==='timeline' && (key==='events'||key==='miss')) return history([key],true,'Accumulated '+key+' history');
-      var current=(stepPanelPatch(d.steps[stepIndex])||{})[p.id];
-      if (own(current && current.enterOnce,key)) return assignment(key,null,true);
-      if (key==='mark'||key==='cells') return history(['cells','mark'],true,'Computed cells/mark history');
-      return assignment(key,p.type==='timeline' && key==='now'?function(v){ return parseClock(v)!=null; }:null,true,true);
+      var authoring=panelAuthoring(p.type), current=(stepPanelPatch(d.steps[stepIndex])||{})[p.id];
+      var custom=authoring.origin && authoring.origin(p,key,snapshot,{assignment:assignment,history:history,input:input,own:own,currentPatch:current,stepIndex:stepIndex});
+      if(custom) return custom;
+      if(key==='log')return history(['log'],true,'Accumulated log history');
+      if(own(current && current.enterOnce,key))return assignment(key,null,true);
+      if(key==='mark'||key==='cells')return history(['cells','mark'],true,'Computed cells/mark history');
+      return assignment(key,null,true,true);
     }
     return {id:p.id,type:p.type,title:p.title||p.id,index:pi,state:snapshot,
       fields:Object.keys(snapshot).sort().map(function(key){ return {key:key,value:snapshot[key],origin:origin(key)}; })};
@@ -2536,103 +2332,10 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
              (third tuple element) lists cols [{k, kind?, req?, options?}]
              and an optional max; unknown keys on existing items survive edits
      objf  — one fixed-shape object edited inline (timeline cadence) */
-var PANEL_SETUP_FIELDS = {
-  deviceapp: [['device','text'],['subtitle','text'],
-    ['sources','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'color'},{k:'node'},{k:'endpoint'},{k:'detail'}],max:6}],
-    ['fields','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:['text','battery']},
-      {k:'source'},{k:'icon',kind:'icon'},{k:'unit'}],max:12}],['initial','json']],
-  image:     [['src','image'],['alt','text'],['caption','text'],['link','text']],
-  replicas:  [['unit','text'],['replicas','rows',{cols:[{k:'id',req:true},{k:'label'}],max:8}],['initial','json']],
-  trace:     [['spans','json'],['initial','json']],
-  table:     [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 4}], ['initial', 'json']],
-  checks:    [['checks', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 12}], ['initial', 'json']],
-  budget:    [['metrics', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'unit'},
-                {k: 'max', kind: 'num', req: true}, {k: 'warn', kind: 'num'}], max: 6}], ['initial', 'json']],
-  state:     [['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
-  leds:      [['leds', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}]}], ['initial', 'json']],
-  gauge:     [['unit', 'text'], ['max', 'num'], ['initial', 'json']],
-  log:       [['tags', 'map'], ['initial', 'json']],
-  screen:    [['scene', 'scene'], ['initial', 'json']],
-  waterfall: [['spans', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'ms', kind: 'num', req: true}, {k: 'startMs', kind: 'num'}]}],
-              ['initial', 'json']],
-  orbit:     [['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
-  zoneframe: [['zones', 'jsonArr'], ['initial', 'json']],
-  xray:      [['layers', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'holder'}]}], ['initial', 'json']],
-  queue:     [['initial', 'json']],
-  pir:       [['cone', 'json'], ['sensor', 'json'], ['path', 'jsonArr'], ['initial', 'json']],
-  thermo:    [['unit', 'text'], ['min', 'num'], ['max', 'num'], ['warn', 'num'], ['crit', 'num'], ['lowWarn', 'num'], ['lowCrit', 'num'], ['initial', 'json']],
-  battery:   [['low', 'num'], ['crit', 'num'], ['initial', 'json']],
-  buffer:    [['segments', 'num'], ['capacity', 'text'], ['initial', 'json']],
-  radar:     [['sensor', 'json'], ['facing', 'num'], ['spread', 'num'], ['range', 'num'],
-              ['threshold', 'num'], ['rings', 'jsonAny'], ['scale', 'json'],
-              ['zones', 'jsonArr'], ['initial', 'json']],
-  homemap:   [['outline', 'objf', {cols:[{k:'w',kind:'num',label:'Width'}, {k:'h',kind:'num',label:'Height'},
-                {k:'x',kind:'num',label:'Left (auto)'}, {k:'y',kind:'num',label:'Top (auto)'}],
-                hint:'Floor plan: width 20–320, height 20–180. Blank left/top centers the house. Rooms and devices keep their coordinates. Press Enter or leave a field to save.'}], ['rooms', 'rows', {cols: [
-                {k:'label'}, {k:'kind',kind:'enum',options:['room','outdoor']}, {k:'x', kind:'num', req:true}, {k:'y', kind:'num', req:true},
-                {k:'w', kind:'num', req:true}, {k:'h', kind:'num', req:true}]}], ['devices', 'rows', {cols: [
-                {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
-                {k: 'display', kind: 'enum', options: ['marker', 'door']},
-                {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
-                {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon', kind: 'icon'},
-                {k: 'doorWidth', kind: 'num'}, {k: 'doorSwing', kind: 'num'}],
-              max: 12}], ['subjects', 'rows', {cols: [
-                {k: 'id', req: true}, {k: 'label'}, {k: 'x', kind: 'num', req: true},
-                {k: 'y', kind: 'num', req: true}, {k: 'icon', kind: 'icon'}], max: 6}], ['initial', 'json']],
-  signal:    [['links', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'},
-                {k: 'transport', kind: 'enum',
-                 options: ['wifi', 'subghz', 'thread', 'zigbee', 'zwave', 'cellular', 'poe', 'ethernet', 'ble']}],
-              max: 6}], ['initial', 'json']],
-  tiles:     [['tiles', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}], max: 12}],
-              ['states', 'csv'], ['colors', 'map'], ['initial', 'json']],
-  inflight:  [['lanes', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}]}], ['initial', 'json']],
-  phone:     [['brand', 'objf', {cols: [{k: 'app'}, {k: 'logo'}, {k: 'accent'}, {k: 'bg'}, {k: 'fg'}]}],
-              ['initial', 'json']],
-  timeline:  [['span', 'clock'],
-              ['cadence', 'objf', {cols: [{k: 'every', kind: 'clock', req: true}, {k: 'label'}]}],
-              ['lanes', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'},
-                {k: 'every', kind: 'clock', req: true}], max: 4}],
-              ['events', 'rows', {cols: [{k: 'at', kind: 'clock', req: true}, {k: 'label'},
-                {k: 'kind', kind: 'enum', options: ['ok', 'alert', 'info']}, {k: 'lane'}]}],
-              ['initial', 'json']]
-};
+var PANEL_SETUP_FIELDS = panelAuthoringMap('setupFields');
 
 /* Dynamic-key types are expanded from their declarations by panelPatchFields. */
-var PANEL_PATCH_FIELDS = {
-  deviceapp: [['clock','text'],['note','text']],
-  image:     [],
-  replicas:  [['reference','json'],['replicas','json'],['note','text']],
-  trace:     [['selected','text']],
-  table:     [['rows', 'jsonArr'], ['note', 'text']],
-  checks:    [['results', 'json'], ['note', 'text']],
-  budget:    [['values', 'json'], ['note', 'text']],
-  state:     [['state', 'text']],
-  leds:      [],
-  gauge:     [['value', 'num']],
-  log:       [['log', 'jsonArr']],
-  screen:    [['mode', 'enum', SCREEN_MODES],
-              ['scenePlayback', 'enum', ['waiting', 'playing']], ['banner', 'text'], ['reason', 'text']],
-  waterfall: [['reveal', 'num'], ['highlight', 'text'], ['total', 'text']],
-  orbit:     [['state', 'text'], ['via', 'text']],
-  zoneframe: [['zones', 'jsonArr'], ['subject', 'json'],
-              ['verdict', 'enum', ['alert', 'suppress', 'never-captured']]],
-  xray:      [['layers', 'jsonArr'], ['hop', 'text']],
-  queue:     [['state', 'enum', ['empty', 'enqueue', 'held', 'dequeue']], ['label', 'text'],
-              ['from', 'text'], ['to', 'text'], ['reason', 'text']],
-  pir:       [['subject', 'json'], ['tripped', 'bool'], ['status', 'text'], ['banner', 'text']],
-  thermo:    [['value', 'num'], ['label', 'text']],
-  battery:   [['charge', 'num'], ['trend', 'enum', ['charging', 'draining', 'idle']],
-              ['source', 'enum', ['solar', 'wired', 'poe', 'cells']], ['cold', 'bool'],
-              ['note', 'text'], ['label', 'text']],
-  buffer:    [['cells', 'jsonArr'], ['mark', 'jsonArr'], ['head', 'num'], ['note', 'text'], ['label', 'text']],
-  radar:     [['subject', 'json'], ['threshold', 'num'], ['alert', 'bool'], ['status', 'text'], ['banner', 'text']],
-  homemap:   [['signals', 'jsonArr']],
-  signal:    [],
-  tiles:     [],
-  inflight:  [['start', 'jsonArr'], ['end', 'jsonArr'], ['mark', 'jsonArr']],
-  phone:     [['clock', 'text'], ['notify', 'jsonAny'], ['clear', 'bool', {trueOnly: true}]],
-  timeline:  [['now', 'clock'], ['events', 'jsonArr'], ['miss', 'jsonArr']]
-};
+var PANEL_PATCH_FIELDS = panelAuthoringMap('patchFields');
 var OPEN_PATCH_EDITORS = new Set();
 var OPEN_EFFECTIVE_STATE = false;
 var OPEN_EFFECTIVE_PANELS = new Set();
@@ -2649,51 +2352,9 @@ function patchSummaryLine(patchObj){
 }
 
 function panelPatchFields(decl){
-  if (!decl || !Object.prototype.hasOwnProperty.call(PANEL_PATCH_FIELDS, decl.type)) return null;
-  if(decl.type==='deviceapp'){
-    var sourceIds=(Array.isArray(decl.sources)?decl.sources:[]).filter(function(s){return s && typeof s.id==='string';}).map(function(s){return s.id;});
-    var appFields=(Array.isArray(decl.fields)?decl.fields:[]).filter(function(f){return f && typeof f.id==='string';}).map(function(f){
-      return [f.id,'objf',[['value',f.kind==='battery'?'num':'text'],
-        ['status','enum',['unknown','loading','ready','stale','error']],
-        ['source','enum',sourceIds],['detail','text']]];
-    });
-    return appFields.concat(PANEL_PATCH_FIELDS.deviceapp);
-  }
-  var states = Array.isArray(decl.states) ? decl.states.map(String) : [];
-  var stateField = states.length ? ['state', 'enum', states] : ['state', 'text'];
-  if (decl.type === 'homemap'){
-    var vocab = {camera: ['sleep', 'scan', 'detect', 'rec', 'off'], entry: ['closed', 'open', 'alert'],
-      sensor: ['ok', 'warn', 'alert', 'off'], hub: ['idle', 'rx', 'tx', 'alert']};
-    var seen = Object.create(null);
-    var fields = (Array.isArray(decl.devices) ? decl.devices : []).filter(function(d){
-      if (!d || typeof d.id !== 'string' || !d.id || seen[d.id]) return false;
-      seen[d.id] = true;
-      return d.id !== 'signals' && typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(vocab, d.kind) &&
-        typeof d.x === 'number' && isFinite(d.x) && typeof d.y === 'number' && isFinite(d.y);
-    }).map(function(d){ return [d.id, 'jsonAny']; });
-    (Array.isArray(decl.subjects) ? decl.subjects : []).forEach(function(sub){
-      if (!sub || typeof sub.id !== 'string' || !sub.id || seen[sub.id]) return;
-      seen[sub.id] = true;
-      if (sub.id === 'signals' || typeof sub.x !== 'number' || !isFinite(sub.x) ||
-          typeof sub.y !== 'number' || !isFinite(sub.y)) return;
-      fields.push([sub.id, 'json', {nullable: true}]);
-    });
-    return fields.concat([['signals', 'jsonArr']]);
-  }
-  if (decl.type === 'state') return [stateField];
-  if (decl.type === 'orbit') return [stateField, ['via', 'text']];
-  if (['leds', 'tiles', 'signal'].indexOf(decl.type) >= 0){
-    var ids = decl[decl.type === 'signal' ? 'links' : decl.type];
-    return (Array.isArray(ids) ? ids : []).filter(function(item){
-      return item && typeof item.id === 'string' && item.id !== '';
-    }).map(function(item){
-      if (decl.type === 'leds') return [item.id, 'enum', ['on', 'off', 'tx', 'rx']];
-      return [item.id, 'objf', decl.type === 'tiles' ? [stateField, ['sub', 'text']] :
-        [['state', 'enum', ['ok', 'weak', 'retrying', 'lost', 'jammed']],
-         ['bars', 'num', {min: 0, max: 4}], ['note', 'text']]];
-    });
-  }
-  return PANEL_PATCH_FIELDS[decl.type];
+  var authoring=decl && panelAuthoring(decl.type), fields=authoring && authoring.patchFields;
+  if (!authoring || fields === undefined) return null;
+  return authoring.expandPatchFields ? authoring.expandPatchFields(decl) : fields;
 }
 
 /* Collect only the supplied fields. Blank values omit keys; callers merge
@@ -2731,30 +2392,6 @@ function patchFieldsCollect(fields, values){
     item[key] = value;
   }
   return {item: item};
-}
-
-var SCENE_TOKENS = ['person-at-door-night', 'person-through-door', 'doorbell-run-away', 'doorbell-runners', 'package-drop', 'kitchen-fire', 'static-noise'];
-
-/* A local preview never patches camera mode or advances the story. Replay
-   replaces only this SVG, so it cannot reset the diagram's animation. */
-function screenScenePreview(initialScene){
-  var wrap = document.createElement('div'); wrap.className = 'screen-scene-preview';
-  var box = document.createElement('div'); box.className = 'screenbox m-live';
-  box.setAttribute('role', 'img'); wrap.appendChild(box);
-  var foot = document.createElement('div'); foot.className = 'screen-scene-footer';
-  var note = document.createElement('span'); note.className = 'fnote'; note.textContent = 'Simulated clip preview';
-  var replay = document.createElement('button'); replay.type = 'button'; replay.className = 'bbtn';
-  replay.textContent = 'Replay clip';
-  foot.appendChild(note); foot.appendChild(replay); wrap.appendChild(foot);
-  var selected;
-  function setScene(scene){
-    selected = SCENE_TOKENS.indexOf(scene) >= 0 ? scene : 'static-noise';
-    box.innerHTML = SCENES[selected];
-    box.setAttribute('aria-label', SCENE_LABELS[selected] + ' — simulated clip preview');
-  }
-  replay.addEventListener('click', function(){ setScene(selected); });
-  setScene(initialScene);
-  return {element:wrap, setScene:setScene};
 }
 
 /* parseClock rides in the same bundle (validator.js); the vm-loaded test
@@ -3048,7 +2685,7 @@ function initWorkbenchBuilder(opts){
   var selectedEl = null;
   var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
   var clipboardHomeTarget = null;
-  var homeElementFolds = Object.create(null); /* inspector-only disclosure preferences */
+  var panelEditors = Object.create(null); /* lazy editor instances, isolated per workbench */
   var inspectorScrollKey = null; /* target of the last-rendered inspector form */
   var invalidateEffectiveState = null;
   var insertSection = 0;    /* zero-based ordinal of the section inserts target */
@@ -3800,8 +3437,7 @@ function initWorkbenchBuilder(opts){
       clearMultiSelect();clipboardHomeTarget=null;
       var t=plan.target;
       if(t.kind === 'home'){
-        var identity=JSON.stringify([t.section,t.index,t.field]);
-        var folds=homeElementFolds[identity] || (homeElementFolds[identity]={open:true,items:[]});folds.open=true;folds.items[t.item]=true;
+        var editor=panelEditorForTarget(t);if(editor.revealElement)editor.revealElement(t);
         selectTarget({kind:'panel',section:t.section,index:t.index},false);homeClipboardSelect(t);
       } else selectTarget(t,false);
     }});
@@ -3809,7 +3445,7 @@ function initWorkbenchBuilder(opts){
   var objectClipboard = typeof initBuilderClipboard === 'function' ? initBuilderClipboard(document,{
     isActive:opts.isActive,
     text:function(){return src.value;},selection:clipboardSelection,destination:clipboardDestination,
-    blocked:function(){return !!(addToStep || connect || rowDrag || nodeDrag || groupDrag || view.querySelector('.home-edit-map.moving') || (guide && guide.querySelector('.home-edit-map.moving')));},
+    blocked:function(){return !!(addToStep || connect || rowDrag || nodeDrag || groupDrag || Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);}));},
     destinationLabel:function(dest){
       var parsed=parseEditor(),panel;
       if(!parsed.error){var got=builderDiagram(src.value,parsed.raw,dest.section);if(!got.error)panel=(got.d.panels || [])[dest.index];}
@@ -4135,7 +3771,8 @@ function initWorkbenchBuilder(opts){
     evidence.appendChild(frow('Runtime conditions JSON',jsonFieldControl('conditions',val.conditions,'jsonArr')));
     rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){
-      if (p && p.type === 'homemap') rows.push(homemapStepControl(ctx.diagram, p, t));
+      var editor=p && panelEditor(p.type);
+      if(editor && editor.stepControl) rows.push(editor.stepControl(ctx.diagram,p,t));
     });
     var laneNames = Object.keys((ctx.page && ctx.page.lanes) || {});
     rows.push(frow('lane', selectControl(laneNames, val.lane, function(v){
@@ -4232,296 +3869,16 @@ function initWorkbenchBuilder(opts){
     var declarations = (ctx.diagram && ctx.diagram.panels) || [];
     pids.forEach(function(pid){
       var decl = Array.isArray(declarations) ? declarations.filter(function(p){ return p && p.id === pid; })[0] : null;
-      if (decl && decl.type === 'homemap') return;
+      if (decl && panelEditor(decl.type).stepControl) return;
       rows.push(panelPatchControl(pid, val.panels[pid], decl, t));
     });
     if (declarations.length) rows.push(effectiveStateControl(t));
     return rows;
   }
 
-  function homemapLayoutControl(panel, target){
-    var box = document.createElement('fieldset'); box.className = 'home-edit';
-    var legend = document.createElement('legend'); legend.textContent = 'Shared layout · drag to arrange'; box.appendChild(legend);
-    var hint = document.createElement('p'); hint.className = 'home-note';
-    hint.textContent = 'Drag rooms, devices, doors, or people. Drag the House grip to move the outline; drag square corners to resize it or a room. Faded people start hidden. Changes apply across all paths; step overrides stay intact. Escape cancels.';
-    box.appendChild(hint);
-    var copyTools=document.createElement('div');copyTools.className='story-actions';
-    var picked=null, pickLabel=document.createElement('span');pickLabel.className='home-note';pickLabel.textContent='Select an element to copy or duplicate.';copyTools.appendChild(pickLabel);
-    var copyItem=actionButton('Copy element',function(){if(picked && objectClipboard)objectClipboard.copy([picked]);});
-    var duplicateItem=actionButton('Duplicate element',function(){if(picked && objectClipboard)objectClipboard.duplicate([picked]);});
-    copyItem.disabled=duplicateItem.disabled=true;copyTools.appendChild(copyItem);copyTools.appendChild(duplicateItem);box.appendChild(copyTools);
-    var map = document.createElement('div'); map.className = 'home-edit-map home-layout-map sk-daylight'; map.tabIndex = 0;
-    map.setAttribute('aria-label', 'Shared home layout placement map'); box.appendChild(map);
-    var scene = builderHomemapLayoutScene(panel), indexedText = src.value, moving = null;
-    function mark(svg, kind, key, x, y, resize){
-      var rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
-      rect.setAttribute('class', resize ? 'home-resize-handle' : 'home-outline-grip');
-      rect.setAttribute('x', x - (resize ? 3 : 12)); rect.setAttribute('y', y * HOMEMAP_Y_SCALE - (resize ? 3 : 5));
-      rect.setAttribute('width', resize ? 6 : 24); rect.setAttribute('height', resize ? 6 : 10); rect.setAttribute('rx','1');
-      rect.setAttribute(kind === 'outline' ? 'data-home-outline' : 'data-home-room', key);
-      if (resize) rect.setAttribute('data-home-resize','');
-      var title = document.createElementNS('http://www.w3.org/2000/svg','title');
-      title.textContent = (resize ? 'Resize ' : 'Move ') + (kind === 'outline' ? 'house outline' : (panel.rooms[key].label || 'room'));
-      rect.appendChild(title); svg.appendChild(rect);
-      if (!resize){
-        var label = document.createElementNS('http://www.w3.org/2000/svg','text');
-        label.setAttribute('class','home-outline-grip-label'); label.setAttribute('x',x); label.setAttribute('y',y * HOMEMAP_Y_SCALE + 1.7);
-        label.setAttribute('text-anchor','middle'); label.textContent='↔ House'; svg.appendChild(label);
-      }
-    }
-    function paint(move){
-      var preview = panel, state = scene.state;
-      if (move){
-        preview = Object.assign({}, panel);
-        if (move.kind === 'outline') preview.outline = Object.assign({}, scene.model.outline, move.point);
-        else {
-          var list = move.kind === 'device' ? 'devices' : move.kind === 'room' ? 'rooms' : 'subjects';
-          preview[list] = panel[list].map(function(item,i){ return i === move.index ? Object.assign({},item,move.point) : item; });
-          if (move.kind === 'subject'){state = Object.assign(Object.create(null),state); state[move.key] = move.point;}
-        }
-      }
-      /* Decorations are editor-only and change as the outline/rooms move. */
-      map._lastHTML = null;
-      renderPanelBody(map, preview, state, 'daylight', [], -1, false);
-      var svg = map.querySelector('svg.hmframe'); if (!svg) return;
-      var outline = homemapModel(preview).outline;
-      svg.querySelector('.hmoutline').setAttribute('data-home-outline','');
-      homemapRooms(preview).forEach(function(r){mark(svg,'room',preview.rooms.indexOf(r),r.x+r.w,r.y+r.h,true);});
-      mark(svg,'outline','',outline.x+outline.w,outline.y+outline.h,true);
-      mark(svg,'outline','',outline.x+outline.w/2,Math.max(5,outline.y-5),false);
-      Array.prototype.forEach.call(svg.querySelectorAll('[data-subject]'),function(el){
-        if (scene.hidden.indexOf(el.getAttribute('data-subject')) >= 0) el.classList.add('home-start-hidden');
-      });
-    }
-    function eventPoint(ev){
-      var svg=map.querySelector('svg'), matrix=svg && svg.getScreenCTM(); if (!matrix) return null;
-      var point=svg.createSVGPoint(); point.x=ev.clientX; point.y=ev.clientY;
-      return homemapPointFromDisplay(point.matrixTransform(matrix.inverse()));
-    }
-    function cancel(){
-      if (!moving) return;
-      var id=moving.pointer; moving=null; map.classList.remove('moving'); paint(null);
-      if (map.hasPointerCapture(id)) map.releasePointerCapture(id);
-    }
-    map.addEventListener('pointerdown',function(ev){
-      if (ev.button !== 0) return;
-      var el=ev.target.closest('[data-device],[data-subject],[data-home-room],[data-home-outline]'); if (!el) return;
-      var kind, key, item, index;
-      if (el.hasAttribute('data-home-outline')){kind='outline';key='';item=scene.model.outline;}
-      else if (el.hasAttribute('data-home-room')){kind='room';key=index=Number(el.getAttribute('data-home-room'));item=panel.rooms[index];}
-      else {
-        kind=el.hasAttribute('data-device') ? 'device' : 'subject';key=el.getAttribute('data-'+kind);
-        var list=kind === 'device' ? 'devices' : 'subjects';
-        item=scene.model[list].find(function(d){return d.id === key;});
-        index=panel[list].findIndex(function(d){return d && d.id === key;});
-      }
-      var start=eventPoint(ev);if (!item || !start) return;
-      if(kind !== 'outline'){
-        picked={kind:'home',section:target.section,index:target.index,field:kind === 'device' ? 'devices' : kind === 'room' ? 'rooms' : 'subjects',item:index};
-        homeClipboardSelect(picked);pickLabel.textContent=item.label || item.id || 'Room';copyItem.disabled=duplicateItem.disabled=false;
-      } else {picked=null;clipboardHomeTarget=null;copyItem.disabled=duplicateItem.disabled=true;pickLabel.textContent='House outline';}
-      ev.preventDefault();map.focus({preventScroll:true});map.setPointerCapture(ev.pointerId);
-      moving={kind:kind,key:key,item:item,index:index,start:start,pointer:ev.pointerId,resize:el.hasAttribute('data-home-resize'),changed:false};
-      map.classList.add('moving');
-    });
-    map.addEventListener('pointermove',function(ev){
-      if (!moving || ev.pointerId !== moving.pointer) return;
-      var at=eventPoint(ev);if (!at) return;
-      moving.point=builderHomemapLayoutDrag(moving.item,moving.start,at,moving.resize,moving.kind === 'outline' ? 20 : 1);
-      moving.changed=Object.keys(moving.point).some(function(k){return moving.point[k] !== moving.item[k];});paint(moving);
-    });
-    map.addEventListener('pointerup',function(ev){
-      if (!moving || ev.pointerId !== moving.pointer) return;
-      var done=moving;cancel();if (!done.changed) return;
-      if (src.value !== indexedText){formError('The source changed. Reselect this home before moving its layout.');return;}
-      if (addToStep){formError('Finish ADD TO STEP before editing the layout.');return;}
-      commitCascade(function(raw){return planHomemapLayoutPosition(src.value,raw,target.section,panel.id,done.kind,done.key,done.point);},
-        {after:function(){renderInspector();}});
-    });
-    map.addEventListener('pointercancel',cancel);map.addEventListener('lostpointercapture',cancel);
-    map.addEventListener('keydown',function(ev){if (ev.key === 'Escape' && moving){ev.preventDefault();ev.stopPropagation();cancel();}});
-    paint(null);return box;
-  }
 
-  function homemapStepControl(diagram, panel, target){
-    var box = document.createElement('fieldset'); box.className = 'home-edit';
-    var title = document.createElement('legend'); title.textContent = (panel.title || panel.id) + ' · at this step'; box.appendChild(title);
-    box.appendChild(actionButton('Edit shared home layout', function(){
-      selectTarget({section:target.section, kind:'panel', index:diagram.panels.indexOf(panel)}, false);
-      rehighlight();
-    }));
-    var sp = stepperFor(target.section);
-    var snapshot = builderHomemapStep(diagram, target.index, panel.id, target.pathId || (sp && sp.path()));
-    if (snapshot.error){ box.textContent = snapshot.error; return box; }
-    var indexedText = src.value, own = function(k){ return Object.prototype.hasOwnProperty.call(snapshot.patch, k); };
-    function commit(key, value, layoutKind, attribute){
-      if (src.value !== indexedText){ formError('The source changed. Reselect this step before editing its map.'); return false; }
-      if (addToStep){ formError('Finish ADD TO STEP before editing the map.'); return false; }
-      return commitCascade(function(raw){
-        if (layoutKind) return planHomemapLayoutPosition(src.value, raw, target.section, panel.id, layoutKind, key, value);
-        if (attribute) return planHomemapDeviceAttribute(src.value, raw, target.section, target.index, panel.id, key, attribute, value);
-        return planStepHomemapField(src.value, raw, target.section, target.index, panel.id, key, value);
-      }, {after:function(){ renderInspector(); }});
-    }
-    function note(text, parent){ var el = document.createElement('p'); el.className = 'home-note'; el.textContent = text; (parent || box).appendChild(el); return el; }
-    function button(label, action){
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'bbtn'; b.textContent = label;
-      b.addEventListener('click', action); return b;
-    }
-    function choice(pairs, value, label, action){
-      var select = document.createElement('select'); select.className = 'fctl'; select.setAttribute('aria-label', label);
-      pairs.forEach(function(pair){ var o = document.createElement('option'); o.value = pair[0]; o.textContent = pair[1]; select.appendChild(o); });
-      select.value = value; select.addEventListener('change', function(){ action(select.value); }); return select;
-    }
-    note('Operating state and temperature condition carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.');
-    var body = document.createElement('div'); body.className = 'home-edit-body'; box.appendChild(body);
-    var map = document.createElement('div'); map.className = 'home-edit-map sk-daylight'; map.tabIndex = 0;
-    map.setAttribute('aria-label', 'Home step placement map'); body.appendChild(map);
-    renderPanelBody(map, panel, snapshot.state, 'daylight', [], snapshot.position, false);
-    var fields = document.createElement('div'); fields.className = 'home-edit-fields'; body.appendChild(fields);
-    var deviceControls = Object.create(null), subjectControls = Object.create(null);
-    snapshot.model.devices.forEach(function(d, i){
-      var before = snapshot.before.devices[i];
-      var pairs = [['', 'Inherit · ' + before.state]].concat(HOMEMAP_STATES[d.kind].map(function(v){ return [v, v]; }));
-      var ownPatch = snapshot.patch[d.id];
-      var hasState = own(d.id) && (!panelObject(ownPatch) || Object.prototype.hasOwnProperty.call(ownPatch,'state'));
-      var ctl = choice(pairs, hasState ? d.state : '', d.label + ' state', function(v){ commit(d.id, v === '' ? undefined : v, null, 'state'); });
-      deviceControls[d.id] = ctl;
-      fields.appendChild(frow(d.label, ctl));
-      var thermalPairs = [['','Inherit · ' + before.thermal]].concat(HOMEMAP_THERMAL.map(function(v){return [v,v];}));
-      fields.appendChild(frow('Temperature', choice(thermalPairs, panelObject(ownPatch) && Object.prototype.hasOwnProperty.call(ownPatch,'thermal') ? d.thermal : '',
-        d.label + ' temperature', function(v){commit(d.id, v === '' ? undefined : v, null, 'thermal');})));
-    });
-    var armedSubject = null;
-    var placementHint = 'Drag devices or room borders/labels to change the layout for all steps. Rooms move independently of their contents. Click a device to edit its state.';
-    var placementNote = note(placementHint, fields);
-    snapshot.model.subjects.forEach(function(sub, i){
-      var group = document.createElement('div'); group.className = 'home-subject'; fields.appendChild(group);
-      var before = snapshot.before.subjects[i];
-      var visibility = choice([['inherit', 'Inherit · ' + (before.hidden ? 'hidden' : before.x + ', ' + before.y)],
-        ['show', 'Show at this position'], ['hide', 'Hidden']], own(sub.id) ? (sub.hidden ? 'hide' : 'show') : 'inherit',
-        sub.label + ' visibility', function(v){ commit(sub.id, v === 'inherit' ? undefined : v === 'hide' ? null : {x:sub.x, y:sub.y}); });
-      group.appendChild(frow(sub.label, visibility));
-      var xy = document.createElement('div'); xy.className = 'home-xy'; group.appendChild(xy);
-      ['x', 'y'].forEach(function(k){
-        var input = numberControl(sub[k], function(v){
-          if (v == null){ formError('Enter a coordinate, or choose Inherit.'); return false; }
-          var pos = {x:sub.x, y:sub.y}; pos[k] = v; return commit(sub.id, pos);
-        });
-        input.setAttribute('aria-label', sub.label + ' ' + k); xy.appendChild(frow(k, input));
-      });
-      var place = button('Place ' + sub.label, function(){
-        armedSubject = armedSubject === sub.id ? null : sub.id;
-        Object.keys(subjectControls).forEach(function(id){ subjectControls[id].setAttribute('aria-pressed', id === armedSubject ? 'true' : 'false'); });
-        map.classList.toggle('placing', armedSubject !== null);
-        placementNote.textContent = armedSubject === null ? 'Placement cancelled.' : 'Tap the map to place ' + sub.label + '. Escape cancels.';
-      });
-      place.setAttribute('aria-pressed', 'false'); subjectControls[sub.id] = place; group.appendChild(place);
-    });
-    if (snapshot.model.subjects.length) placementNote.textContent = 'Drag a person, or choose Place and tap this map, to move them at this step. ' + placementHint;
-    function eventPoint(ev){
-      var svg = map.querySelector('svg'), matrix = svg && svg.getScreenCTM();
-      if (!matrix) return null;
-      var p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; p = p.matrixTransform(matrix.inverse());
-      return homemapPointFromDisplay(p);
-    }
-    var moving = null, swallowClick = false;
-    function previewMove(move){
-      var previewPanel = panel, state = snapshot.state;
-      if (move && move.kind === 'subject'){
-        state = Object.assign(Object.create(null), state); state[move.key] = move.point;
-      } else if (move){
-        previewPanel = Object.assign({}, panel);
-        var list = move.kind === 'device' ? 'devices' : 'rooms';
-        previewPanel[list] = panel[list].map(function(item, i){
-          return i === move.index ? Object.assign({}, item, move.point) : item;
-        });
-      }
-      renderPanelBody(map, previewPanel, state, 'daylight', [], snapshot.position, false);
-    }
-    function cancelMove(){
-      if (!moving) return;
-      var pointer = moving.pointer; moving = null;
-      map.classList.remove('moving'); previewMove(null);
-      if (map.hasPointerCapture(pointer)) map.releasePointerCapture(pointer);
-    }
-    map.addEventListener('pointerdown', function(ev){
-      if (ev.button !== 0 || armedSubject !== null) return;
-      var el = ev.target.closest('[data-subject], [data-device], [data-home-room]');
-      if (!el) return;
-      var kind, key, item, index;
-      if (el.hasAttribute('data-subject')){
-        kind = 'subject'; key = el.getAttribute('data-subject');
-        item = snapshot.model.subjects.find(function(s){ return s.id === key; });
-      } else if (el.hasAttribute('data-device')){
-        kind = 'device'; key = el.getAttribute('data-device');
-        item = snapshot.model.devices.find(function(d){ return d.id === key; });
-        index = panel.devices.findIndex(function(d){ return d && d.id === key; });
-      } else {
-        kind = 'room'; key = index = Number(el.getAttribute('data-home-room'));
-        item = panel.rooms[index];
-      }
-      var at = eventPoint(ev); if (!item || !at) return;
-      ev.preventDefault(); map.focus({preventScroll:true}); map.setPointerCapture(ev.pointerId);
-      moving = {kind:kind, key:key, index:index, item:item, start:at, point:{x:item.x, y:item.y}, pointer:ev.pointerId, changed:false};
-      map.classList.add('moving');
-    });
-    map.addEventListener('pointermove', function(ev){
-      if (!moving || ev.pointerId !== moving.pointer) return;
-      var at = eventPoint(ev); if (!at) return;
-      var maxX = 320 - (moving.kind === 'room' ? moving.item.w : 0), maxY = 180 - (moving.kind === 'room' ? moving.item.h : 0);
-      moving.point = {x:Math.max(0, Math.min(maxX, Math.round(moving.item.x + at.x - moving.start.x))),
-        y:Math.max(0, Math.min(maxY, Math.round(moving.item.y + at.y - moving.start.y)))};
-      moving.changed = moving.point.x !== moving.item.x || moving.point.y !== moving.item.y;
-      previewMove(moving);
-    });
-    map.addEventListener('pointerup', function(ev){
-      if (!moving || ev.pointerId !== moving.pointer) return;
-      var done = moving; cancelMove();
-      if (done.changed){ swallowClick = true; commit(done.key, done.point, done.kind === 'subject' ? null : done.kind); }
-    });
-    map.addEventListener('pointercancel', cancelMove);
-    map.addEventListener('lostpointercapture', cancelMove);
-    box.addEventListener('keydown', function(ev){
-      if (ev.key !== 'Escape') return;
-      if (moving || armedSubject !== null){
-        ev.preventDefault(); ev.stopPropagation(); cancelMove(); armedSubject = null; map.classList.remove('placing');
-        Object.keys(subjectControls).forEach(function(id){ subjectControls[id].setAttribute('aria-pressed', 'false'); });
-        placementNote.textContent = 'Placement cancelled.';
-      }
-    });
-    map.addEventListener('click', function(ev){
-      if (swallowClick){ swallowClick = false; return; }
-      if (armedSubject !== null){ var at = eventPoint(ev); if (at) commit(armedSubject, at); return; }
-      var device = ev.target.closest('[data-device]'), subject = ev.target.closest('[data-subject]');
-      if (device && deviceControls[device.getAttribute('data-device')]) deviceControls[device.getAttribute('data-device')].focus();
-      else if (subject && subjectControls[subject.getAttribute('data-subject')]) subjectControls[subject.getAttribute('data-subject')].click();
-    });
-    note('Signals · this step only', fields);
-    snapshot.model.signals.forEach(function(sig, i){
-      var row = document.createElement('div'); row.className = 'home-signal';
-      var label = document.createElement('span');
-      label.textContent = snapshot.model.devices.find(function(d){ return d.id === sig.from; }).label + ' → ' +
-        snapshot.model.devices.find(function(d){ return d.id === sig.to; }).label;
-      row.appendChild(label); row.appendChild(button('Remove', function(){
-        var signals = snapshot.model.signals.filter(function(_, n){ return n !== i; }).map(function(s){ return {from:s.from, to:s.to}; });
-        commit('signals', signals.length ? signals : undefined);
-      })); fields.appendChild(row);
-    });
-    if (snapshot.model.devices.length > 1){
-      var endpoints = snapshot.model.devices.map(function(d){ return [d.id, d.label]; });
-      var from = choice(endpoints, endpoints[0][0], 'Signal from', function(){});
-      var to = choice(endpoints, endpoints[1][0], 'Signal to', function(){});
-      fields.appendChild(frow('Signal from', from)); fields.appendChild(frow('Signal to', to));
-      fields.appendChild(button('Add signal', function(){
-        if (from.value === to.value){ formError('Choose two different devices for a signal.'); return; }
-        var signals = snapshot.model.signals.map(function(s){ return {from:s.from, to:s.to}; });
-        if (!signals.some(function(s){ return s.from === from.value && s.to === to.value; })) signals.push({from:from.value, to:to.value});
-        commit('signals', signals);
-      }));
-    }
-    return box;
-  }
+
+
 
   function effectiveStateControl(target){
     var outer=document.createElement('details'); outer.className='effective-state'; outer.open=OPEN_EFFECTIVE_STATE;
@@ -4589,6 +3946,7 @@ function initWorkbenchBuilder(opts){
     return outer;
   }
   function panelPatchControl(pid, patch, decl, target){
+    var editor=panelEditor(decl && decl.type);
     var det = document.createElement('details');
     det.className = 'patchedit';
     det.open = OPEN_PATCH_EDITORS.has(pid);
@@ -4640,14 +3998,7 @@ function initWorkbenchBuilder(opts){
         if (f[1] === 'num') input.className += ' fnum';
       }
       input.setAttribute('aria-label', f[0]);
-      if (decl.type === 'screen' && f[0] === 'scenePlayback'){
-        input.setAttribute('aria-label', 'Scene event');
-        Array.prototype.forEach.call(input.options, function(option){
-          if (option.value === 'waiting') option.textContent = 'Before event';
-          else if (option.value === 'playing') option.textContent = 'Play event';
-          else if (option.value === '') option.textContent = 'Inherit';
-        });
-      }
+      if (editor.patchField) editor.patchField(f,input);
       return input;
     }
     function rawControl(){
@@ -4659,11 +4010,7 @@ function initWorkbenchBuilder(opts){
       }, {textarea: true});
     }
     var fields = panelPatchFields(decl);
-    if (decl && decl.type === 'screen'){
-      var sceneNote = document.createElement('p'); sceneNote.className = 'home-note';
-      sceneNote.textContent = 'Active means on without livestreaming or recording. Unavailable hides the scene and shows the reason (for example, protective shutdown). Mode, reason and scene event carry independently; the reason is visible only in Unavailable mode.';
-      body.appendChild(sceneNote);
-    }
+    if (editor.patchIntro) editor.patchIntro(body,decl);
     if (fields === null){
       body.appendChild(frow('patch ' + pid, rawControl()));
       return det;
@@ -4697,7 +4044,7 @@ function initWorkbenchBuilder(opts){
           if (out.error){ formError(out.error); return false; }
           return commitPatch(key, out.item[key]);
         });
-        body.appendChild(frow(decl.type === 'screen' && key === 'scenePlayback' ? 'Scene event' : key, input));
+        body.appendChild(frow(editor.patchLabel ? editor.patchLabel(key) : key, input));
       }
     });
     var rawFold = document.createElement('details');
@@ -4805,7 +4152,8 @@ function initWorkbenchBuilder(opts){
       if (ev.key === 'Enter' && input.tagName !== 'TEXTAREA'){ ev.preventDefault(); go(); }
     });
   }
-  function rowsFieldControl(key, cur, shape, folds){
+  function rowsFieldControl(key, cur, shape, options){
+    options=options || {};
     var wrap = document.createElement('div');
     wrap.className = 'rowsedit';
     var rowRefs = [];
@@ -4821,7 +4169,7 @@ function initWorkbenchBuilder(opts){
       formError('');
       var ok = commitSimple(key, out.items.length ? JSON.stringify(out.items) : null);
       if (ok){
-        if (folds) folds.items = refs.filter(function(r){return !rowIsBlank(r);}).map(function(r){return r.fold.open;});
+        if (options.committed) options.committed(refs.filter(function(r){return !rowIsBlank(r);}));
         refreshFormSoon(); /* resync typed rows, raw fallback, stale bases */
       }
       return ok;
@@ -4859,7 +4207,6 @@ function initWorkbenchBuilder(opts){
       var line = document.createElement('div');
       line.className = wide ? 'rowline rowcard' : 'rowline';
       var ref = {base: base, inputs: {}};
-      var syncIcon;
       (shape.cols || []).forEach(function(col){
         var input = colInput(col, base ? base[col.k] : null);
         wireCommit(input, commitRows);
@@ -4871,57 +4218,19 @@ function initWorkbenchBuilder(opts){
           cap.className = 'rowk';
           cap.textContent = col.k + (col.req ? ' *' : '');
           cell.appendChild(cap);
-          if (col.kind === 'icon'){
-            cell.classList.add('home-icon-cell');
-            var choice = document.createElement('span'); choice.className = 'home-icon-choice';
-            var preview = document.createElement('span'); preview.className = 'home-icon-preview';
-            preview.setAttribute('aria-hidden', 'true');
-            var note = document.createElement('span'); note.className = 'home-icon-note';
-            input.setAttribute('aria-label', (base && (base.label || base.id) || key.slice(0,-1)) + ' icon');
-            input.options[0].textContent = key === 'subjects' ? 'Default (person)' : 'Default (gear)';
-            choice.appendChild(preview); choice.appendChild(input);
-            cell.appendChild(choice); cell.appendChild(note);
-            syncIcon = function(){
-              var subject = key === 'subjects', deviceKind = ref.inputs.kind && ref.inputs.kind.value;
-              var editable = subject || deviceKind === 'sensor';
-              input.disabled = !editable; choice.hidden = !editable;
-              note.textContent = editable ? (subject ? 'Moving actor: person by default; choose an icon for a car or another subject.' :
-                'Sensor also serves as a generic device marker. Choose cloud for a cloud service.') :
-                (deviceKind === 'camera' ? 'Cameras use a fixed camera icon.' : deviceKind === 'hub' ? 'Hubs use a fixed router icon.' :
-                  deviceKind === 'entry' ? 'Entry devices use the entry marker or door drawing.' : 'Choose a device kind first.') +
-                ' For a custom icon, choose kind sensor.';
-              var icon = ICON_SET.indexOf(input.value) >= 0 ? input.value : 'gear';
-              preview.innerHTML = subject && input.value === '' ?
-                '<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>' :
-                '<svg viewBox="0 0 24 24"><use href="#i-' + icon + '"/></svg>';
-            };
-            input.addEventListener('change', syncIcon);
-          } else cell.appendChild(input);
+          if (!options.cell || !options.cell({column:col,input:input,cell:cell,ref:ref,base:base})) cell.appendChild(input);
           line.appendChild(cell);
         } else line.appendChild(input);
       });
-      if (syncIcon){
-        syncIcon();
-        if (ref.inputs.kind) ref.inputs.kind.addEventListener('change', syncIcon);
-      }
+
       var acts = line;
       if (wide){
         acts = document.createElement('div');
         acts.className = 'rowcardacts';
         line.appendChild(acts);
       }
-      if (folds && base && objectClipboard){
-        var homeTarget={kind:'home',section:currentTarget.section,index:currentTarget.index,field:key,item:rowRefs.length};
-        function rowClipboard(action){
-          var parsed=parseEditor(),path=parsed.error ? null : builderTargetPath(parsed.raw,{kind:'panel',section:homeTarget.section,index:homeTarget.index});
-          var live=path && specValueAt(parsed.raw,path.concat([key,homeTarget.item]));
-          if(JSON.stringify(live)!==JSON.stringify(base)){formError('The element changed. Reselect it before copying.');return;}
-          homeClipboardSelect(homeTarget);objectClipboard[action]([homeTarget]);
-        }
-        acts.appendChild(smallButton('Copy', 'Copy this Home element', function(){rowClipboard('copy');}));
-        acts.appendChild(smallButton('Duplicate', 'Duplicate this Home element', function(){rowClipboard('duplicate');}));
-        line.addEventListener('focusin',function(){homeClipboardSelect(homeTarget);});
-      }
+      if(options.actions) options.actions({line:line,actions:acts,base:base,index:rowRefs.length,ref:ref,button:smallButton});
+
       acts.appendChild(smallButton('↑', 'move this item up', function(){ moveRow(ref, -1); }));
       acts.appendChild(smallButton('↓', 'move this item down', function(){ moveRow(ref, 1); }));
       /* commit first; only a SUCCESSFUL commit removes the line (via the
@@ -4931,21 +4240,7 @@ function initWorkbenchBuilder(opts){
       }));
       var index = rowRefs.length;
       rowRefs.push(ref);
-      if (!folds) return line;
-      var fold = document.createElement('details'); fold.className = 'home-element';
-      fold.open = !base || folds.items[index] === true; ref.fold = fold;
-      var summary = document.createElement('summary');
-      var name = document.createElement('span'); name.className = 'home-element-name';
-      var singular = key.slice(0,-1);
-      name.textContent = base ? base.label || base.id || singular[0].toUpperCase() + singular.slice(1) + ' ' + (index + 1) : 'New ' + singular;
-      var kind = document.createElement('span'); kind.className = 'home-element-kind';
-      kind.textContent = ' · ' + (base ? (key === 'rooms' ? base.kind || 'room' : key === 'devices' ? base.display === 'door' ? 'door' : base.kind || 'device' : 'subject') : 'unsaved');
-      summary.appendChild(name); summary.appendChild(kind); fold.appendChild(summary); fold.appendChild(line);
-      if(homeTarget)summary.addEventListener('click',function(){homeClipboardSelect(homeTarget);});
-      fold.addEventListener('toggle',function(){
-        if (fold.isConnected) folds.items[rowRefs.indexOf(ref)] = fold.open;
-      });
-      return fold;
+      return options.wrapRow ? options.wrapRow({line:line,ref:ref,base:base,index:index,refs:rowRefs}) : line;
     }
     (Array.isArray(cur) ? cur : []).forEach(function(it){
       wrap.appendChild(buildRow(it && typeof it === 'object' ? it : {}));
@@ -4964,16 +4259,7 @@ function initWorkbenchBuilder(opts){
     wrap.appendChild(rawJsonFallback(key, cur, 'jsonArr'));
     return wrap;
   }
-  function homemapElementsControl(key, cur, shape){
-    var identity = JSON.stringify([currentTarget.section,currentTarget.index,key]);
-    var state = homeElementFolds[identity] || (homeElementFolds[identity] = {open:false,items:[]});
-    var group = document.createElement('details'); group.className = 'home-elements'; group.open = state.open;
-    var summary = document.createElement('summary');
-    summary.textContent = key[0].toUpperCase() + key.slice(1) + ' (' + (Array.isArray(cur) ? cur.length : 0) + ')';
-    group.appendChild(summary); group.appendChild(rowsFieldControl(key,cur,shape,state));
-    group.addEventListener('toggle',function(){if (group.isConnected) state.open = group.open;});
-    return group;
-  }
+
   function mapFieldControl(key, cur, opts){
     var wrap = document.createElement('div');
     wrap.className = 'rowsedit';
@@ -5057,56 +4343,48 @@ function initWorkbenchBuilder(opts){
     wrap.appendChild(rawJsonFallback(key, cur, 'json'));
     return wrap;
   }
+  /* The extension boundary exposes live reads and existing controls/commands.
+     Plugins cannot replace history, selection restoration, or JSON mutation. */
+  function panelEditor(type){
+    if (!type) return {};
+    var factory=panelAuthoring(type).editor, cached=panelEditors[type];
+    if(cached && cached.factory===factory) return cached.value;
+    var context={
+      source:function(){return src.value;}, target:function(){return currentTarget;},
+      editingBlocked:function(){return !!addToStep;}, parse:parseEditor,
+      commit:commitSimple, transact:commitCascade, error:formError,
+      refresh:refreshFormSoon, inspect:renderInspector, select:selectTarget,
+      rehighlight:rehighlight, stepper:stepperFor,
+      clipboard:function(){return objectClipboard;}, selectClipboard:homeClipboardSelect,
+      controls:{row:frow,block:frowBlock,action:actionButton,text:textControl,
+        number:numberControl,select:selectControl,rows:rowsFieldControl}
+    };
+    var value=factory ? factory(context) : {};
+    panelEditors[type]={factory:factory,value:value};return value;
+  }
+  function panelEditorForTarget(target){
+    if(!target || ['panel','home'].indexOf(target.kind)<0) return {};
+    var parsed=parseEditor();if(parsed.error)return {};
+    var path=builderTargetPath(parsed.raw,{kind:'panel',section:target.section,index:target.index});
+    var panel=path && specValueAt(parsed.raw,path);return panelEditor(panel && panel.type);
+  }
+  function panelEditorForCard(card){
+    var section=card && card.closest('.doc-sec[data-dv-section]');
+    return section ? panelEditorForTarget({kind:'panel',section:Number(section.getAttribute('data-dv-section')),index:Number(card.getAttribute('data-dv-panel'))}) : {};
+  }
+
   function panelSetupRows(val){
     var fields = PANEL_SETUP_FIELDS[val.type] || [['initial', 'json']];
     return fields.map(function(f){
-      var key = f[0], kind = f[1], cur = val[key];
-      if (kind === 'image'){
-        var wrap=document.createElement('div'),input=document.createElement('input'),note=document.createElement('p'),uploadVersion=0;
-        input.type='file'; input.accept='image/png,image/jpeg,image/webp'; input.setAttribute('aria-label','Embedded image file');
-        note.className='fnote';note.textContent='PNG, JPEG or WebP, up to 512 KiB. Stored inside the spec; no external image request.';
-        input.addEventListener('change',function(){
-          var epoch=++uploadVersion,file=input.files && input.files[0];if(!file)return;
-          if(file.size > EMBEDDED_IMAGE_MAX_BYTES){formError('Image is larger than 512 KiB. Use a smaller capture.');input.value='';return;}
-          if(['image/png','image/jpeg','image/webp'].indexOf(file.type)<0){formError('Choose a PNG, JPEG or WebP image.');input.value='';return;}
-          var original=src.value,selection=JSON.stringify(currentTarget),reader=new FileReader();
-          function current(){return epoch===uploadVersion && wrap.isConnected && src.value===original && JSON.stringify(currentTarget)===selection;}
-          reader.onerror=function(){if(current())formError('Could not read the image. Existing content is unchanged.');};
-          reader.onload=function(){
-            if(!current())return;
-            var data=embeddedImageSource(reader.result);
-            if(!data){formError('Invalid embedded image. Existing content is unchanged.');return;}
-            var probe=new Image();
-            probe.onload=function(){
-              if(!current())return;
-              if(!probe.naturalWidth || !probe.naturalHeight || probe.naturalWidth>4096 || probe.naturalHeight>4096){formError('Use an image no larger than 4096 × 4096 pixels.');return;}
-              if(commitSimple(key,JSON.stringify(data)))refreshFormSoon();
-            };
-            probe.onerror=function(){if(current())formError('The file is not a readable image. Existing content is unchanged.');};
-            probe.src=data;
-          };reader.readAsDataURL(file);
-        });
-        wrap.appendChild(input);wrap.appendChild(note);
-        if(cur){var remove=document.createElement('button');remove.type='button';remove.className='bbtn';remove.textContent='Remove image';
-          remove.addEventListener('click',function(){if(commitSimple(key,null))refreshFormSoon();});wrap.appendChild(remove);}
-        return frowBlock('Image file',wrap);
-      }
+      var key = f[0], kind = f[1], cur = val[key], editor=panelEditor(val.type);
+      var custom=editor.setupField && editor.setupField(f,val);
+      if(custom) return custom;
+
       if (kind === 'text')
         return frow(key, textControl(cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }));
       if (kind === 'num')
         return frow(key, numberControl(cur, function(v){ return commitSimple(key, v == null ? null : String(v)); }));
-      if (kind === 'scene'){
-        var scenes = document.createElement('div'); scenes.className = 'screen-scene-control';
-        var preview = screenScenePreview(cur);
-        var picker = selectControl(SCENE_TOKENS, cur, function(v){
-          var ok = commitSimple(key, v == null ? null : JSON.stringify(v));
-          if (ok) preview.setScene(v);
-          return ok;
-        }, true);
-        picker.setAttribute('aria-label', 'Screen scene');
-        scenes.appendChild(picker); scenes.appendChild(preview.element);
-        return frowBlock(key, scenes);
-      }
+
       if (kind === 'clock')
         return frow(key, textControl(cur, function(v){
           if (v != null && builderClockInvalid(v)){
@@ -5115,7 +4393,6 @@ function initWorkbenchBuilder(opts){
           return commitSimple(key, v == null ? null : JSON.stringify(v));
         }, {placeholder: '90s, 5m, 2h30m'}));
       if (kind === 'rows'){
-        if (val.type === 'homemap') return homemapElementsControl(key,cur,f[2] || {cols:[]});
         return frowBlock(key, rowsFieldControl(key, cur, f[2] || {cols: []}));
       }
       if (kind === 'map') return frowBlock(key, mapFieldControl(key, cur, f[2] || {}));
@@ -5156,35 +4433,8 @@ function initWorkbenchBuilder(opts){
       return commitCascade(function(raw){ return planPrimaryPanel(src.value, raw, t.section, v === 'Centerpiece' ? val.id : null); },
         {after:function(){ renderInspector(); }});
     })));
-    if (val.type === 'homemap'){
-      var layoutNote = document.createElement('p'); layoutNote.className = 'home-note';
-      layoutNote.textContent = 'Shared home layout · all steps and paths. Set outline w/h for the floor plan size; edit rooms, devices, and starting subject positions below. Coordinates use a 320 × 180 frame.';
-      rows.unshift(layoutNote);
-      rows.push(frow('Show subject labels', selectControl(['Hidden (default)', 'Shown'], val.showSubjectLabels === true ? 'Shown' : 'Hidden (default)', function(v){
-        return commitSimple('showSubjectLabels', v === 'Shown' ? 'true' : null);
-      })));
-      var editStep = document.createElement('button'); editStep.type = 'button'; editStep.className = 'bbtn';
-      editStep.textContent = 'Edit home at current step';
-      var sp = stepperFor(t.section); editStep.disabled = !sp;
-      editStep.addEventListener('click', function(){
-        var current = stepperFor(t.section); if (!current) return;
-        selectTarget({section:t.section, kind:'step', index:current.sourceIndex()}, false);
-      }); rows.push(editStep);
-      rows.push(homemapLayoutControl(val,t));
-      var conditions = document.createElement('details'); conditions.className = 'rawjson';
-      var conditionsTitle = document.createElement('summary'); conditionsTitle.textContent = 'Starting device conditions'; conditions.appendChild(conditionsTitle);
-      homemapModel(val, val.initial).devices.forEach(function(device){
-        ['state','thermal'].forEach(function(attribute){
-          var options = attribute === 'state' ? HOMEMAP_STATES[device.kind] : HOMEMAP_THERMAL;
-          var input = selectControl(options, device[attribute], function(v){
-            return commitCascade(function(raw){return planHomemapDeviceAttribute(src.value,raw,t.section,null,val.id,device.id,attribute,v);}, {after:function(){renderInspector();}});
-          });
-          input.setAttribute('aria-label', device.label + ' initial ' + attribute);
-          conditions.appendChild(frow(device.label + ' · ' + (attribute === 'thermal' ? 'temperature' : 'state'), input));
-        });
-      });
-      rows.push(conditions);
-    }
+    var editor=panelEditor(val.type);
+    if(editor.setupRows) editor.setupRows(val,ctx.diagram,t,rows);
     return rows.concat(panelSetupRows(val));
   }
   function sectionForm(val, ctx){
@@ -5697,15 +4947,9 @@ function initWorkbenchBuilder(opts){
        preview. Play/Pause are excluded so selecting an inspector cannot
        immediately stop a user-started animation. */
     if (!addToStep && !connect){
-      var homeTarget = builderHomemapClickTarget(ev.target, stepperFor, currentTarget);
-      if (homeTarget){
-        if(homeTarget.kind === 'panel'){
-          var marker=ev.target.closest('[data-device],[data-subject],[data-home-room]');
-          if(marker)homeTarget.homeElement=marker.hasAttribute('data-device') ? {field:'devices',id:marker.getAttribute('data-device')} :
-            marker.hasAttribute('data-subject') ? {field:'subjects',id:marker.getAttribute('data-subject')} : {field:'rooms',item:Number(marker.getAttribute('data-home-room'))};
-        }
-        return homeTarget;
-      }
+      var card=ev.target.closest && ev.target.closest('[data-dv-panel]');
+      var editor=panelEditorForCard(card), custom=editor.clickTarget && editor.clickTarget(ev.target);
+      if(custom) return custom;
     }
     var transport = ev.target.closest && ev.target.closest('.tbtn');
     if (transport && /^(Previous|Next) step$/.test(transport.getAttribute('aria-label') || '') &&
@@ -5804,10 +5048,9 @@ function initWorkbenchBuilder(opts){
     renderInspector();
     applyStepMarkers();
     if (stepList) stepList.sync();
-    if(target.homeElement && !parsed.error){
-      var panelPath=builderTargetPath(parsed.raw,currentTarget), home=panelPath && specValueAt(parsed.raw,panelPath), pick=target.homeElement;
-      var item=pick.field === 'rooms' ? pick.item : home && (home[pick.field] || []).findIndex(function(x){return x.id === pick.id;});
-      if(home && item>=0)homeClipboardSelect({kind:'home',section:target.section,index:target.index,field:pick.field,item:item});
+    if(!parsed.error){
+      var editor=panelEditorForTarget(target);
+      if(editor.selected) editor.selected(target,parsed.raw);
     }
     if (focusEditor === false) return;
     var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
@@ -6274,21 +5517,15 @@ function initWorkbenchBuilder(opts){
     var d = specValueAt(parsed.raw, rec.diagram);
     return (d && Array.isArray(d.rows)) ? d.rows : null;
   }
-  function applyHomeLayoutControls(){
-    Array.prototype.forEach.call(view.querySelectorAll('.pt-homemap[data-dv-panel]'), function(card){
-      if (card.querySelector('[data-home-layout]')) return;
-      var button = document.createElement('button'); button.type = 'button'; button.className = 'bbtn home-layout-button';
-      button.textContent = 'Edit layout'; button.setAttribute('data-home-layout','');
-      button.setAttribute('aria-label','Edit home layout');
-      button.title = 'Edit shared size, rooms, devices, and starting positions';
-      var title = card.querySelector('.ptitle');
-      if (!title){ title=document.createElement('div'); title.className='ptitle'; card.insertBefore(title,card.firstChild); }
-      title.classList.add('home-layout-title'); title.appendChild(button);
+  function applyPanelEditorControls(){
+    Array.prototype.forEach.call(view.querySelectorAll('[data-dv-panel]'),function(card){
+      var editor=panelEditorForCard(card);
+      if(editor.decoratePreview) editor.decoratePreview(card);
     });
   }
   function applyRowGrabs(){
     if(sectionLayoutEditor)sectionLayoutEditor.refresh();
-    applyHomeLayoutControls();
+    applyPanelEditorControls();
     /* inject one grab handle per layout row, left of the row band —
        workbench-only chrome (this file never runs on published pages).
        Handles are skipped when any row has no drawn nodes: without a

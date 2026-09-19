@@ -1,3 +1,50 @@
+/* screen validation and pure state helpers. */
+var SCENE_NAMES = [
+  'person-at-door-night',
+  'person-through-door',
+  'doorbell-run-away',
+  'doorbell-runners',
+  'package-drop',
+  'kitchen-fire',
+  'static-noise',
+];
+var SCREEN_MODES = ['off', 'boot', 'active', 'live', 'rec', 'save', 'unavailable'];
+function screenPatchWarnings(state, path, warnings) {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return;
+  if (state.mode != null && SCREEN_MODES.indexOf(state.mode) < 0)
+    warnings.push(path + '.mode: unknown camera mode — using off');
+  if (state.reason != null && typeof state.reason !== 'string')
+    warnings.push(path + '.reason: expected text or null — using the default explanation');
+  if (
+    Object.prototype.hasOwnProperty.call(state, 'scenePlayback') &&
+    ['waiting', 'playing'].indexOf(state.scenePlayback) < 0
+  )
+    warnings.push(path + '.scenePlayback: expected waiting|playing — using playing');
+  if (state.enterOnce && typeof state.enterOnce === 'object' && !Array.isArray(state.enterOnce)) {
+    var once = Object.assign({}, state.enterOnce);
+    delete once.enterOnce;
+    screenPatchWarnings(once, path + '.enterOnce', warnings);
+  }
+}
+
+PanelRegistry.extend('screen', {
+  validateDeclaration: function (p, PP, warnings, errors, d) {
+    if (p.scene && SCENE_NAMES.indexOf(p.scene) < 0)
+      warnings.push(
+        PP +
+          '.scene: unknown scene "' +
+          p.scene +
+          '" — using "static-noise" (valid: ' +
+          SCENE_NAMES.join(' ') +
+          ')'
+      );
+    screenPatchWarnings(p.initial, PP + '.initial', warnings);
+  },
+  validatePatch: function (patch, path, panel, warnings, context) {
+    screenPatchWarnings(patch, path, warnings);
+  },
+});
+
 /* screen panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
 /* ---------------- stock scenes for the screen widget ---------------- */
 function porchSceneBackdrop(night) {
@@ -242,90 +289,421 @@ var SCENES = {
     '<path d="M0 160H109V162H0Z" fill="#5DBECC"/><path d="M176 160H320V162H176Z" fill="#CD78B4"/></g></svg>',
 };
 
-PanelViews.register(
-  'screen',
-  function (host, panel, state, skin, states, stepIdx, animate) {
-    var h = '';
-    var mode = String(state.mode || 'off');
-    if (SCREEN_MODES.indexOf(mode) < 0) mode = 'off';
-    var sceneName =
-      SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
-    var scrClass =
-      'screenbox m-' +
-      mode +
-      (state.scenePlayback === 'waiting' &&
-      ['active', 'live', 'rec', 'save'].indexOf(mode) >= 0
-        ? ' scene-waiting'
-        : '');
-    /* overlays are built separately from the scene so a mode change between
+PanelViews.register('screen', function (host, panel, state, skin, states, stepIdx, animate) {
+  var h = '';
+  var mode = String(state.mode || 'off');
+  if (SCREEN_MODES.indexOf(mode) < 0) mode = 'off';
+  var sceneName = SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
+  var scrClass =
+    'screenbox m-' +
+    mode +
+    (state.scenePlayback === 'waiting' && ['active', 'live', 'rec', 'save'].indexOf(mode) >= 0
+      ? ' scene-waiting'
+      : '');
+  /* overlays are built separately from the scene so a mode change between
        two scene-showing modes can swap ONLY the overlays (surgical path
        below) and keep the scene subtree's animation state (the walker) */
-    var scrOvl = '';
-    if (mode === 'active')
-      scrOvl += '<span class="ovl activechip">ACTIVE</span>';
-    if (mode === 'live') scrOvl += '<span class="ovl livechip">LIVE</span>';
-    if (mode === 'rec')
-      scrOvl +=
-        '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
-    if (mode === 'save')
-      scrOvl +=
-        '<span class="ovl banner">' +
-        esc(state.banner || 'SAVING CLIP') +
-        '</span>';
-    if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
-    if (mode === 'unavailable')
-      scrOvl +=
-        '<div class="ovl screen-unavailable" role="status">' +
-        '<svg viewBox="0 0 40 32" aria-hidden="true"><rect x="6" y="9" width="24" height="17" rx="4"/><path d="M12 9 L15 5 H23 L26 9 M3 3 L36 30"/><circle cx="18" cy="17" r="5"/></svg>' +
-        '<strong>Camera unavailable</strong><span>' +
-        esc(
-          typeof state.reason === 'string' && state.reason.trim()
-            ? state.reason
-            : 'Video is temporarily unavailable.'
-        ) +
-        '</span></div>';
-    h += '<div class="' + scrClass + '">';
-    if (mode === 'boot') h += SCENES['static-noise'];
-    else if (
-      mode === 'active' ||
-      mode === 'live' ||
-      mode === 'rec' ||
-      mode === 'save'
-    )
-      h += SCENES[sceneName];
-    h += scrOvl + '</div>';
-    return {
-      html: h,
-      patch: function () {
-        /* screen surgical path: consecutive modes that both show the SAME scene
+  var scrOvl = '';
+  if (mode === 'active') scrOvl += '<span class="ovl activechip">ACTIVE</span>';
+  if (mode === 'live') scrOvl += '<span class="ovl livechip">LIVE</span>';
+  if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
+  if (mode === 'save')
+    scrOvl += '<span class="ovl banner">' + esc(state.banner || 'SAVING CLIP') + '</span>';
+  if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
+  if (mode === 'unavailable')
+    scrOvl +=
+      '<div class="ovl screen-unavailable" role="status">' +
+      '<svg viewBox="0 0 40 32" aria-hidden="true"><rect x="6" y="9" width="24" height="17" rx="4"/><path d="M12 9 L15 5 H23 L26 9 M3 3 L36 30"/><circle cx="18" cy="17" r="5"/></svg>' +
+      '<strong>Camera unavailable</strong><span>' +
+      esc(
+        typeof state.reason === 'string' && state.reason.trim()
+          ? state.reason
+          : 'Video is temporarily unavailable.'
+      ) +
+      '</span></div>';
+  h += '<div class="' + scrClass + '">';
+  if (mode === 'boot') h += SCENES['static-noise'];
+  else if (mode === 'active' || mode === 'live' || mode === 'rec' || mode === 'save')
+    h += SCENES[sceneName];
+  h += scrOvl + '</div>';
+  return {
+    html: h,
+    patch: function () {
+      /* screen surgical path: consecutive modes that both show the SAME scene
      (active / live / rec / save) swap only the mode class and the overlay chips,
      keeping the scene subtree — the walker's animation state survives.
      Any other transition (off/boot involved, or a first render) rebuilds. */
-        var surgical = false;
-        var SCENE_SHOWING = { active: true, live: true, rec: true, save: true };
-        if (
-          host._lastHTML != null &&
-          sceneName === host._scrScene &&
-          SCENE_SHOWING[mode] &&
-          SCENE_SHOWING[host._scrMode]
-        ) {
-          var scrBox = host.querySelector('.screenbox');
-          if (scrBox) {
-            surgical = true;
-            scrBox.className = scrClass;
-            if (scrOvl !== host._scrOverlay) {
-              var oldOvls = scrBox.querySelectorAll('.ovl');
-              for (var ov = oldOvls.length - 1; ov >= 0; ov--)
-                oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
-              if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
-            }
+      var surgical = false;
+      var SCENE_SHOWING = { active: true, live: true, rec: true, save: true };
+      if (
+        host._lastHTML != null &&
+        sceneName === host._scrScene &&
+        SCENE_SHOWING[mode] &&
+        SCENE_SHOWING[host._scrMode]
+      ) {
+        var scrBox = host.querySelector('.screenbox');
+        if (scrBox) {
+          surgical = true;
+          scrBox.className = scrClass;
+          if (scrOvl !== host._scrOverlay) {
+            var oldOvls = scrBox.querySelectorAll('.ovl');
+            for (var ov = oldOvls.length - 1; ov >= 0; ov--)
+              oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
+            if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
           }
         }
-        host._scrMode = mode;
-        host._scrScene = sceneName;
-        host._scrOverlay = scrOvl;
-        return surgical;
-      },
-    };
+      }
+      host._scrMode = mode;
+      host._scrScene = sceneName;
+      host._scrOverlay = scrOvl;
+      return surgical;
+    },
+  };
+});
+
+PanelRegistry.extend('screen', {
+  order: 4,
+  label: 'Camera screen',
+  since: '0.1.0',
+  layout: {
+    height: 8,
+  },
+});
+
+PanelRegistry.extend('screen', {
+  styles: [
+    {
+      order: 478,
+      css: String.raw`.screenbox{position:relative; border-radius:8px; overflow:hidden; aspect-ratio:16/9; background:#05080B;}
+.screenbox .scene{display:block; width:100%; height:100%;}
+.screenbox.m-active .walker, .screenbox.m-live .walker, .screenbox.m-rec .walker, .screenbox.m-save .walker{animation:walkin 3.2s ease-out forwards;}
+@keyframes walkin{from{transform:translateX(40px);} to{transform:translateX(160px);}}
+.screenbox .walker{transform:translateX(160px);}`,
+    },
+    {
+      order: 484,
+      css: String.raw`.screenbox .courier{transform:translateX(-40px);}
+.screenbox.m-active .courier, .screenbox.m-live .courier, .screenbox.m-rec .courier, .screenbox.m-save .courier{animation:courierrun 5s ease-in-out forwards;}
+@keyframes courierrun{0%{transform:translateX(-30px);} 42%{transform:translateX(238px);} 58%{transform:translateX(238px);} 100%{transform:translateX(-40px);}}
+.screenbox.m-active .courier .carried, .screenbox.m-live .courier .carried, .screenbox.m-rec .courier .carried, .screenbox.m-save .courier .carried{animation:carrydrop 5s step-end forwards;}
+@keyframes carrydrop{0%{opacity:1;} 50%{opacity:0;} 100%{opacity:0;}}
+.screenbox.m-active .pkg, .screenbox.m-live .pkg, .screenbox.m-rec .pkg, .screenbox.m-save .pkg{animation:pkgdrop 5s ease-out forwards;}
+@keyframes pkgdrop{0%,49%{opacity:0; transform:translateY(-6px);} 56%{opacity:1; transform:translateY(0);} 100%{opacity:1;}}`,
+    },
+    {
+      order: 492,
+      css: String.raw`.screenbox .entry-person{transform-origin:0 155px;transform:translate(215px,-8px) scale(.83);}
+.screenbox .entry-door{transform-origin:174px 28px;transform:skewY(-12deg) scaleX(.24);}
+.screenbox .entry-leg{transform-origin:0 127px;}
+.screenbox .entry-arm{transform-origin:0 106px;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-person{animation:entrycross 6.8s linear forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-door{animation:entryopen 6.8s ease-in-out forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-light{animation:entrylight 6.8s ease-in-out forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-leg,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-arm{animation:entrystride .68s ease-in-out 8 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-leg-back,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-arm:not(.entry-arm-back){animation-direction:alternate-reverse;}
+@keyframes entrycross{
+  0%{transform:translate(22px,0) scale(1);opacity:1;}
+  38%{transform:translate(185px,0) scale(1);opacity:1;}
+  50%{transform:translate(208px,-2px) scale(.95);opacity:1;}
+  69%{transform:translate(226px,-10px) scale(.76);opacity:1;}
+  79%,100%{transform:translate(232px,-15px) scale(.65);opacity:0;}
+}
+@keyframes entryopen{
+  0%,22%,100%{transform:skewY(0) scaleX(1);}
+  40%,80%{transform:skewY(-12deg) scaleX(.24);}
+}
+@keyframes entrylight{0%,22%,100%{opacity:0;}40%,80%{opacity:.22;}}
+@keyframes entrystride{from{transform:rotate(-17deg);}to{transform:rotate(17deg);}}`,
+    },
+    {
+      order: 506,
+      css: String.raw`.screenbox .doorbell-runner{--runner-shirt:#F2A14F;--runner-sleeve:#CE753B;--runner-delay:0s;transform-origin:0 0;transform:translate(143px,125px) scale(.78);}
+.screenbox .doorbell-runner-second{--runner-shirt:#58B8DB;--runner-sleeve:#367FB5;--runner-delay:.42s;transform:translate(186px,135px) scale(.88);}
+.screenbox .doorbell-leg{transform-origin:0 -27px;transform:rotate(-12deg) scaleY(.65);}
+.screenbox .doorbell-leg-back{transform:rotate(12deg);}
+.screenbox .doorbell-arm{transform-origin:8px -46px;transform:rotate(-18deg);}
+.screenbox .doorbell-arm-back{transform-origin:-8px -46px;transform:rotate(18deg);}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-runner{animation:doorbellaway 7.2s linear var(--runner-delay) both;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-runner-second{animation-name:doorbellawaysecond;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-bounce{animation:doorbellbounce .32s ease-in-out var(--runner-delay) 23;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-leg{animation:doorbellstride .16s ease-in-out var(--runner-delay) 46 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-arm{animation:doorbellarms .16s ease-in-out var(--runner-delay) 46 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-leg-back,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-arm:not(.doorbell-arm-back){animation-direction:alternate-reverse;}
+@keyframes doorbellaway{
+  0%{transform:translate(105px,180px) scale(1.35);}
+  16%{transform:translate(130px,146px) scale(.98);}
+  37%{transform:translate(154px,119px) scale(.66);}
+  60%{transform:translate(170px,103px) scale(.42);}
+  72%{transform:translate(180px,99px) scale(.33);}
+  82%{transform:translate(220px,97px) scale(.3);}
+  100%{transform:translate(339px,96px) scale(.27);}
+}
+@keyframes doorbellawaysecond{
+  0%{transform:translate(213px,178px) scale(1.25);}
+  16%{transform:translate(191px,149px) scale(1);}
+  37%{transform:translate(177px,122px) scale(.68);}
+  60%{transform:translate(168px,104px) scale(.43);}
+  72%{transform:translate(156px,99px) scale(.33);}
+  82%{transform:translate(109px,97px) scale(.3);}
+  100%{transform:translate(-19px,96px) scale(.27);}
+}
+@keyframes doorbellbounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-3px);}}
+@keyframes doorbellstride{from{transform:rotate(-14deg) scaleY(.48);}to{transform:rotate(14deg) scaleY(1);}}
+@keyframes doorbellarms{from{transform:rotate(-26deg);}to{transform:rotate(24deg);}}`,
+    },
+    {
+      order: 524,
+      css: String.raw`.screenbox .fire-flame{transform-origin:239px 105px;}
+.screenbox .fire-glow{filter:blur(10px);}
+.screenbox .fire-smoke{transform-origin:233px 72px;filter:blur(3px);}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-flame{animation:firebreathe 1.1s ease-in-out infinite alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-middle{animation-duration:.83s;animation-delay:-.4s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-core{animation-duration:.67s;animation-delay:-.2s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-glow{animation:fireglow 2.2s ease-in-out infinite alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-smoke{animation:firerise 3.8s ease-out infinite;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-smoke-late{animation-delay:-1.9s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-ember{animation:fireember 2.6s ease-out infinite;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-ember-late{animation-delay:-1.3s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-alarm{animation:fireglow 1.5s ease-in-out infinite alternate;}
+@keyframes firebreathe{from{transform:scale(.96,.87) skewX(-3deg);}to{transform:scale(1.04,1.05) skewX(3deg);}}
+@keyframes fireglow{from{opacity:.55;}to{opacity:1;}}
+@keyframes firerise{0%{transform:translate(0,0) scale(.7);opacity:0;}20%{opacity:.9;}100%{transform:translate(-28px,-57px) scale(1.9);opacity:0;}}
+@keyframes fireember{0%{transform:translate(0,0);opacity:0;}15%{opacity:.8;}100%{transform:translate(-12px,-45px);opacity:0;}}`,
+    },
+    {
+      order: 541,
+      css: String.raw`.screenbox.scene-waiting .scene *{animation:none !important;}
+.screenbox.scene-waiting :is(.walker,.courier,.pkg,.entry-person,.doorbell-runner,.fire-flame,.fire-glow,.fire-smoke,.fire-ember,.fire-alarm){visibility:hidden;}
+.screenbox.scene-waiting .entry-door{transform:none;}
+.screenbox.scene-waiting .entry-light{opacity:0;}
+@media(prefers-reduced-motion:reduce){
+  .screenbox :is(.scene-entry,.scene-doorbell,.scene-fire) *{animation:none !important;}
+}
+@media print{
+  .screenbox :is(.scene-entry,.scene-doorbell,.scene-fire) *{animation:none !important;}
+}
+@media print{
+  .screenbox{print-color-adjust:exact;}
+}
+.screenbox.m-boot .flick{animation:flicker .18s steps(2) infinite;}
+@keyframes flicker{50%{opacity:.3; transform:translateY(3px);}}
+.ovl{position:absolute; font:700 10.5px 'IBM Plex Mono',monospace; letter-spacing:.08em;}
+.offlabel{inset:0; display:flex; align-items:center; justify-content:center; color:#2E3A46;}
+.activechip{top:8px;left:8px;color:#FFF;text-shadow:0 1px 3px #000,0 0 2px #000;}
+.livechip{top:8px; left:8px; color:#0B1220; background:#4ADE80; padding:2px 7px; border-radius:4px;}
+.recchip{top:8px; left:8px; color:#FFB0A6; background:rgba(8,20,35,.8); padding:3px 6px; border-radius:5px; display:flex; align-items:center; gap:5px;}
+.recdot{width:8px; height:8px; border-radius:50%; background:#FF3B30; animation:recblink 1s steps(1) infinite;}
+@keyframes recblink{50%{opacity:.15;}}
+.banner{left:0; right:0; bottom:0; text-align:center; padding:5px 0; color:#0B1220; background:#FFB454;}`,
+    },
+    {
+      order: 1201,
+      css: String.raw`@media (prefers-reduced-motion: reduce){
+  .screenbox .courier, .screenbox .courier .carried, .screenbox .pkg{animation:none !important;}
+}
+@media (prefers-reduced-motion: reduce){
+  .screenbox .walker{transform:translateX(160px);}
+}`,
+    },
+    {
+      order: 1582,
+      css: String.raw`@media screen {
+  body.sk-terminal .livechip{color:var(--tm-ground); background:var(--tm-good); border-radius:0;}
+}
+@media screen {
+  body.sk-terminal .recchip{color:var(--tm-alert);}
+}
+@media screen {
+  body.sk-terminal .recdot{background-color:var(--tm-alert);}
+}
+@media screen {
+  body.sk-terminal .banner{color:var(--tm-ground); background:var(--tm-alert);}
+}`,
+    },
+    {
+      order: 1790,
+      css: String.raw`@media screen {
+  body.sk-pastel .screenbox { background:#142033; }
+}
+@media screen {
+  body.sk-pastel .livechip { color:#1E4935; background:#8AD1AA; border-radius:999px; padding:3px 8px; }
+}
+@media screen {
+  body.sk-pastel .recchip { color:#F29AA3; }
+}
+@media screen {
+  body.sk-pastel .recdot { background:#E66C77; }
+}
+@media screen {
+  body.sk-pastel .banner { color:#604716; background:#F2CE8F; }
+}`,
+    },
+    {
+      order: 2028,
+      css: String.raw`@media screen {
+  body.sk-blueprint .offlabel{color:#7DA9C1;}
+}
+@media screen {
+  body.sk-blueprint .livechip{color:#04264F;background:#47F590;border-radius:0;}
+}
+@media screen {
+  body.sk-blueprint .banner{color:#052956;background:#FFD166;}
+}`,
+    },
+    {
+      order: 2450,
+      css: String.raw`.screenbox.m-unavailable{background:radial-gradient(ellipse at 50% 10%,#263C52,#101A28 85%);}
+.screen-unavailable{inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:7px;padding:16px;box-sizing:border-box;overflow:auto;text-align:center;color:#E6EDF6;}
+.screen-unavailable svg{flex:none;width:40px;height:32px;fill:none;stroke:#A8C3E2;stroke-width:2;stroke-linecap:round;}
+.screen-unavailable strong{font:600 14px 'IBM Plex Sans',system-ui,sans-serif;}
+.screen-unavailable span{font:400 12px/1.4 'IBM Plex Sans',system-ui,sans-serif;overflow-wrap:anywhere;max-width:36em;}`,
+    },
+    {
+      order: 2459,
+      css: String.raw`@media print{
+  .screenbox.m-unavailable{print-color-adjust:exact;}
+}`,
+    },
+  ],
+});
+
+PanelRegistry.extend('screen', {
+  editorStyles: [
+    {
+      order: 503,
+      css: String.raw`.screen-scene-control{flex:1;min-width:0;display:grid;gap:8px;}
+.screen-scene-control>.fctl{width:100%;min-width:0;}
+.screen-scene-preview{min-width:0;}
+.screen-scene-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.screen-scene-footer .bbtn{min-height:32px;}`,
+    },
+  ],
+});
+
+/* screen authoring contract; merged into this panel definition by the bundle. */
+var SCENE_TOKENS = [
+  'person-at-door-night',
+  'person-through-door',
+  'doorbell-run-away',
+  'doorbell-runners',
+  'package-drop',
+  'kitchen-fire',
+  'static-noise',
+];
+
+/* A local preview never patches camera mode or advances the story. Replay
+   replaces only this SVG, so it cannot reset the diagram's animation. */
+function screenScenePreview(initialScene) {
+  var wrap = document.createElement('div');
+  wrap.className = 'screen-scene-preview';
+  var box = document.createElement('div');
+  box.className = 'screenbox m-live';
+  box.setAttribute('role', 'img');
+  wrap.appendChild(box);
+  var foot = document.createElement('div');
+  foot.className = 'screen-scene-footer';
+  var note = document.createElement('span');
+  note.className = 'fnote';
+  note.textContent = 'Simulated clip preview';
+  var replay = document.createElement('button');
+  replay.type = 'button';
+  replay.className = 'bbtn';
+  replay.textContent = 'Replay clip';
+  foot.appendChild(note);
+  foot.appendChild(replay);
+  wrap.appendChild(foot);
+  var selected;
+  function setScene(scene) {
+    selected = SCENE_TOKENS.indexOf(scene) >= 0 ? scene : 'static-noise';
+    box.innerHTML = SCENES[selected];
+    box.setAttribute('aria-label', SCENE_LABELS[selected] + ' — simulated clip preview');
   }
-);
+  replay.addEventListener('click', function () {
+    setScene(selected);
+  });
+  setScene(initialScene);
+  return { element: wrap, setScene: setScene };
+}
+
+PanelRegistry.extend('screen', {
+  authoring: {
+    template: { title: 'Camera', scene: 'static-noise', initial: { mode: 'off' } },
+    setupFields: [
+      ['scene', 'scene'],
+      ['initial', 'json'],
+    ],
+    patchFields: [
+      ['mode', 'enum', SCREEN_MODES],
+      ['scenePlayback', 'enum', ['waiting', 'playing']],
+      ['banner', 'text'],
+      ['reason', 'text'],
+    ],
+    picker: {
+      order: 15,
+      name: 'Camera view',
+      category: 'Places & sensing',
+      tagline: 'What the camera sees',
+      description:
+        'Show a camera scene moving through live view, recording, saving, and other modes.',
+    },
+    example: function (sample, context) {
+      var panel = sample.panel,
+        state = sample.state,
+        states = sample.states,
+        step = sample.step;
+      panel.scene = 'person-through-door';
+      state = { mode: 'live' };
+      panel.initial = builderClone(state);
+
+      return { panel: panel, state: state, states: states, step: step };
+    },
+    editor: function (context) {
+      return {
+        setupField: function (field, panel) {
+          if (field[1] !== 'scene') return;
+          var key = field[0],
+            cur = panel[key];
+          var scenes = document.createElement('div');
+          scenes.className = 'screen-scene-control';
+          var preview = screenScenePreview(cur);
+          var picker = context.controls.select(
+            SCENE_TOKENS,
+            cur,
+            function (v) {
+              var ok = context.commit(key, v == null ? null : JSON.stringify(v));
+              if (ok) preview.setScene(v);
+              return ok;
+            },
+            true
+          );
+          picker.setAttribute('aria-label', 'Screen scene');
+          scenes.appendChild(picker);
+          scenes.appendChild(preview.element);
+          return context.controls.block(key, scenes);
+        },
+        patchField: function (f, input) {
+          if (f[0] !== 'scenePlayback') return;
+          input.setAttribute('aria-label', 'Scene event');
+          Array.prototype.forEach.call(input.options, function (option) {
+            if (option.value === 'waiting') option.textContent = 'Before event';
+            else if (option.value === 'playing') option.textContent = 'Play event';
+            else if (option.value === '') option.textContent = 'Inherit';
+          });
+        },
+        patchIntro: function (body) {
+          var sceneNote = document.createElement('p');
+          sceneNote.className = 'home-note';
+          sceneNote.textContent =
+            'Active means on without livestreaming or recording. Unavailable hides the scene and shows the reason (for example, protective shutdown). Mode, reason and scene event carry independently; the reason is visible only in Unavailable mode.';
+          body.appendChild(sceneNote);
+        },
+        patchLabel: function (key) {
+          return key === 'scenePlayback' ? 'Scene event' : key;
+        },
+      };
+    },
+  },
+});

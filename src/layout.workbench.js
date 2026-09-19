@@ -93,7 +93,7 @@ function sectionLayoutSwap(items,from,to){
 function sectionLayoutOptimize(d,target,items){
   var hidden=(items || []).filter(function(it){return it.hidden===true && it.controls==null;});
   var previous=(items || []).find(function(it){return it.controls==='steps';});
-  var attachment=previous?previous.attachTo:items?'diagram':d.primaryPanel && (d.panels || []).some(function(p){return p.id===d.primaryPanel && p.type==='homemap';})?'panel:'+d.primaryPanel:'diagram';
+  var attachment=previous?previous.attachTo:items?'diagram':d.primaryPanel && (d.panels || []).some(function(p){return p.id===d.primaryPanel && panelCapability(p.type,'attachControls',false);})?'panel:'+d.primaryPanel:'diagram';
   var excluded=hidden.map(sectionLayoutKey),dock=attachment && excluded.indexOf(attachment)<0 && sectionLayoutTiles(d).some(function(t){return t.key==='steps';});
   if(dock)excluded.push('steps');
   var presetDiagram=attachment?Object.assign({},d,{primaryPanel:attachment==='diagram'?undefined:attachment.slice(6)}):d;
@@ -275,7 +275,7 @@ function initSectionLayoutEditor(opts){
     row.insertBefore(visibility,row.firstChild);
     if(sectionLayoutTiles(d).some(function(t){return t.key==='steps';})){
       var coupling=el('label',null,'Step controls '),attach=el('select');attach.setAttribute('aria-label','Attach step controls to');
-      [{key:'',title:'Detached'}].concat(sectionLayoutTiles(d).filter(function(t){return t.key==='diagram' || t.type==='homemap';})).forEach(function(t){var o=el('option',null,t.key?'Attached to '+t.title:t.title);o.value=t.key;attach.appendChild(o);});
+      [{key:'',title:'Detached'}].concat(sectionLayoutTiles(d).filter(function(t){return t.key==='diagram' || panelCapability(t.type,'attachControls',false);})).forEach(function(t){var o=el('option',null,t.key?'Attached to '+t.title:t.title);o.value=t.key;attach.appendChild(o);});
       var controls=items.find(function(it){return it.controls==='steps';});attach.value=controls?controls.attachTo || '':'diagram';
       attach.addEventListener('change',function(){persist(index,sectionLayoutAttach(d,items,attach.value),id);});coupling.appendChild(attach);row.appendChild(coupling);
       if(dock || !controls){

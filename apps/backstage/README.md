@@ -200,8 +200,8 @@ approved local decisions; unapproved proposals never appear.
 
 See [module ownership and verification boundaries](ARCHITECTURE.md) before changing
 request lifecycle, selection, or the viewer protocol. The upstream
-[panel module guide](../../docs/panel-modularity.md) describes the renderer modules
-and shared lifecycle, plus the remaining authoring/schema extraction.
+[panel module guide](../../docs/panel-modularity.md) describes the complete
+single-file panel contract, shared lifecycle, authoring hooks and build discovery.
 
 ## Verify
 

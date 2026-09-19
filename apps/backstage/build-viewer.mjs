@@ -7,7 +7,8 @@ import path from 'node:path';
 import {transform} from 'esbuild';
 import sourceLoader from '../../tools/source-loader.cjs';
 const app=path.dirname(fileURLToPath(import.meta.url)),root=path.resolve(app,'../..');
-const read=name=>name==='src/engine.js' ? sourceLoader.readSource('engine.js') : readFile(path.join(root,name),'utf8');
+const read=name=>name.startsWith('src/') && name.endsWith('.js') ? sourceLoader.readSource(name.slice(4)) :
+  name==='src/style.core.css' ? sourceLoader.readStyles('style.core.css') : readFile(path.join(root,name),'utf8');
 const sources=['src/compatibility.js','src/canon.js','src/validator.js','src/engine.js','apps/backstage/viewer/frame.js'];
 const js=(await transform('(function(){\n'+(await Promise.all(sources.map(read))).join('\n')+'\n})();', {minify:true,target:'es2020',legalComments:'none'})).code;
 const hash=createHash('sha256').update(js).digest('base64');

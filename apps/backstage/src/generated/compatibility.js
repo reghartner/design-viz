@@ -7,21 +7,15 @@ var FlowviewCompatibility = (function(){
   'use strict';
   var version = '0.1.0', contract = '1', baseline = '0.1.0';
   var features = Object.create(null);
-  var panelLabels = {
-    state:'State', leds:'LEDs', gauge:'Gauge', log:'Log', screen:'Camera screen',
-    image:'Embedded image', waterfall:'Waterfall', orbit:'Orbit', zoneframe:'Zone frame',
-    xray:'Device internals', queue:'Queue', pir:'Motion sensor', thermo:'Temperature',
-    battery:'Battery', buffer:'Buffer', radar:'Radar', homemap:'Home map', signal:'Signal',
-    tiles:'Tiles', inflight:'In-flight activity', phone:'Phone', deviceapp:'Camera app',
-    timeline:'Timeline', table:'Table', checks:'Checks', budget:'Budget', trace:'Trace', replicas:'Replicas'
-  };
-  Object.keys(panelLabels).forEach(function(type){features['panel.'+type]={label:panelLabels[type]+' panel',since:baseline};});
+  var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.pir":{"label":"Motion sensor panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Camera app panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"}};
+
+  Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
-  // Register future capabilities here with their actual first release, e.g.
-  // features['panel.example']={label:'Example panel',since:'1.2.0'};
+  // Panel capabilities come from their definitions at build time.
+  // Non-panel capabilities and the release version remain owned here.
   function object(v){return !!v && typeof v==='object' && !Array.isArray(v);}
   function pageOf(raw){return object(raw) && object(raw.page) ? raw.page : raw;}
   function parseVersion(value){

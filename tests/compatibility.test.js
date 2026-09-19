@@ -1,6 +1,7 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {spawnSync}=require('node:child_process'),path=require('node:path'),os=require('node:os');
-const context={};vm.runInNewContext(fs.readFileSync('src/compatibility.js','utf8'),context);
+const context={};vm.runInNewContext(readSource('compatibility.js'),context);
 const C=context.FlowviewCompatibility;
 const spec=()=>({page:{contract:'1',title:'Compatibility test',blocks:[{tabs:[{label:'Story',sections:[{
   heading:'Doorbell',diagram:{nodes:{cam:{title:'Doorbell'}},rows:[['cam']],edges:[],
@@ -56,14 +57,14 @@ test('stamping infers feature requirements, preserves future declarations and ne
   assert.equal(C.stamp({nodes:{a:{}},rows:[['a']]}).page.contract,'1');
 });
 test('new feature release requirements are inferred rather than stamping every spec with the current editor version',()=>{
-  const source=fs.readFileSync('src/compatibility.js','utf8').replace("version = '0.1.0'","version = '2.0.0'");
+  const source=readSource('compatibility.js').replace("version = '0.1.0'","version = '2.0.0'");
   const newer={};vm.runInNewContext(source,newer);const N=newer.FlowviewCompatibility;
   N.features['panel.deviceapp'].since='1.2.0';
   const stamped=N.stamp(spec());
   assert.equal(stamped.page.flowview.authoredWith,'2.0.0');assert.equal(stamped.page.flowview.minVersion,'1.2.0');
 });
 test('all current panel types have an explicit compatibility capability',()=>{
-  const validator={};vm.runInNewContext(fs.readFileSync('src/validator.js','utf8'),validator);
+  const validator={};vm.runInNewContext(readSource('validator.js'),validator);
   for(const type of validator.PANEL_TYPES)assert.ok(C.features['panel.'+type],type+' requires a capability entry');
   for(const feature of Object.values(C.features)){
     assert.notEqual(C.compare(feature.since,C.version),null);assert.ok(C.compare(feature.since,C.version)<=0);

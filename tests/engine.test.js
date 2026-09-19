@@ -1,5 +1,5 @@
 'use strict';
-const {readSource} = require('../tools/source-loader.cjs');
+const {readSource, readStyles} = require('../tools/source-loader.cjs');
 
 /* Unit tests for the pure engine core (src/validator.js + src/engine.js),
    loaded via vm so the browser fragments run without a DOM.
@@ -15,7 +15,7 @@ const ROOT = path.join(__dirname, '..');
 
 function loadCore(overrides = {}){
   const code =
-    fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
+    readSource('validator.js') + '\n' +
     readSource('engine.js') + '\n' +
     ';__exports = {validate, normalize, blocksOf, resolveProtocols, resolveLanes, diagramHasDelta,' +
     ' kindColor, stepKeys, stepTonePatch, foldPanelStates, foldNodeTones, layout, isWrap, edgePath, renderBoard, SKINS,' +
@@ -119,7 +119,7 @@ test('derived backlink parser degrades malformed or absent data to no affordance
 });
 
 test('derived backlink affordances are themed for six skins and hidden in print', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   ['.sk-aurora .nbackpop', '.sk-daylight .nbackpop',
    'body.sk-editorial .nbackpop', 'body.sk-terminal .nbackpop',
    'body.sk-pastel .nbackpop', 'body.sk-blueprint .nbackpop'].forEach(selector => {
@@ -146,7 +146,7 @@ test('panel boards keep the step bar in the diagram cell before the top-aligned 
   assert.ok(layout.grid.children.indexOf(layout.diagramCol) < layout.grid.children.indexOf(panels),
     'DOM order drives the collapsed mobile order: diagram, controls, widgets');
 
-  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   assert.match(css, /\.boardgrid\.haspanels\{[^}]*align-items:start;/);
   assert.match(css, /\.boardgrid\.haspanels > \.panelcol\{align-self:start;min-width:0;\}/);
   ['editorial', 'terminal', 'pastel', 'blueprint'].forEach(skin => {
@@ -450,7 +450,7 @@ test('validator warns, never errors, for bad node-tone shapes, ids, and tokens',
 });
 
 test('node tone CSS has complete, accessible card/title colors for all six skins and four tones', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   const uncommented = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const rules = Array.from(uncommented.matchAll(/([^{}]+)\{([^{}]*)\}/g), match => {
     const declarations = Object.create(null);
@@ -513,7 +513,7 @@ test('node tone CSS has complete, accessible card/title colors for all six skins
 });
 
 test('print resets node tones to the structural base card and disables their pulse', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   assert.match(css, /@media print\{[\s\S]*?\.node\.tone-alert \.card,\.node\.tone-warn \.card,[\s\S]*?fill:#FFFFFF !important;stroke:#999999 !important;filter:none !important;animation:none !important;/);
   assert.match(css, /@media print\{[\s\S]*?\.node\.tone-alert \.t1,\.node\.tone-warn \.t1,[\s\S]*?fill:#111111 !important;/);
   assert.match(css, /@media print\{[\s\S]*?\.node\.tone-pulse \.card\{animation:none !important;\}/);
@@ -1457,7 +1457,7 @@ test('phone validator warns on bad fields and notification shapes without errors
 });
 
 test('phone styles cover base/overlay skins, reduced motion, and static print', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   const uncommented = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const rules = Array.from(uncommented.matchAll(/([^{}]+)\{([^{}]*)\}/g), match => {
     const declarations = Object.create(null);
@@ -1750,7 +1750,7 @@ test('section collapsed authoring values warn only when non-boolean', () => {
 });
 
 test('prose collapse controls have print expansion and explicit six-skin styling', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   ['.sk-aurora .prosetoggle', '.sk-daylight .prosetoggle',
    'body.sk-editorial .prosetoggle', 'body.sk-terminal .prosetoggle',
    'body.sk-pastel .prosetoggle', 'body.sk-blueprint .prosetoggle'].forEach(selector => {
@@ -3409,7 +3409,7 @@ test('contract card deltas: badges render with semantic row classes and removed 
   assert.ok(h.includes('class="ctrow delta-added"') && h.includes('>added</span>'), h);
   assert.ok(h.includes('class="ctrow delta-removed"') && h.includes('class="ctkey">oldField'), h);
   assert.ok(h.includes('class="ctrow delta-changed"') && h.includes('>changed</span>'), h);
-  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   assert.ok(css.includes('.ctrow.delta-removed .ctkey') && css.includes('text-decoration:line-through'));
 });
 
@@ -4183,7 +4183,7 @@ test('the teaser shows while collapsed, hides on expand, and its click expands t
 });
 
 test('print styles hide the teaser (the prose itself prints expanded)', () => {
-  const css = fs.readFileSync(path.join(ROOT, 'src', 'style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   assert.match(css, /@media print\{[\s\S]*?\.sec-teaser\{display:none !important;\}/);
   assert.ok(css.includes('.sec-teaser[hidden]{display:none;}'), 'hidden attribute wins over flex');
 });
@@ -4524,7 +4524,7 @@ test('homemap subject render: jumps settle pending glides, reduced motion, escap
   reduced.renderPanelBody(host, p, {}, 'aurora', [], 0);
   reduced.renderPanelBody(host, p, moved, 'aurora', [], 1, true);
   assert.doesNotMatch(host.innerHTML, /transform:translate/);
-  const css = fs.readFileSync(path.join(ROOT, 'src/style.core.css'), 'utf8');
+  const css = readStyles('style.core.css');
   assert.match(css, /\.hmsubject\{[^}]*transition:transform \.7s/);
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.rdsubject,\.hmsubject\{transition:none !important;/);
   const core = loadCore({requestAnimationFrame: fn => raf.push(fn)});

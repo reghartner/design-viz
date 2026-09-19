@@ -38,9 +38,10 @@ function loadBuilder(extraGlobals){
     ' builderSectionPrefs,' +
     ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes, planStackNodes, builderDeletePlan, planBulkSetField, planBulkDelete, BUILDER_MULTI_KINDS,' +
     ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
-  const core = {};
-  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8'), core);
-  const sandbox = {console, ICON_SET: core.ICON_SET, SCREEN_MODES: core.SCREEN_MODES, sanitizedGroupParents: core.sanitizedGroupParents, stepFailures: core.stepFailures};
+  const sandbox = {console};
+  vm.runInNewContext(readSource('validator.js'), sandbox);
+  // This utility harness deliberately tests the no-clock-parser fallback.
+  sandbox.parseClock = undefined;
   if (extraGlobals) Object.assign(sandbox, extraGlobals);
   vm.runInNewContext(code, sandbox);
   return sandbox.__exports;
@@ -899,7 +900,7 @@ test('planDuplicateNode clones a float entry wholesale and places it after the o
 
 function loadValidator(){
   const code =
-    fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
+    readSource('validator.js') + '\n' +
     ';__exports = {validate, normalize, parseClock, ICON_SET, TINT_SET, PANEL_TYPES};';
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
@@ -1770,7 +1771,7 @@ function importHarness(ctl, boardSpec){
     MutationObserver: class {constructor(fn){ observer = fn; } observe(){}}, setTimeout(){}, clearTimeout(){},
     getComputedStyle(){ return {}; },
     localStorage: {getItem(k){ return saved[k] || null; }, setItem(k, v){ saved[k] = v; }}};
-  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/validator.js'), 'utf8') + '\n' +
+  vm.runInNewContext(readSource('validator.js') + '\n' +
     fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8'), sandbox);
   let renders = 0;
   sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, ctl:()=>ctl, render(){
@@ -1779,7 +1780,7 @@ function importHarness(ctl, boardSpec){
     const finding = element('li'); finding.textContent = 'existing validator warning';
     elements.msgs.appendChild(finding);
   }});
-  return {elements, doc, element, saved, cards, svg, get renders(){ return renders; },
+  return {elements, doc, element, saved, cards, svg, sandbox, get renders(){ return renders; },
     rerender(){ observer(); },
     move(x, y, over = null){
       doc.over = over;
@@ -1890,7 +1891,7 @@ test('Mermaid import UI blocks opening and conversion while ADD TO STEP is armed
 test('generated workbench validates imported skeletons and retains expected authoring lint', () => {
   const html = fs.readFileSync(path.join(ROOT, 'workbench/flowspec.html'), 'utf8');
   const sandbox = {console};
-  vm.runInNewContext(html.slice(html.indexOf('/* ---- src/validator.js ---- */'),
+  vm.runInNewContext(html.slice(html.indexOf('/* ---- src/panels/registry.js ---- */'),
     html.indexOf('/* ---- src/boot.workbench.js ---- */')), sandbox);
   const hld = fs.readFileSync(path.join(ROOT, 'examples/cumulus/cumulus-hld.md'), 'utf8');
   const page = sandbox.normalize(sandbox.mermaidToSpec(hld));
@@ -2061,7 +2062,7 @@ function diffWorkbench(storage = new Map(), options = {}){
       removeItem(k){ if (options.storageThrows) throw Error('blocked'); storage.delete(k); }
     }
   };
-  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/validator.js'), 'utf8'), sandbox);
+  vm.runInNewContext(readSource('validator.js'), sandbox);
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/builder.workbench.js'), 'utf8'), sandbox);
   ids.src.value = JSON.stringify(diffFixture());
   const builder = sandbox.initWorkbenchBuilder({view: element(), src: ids.src,
@@ -3133,4 +3134,48 @@ test('planStepTone keeps a "__proto__" node id as an ordinary tone key', () => {
   assert.ok(plan.text.includes('"__proto__": "alert"'), plan.text);
   const tone = JSON.parse(plan.text).steps[0].tone;
   assert.strictEqual(Object.getOwnPropertyDescriptor(tone, '__proto__').value, 'alert');
+});
+
+
+test('a registered panel supplies custom inspectors through shared controls and one-step undo/redo', () => {
+  const spec={nodes:{},rows:[[]],panels:[{id:'reading',type:'authoring-fixture',title:'Reading',value:4}],steps:[{text:'Measure',panels:{reading:{value:5}}}]};
+  const h=importHarness(null,spec), C=h.sandbox;
+  let factories=0;
+  C.PanelRegistry.extend('authoring-fixture',{authoring:{
+    template:{title:'Reading',value:4},setupFields:[['value','num']],patchFields:[['value','num']],
+    editor(context){
+      factories++;
+      return {
+        setupRows(panel,diagram,target,rows){
+          rows.push(context.controls.action('Raise reading',()=>{
+            if(context.commit('value',String(panel.value+1)))context.inspect();
+          }));
+        },
+        stepControl(diagram,panel,target){
+          return context.controls.row('Custom reading',context.controls.number(diagram.steps[target.index].panels[panel.id].value,value=>
+            context.transact(raw=>C.planStepSetPanelPatch(context.source(),raw,target.section,target.index,panel.id,JSON.stringify({value})),{after:context.inspect})));
+        }
+      };
+    }
+  }});
+  const section=h.elements.docview.querySelector('.doc-sec');
+  const card=section.appendChild(h.element());card.setAttribute('data-dv-panel','0');
+  card.fire('click');
+  const raise=()=>h.elements.guide.querySelectorAll('button').find(button=>button.textContent==='Raise reading');
+  assert.ok(raise(),'new panel hook is discovered after workbench initialization');
+  raise().fire('click');
+  assert.equal(JSON.parse(h.elements.src.value).panels[0].value,5);
+  h.click('undo-builder');assert.equal(JSON.parse(h.elements.src.value).panels[0].value,4);
+  assert.equal(h.elements['undo-builder'].disabled,true,'one custom action creates exactly one undo entry');
+  h.click('redo-builder');assert.equal(JSON.parse(h.elements.src.value).panels[0].value,5);
+  card.fire('click');
+  const ordinary=h.elements.guide.querySelector('input.fnum');ordinary.value='8';ordinary.fire('change');
+  assert.equal(JSON.parse(h.elements.src.value).panels[0].value,8,'metadata still uses the ordinary shared setup control');
+  h.click('undo-builder');assert.equal(JSON.parse(h.elements.src.value).panels[0].value,5);
+  const step=section.appendChild(h.element());step.setAttribute('data-dv-step','0');step.fire('click');
+  const reading=h.elements.guide.querySelector('input.fnum');reading.value='9';reading.fire('change');
+  assert.equal(JSON.parse(h.elements.src.value).steps[0].panels.reading.value,9);
+  h.click('undo-builder');assert.equal(JSON.parse(h.elements.src.value).steps[0].panels.reading.value,5);
+  h.click('redo-builder');assert.equal(JSON.parse(h.elements.src.value).steps[0].panels.reading.value,9);
+  assert.equal(factories,1,'the panel owns one editor instance across rerenders and selections');
 });

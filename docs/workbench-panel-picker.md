@@ -28,10 +28,12 @@ current destination.
 
 ## Implementation and verification
 
-`src/panel-picker.workbench.js` contains the catalog and preview examples. The
-builder supplies the current destination and commits through the existing
-`planAddPanel` / insertion history. Examples are cloned independently of
-`PANEL_TEMPLATES`, which still define the added panel’s defaults.
+Each file in `src/panels/types/` supplies its catalog entry, template and preview
+example through the [panel definition](panel-modularity.md).
+`src/panel-picker.workbench.js` discovers them from the registry. The builder
+supplies the destination and commits through the existing `planAddPanel` /
+insertion history. Examples are cloned independently of each panel's template;
+`PANEL_TEMPLATES` is a compatibility view of those registered defaults.
 
 Each preview calls `renderPanelBody` once with animation disabled and keeps a
 DOM clone. Cloning drops renderer listeners and state; internal SVG IDs and their

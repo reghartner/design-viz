@@ -2214,7 +2214,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
 function diagramFocusPanel(d){
   var panels = Array.isArray(d.panels) ? d.panels : [];
   return panels.find(function(p){return p && typeof p.id === 'string' && p.id && p.id === d.primaryPanel;}) ||
-    panels.find(function(p){return p && typeof p.id === 'string' && p.id && p.type === 'homemap';}) || null;
+    panels.find(function(p){return p && typeof p.id === 'string' && p.id && panelCapability(p.type,'focusByDefault',false);}) || null;
 }
 function createBoardGrid(sectionEl, hasPanels, primaryPanel){
   var toolbar, choices, modes;
@@ -2277,7 +2277,7 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
     buttons.flow.setAttribute('aria-pressed',String(!home));
     if (changed) changed(home ? layout.primaryHost : layout.diagramCol);
   }
-  [['panel',panel.type === 'homemap' ? 'Home' : panel.title || 'Panel'],['flow','Data flow']].forEach(function(choice){
+  [['panel',panelCapability(panel.type,'focusLabel',panel.title || 'Panel')],['flow','Data flow']].forEach(function(choice){
     var button = document.createElement('button'); button.type = 'button'; button.className = 'mbtn';
     button.textContent = choice[1]; button.setAttribute('data-view-focus',choice[0]);
     button.title = 'Make ' + choice[1] + ' the main view';

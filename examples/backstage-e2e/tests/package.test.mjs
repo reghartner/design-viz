@@ -101,11 +101,14 @@ test('fresh portable repositories seed over HTTP, pin real code, and detect both
   // Valid mixed-case IDs must work through both association and revision reads.
   const {createDesignerServer} = await import(pathToFileURL(path.join(designer, 'server/server.mjs')));
   const specFile = path.join(designer, 'specs/doorbell.json'), originalSpec = await readFile(specFile, 'utf8');
+  const registryFile = path.join(designer, 'registry.json'), originalRegistry = await readFile(registryFile, 'utf8');
+  const mixedRegistry = JSON.parse(originalRegistry); mixedRegistry.diagrams[0].id = 'Doorbell';
   const mixed = structuredClone(spec); mixed.page.canon.id = 'Doorbell';
   const caseServer = createDesignerServer({token: 'fictional-test'});
   await new Promise(resolve => caseServer.listen(0, '127.0.0.1', resolve));
   try {
     await writeFile(specFile, JSON.stringify(mixed));
+    await writeFile(registryFile, JSON.stringify(mixedRegistry));
     const base = 'http://127.0.0.1:' + caseServer.address().port;
     const headers = {Authorization: 'Bearer fictional-test'};
     const indexed = await (await fetch(base + '/api/canon/entity-diagrams?entityRef=component:home/recording-service', {headers})).json();
@@ -115,6 +118,7 @@ test('fresh portable repositories seed over HTTP, pin real code, and detect both
     assert.equal((await published.json()).page.canon.id, 'Doorbell');
   } finally {
     await writeFile(specFile, originalSpec);
+    await writeFile(registryFile, originalRegistry);
     await new Promise(resolve => caseServer.close(resolve));
   }
   const sources = new LocalGitSources({'https://github.com/fixture-company/sample.mock': mock});

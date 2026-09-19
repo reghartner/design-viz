@@ -5,6 +5,13 @@
   source is in `src/`; `tools/build.py` builds both committed HTML entry points.
   Generated-only edits need a source explanation or correction, not acceptance
   of a hand patch that the next build erases.
+- Panel discovery follows `src/source-bundles.json`: the assembled validator
+  includes `panels/registry.js`, shared helpers and every `panels/types/*.js`.
+  Use `tools/source-loader.cjs` (`readSource`) for VM tests and tools; raw-file
+  reads skip module definitions. The same collector supplies module CSS and
+  compatibility metadata to portable pages and host builds. See
+  `docs/panel-modularity.md` and `tests/panel-extension.test.js` for the complete
+  single-file extension contract, including headless backend packaging.
 - Tool/CLI changes: check actual callers, exit codes, input/output formats,
   escaping, destination safety and reproducibility. Run matching Python/Node
   tests; shared Python helpers may warrant

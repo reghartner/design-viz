@@ -1,23 +1,26 @@
-# Recipe — radar range view: distance-gated alerts and a visit path
+# Recipe — Radar range, an authored alert, and a visit path
 
-Widget: `radar` — a top-down range view. Declare the sensor, wedge
-(`facing`/`spread`, same degree convention as `pir`: 0 right, 90 down, 180
-left, 270 up, y grows DOWNWARD), `range`, an alert `threshold` distance, and
-optional zone polygons. Each step patches only `subject`; the engine computes
-distance, threshold alert, zone occupancy, and the dotted track of every
-prior position.
+Widget: `radar` — a top-down sensing view. Declare the sensor, `facing`,
+`spread`, `range`, an optional reference `threshold`, and zone polygons.
+Directions are degrees clockwise from +x: 0 right, 90 down, 180 left,
+270 up; y increases downward.
 
-`pir` vs `radar`: `pir` argues a binary cone trip (in the cone or not);
-`radar` argues DISTANCE and PATH (how close, along what route). A
-radar-wakes-camera story often pairs both: `radar` panel for the approach,
-then the camera pipeline.
+The engine computes distance, zone occupancy and the dotted subject track.
+**Alert state is authored:** start with `initial.alert:false`, set `alert:true`
+on the source's alarm beat and `alert:false` when it clears. Sparse patches
+carry alert state along the selected path. Threshold crossings, wedge entry,
+zone occupancy and subject removal never change it automatically.
 
-Complete working spec (distance-gated doorbell alert with a visit path):
+This illustrative doorbell sequence uses an 8 ft reference arc and an authored
+wake event. Replace its measurements and event timing with the source's facts.
+The final beat clears the alert while the subject remains near the door.
+
+Complete working spec (explicit alert transitions with distance context):
 
 ```json
 {
   "page": {
-    "title": "Recipe — radar range gating",
+    "title": "Recipe — Radar alert and visit path",
     "skin": "aurora",
     "lanes": {
       "DEV": {"color": "#FFB454"},
@@ -25,10 +28,10 @@ Complete working spec (distance-gated doorbell alert with a visit path):
     },
     "blocks": [
       {
-        "heading": "Alert only inside 8 ft — and keep the visit path",
+        "heading": "An authored alert near the door — and the visit path",
         "accent": "amber",
         "text": [
-          "The radar tracks an approach long before the camera wakes. Sidewalk traffic stays outside the threshold arc and never alerts; the alert fires only when the subject crosses it, and the dotted track in the panel is the path map attached to the notification."
+          "Illustrative sequence: Radar shows distance and the subject track. The spec authors the alarm when the sensor reports an event, then clears it after handling. The 8 ft arc supplies distance context; it does not trigger the alarm."
         ],
         "diagram": {
           "view": "step",
@@ -50,10 +53,11 @@ Complete working spec (distance-gated doorbell alert with a visit path):
           "panels": [
             {"id": "rng", "type": "radar", "title": "Radar — approach (plan)",
              "sensor": {"x": 160, "y": 168}, "facing": 270, "spread": 120,
-             "range": 150, "threshold": 80, "rings": 3,
+             "scale": {"pxPerUnit": 10, "unit": "ft"},
+             "range": 15, "threshold": 8, "rings": [4, 8, 12],
              "zones": [{"id": "walk", "label": "sidewalk",
                         "points": [[10, 20], [310, 20], [310, 52], [10, 52]]}],
-             "initial": {"subject": {"x": 40, "y": 36}}},
+             "initial": {"subject": {"x": 40, "y": 36}, "alert": false}},
             {"id": "cam", "type": "state", "title": "Camera",
              "states": ["ASLEEP", "WAKING", "RECORDING"],
              "colors": {"ASLEEP": "#55627A", "WAKING": "#FFB454", "RECORDING": "#FF6B5E"},
@@ -64,11 +68,11 @@ Complete working spec (distance-gated doorbell alert with a visit path):
              "text": "Passer-by on the sidewalk — tracked, outside the threshold, no alert"},
             {"nodes": ["rdr"], "lane": "DEV",
              "text": "Someone turns up the walkway — still outside 8 ft",
-             "panels": {"rng": {"subject": {"x": 120, "y": 70}}}},
+             "panels": {"rng": {"subject": {"x": 120, "y": 70}, "alert": false}}},
             {"edge": "rdr->soc", "lane": "DEV",
-             "text": "Threshold crossed — the radar wakes the camera before the visitor arrives",
-             "panels": {"rng": {"subject": {"x": 150, "y": 112},
-                                "banner": "INSIDE 8 FT — WAKE CAMERA"},
+             "text": "Sensor reports an alarm — the authored alert wakes the camera",
+             "panels": {"rng": {"subject": {"x": 150, "y": 112}, "alert": true,
+                                "banner": "ALARM REPORTED — WAKE CAMERA"},
                         "cam": {"state": "WAKING"}}},
             {"nodes": ["soc"], "lane": "DEV",
              "text": "Camera up and recording as the visitor reaches the door",
@@ -76,7 +80,10 @@ Complete working spec (distance-gated doorbell alert with a visit path):
                         "cam": {"state": "RECORDING"}}},
             {"edges": ["soc->cloud", "cloud->phone"], "lane": "NET",
              "packets": [{"edge": "soc->cloud"}, {"edge": "cloud->phone", "delay": 0.45}],
-             "text": "Event uploads with the visit path; the push renders the track"}
+             "text": "Event uploads with the visit path; the push renders the track"},
+            {"nodes": ["rdr"], "lane": "DEV",
+             "text": "Event handled — clear the alert while the visitor remains nearby",
+             "panels": {"rng": {"alert": false}}}
           ]
         }
       }
@@ -87,11 +94,13 @@ Complete working spec (distance-gated doorbell alert with a visit path):
 
 Adaptation notes:
 
-- Geometry verification works like `pir` (see `motion-detection.md`): run
-  `radarModel` in a Node vm with your planned subject points and read
-  `alert` / `occupied` before injecting — never assert the alert yourself.
-- Room presence (mmWave sensor): `spread: 360` draws full rings; zones are
-  the room regions (bed, desk, door); step the subject through them and let
-  occupancy light the zones. No threshold needed — omit it.
-- The track dedupes a parked subject and breaks where a step has no
-  `subject` — a person leaving and returning reads correctly.
+- Run `radarModel` through the assembled source loader as shown in
+  [motion detection](motion-detection.md). Check `dist` and `occupied` for the
+  planned geometry, and check `alert` against the separately authored event.
+- Room presence: `spread:360` draws full rings. Use room zones and subject
+  positions to show computed occupancy. Occupancy does not set an alarm;
+  keep `alert:false` unless the source establishes an alert event.
+- An omitted `subject` patch carries the previous position. Use `subject:null`
+  to hide it and break the track; explicitly clear the alert when appropriate.
+- Preserve hardware names from the source. A Radar visualization does not
+  establish which sensing technology or real-world policy produced an event.

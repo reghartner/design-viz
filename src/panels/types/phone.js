@@ -261,7 +261,7 @@ PanelViews.register('phone', function (host, panel, state, skin, states, stepIdx
   var h = '';
   var hBaseline = null;
   var phm = phoneModel(state);
-  /* Like pir/radar, entry is derived from the transition we actually
+  /* Like Radar, entry is derived from the transition we actually
        painted, never from the target snapshot's `_phoneAdded` marker. That
        marker is also present when navigating backward onto its source step.
        Requiring an adjacent forward step and a strictly deeper stack keeps

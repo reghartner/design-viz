@@ -13,7 +13,7 @@ function radarPatchWarnings(obj, path, warnings) {
   if (obj.threshold != null && !(isFiniteNum(obj.threshold) && obj.threshold > 0))
     warnings.push(path + '.threshold: must be a positive finite distance — re-tune ignored');
   if (obj.alert != null && typeof obj.alert !== 'boolean')
-    warnings.push(path + '.alert: must be true or false — override ignored');
+    warnings.push(path + '.alert: must be true or false — only true activates the alert');
 }
 
 PanelRegistry.extend('radar', {
@@ -228,20 +228,19 @@ function radarModel(panel, state) {
     var sp = fromPolar(state.subject.r, state.subject.deg);
     subj = { x: Math.round(sp.x * 10) / 10, y: Math.round(sp.y * 10) / 10 };
   }
+  /* Alerts are authored state, independent of proximity and occupied zones.
+     Sparse step folding carries the last explicit alert until it is cleared. */
   var dist = null,
-    alert = false,
+    alert = state.alert === true,
     occupied = [];
   if (subj) {
     var dx = subj.x - sensor.x,
       dy = subj.y - sensor.y;
     dist = Math.sqrt(dx * dx + dy * dy);
-    if (threshold != null && dist <= threshold) alert = true;
     zones.forEach(function (z) {
       if (pointInPoly(subj.x, subj.y, z.points)) occupied.push(z.id);
     });
   }
-  if (state.alert === true) alert = true;
-  if (state.alert === false) alert = false;
   return {
     sensor: sensor,
     facing: facing,
@@ -260,13 +259,6 @@ function radarModel(panel, state) {
   };
 }
 
-/* buffer widget: a segmented buffer strip — pre-roll rings, store-and-forward
-   queues, storage rotation. Pure model (node-testable). The author declares
-   the segment count once and patches a `cells` array of state tokens per step
-   (REPLACES wholesale, like zones); missing tail cells are `empty`, unknown
-   tokens fall back to `empty` (validator warns). `head` marks the write
-   position. The footer summary (counts per state) is COMPUTED. */
-
 PanelViews.register('radar', function (host, panel, state, skin, states, stepIdx, animate) {
   var h = '';
   var hBaseline = null;
@@ -274,7 +266,7 @@ PanelViews.register('radar', function (host, panel, state, skin, states, stepIdx
   var ridx = typeof stepIdx === 'number' ? stepIdx : 0;
   /* one-shot ripple + glide fire on the clear→alert transition / a move,
        with a steady baseline stored so the following unchanged step skips
-       (same discipline as pir) */
+       so unchanged steps preserve ambient animation */
   var rdFresh = animate && rm2.alert && host._rdAlert === false;
   var rdPrev = host._rdPrev || null;
   var rdMoved =
@@ -447,7 +439,7 @@ PanelViews.register('radar', function (host, panel, state, skin, states, stepIdx
           '<circle class="rdripple" cx="' + rm2.subject.x + '" cy="' + rm2.subject.y + '" r="6"/>';
     }
     var rstat =
-      rm2.status != null ? rm2.status : rm2.subject ? (rm2.alert ? 'RANGE ALERT' : 'CLEAR') : '';
+      rm2.status != null ? rm2.status : rm2.alert ? 'RANGE ALERT' : rm2.subject ? 'CLEAR' : '';
     if (rstat) {
       s +=
         '<rect class="rdstatusbg ' +
@@ -498,14 +490,14 @@ PanelRegistry.extend('radar', {
 .rdzlbl{font:600 9px 'IBM Plex Mono',monospace; fill:#55627A;}
 .rdzlbl.occ{fill:#8AE8FF;}
 .rdsweep line{stroke:#38E1FF; stroke-width:1.2; opacity:.28; stroke-linecap:round;}
-.rdsweep{transform-box:view-box; animation:pirsweep 3.2s ease-in-out infinite alternate;}
+.rdsweep{transform-box:view-box; animation:sensorSweep 3.2s ease-in-out infinite alternate;}
 .rdsensor{fill:#38E1FF; filter:drop-shadow(0 0 4px rgba(56,225,255,.85));}
 .rdtrack{fill:none; stroke:#5E7396; stroke-width:1.2; stroke-dasharray:2 4;}
 .rdtrackdot{fill:#5E7396;}
 .rdsubject{stroke:#0A0F14; stroke-width:1.5; transition:transform .7s cubic-bezier(.4,0,.2,1);}
 .rdsubject.clear{fill:#94A3B8;}
 .rdsubject.alert{fill:#FFB454; filter:drop-shadow(0 0 5px rgba(255,180,84,.9));}
-.rdripple{fill:none; stroke:#FFB454; stroke-width:2; animation:pirripple 1s ease-out both;}
+.rdripple{fill:none; stroke:#FFB454; stroke-width:2; animation:sensorRipple 1s ease-out both;}
 .rdstatusbg{opacity:.92;}
 .rdstatusbg.clear{fill:#334155;}
 .rdstatusbg.alert{fill:#B45309;}
@@ -641,7 +633,7 @@ PanelRegistry.extend('radar', {
       name: 'Range radar',
       category: 'Places & sensing',
       tagline: 'Distance makes the difference',
-      description: 'Show measured range, detection zones, and alert thresholds around a sensor.',
+      description: 'Show measured range, occupied zones, and a reference threshold. Turn alerts on or off explicitly in each step.',
     },
     example: function (sample, context) {
       var panel = sample.panel,

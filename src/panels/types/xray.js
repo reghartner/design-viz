@@ -27,13 +27,6 @@ function xrayModel(declared, stateLayers) {
   });
 }
 
-/* pir line-of-sight widget: a mounted IR/PIR sensor projects a field-of-view
-   cone; a subject dot is tested against it and rendered tripped or clear. Pure
-   model (node-testable, no DOM). Frame is 320x180. `facing` is degrees measured
-   clockwise from +x in screen space (y grows downward): 0=right, 90=down,
-   180=left, 270=up. Containment = within range AND within half the spread of
-   the facing direction. An explicit state.tripped overrides the computation. */
-
 PanelViews.register('xray', function (host, panel, state, skin, states, stepIdx, animate) {
   var h = '';
   var xm = xrayModel(panel.layers, state.layers);

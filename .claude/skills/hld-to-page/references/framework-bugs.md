@@ -4,7 +4,16 @@ Use this only after an actual tool failure or a documented capability gap.
 Check `tools/widget_doc.py <type>`, the authoring contract, and the matching
 recipe before claiming a feature is missing. Multi-row layouts (`rows`), staged
 reveals (`revealAt`), custom edge kinds (`protocols`), and alternate paths already
-exist. Cite the relevant contract when describing a real limitation.
+exist. Radar distance and occupancy are geometric; its alert state is explicitly
+authored, so a threshold crossing without an alert patch is not a renderer bug.
+Cite the relevant contract when describing a real limitation.
+
+For panel defects, implementation lives in `src/panels/types/<type>.js`;
+shared state/presentation behavior lives in `src/panels/shared.js`. Registry
+and source assembly are described in `docs/panel-modularity.md`. A headless
+model reproduction must use `readSource('validator.js')` from
+`tools/source-loader.cjs`, then `readSource('engine.js')` when engine helpers
+are needed; the raw validator/engine files omit the discovered definitions.
 
 Fix spec errors in your output. Do not change VIZ to make a consumer spec pass.
 If an engine defect blocks one part, report that part and continue independent

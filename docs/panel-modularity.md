@@ -3,7 +3,7 @@
 Each panel type has one authored JavaScript file in `src/panels/types/`. It owns
 validation, state rules, presentation, editor metadata and custom controls,
 picker examples, styles, layout capabilities, reference paths and release metadata.
-All 28 built-in types use this contract. There is no central panel allowlist,
+All built-in types use this contract. There is no central panel allowlist,
 picker table, import list or compatibility entry to update.
 
 Add a panel definition and its tests, then rebuild generated artifacts. A new
@@ -89,8 +89,18 @@ duplicate rules between modules.
 `src/source-bundles.json` discovers `panels/types/*.js` deterministically. The
 validator bundle includes DOM-free definitions; the viewer adds the engine and
 the workbench adds generic editing code. Node/Python builders use the same manifest
-and asset collector. Feature metadata and CSS are collected at build time for
+and asset collector. Use `readSource('validator.js')` from
+`tools/source-loader.cjs` for headless tools/tests; it assembles the registry,
+validator, shared helpers and type definitions. Add `readSource('engine.js')`
+when player/layout helpers are needed. Reading either raw file directly omits
+panel modules. Feature metadata and CSS are collected at build time for
 standalone, workbench, Backstage and Forge.
+
+Radar's module keeps geometry and alert state separate: the model computes
+distance and occupancy, while authored `alert` booleans fold through the shared
+state helper. No geometric test sets the alert. The old PIR panel is removed;
+convert old declarations and events explicitly as described in the authoring
+contract rather than adding a runtime alias or inferred alarm rule.
 
 The packaged backend contains generated code and has no runtime source-file or
 VM dependency. Backstage's standalone compatibility checker contains generated

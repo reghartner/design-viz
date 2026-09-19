@@ -41,8 +41,8 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | a temperature readout with warning / shutdown thresholds | `temperature.md` |
 | a hot or frozen Home device, charging pause, camera unavailability and thermal recovery | [thermal-protection.md](thermal-protection.md) — complete interactive teaching flow |
 | a battery / charge level that drains and raises a low event | `battery-level.md` |
-| motion detection — a sensor cone, an approach, a trip | `motion-detection.md` |
-| radar range, zones, targets, or occupancy | `radar-range.md` |
+| motion detection — sensing geometry, an approach, and an authored event | `motion-detection.md` |
+| Radar range, zones, targets, occupancy, or manual alert transitions | `radar-range.md` |
 | Wi-Fi/link health, retries, or a weak connection | `link-health.md` |
 | several devices in a fleet overview | `fleet-dashboard.md` |
 | camera recording buffers and dropped or retained frames | `recording-buffer.md` |
@@ -65,12 +65,12 @@ and [effective panel state](../docs/workbench-state-inspector.md).
 - Alternate paths use one step registry. Shared IDs share content; a different
   outcome needs its own ID at the first differing beat. State folds through
   the selected path only, including any shared ending. See the alternate recipe.
-- The engine COMPUTES verdict-like state (a pir subject's tripped/clear, a
-  thermo zone) from declared geometry/thresholds — author inputs, not
-  conclusions for these computed widgets. `checks` instead displays explicitly
-  sourced outcomes; it never runs rules or verifies a system. `table` change
-  badges are also authored. `budget` computes comparisons from sourced values
-  and limits, and shows missing data explicitly.
+- Geometry and alarm decisions are separate. Radar computes distance and zone
+  occupancy; its `alert` is authored with explicit true/false transitions and
+  never inferred from geometry. Thermo/battery bands and budget comparisons
+  compute from sourced values and limits. `checks` outcomes, `table` change
+  badges and `zoneframe.verdict` are authored; they do not run system rules or
+  prove a real-world decision.
 - Every step needs content (an edge, nodes, a panel patch, or `failures`), and each
   edge-bearing step needs a DISTINCT first edge or its number coin lands on
   another step's coin (the validator lint names both steps when this happens).

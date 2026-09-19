@@ -240,3 +240,30 @@ test('paths ending inside a shared prefix show only shared shadows, without an i
     assert.equal(h.term.btnNext.disabled,true);
   }
 });
+
+
+test('Radar alarms carry until explicitly cleared and stay isolated between paths',()=>{
+  const c=load(),d={nodes:{sensor:{}},rows:[['sensor']],
+    panels:[{id:'radar',type:'radar',threshold:80,initial:{subject:{x:160,y:110}}}],
+    steps:[
+      {id:'near',text:'Inside reference threshold'},
+      {id:'alarm',text:'Sensor reports alarm',panels:{radar:{alert:true}}},
+      {id:'depart',text:'Subject leaves',panels:{radar:{subject:null}}},
+      {id:'reset',text:'Clear alarm',panels:{radar:{alert:false}}},
+      {id:'quiet',text:'No alarm reported',panels:{radar:{}}}
+    ],paths:[{id:'happy',steps:['near','alarm','depart','reset']},
+      {id:'quiet',steps:['near','quiet','depart']}]};
+  const before=JSON.stringify(d);
+  const alerts=id=>c.foldPanelStates(c.diagramForPath(d,id)).radar.map(state=>c.radarModel(d.panels[0],state).alert);
+  assert.deepEqual(plain(alerts('happy')),[false,true,true,false]);
+  assert.deepEqual(plain(alerts('quiet')),[false,false,false]);
+  assert.deepEqual(plain(alerts('happy')),[false,true,true,false], 'returning to a path is deterministic');
+  assert.equal(JSON.stringify(d),before);
+  const edit=c.planStepSetPanelPatch(JSON.stringify(d),d,0,4,'radar','{"alert":true}');
+  assert.equal(edit.error,undefined);
+  const edited=JSON.parse(edit.text);
+  assert.equal(c.foldPanelStates(c.diagramForPath(edited,'quiet')).radar[1].alert,true);
+  assert.equal(edited.steps[1].panels.radar.alert,true,'editing an alternate preserves the main step');
+  const clear=c.planStepSetPanelPatch(edit.text,edited,0,4,'radar','{"alert":false}');
+  assert.equal(c.foldPanelStates(c.diagramForPath(JSON.parse(clear.text),'quiet')).radar[1].alert,false);
+});

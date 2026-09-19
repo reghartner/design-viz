@@ -90,7 +90,7 @@ The effective-state inspector is built in [#54](https://github.com/reghartner/de
 | AI tool execution / RAG | Trace + retrieved-item table + token/cost budget + tool checks |
 | Device shadow reconciliation | Desired/reported table + version/interlock checks + memory budget |
 | Firmware update | Existing xray/tiles + signature checks + staging budget + rollback story |
-| Battery camera wake path | Existing battery/PIR/screen + latency budget + wake interlocks |
+| Battery camera wake path | Existing battery/Radar/screen + authored alert transitions + wake interlocks |
 | Industrial actuator control | Existing signal/timeline + safety checks + deadline occupancy |
 
 ## Design constraints

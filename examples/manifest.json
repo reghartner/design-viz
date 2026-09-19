@@ -97,8 +97,8 @@
         "gauge",
         "leds",
         "log",
-        "pir",
         "queue",
+        "radar",
         "screen",
         "state",
         "thermo"
@@ -321,7 +321,6 @@
         "log",
         "orbit",
         "phone",
-        "pir",
         "queue",
         "radar",
         "screen",

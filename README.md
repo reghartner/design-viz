@@ -172,9 +172,8 @@ Everything here — content and tooling — came out of an agent-driven loop:
    corresponds to the 24 GHz radar in Ring's Battery Doorbell Pro. No affiliation with
    either company; everything named in the documents is fictional.
 3. **Widgets.** Agents built the inspector widgets needed to visualize those features —
-   twenty of them, from state machines and gauges to a ring buffer, a radar sweep, a
-   wall-clock heartbeat timeline, and a
-   phone notification stack.
+   built-in panels ranging from state machines and gauges to a ring buffer, a radar
+   sweep, a wall-clock heartbeat timeline, and a phone notification stack.
 4. **Generator + contract.** The page generator was built around a strict authoring
    contract (`contract/authoring-contract.md`) and a written agent runbook
    (`.claude/skills/hld-to-page/SKILL.md`) for turning an HLD into a page.
@@ -186,6 +185,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 
 | path | what it is |
 |---|---|
+| `src/panels/types/<type>.js` | One complete panel definition: validation, state rules, renderer, editor controls/metadata, picker example, styles, layout/reference capabilities and release metadata. Shared primitives stay in `src/panels/shared.js`; see [panel development](docs/panel-modularity.md). |
 | `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both committed single-file pages and `tools/canon/generated-runtime.cjs` for Node backends from `src/`. Edit `src/`, run `python3 tools/build.py`, commit the outputs with it — CI fails if they drift. |
 | `tests/` + `.github/workflows/ci.yml` | Python + Node unit tests (zero dependencies): injection anchoring, build determinism, spec validation, lint rules, layout math, panel-state folding, tool exports, and end-to-end CLI checks over seeded fixtures. CI runs them plus an examples-build and spec-validation check on every push and PR. |
 | `tools/validate.js` | Validator + lint CLI: `node tools/validate.js <spec.json>` prints errors, warnings, and lint findings with field paths; exit 1 on errors. `--quiet` for CI. Loads the same validator the pages ship, so CLI and in-page results cannot drift. |
@@ -194,10 +194,15 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | `tools/build_index.py` | Generates a root's `index.html` and `crossref.json` from `manifest.json` plus every named spec. The index groups pages by family and lists exact-title services shared by 2+ pages; the JSON catalog supplies derived per-page backlinks. |
 | `tools/mermaid2spec.py` | Converts a mermaid `sequenceDiagram` (bare, or the first ```mermaid fence in markdown) into a deliberately bland skeleton spec: `python3 tools/mermaid2spec.py <input.(md\|mmd)> [-o out.json] [--title "..."]`. Enriching icons, tints, protocols, and prose stays the authoring LLM's job; unsupported mermaid constructs fail loud. |
 | `contract/authoring-contract.md` | The complete authoring contract. Self-sufficient: hand this file plus a source document to any LLM and it can emit a valid spec with zero other context. |
-| `cookbook/` | Task-shaped recipes for authoring agents: one file per common request (temperature thresholds, battery drain, motion-detection geometry, wake-up mailbox, persistent-connection-while-awake, LP-chip MQTT relay, egress routing) plus `adjustments.md`, a phrase-to-knob table for visual feedback ("move that up and to the right"). Every ```json fence in it is a complete spec kept lint-clean by `tests/test_cookbook.py`. |
+| `cookbook/` | Task-shaped recipes for authoring agents: one file per common request (temperature thresholds, battery drain, Radar sensing geometry and authored alerts, wake-up mailbox, persistent-connection-while-awake, LP-chip MQTT relay, egress routing) plus `adjustments.md`, a phrase-to-knob table for visual feedback ("move that up and to the right"). Every ```json fence in it is a complete spec kept lint-clean by `tests/test_cookbook.py`. |
 | `workbench/flowspec.html` | Interactive workbench: the same engine plus an editable JSON panel with a Render button, click-to-definition selection with per-element inspector forms (field edits, id renames with reference rewrite, deletes with reference pruning, step reorder, undo), snippet INSERT buttons, schema reference, and known-limits notes. For hand-tuning specs. |
 | `examples/cumulus/` | End-to-end proof. `cumulus-hld.md` is a realistic fixture design doc (mermaid + prose-only flow + facts buried in paragraphs). `cumulus-page.spec.json` was generated from it by GPT-5.6 given only the contract; `cumulus-page.spec.v2.json` applied three plain-English "meeting feedback" items. `cumulus-flow.html` is the rendered v2 output. |
 | `mockups/` | The hand-built design explorations that defined the target: `flowline-mockups.html` (four visual treatments; mockup 04 "Aurora Combined" is the chosen direction), `device-lens.html` (click-through with a device-internals inspector), `doorbell-northstar.html` (the northstar: three synchronized panels — flow board, two-chip hardware view with wake states, camera viewfinder that visibly starts recording). |
+
+Panel modules are discovered through `src/source-bundles.json`. For headless
+Node tools or VM tests, load `readSource('validator.js')` from
+`tools/source-loader.cjs`, then the assembled engine when needed; raw validator
+and engine file reads omit the registered panel implementations.
 
 ## Regenerating the example
 
@@ -367,7 +372,7 @@ edits to keep the two aligned. The INSERT buttons splice a ready-made node,
 step, panel, or section into the spec and re-render; inserts target the
 section you last clicked. **+ node and + panel open a picker**: one preset
 per icon type (Console, API, Auth, Store, Broker, Sensor, …, each with its
-usual tint) and one working starter per panel widget type (all 19 — every
+usual tint) and one working starter per registered panel widget type (every
 template validates with zero errors and zero warnings). **+ edge draws by
 clicking**: press it, click the source node, click the target node (Esc
 cancels; a duplicate `from->to` pair is refused). **Dragging an edge label** commits the movement as

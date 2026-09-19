@@ -22585,6 +22585,7 @@ function initPanelPicker(opts){
     el('panel-picker-description').textContent = selected.description;
     el('panel-picker-type').textContent = selected.type;
     detail.replaceChildren(makePreview(type,true));
+    detail.parentElement.scrollTop = 0;
     add.disabled = invalid;
     fitPreviews();
   }
@@ -22633,7 +22634,12 @@ function initPanelPicker(opts){
     if (opts.pause) opts.pause();
     paintGrid(); select('table'); dialog.showModal(); fitPreviews();
     if (resize) resize.observe(dialog);
-    search.focus();
+    search.focus({preventScroll:true});
+    /* A hidden dialog can retain its old scroll positions. Reset after it is
+       visible and focused, so each opening starts with the selected card. */
+    grid.scrollTop = 0;
+    detail.parentElement.scrollTop = 0;
+    dialog.querySelector('.panel-picker-content').scrollTop = 0;
   }
   ['All panels'].concat(Array.from(new Set(PANEL_CATALOG.map(function(entry){return entry.category;})))).forEach(function(name){
     var button = document.createElement('button'); button.type = 'button'; button.textContent = name;

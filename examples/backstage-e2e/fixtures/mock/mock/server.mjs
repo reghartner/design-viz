@@ -1,8 +1,8 @@
 import {createServer} from 'node:http';
-import {readFile,realpath} from 'node:fs/promises';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {entities,queryEntities} from './catalog.mjs';
+import {readPublicFile} from '../lib/public-files.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 export function createMockServer({token=process.env.MOCK_CATALOG_TOKEN}={}){
  if(!token)throw new Error('Set MOCK_CATALOG_TOKEN (fictional test credential; keep it out of commits).');
@@ -11,9 +11,12 @@ export function createMockServer({token=process.env.MOCK_CATALOG_TOKEN}={}){
   if(req.method!=='GET')return send(405,{error:{name:'NotAllowedError',message:'Read only'}});
   if(url.pathname==='/health')return send(200,{status:'ok',fixture:true});
   if(url.pathname.startsWith('/files/')){
-   const relative=decodeURIComponent(url.pathname.slice(7));
-   if(!['catalog-info.yaml'].includes(relative)&&!['catalog/','openapi/'].some(p=>relative.startsWith(p)))return send(404,{error:{name:'NotFoundError'}});
-   try{const file=await realpath(path.resolve(root,relative));if(!file.startsWith(root))return send(404,{});res.writeHead(200,{'Content-Type':'text/yaml'});return res.end(await readFile(file));}catch{return send(404,{});}
+   let relative;
+   try {relative=decodeURIComponent(url.pathname.slice(7));}
+   catch {return send(400,{error:{name:'InputError',message:'Malformed URL encoding'}});}
+   const contents=await readPublicFile(root,relative,['catalog-info.yaml','catalog','openapi']);
+   if(contents===null)return send(404,{error:{name:'NotFoundError'}});
+   res.writeHead(200,{'Content-Type':'text/yaml'});return res.end(contents);
   }
   if(req.headers.authorization!=='Bearer '+token)return send(401,{error:{name:'AuthenticationError',message:'Missing or invalid credential'},request:{method:req.method,url:req.url},response:{statusCode:401}});
   try{

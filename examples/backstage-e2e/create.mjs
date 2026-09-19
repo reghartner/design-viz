@@ -65,6 +65,9 @@ export async function createRehearsal(config) {
   };
   await renderTree(path.join(here, 'fixtures/mock'), mock, substitutions);
   await renderTree(path.join(here, 'fixtures/designer'), designer, substitutions);
+  for (const destination of [mock, designer]) {
+    await renderTree(path.join(here, 'fixtures/shared'), path.join(destination, 'lib'), substitutions);
+  }
   await cp(path.join(flowview, 'LICENSE'), path.join(mock, 'LICENSE'));
   await mkdir(path.join(designer, '.flowview'), {recursive: true});
   await mkdir(path.join(designer, 'specs'), {recursive: true});

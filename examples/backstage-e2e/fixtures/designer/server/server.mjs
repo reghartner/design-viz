@@ -1,13 +1,14 @@
 /* Local rehearsal host. Static editor/specs contain fictional data only.
    Production must put static files behind company auth and authorize each spec. */
 import {createServer} from 'node:http';
-import {readFile,realpath} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {registry} from '../tools/canon/registry.mjs';
 import {buildEntityDiagramIndex,diagramsForEntity} from '../tools/canon/entity-diagrams.mjs';
 import {digest} from '../tools/canon/drift.mjs';
+import {readPublicFile} from '../lib/public-files.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 export function createDesignerServer({token=process.env.FLOWVIEW_READ_TOKEN,publicBaseUrl=process.env.PUBLIC_BASE_URL||'http://localhost:7020'}={}){
  if(!token)throw new Error('Set FLOWVIEW_READ_TOKEN for the Backstage proxy.');
@@ -33,15 +34,17 @@ export function createDesignerServer({token=process.env.FLOWVIEW_READ_TOKEN,publ
    }catch(e){return json(400,{error:e.message});}
   }
   if(url.pathname==='/'){res.writeHead(302,{Location:'/workbench/flowspec.html'});return res.end();}
-  const relative=decodeURIComponent(url.pathname).slice(1);
-  if(!['workbench/','template/','src/starters/','specs/','docs/'].some(prefix=>relative.startsWith(prefix)))return json(404,{error:'Not found'});
+  let relative;
+  try {relative=decodeURIComponent(url.pathname).slice(1);}
+  catch {return json(400,{error:'Malformed URL encoding'});}
   try{
-   const file=await realpath(path.resolve(root,relative));if(!file.startsWith(root))return json(404,{error:'Not found'});
+   const contents=await readPublicFile(root,relative,['workbench','template','src/starters','specs','docs']);
+   if(contents===null)return json(404,{error:'Not found'});
    const types={'.html':'text/html','.json':'application/json','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.md':'text/plain'};
-   const headers={'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};
+   const headers={'Content-Type':types[path.extname(relative)]||'application/octet-stream','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'};
    // Developer-only session for opening the external workbench. No company identity implied.
    if(relative==='workbench/flowspec.html'||relative==='template/flowview.html')headers['Set-Cookie']='flowview_rehearsal='+session+'; HttpOnly; SameSite=Strict; Path=/';
-   res.writeHead(200,headers);res.end(await readFile(file));
+   res.writeHead(200,headers);res.end(contents);
   }catch{return json(404,{error:'Not found'});}
  });
 }

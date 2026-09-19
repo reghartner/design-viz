@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {mkdtemp, readFile, rm} from 'node:fs/promises';
+import {mkdtemp, readFile, rm, writeFile, mkdir, symlink} from 'node:fs/promises';
+import {request} from 'node:http';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -17,6 +18,41 @@ const {LocalGitSources} = await import(pathToFileURL(path.join(root, 'tools/cano
 async function run(command, args, cwd) {
   const env = {...process.env}; delete env.NODE_TEST_CONTEXT;
   return exec(command, args, {cwd, env, encoding: 'utf8', maxBuffer: 4_000_000, timeout: 120000});
+}
+function rawGet(port, pathname) {
+  return new Promise((resolve, reject) => {
+    const req = request({host: '127.0.0.1', port, path: pathname}, response => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => {body += chunk;});
+      response.on('end', () => resolve({status: response.statusCode, body}));
+    });
+    req.on('error', reject); req.end();
+  });
+}
+async function checkPublicFileBoundaries(directory, modulePath, createName, prefix, publicDirectory, validPath) {
+  const { [createName]: createServer } = await import(pathToFileURL(path.join(directory, modulePath)));
+  const privateFile = path.join(directory, '.local/review-canary.txt');
+  const shortcut = path.join(directory, publicDirectory, 'review-shortcut.txt');
+  await mkdir(path.dirname(privateFile), {recursive: true});
+  await writeFile(privateFile, 'FICTIONAL_PRIVATE_CANARY');
+  await symlink(privateFile, shortcut);
+  const server = createServer({token: 'fictional-test'});
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const port = server.address().port;
+    assert.equal((await rawGet(port, validPath)).status, 200);
+    for (const suffix of ['..%2f.local/review-canary.txt', '%2e%2e%2f.local/review-canary.txt', 'review-shortcut.txt']) {
+      const response = await rawGet(port, prefix + suffix);
+      assert.equal(response.status, 404, prefix + suffix);
+      assert.doesNotMatch(response.body, /FICTIONAL_PRIVATE_CANARY/);
+    }
+    assert.equal((await rawGet(port, prefix + '%')).status, 400);
+    assert.equal((await rawGet(port, validPath)).status, 200, 'Malformed URLs must not crash the server');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(shortcut); await rm(privateFile);
+  }
 }
 test('repository inputs cannot become paths, shell fragments, or ambiguous identities', () => {
   assert.equal(options(['--out', '/tmp/new demo', '--owner', 'fictional-home']).mockRepo, 'backstage-designer-mock');
@@ -58,6 +94,8 @@ test('fresh portable repositories seed over HTTP, pin real code, and detect both
   assert.equal(await readFile(path.join(designer, 'workbench/flowspec.html'), 'utf8'), await readFile(path.join(root, 'workbench/flowspec.html'), 'utf8'));
   await run('npm', ['test'], mock);
   await run('npm', ['test'], designer);
+  await checkPublicFileBoundaries(mock, 'mock/server.mjs', 'createMockServer', '/files/catalog/', 'catalog', '/files/catalog-info.yaml');
+  await checkPublicFileBoundaries(designer, 'server/server.mjs', 'createDesignerServer', '/workbench/', 'workbench', '/workbench/catalog.json');
   const sources = new LocalGitSources({'https://github.com/fixture-company/sample.mock': mock});
   assert.equal((await scan([spec], sources)).findings.length, 0);
   await run('git', ['switch', 'codex/rehearsal-refactor'], mock);

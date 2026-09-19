@@ -1,4 +1,5 @@
 import { build } from 'esbuild';
+import sourceLoader from '../../tools/source-loader.cjs';
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -11,7 +12,7 @@ const exports = ['buildConfluenceExport', 'buildConfluenceConfig', 'confluenceSe
   'confluenceDisplayPage', 'confluenceSourceUrl', 'CONFLUENCE_INPUT_BYTES',
   'SKIN_NAMES', 'DEFAULT_SKIN', 'renderPage', 'applySkinClasses'];
 const core = (await Promise.all(['compatibility.js','canon.js','validator.js','engine.js','confluence.js'].map(name =>
-  readFile(path.join(root, 'src', name), 'utf8')))).join('\n') + '\nexport {' + exports.join(',') + '};';
+  sourceLoader.readSource(name)))).join('\n') + '\nexport {' + exports.join(',') + '};';
 
 await rm(outdir, {recursive:true, force:true});
 await mkdir(outdir, {recursive:true});

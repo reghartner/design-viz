@@ -49,9 +49,15 @@ def read(name: str) -> str:
     return (SRC / name).read_text()
 
 
+def source_files(name: str) -> list[str]:
+    manifest = json.loads(read("source-bundles.json"))
+    return [str(path.relative_to(SRC)) for entry in manifest.get(name, [name])
+            for path in (sorted(SRC.glob(entry)) if entry.endswith("/*.js") else [SRC / entry])]
+
+
 def js_bundle(*names: str) -> str:
     parts = []
-    for n in names:
+    for n in [file for name in names for file in source_files(name)]:
         parts.append("/* ---- src/" + n + " ---- */")
         parts.append(read(n).rstrip())
     return "\n".join(parts)

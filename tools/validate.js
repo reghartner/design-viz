@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 'use strict';
+const {readSource} = require('./source-loader.cjs');
 /* validate.js — flowspec validator + lint CLI.
 
    Usage: node tools/validate.js [--quiet] <spec.json> [<spec.json> ...]
@@ -21,10 +22,10 @@ const ROOT = path.join(__dirname, '..');
 
 function loadCore(){
   const code =
-    fs.readFileSync(path.join(ROOT, 'src', 'compatibility.js'), 'utf8') + '\n' +
-    fs.readFileSync(path.join(ROOT, 'src', 'canon.js'), 'utf8') + '\n' +
-    fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
-    fs.readFileSync(path.join(ROOT, 'src', 'engine.js'), 'utf8') + '\n' +
+    readSource('compatibility.js') + '\n' +
+    readSource('canon.js') + '\n' +
+    readSource('validator.js') + '\n' +
+    readSource('engine.js') + '\n' +
     ';__exports = {normalize, validate, lintPage, compatibility:FlowviewCompatibility};';
   const sandbox = {console, URL};
   vm.runInNewContext(code, sandbox);

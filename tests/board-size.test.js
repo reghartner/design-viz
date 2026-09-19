@@ -1,10 +1,11 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const code = ['validator.js', 'engine.js', 'workspace.workbench.js']
-  .map(name => fs.readFileSync(path.join(__dirname, '../src', name), 'utf8')).join('\n');
+  .map(name => readSource(name)).join('\n');
 
 function element(){
   const classes = new Set();

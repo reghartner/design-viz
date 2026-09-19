@@ -1,8 +1,9 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'), assert=require('node:assert/strict');
 const fs=require('node:fs'), path=require('node:path'), vm=require('node:vm');
 const c={};vm.createContext(c);
 for(const name of ['validator','engine','builder.workbench','reuse.workbench'])
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/'+name+'.js'),'utf8'),c);
+  vm.runInContext(readSource(name+'.js'),c);
 const plain=x=>JSON.parse(JSON.stringify(x));
 function fixture(){return {view:'step',nodes:{hub:{}},rows:[['hub']],panels:[
   {id:'state',type:'state',states:['ready','sent','lost'],initial:{state:'ready'}},
@@ -125,7 +126,7 @@ function pickerHarness(diagram=fixture(),index=4){
   doc.activeElement=node('button');const opener=doc.activeElement;
   doc.getElementById=id=>elements[id];doc.createElement=node;
   const ctx={document:doc};vm.createContext(ctx);
-  for(const name of ['validator','engine','builder.workbench','reuse.workbench'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/'+name+'.js'),'utf8'),ctx);
+  for(const name of ['validator','engine','builder.workbench','reuse.workbench'])vm.runInContext(readSource(name+'.js'),ctx);
   ctx.renderPanelBody=(host,p,value)=>painted.push({id:p.id,value:plain(value)});
   let locked=false,rendered=src.value;
   const ui=ctx.initWorkbenchStepReuse({src,context(){

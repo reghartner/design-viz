@@ -1,4 +1,6 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
+
 /* Unit tests for the pure engine core (src/validator.js + src/engine.js),
    loaded via vm so the browser fragments run without a DOM.
    Run: node --test tests/   (zero npm dependencies) */
@@ -14,7 +16,7 @@ const ROOT = path.join(__dirname, '..');
 function loadCore(overrides = {}){
   const code =
     fs.readFileSync(path.join(ROOT, 'src', 'validator.js'), 'utf8') + '\n' +
-    fs.readFileSync(path.join(ROOT, 'src', 'engine.js'), 'utf8') + '\n' +
+    readSource('engine.js') + '\n' +
     ';__exports = {validate, normalize, blocksOf, resolveProtocols, resolveLanes, diagramHasDelta,' +
     ' kindColor, stepKeys, stepTonePatch, foldPanelStates, foldNodeTones, layout, isWrap, edgePath, renderBoard, SKINS,' +
     ' BUILTIN_PROTOCOLS, SCENES, spreadPositions, resolveLabelCollisions,' +

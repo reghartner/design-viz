@@ -1,6 +1,7 @@
+const {readSource}=require('../tools/source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const ctx={URL,console};vm.createContext(ctx);
-for(const file of ['canon','validator','engine'])vm.runInContext(fs.readFileSync('src/'+file+'.js','utf8'),ctx);
+for(const file of ['canon','validator','engine'])vm.runInContext(readSource(file+'.js'),ctx);
 const plain=x=>JSON.parse(JSON.stringify(x));
 const ref={id:'worker.handle',repository:'https://github.example/team/service.git',revision:'a'.repeat(40),path:'src/handler.js',startLine:12,endLine:20,anchor:{start:'start',end:'end'}};
 function diagram(){return {nodes:{api:{title:'API',link:'https://docs.example/design',binding:{entityRef:'component:default/api',label:'API',catalogUrl:'https://backstage.example/catalog/default/component/api',api:{operationId:'record',definitionUrl:'https://docs.example/openapi',endpoints:{production:'https://api.example/v1'}}},codeRefs:[ref]},client:{title:'Client'},unrelated:{title:'API'}},edges:[{from:'client',to:'api'}],steps:[]};}

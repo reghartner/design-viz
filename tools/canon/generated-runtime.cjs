@@ -2421,9 +2421,5585 @@ module.exports.viewerRouting = () => {
 // Scanners initialize only the evidence/validation code. The viewer's
 // routing helpers share that scope and initialize on first use.
 function createViewerRouting(){
+/* ---- src/panels/shared.js ---- */
+/* Shared panel presentation lifecycle. Panel modules describe their output and
+   motion; none owns another panel's state, DOM or animation implementation. */
+var PanelViews = (function () {
+  var views = Object.create(null);
+  return {
+    register: function (type, render, options) {
+      if (!/^[a-z][a-z0-9-]*$/.test(type) || typeof render !== 'function')
+        throw new Error('Invalid panel renderer: ' + type);
+      if (Object.prototype.hasOwnProperty.call(views, type))
+        throw new Error('Duplicate panel renderer: ' + type);
+      render.options = options || {};
+      views[type] = render;
+    },
+    get: function (type) {
+      return views[type];
+    },
+    types: function () {
+      return Object.keys(views);
+    },
+  };
+})();
+var ZF_SEQ = 0; // Shared unique SVG IDs across every panel instance.
+function panelDecimalPlaces(value) {
+  var text = String(value),
+    dot = text.indexOf('.');
+  return dot < 0 ? 0 : Math.min(3, text.length - dot - 1);
+}
+function softwarePanelShell(content, state) {
+  return (
+    '<div class="swpanel">' +
+    content +
+    (state.note
+      ? '<div class="swnote">' + esc(String(state.note)) + '</div>'
+      : '') +
+    '</div>'
+  );
+}
+// Kept as a compatibility helper for callers of the software panel models.
+function softwarePanelHTML(panel, state) {
+  var render = PanelViews.get(panel.type);
+  return render
+    ? render({}, panel, state || {}).html
+    : softwarePanelShell('', state || {});
+}
+function panelGlideElements(host, glide) {
+  if (!glide) return [];
+  if (glide.multiple)
+    return typeof host.querySelectorAll === 'function'
+      ? host.querySelectorAll(glide.selector)
+      : [];
+  var el = host.querySelector(glide.selector);
+  return el ? [el] : [];
+}
+function cancelPanelMotion(host) {
+  if (host._thTween && typeof cancelAnimationFrame === 'function')
+    cancelAnimationFrame(host._thTween);
+  host._thTween = null;
+  if (host._pulseTimer) {
+    clearTimeout(host._pulseTimer);
+    host._pulseTimer = null;
+  }
+  host._ifEpoch = (host._ifEpoch || 0) + 1;
+}
+function settlePanelPresentation(host, result) {
+  cancelPanelMotion(host);
+  if (typeof host.querySelectorAll === 'function') {
+    var emphasized = host.querySelectorAll('.dv-chip-pulse,.dv-bar-enter');
+    for (var i = 0; i < emphasized.length; i++) {
+      emphasized[i].classList.remove('dv-chip-pulse');
+      emphasized[i].classList.remove('dv-bar-enter');
+    }
+    var fresh = host.querySelectorAll('.fresh');
+    for (var f = 0; f < fresh.length; f++) fresh[f].classList.remove('fresh');
+    if (result.transient) {
+      var temporary = host.querySelectorAll(result.transient);
+      for (var j = temporary.length - 1; j >= 0; j--)
+        if (temporary[j].parentNode)
+          temporary[j].parentNode.removeChild(temporary[j]);
+    }
+  }
+  var level = result.level;
+  if (level) {
+    var fill = host.querySelector(level.fill),
+      value = host.querySelector(level.readout);
+    if (fill) {
+      fill.style.transition = 'none';
+      fill.style.width = level.pct.toFixed(1) + '%';
+    }
+    var settled = level.settled !== undefined ? level.settled : level.value;
+    if (value && value.firstChild && settled != null)
+      value.firstChild.nodeValue = String(settled);
+  }
+  var subjects = panelGlideElements(host, result.glide);
+  for (var k = 0; k < subjects.length; k++) {
+    subjects[k].style.transition = 'none';
+    subjects[k].style.transform = 'translate(0,0)';
+  }
+  if (result.bars && typeof host.querySelectorAll === 'function') {
+    var bars = host.querySelectorAll(result.bars.selector);
+    result.bars.frames.forEach(function (frame, i) {
+      if (!bars[i]) return;
+      bars[i].style.transition = 'none';
+      bars[i].style.width = frame.width.toFixed(3) + '%';
+      bars[i].style.opacity = '1';
+    });
+  }
+  if (result.settle) result.settle();
+}
+function tweenPanelLevel(host, level, animate) {
+  var pctNow = level.pct,
+    valNow = level.value,
+    prev = host._thPrev;
+  host._thPrev = { pct: pctNow, value: valNow };
+  if (!animate || !prev || valNow == null) return;
+  var fill = host.querySelector(level.fill);
+  if (
+    fill &&
+    typeof prev.pct === 'number' &&
+    Math.abs(prev.pct - pctNow) > 0.05
+  ) {
+    var epoch = host._ifEpoch;
+    fill.style.transition = 'none';
+    fill.style.width = prev.pct.toFixed(1) + '%';
+    void fill.getBoundingClientRect();
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (host._ifEpoch !== epoch) return;
+        fill.style.transition = '';
+        fill.style.width = pctNow.toFixed(1) + '%';
+      });
+    });
+  }
+  var value = host.querySelector(level.readout);
+  if (
+    value &&
+    typeof prev.value === 'number' &&
+    prev.value !== valNow &&
+    value.firstChild
+  ) {
+    var mul = Math.pow(10, level.decimals),
+      from = prev.value,
+      t0 = Date.now(),
+      node = value.firstChild;
+    var tick = function () {
+      var k = Math.min(1, (Date.now() - t0) / 500);
+      k = 1 - (1 - k) * (1 - k);
+      node.nodeValue = String(
+        Math.round((from + (valNow - from) * k) * mul) / mul
+      );
+      if (k < 1) host._thTween = requestAnimationFrame(tick);
+      else host._thTween = null;
+    };
+    host._thTween = requestAnimationFrame(tick);
+  }
+}
+function tweenPanelBars(host, bars, animate) {
+  if (
+    !animate ||
+    !bars.previous ||
+    typeof host.querySelectorAll !== 'function' ||
+    typeof requestAnimationFrame !== 'function'
+  )
+    return;
+  var elements = host.querySelectorAll(bars.selector),
+    tweens = [];
+  bars.frames.forEach(function (frame, i) {
+    var el = elements[i];
+    if (!el) return;
+    var width = bars.previous[frame.key],
+      fresh = typeof width !== 'number';
+    if (fresh) width = 0;
+    if (!fresh && Math.abs(width - frame.width) < 0.001) return;
+    el.style.transition = 'none';
+    el.style.width = width.toFixed(3) + '%';
+    if (fresh) el.style.opacity = '0';
+    tweens.push({ el: el, width: frame.width, fresh: fresh });
+  });
+  if (!tweens.length) return;
+  var epoch = host._ifEpoch;
+  void tweens[0].el.getBoundingClientRect();
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      if (host._ifEpoch !== epoch) return;
+      tweens.forEach(function (tween) {
+        tween.el.style.transition = '';
+        tween.el.style.width = tween.width.toFixed(3) + '%';
+        if (tween.fresh) tween.el.style.opacity = '1';
+      });
+    });
+  });
+}
+/* Input is an absolute folded snapshot. Previous DOM values are presentation
+   history only; they never participate in state folding or alternate paths. */
+function renderPanelBody(
+  host,
+  panel,
+  state,
+  skin,
+  states,
+  stepIdx,
+  animatePresentation
+) {
+  var render = PanelViews.get(panel.type),
+    animate = animatePresentation !== false && !RM;
+  var result = render
+    ? render(host, panel, state || {}, skin, states, stepIdx, animate)
+    : {
+        html:
+          '<div class="punknown">unknown panel type: ' +
+          esc(String(panel.type)) +
+          '</div>',
+      };
+  if (!animate) settlePanelPresentation(host, result);
+  if (host._lastHTML === result.html) return;
+  if (animate) cancelPanelMotion(host);
+  var patched = result.patch && result.patch();
+  host._lastHTML = result.baseline != null ? result.baseline : result.html;
+  if (!patched) host.innerHTML = result.html;
+  if (result.mounted) result.mounted();
+  if (animate && result.glide) {
+    var subjects = panelGlideElements(host, result.glide),
+      glideEpoch = host._ifEpoch;
+    if (subjects.length) {
+      for (var i = 0; i < subjects.length; i++)
+        void subjects[i].getBoundingClientRect();
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          if (host._ifEpoch !== glideEpoch) return;
+          for (var j = 0; j < subjects.length; j++)
+            subjects[j].style.transform = 'translate(0,0)';
+        });
+      });
+    }
+  }
+  if (result.level) tweenPanelLevel(host, result.level, animate);
+  if (animate && result.pulse && result.pulse.changed) {
+    var pulse = host.querySelector(result.pulse.selector);
+    if (pulse && pulse.classList) {
+      pulse.classList.add('dv-chip-pulse');
+      host._pulseTimer = setTimeout(function () {
+        pulse.classList.remove('dv-chip-pulse');
+        host._pulseTimer = null;
+      }, 620);
+    }
+  }
+  if (
+    animate &&
+    result.enterBars &&
+    result.enterBars.entrants &&
+    typeof host.querySelectorAll === 'function'
+  ) {
+    var rows = host.querySelectorAll(result.enterBars.rows);
+    result.enterBars.entrants.forEach(function (enters, i) {
+      if (!enters || !rows[i]) return;
+      var bar = rows[i].querySelector(result.enterBars.bar);
+      if (bar) bar.classList.add('dv-bar-enter');
+    });
+  }
+  if (result.bars) tweenPanelBars(host, result.bars, animate);
+}
+
+/* log panels are the only widgets that GROW as steps append lines, so they
+   always render at the BOTTOM of the panel column — nothing below them can
+   be pushed around. Relative order within each group is preserved. */
+function panelOrder(panels) {
+  var fixed = [],
+    growing = [];
+  (panels || []).forEach(function (p) {
+    var view = p && PanelViews.get(p.type);
+    (view && view.options.growing ? growing : fixed).push(p);
+  });
+  return fixed.concat(growing);
+}
+
+function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
+  var folded = foldPanelStates(d);
+  var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
+  var hosts = {};
+  panelOrder(d.panels).forEach(function (p) {
+    if (!p || !p.id) return;
+    var card = document.createElement('div');
+    card.className =
+      'pwidget pt-' + (PANEL_TYPES.indexOf(p.type) >= 0 ? p.type : 'unknown');
+    /* spec index, not render order — log panels are reordered to the end */
+    card.setAttribute('data-dv-panel', String((d.panels || []).indexOf(p)));
+    if (p.title) {
+      var t = document.createElement('div');
+      t.className = 'ptitle';
+      t.textContent = p.title;
+      card.appendChild(t);
+    }
+    var body = document.createElement('div');
+    body.className = 'pbody';
+    card.appendChild(body);
+    (primaryHost && p.id === (primaryId || d.primaryPanel)
+      ? primaryHost
+      : asideEl
+    ).appendChild(card);
+    hosts[p.id] = { panel: p, body: body };
+    /* Homemap ambient state precedes step zero; other widgets keep their
+       established first-folded-step preview. */
+    var view = PanelViews.get(p.type),
+      options = view ? view.options : {};
+    var home = options.ambientInitial;
+    renderPanelBody(
+      body,
+      p,
+      home ? p.initial : (folded[p.id] || [])[0],
+      skin,
+      options.historyRequiresSteps && !traceNavigation
+        ? []
+        : folded[p.id] || [],
+      home ? -1 : 0,
+      false
+    );
+  });
+  return {
+    destroy: function () {
+      Object.keys(hosts).forEach(function (id) {
+        cancelPanelMotion(hosts[id].body);
+      });
+    },
+    setDiagram: function (next) {
+      folded = foldPanelStates(next);
+      traceNavigation =
+        (next.steps || []).length && next.view !== 'ambient-only';
+    },
+    setStep: function (i, animate, ambient) {
+      Object.keys(hosts).forEach(function (pid) {
+        var states = folded[pid] || [];
+        var si = Math.min(i, states.length - 1);
+        var panel = hosts[pid].panel;
+        var view = PanelViews.get(panel.type),
+          options = view ? view.options : {};
+        var homeAmbient = ambient && options.ambientInitial;
+        renderPanelBody(
+          hosts[pid].body,
+          panel,
+          homeAmbient ? panel.initial : states[si],
+          skin,
+          options.historyRequiresSteps && !traceNavigation ? [] : states,
+          homeAmbient ? -1 : si,
+          animate
+        );
+      });
+    },
+  };
+}
+/* ---- src/panels/types/battery.js ---- */
+/* battery panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+var BATTERY_ZONE_LABELS = {
+  ok: 'NOMINAL',
+  low: 'LOW',
+  crit: 'CRITICAL',
+  na: 'NO DATA',
+};
+var BATTERY_SOURCES = ['solar', 'wired', 'poe', 'cells'];
+var BATTERY_TRENDS = ['charging', 'draining', 'idle'];
+function batteryModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  function fin(v) {
+    return typeof v === 'number' && isFinite(v) ? v : null;
+  }
+  var low = fin(panel.low) != null ? clamp(panel.low, 0, 100) : null;
+  var crit = fin(panel.crit) != null ? clamp(panel.crit, 0, 100) : null;
+  if (low != null && crit != null && crit > low) {
+    var sw = low;
+    low = crit;
+    crit = sw;
+  }
+  var charge = fin(state.charge) != null ? clamp(state.charge, 0, 100) : null;
+  var zone = 'na';
+  if (charge != null) {
+    zone = 'ok';
+    if (low != null && charge <= low) zone = 'low';
+    if (crit != null && charge <= crit) zone = 'crit';
+  }
+  var trend = BATTERY_TRENDS.indexOf(state.trend) >= 0 ? state.trend : null;
+  var source = BATTERY_SOURCES.indexOf(state.source) >= 0 ? state.source : null;
+  return {
+    charge: charge,
+    low: low,
+    crit: crit,
+    zone: zone,
+    trend: trend,
+    source: source,
+    cold: state.cold === true,
+    note: state.note != null ? String(state.note) : '',
+    label:
+      state.label != null ? String(state.label) : BATTERY_ZONE_LABELS[zone],
+  };
+}
+
+/* tiles widget: a device-fleet grid — one named tile per device/cohort with
+   a state chip and an optional sub-line. Pure model (node-testable). Tiles
+   and the state vocabulary (states + colors, like the state widget) are
+   DECLARED once; each step patches per tile id (like leds/signal): a patch
+   replaces that tile's whole `{state, sub}` status. A state not in the
+   declared list renders the tile dimmed with '—' (validator warns). */
+
+PanelViews.register(
+  'battery',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var bm = batteryModel(panel, state);
+    var bidx = typeof stepIdx === 'number' ? stepIdx : 0;
+    var bv = bm.charge != null ? String(Math.round(bm.charge)) : null;
+    h +=
+      '<div class="bthead"><div class="btval z-' +
+      bm.zone +
+      '">' +
+      (bv != null ? esc(bv) : '&#8212;') +
+      '<span class="btunit">%</span>' +
+      (bm.trend === 'charging'
+        ? '<span class="btbolt" aria-label="charging">&#9889;</span>'
+        : '') +
+      (bm.cold
+        ? '<span class="btcold" aria-label="cold-limited">&#10052;</span>'
+        : '') +
+      '</div><span class="btzone z-' +
+      bm.zone +
+      '">' +
+      esc(bm.label) +
+      '</span></div>';
+    /* battery glyph: shell + terminal nub + zone-colored fill; low/crit
+       threshold ticks on the shell like thermo's bands */
+    h += '<div class="btglyph"><div class="btshell">';
+    if (bm.charge != null)
+      h +=
+        '<span class="btfill z-' +
+        bm.zone +
+        '" style="width:' +
+        bm.charge.toFixed(1) +
+        '%"></span>';
+    if (bm.low != null)
+      h +=
+        '<span class="bttick low" style="left:' +
+        bm.low.toFixed(1) +
+        '%"></span>';
+    if (bm.crit != null)
+      h +=
+        '<span class="bttick crit" style="left:' +
+        bm.crit.toFixed(1) +
+        '%"></span>';
+    h += '</div><span class="btnub"></span></div>';
+    /* context row: power source badge + trend word + forecast note; all
+       containers always emitted so the panel height is constant */
+    h +=
+      '<div class="btctx"><span class="btsrc">' +
+      (bm.source ? esc(bm.source.toUpperCase()) : '') +
+      '</span>' +
+      '<span class="bttrend">' +
+      (bm.trend ? esc(bm.trend) : '') +
+      '</span>' +
+      '<span class="btnote">' +
+      esc(bm.note) +
+      '</span></div>';
+    /* step-history sparkline, same reveal semantics as thermo: every step's
+       folded charge plots faintly, bright up to the current step, gaps break
+       the line */
+    var bhist = Array.isArray(states)
+      ? states.map(function (s) {
+          return s && typeof s.charge === 'number' && isFinite(s.charge)
+            ? clamp(s.charge, 0, 100)
+            : null;
+        })
+      : [];
+    if (bhist.length > 1) {
+      var bX = function (i) {
+        return 6 + (248 * i) / (bhist.length - 1);
+      };
+      var bY = function (vv) {
+        return 54 - (vv / 100) * 46;
+      };
+      h +=
+        '<svg class="btspark" viewBox="0 0 260 62" role="img" aria-label="charge per step">';
+      if (bm.low != null)
+        h +=
+          '<line class="btguide low" x1="6" x2="254" y1="' +
+          bY(bm.low).toFixed(1) +
+          '" y2="' +
+          bY(bm.low).toFixed(1) +
+          '"/>';
+      if (bm.crit != null)
+        h +=
+          '<line class="btguide crit" x1="6" x2="254" y1="' +
+          bY(bm.crit).toFixed(1) +
+          '" y2="' +
+          bY(bm.crit).toFixed(1) +
+          '"/>';
+      var bGhost = [],
+        bLit = [],
+        bg = null,
+        bl = null;
+      bhist.forEach(function (vv, i) {
+        if (vv == null) {
+          bg = null;
+          bl = null;
+          return;
+        }
+        var pt = bX(i).toFixed(1) + ',' + bY(vv).toFixed(1);
+        if (!bg) {
+          bg = [];
+          bGhost.push(bg);
+        }
+        bg.push(pt);
+        if (i <= bidx) {
+          if (!bl) {
+            bl = [];
+            bLit.push(bl);
+          }
+          bl.push(pt);
+        } else bl = null;
+      });
+      bGhost.forEach(function (seg) {
+        if (seg.length > 1)
+          h +=
+            '<polyline class="btline ghost" points="' + seg.join(' ') + '"/>';
+      });
+      bLit.forEach(function (seg) {
+        if (seg.length > 1)
+          h += '<polyline class="btline" points="' + seg.join(' ') + '"/>';
+      });
+      bhist.forEach(function (vv, i) {
+        if (vv == null) return;
+        var bz = batteryModel(panel, { charge: vv }).zone;
+        var bCur = i === bidx;
+        h +=
+          '<circle class="btdot z-' +
+          bz +
+          (i <= bidx ? ' on' : '') +
+          (bCur ? ' cur' : '') +
+          '" cx="' +
+          bX(i).toFixed(1) +
+          '" cy="' +
+          bY(vv).toFixed(1) +
+          '" r="' +
+          (bCur ? 4 : 2.4) +
+          '"/>';
+      });
+      h += '</svg>';
+    }
+    return {
+      html: h,
+      level: {
+        pct: bm.charge != null ? bm.charge : 0,
+        value: bm.charge,
+        settled: bv,
+        fill: '.btfill',
+        readout: '.btval',
+        decimals: 0,
+      },
+    };
+  }
+);
+/* ---- src/panels/types/budget.js ---- */
+/* budget panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function budgetModel(panel, state) {
+  state = state || {};
+  return softwarePanelItems(panel).map(function (metric) {
+    var raw = panelOwn(state.values, metric.id)
+      ? state.values[metric.id]
+      : null;
+    var value = isFiniteNum(raw) && raw >= 0 ? raw : null;
+    var max = isFiniteNum(metric.max) && metric.max > 0 ? metric.max : null;
+    var warn =
+      max !== null &&
+      isFiniteNum(metric.warn) &&
+      metric.warn >= 0 &&
+      metric.warn <= max
+        ? metric.warn
+        : null;
+    var status =
+      value === null
+        ? 'unknown'
+        : max === null
+        ? 'unbounded'
+        : value > max
+        ? 'over'
+        : value === max
+        ? 'limit'
+        : warn !== null && value >= warn
+        ? 'warn'
+        : 'ok';
+    return {
+      id: metric.id,
+      label: metric.label || metric.id,
+      unit: metric.unit || '',
+      value: value,
+      max: max,
+      warn: warn,
+      status: status,
+      pct: value !== null && max !== null ? Math.min(value / max, 1) * 100 : 0,
+      remaining: value !== null && max !== null ? max - value : null,
+    };
+  });
+}
+
+PanelViews.register(
+  'budget',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var metrics = budgetModel(panel, state);
+    var labels = {
+      unknown: 'NO DATA',
+      unbounded: 'NO LIMIT',
+      over: 'OVER LIMIT',
+      limit: 'AT LIMIT',
+      warn: 'NEAR LIMIT',
+      ok: 'WITHIN LIMIT',
+    };
+    metrics.forEach(function (metric) {
+      var tone =
+        metric.status === 'over'
+          ? 'fail'
+          : ['warn', 'limit'].indexOf(metric.status) >= 0
+          ? 'warn'
+          : metric.status === 'ok'
+          ? 'pass'
+          : 'pending';
+      h +=
+        '<div class="swmetric"><div class="swcheckhead"><span>' +
+        esc(metric.label) +
+        '</span>' +
+        '<span class="swbadge sw-' +
+        tone +
+        '">' +
+        labels[metric.status] +
+        '</span></div>' +
+        '<div class="swmeasure"><strong>' +
+        (metric.value === null ? '—' : esc(String(metric.value))) +
+        '</strong>' +
+        ' / ' +
+        (metric.max === null ? '—' : esc(String(metric.max))) +
+        ' ' +
+        esc(metric.unit) +
+        '</div>';
+      if (metric.value !== null && metric.max !== null) {
+        h +=
+          '<div class="swtrack" role="img" aria-label="' +
+          esc(
+            metric.label +
+              ': ' +
+              metric.value +
+              ' of ' +
+              metric.max +
+              ' ' +
+              metric.unit +
+              ', ' +
+              labels[metric.status]
+          ) +
+          '">' +
+          '<div class="swfill sw-' +
+          tone +
+          '" style="width:' +
+          metric.pct.toFixed(2) +
+          '%"></div>';
+        if (metric.warn !== null)
+          h +=
+            '<span class="swthreshold" style="left:' +
+            ((metric.warn / metric.max) * 100).toFixed(2) +
+            '%" title="Warning at ' +
+            esc(String(metric.warn)) +
+            '"></span>';
+        h +=
+          '</div><div class="swdetail">' +
+          esc(String(Number(Math.abs(metric.remaining).toPrecision(6)))) +
+          ' ' +
+          esc(metric.unit) +
+          (metric.remaining < 0 ? ' over budget' : ' remaining') +
+          '</div>';
+      }
+      h += '</div>';
+    });
+    if (!metrics.length) h += '<div class="swempty">No budgets declared</div>';
+    h = softwarePanelShell(h, state);
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/buffer.js ---- */
+/* buffer panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+var BUFFER_CELL_STATES = [
+  'empty',
+  'buffered',
+  'protected',
+  'uploading',
+  'uploaded',
+  'dropped',
+];
+function bufferModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  var n =
+    typeof panel.segments === 'number' && isFinite(panel.segments)
+      ? Math.round(clamp(panel.segments, 2, 48))
+      : 12;
+  /* mark: cumulative inclusive range paints [[i0,i1,"state"],...] applied
+     over the cells base in order (shared bufferPaint helper — the fold
+     compactor uses the same function, so a compacted story renders
+     identically to an uncompacted one). */
+  var cells = bufferPaint(n, state.cells, state.mark);
+  var head =
+    typeof state.head === 'number' &&
+    isFinite(state.head) &&
+    state.head >= 0 &&
+    state.head < n
+      ? Math.round(state.head)
+      : null;
+  var counts = {};
+  cells.forEach(function (c) {
+    counts[c] = (counts[c] || 0) + 1;
+  });
+  var parts = [];
+  BUFFER_CELL_STATES.forEach(function (sname) {
+    if (sname !== 'empty' && counts[sname])
+      parts.push(counts[sname] + ' ' + sname);
+  });
+  return {
+    n: n,
+    cells: cells,
+    head: head,
+    counts: counts,
+    capacity: panel.capacity != null ? String(panel.capacity) : '',
+    note:
+      state.note != null
+        ? String(state.note)
+        : state.label != null
+        ? String(state.label)
+        : '',
+    summary: parts.length ? parts.join(' · ') : 'empty',
+  };
+}
+
+/* inflight widget: operations/messages as bars on one shared step axis.
+   foldInflightStates (validator.js) supplies complete history snapshots;
+   this pure model vets that snapshot for the HTML renderer. */
+/* timeline: wall-clock axis over a declared span with periodic cadence
+   beats and event dots; steps sweep a `now` cursor and append events.
+   Pure model (node-testable, no DOM). */
+
+PanelViews.register(
+  'buffer',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var bfm = bufferModel(panel, state);
+    /* head row: one marker slot per cell so the ▼ sits over the write head */
+    h += '<div class="bfhead">';
+    for (var bh = 0; bh < bfm.n; bh++)
+      h +=
+        '<span class="bfmark' +
+        (bfm.head === bh ? ' on' : '') +
+        '">' +
+        (bfm.head === bh ? '&#9660;' : '') +
+        '</span>';
+    h += '</div>';
+    h += '<div class="bfrow">';
+    bfm.cells.forEach(function (c) {
+      h += '<span class="bfcell s-' + c + '"></span>';
+    });
+    h += '</div>';
+    h +=
+      '<div class="bffoot"><span class="bfsum">' +
+      esc(bfm.summary) +
+      '</span>' +
+      (bfm.capacity
+        ? '<span class="bfcap">' + esc(bfm.capacity) + '</span>'
+        : '') +
+      '</div>';
+    /* note line always emitted (fixed height — never reflows the column) */
+    h += '<div class="bfnote">' + esc(bfm.note) + '</div>';
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/checks.js ---- */
+/* checks panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function checksModel(panel, state) {
+  state = state || {};
+  return softwarePanelItems(panel).map(function (check) {
+    var result =
+      panelOwn(state.results, check.id) && panelObject(state.results[check.id])
+        ? state.results[check.id]
+        : {};
+    return {
+      id: check.id,
+      label: check.label || check.id,
+      status:
+        CHECK_STATUSES.indexOf(result.status) >= 0 ? result.status : 'pending',
+      detail: result.detail == null ? '' : String(result.detail),
+    };
+  });
+}
+
+PanelViews.register(
+  'checks',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var checks = checksModel(panel, state),
+      passed = checks.filter(function (c) {
+        return c.status === 'pass';
+      }).length;
+    h +=
+      '<div class="swsummary">' +
+      passed +
+      ' / ' +
+      checks.length +
+      ' passed <span>Authored outcomes</span></div><ul class="swchecks">';
+    checks.forEach(function (check) {
+      h +=
+        '<li><div class="swcheckhead"><span>' +
+        esc(check.label) +
+        '</span>' +
+        '<span class="swbadge sw-' +
+        check.status +
+        '">' +
+        check.status +
+        '</span></div>' +
+        (check.detail
+          ? '<div class="swdetail">' + esc(check.detail) + '</div>'
+          : '') +
+        '</li>';
+    });
+    h += '</ul>';
+    if (!checks.length) h += '<div class="swempty">No checks declared</div>';
+    h = softwarePanelShell(h, state);
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/deviceapp.js ---- */
+/* deviceapp panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function deviceAppModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  var str = function (v, fallback) {
+    return typeof v === 'string' ? v : fallback || '';
+  };
+  var palette = [
+    '#5865d8',
+    '#168878',
+    '#bd6716',
+    '#a354b5',
+    '#287fbe',
+    '#b95164',
+  ];
+  var sources = deviceAppItems(panel, 'sources').map(function (s, i) {
+    return {
+      id: s.id,
+      label: str(s.label, s.id),
+      letter: String.fromCharCode(65 + i),
+      color:
+        typeof s.color === 'string' &&
+        /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(s.color)
+          ? s.color
+          : palette[i],
+      node: str(s.node),
+      endpoint: str(s.endpoint),
+      detail: str(s.detail),
+    };
+  });
+  var fields = deviceAppItems(panel, 'fields').map(function (f) {
+    var v = panelObject(state[f.id]) ? state[f.id] : {},
+      battery = f.kind === 'battery';
+    var source = sources.find(function (s) {
+      return s.id === (v.source == null ? f.source : v.source);
+    });
+    var valid =
+      v.value != null &&
+      (typeof v.value === 'string' ||
+        isFiniteNum(v.value) ||
+        typeof v.value === 'boolean');
+    if (battery) valid = isFiniteNum(v.value) && v.value >= 0 && v.value <= 100;
+    return {
+      id: f.id,
+      label: str(f.label, f.id),
+      source: source || null,
+      battery: battery,
+      icon: ICON_SET.indexOf(f.icon) >= 0 ? f.icon : null,
+      value: valid ? String(v.value) + (battery ? '%' : str(f.unit)) : '—',
+      pct: battery && valid ? v.value : 0,
+      status: DEVICEAPP_STATUSES.indexOf(v.status) >= 0 ? v.status : 'unknown',
+      detail: str(v.detail),
+      updated:
+        Array.isArray(state._updated) && state._updated.indexOf(f.id) >= 0,
+    };
+  });
+  return {
+    device: str(panel.device, 'Camera'),
+    subtitle: str(panel.subtitle, 'Device health'),
+    clock: str(state.clock, '9:41'),
+    note: str(state.note),
+    sources: sources,
+    fields: fields,
+  };
+}
+function deviceAppPanelHTML(panel, state, fresh) {
+  var m = deviceAppModel(panel, state),
+    labels = {
+      unknown: 'No data',
+      loading: 'Loading',
+      ready: 'Current',
+      stale: 'Cached',
+      error: 'Unavailable',
+    };
+  function badge(s) {
+    return (
+      '<span class="da-badge" aria-hidden="true">' +
+      (s ? s.letter : '?') +
+      '</span>'
+    );
+  }
+  function props(s) {
+    return (
+      ' data-da-source="' +
+      esc(s ? s.id : '') +
+      '" style="--da-color:' +
+      (s ? s.color : '#78808d') +
+      '"'
+    );
+  }
+  var h =
+    '<div class="deviceapp"><div class="da-phone"><div class="da-statusbar"><span>' +
+    esc(m.clock) +
+    '</span><span aria-hidden="true">▂▄▆ · ▰</span></div>' +
+    '<div class="da-heading"><span class="da-eyebrow">CAMERA DETAILS</span><h3>' +
+    esc(m.device) +
+    '</h3><span>' +
+    esc(m.subtitle) +
+    '</span></div><div class="da-fields">';
+  m.fields.forEach(function (f) {
+    h +=
+      '<button type="button" class="da-field da-' +
+      f.status +
+      (f.updated ? ' da-updated' : '') +
+      (fresh && f.updated ? ' fresh' : '') +
+      '" data-da-field="' +
+      esc(f.id) +
+      '"' +
+      props(f.source) +
+      ' aria-pressed="false" aria-label="' +
+      esc(
+        f.label +
+          ': ' +
+          f.value +
+          '. ' +
+          labels[f.status] +
+          '. Source: ' +
+          (f.source ? f.source.label : 'Unmapped')
+      ) +
+      '">' +
+      '<span class="da-field-top"><span>' +
+      esc(f.label) +
+      '</span>' +
+      badge(f.source) +
+      '</span>' +
+      '<span class="da-value">' +
+      (f.icon
+        ? '<svg class="da-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
+          f.icon +
+          '"/></svg>'
+        : '') +
+      esc(f.value) +
+      '</span>' +
+      (f.battery
+        ? '<span class="da-meter" aria-hidden="true"><i style="width:' +
+          f.pct +
+          '%"></i></span>'
+        : '') +
+      '<span class="da-meta"><span class="da-state">' +
+      labels[f.status] +
+      '</span>' +
+      (f.updated ? '<span class="da-update-label">Updated</span>' : '') +
+      '</span>' +
+      (f.detail ? '<span class="da-detail">' + esc(f.detail) + '</span>' : '') +
+      '</button>';
+  });
+  h +=
+    '</div><div class="da-home" aria-hidden="true"></div></div><div class="da-provenance"><div class="da-eyebrow">WHERE THE DATA COMES FROM</div>' +
+    '<h3>One screen. Multiple sources.</h3><p class="da-help">Select a field or source to trace its data' +
+    (m.sources.some(function (s) {
+      return s.node;
+    })
+      ? ' and highlight its service in the diagram'
+      : '') +
+    '.</p><div class="da-sources">';
+  m.sources.forEach(function (s) {
+    var fields = m.fields.filter(function (f) {
+      return f.source && f.source.id === s.id;
+    });
+    h +=
+      '<button type="button" class="da-source"' +
+      props(s) +
+      ' aria-pressed="false"><span class="da-source-title">' +
+      badge(s) +
+      '<strong>' +
+      esc(s.label) +
+      '</strong></span>' +
+      (s.endpoint ? '<code>' + esc(s.endpoint) + '</code>' : '') +
+      (s.detail ? '<span class="da-detail">' + esc(s.detail) + '</span>' : '') +
+      '<span class="da-source-fields">' +
+      esc(
+        fields.length
+          ? fields
+              .map(function (f) {
+                return f.label + ' · ' + labels[f.status];
+              })
+              .join(' / ')
+          : 'No fields in this step'
+      ) +
+      '</span></button>';
+  });
+  return (
+    h +
+    '</div>' +
+    (m.note ? '<p class="da-note">' + esc(m.note) + '</p>' : '') +
+    '</div></div>'
+  );
+}
+function bindDeviceAppSources(host, panel, state) {
+  if (typeof host.querySelectorAll !== 'function') return;
+  if (host._daClear) host._daClear();
+  var nodes = [],
+    m = deviceAppModel(panel, state);
+  var buttons = Array.from(host.querySelectorAll('[data-da-source]'));
+  function clearNodes() {
+    nodes.forEach(function (n) {
+      if (n._daOwners) {
+        n._daOwners.delete(host);
+        if (!n._daOwners.size) n.classList.remove('da-node-focus');
+      }
+    });
+    nodes = [];
+  }
+  host._daClear = clearNodes;
+  function select(id) {
+    clearNodes();
+    host._daSource = id;
+    buttons.forEach(function (b) {
+      var on = !!id && b.getAttribute('data-da-source') === id;
+      b.setAttribute('aria-pressed', String(on));
+    });
+    var source = m.sources.find(function (s) {
+      return s.id === id;
+    });
+    var section = host.closest && host.closest('.doc-sec');
+    if (section && source && source.node)
+      Array.from(section.querySelectorAll('[data-dv-node]')).forEach(function (
+        n
+      ) {
+        if (n.getAttribute('data-dv-node') !== source.node) return;
+        if (!n._daOwners) n._daOwners = new Set();
+        n._daOwners.add(host);
+        n.classList.add('da-node-focus');
+        nodes.push(n);
+      });
+  }
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var id = b.getAttribute('data-da-source');
+      select(host._daSource === id ? null : id);
+    });
+  });
+  select(host._daSource);
+}
+
+/* queue widget: mailbox — a message enqueued, held, dequeued. Pure model +
+   markup builder so node tests cover them without a DOM. Directional context:
+   `from` shows during enqueue (arrival side), `to` during dequeue (departure
+   side), `reason` while held (the waiting-on line). Carried like any patch
+   field; only the state-relevant one renders. Non-strings are ignored (the
+   validator warns). */
+
+PanelViews.register(
+  'deviceapp',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var hBaseline = null;
+    var daFresh =
+      animate &&
+      validRevealIndex(host._daStep) &&
+      validRevealIndex(stepIdx) &&
+      stepIdx === host._daStep + 1;
+    host._daStep = validRevealIndex(stepIdx) ? stepIdx : null;
+    h += deviceAppPanelHTML(panel, state, daFresh);
+    hBaseline = daFresh ? deviceAppPanelHTML(panel, state, false) : null;
+    return {
+      html: h,
+      baseline: hBaseline,
+      mounted: function () {
+        bindDeviceAppSources(host, panel, state);
+      },
+    };
+  }
+);
+/* ---- src/panels/types/gauge.js ---- */
+/* gauge panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+PanelViews.register(
+  'gauge',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var v = typeof state.value === 'number' ? state.value : 0;
+    var max = typeof panel.max === 'number' && panel.max > 0 ? panel.max : 100;
+    var pct = clamp((v / max) * 100, 0, 100);
+    h +=
+      '<div class="gaugeval">' +
+      esc(String(v)) +
+      (panel.unit
+        ? ' <span class="gaugeunit">' + esc(panel.unit) + '</span>'
+        : '') +
+      '</div>';
+    h +=
+      '<div class="gaugebar"><div class="gaugefill" style="width:' +
+      pct.toFixed(1) +
+      '%"></div></div>';
+    return {
+      html: h,
+      level: {
+        pct: pct,
+        value: v,
+        fill: '.gaugefill',
+        readout: '.gaugeval',
+        decimals: panelDecimalPlaces(v),
+      },
+    };
+  }
+);
+/* ---- src/panels/types/homemap.js ---- */
+/* homemap panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+var HOMEMAP_DISPLAY_HEIGHT = 216;
+var HOMEMAP_Y_SCALE = HOMEMAP_DISPLAY_HEIGHT / 180;
+function homemapPointFromDisplay(point) {
+  return {
+    x: Math.round(clamp(point.x, 0, 320)),
+    y: Math.round(clamp(point.y / HOMEMAP_Y_SCALE, 0, 180)),
+  };
+}
+function homemapModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  function fin(v) {
+    return typeof v === 'number' && isFinite(v) ? v : null;
+  }
+  var box = panel.outline || {};
+  var w = fin(box.w) != null ? clamp(box.w, 20, 320) : 300;
+  var h = fin(box.h) != null ? clamp(box.h, 20, 180) : 160;
+  var ox = fin(box.x) != null ? clamp(box.x, 0, 320 - w) : (320 - w) / 2;
+  var oy = fin(box.y) != null ? clamp(box.y, 0, 180 - h) : (180 - h) / 2;
+  var byId = Object.create(null),
+    seen = Object.create(null),
+    devices = [];
+  (Array.isArray(panel.devices) ? panel.devices : []).forEach(function (d) {
+    if (!d || typeof d.id !== 'string' || seen[d.id]) return;
+    seen[d.id] = true;
+    if (!homemapDeviceValid(d)) return;
+    var vocab = HOMEMAP_STATES[d.kind];
+    var x = clamp(d.x, 0, 320),
+      y = clamp(d.y, 0, 180);
+    var floorDoor = d.kind === 'entry' && d.display === 'door';
+    var devicePatch = Object.prototype.hasOwnProperty.call(state, d.id)
+      ? state[d.id]
+      : undefined;
+    var operating = panelObject(devicePatch) ? devicePatch.state : devicePatch;
+    var facing =
+      fin(d.facing) != null
+        ? d.facing
+        : floorDoor
+        ? 0
+        : (Math.atan2(90 - y, 160 - x) * 180) / Math.PI;
+    var item = {
+      id: d.id,
+      kind: d.kind,
+      label: String(d.label != null ? d.label : d.id),
+      x: x,
+      y: y,
+      state: vocab.indexOf(operating) >= 0 ? operating : vocab[0],
+      thermal:
+        panelObject(devicePatch) &&
+        HOMEMAP_THERMAL.indexOf(devicePatch.thermal) >= 0
+          ? devicePatch.thermal
+          : 'normal',
+      icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
+      facing: ((facing % 360) + 360) % 360,
+      spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
+      range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70,
+    };
+    if (floorDoor) {
+      item.display = 'door';
+      item.doorWidth =
+        fin(d.doorWidth) != null ? clamp(d.doorWidth, 8, 48) : 24;
+      item.doorSwing =
+        fin(d.doorSwing) != null &&
+        Math.abs(d.doorSwing) >= 15 &&
+        Math.abs(d.doorSwing) <= 135
+          ? d.doorSwing
+          : 90;
+    }
+    byId[d.id] = item;
+    devices.push(item);
+  });
+  var subjects = homemapSubjects(panel).map(function (sub) {
+    var value = Object.prototype.hasOwnProperty.call(state, sub.id)
+      ? state[sub.id]
+      : undefined;
+    var position = homemapSubjectPosition(value) ? value : sub;
+    return {
+      id: sub.id,
+      label: String(sub.label != null ? sub.label : sub.id),
+      icon:
+        sub.icon === undefined
+          ? null
+          : ICON_SET.indexOf(sub.icon) >= 0
+          ? sub.icon
+          : 'gear',
+      x: clamp(position.x, 0, 320),
+      y: clamp(position.y, 0, 180),
+      hidden: value === null,
+    };
+  });
+  var signals = [];
+  (Array.isArray(state.signals) ? state.signals : []).forEach(function (sig) {
+    if (
+      !sig ||
+      Array.isArray(sig) ||
+      typeof sig.from !== 'string' ||
+      typeof sig.to !== 'string'
+    )
+      return;
+    var from = byId[sig.from],
+      to = byId[sig.to];
+    if (from && to)
+      signals.push({
+        from: sig.from,
+        to: sig.to,
+        fromXY: { x: from.x, y: from.y },
+        toXY: { x: to.x, y: to.y },
+      });
+  });
+  return {
+    outline: { x: ox, y: oy, w: w, h: h },
+    devices: devices,
+    subjects: subjects,
+    signals: signals,
+  };
+}
+
+/* Room lighting is a view of the authored scene, not a simulated sensor or
+   containment rule. The highest visible device state wins, then occupancy. */
+function homemapRoomModel(panel, model) {
+  return homemapRooms(panel).map(function (room) {
+    function inside(item) {
+      var house = model.outline;
+      if (
+        room.kind === 'outdoor' &&
+        item.x > house.x &&
+        item.x < house.x + house.w &&
+        item.y > house.y &&
+        item.y < house.y + house.h
+      )
+        return false;
+      return (
+        item.x >= room.x &&
+        item.y >= room.y &&
+        (item.x < room.x + room.w ||
+          (item.x === 320 && room.x + room.w === 320)) &&
+        (item.y < room.y + room.h ||
+          (item.y === 180 && room.y + room.h === 180))
+      );
+    }
+    var devices = model.devices.filter(inside);
+    var occupied = model.subjects.some(function (s) {
+      return !s.hidden && inside(s);
+    });
+    var tone = devices.some(function (d) {
+      return d.state === 'alert' || d.state === 'detect';
+    })
+      ? 'alert'
+      : devices.some(function (d) {
+          return d.state === 'warn';
+        })
+      ? 'warn'
+      : occupied
+      ? 'occupied'
+      : 'quiet';
+    return { room: room, tone: tone };
+  });
+}
+
+function homemapThermalHTML(d, scaleY, clearing) {
+  var thermal = clearing || d.thermal;
+  if (!thermal || thermal === 'normal') return '';
+  var cold = thermal === 'cold' || thermal === 'freezing';
+  var s =
+    '<g class="hmthermal thermal-' +
+    thermal +
+    (clearing ? ' thermal-clearing' : '') +
+    '" data-home-thermal="' +
+    esc(d.id) +
+    '" data-thermal="' +
+    esc(d.thermal) +
+    '" transform="translate(' +
+    d.x +
+    ' ' +
+    d.y * scaleY +
+    ')">' +
+    '<title>' +
+    esc(
+      d.label + ': ' + (clearing ? 'temperature returning to normal' : thermal)
+    ) +
+    '</title>' +
+    '<circle class="thermal-halo" r="20"/><circle class="thermal-rim" r="12"/>';
+  if (cold) {
+    for (var i = 0; i < 6; i++)
+      s +=
+        '<path class="thermal-frost" transform="rotate(' +
+        i * 60 +
+        ')" d="M0 -11 V-19 M-3 -16 L0 -13 L3 -16"/>';
+    s +=
+      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><path d="M0 -4 V4 M-3.5 -2 L3.5 2 M-3.5 2 L3.5 -2"/></g>';
+  } else {
+    [-8, 0, 8].forEach(function (x, i) {
+      s +=
+        '<path class="thermal-wave" style="animation-delay:-' +
+        i * 0.65 +
+        's" d="M' +
+        x +
+        ' -13 C' +
+        (x - 5) +
+        ' -18 ' +
+        (x + 5) +
+        ' -21 ' +
+        x +
+        ' -27"/>';
+    });
+    s +=
+      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><use href="#i-thermo" x="-5" y="-5" width="10" height="10"/></g>';
+  }
+  return s + '</g>';
+}
+function homemapDoorHTML(d, transition, outline, clearing) {
+  var w = d.doorWidth,
+    angle = (d.doorSwing * Math.PI) / 180;
+  var endX = (w * Math.cos(angle)).toFixed(3),
+    endY = (w * Math.sin(angle)).toFixed(3);
+  var body =
+    '<g class="hmdev hm-entry hm-' +
+    esc(d.state) +
+    ' hm-floor-door" data-device="' +
+    esc(d.id) +
+    '">' +
+    '<title>' +
+    esc(d.label) +
+    ': ' +
+    esc(d.state) +
+    '</title>' +
+    homemapThermalHTML(d, HOMEMAP_Y_SCALE, clearing) +
+    '<g transform="translate(' +
+    d.x +
+    ' ' +
+    d.y * HOMEMAP_Y_SCALE +
+    ') scale(1 ' +
+    HOMEMAP_Y_SCALE +
+    ') rotate(' +
+    d.facing +
+    ')">' +
+    '<path class="hm-door-threshold" d="M-1 0 H' +
+    (w + 1) +
+    '"/>' +
+    '<path class="hm-door-hit" d="M0 0 H' +
+    w +
+    ' M' +
+    w +
+    ' 0 A' +
+    w +
+    ' ' +
+    w +
+    ' 0 0 ' +
+    (d.doorSwing > 0 ? 1 : 0) +
+    ' ' +
+    endX +
+    ' ' +
+    endY +
+    '"/>' +
+    '<path class="hm-door-arc" d="M' +
+    w +
+    ' 0 A' +
+    w +
+    ' ' +
+    w +
+    ' 0 0 ' +
+    (d.doorSwing > 0 ? 1 : 0) +
+    ' ' +
+    endX +
+    ' ' +
+    endY +
+    '"/>' +
+    '<g class="hm-floor-leaf' +
+    (transition ? ' hm-floor-' + transition : '') +
+    '" style="--hm-door-angle:' +
+    d.doorSwing +
+    'deg">' +
+    '<path d="M0 0 H' +
+    w +
+    '"/><circle class="hm-door-handle" cx="' +
+    (w - 4) +
+    '" cy="-2" r="1"/></g>' +
+    '<path class="hm-door-jamb" d="M0 -3 V3 M' +
+    w +
+    ' -3 V3"/><circle class="hm-door-hinge" r="1.8"/></g>';
+  var labelX = d.x,
+    labelY =
+      d.y > 139 ? d.y * HOMEMAP_Y_SCALE - 14 : d.y * HOMEMAP_Y_SCALE + 16;
+  var direction = (d.facing * Math.PI) / 180;
+  if (outline && Math.abs(Math.cos(direction)) > 0.7) {
+    labelX += (w * Math.cos(direction)) / 2;
+    labelY =
+      (d.y + (w * Math.sin(direction)) / 2) * HOMEMAP_Y_SCALE +
+      (d.y < outline.y + outline.h / 2 ? -14 : 14);
+  }
+  return (
+    body +
+    '<text class="hmlbl" x="' +
+    clamp(labelX, 28, 292) +
+    '" y="' +
+    clamp(labelY, 10, HOMEMAP_DISPLAY_HEIGHT - 5) +
+    '" text-anchor="middle">' +
+    esc(d.label) +
+    '</text></g>'
+  );
+}
+
+PanelViews.register(
+  'homemap',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var hBaseline = null;
+    var hm = homemapModel(panel, state);
+    var hmThermalPrev = host._hmThermal || Object.create(null),
+      hmThermalNow = Object.create(null),
+      hmClearing = Object.create(null);
+    var hmPrev = host._hmStates || Object.create(null),
+      hmNow = Object.create(null);
+    var hmFresh = Object.create(null),
+      hmHasFresh = false,
+      hmDoors = Object.create(null);
+    hm.devices.forEach(function (d) {
+      hmThermalNow[d.id] = d.thermal;
+      if (
+        animate &&
+        d.thermal === 'normal' &&
+        hmThermalPrev[d.id] &&
+        hmThermalPrev[d.id] !== 'normal'
+      ) {
+        hmClearing[d.id] = hmThermalPrev[d.id];
+        hmHasFresh = true;
+      }
+      hmNow[d.id] = d.state;
+      if (
+        animate &&
+        d.kind === 'entry' &&
+        hmPrev[d.id] !== undefined &&
+        (d.state === 'open') !== (hmPrev[d.id] === 'open')
+      ) {
+        hmDoors[d.id] = d.state === 'open' ? 'opening' : 'closing';
+        hmHasFresh = true;
+      }
+      if (
+        animate &&
+        hmPrev[d.id] !== undefined &&
+        hmPrev[d.id] !== d.state &&
+        ((d.kind === 'camera' && d.state === 'detect') ||
+          (d.kind === 'entry' && d.state === 'alert') ||
+          (d.kind === 'hub' && d.state === 'rx') ||
+          (d.kind === 'sensor' && ['warn', 'alert'].indexOf(d.state) >= 0))
+      ) {
+        hmFresh[d.id] = true;
+        hmHasFresh = true;
+      }
+    });
+    host._hmStates = hmNow;
+    host._hmThermal = hmThermalNow;
+    var hmSubjPrev = host._hmSubjPrev || Object.create(null),
+      hmSubjNow = Object.create(null);
+    var hmMoved = Object.create(null),
+      hmHasMoved = false;
+    hm.subjects.forEach(function (sub) {
+      if (sub.hidden) return;
+      var prev = hmSubjPrev[sub.id];
+      hmSubjNow[sub.id] = { x: sub.x, y: sub.y };
+      if (animate && prev && (prev.x !== sub.x || prev.y !== sub.y)) {
+        hmMoved[sub.id] = true;
+        hmHasMoved = true;
+      }
+    });
+    /* Hidden/removed subjects lose their previous position before reappearing. */
+    host._hmSubjPrev = hmSubjNow;
+    var hmSignals =
+      animate && typeof stepIdx === 'number' && stepIdx >= 0 ? hm.signals : [];
+    var buildHomemap = function (transient) {
+      var o = hm.outline;
+      var sy = HOMEMAP_Y_SCALE;
+      var s =
+        '<svg class="hmframe" viewBox="0 0 320 ' +
+        HOMEMAP_DISPLAY_HEIGHT +
+        '" role="img" aria-label="' +
+        esc(panel.title || 'Home device map') +
+        '">';
+      var spaces = homemapRoomModel(panel, hm);
+      function drawSpace(space) {
+        var room = space.room,
+          outdoor = room.kind === 'outdoor';
+        s +=
+          '<g class="hmspace hm-room-' +
+          space.tone +
+          (outdoor ? ' hm-outdoor' : '') +
+          '" data-home-room="' +
+          panel.rooms.indexOf(room) +
+          '">';
+        s +=
+          '<rect class="hmroom" x="' +
+          room.x +
+          '" y="' +
+          room.y * sy +
+          '" width="' +
+          room.w +
+          '" height="' +
+          room.h * sy +
+          '" rx="2"/>';
+        if (!outdoor)
+          s +=
+            '<path class="hmroomwall" d="M' +
+            (room.x + 2) +
+            ' ' +
+            ((room.y + room.h) * sy - 2) +
+            ' V' +
+            (room.y * sy + 2) +
+            ' H' +
+            (room.x + room.w - 2) +
+            '"/>';
+        s +=
+          '<text class="hmroomlabel" x="' +
+          (room.x + 6) +
+          '" y="' +
+          (room.y * sy + 10) +
+          '">' +
+          esc(room.label || '') +
+          '</text></g>';
+      }
+      spaces
+        .filter(function (space) {
+          return space.room.kind === 'outdoor';
+        })
+        .forEach(drawSpace);
+      s +=
+        '<rect class="hmfoundation" x="' +
+        o.x +
+        '" y="' +
+        (o.y * sy + 2) +
+        '" width="' +
+        o.w +
+        '" height="' +
+        o.h * sy +
+        '" rx="9"/>';
+      s +=
+        '<rect class="hmoutline" x="' +
+        o.x +
+        '" y="' +
+        o.y * sy +
+        '" width="' +
+        o.w +
+        '" height="' +
+        o.h * sy +
+        '" rx="9"/>';
+      spaces
+        .filter(function (space) {
+          return space.room.kind !== 'outdoor';
+        })
+        .forEach(drawSpace);
+      if (transient && hmHasMoved)
+        hm.subjects.forEach(function (sub) {
+          if (!hmMoved[sub.id]) return;
+          var prev = hmSubjPrev[sub.id];
+          s +=
+            '<path class="hmtrail" d="M' +
+            prev.x +
+            ' ' +
+            prev.y * sy +
+            ' L' +
+            sub.x +
+            ' ' +
+            sub.y * sy +
+            '"/>';
+        });
+      /* Direction remains readable while paused and under reduced motion.
+         Animated step paints add traveling packets over the route. */
+      if (typeof stepIdx === 'number' && stepIdx >= 0)
+        hm.signals.forEach(function (sig) {
+          var fromY = sig.fromXY.y * sy,
+            toY = sig.toXY.y * sy;
+          var dx = sig.toXY.x - sig.fromXY.x,
+            dy = toY - fromY;
+          var length = Math.sqrt(dx * dx + dy * dy);
+          if (length < 24) return;
+          var ux = dx / length,
+            uy = dy / length;
+          var x = sig.toXY.x - ux * 13,
+            y = toY - uy * 13;
+          s +=
+            '<g class="hmlink"><title>' +
+            esc(sig.from + ' → ' + sig.to) +
+            '</title>' +
+            '<path class="hmlinkglow" d="M' +
+            (sig.fromXY.x + ux * 12) +
+            ' ' +
+            (fromY + uy * 12) +
+            ' L' +
+            x +
+            ' ' +
+            y +
+            '"/>' +
+            '<path class="hmlinkroute" d="M' +
+            (sig.fromXY.x + ux * 12) +
+            ' ' +
+            (fromY + uy * 12) +
+            ' L' +
+            x +
+            ' ' +
+            y +
+            '"/>' +
+            '<path class="hmlinktip" d="M' +
+            (x - ux * 5 - uy * 3) +
+            ' ' +
+            (y - uy * 5 + ux * 3) +
+            ' L' +
+            x +
+            ' ' +
+            y +
+            ' L' +
+            (x - ux * 5 + uy * 3) +
+            ' ' +
+            (y - uy * 5 - ux * 3) +
+            '"/></g>';
+        });
+      /* Wedges below all markers, so one camera cannot obscure another. */
+      hm.devices.forEach(function (d) {
+        if (
+          d.kind !== 'camera' ||
+          ['scan', 'detect', 'rec'].indexOf(d.state) < 0
+        )
+          return;
+        var a1 = ((d.facing - d.spread / 2) * Math.PI) / 180;
+        var a2 = ((d.facing + d.spread / 2) * Math.PI) / 180;
+        var mid = (d.facing * Math.PI) / 180;
+        s +=
+          '<g class="hmdev hm-camera hm-' +
+          esc(d.state) +
+          '" transform="scale(1 ' +
+          sy +
+          ')">';
+        s +=
+          '<path class="hmwedge" d="M' +
+          d.x +
+          ' ' +
+          d.y +
+          ' L' +
+          (d.x + d.range * Math.cos(a1)).toFixed(1) +
+          ' ' +
+          (d.y + d.range * Math.sin(a1)).toFixed(1) +
+          ' A' +
+          d.range +
+          ' ' +
+          d.range +
+          ' 0 0 1 ' +
+          (d.x + d.range * Math.cos(a2)).toFixed(1) +
+          ' ' +
+          (d.y + d.range * Math.sin(a2)).toFixed(1) +
+          ' Z"/>';
+        if (!RM)
+          s +=
+            '<g class="hmsweep" style="transform-origin:' +
+            d.x +
+            'px ' +
+            d.y +
+            'px;--sw:' +
+            (d.spread / 2 - 2) +
+            'deg"><line x1="' +
+            d.x +
+            '" y1="' +
+            d.y +
+            '" x2="' +
+            (d.x + (d.range - 3) * Math.cos(mid)).toFixed(1) +
+            '" y2="' +
+            (d.y + (d.range - 3) * Math.sin(mid)).toFixed(1) +
+            '"/></g>';
+        s += '</g>';
+      });
+      hm.devices.forEach(function (d) {
+        if (d.display === 'door') {
+          s += homemapDoorHTML(
+            d,
+            transient ? hmDoors[d.id] : null,
+            hm.outline,
+            transient ? hmClearing[d.id] : null
+          );
+          return;
+        }
+        s +=
+          '<g class="hmdev hm-' +
+          esc(d.kind) +
+          ' hm-' +
+          esc(d.state) +
+          '" data-device="' +
+          esc(d.id) +
+          '" transform="translate(0 ' +
+          (d.y * (sy - 1)).toFixed(3) +
+          ')">' +
+          '<title>' +
+          esc(d.label) +
+          ': ' +
+          esc(d.state) +
+          (d.thermal !== 'normal' ? ' · ' + d.thermal : '') +
+          '</title>';
+        s += homemapThermalHTML(d, 1, transient ? hmClearing[d.id] : null);
+        s +=
+          '<circle class="hmdevice-aura" cx="' +
+          d.x +
+          '" cy="' +
+          d.y +
+          '" r="13"/>';
+        if (transient && hmFresh[d.id])
+          s +=
+            '<circle class="' +
+            (d.kind === 'hub' ? 'hmglow' : 'hmripple') +
+            '" cx="' +
+            d.x +
+            '" cy="' +
+            d.y +
+            '" r="6"/>';
+        s +=
+          '<circle class="hmmarker" cx="' +
+          d.x +
+          '" cy="' +
+          d.y +
+          '" r="8.5"/>';
+        if (d.kind === 'hub')
+          s +=
+            '<circle class="hmhubring" cx="' +
+            d.x +
+            '" cy="' +
+            d.y +
+            '" r="10"/>';
+        /* tx: steady looping broadcast waves — part of the baseline, so an
+           unchanged step repaint leaves the animation running */
+        if (d.kind === 'hub' && d.state === 'tx')
+          s +=
+            '<circle class="hmtxring" cx="' +
+            d.x +
+            '" cy="' +
+            d.y +
+            '" r="8"/>' +
+            '<circle class="hmtxring hmtxring2" cx="' +
+            d.x +
+            '" cy="' +
+            d.y +
+            '" r="8"/>';
+        /* rec: the classic blinking recording light beside the camera dot —
+           steady markup, so the blink survives unchanged step repaints */
+        if (d.kind === 'camera' && d.state === 'rec')
+          s +=
+            '<circle class="hmrecdot" cx="' +
+            (d.x + 7) +
+            '" cy="' +
+            (d.y - 7) +
+            '" r="2.5"/>';
+        if (d.kind === 'entry') {
+          s +=
+            '<path class="hmentry" d="M' +
+            (d.x - 3.5) +
+            ' ' +
+            (d.y + 5) +
+            ' v-10 h7 v10"/>';
+          s +=
+            '<path class="hmdoorleaf' +
+            (transient && hmDoors[d.id] ? ' hmdoor-' + hmDoors[d.id] : '') +
+            '" style="transform-origin:' +
+            (d.x - 3.5) +
+            'px ' +
+            (d.y + 5) +
+            'px" d="M' +
+            (d.x - 3.5) +
+            ' ' +
+            (d.y + 5) +
+            ' h7"/>';
+        } else {
+          var deviceIcon =
+            d.kind === 'camera'
+              ? 'camera'
+              : d.kind === 'hub'
+              ? 'router'
+              : d.icon;
+          s +=
+            '<use class="hmicon hmdeviceglyph" href="#i-' +
+            esc(deviceIcon) +
+            '" x="' +
+            (d.x - 6) +
+            '" y="' +
+            (d.y - 6) +
+            '" width="12" height="12"/>';
+        }
+        var labelY = d.y > 139 ? d.y - 25 : d.y + 20;
+        var labelX = clamp(d.x, 28, 292);
+        s +=
+          '<text class="hmlbl" x="' +
+          labelX +
+          '" y="' +
+          labelY +
+          '" text-anchor="middle">' +
+          esc(d.label) +
+          '</text></g>';
+      });
+      hm.subjects.forEach(function (sub) {
+        if (sub.hidden) return;
+        var prev = hmSubjPrev[sub.id];
+        s +=
+          '<g transform="translate(0 ' +
+          (sub.y * (sy - 1)).toFixed(3) +
+          ')"><g class="hmsubject" data-subject="' +
+          esc(sub.id) +
+          '"' +
+          (transient && hmMoved[sub.id]
+            ? ' style="transform:translate(' +
+              (prev.x - sub.x) +
+              'px,' +
+              (prev.y - sub.y) * sy +
+              'px)"'
+            : '') +
+          '><title>' +
+          esc(sub.label) +
+          '</title>';
+        s +=
+          '<ellipse class="hmactor-shadow" cx="' +
+          sub.x +
+          '" cy="' +
+          (sub.y + 9) +
+          '" rx="7" ry="2.2"/>';
+        s +=
+          '<circle class="hmsubjectdot" cx="' +
+          sub.x +
+          '" cy="' +
+          sub.y +
+          '" r="7"/>';
+        if (sub.icon)
+          s +=
+            '<use class="hmactor-icon" href="#i-' +
+            esc(sub.icon) +
+            '" x="' +
+            (sub.x - 5) +
+            '" y="' +
+            (sub.y - 5) +
+            '" width="10" height="10"/>';
+        else
+          s +=
+            '<circle class="hmactor-icon" cx="' +
+            sub.x +
+            '" cy="' +
+            (sub.y - 2.2) +
+            '" r="1.8"/>' +
+            '<path class="hmactor-icon" d="M' +
+            (sub.x - 3.4) +
+            ' ' +
+            (sub.y + 4) +
+            ' v-1 a3.4 3.4 0 0 1 6.8 0 v1 Z"/>';
+        if (panel.showSubjectLabels === true)
+          s +=
+            '<text class="hmlbl hmactor-label" x="' +
+            clamp(sub.x, 24, 296) +
+            '" y="' +
+            (sub.y > 146 ? sub.y - 12 : sub.y + 19) +
+            '" text-anchor="middle">' +
+            esc(sub.label) +
+            '</text>';
+        s += '</g></g>';
+      });
+      if (!hm.devices.length)
+        s +=
+          '<text class="hmlbl" x="160" y="' +
+          (HOMEMAP_DISPLAY_HEIGHT / 2 + 4) +
+          '" text-anchor="middle">No devices configured</text>';
+      if (transient)
+        hmSignals.forEach(function (sig, i) {
+          s +=
+            '<circle class="hmsig" r="3" style="--hx1:' +
+            sig.fromXY.x +
+            'px;--hy1:' +
+            sig.fromXY.y * sy +
+            'px;--hx2:' +
+            sig.toXY.x +
+            'px;--hy2:' +
+            sig.toXY.y * sy +
+            'px;animation-delay:' +
+            i * 0.25 +
+            's"/>';
+        });
+      return s + '</svg>';
+    };
+    h += buildHomemap(true);
+    hBaseline =
+      hmHasFresh || hmHasMoved || hmSignals.length ? buildHomemap(false) : null;
+    return {
+      html: h,
+      baseline: hBaseline,
+      transient: '.hmripple,.hmglow,.hmsig,.hmtrail',
+      glide: { selector: '.hmsubject[style]', multiple: true },
+      settle: function () {
+        if (typeof host.querySelectorAll !== 'function') return;
+        var leaves = host.querySelectorAll('.hmdoor-opening,.hmdoor-closing');
+        for (var i = 0; i < leaves.length; i++) {
+          leaves[i].classList.remove('hmdoor-opening');
+          leaves[i].classList.remove('hmdoor-closing');
+        }
+      },
+    };
+  },
+  { ambientInitial: true }
+);
+/* ---- src/panels/types/image.js ---- */
+/* image panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+PanelViews.register(
+  'image',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var imageSrc = embeddedImageSource(panel.src);
+    h = '<figure class="pimage">';
+    if (imageSrc)
+      h +=
+        '<img src="' +
+        esc(imageSrc) +
+        '" alt="' +
+        esc(panel.alt || '') +
+        '" decoding="async">';
+    else
+      h +=
+        '<div class="pimage-empty">Add an embedded PNG, JPEG or WebP image</div>';
+    if (panel.caption)
+      h += '<figcaption>' + esc(panel.caption) + '</figcaption>';
+    var imageLink =
+      typeof FlowCanon !== 'undefined' && FlowCanon.http(panel.link);
+    if (imageLink)
+      h +=
+        '<a class="pimage-link" href="' +
+        esc(imageLink) +
+        '" target="_blank" rel="noopener noreferrer">Open reference ↗</a>';
+    h += '</figure>';
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/inflight.js ---- */
+/* inflight panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function inflightModel(panel, state, stepCount, currentStep) {
+  panel = panel || {};
+  state = state || {};
+  var seen = {};
+  var lanes = (Array.isArray(panel.lanes) ? panel.lanes : [])
+    .slice(0, 8)
+    .map(function (l) {
+      if (!l || !l.id || seen[l.id]) return null;
+      seen[l.id] = true;
+      return {
+        id: String(l.id),
+        label: l.label != null ? String(l.label) : String(l.id),
+        bars: [],
+      };
+    })
+    .filter(Boolean);
+  var byId = {};
+  lanes.forEach(function (l) {
+    byId[l.id] = l;
+  });
+  var n =
+    typeof stepCount === 'number' && isFinite(stepCount)
+      ? Math.max(0, Math.round(stepCount))
+      : typeof state.stepCount === 'number'
+      ? Math.max(0, Math.round(state.stepCount))
+      : 0;
+  var cur =
+    typeof currentStep === 'number' && isFinite(currentStep)
+      ? Math.round(currentStep)
+      : typeof state.currentStep === 'number'
+      ? Math.round(state.currentStep)
+      : 0;
+  if (n) cur = clamp(cur, 0, n - 1);
+  else cur = 0;
+  (Array.isArray(state.bars) ? state.bars : []).forEach(function (b) {
+    if (!b || !byId[b.lane] || !validRevealIndex(b.start)) return;
+    var end = validRevealIndex(b.end) ? b.end : null;
+    var st = INFLIGHT_STATES.indexOf(b.state) >= 0 ? b.state : 'ok';
+    byId[b.lane].bars.push({
+      lane: b.lane,
+      label: b.label != null ? String(b.label) : '',
+      start: b.start,
+      end: end,
+      state: st,
+      open: end == null,
+    });
+  });
+  return { lanes: lanes, stepCount: n, currentStep: cur };
+}
+
+function inflightPanelHTML(panel, state, stepCount, currentStep) {
+  var m = inflightModel(panel, state, stepCount, currentStep);
+  if (!m.lanes.length) return '<div class="ifempty">no lanes</div>';
+  var n = Math.max(1, m.stepCount);
+  var h =
+    '<div class="ifbox"><div class="ifaxis"><span class="ifaxislabel">step</span><span class="ifticks">';
+  for (var i = 0; i < m.stepCount; i++) {
+    h +=
+      '<span class="iftick' +
+      (i === m.currentStep ? ' cur' : '') +
+      '" style="left:' +
+      (((i + 0.5) / n) * 100).toFixed(3) +
+      '%">' +
+      i +
+      '</span>';
+  }
+  h += '</span></div>';
+  m.lanes.forEach(function (lane) {
+    h +=
+      '<div class="ifrow"><span class="iflabel" title="' +
+      esc(lane.label) +
+      '">' +
+      esc(lane.label) +
+      '</span><span class="iftrack">';
+    if (m.stepCount)
+      h +=
+        '<i class="ifnow" style="left:' +
+        ((m.currentStep / n) * 100).toFixed(3) +
+        '%;width:' +
+        (100 / n).toFixed(3) +
+        '%"></i>';
+    for (var gi = 1; gi < n; gi++)
+      h +=
+        '<i class="ifgrid" style="left:' +
+        ((gi / n) * 100).toFixed(3) +
+        '%"></i>';
+    lane.bars.forEach(function (bar) {
+      var last = bar.open ? m.currentStep : bar.end;
+      last = Math.max(bar.start, Math.min(n - 1, last));
+      var left = (bar.start / n) * 100;
+      var width = ((last - bar.start + 1) / n) * 100;
+      h +=
+        '<b class="ifbar s-' +
+        bar.state +
+        (bar.open ? ' open' : '') +
+        '" style="left:' +
+        left.toFixed(3) +
+        '%;width:' +
+        width.toFixed(3) +
+        '%" title="' +
+        esc(bar.label || lane.label) +
+        ' · steps ' +
+        bar.start +
+        (bar.open ? '+' : '–' + bar.end) +
+        '">' +
+        esc(bar.label) +
+        '</b>';
+    });
+    h += '</span></div>';
+  });
+  return h + '</div>';
+}
+
+/* Stable presentation keys and target widths for inflight bars. These frames
+   are never folded back into state; they only let a rebuilt bar begin at its
+   previous painted width during an adjacent transition. */
+function inflightBarFrames(model) {
+  var frames = [],
+    seen = {},
+    n = Math.max(1, model.stepCount);
+  model.lanes.forEach(function (lane) {
+    lane.bars.forEach(function (bar) {
+      var base = lane.id + '\n' + bar.start + '\n' + bar.label;
+      var ordinal = seen[base] || 0;
+      seen[base] = ordinal + 1;
+      var last = bar.open ? model.currentStep : bar.end;
+      last = Math.max(bar.start, Math.min(n - 1, last));
+      frames.push({
+        key: base + '\n' + ordinal,
+        width: ((last - bar.start + 1) / n) * 100,
+      });
+    });
+  });
+  return frames;
+}
+
+/* phone widget: a generic handset lock screen backed by the absolute unread
+   stack produced by foldPhoneStates. The model keeps the full count for the
+   computed badge while exposing only the three cards that can fit. */
+
+PanelViews.register(
+  'inflight',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var inflightFramesNow, inflightFramesPrev;
+    var ifmNow = inflightModel(
+      panel,
+      state,
+      Array.isArray(states) ? states.length : state.stepCount,
+      stepIdx
+    );
+    inflightFramesNow = inflightBarFrames(ifmNow);
+    inflightFramesPrev = host._ifFrames || null;
+    host._ifFrames = {};
+    inflightFramesNow.forEach(function (frame) {
+      host._ifFrames[frame.key] = frame.width;
+    });
+    h += inflightPanelHTML(
+      panel,
+      state,
+      Array.isArray(states) ? states.length : state.stepCount,
+      stepIdx
+    );
+    return {
+      html: h,
+      bars: {
+        selector: '.ifbar',
+        frames: inflightFramesNow,
+        previous: inflightFramesPrev,
+      },
+    };
+  }
+);
+/* ---- src/panels/types/leds.js ---- */
+/* leds panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+PanelViews.register(
+  'leds',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    h += '<div class="ledrow">';
+    (panel.leds || []).forEach(function (l) {
+      var mode = String(state[l.id] || 'off');
+      if (['on', 'off', 'tx', 'rx'].indexOf(mode) < 0) mode = 'off';
+      h +=
+        '<span class="led"><span class="leddot ' +
+        mode +
+        '"></span>' +
+        esc(l.label || l.id) +
+        '</span>';
+    });
+    h += '</div>';
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/log.js ---- */
+/* log panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+PanelViews.register(
+  'log',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var tags = panel.tags || {};
+    h += '<div class="plog">';
+    (state.log || []).forEach(function (line) {
+      var tag = line && line.tag ? String(line.tag) : '';
+      var col2 = isHex(tags[tag]) ? tags[tag] : null;
+      h +=
+        '<div class="plogline">' +
+        (tag
+          ? '<span class="plogtag"' +
+            (col2 ? ' style="color:' + col2 + '"' : '') +
+            '>' +
+            esc(tag) +
+            '</span>'
+          : '') +
+        '<span>' +
+        esc(line && line.text != null ? line.text : String(line)) +
+        '</span></div>';
+    });
+    h += '</div>';
+    return {
+      html: h,
+      mounted: function () {
+        var log = host.querySelector('.plog');
+        if (log && typeof log.scrollHeight === 'number')
+          log.scrollTop = log.scrollHeight;
+      },
+    };
+  },
+  { growing: true }
+);
+/* ---- src/panels/types/orbit.js ---- */
+/* orbit panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function orbitPositions(n, cx, cy, r) {
+  var out = [];
+  for (var i = 0; i < n; i++) {
+    var a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    out.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  }
+  return out;
+}
+
+/* zones/layers patches replace the whole array (fold is a shallow merge);
+   the model joins the declared geometry with the latest state array. */
+
+PanelViews.register(
+  'orbit',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var pulseSelector, pulseChanged;
+    var ostates = Array.isArray(panel.states) ? panel.states : [];
+    var ocur = state.state != null ? String(state.state) : null;
+    pulseSelector = '.odot.cur';
+    pulseChanged =
+      Object.prototype.hasOwnProperty.call(host, '_orbitCur') &&
+      host._orbitCur !== ocur;
+    host._orbitCur = ocur;
+    var ocolors = panel.colors || {};
+    var opos = orbitPositions(ostates.length, 110, 78, 54);
+    h +=
+      '<svg class="orbit" viewBox="0 0 220 156" role="img" aria-label="' +
+      esc(panel.title || 'state machine') +
+      '">';
+    h += '<circle class="oring" cx="110" cy="78" r="54"/>';
+    ostates.forEach(function (sname, i) {
+      var p = opos[i];
+      var isCur = String(sname) === ocur;
+      var col = isHex(ocolors[sname]) ? ocolors[sname] : null;
+      var anchor = p.x < 100 ? 'end' : p.x > 120 ? 'start' : 'middle';
+      var lx = p.x + (anchor === 'end' ? -11 : anchor === 'start' ? 11 : 0);
+      var ly =
+        anchor === 'middle' ? (p.y < 78 ? p.y - 10 : p.y + 16) : p.y + 3.5;
+      h +=
+        '<circle class="odot' +
+        (isCur ? ' cur' : '') +
+        '" cx="' +
+        p.x.toFixed(1) +
+        '" cy="' +
+        p.y.toFixed(1) +
+        '" r="' +
+        (isCur ? 7 : 4.5) +
+        '"' +
+        (isCur && col ? ' style="fill:' + col + '"' : '') +
+        '/>';
+      h +=
+        '<text class="olbl' +
+        (isCur ? ' cur' : '') +
+        '" x="' +
+        lx.toFixed(1) +
+        '" y="' +
+        ly.toFixed(1) +
+        '" text-anchor="' +
+        anchor +
+        '">' +
+        esc(String(sname)) +
+        '</text>';
+    });
+    h +=
+      '<text class="ocur" x="110" y="75" text-anchor="middle"' +
+      (ocur && isHex(ocolors[ocur])
+        ? ' style="fill:' + ocolors[ocur] + '"'
+        : '') +
+      '>' +
+      esc(ocur || '—') +
+      '</text>';
+    if (state.via)
+      h +=
+        '<text class="ovia" x="110" y="91" text-anchor="middle">via ' +
+        esc(String(state.via)) +
+        '</text>';
+    h += '</svg>';
+    return {
+      html: h,
+      pulse: { selector: pulseSelector, changed: pulseChanged },
+    };
+  }
+);
+/* ---- src/panels/types/phone.js ---- */
+/* phone panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function phoneBrand(panel) {
+  var brand = panel && panel.brand;
+  if (!phoneBrandIsPlainObject(brand)) return null;
+  var out = {};
+  if (typeof brand.app === 'string') out.app = brand.app;
+  if (
+    typeof brand.logo === 'string' &&
+    brand.logo.length >= 1 &&
+    brand.logo.length <= 4
+  )
+    out.logo = brand.logo;
+  /* These values enter an inline style: accept only literal hex colors. */
+  ['accent', 'bg', 'fg'].forEach(function (k) {
+    if (
+      typeof brand[k] === 'string' &&
+      (brand[k].length === 4 || brand[k].length === 7) &&
+      /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k])
+    )
+      out[k] = brand[k];
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+function phoneModel(panelOrState, stepsOrState, currentStep) {
+  var state;
+  /* Public fold form: phoneModel(panel, diagramSteps, targetIndex). This is
+     useful to callers/tests that need the complete target state without
+     first reaching through foldPanelStates. Omit targetIndex for the end. */
+  if (Array.isArray(stepsOrState)) {
+    var folded = foldPhoneStates(panelOrState || {}, stepsOrState);
+    var target =
+      typeof currentStep === 'number' && isFinite(currentStep)
+        ? Math.round(currentStep)
+        : folded.length - 1;
+    state = folded[clamp(target, 0, folded.length - 1)] || {};
+  } else if (
+    stepsOrState &&
+    typeof stepsOrState === 'object' &&
+    !Array.isArray(stepsOrState)
+  ) {
+    /* Conventional widget-model form: phoneModel(panel, absoluteState). */
+    state = stepsOrState;
+  } else {
+    /* Compact renderer form: phoneModel(absoluteState). */
+    state = panelOrState || {};
+  }
+  var notifications = (
+    Array.isArray(state.notifications) ? state.notifications : []
+  )
+    .map(function (n) {
+      if (
+        !n ||
+        typeof n !== 'object' ||
+        Array.isArray(n) ||
+        typeof n.app !== 'string' ||
+        !n.app
+      )
+        return null;
+      return {
+        app: n.app,
+        title: typeof n.title === 'string' ? n.title : '',
+        text: typeof n.text === 'string' ? n.text : '',
+      };
+    })
+    .filter(Boolean);
+  return {
+    clock: typeof state.clock === 'string' ? state.clock : '',
+    notifications: notifications,
+    cards: notifications.slice(0, 3),
+    count: notifications.length,
+    badge: notifications.length,
+    overflow: Math.max(0, notifications.length - 3),
+    added:
+      typeof state._phoneAdded === 'number'
+        ? Math.max(0, Math.round(state._phoneAdded))
+        : 0,
+  };
+}
+
+function phonePanelHTML(panel, state, fresh) {
+  panel = panel || {};
+  var m = phoneModel(panel, state);
+  var brand = phoneBrand(panel);
+  var styles = [];
+  if (brand) {
+    if (brand.accent) styles.push('--phacc:' + brand.accent);
+    if (brand.bg) styles.push('--phbg:' + brand.bg);
+    if (brand.fg) styles.push('--phfg:' + brand.fg);
+  }
+  var label = m.count
+    ? 'Phone with ' +
+      m.count +
+      ' unread notification' +
+      (m.count === 1 ? '' : 's')
+    : 'Phone with no notifications';
+  if (brand && brand.app) label = brand.app + ' phone' + label.slice(5);
+  var h =
+    '<div class="phoneframe"' +
+    (styles.length ? ' style="' + styles.join(';') + '"' : '') +
+    ' role="img" aria-label="' +
+    esc(label) +
+    '">' +
+    '<span class="phonespeaker" aria-hidden="true"></span>' +
+    '<div class="phonestatus"><span class="phoneclock">' +
+    esc(m.clock) +
+    '</span>' +
+    '<span class="phoneglyphs" aria-hidden="true"><span class="phonesignal"><i></i><i></i><i></i></span>' +
+    '<span class="phonebattery"><i></i></span></span></div>';
+  if (brand && (brand.app || brand.logo))
+    h +=
+      '<div class="phonebrand">' +
+      (brand.logo
+        ? '<span class="phonelogo" aria-hidden="true">' +
+          esc(brand.logo) +
+          '</span>'
+        : '') +
+      (brand.app
+        ? '<span class="phonebrandname">' + esc(brand.app) + '</span>'
+        : '') +
+      '</div>';
+  if (m.count)
+    h += '<span class="phonebadge" aria-hidden="true">' + m.badge + '</span>';
+  h += '<div class="phonecards">';
+  if (!m.cards.length) {
+    h += '<div class="phoneempty">no notifications</div>';
+  } else {
+    m.cards.forEach(function (card, i) {
+      h +=
+        '<div class="phonecard' +
+        (fresh && i === 0 ? ' fresh' : '') +
+        '">' +
+        '<div class="phoneapp" title="' +
+        esc(card.app) +
+        '">' +
+        esc(card.app) +
+        '</div>' +
+        (card.title
+          ? '<div class="phonetitle" title="' +
+            esc(card.title) +
+            '">' +
+            esc(card.title) +
+            '</div>'
+          : '') +
+        (card.text
+          ? '<div class="phonetext" title="' +
+            esc(card.text) +
+            '">' +
+            esc(card.text) +
+            '</div>'
+          : '') +
+        '</div>';
+    });
+  }
+  h += '</div>';
+  if (m.overflow)
+    h += '<div class="phoneoverflow">+' + m.overflow + ' more</div>';
+  return h + '<span class="phonehome" aria-hidden="true"></span></div>';
+}
+
+/* Camera-details UI with field-level provenance. Everything is authored data;
+   even endpoint labels are inert text. Source selection is local viewer state. */
+
+PanelViews.register(
+  'phone',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var hBaseline = null;
+    var phm = phoneModel(state);
+    /* Like pir/radar, entry is derived from the transition we actually
+       painted, never from the target snapshot's `_phoneAdded` marker. That
+       marker is also present when navigating backward onto its source step.
+       Requiring an adjacent forward step and a strictly deeper stack keeps
+       backward navigation, jumps/deep links, and settled export renders free
+       of one-shot markup. */
+    var phonePrevStack = Array.isArray(host._phoneStack)
+      ? host._phoneStack
+      : null;
+    var phoneDeeper =
+      phonePrevStack !== null &&
+      phm.notifications.length > phonePrevStack.length &&
+      phonePrevStack.every(function (previousCard, previousIndex) {
+        var nextCard =
+          phm.notifications[
+            phm.notifications.length - phonePrevStack.length + previousIndex
+          ];
+        return (
+          nextCard &&
+          nextCard.app === previousCard.app &&
+          nextCard.title === previousCard.title &&
+          nextCard.text === previousCard.text
+        );
+      });
+    var phoneFresh =
+      animate &&
+      validRevealIndex(host._phoneStep) &&
+      validRevealIndex(stepIdx) &&
+      stepIdx === host._phoneStep + 1 &&
+      phoneDeeper;
+    host._phoneStep = validRevealIndex(stepIdx) ? stepIdx : null;
+    host._phoneStack = phm.notifications.map(function (card) {
+      return { app: card.app, title: card.title, text: card.text };
+    });
+    h += phonePanelHTML(panel, state, phoneFresh);
+    hBaseline = phoneFresh ? phonePanelHTML(panel, state, false) : null;
+    return { html: h, baseline: hBaseline };
+  }
+);
+/* ---- src/panels/types/pir.js ---- */
+/* pir panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function pirModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  var sensor =
+    panel.sensor &&
+    typeof panel.sensor.x === 'number' &&
+    typeof panel.sensor.y === 'number'
+      ? { x: panel.sensor.x, y: panel.sensor.y }
+      : { x: 298, y: 78 };
+  var cone = panel.cone || {};
+  var facing = typeof cone.facing === 'number' ? cone.facing : 180;
+  var spread =
+    typeof cone.spread === 'number' ? clamp(cone.spread, 4, 340) : 66;
+  var range =
+    typeof cone.range === 'number' && cone.range > 0 ? cone.range : 250;
+  var f = (facing * Math.PI) / 180;
+  var half = ((spread / 2) * Math.PI) / 180;
+  var N = 16,
+    pts = [[sensor.x, sensor.y]];
+  for (var i = 0; i <= N; i++) {
+    var a = f - half + 2 * half * (i / N);
+    pts.push([sensor.x + range * Math.cos(a), sensor.y + range * Math.sin(a)]);
+  }
+  var subj =
+    state.subject &&
+    typeof state.subject.x === 'number' &&
+    typeof state.subject.y === 'number'
+      ? { x: state.subject.x, y: state.subject.y }
+      : null;
+  var tripped = false;
+  if (subj) {
+    var dx = subj.x - sensor.x,
+      dy = subj.y - sensor.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist === 0) {
+      tripped = true;
+    } else if (dist <= range) {
+      var diff = Math.abs(
+        Math.atan2(
+          Math.sin(Math.atan2(dy, dx) - f),
+          Math.cos(Math.atan2(dy, dx) - f)
+        )
+      );
+      if (diff <= half) tripped = true;
+    }
+  }
+  if (state.tripped === true) tripped = true;
+  if (state.tripped === false) tripped = false;
+  return {
+    sensor: sensor,
+    cone: { facing: facing, spread: spread, range: range },
+    conePoints: pts,
+    subject: subj,
+    tripped: tripped,
+    path: (function () {
+      var pp = (Array.isArray(panel.path) ? panel.path : []).filter(function (
+        p
+      ) {
+        return (
+          Array.isArray(p) &&
+          typeof p[0] === 'number' &&
+          isFinite(p[0]) &&
+          typeof p[1] === 'number' &&
+          isFinite(p[1])
+        );
+      });
+      return pp.length >= 2 ? pp : null;
+    })(),
+    banner: state.banner != null ? String(state.banner) : '',
+    status: state.status != null ? String(state.status) : null,
+  };
+}
+
+/* thermo widget: a device temperature readout against warning / critical
+   shutdown thresholds. Pure model (node-testable, no DOM). The engine COMPUTES
+   the zone (ok / warn / crit) from the value and the declared thresholds
+   rather than trusting the author to assert it; `state.label` overrides only
+   the zone-chip caption. A missing value renders as a dash (zone 'na').
+   Reversed warn/crit are swapped (the validator warns). */
+
+PanelViews.register(
+  'pir',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var hBaseline = null;
+    var pm = pirModel(panel, state);
+    var trip = pm.tripped ? 'tripped' : 'clear';
+    /* one-shot cues (cone flash, subject ripple, status blink) fire only on a
+       clear→tripped transition, not on every re-render while tripped and not
+       on a first render that starts tripped (host._pirTrip === false means
+       the PREVIOUS render was explicitly clear; undefined means no previous
+       render). The previous render's tripped/subject live on the host. */
+    var pirFresh = animate && pm.tripped && host._pirTrip === false;
+    var pirPrev = host._pirPrev || null;
+    var pirMoved =
+      animate &&
+      pirPrev &&
+      pm.subject &&
+      (pirPrev.x !== pm.subject.x || pirPrev.y !== pm.subject.y);
+    host._pirTrip = pm.tripped;
+    host._pirPrev = pm.subject ? { x: pm.subject.x, y: pm.subject.y } : null;
+    /* the widget markup is built twice: once WITH the one-shot transients
+       (fresh classes, ghost, trail, ripple, glide offset) for the DOM, and
+       once WITHOUT them as the comparison baseline (hBaseline) — the step
+       AFTER a trip or a move produces exactly the steady form, so it matches
+       the baseline and skips the rebuild instead of restarting the ambient
+       sweep/ping animations. */
+    var buildPir = function (transient) {
+      var s =
+        '<div class="pirbox"><svg class="pirframe" viewBox="0 0 320 180" role="img" aria-label="' +
+        esc(panel.title || 'IR sensor line of sight') +
+        '">';
+      s +=
+        '<rect width="320" height="180" class="pirbg"/><rect y="150" width="320" height="30" class="pirground"/>';
+      if (pm.path)
+        s +=
+          '<path class="pirpath" d="M' +
+          pm.path
+            .map(function (p) {
+              return p[0] + ' ' + p[1];
+            })
+            .join(' L') +
+          '"/>';
+      s +=
+        '<polygon class="pircone ' +
+        trip +
+        (transient && pirFresh ? ' fresh' : '') +
+        '" points="' +
+        cpts +
+        '"/>';
+      /* scanning beam sweeping the cone + detection pings from the sensor —
+         ambient life while the step is parked; suppressed under reduced motion */
+      if (!RM) {
+        var fr = (pm.cone.facing * Math.PI) / 180;
+        var swx = pm.sensor.x + (pm.cone.range - 4) * Math.cos(fr);
+        var swy = pm.sensor.y + (pm.cone.range - 4) * Math.sin(fr);
+        s +=
+          '<g class="pirsweep ' +
+          trip +
+          '" style="transform-origin:' +
+          pm.sensor.x +
+          'px ' +
+          pm.sensor.y +
+          'px;--sw:' +
+          Math.max(0, pm.cone.spread / 2 - 3).toFixed(1) +
+          'deg">' +
+          '<line x1="' +
+          pm.sensor.x +
+          '" y1="' +
+          pm.sensor.y +
+          '" x2="' +
+          swx.toFixed(1) +
+          '" y2="' +
+          swy.toFixed(1) +
+          '"/></g>';
+        s +=
+          '<circle class="pirping" cx="' +
+          pm.sensor.x +
+          '" cy="' +
+          pm.sensor.y +
+          '" r="5"/>' +
+          '<circle class="pirping p2" cx="' +
+          pm.sensor.x +
+          '" cy="' +
+          pm.sensor.y +
+          '" r="5"/>';
+      }
+      s +=
+        '<circle class="pirsensor" cx="' +
+        pm.sensor.x +
+        '" cy="' +
+        pm.sensor.y +
+        '" r="5"/>';
+      s +=
+        '<text class="pirsensorlbl" x="' +
+        (pm.sensor.x - 9) +
+        '" y="' +
+        (pm.sensor.y - 8) +
+        '" text-anchor="end">IR</text>';
+      if (pm.subject) {
+        /* between steps the subject glides from its previous position: it is
+           rendered offset back to the old spot via an inline transform, which
+           the post-render hook releases on the next frame (CSS transition).
+           A fading ghost + dashed trail mark where it came from. */
+        if (transient && pirMoved) {
+          s +=
+            '<line class="pirtrail" x1="' +
+            pirPrev.x +
+            '" y1="' +
+            pirPrev.y +
+            '" x2="' +
+            pm.subject.x +
+            '" y2="' +
+            pm.subject.y +
+            '"/>';
+          s +=
+            '<circle class="pirghost" cx="' +
+            pirPrev.x +
+            '" cy="' +
+            pirPrev.y +
+            '" r="6"/>';
+        }
+        s +=
+          '<circle class="pirsubject ' +
+          trip +
+          '" cx="' +
+          pm.subject.x +
+          '" cy="' +
+          pm.subject.y +
+          '" r="6"' +
+          (transient && pirMoved
+            ? ' style="transform:translate(' +
+              (pirPrev.x - pm.subject.x) +
+              'px,' +
+              (pirPrev.y - pm.subject.y) +
+              'px)"'
+            : '') +
+          '/>';
+        if (transient && !RM && pirFresh)
+          s +=
+            '<circle class="pirripple" cx="' +
+            pm.subject.x +
+            '" cy="' +
+            pm.subject.y +
+            '" r="6"/>';
+      }
+      var pstat =
+        pm.status != null
+          ? pm.status
+          : pm.subject
+          ? pm.tripped
+            ? 'IR TRIPPED'
+            : 'IR CLEAR'
+          : '';
+      if (pstat) {
+        s +=
+          '<rect class="pirstatusbg ' +
+          trip +
+          (transient && pirFresh ? ' fresh' : '') +
+          '" x="0" y="0" width="132" height="20"/>' +
+          '<text class="pirstatustext" x="8" y="14">' +
+          esc(pstat) +
+          '</text>';
+      }
+      if (pm.banner) {
+        s +=
+          '<rect class="pirbannerbg" x="0" y="150" width="320" height="30"/>' +
+          '<text class="pirbannertext" x="160" y="169" text-anchor="middle">' +
+          esc(pm.banner) +
+          '</text>';
+      }
+      return s + '</svg></div>';
+    };
+    var cpts = pm.conePoints
+      .map(function (p) {
+        return p[0].toFixed(1) + ',' + p[1].toFixed(1);
+      })
+      .join(' ');
+    var pirTransients = pirFresh || pirMoved;
+    h += buildPir(true);
+    hBaseline = pirTransients ? buildPir(false) : null;
+    return {
+      html: h,
+      baseline: hBaseline,
+      transient: '.pirghost,.pirtrail,.pirripple',
+      glide: { selector: '.pirsubject', multiple: false },
+    };
+  }
+);
+/* ---- src/panels/types/queue.js ---- */
+/* queue panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function queueModel(state) {
+  state = state || {};
+  var s =
+    QUEUE_STATES.indexOf(String(state.state)) >= 0
+      ? String(state.state)
+      : 'empty';
+  function str(v) {
+    return typeof v === 'string' ? v : '';
+  }
+  return {
+    state: s,
+    label: state.label != null ? String(state.label) : '',
+    from: str(state.from),
+    to: str(state.to),
+    reason: str(state.reason),
+  };
+}
+
+function queuePanelHTML(panel, state) {
+  var qm = queueModel(state);
+  var h = '<div class="qbox s-' + qm.state + '">';
+  h += '<div class="qtrack">';
+  h += '<span class="qarr qarr-in" aria-hidden="true">&#8594;</span>';
+  h += '<div class="qslot">';
+  if (qm.state === 'empty') h += '<span class="qempty">empty</span>';
+  else h += '<span class="qmsg">' + esc(qm.label || 'message') + '</span>';
+  h += '</div>';
+  h += '<span class="qarr qarr-out" aria-hidden="true">&#8594;</span>';
+  h += '</div>';
+  /* directional context row: arrival label on the in-side during enqueue,
+     departure label on the out-side during dequeue. Both spans are ALWAYS
+     emitted (populated only in the relevant state) so the row reserves a
+     fixed height and the panel never changes size between steps — otherwise
+     the panel column and the step bar below it reflow. Static text, so it is
+     reduced-motion safe. */
+  var ctxIn = qm.state === 'enqueue' ? esc(qm.from) : '';
+  var ctxOut = qm.state === 'dequeue' ? esc(qm.to) : '';
+  h +=
+    '<div class="qctx"><span class="qside qside-in">' +
+    ctxIn +
+    '</span>' +
+    '<span class="qside qside-out">' +
+    ctxOut +
+    '</span></div>';
+  h += '<div class="qstatecap">' + qm.state + '</div>';
+  /* waiting-on line, shown while held; container always emitted (empty
+     otherwise) and clamped to a fixed height so its length cannot reflow. */
+  var reason = qm.state === 'held' ? esc(qm.reason) : '';
+  h += '<div class="qreason">' + reason + '</div>';
+  h += '</div>';
+  return h;
+}
+
+/* inline markup: a small, safe subset for prose. The whole string is ESCAPED
+   FIRST, then a fixed set of substitutions is applied, so labels/URLs are
+   always HTML-safe and only http/https links are ever emitted (never
+   javascript:/data:). Supported:
+     [label](https://url)  ->  underlined anchor
+     **bold**              ->  <strong>
+     *italic*              ->  <em>   (single star; snake_case is untouched
+                                       because italics use * not _)
+     `code`                ->  <code>
+   Plain prose with none of these is simply escaped, so this is a drop-in
+   replacement for esc() in prose contexts. */
+
+PanelViews.register(
+  'queue',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    h += queuePanelHTML(panel, state);
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/radar.js ---- */
+/* radar panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function radarModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  function fin(v) {
+    return typeof v === 'number' && isFinite(v) ? v : null;
+  }
+  var sensor =
+    panel.sensor && fin(panel.sensor.x) != null && fin(panel.sensor.y) != null
+      ? { x: panel.sensor.x, y: panel.sensor.y }
+      : { x: 160, y: 168 };
+  var facing = fin(panel.facing) != null ? panel.facing : 270;
+  var spread = fin(panel.spread) != null ? clamp(panel.spread, 10, 360) : 120;
+  /* POLAR AUTHORING LAYER: with `scale: {pxPerUnit, unit}` declared, authors
+     write real units everywhere — `range`, `threshold`, and a `rings` ARRAY
+     are unit distances; a zone may be an annular sector {r:[r0,r1],
+     deg:[d0,d1]}; a subject may be {r, deg} (degrees in the same clockwise-
+     from-+x convention). Everything converts to frame pixels HERE; the rest
+     of the model and the renderer stay Cartesian. Without `scale`, all
+     numbers are frame pixels and subjects/zones are Cartesian, as before. */
+  var ppu =
+    panel.scale &&
+    fin(panel.scale.pxPerUnit) != null &&
+    panel.scale.pxPerUnit > 0
+      ? panel.scale.pxPerUnit
+      : null;
+  var toPx = function (v) {
+    return ppu != null ? v * ppu : v;
+  };
+  var fromPolar = function (r, deg) {
+    var a = (deg * Math.PI) / 180;
+    return {
+      x: sensor.x + toPx(r) * Math.cos(a),
+      y: sensor.y + toPx(r) * Math.sin(a),
+    };
+  };
+  var range =
+    fin(panel.range) != null && panel.range > 0 ? toPx(panel.range) : 150;
+  var ringRadii = null,
+    rings = 3;
+  if (Array.isArray(panel.rings)) {
+    ringRadii = panel.rings
+      .map(fin)
+      .filter(function (v) {
+        return v != null && v > 0;
+      })
+      .map(toPx)
+      .filter(function (v) {
+        return v <= range + 0.5;
+      })
+      .map(function (v) {
+        return Math.round(v * 10) / 10;
+      });
+    rings = ringRadii.length || 3;
+    if (!ringRadii.length) ringRadii = null;
+  } else if (fin(panel.rings) != null) {
+    rings = Math.round(clamp(panel.rings, 1, 6));
+  }
+  var threshold =
+    fin(panel.threshold) != null && panel.threshold > 0
+      ? Math.min(toPx(panel.threshold), range)
+      : null;
+  /* a step may re-tune the alert line: state.threshold (same units as the
+     declaration) overrides it for that step onward via normal folding */
+  if (fin(state.threshold) != null && state.threshold > 0)
+    threshold = Math.min(toPx(state.threshold), range);
+  var zones = (Array.isArray(panel.zones) ? panel.zones : [])
+    .map(function (z) {
+      z = z || {};
+      var pts = Array.isArray(z.points) ? z.points : [];
+      /* annular sector → sampled polygon (inner arc out, outer arc back) */
+      if (
+        !pts.length &&
+        Array.isArray(z.r) &&
+        z.r.length === 2 &&
+        Array.isArray(z.deg) &&
+        z.deg.length === 2 &&
+        fin(z.r[0]) != null &&
+        fin(z.r[1]) != null &&
+        z.r[0] >= 0 &&
+        z.r[1] > z.r[0] &&
+        fin(z.deg[0]) != null &&
+        fin(z.deg[1]) != null
+      ) {
+        /* wrapped sectors take the natural short way round ([350,10] spans 20°,
+         not 340°); sampling adapts to the span (≈15° chords) so wide sectors
+         keep the arc tight enough for correct point-in-polygon occupancy */
+        /* span is the clockwise travel from d0 to d1, normalized into (0,360]:
+         [350,10] → 20°, and a full-turn writing ([0,360], [360,0], [10,-350])
+         → 360°. Only literally equal endpoints are degenerate (skipped; the
+         validator warns). */
+        var d0 = z.deg[0],
+          d1 = z.deg[1];
+        var span = (((d1 - d0) % 360) + 360) % 360;
+        if (span === 0) {
+          if (d0 === d1)
+            return { id: z.id, label: z.label || z.id || '', points: [] };
+          span = 360;
+        }
+        var N = Math.max(6, Math.ceil(span / 15));
+        pts = [];
+        for (var zi = 0; zi <= N; zi++) {
+          var p1 = fromPolar(z.r[0], d0 + (span * zi) / N);
+          pts.push([p1.x, p1.y]);
+        }
+        for (var zj = N; zj >= 0; zj--) {
+          var p2 = fromPolar(z.r[1], d0 + (span * zj) / N);
+          pts.push([p2.x, p2.y]);
+        }
+        pts = pts.map(function (p) {
+          return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
+        });
+      }
+      /* numeric-only points: author data goes straight into SVG attributes, so
+       anything non-finite is dropped here (attribute injection impossible) */
+      pts = pts
+        .filter(function (p) {
+          return Array.isArray(p) && fin(p[0]) != null && fin(p[1]) != null;
+        })
+        .map(function (p) {
+          return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
+        });
+      return { id: z.id, label: z.label || z.id || '', points: pts };
+    })
+    .filter(function (z) {
+      return z.id && z.points.length >= 3;
+    });
+  var subj = null;
+  if (
+    state.subject &&
+    fin(state.subject.x) != null &&
+    fin(state.subject.y) != null
+  )
+    subj = { x: state.subject.x, y: state.subject.y };
+  else if (
+    state.subject &&
+    fin(state.subject.r) != null &&
+    fin(state.subject.deg) != null
+  ) {
+    var sp = fromPolar(state.subject.r, state.subject.deg);
+    subj = { x: Math.round(sp.x * 10) / 10, y: Math.round(sp.y * 10) / 10 };
+  }
+  var dist = null,
+    alert = false,
+    occupied = [];
+  if (subj) {
+    var dx = subj.x - sensor.x,
+      dy = subj.y - sensor.y;
+    dist = Math.sqrt(dx * dx + dy * dy);
+    if (threshold != null && dist <= threshold) alert = true;
+    zones.forEach(function (z) {
+      if (pointInPoly(subj.x, subj.y, z.points)) occupied.push(z.id);
+    });
+  }
+  if (state.alert === true) alert = true;
+  if (state.alert === false) alert = false;
+  return {
+    sensor: sensor,
+    facing: facing,
+    spread: spread,
+    range: range,
+    rings: rings,
+    ringRadii: ringRadii,
+    threshold: threshold,
+    zones: zones,
+    subject: subj,
+    dist: dist,
+    alert: alert,
+    occupied: occupied,
+    banner: state.banner != null ? String(state.banner) : '',
+    status: state.status != null ? String(state.status) : null,
+  };
+}
+
+/* buffer widget: a segmented buffer strip — pre-roll rings, store-and-forward
+   queues, storage rotation. Pure model (node-testable). The author declares
+   the segment count once and patches a `cells` array of state tokens per step
+   (REPLACES wholesale, like zones); missing tail cells are `empty`, unknown
+   tokens fall back to `empty` (validator warns). `head` marks the write
+   position. The footer summary (counts per state) is COMPUTED. */
+
+PanelViews.register(
+  'radar',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var hBaseline = null;
+    var rm2 = radarModel(panel, state);
+    var ridx = typeof stepIdx === 'number' ? stepIdx : 0;
+    /* one-shot ripple + glide fire on the clear→alert transition / a move,
+       with a steady baseline stored so the following unchanged step skips
+       (same discipline as pir) */
+    var rdFresh = animate && rm2.alert && host._rdAlert === false;
+    var rdPrev = host._rdPrev || null;
+    var rdMoved =
+      animate &&
+      rdPrev &&
+      rm2.subject &&
+      (rdPrev.x !== rm2.subject.x || rdPrev.y !== rm2.subject.y);
+    host._rdAlert = rm2.alert;
+    host._rdPrev = rm2.subject ? { x: rm2.subject.x, y: rm2.subject.y } : null;
+    var rdA1 = ((rm2.facing - rm2.spread / 2) * Math.PI) / 180;
+    var rdA2 = ((rm2.facing + rm2.spread / 2) * Math.PI) / 180;
+    var rdFull = rm2.spread >= 359.9;
+    var rdArc = function (r) {
+      if (rdFull) return null;
+      var x1 = rm2.sensor.x + r * Math.cos(rdA1),
+        y1 = rm2.sensor.y + r * Math.sin(rdA1);
+      var x2 = rm2.sensor.x + r * Math.cos(rdA2),
+        y2 = rm2.sensor.y + r * Math.sin(rdA2);
+      return (
+        'M' +
+        x1.toFixed(1) +
+        ' ' +
+        y1.toFixed(1) +
+        ' A' +
+        r.toFixed(1) +
+        ' ' +
+        r.toFixed(1) +
+        ' 0 ' +
+        (rdA2 - rdA1 > Math.PI ? 1 : 0) +
+        ' 1 ' +
+        x2.toFixed(1) +
+        ' ' +
+        y2.toFixed(1)
+      );
+    };
+    /* track: the subject positions of every folded step up to the current
+       one — engine-derived, so any step jump redraws it consistently */
+    var rdTrack = [];
+    if (Array.isArray(states)) {
+      for (var rti = 0; rti <= Math.min(ridx, states.length - 1); rti++) {
+        /* run each folded step through the model so POLAR subjects convert
+           exactly like the live one; dedupe parked positions so unchanged
+           steps keep identical markup (rebuild skip) */
+        var rsub = radarModel(panel, states[rti]).subject;
+        var last = rdTrack.length ? rdTrack[rdTrack.length - 1] : undefined;
+        if (rsub) {
+          if (!(last && last[0] === rsub.x && last[1] === rsub.y))
+            rdTrack.push([rsub.x, rsub.y]);
+        } else if (last !== null && rdTrack.length) {
+          rdTrack.push(null);
+        }
+      }
+    }
+    var buildRadar = function (transient) {
+      var s =
+        '<div class="rdbox"><svg class="rdframe" viewBox="0 0 320 180" role="img" aria-label="' +
+        esc(panel.title || 'radar range view') +
+        '">';
+      s += '<rect width="320" height="180" class="rdbg"/>';
+      rm2.zones.forEach(function (z) {
+        var zpts = z.points
+          .map(function (p) {
+            return p[0] + ',' + p[1];
+          })
+          .join(' ');
+        var occ = rm2.occupied.indexOf(z.id) >= 0;
+        s +=
+          '<polygon class="rdzone' +
+          (occ ? ' occ' : '') +
+          '" points="' +
+          zpts +
+          '"/>';
+        s +=
+          '<text class="rdzlbl' +
+          (occ ? ' occ' : '') +
+          '" x="' +
+          (z.points[0][0] + 5) +
+          '" y="' +
+          (z.points[0][1] + 13) +
+          '">' +
+          esc(z.label) +
+          '</text>';
+      });
+      var radii = rm2.ringRadii;
+      for (var ri = 1; ri <= rm2.rings; ri++) {
+        var rr = radii ? radii[ri - 1] : (rm2.range * ri) / rm2.rings;
+        if (rdFull)
+          s +=
+            '<circle class="rdring" cx="' +
+            rm2.sensor.x +
+            '" cy="' +
+            rm2.sensor.y +
+            '" r="' +
+            rr.toFixed(1) +
+            '"/>';
+        else s += '<path class="rdring" d="' + rdArc(rr) + '"/>';
+      }
+      if (!rdFull) {
+        [rdA1, rdA2].forEach(function (a) {
+          s +=
+            '<line class="rdedge" x1="' +
+            rm2.sensor.x +
+            '" y1="' +
+            rm2.sensor.y +
+            '" x2="' +
+            (rm2.sensor.x + rm2.range * Math.cos(a)).toFixed(1) +
+            '" y2="' +
+            (rm2.sensor.y + rm2.range * Math.sin(a)).toFixed(1) +
+            '"/>';
+        });
+      }
+      if (rm2.threshold != null) {
+        if (rdFull)
+          s +=
+            '<circle class="rdthresh" cx="' +
+            rm2.sensor.x +
+            '" cy="' +
+            rm2.sensor.y +
+            '" r="' +
+            rm2.threshold.toFixed(1) +
+            '"/>';
+        else s += '<path class="rdthresh" d="' + rdArc(rm2.threshold) + '"/>';
+      }
+      if (!RM) {
+        var rmid = (rm2.facing * Math.PI) / 180;
+        s +=
+          '<g class="rdsweep" style="transform-origin:' +
+          rm2.sensor.x +
+          'px ' +
+          rm2.sensor.y +
+          'px;--sw:' +
+          Math.max(0, Math.min(rm2.spread, 358) / 2 - 2).toFixed(1) +
+          'deg">' +
+          '<line x1="' +
+          rm2.sensor.x +
+          '" y1="' +
+          rm2.sensor.y +
+          '" x2="' +
+          (rm2.sensor.x + (rm2.range - 3) * Math.cos(rmid)).toFixed(1) +
+          '" y2="' +
+          (rm2.sensor.y + (rm2.range - 3) * Math.sin(rmid)).toFixed(1) +
+          '"/></g>';
+      }
+      s +=
+        '<circle class="rdsensor" cx="' +
+        rm2.sensor.x +
+        '" cy="' +
+        rm2.sensor.y +
+        '" r="5"/>';
+      /* track dots + connecting segments (broken at steps with no subject) */
+      var seg = [];
+      var flushSeg = function () {
+        if (seg.length > 1)
+          s += '<polyline class="rdtrack" points="' + seg.join(' ') + '"/>';
+        seg = [];
+      };
+      rdTrack.forEach(function (p) {
+        if (!p) {
+          flushSeg();
+          return;
+        }
+        seg.push(p[0] + ',' + p[1]);
+        s +=
+          '<circle class="rdtrackdot" cx="' +
+          p[0] +
+          '" cy="' +
+          p[1] +
+          '" r="2"/>';
+      });
+      flushSeg();
+      if (rm2.subject) {
+        s +=
+          '<circle class="rdsubject ' +
+          (rm2.alert ? 'alert' : 'clear') +
+          '" cx="' +
+          rm2.subject.x +
+          '" cy="' +
+          rm2.subject.y +
+          '" r="6"' +
+          (transient && rdMoved
+            ? ' style="transform:translate(' +
+              (rdPrev.x - rm2.subject.x) +
+              'px,' +
+              (rdPrev.y - rm2.subject.y) +
+              'px)"'
+            : '') +
+          '/>';
+        if (transient && !RM && rdFresh)
+          s +=
+            '<circle class="rdripple" cx="' +
+            rm2.subject.x +
+            '" cy="' +
+            rm2.subject.y +
+            '" r="6"/>';
+      }
+      var rstat =
+        rm2.status != null
+          ? rm2.status
+          : rm2.subject
+          ? rm2.alert
+            ? 'RANGE ALERT'
+            : 'CLEAR'
+          : '';
+      if (rstat) {
+        s +=
+          '<rect class="rdstatusbg ' +
+          (rm2.alert ? 'alert' : 'clear') +
+          (transient && rdFresh ? ' fresh' : '') +
+          '" x="0" y="0" width="132" height="20"/>' +
+          '<text class="rdstatustext" x="8" y="14">' +
+          esc(rstat) +
+          '</text>';
+      }
+      if (rm2.banner) {
+        s +=
+          '<rect class="rdbannerbg" x="0" y="150" width="320" height="30"/>' +
+          '<text class="rdbannertext" x="160" y="169" text-anchor="middle">' +
+          esc(rm2.banner) +
+          '</text>';
+      }
+      return s + '</svg></div>';
+    };
+    h += buildRadar(true);
+    hBaseline = rdFresh || rdMoved ? buildRadar(false) : null;
+    return {
+      html: h,
+      baseline: hBaseline,
+      transient: '.rdripple',
+      glide: { selector: '.rdsubject', multiple: false },
+    };
+  }
+);
+/* ---- src/panels/types/replicas.js ---- */
+/* replicas panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function replicaModel(panel, state) {
+  state = panelObject(state) ? state : {};
+  var ref = replicaCursor(state.reference),
+    unit = replicaSeries(panel.unit) || 'positions';
+  var rows = replicaPanelItems(panel).map(function (r) {
+    var s =
+      panelOwn(state.replicas, r.id) && panelObject(state.replicas[r.id])
+        ? state.replicas[r.id]
+        : {};
+    var cur = replicaCursor(s),
+      delta =
+        ref && cur && ref.series === cur.series
+          ? cur.position - ref.position
+          : null;
+    return {
+      id: r.id,
+      label: typeof r.label === 'string' ? r.label : r.id,
+      position: replicaPosition(s.position),
+      series: replicaSeries(s.series),
+      role: typeof s.role === 'string' ? s.role : '',
+      observedAt: typeof s.observedAt === 'string' ? s.observedAt : '',
+      status: REPLICA_STATUSES.indexOf(s.status) >= 0 ? s.status : 'unknown',
+      lagMs: isFiniteNum(s.lagMs) && s.lagMs >= 0 ? s.lagMs : null,
+      delta: delta,
+      comparison:
+        delta !== null
+          ? delta === 0
+            ? 'equal'
+            : delta < 0
+            ? 'behind'
+            : 'ahead'
+          : !cur
+          ? 'unknown'
+          : !ref
+          ? 'no-reference'
+          : 'different-series',
+    };
+  });
+  var comparable = rows.filter(function (r) {
+    return r.delta !== null;
+  });
+  var positions = comparable.map(function (r) {
+    return r.position;
+  });
+  if (ref) positions.push(ref.position);
+  var min = positions.length ? Math.min.apply(null, positions) : null;
+  var max = positions.length ? Math.max.apply(null, positions) : null;
+  function pct(value) {
+    return min === max ? 50 : ((value - min) / (max - min)) * 100;
+  }
+  rows.forEach(function (r) {
+    r.pct = r.delta !== null ? pct(r.position) : null;
+  });
+  return {
+    reference: ref,
+    rows: rows,
+    comparable: comparable.length,
+    min: min,
+    max: max,
+    referencePct: ref ? pct(ref.position) : null,
+    unit: unit,
+    note: typeof state.note === 'string' ? state.note : '',
+  };
+}
+function replicaPanelHTML(panel, state) {
+  var m = replicaModel(panel, state),
+    ref = m.reference;
+  var h =
+    '<div class="replicas-view"><div class="rep-reference"><b>' +
+    (ref
+      ? 'Reference ' + esc(String(ref.position)) + ' ' + esc(m.unit)
+      : 'Reference unavailable') +
+    '</b>' +
+    (ref
+      ? '<div>Sequence: ' + esc(ref.series) + '</div>'
+      : '<div>A position and sequence identity are required.</div>') +
+    '</div>';
+  if (ref)
+    h +=
+      '<div class="rep-scale">Position window: ' +
+      esc(String(m.min)) +
+      ' – ' +
+      esc(String(m.max)) +
+      ' ' +
+      esc(m.unit) +
+      ' · dashed marker = reference</div>';
+  h +=
+    '<div class="rep-list" tabindex="0" role="region" aria-label="Replica observations">';
+  m.rows.forEach(function (r) {
+    var comparison =
+      r.comparison === 'equal'
+        ? 'At reference'
+        : r.delta !== null
+        ? Math.abs(r.delta) + ' ' + m.unit + ' ' + r.comparison
+        : r.comparison === 'different-series'
+        ? 'Different sequence · not compared'
+        : r.comparison === 'no-reference'
+        ? 'No reference · not compared'
+        : 'Position or sequence unknown';
+    h +=
+      '<div class="rep-row"><div class="rep-head"><b>' +
+      esc(r.label) +
+      '</b><span class="rep-status">' +
+      esc(r.status) +
+      '</span></div>' +
+      (r.role ? '<div class="rep-role">' + esc(r.role) + '</div>' : '') +
+      '<div class="rep-value">Position ' +
+      (r.position === null ? 'unknown' : esc(String(r.position))) +
+      '</div>' +
+      '<div class="rep-series">Sequence: ' +
+      (r.series === null ? 'unknown' : esc(r.series)) +
+      '</div>' +
+      '<div class="rep-track" aria-hidden="true">' +
+      (ref
+        ? '<i class="rep-reference-mark" style="left:' +
+          m.referencePct +
+          '%"></i>'
+        : '') +
+      (r.pct !== null
+        ? '<i class="rep-position-mark" style="left:' + r.pct + '%"></i>'
+        : '') +
+      '</div>' +
+      '<div class="rep-comparison">' +
+      esc(comparison) +
+      '</div><div class="rep-lag">Reported lag: ' +
+      (r.lagMs === null ? 'unknown' : esc(String(r.lagMs)) + ' ms') +
+      '</div><div class="rep-observed">Observed: ' +
+      (r.observedAt ? esc(r.observedAt) : 'time unknown') +
+      '</div></div>';
+  });
+  if (!m.rows.length) h += '<div class="swempty">No replicas declared</div>';
+  h +=
+    '</div><p class="rep-note">' +
+    m.comparable +
+    ' / ' +
+    m.rows.length +
+    ' positions comparable. Position equality does not prove availability, commit, or read safety. Lag is supplied separately; it is not a catch-up estimate.</p>';
+  if (m.note) h += '<p class="rep-note">' + esc(m.note) + '</p>';
+  return h + '</div>';
+}
+
+PanelViews.register(
+  'replicas',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    h = replicaPanelHTML(panel, state);
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/screen.js ---- */
+/* screen panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+/* ---------------- stock scenes for the screen widget ---------------- */
+function porchSceneBackdrop(night) {
+  /* Shared fixed artwork, with actual surface colors under day/night light.
+     Keep the legacy doorway and floor anchors for the existing clip tracks. */
+  return (
+    '<rect width="320" height="180" fill="' +
+    (night ? '#192D56' : '#93D4EF') +
+    '"/>' +
+    (night
+      ? '<circle cx="275" cy="18" r="9" fill="#FFE4AD"/><g fill="#BED8FF"><circle cx="38" cy="12" r="1"/><circle cx="230" cy="9" r="1"/><circle cx="303" cy="32" r="1"/></g>'
+      : '') +
+    '<path d="M0 29H320V150H0Z" fill="' +
+    (night ? '#344D72' : '#EFCBB1') +
+    '"/>' +
+    '<path d="M0 30H320M0 51H320M0 73H320M0 95H320M0 117H320M0 139H320" stroke="' +
+    (night ? '#476389' : '#C5A28E') +
+    '" opacity=".5"/>' +
+    '<rect y="150" width="320" height="30" fill="' +
+    (night ? '#59657B' : '#BA9673') +
+    '"/>' +
+    '<path d="M0 164H320M53 150L38 180M273 150L289 180" stroke="' +
+    (night ? '#7D8593' : '#E6CBA3') +
+    '" opacity=".6"/>' +
+    '<rect x="25" y="52" width="64" height="53" rx="2" fill="' +
+    (night ? '#E9AB60' : '#6BB9DA') +
+    '" stroke="#E9D8BC" stroke-width="3"/>' +
+    '<path d="M57 52V105M25 78H89" stroke="#F2E5CF" stroke-width="3"/>' +
+    '<path d="M31 58H49L31 72ZM63 84H81L63 99Z" fill="#FFF1CC" opacity=".28"/>' +
+    '<rect x="114" y="25" width="92" height="129" rx="3" fill="#EAD7B9"/>' +
+    '<rect x="118" y="29" width="84" height="121" rx="2" fill="' +
+    (night ? '#277E87' : '#278F92') +
+    '"/>' +
+    '<path d="M127 39H193V83H127ZM127 104H193V140H127Z" fill="' +
+    (night ? '#36959C' : '#40ACAA') +
+    '" stroke="#72C6BA"/>' +
+    '<circle cx="188" cy="94" r="3" fill="#FFD07B"/>' +
+    '<path d="M121 157H201L208 170H114Z" fill="#65544B"/>' +
+    (night
+      ? '<path d="M224 61L192 150H260Z" fill="#FFD384" opacity=".12"/><ellipse cx="225" cy="152" rx="42" ry="6" fill="#FFCC80" opacity=".13"/>'
+      : '') +
+    '<rect x="219" y="44" width="11" height="22" rx="4" fill="#293B4C"/><rect x="221" y="48" width="7" height="13" rx="2" fill="#FFE2A3"/>' +
+    '<path d="M284 137H303L299 153H288Z" fill="#CB7754"/>' +
+    '<path d="M293 139V109M293 127Q274 126 280 112Q292 115 293 127M293 119Q310 119 308 104Q295 104 293 119" fill="' +
+    (night ? '#498668' : '#58A762') +
+    '" stroke="#8BC987" stroke-width="2"/>'
+  );
+}
+function doorbellRunScene(pair) {
+  /* Fixed artwork shared by the two stock clips. Local coordinates put each
+     runner's feet at the origin, so distance scales the whole stride/shadow.
+     No SVG IDs: multiple doorbells can play independently on the same page. */
+  function runner(second) {
+    return (
+      '<g class="doorbell-runner' +
+      (second ? ' doorbell-runner-second' : '') +
+      '">' +
+      '<ellipse cx="0" cy="1" rx="13" ry="3" fill="#152B30" opacity=".28"/>' +
+      '<g class="doorbell-bounce" stroke-linecap="round" stroke-linejoin="round">' +
+      '<g fill="none" stroke="#243D50" stroke-width="6">' +
+      '<path class="doorbell-leg doorbell-leg-back" d="M-4-27L-10-14L-5-2"/>' +
+      '<path class="doorbell-leg" d="M4-27L11-16L7-3"/>' +
+      '</g><g fill="none" stroke="var(--runner-sleeve)" stroke-width="6">' +
+      '<path class="doorbell-arm doorbell-arm-back" d="M-8-46L-16-34L-20-42"/>' +
+      '<path class="doorbell-arm" d="M8-46L17-35L21-42"/>' +
+      '</g><path d="M-8-49Q0-53 8-49L10-28Q0-24-10-28Z" fill="var(--runner-shirt)"/>' +
+      '<path d="M-6-49Q0-38 6-49" fill="var(--runner-sleeve)"/>' +
+      '<path d="M0-40V-30" stroke="var(--runner-sleeve)" stroke-width="1.2" opacity=".55"/>' +
+      '<path d="M-7-29Q0-26 7-29" fill="none" stroke="var(--runner-sleeve)" stroke-width="2"/>' +
+      '<path d="M0-54V-51" stroke="#C49070" stroke-width="6"/>' +
+      '<circle cx="0" cy="-61" r="8" fill="#D7A27E"/>' +
+      '<path d="M-8-60Q-10-72 0-72Q10-71 8-60L5-55H-5Z" fill="#293237"/>' +
+      '</g></g>'
+    );
+  }
+  return (
+    '<svg viewBox="0 0 320 180" class="scene scene-doorbell" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#87D0ED"/>' +
+    '<path d="M24 54Q72 49 112 55T226 53T306 51V85H24Z" fill="#4C936A"/>' +
+    '<path d="M43 61L84 35L127 60Z" fill="#345D88"/>' +
+    '<path d="M51 60H118V84H51Z" fill="#F0CDA3"/>' +
+    '<path d="M62 66H76V77H62ZM91 65H106V78H91Z" fill="#63ACD3"/>' +
+    '<path d="M68 66V77M98 65V78" stroke="#DDE0CF" stroke-width="1.4"/>' +
+    '<path d="M206 63L244 38L281 63Z" fill="#5068A1"/>' +
+    '<path d="M213 62H274V84H213Z" fill="#F0BFAA"/>' +
+    '<path d="M225 68H239V79H225ZM249 68H263V79H249Z" fill="#508DBC"/>' +
+    '<path d="M31 82Q160 76 290 82V98Q160 92 31 98Z" fill="#516570"/>' +
+    '<path d="M40 87Q160 81 280 87" fill="none" stroke="#D2CCAD" stroke-width="1" stroke-dasharray="16 18" opacity=".65"/>' +
+    '<path d="M22 99Q160 91 300 99L315 149H5Z" fill="#79AE68"/>' +
+    '<path d="M23 97Q160 89 297 97L299 103Q160 94 21 103Z" fill="#D5C7AE"/>' +
+    '<path d="M156 99H184L219 148H106Z" fill="#E6D3AD"/>' +
+    '<path d="M145 114H195M128 134H210" fill="none" stroke="#C0AD88" stroke-width="1"/>' +
+    '<path d="M0 148Q160 136 320 148V180H0Z" fill="#C39E7A"/>' +
+    '<path d="M0 158Q160 146 320 158M64 145L41 180M248 145L273 180" fill="none" stroke="#F0D7B0" stroke-width="1.5" opacity=".65"/>' +
+    '<path d="M101 171Q158 167 215 171L222 180H94Z" fill="#615E50"/>' +
+    '<path d="M42 134L38 93M43 112L54 101" fill="none" stroke="#8C7755" stroke-width="4"/>' +
+    '<g fill="#408A5A"><ellipse cx="36" cy="88" rx="20" ry="16"/><ellipse cx="52" cy="98" rx="17" ry="13"/>' +
+    '<ellipse cx="279" cy="117" rx="25" ry="14"/><ellipse cx="290" cy="104" rx="20" ry="16"/></g>' +
+    runner(false) +
+    (pair ? runner(true) : '') +
+    /* Door-frame edges and bowed porch roof suggest the wide doorbell lens. */
+    '<path d="M0 0H320V13Q160-2 0 13Z" fill="#273D44"/>' +
+    '<path d="M0 0H15Q24 89 14 180H0ZM320 0H305Q297 90 308 180H320Z" fill="#426F79"/>' +
+    '<path d="M9 18Q17 90 9 166M312 19Q306 90 314 166" fill="none" stroke="#91B7AD" stroke-width="2" opacity=".55"/>' +
+    '<path d="M0 0H45Q3 15 0 49ZM320 0H275Q317 15 320 49ZM0 180V139Q6 171 41 180ZM320 180V139Q314 171 279 180Z" fill="#11272F" opacity=".25"/>' +
+    '<text x="293" y="171" text-anchor="end" fill="#F4EEDC" opacity=".85" font-family="monospace" font-size="5" letter-spacing="1">FRONT DOOR · DEMO</text>' +
+    '</svg>'
+  );
+}
+var SCENE_LABELS = {
+  'person-at-door-night': 'Visitor at night',
+  'person-through-door': 'Person walking through a door',
+  'doorbell-run-away': 'Doorbell: person running away',
+  'doorbell-runners': 'Doorbell: two people running away',
+  'package-drop': 'Package delivery',
+  'kitchen-fire': 'Kitchen fire',
+  'static-noise': 'Static noise',
+};
+var SCENES = {
+  'doorbell-run-away': doorbellRunScene(false),
+  'doorbell-runners': doorbellRunScene(true),
+  'person-at-door-night':
+    '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
+    porchSceneBackdrop(true) +
+    '<g class="walker"><ellipse cy="152" rx="15" ry="3" fill="#1A2945" opacity=".3"/>' +
+    '<path d="M-4 126L-6 147M4 126L6 147" stroke="#385A88" stroke-width="6" stroke-linecap="round"/>' +
+    '<path d="M-8 148H-3M3 148H9" stroke="#1C304D" stroke-width="4" stroke-linecap="round"/>' +
+    '<path d="M-8 102L-12 122M8 102L12 119" stroke="#DC9250" stroke-width="6" stroke-linecap="round"/>' +
+    '<rect x="-9" y="96" width="18" height="34" rx="6" fill="#F2B65E"/>' +
+    '<path d="M0 100V125M-6 115H-2M2 115H6" stroke="#CD824B" stroke-width="1.5"/>' +
+    '<path d="M0 93V97" stroke="#C78966" stroke-width="6"/>' +
+    '<circle cy="86" r="9" fill="#E9B38A"/><path d="M-9 85Q-9 74 1 76Q10 75 9 85L4 81L-9 83Z" fill="#3D3243"/>' +
+    '</g></svg>',
+  'package-drop':
+    /* courier + package positions are the ANIMATION END STATES' anchors: the
+       courier group is parked off-canvas by default CSS (reduced motion shows
+       only the delivered package), the package is visible by default and the
+       running animation hides it until the drop beat */
+    '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
+    porchSceneBackdrop(false) +
+    '<g class="courier"><ellipse cy="152" rx="15" ry="3" fill="#5E493E" opacity=".2"/>' +
+    '<path d="M-4 126L-6 147M4 126L6 147" stroke="#263C64" stroke-width="6" stroke-linecap="round"/>' +
+    '<path d="M-8 148H-3M3 148H9" stroke="#182B49" stroke-width="4" stroke-linecap="round"/>' +
+    '<rect x="-9" y="94" width="18" height="34" rx="6" fill="#4C92E0"/>' +
+    '<path d="M-6 102H6M-7 120H7" stroke="#ABD8EF" stroke-width="2"/>' +
+    '<path d="M-8 100L-11 122M8 101L14 114" stroke="#3273BB" stroke-width="6" stroke-linecap="round"/>' +
+    '<path d="M0 91V96" stroke="#AA6B48" stroke-width="6"/>' +
+    '<circle cy="84" r="9" fill="#CE9367"/><path d="M-9 82Q-9 73 0 74Q10 74 9 82H14V85H-9Z" fill="#2858A0"/>' +
+    '<g class="carried"><rect x="9" y="104" width="20" height="15" rx="2" fill="#DEA05E" stroke="#AF713F" stroke-width="1.5"/>' +
+    '<path d="M19 105V118" stroke="#F8D39B" stroke-width="3"/></g></g>' +
+    '<g class="pkg"><ellipse cx="239" cy="153" rx="27" ry="4" fill="#715443" opacity=".25"/>' +
+    '<rect x="216" y="118" width="46" height="34" rx="3" fill="#DEA05E" stroke="#AF713F" stroke-width="2"/>' +
+    '<path d="M239 119V151" stroke="#F8D39B" stroke-width="6"/><path d="M217 127H261" stroke="#BB7D43"/>' +
+    '<rect x="244" y="134" width="12" height="9" rx="1" fill="#FFF0D3"/><path d="M247 137H253M247 140H251" stroke="#967654"/>' +
+    '</g></svg>',
+  'person-through-door':
+    /* A single six-second entry: approach, door opens, cross the threshold,
+       door closes. No IDs or external assets, so many cameras can coexist.
+       CSS defaults hold a readable mid-entry pose for reduced motion. */
+    '<svg viewBox="0 0 320 180" class="scene scene-entry" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#E7BEA6"/>' +
+    '<path d="M0 150H320V180H0Z" fill="#BE9A77"/>' +
+    '<path d="M0 160H320M0 177H320M64 150L40 180M140 150L132 180M230 150L242 180" stroke="#E4CFAB" stroke-opacity=".35"/>' +
+    '<rect x="28" y="40" width="74" height="66" rx="3" fill="#77BBDD" stroke="#F4DDC0" stroke-width="3"/>' +
+    '<path d="M65 40V106M28 73H102" stroke="#EEDBC0" stroke-width="3"/>' +
+    '<path d="M34 47H58L34 69ZM72 80H95L72 100Z" fill="#E0F9FF" opacity=".14"/>' +
+    '<rect x="168" y="22" width="88" height="132" rx="3" fill="#F3DDC0"/>' +
+    '<rect x="174" y="28" width="76" height="124" fill="#D8B47F"/>' +
+    '<path d="M174 28H250V48H200V152H174Z" fill="#AD8259"/>' +
+    '<path d="M200 48H250V152H200Z" fill="#F3D5A4"/>' +
+    '<path d="M210 56H238V107H210Z" fill="#BC9669"/><path d="M213 59H235V104H213Z" fill="#6F9DAD"/>' +
+    '<path class="entry-light" d="M174 152H250L282 180H139Z" fill="#FFDB9E" opacity=".22"/>' +
+    '<rect x="270" y="58" width="9" height="23" rx="4" fill="#F3E8D5"/>' +
+    '<circle cx="274.5" cy="65" r="2" fill="#31A99F"/>' +
+    '<ellipse cx="294" cy="152" rx="16" ry="4" fill="#10282E"/>' +
+    '<path d="M286 137H303L300 153H289Z" fill="#D57D54"/>' +
+    '<path d="M294 140V111M294 126Q275 127 282 114Q294 113 294 126M294 119Q306 120 310 105Q296 103 294 119" fill="#4C9B60" stroke="#77C87A" stroke-width="2"/>' +
+    '<g class="entry-person"><ellipse cx="0" cy="155" rx="16" ry="4" fill="#0A1D24" opacity=".3"/>' +
+    '<g class="entry-stride" fill="none" stroke-linecap="round">' +
+    '<path class="entry-leg entry-leg-back" d="M2 127L-4 141L-7 153" stroke="#182E40" stroke-width="7"/>' +
+    '<path class="entry-arm entry-arm-back" d="M0 106L-10 117L-13 128" stroke="#496ABA" stroke-width="6"/>' +
+    '<path class="entry-leg" d="M0 126L7 140L9 153" stroke="#294D5E" stroke-width="7"/>' +
+    '<path d="M0 105L0 126" stroke="#7894DF" stroke-width="17"/>' +
+    '<path class="entry-arm" d="M2 106L12 116L14 126" stroke="#91ADF2" stroke-width="6"/>' +
+    '<path d="M1 95V100" stroke="#D9A17E" stroke-width="6"/>' +
+    '<circle cx="1" cy="87" r="9" fill="#E4B38B"/>' +
+    '<path d="M-7 86Q-9 76 2 76Q12 77 10 86L6 83L-7 84Z" fill="#24313D"/>' +
+    '</g></g>' +
+    '<g class="entry-door"><rect x="174" y="28" width="76" height="124" fill="#208F94" stroke="#1C657B" stroke-width="2"/>' +
+    '<rect x="183" y="39" width="58" height="47" rx="2" fill="#3CAFAD" stroke="#81D4BF"/>' +
+    '<rect x="183" y="108" width="58" height="34" rx="2" fill="#21818B" stroke="#58B8B1"/>' +
+    '<path d="M231 99H240" stroke="#F4D795" stroke-width="3" stroke-linecap="round"/></g>' +
+    '<path d="M172 28V153H251" fill="none" stroke="#F5E6CA" stroke-width="3"/>' +
+    '<rect x="197" y="158" width="52" height="10" rx="3" fill="#10282E" opacity=".65"/>' +
+    '</svg>',
+  'kitchen-fire':
+    '<svg viewBox="0 0 320 180" class="scene scene-fire" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#F0D1B2"/>' +
+    '<path d="M0 143H320V180H0Z" fill="#C79A78"/>' +
+    '<path d="M0 162H320M57 143L42 180M139 143L133 180M235 143L247 180" stroke="#E8C5A0" stroke-opacity=".35"/>' +
+    '<rect x="23" y="33" width="84" height="62" rx="2" fill="#6FBCDF" stroke="#FFF0D4" stroke-width="3"/>' +
+    '<path d="M65 33V95M23 63H107" stroke="#F7E8CD" stroke-width="3"/>' +
+    '<path d="M30 41H57L30 58ZM72 70H99L72 88Z" fill="#E4F9FF" opacity=".15"/>' +
+    '<rect x="16" y="110" width="292" height="40" rx="2" fill="#287A91"/>' +
+    '<path d="M24 116H87V144H24ZM96 116H163V144H96ZM172 117H197V144H172Z" fill="#429BB0" stroke="#78C7CE"/>' +
+    '<path d="M74 122H79M150 122H155M185 122H190" stroke="#E6C27A" stroke-width="2" stroke-linecap="round"/>' +
+    '<rect x="203" y="111" width="72" height="39" fill="#263C49"/>' +
+    '<rect x="213" y="122" width="52" height="22" rx="2" fill="#102633" stroke="#66808D"/>' +
+    '<path d="M217 127H260" stroke="#92A3A9" stroke-width="2"/>' +
+    '<circle cx="221" cy="116" r="2" fill="#C0C7BE"/><circle cx="237" cy="116" r="2" fill="#C0C7BE"/><circle cx="253" cy="116" r="2" fill="#C0C7BE"/>' +
+    '<rect x="12" y="104" width="300" height="8" rx="2" fill="#EEE4D0"/>' +
+    '<path d="M116 104V91Q116 84 123 84Q130 84 130 91" fill="none" stroke="#B9C9C6" stroke-width="3"/>' +
+    '<ellipse cx="144" cy="106" rx="24" ry="2" fill="#3A5661"/>' +
+    '<g class="fire-glow"><ellipse cx="234" cy="99" rx="78" ry="74" fill="#F98036" opacity=".12"/>' +
+    '<ellipse cx="234" cy="105" rx="46" ry="52" fill="#FFB45C" opacity=".13"/>' +
+    '<ellipse cx="234" cy="159" rx="60" ry="11" fill="#FFAC55" opacity=".18"/></g>' +
+    '<g fill="#746779"><g class="fire-smoke"><circle cx="237" cy="64" r="14" opacity=".23"/><circle cx="224" cy="55" r="18" opacity=".19"/></g>' +
+    '<g class="fire-smoke fire-smoke-late"><circle cx="241" cy="65" r="18" opacity=".2"/><circle cx="224" cy="55" r="15" opacity=".16"/></g></g>' +
+    '<ellipse cx="235" cy="105" rx="32" ry="3" fill="#182A34"/>' +
+    '<path d="M214 96H258L253 108H220Z" fill="#253D4A" stroke="#819096" stroke-width="1.5"/>' +
+    '<path d="M256 97H270" stroke="#667B84" stroke-width="3" stroke-linecap="round"/>' +
+    '<path class="fire-flame fire-outer" d="M216 100C202 87 217 72 215 59C225 64 226 74 228 77C231 61 243 53 239 35C260 54 247 64 252 75C259 72 259 66 259 62C273 82 266 98 254 103Z" fill="#EE6938"/>' +
+    '<path class="fire-flame fire-middle" d="M221 101C212 90 226 82 224 70C232 75 232 82 234 84C243 75 244 62 243 56C257 72 246 79 251 89C258 85 257 80 257 78C264 92 254 103 245 105Z" fill="#FFB74F"/>' +
+    '<path class="fire-flame fire-core" d="M230 103C224 98 231 90 233 84C240 89 235 94 241 96C247 91 246 87 247 85C255 97 247 106 239 107Z" fill="#FFE6A0"/>' +
+    '<g fill="#FFD180"><circle class="fire-ember" cx="229" cy="66" r="1.5"/>' +
+    '<circle class="fire-ember fire-ember-late" cx="252" cy="72" r="1.2"/></g>' +
+    '<ellipse cx="157" cy="21" rx="13" ry="5" fill="#FFF3DB"/>' +
+    '<path d="M150 21H159" stroke="#627F8F" stroke-width="1.5"/>' +
+    '<circle class="fire-alarm" cx="164" cy="21" r="1.8" fill="#FF8658"/>' +
+    '</svg>',
+  'static-noise':
+    '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
+    '<rect width="320" height="180" fill="#182C49"/>' +
+    '<g opacity=".7"><path d="M0 0H46V118H0Z" fill="#DAE4E9"/><path d="M46 0H92V118H46Z" fill="#E2BF58"/>' +
+    '<path d="M92 0H138V118H92Z" fill="#51BCCB"/><path d="M138 0H184V118H138Z" fill="#66BC83"/>' +
+    '<path d="M184 0H230V118H184Z" fill="#B474C9"/><path d="M230 0H276V118H230Z" fill="#D6737E"/>' +
+    '<path d="M276 0H320V118H276Z" fill="#538ECE"/></g>' +
+    '<path d="M0 124H80V144H0Z" fill="#27507D"/><path d="M80 124H160V144H80Z" fill="#BDD5DE"/>' +
+    '<path d="M160 124H240V144H160Z" fill="#725687"/><path d="M240 124H320V144H240Z" fill="#2D3E60"/>' +
+    '<g class="flick" opacity=".32"><path d="M0 12H320V16H0ZM0 90H320V92H0Z" fill="#DCF0FA"/>' +
+    '<path d="M0 52H320V56H0ZM0 132H320V135H0Z" fill="#142640"/>' +
+    '<path d="M0 160H109V162H0Z" fill="#5DBECC"/><path d="M176 160H320V162H176Z" fill="#CD78B4"/></g></svg>',
+};
+
+PanelViews.register(
+  'screen',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var mode = String(state.mode || 'off');
+    if (SCREEN_MODES.indexOf(mode) < 0) mode = 'off';
+    var sceneName =
+      SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
+    var scrClass =
+      'screenbox m-' +
+      mode +
+      (state.scenePlayback === 'waiting' &&
+      ['active', 'live', 'rec', 'save'].indexOf(mode) >= 0
+        ? ' scene-waiting'
+        : '');
+    /* overlays are built separately from the scene so a mode change between
+       two scene-showing modes can swap ONLY the overlays (surgical path
+       below) and keep the scene subtree's animation state (the walker) */
+    var scrOvl = '';
+    if (mode === 'active')
+      scrOvl += '<span class="ovl activechip">ACTIVE</span>';
+    if (mode === 'live') scrOvl += '<span class="ovl livechip">LIVE</span>';
+    if (mode === 'rec')
+      scrOvl +=
+        '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
+    if (mode === 'save')
+      scrOvl +=
+        '<span class="ovl banner">' +
+        esc(state.banner || 'SAVING CLIP') +
+        '</span>';
+    if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
+    if (mode === 'unavailable')
+      scrOvl +=
+        '<div class="ovl screen-unavailable" role="status">' +
+        '<svg viewBox="0 0 40 32" aria-hidden="true"><rect x="6" y="9" width="24" height="17" rx="4"/><path d="M12 9 L15 5 H23 L26 9 M3 3 L36 30"/><circle cx="18" cy="17" r="5"/></svg>' +
+        '<strong>Camera unavailable</strong><span>' +
+        esc(
+          typeof state.reason === 'string' && state.reason.trim()
+            ? state.reason
+            : 'Video is temporarily unavailable.'
+        ) +
+        '</span></div>';
+    h += '<div class="' + scrClass + '">';
+    if (mode === 'boot') h += SCENES['static-noise'];
+    else if (
+      mode === 'active' ||
+      mode === 'live' ||
+      mode === 'rec' ||
+      mode === 'save'
+    )
+      h += SCENES[sceneName];
+    h += scrOvl + '</div>';
+    return {
+      html: h,
+      patch: function () {
+        /* screen surgical path: consecutive modes that both show the SAME scene
+     (active / live / rec / save) swap only the mode class and the overlay chips,
+     keeping the scene subtree — the walker's animation state survives.
+     Any other transition (off/boot involved, or a first render) rebuilds. */
+        var surgical = false;
+        var SCENE_SHOWING = { active: true, live: true, rec: true, save: true };
+        if (
+          host._lastHTML != null &&
+          sceneName === host._scrScene &&
+          SCENE_SHOWING[mode] &&
+          SCENE_SHOWING[host._scrMode]
+        ) {
+          var scrBox = host.querySelector('.screenbox');
+          if (scrBox) {
+            surgical = true;
+            scrBox.className = scrClass;
+            if (scrOvl !== host._scrOverlay) {
+              var oldOvls = scrBox.querySelectorAll('.ovl');
+              for (var ov = oldOvls.length - 1; ov >= 0; ov--)
+                oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
+              if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
+            }
+          }
+        }
+        host._scrMode = mode;
+        host._scrScene = sceneName;
+        host._scrOverlay = scrOvl;
+        return surgical;
+      },
+    };
+  }
+);
+/* ---- src/panels/types/signal.js ---- */
+/* signal panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+var SIGNAL_STATES = ['ok', 'weak', 'retrying', 'lost', 'jammed'];
+var SIGNAL_TRANSPORTS = [
+  'wifi',
+  'subghz',
+  'thread',
+  'zigbee',
+  'zwave',
+  'cellular',
+  'poe',
+  'ethernet',
+  'ble',
+];
+function signalModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  function fin(v) {
+    return typeof v === 'number' && isFinite(v) ? v : null;
+  }
+  return (Array.isArray(panel.links) ? panel.links : [])
+    .slice(0, 6)
+    .map(function (l) {
+      l = l || {};
+      var st =
+        l.id && state[l.id] && typeof state[l.id] === 'object'
+          ? state[l.id]
+          : {};
+      var s = SIGNAL_STATES.indexOf(st.state) >= 0 ? st.state : 'ok';
+      var bars = fin(st.bars) != null ? Math.round(clamp(st.bars, 0, 4)) : null;
+      return {
+        id: l.id,
+        label: l.label || l.id || '',
+        transport:
+          SIGNAL_TRANSPORTS.indexOf(l.transport) >= 0 ? l.transport : null,
+        state: s,
+        bars: bars,
+        note: st.note != null ? String(st.note) : '',
+      };
+    })
+    .filter(function (l) {
+      return l.id;
+    });
+}
+
+/* radar widget: a top-down range view — concentric distance rings inside a
+   wedge, an alert-threshold arc, named zone polygons, and a subject whose
+   distance is measured. Pure model (node-testable). The engine COMPUTES:
+   the subject's distance from the sensor, whether it is inside the alert
+   threshold (state.alert overrides), and which zones contain it
+   (point-in-polygon). The track drawn across steps is render-level (from the
+   folded state history), not part of this model. Frame is 320x180, y down;
+   `facing`/`spread` follow the pir convention (degrees clockwise from +x). */
+
+PanelViews.register(
+  'signal',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var sgm = signalModel(panel, state);
+    h += '<div class="sgrows">';
+    sgm.forEach(function (l) {
+      h += '<div class="sgrow s-' + l.state + '">';
+      h +=
+        '<span class="sgtag">' +
+        (l.transport ? esc(l.transport.toUpperCase()) : '') +
+        '</span>';
+      h += '<span class="sglabel">' + esc(l.label) + '</span>';
+      h += '<span class="sgbars">';
+      for (var sb = 1; sb <= 4; sb++)
+        h +=
+          '<span class="sgbar b' +
+          sb +
+          (l.bars != null && sb <= l.bars ? ' on' : '') +
+          '"></span>';
+      h += '</span>';
+      h += '<span class="sgstate">' + l.state.toUpperCase() + '</span>';
+      h += '<span class="sgnote">' + esc(l.note) + '</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/state.js ---- */
+/* state panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+PanelViews.register(
+  'state',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var pulseSelector, pulseChanged;
+    var cur = state.state != null ? String(state.state) : '—';
+    pulseSelector = '.pchip.cur';
+    pulseChanged =
+      Object.prototype.hasOwnProperty.call(host, '_stateCur') &&
+      host._stateCur !== cur;
+    host._stateCur = cur;
+    var colors = panel.colors || {};
+    var col = isHex(colors[cur]) ? colors[cur] : null;
+    h +=
+      '<div class="preadout"' +
+      (col ? ' style="color:' + col + '"' : '') +
+      '>' +
+      esc(cur) +
+      '</div>';
+    h += '<div class="prail">';
+    (panel.states || []).forEach(function (st) {
+      h +=
+        '<span class="pchip' +
+        (st === cur ? ' cur' : '') +
+        '">' +
+        esc(st) +
+        '</span>';
+    });
+    h += '</div>';
+    return {
+      html: h,
+      pulse: { selector: pulseSelector, changed: pulseChanged },
+    };
+  }
+);
+/* ---- src/panels/types/table.js ---- */
+/* table panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function tableModel(panel, state) {
+  state = state || {};
+  var columns = softwarePanelItems(panel),
+    seen = Object.create(null);
+  var rows = (Array.isArray(state.rows) ? state.rows : [])
+    .slice(0, 12)
+    .filter(function (row) {
+      if (
+        !panelObject(row) ||
+        typeof row.id !== 'string' ||
+        !row.id ||
+        seen[row.id]
+      )
+        return false;
+      seen[row.id] = true;
+      return true;
+    })
+    .map(function (row) {
+      return {
+        id: row.id,
+        status:
+          TABLE_STATUSES.indexOf(row.status) >= 0 ? row.status : 'neutral',
+        cells: columns.map(function (col) {
+          if (!panelOwn(row.cells, col.id)) return '—';
+          var v = row.cells[col.id];
+          if (v === null) return 'null';
+          return typeof v === 'object' ? JSON.stringify(v) : String(v);
+        }),
+      };
+    });
+  return { columns: columns, rows: rows };
+}
+
+PanelViews.register(
+  'table',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var table = tableModel(panel, state);
+    h +=
+      '<div class="swtablewrap" tabindex="0" role="region" aria-label="' +
+      esc(panel.title || 'Data state') +
+      '">' +
+      '<table class="swtable"><caption class="swcaption">' +
+      esc(panel.title || 'Data state') +
+      '</caption><thead><tr>';
+    table.columns.forEach(function (col) {
+      h += '<th scope="col">' + esc(col.label || col.id) + '</th>';
+    });
+    h += '<th scope="col">Change</th></tr></thead><tbody>';
+    table.rows.forEach(function (row) {
+      h += '<tr class="swrow-' + row.status + '">';
+      row.cells.forEach(function (cell) {
+        h += '<td>' + esc(cell) + '</td>';
+      });
+      h +=
+        '<td><span class="swbadge sw-' +
+        row.status +
+        '">' +
+        (row.status === 'neutral' ? '—' : row.status) +
+        '</span></td></tr>';
+    });
+    if (!table.rows.length)
+      h +=
+        '<tr><td colspan="' +
+        (table.columns.length + 1) +
+        '" class="swempty">No rows at this step</td></tr>';
+    h += '</tbody></table></div>';
+    h = softwarePanelShell(h, state);
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/thermo.js ---- */
+/* thermo panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+var THERMO_ZONE_LABELS = {
+  ok: 'NOMINAL',
+  warn: 'WARNING',
+  crit: 'CRITICAL',
+  'cold-warn': 'COLD WARNING',
+  'cold-crit': 'TOO COLD',
+  na: 'NO DATA',
+};
+function thermoModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  /* finite-only: JSON overflow literals (1e400) parse to Infinity, which is
+     typeof 'number' but would poison every percentage into NaN and emit
+     invalid SVG/CSS attribute values — treat non-finite as absent */
+  function fin(v) {
+    return typeof v === 'number' && isFinite(v) ? v : null;
+  }
+  var limits = thermoLimits(panel),
+    min = limits.min,
+    max = limits.max;
+  var warn = limits.warn,
+    crit = limits.crit,
+    lowWarn = limits.lowWarn,
+    lowCrit = limits.lowCrit;
+  var value = fin(state.value);
+  var zone = 'na';
+  if (value != null) {
+    zone = 'ok';
+    if (lowWarn != null && value <= lowWarn) zone = 'cold-warn';
+    if (lowCrit != null && value <= lowCrit) zone = 'cold-crit';
+    if (warn != null && value >= warn) zone = 'warn';
+    if (crit != null && value >= crit) zone = 'crit';
+  }
+  function pct(v) {
+    return clamp(((v - min) / (max - min)) * 100, 0, 100);
+  }
+  return {
+    value: value,
+    min: min,
+    max: max,
+    warn: warn,
+    crit: crit,
+    lowWarn: lowWarn,
+    lowCrit: lowCrit,
+    zone: zone,
+    unit: panel.unit != null ? String(panel.unit) : '°C',
+    pct: value != null ? pct(value) : 0,
+    warnPct: warn != null ? pct(warn) : null,
+    critPct: crit != null ? pct(crit) : null,
+    lowWarnPct: lowWarn != null ? pct(lowWarn) : null,
+    lowCritPct: lowCrit != null ? pct(lowCrit) : null,
+    label: state.label != null ? String(state.label) : THERMO_ZONE_LABELS[zone],
+  };
+}
+
+/* battery widget: charge level where LOW is bad — the inverse of thermo's
+   zones. Pure model (node-testable). The engine COMPUTES the zone (ok / low /
+   crit, both thresholds inclusive at-or-below) from the charge and the
+   declared thresholds; `state.label` overrides only the zone-chip caption.
+   Non-finite numbers (JSON 1e400 → Infinity) are treated as absent. Charge
+   is a percentage, clamped to 0–100. Reversed thresholds (crit > low) are
+   swapped (the validator warns). */
+
+PanelViews.register(
+  'thermo',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var tm = thermoModel(panel, state);
+    var idx = typeof stepIdx === 'number' ? stepIdx : 0;
+    var tv = tm.value != null ? String(Math.round(tm.value * 10) / 10) : null;
+    h +=
+      '<div class="thhead"><div class="thval z-' +
+      tm.zone +
+      '">' +
+      (tv != null ? esc(tv) : '&#8212;') +
+      '<span class="thunit">' +
+      esc(tm.unit) +
+      '</span></div>' +
+      '<span class="thzone z-' +
+      tm.zone +
+      '">' +
+      esc(tm.label) +
+      '</span></div>';
+    /* threshold track: shaded warn/crit bands under the value fill, threshold
+       ticks over it, numeric scale beneath */
+    h += '<div class="thbar">';
+    if (tm.lowWarnPct != null || tm.lowCritPct != null) {
+      var safeStart = tm.lowWarnPct != null ? tm.lowWarnPct : tm.lowCritPct;
+      var safeEnd =
+        tm.warnPct != null ? tm.warnPct : tm.critPct != null ? tm.critPct : 100;
+      h +=
+        '<span class="thband safe" style="left:' +
+        safeStart.toFixed(1) +
+        '%;width:' +
+        (safeEnd - safeStart).toFixed(1) +
+        '%"></span>';
+    }
+    if (tm.lowWarnPct != null)
+      h +=
+        '<span class="thband cold-warn" style="left:' +
+        (tm.lowCritPct || 0).toFixed(1) +
+        '%;width:' +
+        (tm.lowWarnPct - (tm.lowCritPct || 0)).toFixed(1) +
+        '%"></span>';
+    if (tm.lowCritPct != null)
+      h +=
+        '<span class="thband cold-crit" style="left:0;width:' +
+        tm.lowCritPct.toFixed(1) +
+        '%"></span>';
+    if (tm.warnPct != null)
+      h +=
+        '<span class="thband warn" style="left:' +
+        tm.warnPct.toFixed(1) +
+        '%;width:' +
+        ((tm.critPct != null ? tm.critPct : 100) - tm.warnPct).toFixed(1) +
+        '%"></span>';
+    if (tm.critPct != null)
+      h +=
+        '<span class="thband crit" style="left:' +
+        tm.critPct.toFixed(1) +
+        '%;width:' +
+        (100 - tm.critPct).toFixed(1) +
+        '%"></span>';
+    if (tm.value != null)
+      h +=
+        '<span class="thfill z-' +
+        tm.zone +
+        '" style="width:' +
+        tm.pct.toFixed(1) +
+        '%"></span>';
+    if (tm.warnPct != null)
+      h +=
+        '<span class="thtick warn" style="left:' +
+        tm.warnPct.toFixed(1) +
+        '%"></span>';
+    if (tm.critPct != null)
+      h +=
+        '<span class="thtick crit" style="left:' +
+        tm.critPct.toFixed(1) +
+        '%"></span>';
+    ['lowWarn', 'lowCrit'].forEach(function (key) {
+      if (tm[key] != null)
+        h +=
+          '<span class="thtick ' +
+          (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') +
+          '" style="left:' +
+          tm[key + 'Pct'].toFixed(1) +
+          '%" title="' +
+          (key === 'lowWarn' ? 'Cold warning' : 'Cold critical') +
+          ': ' +
+          esc(String(tm[key]) + tm.unit) +
+          '"></span>';
+    });
+    h += '</div>';
+    h +=
+      '<div class="thscale"><span class="lo">' +
+      esc(String(tm.min)) +
+      '</span>';
+    if (tm.warn != null)
+      h +=
+        '<span class="warn" style="left:' +
+        tm.warnPct.toFixed(1) +
+        '%">' +
+        esc(String(tm.warn)) +
+        '</span>';
+    if (tm.crit != null)
+      h +=
+        '<span class="crit" style="left:' +
+        tm.critPct.toFixed(1) +
+        '%">' +
+        esc(String(tm.crit)) +
+        '</span>';
+    ['lowWarn', 'lowCrit'].forEach(function (key) {
+      if (tm[key] != null)
+        h +=
+          '<span class="' +
+          (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') +
+          '" style="left:' +
+          tm[key + 'Pct'].toFixed(1) +
+          '%">' +
+          esc(String(tm[key])) +
+          '</span>';
+    });
+    h += '<span class="hi">' + esc(String(tm.max)) + '</span></div>';
+    if (tm.lowWarn != null || tm.lowCrit != null)
+      h +=
+        '<div class="thrange-key"><span>Cold limits</span><span>Safe interval</span><span>' +
+        (tm.warn != null || tm.crit != null ? 'Hot limits' : '') +
+        '</span></div>';
+    /* step-history sparkline: every step's value plots as a faint frame (dots
+       + ghost line) so the axis is stable; the bright line and dots reveal
+       only up to the current step, so stepping tells the thermal story and a
+       jump to any step re-renders consistently */
+    /* same finite-only rule as thermoModel: an Infinity value renders as
+       NO DATA in the readout, so it must not plot as a history point either */
+    var hist = Array.isArray(states)
+      ? states.map(function (s) {
+          return s && typeof s.value === 'number' && isFinite(s.value)
+            ? s.value
+            : null;
+        })
+      : [];
+    if (hist.length > 1) {
+      var sX = function (i) {
+        return 6 + (248 * i) / (hist.length - 1);
+      };
+      var sY = function (vv) {
+        return 54 - clamp((vv - tm.min) / (tm.max - tm.min), 0, 1) * 46;
+      };
+      h +=
+        '<svg class="thspark" viewBox="0 0 260 62" role="img" aria-label="temperature per step">';
+      ['lowWarn', 'lowCrit'].forEach(function (key) {
+        if (tm[key] != null)
+          h +=
+            '<line class="thguide ' +
+            (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') +
+            '" x1="6" x2="254" y1="' +
+            sY(tm[key]).toFixed(1) +
+            '" y2="' +
+            sY(tm[key]).toFixed(1) +
+            '"/>';
+      });
+      if (tm.warn != null)
+        h +=
+          '<line class="thguide warn" x1="6" x2="254" y1="' +
+          sY(tm.warn).toFixed(1) +
+          '" y2="' +
+          sY(tm.warn).toFixed(1) +
+          '"/>';
+      if (tm.crit != null)
+        h +=
+          '<line class="thguide crit" x1="6" x2="254" y1="' +
+          sY(tm.crit).toFixed(1) +
+          '" y2="' +
+          sY(tm.crit).toFixed(1) +
+          '"/>';
+      /* a null slot (step with no finite value) BREAKS the line: segments are
+         emitted per run of consecutive finite values, so the line never
+         bridges a no-data step */
+      var ghostSegs = [],
+        litSegs = [],
+        gSeg = null,
+        lSeg = null;
+      hist.forEach(function (vv, i) {
+        if (vv == null) {
+          gSeg = null;
+          lSeg = null;
+          return;
+        }
+        var pt = sX(i).toFixed(1) + ',' + sY(vv).toFixed(1);
+        if (!gSeg) {
+          gSeg = [];
+          ghostSegs.push(gSeg);
+        }
+        gSeg.push(pt);
+        if (i <= idx) {
+          if (!lSeg) {
+            lSeg = [];
+            litSegs.push(lSeg);
+          }
+          lSeg.push(pt);
+        } else lSeg = null;
+      });
+      ghostSegs.forEach(function (seg) {
+        if (seg.length > 1)
+          h +=
+            '<polyline class="thline ghost" points="' + seg.join(' ') + '"/>';
+      });
+      litSegs.forEach(function (seg) {
+        if (seg.length > 1)
+          h += '<polyline class="thline" points="' + seg.join(' ') + '"/>';
+      });
+      hist.forEach(function (vv, i) {
+        if (vv == null) return;
+        var zc = thermoModel(panel, { value: vv }).zone;
+        var isCur = i === idx;
+        h +=
+          '<circle class="thdot z-' +
+          zc +
+          (i <= idx ? ' on' : '') +
+          (isCur ? ' cur' : '') +
+          '" cx="' +
+          sX(i).toFixed(1) +
+          '" cy="' +
+          sY(vv).toFixed(1) +
+          '" r="' +
+          (isCur ? 4 : 2.4) +
+          '"/>';
+      });
+      h += '</svg>';
+    }
+    return {
+      html: h,
+      level: {
+        pct: tm.pct,
+        value: tm.value,
+        settled: tv,
+        fill: '.thfill',
+        readout: '.thval',
+        decimals: 1,
+      },
+    };
+  }
+);
+/* ---- src/panels/types/tiles.js ---- */
+/* tiles panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function tilesModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  var vocab = Array.isArray(panel.states) ? panel.states.map(String) : [];
+  var colors = panel.colors || {};
+  return (Array.isArray(panel.tiles) ? panel.tiles : [])
+    .slice(0, 12)
+    .map(function (t) {
+      t = t || {};
+      var st =
+        t.id && state[t.id] && typeof state[t.id] === 'object'
+          ? state[t.id]
+          : {};
+      var sname = st.state != null ? String(st.state) : null;
+      var known =
+        sname != null && (vocab.length === 0 || vocab.indexOf(sname) >= 0);
+      return {
+        id: t.id,
+        label: t.label || t.id || '',
+        state: known ? sname : null,
+        color: known && isHex(colors[sname]) ? colors[sname] : null,
+        sub: st.sub != null ? String(st.sub) : '',
+      };
+    })
+    .filter(function (t) {
+      return t.id;
+    });
+}
+
+/* signal widget: link health for 1–6 named radio/wired links. Pure model
+   (node-testable). Links are DECLARED once (id, label, transport tag); each
+   step patches per link id, like the leds widget: a patch value replaces that
+   link's whole status object `{state, bars, note}`. Unknown state tokens fall
+   back to 'ok' (validator warns); bars 0–4 or null (chip-only). */
+
+PanelViews.register(
+  'tiles',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var tlm = tilesModel(panel, state);
+    h += '<div class="tlgrid">';
+    tlm.forEach(function (t) {
+      h += '<div class="tltile' + (t.state == null ? ' dim' : '') + '">';
+      h += '<span class="tllabel">' + esc(t.label) + '</span>';
+      h +=
+        '<span class="tlstate"' +
+        (t.color
+          ? ' style="color:' + t.color + ';border-color:' + t.color + '"'
+          : '') +
+        '>' +
+        (t.state != null ? esc(t.state) : '&#8212;') +
+        '</span>';
+      h += '<span class="tlsub">' + esc(t.sub) + '</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/timeline.js ---- */
+/* timeline panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function timelineLabelRows(events) {
+  /* deterministic label collision layout: labels go on row 0, overflow
+     to row 1, and drop to hover-title-only (labelRow null) when both
+     rows are occupied at that x. Widths are estimated from the 8.5px
+     mono glyphs; x positions mirror the renderer's clamp. */
+  var charW = 5.1;
+  var ends = [-Infinity, -Infinity];
+  events.forEach(function (e) {
+    if (!e.label) {
+      e.labelRow = null;
+      return;
+    }
+    /* the estimate and the drawing must agree: long labels TRUNCATE to
+       what the estimate measures (the hover title keeps the full text) */
+    e.labelText =
+      e.label.length > 22 ? e.label.slice(0, 21) + '\u2026' : e.label;
+    var x = Math.min(Math.max(6 + (e.pct / 100) * 308, 16), 304);
+    var half = (e.labelText.length * charW) / 2;
+    var xs = x - half,
+      xe = x + half;
+    if (xs >= ends[0] + 4) {
+      e.labelRow = 0;
+      ends[0] = xe;
+    } else if (xs >= ends[1] + 4) {
+      e.labelRow = 1;
+      ends[1] = xe;
+    } else e.labelRow = null;
+  });
+  return events;
+}
+/* cadence lanes: several periodic processes on ONE wall-clock axis,
+   each lane rendered in a density REGIME chosen by its beat count over
+   the span — individual dots, a true-spacing tick comb, a solid band,
+   or an empty row with a "next in …" promise. The regime is the
+   orders-of-magnitude contrast. Pure model. */
+var TL_DOT_MAX = 32; /* beats drawable as individual dots on the track */
+var TL_COMB_MAX = 120; /* beats drawable as a legible tick comb */
+function timelineLanesModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  var span = parseClock(panel.span);
+  if (span == null || span <= 0) span = 3600;
+  if (span > TIMELINE_MAX_SPAN) span = TIMELINE_MAX_SPAN;
+  var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
+  var unit = units[units.length - 1];
+  for (var i = 0; i < units.length; i++) {
+    if (span / units[i] <= 8) {
+      unit = units[i];
+      break;
+    }
+  }
+  var ticks = [];
+  for (var ts = 0; ts <= span + 1e-6 && ticks.length <= 12; ts += unit)
+    ticks.push({ s: ts, pct: (ts / span) * 100, label: formatClock(ts) });
+  var nowS = parseClock(state.now);
+  var now = null;
+  if (nowS != null) {
+    var nc = Math.min(Math.max(nowS, 0), span);
+    now = { s: nc, pct: (nc / span) * 100, label: formatClock(nc) };
+  }
+  function normList(list) {
+    var out = [];
+    (Array.isArray(list) ? list : []).forEach(function (e) {
+      if (!e) return;
+      var at = parseClock(e.at);
+      if (at == null) return;
+      var s = Math.min(Math.max(at, 0), span);
+      out.push({
+        s: s,
+        pct: (s / span) * 100,
+        lane: e.lane != null ? String(e.lane) : null,
+        label: e.label != null ? String(e.label) : '',
+        kind: ['ok', 'alert', 'info'].indexOf(e.kind) >= 0 ? e.kind : 'info',
+      });
+    });
+    return out;
+  }
+  var allEvents = normList(panel.events).concat(normList(state.events));
+  var misses = normList(state.miss);
+  var seen = Object.create(null);
+  var lanes = [];
+  (Array.isArray(panel.lanes) ? panel.lanes : []).forEach(function (l) {
+    if (lanes.length >= 4) return;
+    if (!l || typeof l !== 'object' || l.id == null) return;
+    var id = String(l.id);
+    if (seen[id]) return;
+    var every = parseClock(l.every);
+    if (every == null || every <= 0) return;
+    seen[id] = true;
+    var count = Math.floor((span + 1e-6) / every);
+    var regime =
+      count < 1
+        ? 'sparse'
+        : count <= TL_DOT_MAX
+        ? 'dots'
+        : count <= TL_COMB_MAX
+        ? 'comb'
+        : 'band';
+    var beats = [];
+    if (regime === 'dots') {
+      for (var b = every; b <= span + 1e-6; b += every)
+        beats.push({
+          s: b,
+          pct: (b / span) * 100,
+          past: !!(now && b <= now.s + 1e-6),
+        });
+    }
+    var badge;
+    if (regime === 'sparse') {
+      if (now) {
+        var nextAt = (Math.floor((now.s + 1e-6) / every) + 1) * every;
+        badge = 'next in ' + formatClock(nextAt - now.s) + ' \u25b8';
+      } else badge = 'every ' + formatClock(every);
+    } else badge = count + '\u00d7';
+    lanes.push({
+      id: id,
+      label: l.label != null ? String(l.label) : id,
+      every: every,
+      everyLabel: formatClock(every),
+      regime: regime,
+      count: count,
+      beats: beats,
+      spacingPct: (every / span) * 100,
+      badge: badge,
+      misses: misses.filter(function (m) {
+        return m.lane === id;
+      }),
+      events: allEvents.filter(function (e) {
+        return e.lane === id;
+      }),
+    });
+  });
+  return {
+    span: span,
+    spanLabel: formatClock(span),
+    ticks: ticks,
+    now: now,
+    lanes: lanes,
+    axisEvents: allEvents.filter(function (e) {
+      return e.lane == null || !seen[e.lane];
+    }),
+  };
+}
+
+function timelineModel(panel, state) {
+  panel = panel || {};
+  state = state || {};
+  var span = parseClock(panel.span);
+  if (span == null || span <= 0) span = 3600;
+  if (span > TIMELINE_MAX_SPAN) span = TIMELINE_MAX_SPAN; /* validator warns */
+  /* tick unit: coarsest table entry giving at most 8 intervals; the top
+     entry (1d) covers the clamped 7d maximum within the bound */
+  var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
+  var unit = units[units.length - 1];
+  for (var i = 0; i < units.length; i++) {
+    if (span / units[i] <= 8) {
+      unit = units[i];
+      break;
+    }
+  }
+  var ticks = [];
+  for (var ts = 0; ts <= span + 1e-6 && ticks.length <= 12; ts += unit)
+    ticks.push({ s: ts, pct: (ts / span) * 100, label: formatClock(ts) });
+  var every = panel.cadence ? parseClock(panel.cadence.every) : null;
+  var beats = [],
+    beatsOmitted = 0;
+  if (every != null && every > 0) {
+    var beatCount = Math.floor((span + 1e-6) / every);
+    if (beatCount > TIMELINE_MAX_BEATS) {
+      /* sub-pixel soup — draw none, report the count instead of
+         silently truncating the cadence */
+      beatsOmitted = beatCount;
+    } else {
+      for (var b = every; b <= span + 1e-6; b += every)
+        beats.push({ s: b, pct: (b / span) * 100 });
+    }
+  }
+  function norm(list) {
+    var out = [];
+    (Array.isArray(list) ? list : []).forEach(function (e) {
+      if (!e) return;
+      var at = parseClock(e.at);
+      if (at == null) return;
+      var s = Math.min(Math.max(at, 0), span);
+      out.push({
+        s: s,
+        pct: (s / span) * 100,
+        label: e.label != null ? String(e.label) : '',
+        kind: ['ok', 'alert', 'info'].indexOf(e.kind) >= 0 ? e.kind : 'info',
+      });
+    });
+    return out;
+  }
+  var events = norm(panel.events).concat(norm(state.events));
+  events.sort(function (a, b) {
+    return a.s - b.s;
+  });
+  timelineLabelRows(events);
+  var nowS = parseClock(state.now);
+  var now = null;
+  if (nowS != null) {
+    var c = Math.min(Math.max(nowS, 0), span);
+    now = { s: c, pct: (c / span) * 100, label: formatClock(c) };
+  }
+  /* detail window: the cadence interval containing `now`, magnified so
+     events BETWEEN two long-running beats spread out legibly. Derived —
+     no spec field. Absent without a cadence or a cursor. */
+  var detail = null;
+  if (every != null && every > 0 && now) {
+    var k = Math.floor((now.s + 1e-6) / every);
+    var dStart = k * every;
+    if (dStart >= span) dStart = Math.max(span - every, 0);
+    var dEnd = Math.min(dStart + every, span);
+    if (dEnd > dStart) {
+      var dLen = dEnd - dStart;
+      var dEvents = [];
+      events.forEach(function (e) {
+        if (e.s >= dStart - 1e-6 && e.s <= dEnd + 1e-6)
+          dEvents.push({
+            s: e.s,
+            pct: ((e.s - dStart) / dLen) * 100,
+            label: e.label,
+            kind: e.kind,
+          });
+      });
+      timelineLabelRows(dEvents);
+      var dUnits = [
+        1, 5, 10, 30, 60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200,
+      ];
+      var dUnit = dUnits[dUnits.length - 1];
+      for (var di = 0; di < dUnits.length; di++) {
+        if (dLen / dUnits[di] <= 6) {
+          dUnit = dUnits[di];
+          break;
+        }
+      }
+      var dTicks = [];
+      for (
+        var dts = Math.ceil((dStart + 1e-6) / dUnit) * dUnit;
+        dts < dEnd - 1e-6 && dTicks.length <= 8;
+        dts += dUnit
+      )
+        dTicks.push({ s: dts, pct: ((dts - dStart) / dLen) * 100 });
+      detail = {
+        start: dStart,
+        end: dEnd,
+        startLabel: formatClock(dStart),
+        endLabel: formatClock(dEnd),
+        startPct: (dStart / span) * 100,
+        endPct: (dEnd / span) * 100,
+        ticks: dTicks,
+        events: dEvents,
+        nowPct: Math.min(Math.max(((now.s - dStart) / dLen) * 100, 0), 100),
+        startPast: now.s >= dStart - 1e-6,
+        endPast: now.s >= dEnd - 1e-6,
+      };
+    }
+  }
+  return {
+    span: span,
+    spanLabel: formatClock(span),
+    unit: unit,
+    ticks: ticks,
+    beats: beats,
+    beatsOmitted: beatsOmitted,
+    every: every,
+    events: events,
+    now: now,
+    detail: detail,
+    cadenceLabel:
+      panel.cadence && panel.cadence.label != null
+        ? String(panel.cadence.label)
+        : '',
+  };
+}
+
+PanelViews.register(
+  'timeline',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    if (Array.isArray(panel.lanes) && panel.lanes.length) {
+      var lnm = timelineLanesModel(panel, state);
+      var LX0 = 70,
+        LX1 = 252,
+        LW = LX1 - LX0; /* track range; labels left, badges right */
+      function lx(pct) {
+        return (LX0 + (pct / 100) * LW).toFixed(1);
+      }
+      var rowsTop = 22,
+        rowH = 18;
+      var rowsBottom = rowsTop + lnm.lanes.length * rowH;
+      var tlH = rowsBottom + 14;
+      h +=
+        '<svg class="tlsvg" viewBox="0 0 320 ' +
+        tlH +
+        '" role="img" aria-label="cadence lanes">';
+      /* shared axis strip on top */
+      h +=
+        '<line class="tlaxis" x1="' +
+        LX0 +
+        '" y1="12" x2="' +
+        LX1 +
+        '" y2="12"/>';
+      lnm.ticks.forEach(function (tk) {
+        h +=
+          '<line class="tltickline" x1="' +
+          lx(tk.pct) +
+          '" y1="8" x2="' +
+          lx(tk.pct) +
+          '" y2="16"/>';
+      });
+      lnm.axisEvents.forEach(function (ev) {
+        h +=
+          '<circle class="tlev tl-' +
+          ev.kind +
+          '" cx="' +
+          lx(ev.pct) +
+          '" cy="12" r="2.6"><title>' +
+          esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) +
+          '</title></circle>';
+      });
+      /* lane rows */
+      lnm.lanes.forEach(function (ln, li) {
+        var cy = rowsTop + li * rowH + 9;
+        var labText =
+          ln.label.length > 13 ? ln.label.slice(0, 12) + '\u2026' : ln.label;
+        h +=
+          '<text class="tllane" x="2" y="' +
+          (cy + 3) +
+          '">' +
+          esc(labText) +
+          '<title>' +
+          esc(ln.label + ' — every ' + ln.everyLabel) +
+          '</title></text>';
+        h +=
+          '<line class="tlrowline" x1="' +
+          LX0 +
+          '" y1="' +
+          cy +
+          '" x2="' +
+          LX1 +
+          '" y2="' +
+          cy +
+          '"/>';
+        var splitX = lnm.now ? parseFloat(lx(lnm.now.pct)) : LX0;
+        if (ln.regime === 'dots') {
+          ln.beats.forEach(function (bt) {
+            h +=
+              '<circle class="tlbeat' +
+              (bt.past ? ' past' : '') +
+              '" cx="' +
+              lx(bt.pct) +
+              '" cy="' +
+              cy +
+              '" r="2.6"/>';
+          });
+        } else if (ln.regime === 'comb') {
+          var spacing = (ln.spacingPct / 100) * LW;
+          var pid = 'tlp' + ++ZF_SEQ;
+          h +=
+            '<defs><pattern id="' +
+            pid +
+            '" x="' +
+            LX0 +
+            '" width="' +
+            spacing.toFixed(3) +
+            '" height="' +
+            rowH +
+            '" patternUnits="userSpaceOnUse">' +
+            '<line class="tlcombline" x1="' +
+            spacing.toFixed(3) +
+            '" y1="3" x2="' +
+            spacing.toFixed(3) +
+            '" y2="15"/></pattern></defs>';
+          if (splitX > LX0)
+            h +=
+              '<rect class="tlpast" x="' +
+              LX0 +
+              '" y="' +
+              (cy - 9) +
+              '" width="' +
+              (splitX - LX0).toFixed(1) +
+              '" height="' +
+              rowH +
+              '" fill="url(#' +
+              pid +
+              ')"/>';
+          if (splitX < LX1)
+            h +=
+              '<rect class="tlfuture" x="' +
+              splitX.toFixed(1) +
+              '" y="' +
+              (cy - 9) +
+              '" width="' +
+              (LX1 - splitX).toFixed(1) +
+              '" height="' +
+              rowH +
+              '" fill="url(#' +
+              pid +
+              ')"/>';
+        } else if (ln.regime === 'band') {
+          if (splitX > LX0)
+            h +=
+              '<rect class="tlbandfill tlpast" x="' +
+              LX0 +
+              '" y="' +
+              (cy - 4) +
+              '" width="' +
+              (splitX - LX0).toFixed(1) +
+              '" height="8" rx="2"/>';
+          if (splitX < LX1)
+            h +=
+              '<rect class="tlbandfill tlfuture" x="' +
+              splitX.toFixed(1) +
+              '" y="' +
+              (cy - 4) +
+              '" width="' +
+              (LX1 - splitX).toFixed(1) +
+              '" height="8" rx="2"/>';
+        }
+        /* sparse: the badge carries the promise; nothing on the track */
+        ln.misses.forEach(function (m) {
+          if (ln.regime === 'dots') {
+            h +=
+              '<circle class="tlmissring" cx="' +
+              lx(m.pct) +
+              '" cy="' +
+              cy +
+              '" r="4"><title>' +
+              esc('missed — expected ' + formatClock(m.s)) +
+              '</title></circle>';
+          } else {
+            h +=
+              '<line class="tlmiss" x1="' +
+              lx(m.pct) +
+              '" y1="' +
+              (cy - 8) +
+              '" x2="' +
+              lx(m.pct) +
+              '" y2="' +
+              (cy + 8) +
+              '"><title>' +
+              esc('missed — expected ' + formatClock(m.s)) +
+              '</title></line>';
+          }
+        });
+        ln.events.forEach(function (ev) {
+          h +=
+            '<circle class="tlev tl-' +
+            ev.kind +
+            '" cx="' +
+            lx(ev.pct) +
+            '" cy="' +
+            cy +
+            '" r="3"><title>' +
+            esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) +
+            '</title></circle>';
+        });
+        h +=
+          '<text class="tlbadge" x="318" y="' +
+          (cy + 3) +
+          '" text-anchor="end">' +
+          esc(ln.badge) +
+          '</text>';
+      });
+      /* the now cursor runs through the axis and every row */
+      if (lnm.now) {
+        var lnx = lx(lnm.now.pct);
+        h +=
+          '<line class="tlnow" x1="' +
+          lnx +
+          '" y1="6" x2="' +
+          lnx +
+          '" y2="' +
+          rowsBottom +
+          '"/>' +
+          '<circle class="tlnowhead" cx="' +
+          lnx +
+          '" cy="6" r="3"/>';
+      }
+      /* tick labels under the rows */
+      lnm.ticks.forEach(function (tk) {
+        h +=
+          '<text class="tltick" x="' +
+          lx(tk.pct) +
+          '" y="' +
+          (rowsBottom + 10) +
+          '" text-anchor="middle">' +
+          esc(tk.label) +
+          '</text>';
+      });
+      h += '</svg>';
+      var lmeta = [];
+      if (lnm.now) lmeta.push('now ' + lnm.now.label);
+      lmeta.push('span ' + lnm.spanLabel);
+      h += '<div class="tlmeta">' + esc(lmeta.join(' \u00b7 ')) + '</div>';
+    } else {
+      var tlm = timelineModel(panel, state);
+      function tlx(pct) {
+        return (6 + (pct / 100) * 308).toFixed(1);
+      }
+      if (tlm.detail) {
+        /* overview strip on top, the CURRENT cadence interval magnified
+         below — events between two long-running beats spread out there */
+        var dm = tlm.detail;
+        h +=
+          '<svg class="tlsvg" viewBox="0 0 320 100" role="img" aria-label="timeline">';
+        /* overview strip */
+        if (tlm.now)
+          h +=
+            '<rect class="tlelapsed" x="6" y="9" width="' +
+            ((tlm.now.pct / 100) * 308).toFixed(1) +
+            '" height="6" rx="2"/>';
+        h +=
+          '<rect class="tlband" x="' +
+          tlx(dm.startPct) +
+          '" y="3" width="' +
+          (((dm.endPct - dm.startPct) / 100) * 308).toFixed(1) +
+          '" height="18"/>';
+        h += '<line class="tlaxis" x1="6" y1="12" x2="314" y2="12"/>';
+        tlm.ticks.forEach(function (tk) {
+          h +=
+            '<line class="tltickline" x1="' +
+            tlx(tk.pct) +
+            '" y1="9" x2="' +
+            tlx(tk.pct) +
+            '" y2="15"/>';
+        });
+        tlm.beats.forEach(function (bt) {
+          var past = tlm.now && bt.s <= tlm.now.s + 1e-6;
+          h +=
+            '<circle class="tlbeat' +
+            (past ? ' past' : '') +
+            '" cx="' +
+            tlx(bt.pct) +
+            '" cy="12" r="2.2"/>';
+        });
+        tlm.events.forEach(function (ev) {
+          h +=
+            '<circle class="tlev tl-' +
+            ev.kind +
+            '" cx="' +
+            tlx(ev.pct) +
+            '" cy="12" r="1.7"/>';
+        });
+        if (tlm.now) {
+          var onx = tlx(tlm.now.pct);
+          h +=
+            '<line class="tlnow" x1="' +
+            onx +
+            '" y1="4" x2="' +
+            onx +
+            '" y2="20"/>';
+        }
+        /* zoom connectors from the band to the detail axis */
+        h +=
+          '<line class="tlzoom" x1="' +
+          tlx(dm.startPct) +
+          '" y1="21" x2="6" y2="46"/>' +
+          '<line class="tlzoom" x1="' +
+          tlx(dm.endPct) +
+          '" y1="21" x2="314" y2="46"/>';
+        /* detail: one interval, beat to beat */
+        h += '<line class="tlaxis" x1="6" y1="68" x2="314" y2="68"/>';
+        dm.ticks.forEach(function (tk) {
+          h +=
+            '<line class="tltickline" x1="' +
+            tlx(tk.pct) +
+            '" y1="64" x2="' +
+            tlx(tk.pct) +
+            '" y2="72"/>';
+        });
+        h +=
+          '<circle class="tlbeat' +
+          (dm.startPast ? ' past' : '') +
+          '" cx="6" cy="68" r="4.2"/>' +
+          '<circle class="tlbeat' +
+          (dm.endPast ? ' past' : '') +
+          '" cx="314" cy="68" r="4.2"/>' +
+          '<text class="tltick" x="6" y="84" text-anchor="start">' +
+          esc(dm.startLabel) +
+          '</text>' +
+          '<text class="tltick" x="314" y="84" text-anchor="end">' +
+          esc(dm.endLabel) +
+          '</text>';
+        dm.events.forEach(function (ev) {
+          var x = tlx(ev.pct);
+          h +=
+            '<circle class="tlev tl-' +
+            ev.kind +
+            '" cx="' +
+            x +
+            '" cy="54" r="4"><title>' +
+            esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) +
+            '</title></circle>';
+          if (ev.label && ev.labelRow != null)
+            h +=
+              '<text class="tlevlab" x="' +
+              Math.min(Math.max(parseFloat(x), 16), 304) +
+              '" y="' +
+              (ev.labelRow === 0 ? 43 : 32) +
+              '" text-anchor="middle">' +
+              esc(ev.labelText || ev.label) +
+              '</text>';
+        });
+        var dnx = tlx(dm.nowPct);
+        h +=
+          '<line class="tlnow" x1="' +
+          dnx +
+          '" y1="47" x2="' +
+          dnx +
+          '" y2="74"/>' +
+          '<circle class="tlnowhead" cx="' +
+          dnx +
+          '" cy="47" r="3"/>';
+        h += '</svg>';
+      } else {
+        h +=
+          '<svg class="tlsvg" viewBox="0 0 320 64" role="img" aria-label="timeline">';
+        if (tlm.now)
+          h +=
+            '<rect class="tlelapsed" x="6" y="36" width="' +
+            ((tlm.now.pct / 100) * 308).toFixed(1) +
+            '" height="8" rx="2"/>';
+        h += '<line class="tlaxis" x1="6" y1="40" x2="314" y2="40"/>';
+        tlm.ticks.forEach(function (tk) {
+          var x = tlx(tk.pct);
+          h +=
+            '<line class="tltickline" x1="' +
+            x +
+            '" y1="36" x2="' +
+            x +
+            '" y2="44"/>' +
+            '<text class="tltick" x="' +
+            x +
+            '" y="56" text-anchor="middle">' +
+            esc(tk.label) +
+            '</text>';
+        });
+        tlm.beats.forEach(function (bt) {
+          var past = tlm.now && bt.s <= tlm.now.s + 1e-6;
+          h +=
+            '<circle class="tlbeat' +
+            (past ? ' past' : '') +
+            '" cx="' +
+            tlx(bt.pct) +
+            '" cy="40" r="2.6"/>';
+        });
+        tlm.events.forEach(function (ev) {
+          var x = tlx(ev.pct);
+          h +=
+            '<circle class="tlev tl-' +
+            ev.kind +
+            '" cx="' +
+            x +
+            '" cy="26" r="4"><title>' +
+            esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) +
+            '</title></circle>';
+          if (ev.label && ev.labelRow != null)
+            h +=
+              '<text class="tlevlab" x="' +
+              Math.min(Math.max(parseFloat(x), 16), 304) +
+              '" y="' +
+              (ev.labelRow === 0 ? 15 : 6) +
+              '" text-anchor="middle">' +
+              esc(ev.labelText || ev.label) +
+              '</text>';
+        });
+        if (tlm.now) {
+          var nx = tlx(tlm.now.pct);
+          h +=
+            '<line class="tlnow" x1="' +
+            nx +
+            '" y1="18" x2="' +
+            nx +
+            '" y2="46"/>' +
+            '<circle class="tlnowhead" cx="' +
+            nx +
+            '" cy="18" r="3"/>';
+        }
+        h += '</svg>';
+      }
+      var tlmeta = [];
+      if (tlm.every != null && tlm.every > 0) {
+        var cad =
+          (tlm.cadenceLabel || 'beat') + ' every ' + formatClock(tlm.every);
+        if (tlm.beatsOmitted)
+          cad += ' (' + tlm.beatsOmitted + ' beats — too dense to draw)';
+        tlmeta.push(cad);
+      }
+      if (tlm.detail)
+        tlmeta.push(
+          'window ' + tlm.detail.startLabel + '\u2013' + tlm.detail.endLabel
+        );
+      if (tlm.now) tlmeta.push('now ' + tlm.now.label);
+      tlmeta.push('span ' + tlm.spanLabel);
+      h += '<div class="tlmeta">' + esc(tlmeta.join(' · ')) + '</div>';
+    }
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/trace.js ---- */
+/* trace panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function traceIntervalUnion(intervals) {
+  var sorted = intervals
+      .filter(function (v) {
+        return v[1] > v[0];
+      })
+      .map(function (v) {
+        return v.slice();
+      })
+      .sort(function (a, b) {
+        return a[0] - b[0] || a[1] - b[1];
+      }),
+    out = [];
+  sorted.forEach(function (v) {
+    var last = out[out.length - 1];
+    if (last && v[0] <= last[1]) last[1] = Math.max(last[1], v[1]);
+    else out.push(v);
+  });
+  return out;
+}
+function traceTimingModel(panel, state) {
+  var data = tracePanelData(panel);
+  if (data.errors.length) return { errors: data.errors, notices: data.notices };
+  var spans = data.spans.sort(function (a, b) {
+    return a.startMs - b.startMs || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  });
+  var byId = new Map(),
+    children = new Map();
+  spans.forEach(function (s) {
+    byId.set(s.id, s);
+  });
+  spans.forEach(function (s) {
+    if (!children.has(s.parentId)) children.set(s.parentId, []);
+    children.get(s.parentId).push(s);
+  });
+  var selected =
+    state && state.selected != null ? byId.get(state.selected) : spans[0];
+  if (!selected)
+    return { errors: ['Selected span is unavailable.'], notices: data.notices };
+  function duration(intervals) {
+    return intervals.reduce(function (sum, v) {
+      return sum + (v[1] - v[0]);
+    }, 0);
+  }
+  function stats(s) {
+    var childSpans = children.get(s.id) || [];
+    var covered = traceIntervalUnion(
+      childSpans.map(function (c) {
+        return [
+          Math.max(s.startMs, c.startMs),
+          Math.min(s.startMs + s.ms, c.startMs + c.ms),
+        ];
+      })
+    );
+    var childMs = Math.min(s.ms, duration(covered));
+    return {
+      span: s,
+      covered: covered,
+      childMs: childMs,
+      uncoveredMs: Math.max(0, s.ms - childMs),
+      children: childSpans,
+    };
+  }
+  var serviceSpans = spans.filter(function (s) {
+    return s.service === selected.service;
+  });
+  var serviceIntervals = traceIntervalUnion(
+    serviceSpans.map(function (s) {
+      return [s.startMs, s.startMs + s.ms];
+    })
+  );
+  var serviceStart = Math.min.apply(
+    null,
+    serviceSpans.map(function (s) {
+      return s.startMs;
+    })
+  );
+  var serviceEnd = Math.max.apply(
+    null,
+    serviceSpans.map(function (s) {
+      return s.startMs + s.ms;
+    })
+  );
+  var rows = [];
+  function visit(s, depth) {
+    if (s.service === selected.service) {
+      var row = stats(s);
+      row.depth = depth;
+      rows.push(row);
+    }
+    (children.get(s.id) || []).forEach(function (c) {
+      visit(c, depth + 1);
+    });
+  }
+  spans
+    .filter(function (s) {
+      return !s.parentId || !byId.has(s.parentId);
+    })
+    .forEach(function (s) {
+      visit(s, 0);
+    });
+  return {
+    errors: [],
+    notices: data.notices,
+    selected: stats(selected),
+    rows: rows,
+    service: selected.service,
+    serviceStart: serviceStart,
+    serviceEnd: serviceEnd,
+    serviceCoverageMs: duration(serviceIntervals),
+  };
+}
+function tracePanelHTML(panel, state, states) {
+  var m = traceTimingModel(panel, state);
+  function ms(n) {
+    return String(Math.round(n * 1000) / 1000) + ' ms';
+  }
+  if (m.errors.length)
+    return (
+      '<div class="tr-time"><b>Timing unavailable</b><p>' +
+      esc(m.errors.join(' · ')) +
+      '</p></div>'
+    );
+  var s = m.selected,
+    duration = s.span.ms,
+    h = '<div class="tr-time">';
+  var serviceSteps = new Map(),
+    spanServices = new Map();
+  panel.spans.forEach(function (span) {
+    spanServices.set(span.id, span.service);
+  });
+  (states || []).forEach(function (st, i) {
+    var service = st && spanServices.get(st.selected);
+    if (service && !serviceSteps.has(service)) serviceSteps.set(service, i);
+  });
+  if (serviceSteps.size > 1) {
+    h +=
+      '<label class="tr-picker">Inspect service<select data-dv-trace-service aria-label="Inspect service">';
+    serviceSteps.forEach(function (i, service) {
+      h +=
+        '<option value="' +
+        i +
+        '"' +
+        (service === m.service ? ' selected' : '') +
+        '>' +
+        esc(service) +
+        '</option>';
+    });
+    h += '</select></label>';
+  }
+  h +=
+    '<div class="tr-service">' +
+    esc(m.service) +
+    '</div><p class="tr-coverage">Service span coverage (union): <b>' +
+    ms(m.serviceCoverageMs) +
+    '</b> · ' +
+    m.rows.length +
+    ' observed span(s)</p>';
+  h +=
+    '<div class="tr-selected"><b>' +
+    esc(s.span.name) +
+    '</b><code>' +
+    esc(s.span.id) +
+    '</code><small>Parent: ' +
+    esc(s.span.parentId || 'none') +
+    '</small></div>';
+  h +=
+    '<dl class="tr-metrics"><div><dt>Inclusive</dt><dd>' +
+    ms(duration) +
+    '</dd></div><div><dt>Child-covered</dt><dd>' +
+    ms(s.childMs) +
+    '</dd></div><div><dt>Uncovered</dt><dd>' +
+    ms(s.uncoveredMs) +
+    '</dd></div></dl>';
+  h +=
+    '<div class="tr-interval' +
+    (duration === 0 ? ' tr-zero' : '') +
+    '" role="img" aria-label="' +
+    esc(
+      'Selected span: ' +
+        ms(duration) +
+        ' inclusive, ' +
+        ms(s.childMs) +
+        ' child-covered, ' +
+        ms(s.uncoveredMs) +
+        ' uncovered'
+    ) +
+    '">';
+  s.covered.forEach(function (v) {
+    h +=
+      '<span class="tr-covered" style="left:' +
+      (((v[0] - s.span.startMs) / duration) * 100).toFixed(4) +
+      '%;width:' +
+      (((v[1] - v[0]) / duration) * 100).toFixed(4) +
+      '%"></span>';
+  });
+  h +=
+    '</div><p class="tr-key">' +
+    (duration === 0
+      ? 'Zero-duration span; no wall-time interval.'
+      : '<span>Blue: child-covered</span> · <span>Hatched: uncovered</span>') +
+    '</p>';
+  h +=
+    '<p class="tr-explain">Direct-child intervals count once where they overlap and are clipped to this span. Uncovered wall time can include local work, waiting, and missing instrumentation; it is not CPU time.</p>';
+  m.notices.forEach(function (n) {
+    h += '<p class="tr-notice">' + esc(n) + '</p>';
+  });
+  h +=
+    '<div class="tr-ophead">Service operations · inclusive / uncovered</div><div class="tr-operations">';
+  m.rows.forEach(function (r) {
+    var step = (states || []).findIndex(function (st) {
+      return st && st.selected === r.span.id;
+    });
+    var extent = m.serviceEnd - m.serviceStart,
+      selected = r.span.id === s.span.id;
+    var description =
+      r.span.name +
+      ' · ' +
+      r.span.id +
+      ' · parent ' +
+      (r.span.parentId || 'none') +
+      ' · +' +
+      ms(r.span.startMs) +
+      ' · ' +
+      ms(r.span.ms) +
+      ' inclusive / ' +
+      ms(r.uncoveredMs) +
+      ' uncovered' +
+      (r.span.error === true ? ' · recorded error' : '');
+    h +=
+      '<' +
+      (step >= 0
+        ? 'button type="button" data-dv-trace-step="' + step + '"'
+        : 'div') +
+      ' class="tr-op' +
+      (selected ? ' tr-current' : '') +
+      '" title="' +
+      esc(description) +
+      '"' +
+      (step >= 0 ? ' aria-label="Inspect ' + esc(description) + '"' : '') +
+      '>';
+    h +=
+      '<span class="tr-opname">' +
+      (r.depth ? '↳ ' : '') +
+      esc(r.span.name) +
+      (r.span.error === true ? ' · ERROR' : '') +
+      '</span><span class="tr-opvalues">' +
+      ms(r.span.ms) +
+      ' / ' +
+      ms(r.uncoveredMs) +
+      '</span>';
+    h +=
+      '<span class="tr-optrack"><span style="left:' +
+      (extent ? ((r.span.startMs - m.serviceStart) / extent) * 100 : 0).toFixed(
+        4
+      ) +
+      '%;width:' +
+      (extent ? (r.span.ms / extent) * 100 : 0).toFixed(4) +
+      '%"></span></span>';
+    h += '</' + (step >= 0 ? 'button' : 'div') + '>';
+  });
+  h +=
+    '</div><p class="tr-explain">Rows share the service’s +' +
+    ms(m.serviceStart) +
+    ' to +' +
+    ms(m.serviceEnd) +
+    ' scale. Nested spans overlap; row durations must not be added. The parent ID remains in each row’s tooltip.</p>';
+  if (s.children.length) {
+    h +=
+      '<details class="tr-children"><summary>' +
+      s.children.length +
+      ' direct child span(s)</summary><ul>';
+    s.children.forEach(function (c) {
+      h +=
+        '<li>' +
+        esc(c.service + ' · ' + c.name) +
+        ' · ' +
+        ms(c.ms) +
+        (c.service === m.service ? ' · same service' : ' · other service') +
+        '</li>';
+    });
+    h += '</ul></details>';
+  }
+  return h + '</div>';
+}
+
+PanelViews.register(
+  'trace',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    h = tracePanelHTML(panel, state, states);
+    return { html: h };
+  },
+  { historyRequiresSteps: true }
+);
+/* ---- src/panels/types/waterfall.js ---- */
+/* waterfall panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function waterfallModel(spans, state) {
+  spans = Array.isArray(spans) ? spans : [];
+  state = state || {};
+  var total = 0,
+    cursor = 0;
+  var timed = spans.some(function (s) {
+    return s && isFiniteNum(s.startMs) && s.startMs >= 0;
+  });
+  var measured = spans.map(function (s) {
+    var ms = s && isFiniteNum(s.ms) && s.ms > 0 ? s.ms : 0;
+    var start =
+      s && isFiniteNum(s.startMs) && s.startMs >= 0 ? s.startMs : cursor;
+    cursor = start + ms;
+    total = Math.max(total, cursor);
+    return { ms: ms, start: start };
+  });
+  var reveal =
+    typeof state.reveal === 'number'
+      ? clamp(state.reveal, 0, spans.length)
+      : spans.length;
+  var shown = 0,
+    rows = [];
+  spans.forEach(function (s, i) {
+    var ms = measured[i].ms,
+      off = measured[i].start;
+    var revealed = i < reveal;
+    if (revealed) shown = Math.max(shown, off + ms);
+    rows.push({
+      id: s && s.id,
+      label: (s && (s.label || s.id)) || '',
+      ms: ms,
+      startMs: off,
+      error: !!(s && s.error === true),
+      offsetPct: total ? (off / total) * 100 : 0,
+      widthPct: total ? (ms / total) * 100 : 0,
+      revealed: revealed,
+      highlight: !!(s && state.highlight === s.id),
+    });
+  });
+  return {
+    rows: rows,
+    totalMs: total,
+    shownMs: shown,
+    timed: timed,
+    totalLabel: state.total != null ? String(state.total) : shown + ' ms',
+  };
+}
+
+PanelViews.register(
+  'waterfall',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var waterfallEntrants;
+    var wm = waterfallModel(panel.spans, state);
+    var wfPrev = host._wfRevealed || null;
+    var wfNow = wm.rows.map(function (r) {
+      return r.revealed;
+    });
+    waterfallEntrants = wfPrev
+      ? wfNow.map(function (on, i) {
+          return on && !wfPrev[i];
+        })
+      : null;
+    host._wfRevealed = wfNow;
+    h += '<div class="wfall' + (wm.timed ? ' wf-timed' : '') + '">';
+    wm.rows.forEach(function (r) {
+      h +=
+        '<div class="wfrow' +
+        (r.revealed ? ' on' : '') +
+        (r.highlight ? ' hl' : '') +
+        (r.error ? ' wf-error' : '') +
+        '" title="' +
+        esc(
+          r.label +
+            ' · start +' +
+            r.startMs +
+            ' ms · duration ' +
+            r.ms +
+            ' ms' +
+            (r.error ? ' · recorded error' : '')
+        ) +
+        '">' +
+        '<span class="wflabel">' +
+        esc(r.label) +
+        '</span>' +
+        '<span class="wftrack"><span class="wfbar" style="margin-left:' +
+        r.offsetPct.toFixed(2) +
+        '%;width:' +
+        Math.max(r.widthPct, wm.timed ? 0 : 1.2).toFixed(2) +
+        '%"></span></span>' +
+        '<span class="wfms">' +
+        (r.revealed
+          ? (r.error ? '! ' : '') + esc(String(r.ms)) + ' ms'
+          : '&#8212;') +
+        '</span></div>';
+    });
+    h +=
+      '<div class="wftotal">' +
+      (wm.timed ? 'elapsed extent ' : 'total ') +
+      '<b>' +
+      esc(wm.totalLabel) +
+      '</b></div></div>';
+    return {
+      html: h,
+      enterBars: { rows: '.wfrow', bar: '.wfbar', entrants: waterfallEntrants },
+    };
+  }
+);
+/* ---- src/panels/types/xray.js ---- */
+/* xray panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function xrayModel(declared, stateLayers) {
+  var st = {};
+  (Array.isArray(stateLayers) ? stateLayers : []).forEach(function (l) {
+    if (l && l.id) st[l.id] = l.open === true;
+  });
+  return (Array.isArray(declared) ? declared : []).map(function (l) {
+    l = l || {};
+    return {
+      id: l.id,
+      label: l.label || l.id || '',
+      holder: l.holder || '',
+      open: st[l.id] === true,
+    };
+  });
+}
+
+/* pir line-of-sight widget: a mounted IR/PIR sensor projects a field-of-view
+   cone; a subject dot is tested against it and rendered tripped or clear. Pure
+   model (node-testable, no DOM). Frame is 320x180. `facing` is degrees measured
+   clockwise from +x in screen space (y grows downward): 0=right, 90=down,
+   180=left, 270=up. Containment = within range AND within half the spread of
+   the facing direction. An explicit state.tripped overrides the computation. */
+
+PanelViews.register(
+  'xray',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var xm = xrayModel(panel.layers, state.layers);
+    var xopen = '',
+      xclose = '';
+    xm.forEach(function (l) {
+      xopen +=
+        '<div class="xlayer ' +
+        (l.open ? 'open' : 'sealed') +
+        '">' +
+        '<div class="xhead"><span class="xstate">' +
+        (l.open ? 'OPEN' : 'SEALED') +
+        '</span>' +
+        '<span class="xname">' +
+        esc(l.label) +
+        '</span>' +
+        (l.holder
+          ? '<span class="xholder">key: ' + esc(l.holder) + '</span>'
+          : '') +
+        '</div>';
+      xclose = '</div>' + xclose;
+    });
+    h +=
+      '<div class="xray">' +
+      xopen +
+      '<div class="xcore">payload</div>' +
+      xclose +
+      '</div>';
+    if (state.hop != null) {
+      var readable =
+        xm.length > 0 &&
+        xm.every(function (l) {
+          return l.open;
+        });
+      h +=
+        '<div class="xfoot' +
+        (readable ? ' yes' : ' no') +
+        '">at <b>' +
+        esc(String(state.hop)) +
+        '</b> — payload ' +
+        (readable ? 'READABLE here' : 'NOT readable here') +
+        '</div>';
+    }
+    return { html: h };
+  }
+);
+/* ---- src/panels/types/zoneframe.js ---- */
+/* zoneframe panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+function zoneModel(declared, stateZones) {
+  var ZKINDS = ['armed', 'ignored', 'masked'];
+  var st = {};
+  (Array.isArray(stateZones) ? stateZones : []).forEach(function (z) {
+    if (z && z.id) st[z.id] = z.state;
+  });
+  return (Array.isArray(declared) ? declared : []).map(function (z) {
+    z = z || {};
+    var s = st[z.id] != null ? st[z.id] : z.state || 'armed';
+    if (ZKINDS.indexOf(s) < 0) s = 'armed';
+    var zpts = (Array.isArray(z.points) ? z.points : []).filter(function (p) {
+      return (
+        Array.isArray(p) &&
+        typeof p[0] === 'number' &&
+        isFinite(p[0]) &&
+        typeof p[1] === 'number' &&
+        isFinite(p[1])
+      );
+    });
+    return { id: z.id, label: z.label || z.id || '', state: s, points: zpts };
+  });
+}
+
+PanelViews.register(
+  'zoneframe',
+  function (host, panel, state, skin, states, stepIdx, animate) {
+    var h = '';
+    var zm = zoneModel(panel.zones, state.zones);
+    /* pattern id is per-HOST, not per-render: a fresh id every render would
+       make otherwise-identical markup unequal and defeat the unchanged-skip */
+    var hid = host._zfId || (host._zfId = 'zfh' + ++ZF_SEQ);
+    h +=
+      '<div class="zfbox"><svg class="zframe" viewBox="0 0 320 180" role="img" aria-label="' +
+      esc(panel.title || 'camera zones') +
+      '">';
+    h +=
+      '<defs><pattern id="' +
+      hid +
+      '" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+      '<line x1="0" y1="0" x2="0" y2="8" stroke="#94A3B8" stroke-width="2" opacity=".5"/></pattern></defs>';
+    h +=
+      '<rect width="320" height="180" fill="#0A0F14"/><rect y="150" width="320" height="30" fill="#131A21"/>';
+    h +=
+      '<rect x="118" y="28" width="84" height="124" rx="3" fill="#10161D" stroke="#26313C" stroke-width="2"/>';
+    zm.forEach(function (z) {
+      var pts = z.points
+        .map(function (p) {
+          return p[0] + ',' + p[1];
+        })
+        .join(' ');
+      h +=
+        '<polygon class="zone ' +
+        z.state +
+        '" points="' +
+        pts +
+        '"' +
+        (z.state === 'masked' ? ' fill="url(#' + hid + ')"' : '') +
+        '/>';
+      if (z.points.length)
+        h +=
+          '<text class="zlbl" x="' +
+          (z.points[0][0] + 5) +
+          '" y="' +
+          (z.points[0][1] + 13) +
+          '">' +
+          esc(z.label) +
+          '</text>';
+    });
+    if (
+      state.subject &&
+      typeof state.subject.x === 'number' &&
+      typeof state.subject.y === 'number'
+    )
+      h +=
+        '<circle class="zsubject" cx="' +
+        state.subject.x +
+        '" cy="' +
+        state.subject.y +
+        '" r="6"/>';
+    var ZVERDICTS = {
+      alert: 'ALERT SENT',
+      suppress: 'IGNORED — OUTSIDE ARMED ZONES',
+      'never-captured': 'MASKED — PIXELS NEVER CAPTURED',
+    };
+    if (ZVERDICTS[state.verdict]) {
+      h +=
+        '<rect class="zverbg ' +
+        state.verdict +
+        '" x="0" y="0" width="320" height="22"/>' +
+        '<text class="zvertext" x="8" y="15">' +
+        ZVERDICTS[state.verdict] +
+        '</text>';
+    }
+    h += '</svg></div>';
+    return { html: h };
+  }
+);
 /* ---- src/engine.js ---- */
-/* engine.js — layout, geometry, board/panel renderers, stepper, page renderer.
-   Browser-pure fragment concatenated after validator.js by tools/build.py.
+/* engine.js — layout, geometry, board renderer, stepper, page renderer.
+   Browser-pure fragment assembled with panels/ via source-bundles.json.
    layout/isWrap/edgePath are pure (Node-testable); the render functions need a
    DOM and are only called from the boot files. */
 
@@ -3735,219 +9311,6 @@ function resolveHashTarget(st, manifest){
   return out;
 }
 
-/* ---------------- stock scenes for the screen widget ---------------- */
-function porchSceneBackdrop(night){
-  /* Shared fixed artwork, with actual surface colors under day/night light.
-     Keep the legacy doorway and floor anchors for the existing clip tracks. */
-  return '<rect width="320" height="180" fill="' + (night ? '#192D56' : '#93D4EF') + '"/>' +
-    (night ? '<circle cx="275" cy="18" r="9" fill="#FFE4AD"/><g fill="#BED8FF"><circle cx="38" cy="12" r="1"/><circle cx="230" cy="9" r="1"/><circle cx="303" cy="32" r="1"/></g>' : '') +
-    '<path d="M0 29H320V150H0Z" fill="' + (night ? '#344D72' : '#EFCBB1') + '"/>' +
-    '<path d="M0 30H320M0 51H320M0 73H320M0 95H320M0 117H320M0 139H320" stroke="' + (night ? '#476389' : '#C5A28E') + '" opacity=".5"/>' +
-    '<rect y="150" width="320" height="30" fill="' + (night ? '#59657B' : '#BA9673') + '"/>' +
-    '<path d="M0 164H320M53 150L38 180M273 150L289 180" stroke="' + (night ? '#7D8593' : '#E6CBA3') + '" opacity=".6"/>' +
-    '<rect x="25" y="52" width="64" height="53" rx="2" fill="' + (night ? '#E9AB60' : '#6BB9DA') + '" stroke="#E9D8BC" stroke-width="3"/>' +
-    '<path d="M57 52V105M25 78H89" stroke="#F2E5CF" stroke-width="3"/>' +
-    '<path d="M31 58H49L31 72ZM63 84H81L63 99Z" fill="#FFF1CC" opacity=".28"/>' +
-    '<rect x="114" y="25" width="92" height="129" rx="3" fill="#EAD7B9"/>' +
-    '<rect x="118" y="29" width="84" height="121" rx="2" fill="' + (night ? '#277E87' : '#278F92') + '"/>' +
-    '<path d="M127 39H193V83H127ZM127 104H193V140H127Z" fill="' + (night ? '#36959C' : '#40ACAA') + '" stroke="#72C6BA"/>' +
-    '<circle cx="188" cy="94" r="3" fill="#FFD07B"/>' +
-    '<path d="M121 157H201L208 170H114Z" fill="#65544B"/>' +
-    (night ? '<path d="M224 61L192 150H260Z" fill="#FFD384" opacity=".12"/><ellipse cx="225" cy="152" rx="42" ry="6" fill="#FFCC80" opacity=".13"/>' : '') +
-    '<rect x="219" y="44" width="11" height="22" rx="4" fill="#293B4C"/><rect x="221" y="48" width="7" height="13" rx="2" fill="#FFE2A3"/>' +
-    '<path d="M284 137H303L299 153H288Z" fill="#CB7754"/>' +
-    '<path d="M293 139V109M293 127Q274 126 280 112Q292 115 293 127M293 119Q310 119 308 104Q295 104 293 119" fill="' + (night ? '#498668' : '#58A762') + '" stroke="#8BC987" stroke-width="2"/>';
-}
-function doorbellRunScene(pair){
-  /* Fixed artwork shared by the two stock clips. Local coordinates put each
-     runner's feet at the origin, so distance scales the whole stride/shadow.
-     No SVG IDs: multiple doorbells can play independently on the same page. */
-  function runner(second){
-    return '<g class="doorbell-runner' + (second ? ' doorbell-runner-second' : '') + '">' +
-      '<ellipse cx="0" cy="1" rx="13" ry="3" fill="#152B30" opacity=".28"/>' +
-      '<g class="doorbell-bounce" stroke-linecap="round" stroke-linejoin="round">' +
-      '<g fill="none" stroke="#243D50" stroke-width="6">' +
-      '<path class="doorbell-leg doorbell-leg-back" d="M-4-27L-10-14L-5-2"/>' +
-      '<path class="doorbell-leg" d="M4-27L11-16L7-3"/>' +
-      '</g><g fill="none" stroke="var(--runner-sleeve)" stroke-width="6">' +
-      '<path class="doorbell-arm doorbell-arm-back" d="M-8-46L-16-34L-20-42"/>' +
-      '<path class="doorbell-arm" d="M8-46L17-35L21-42"/>' +
-      '</g><path d="M-8-49Q0-53 8-49L10-28Q0-24-10-28Z" fill="var(--runner-shirt)"/>' +
-      '<path d="M-6-49Q0-38 6-49" fill="var(--runner-sleeve)"/>' +
-      '<path d="M0-40V-30" stroke="var(--runner-sleeve)" stroke-width="1.2" opacity=".55"/>' +
-      '<path d="M-7-29Q0-26 7-29" fill="none" stroke="var(--runner-sleeve)" stroke-width="2"/>' +
-      '<path d="M0-54V-51" stroke="#C49070" stroke-width="6"/>' +
-      '<circle cx="0" cy="-61" r="8" fill="#D7A27E"/>' +
-      '<path d="M-8-60Q-10-72 0-72Q10-71 8-60L5-55H-5Z" fill="#293237"/>' +
-      '</g></g>';
-  }
-  return '<svg viewBox="0 0 320 180" class="scene scene-doorbell" aria-hidden="true">' +
-    '<rect width="320" height="180" fill="#87D0ED"/>' +
-    '<path d="M24 54Q72 49 112 55T226 53T306 51V85H24Z" fill="#4C936A"/>' +
-    '<path d="M43 61L84 35L127 60Z" fill="#345D88"/>' +
-    '<path d="M51 60H118V84H51Z" fill="#F0CDA3"/>' +
-    '<path d="M62 66H76V77H62ZM91 65H106V78H91Z" fill="#63ACD3"/>' +
-    '<path d="M68 66V77M98 65V78" stroke="#DDE0CF" stroke-width="1.4"/>' +
-    '<path d="M206 63L244 38L281 63Z" fill="#5068A1"/>' +
-    '<path d="M213 62H274V84H213Z" fill="#F0BFAA"/>' +
-    '<path d="M225 68H239V79H225ZM249 68H263V79H249Z" fill="#508DBC"/>' +
-    '<path d="M31 82Q160 76 290 82V98Q160 92 31 98Z" fill="#516570"/>' +
-    '<path d="M40 87Q160 81 280 87" fill="none" stroke="#D2CCAD" stroke-width="1" stroke-dasharray="16 18" opacity=".65"/>' +
-    '<path d="M22 99Q160 91 300 99L315 149H5Z" fill="#79AE68"/>' +
-    '<path d="M23 97Q160 89 297 97L299 103Q160 94 21 103Z" fill="#D5C7AE"/>' +
-    '<path d="M156 99H184L219 148H106Z" fill="#E6D3AD"/>' +
-    '<path d="M145 114H195M128 134H210" fill="none" stroke="#C0AD88" stroke-width="1"/>' +
-    '<path d="M0 148Q160 136 320 148V180H0Z" fill="#C39E7A"/>' +
-    '<path d="M0 158Q160 146 320 158M64 145L41 180M248 145L273 180" fill="none" stroke="#F0D7B0" stroke-width="1.5" opacity=".65"/>' +
-    '<path d="M101 171Q158 167 215 171L222 180H94Z" fill="#615E50"/>' +
-    '<path d="M42 134L38 93M43 112L54 101" fill="none" stroke="#8C7755" stroke-width="4"/>' +
-    '<g fill="#408A5A"><ellipse cx="36" cy="88" rx="20" ry="16"/><ellipse cx="52" cy="98" rx="17" ry="13"/>' +
-    '<ellipse cx="279" cy="117" rx="25" ry="14"/><ellipse cx="290" cy="104" rx="20" ry="16"/></g>' +
-    runner(false) + (pair ? runner(true) : '') +
-    /* Door-frame edges and bowed porch roof suggest the wide doorbell lens. */
-    '<path d="M0 0H320V13Q160-2 0 13Z" fill="#273D44"/>' +
-    '<path d="M0 0H15Q24 89 14 180H0ZM320 0H305Q297 90 308 180H320Z" fill="#426F79"/>' +
-    '<path d="M9 18Q17 90 9 166M312 19Q306 90 314 166" fill="none" stroke="#91B7AD" stroke-width="2" opacity=".55"/>' +
-    '<path d="M0 0H45Q3 15 0 49ZM320 0H275Q317 15 320 49ZM0 180V139Q6 171 41 180ZM320 180V139Q314 171 279 180Z" fill="#11272F" opacity=".25"/>' +
-    '<text x="293" y="171" text-anchor="end" fill="#F4EEDC" opacity=".85" font-family="monospace" font-size="5" letter-spacing="1">FRONT DOOR · DEMO</text>' +
-    '</svg>';
-}
-var SCENE_LABELS = {
-  'person-at-door-night': 'Visitor at night',
-  'person-through-door': 'Person walking through a door',
-  'doorbell-run-away': 'Doorbell: person running away',
-  'doorbell-runners': 'Doorbell: two people running away',
-  'package-drop': 'Package delivery',
-  'kitchen-fire': 'Kitchen fire',
-  'static-noise': 'Static noise'
-};
-var SCENES = {
-  'doorbell-run-away': doorbellRunScene(false),
-  'doorbell-runners': doorbellRunScene(true),
-  'person-at-door-night':
-    '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
-    porchSceneBackdrop(true) +
-    '<g class="walker"><ellipse cy="152" rx="15" ry="3" fill="#1A2945" opacity=".3"/>' +
-    '<path d="M-4 126L-6 147M4 126L6 147" stroke="#385A88" stroke-width="6" stroke-linecap="round"/>' +
-    '<path d="M-8 148H-3M3 148H9" stroke="#1C304D" stroke-width="4" stroke-linecap="round"/>' +
-    '<path d="M-8 102L-12 122M8 102L12 119" stroke="#DC9250" stroke-width="6" stroke-linecap="round"/>' +
-    '<rect x="-9" y="96" width="18" height="34" rx="6" fill="#F2B65E"/>' +
-    '<path d="M0 100V125M-6 115H-2M2 115H6" stroke="#CD824B" stroke-width="1.5"/>' +
-    '<path d="M0 93V97" stroke="#C78966" stroke-width="6"/>' +
-    '<circle cy="86" r="9" fill="#E9B38A"/><path d="M-9 85Q-9 74 1 76Q10 75 9 85L4 81L-9 83Z" fill="#3D3243"/>' +
-    '</g></svg>',
-  'package-drop':
-    /* courier + package positions are the ANIMATION END STATES' anchors: the
-       courier group is parked off-canvas by default CSS (reduced motion shows
-       only the delivered package), the package is visible by default and the
-       running animation hides it until the drop beat */
-    '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
-    porchSceneBackdrop(false) +
-    '<g class="courier"><ellipse cy="152" rx="15" ry="3" fill="#5E493E" opacity=".2"/>' +
-    '<path d="M-4 126L-6 147M4 126L6 147" stroke="#263C64" stroke-width="6" stroke-linecap="round"/>' +
-    '<path d="M-8 148H-3M3 148H9" stroke="#182B49" stroke-width="4" stroke-linecap="round"/>' +
-    '<rect x="-9" y="94" width="18" height="34" rx="6" fill="#4C92E0"/>' +
-    '<path d="M-6 102H6M-7 120H7" stroke="#ABD8EF" stroke-width="2"/>' +
-    '<path d="M-8 100L-11 122M8 101L14 114" stroke="#3273BB" stroke-width="6" stroke-linecap="round"/>' +
-    '<path d="M0 91V96" stroke="#AA6B48" stroke-width="6"/>' +
-    '<circle cy="84" r="9" fill="#CE9367"/><path d="M-9 82Q-9 73 0 74Q10 74 9 82H14V85H-9Z" fill="#2858A0"/>' +
-    '<g class="carried"><rect x="9" y="104" width="20" height="15" rx="2" fill="#DEA05E" stroke="#AF713F" stroke-width="1.5"/>' +
-    '<path d="M19 105V118" stroke="#F8D39B" stroke-width="3"/></g></g>' +
-    '<g class="pkg"><ellipse cx="239" cy="153" rx="27" ry="4" fill="#715443" opacity=".25"/>' +
-    '<rect x="216" y="118" width="46" height="34" rx="3" fill="#DEA05E" stroke="#AF713F" stroke-width="2"/>' +
-    '<path d="M239 119V151" stroke="#F8D39B" stroke-width="6"/><path d="M217 127H261" stroke="#BB7D43"/>' +
-    '<rect x="244" y="134" width="12" height="9" rx="1" fill="#FFF0D3"/><path d="M247 137H253M247 140H251" stroke="#967654"/>' +
-    '</g></svg>',
-  'person-through-door':
-    /* A single six-second entry: approach, door opens, cross the threshold,
-       door closes. No IDs or external assets, so many cameras can coexist.
-       CSS defaults hold a readable mid-entry pose for reduced motion. */
-    '<svg viewBox="0 0 320 180" class="scene scene-entry" aria-hidden="true">' +
-    '<rect width="320" height="180" fill="#E7BEA6"/>' +
-    '<path d="M0 150H320V180H0Z" fill="#BE9A77"/>' +
-    '<path d="M0 160H320M0 177H320M64 150L40 180M140 150L132 180M230 150L242 180" stroke="#E4CFAB" stroke-opacity=".35"/>' +
-    '<rect x="28" y="40" width="74" height="66" rx="3" fill="#77BBDD" stroke="#F4DDC0" stroke-width="3"/>' +
-    '<path d="M65 40V106M28 73H102" stroke="#EEDBC0" stroke-width="3"/>' +
-    '<path d="M34 47H58L34 69ZM72 80H95L72 100Z" fill="#E0F9FF" opacity=".14"/>' +
-    '<rect x="168" y="22" width="88" height="132" rx="3" fill="#F3DDC0"/>' +
-    '<rect x="174" y="28" width="76" height="124" fill="#D8B47F"/>' +
-    '<path d="M174 28H250V48H200V152H174Z" fill="#AD8259"/>' +
-    '<path d="M200 48H250V152H200Z" fill="#F3D5A4"/>' +
-    '<path d="M210 56H238V107H210Z" fill="#BC9669"/><path d="M213 59H235V104H213Z" fill="#6F9DAD"/>' +
-    '<path class="entry-light" d="M174 152H250L282 180H139Z" fill="#FFDB9E" opacity=".22"/>' +
-    '<rect x="270" y="58" width="9" height="23" rx="4" fill="#F3E8D5"/>' +
-    '<circle cx="274.5" cy="65" r="2" fill="#31A99F"/>' +
-    '<ellipse cx="294" cy="152" rx="16" ry="4" fill="#10282E"/>' +
-    '<path d="M286 137H303L300 153H289Z" fill="#D57D54"/>' +
-    '<path d="M294 140V111M294 126Q275 127 282 114Q294 113 294 126M294 119Q306 120 310 105Q296 103 294 119" fill="#4C9B60" stroke="#77C87A" stroke-width="2"/>' +
-    '<g class="entry-person"><ellipse cx="0" cy="155" rx="16" ry="4" fill="#0A1D24" opacity=".3"/>' +
-    '<g class="entry-stride" fill="none" stroke-linecap="round">' +
-    '<path class="entry-leg entry-leg-back" d="M2 127L-4 141L-7 153" stroke="#182E40" stroke-width="7"/>' +
-    '<path class="entry-arm entry-arm-back" d="M0 106L-10 117L-13 128" stroke="#496ABA" stroke-width="6"/>' +
-    '<path class="entry-leg" d="M0 126L7 140L9 153" stroke="#294D5E" stroke-width="7"/>' +
-    '<path d="M0 105L0 126" stroke="#7894DF" stroke-width="17"/>' +
-    '<path class="entry-arm" d="M2 106L12 116L14 126" stroke="#91ADF2" stroke-width="6"/>' +
-    '<path d="M1 95V100" stroke="#D9A17E" stroke-width="6"/>' +
-    '<circle cx="1" cy="87" r="9" fill="#E4B38B"/>' +
-    '<path d="M-7 86Q-9 76 2 76Q12 77 10 86L6 83L-7 84Z" fill="#24313D"/>' +
-    '</g></g>' +
-    '<g class="entry-door"><rect x="174" y="28" width="76" height="124" fill="#208F94" stroke="#1C657B" stroke-width="2"/>' +
-    '<rect x="183" y="39" width="58" height="47" rx="2" fill="#3CAFAD" stroke="#81D4BF"/>' +
-    '<rect x="183" y="108" width="58" height="34" rx="2" fill="#21818B" stroke="#58B8B1"/>' +
-    '<path d="M231 99H240" stroke="#F4D795" stroke-width="3" stroke-linecap="round"/></g>' +
-    '<path d="M172 28V153H251" fill="none" stroke="#F5E6CA" stroke-width="3"/>' +
-    '<rect x="197" y="158" width="52" height="10" rx="3" fill="#10282E" opacity=".65"/>' +
-    '</svg>',
-  'kitchen-fire':
-    '<svg viewBox="0 0 320 180" class="scene scene-fire" aria-hidden="true">' +
-    '<rect width="320" height="180" fill="#F0D1B2"/>' +
-    '<path d="M0 143H320V180H0Z" fill="#C79A78"/>' +
-    '<path d="M0 162H320M57 143L42 180M139 143L133 180M235 143L247 180" stroke="#E8C5A0" stroke-opacity=".35"/>' +
-    '<rect x="23" y="33" width="84" height="62" rx="2" fill="#6FBCDF" stroke="#FFF0D4" stroke-width="3"/>' +
-    '<path d="M65 33V95M23 63H107" stroke="#F7E8CD" stroke-width="3"/>' +
-    '<path d="M30 41H57L30 58ZM72 70H99L72 88Z" fill="#E4F9FF" opacity=".15"/>' +
-    '<rect x="16" y="110" width="292" height="40" rx="2" fill="#287A91"/>' +
-    '<path d="M24 116H87V144H24ZM96 116H163V144H96ZM172 117H197V144H172Z" fill="#429BB0" stroke="#78C7CE"/>' +
-    '<path d="M74 122H79M150 122H155M185 122H190" stroke="#E6C27A" stroke-width="2" stroke-linecap="round"/>' +
-    '<rect x="203" y="111" width="72" height="39" fill="#263C49"/>' +
-    '<rect x="213" y="122" width="52" height="22" rx="2" fill="#102633" stroke="#66808D"/>' +
-    '<path d="M217 127H260" stroke="#92A3A9" stroke-width="2"/>' +
-    '<circle cx="221" cy="116" r="2" fill="#C0C7BE"/><circle cx="237" cy="116" r="2" fill="#C0C7BE"/><circle cx="253" cy="116" r="2" fill="#C0C7BE"/>' +
-    '<rect x="12" y="104" width="300" height="8" rx="2" fill="#EEE4D0"/>' +
-    '<path d="M116 104V91Q116 84 123 84Q130 84 130 91" fill="none" stroke="#B9C9C6" stroke-width="3"/>' +
-    '<ellipse cx="144" cy="106" rx="24" ry="2" fill="#3A5661"/>' +
-    '<g class="fire-glow"><ellipse cx="234" cy="99" rx="78" ry="74" fill="#F98036" opacity=".12"/>' +
-    '<ellipse cx="234" cy="105" rx="46" ry="52" fill="#FFB45C" opacity=".13"/>' +
-    '<ellipse cx="234" cy="159" rx="60" ry="11" fill="#FFAC55" opacity=".18"/></g>' +
-    '<g fill="#746779"><g class="fire-smoke"><circle cx="237" cy="64" r="14" opacity=".23"/><circle cx="224" cy="55" r="18" opacity=".19"/></g>' +
-    '<g class="fire-smoke fire-smoke-late"><circle cx="241" cy="65" r="18" opacity=".2"/><circle cx="224" cy="55" r="15" opacity=".16"/></g></g>' +
-    '<ellipse cx="235" cy="105" rx="32" ry="3" fill="#182A34"/>' +
-    '<path d="M214 96H258L253 108H220Z" fill="#253D4A" stroke="#819096" stroke-width="1.5"/>' +
-    '<path d="M256 97H270" stroke="#667B84" stroke-width="3" stroke-linecap="round"/>' +
-    '<path class="fire-flame fire-outer" d="M216 100C202 87 217 72 215 59C225 64 226 74 228 77C231 61 243 53 239 35C260 54 247 64 252 75C259 72 259 66 259 62C273 82 266 98 254 103Z" fill="#EE6938"/>' +
-    '<path class="fire-flame fire-middle" d="M221 101C212 90 226 82 224 70C232 75 232 82 234 84C243 75 244 62 243 56C257 72 246 79 251 89C258 85 257 80 257 78C264 92 254 103 245 105Z" fill="#FFB74F"/>' +
-    '<path class="fire-flame fire-core" d="M230 103C224 98 231 90 233 84C240 89 235 94 241 96C247 91 246 87 247 85C255 97 247 106 239 107Z" fill="#FFE6A0"/>' +
-    '<g fill="#FFD180"><circle class="fire-ember" cx="229" cy="66" r="1.5"/>' +
-    '<circle class="fire-ember fire-ember-late" cx="252" cy="72" r="1.2"/></g>' +
-    '<ellipse cx="157" cy="21" rx="13" ry="5" fill="#FFF3DB"/>' +
-    '<path d="M150 21H159" stroke="#627F8F" stroke-width="1.5"/>' +
-    '<circle class="fire-alarm" cx="164" cy="21" r="1.8" fill="#FF8658"/>' +
-    '</svg>',
-  'static-noise':
-    '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
-    '<rect width="320" height="180" fill="#182C49"/>' +
-    '<g opacity=".7"><path d="M0 0H46V118H0Z" fill="#DAE4E9"/><path d="M46 0H92V118H46Z" fill="#E2BF58"/>' +
-    '<path d="M92 0H138V118H92Z" fill="#51BCCB"/><path d="M138 0H184V118H138Z" fill="#66BC83"/>' +
-    '<path d="M184 0H230V118H184Z" fill="#B474C9"/><path d="M230 0H276V118H230Z" fill="#D6737E"/>' +
-    '<path d="M276 0H320V118H276Z" fill="#538ECE"/></g>' +
-    '<path d="M0 124H80V144H0Z" fill="#27507D"/><path d="M80 124H160V144H80Z" fill="#BDD5DE"/>' +
-    '<path d="M160 124H240V144H160Z" fill="#725687"/><path d="M240 124H320V144H240Z" fill="#2D3E60"/>' +
-    '<g class="flick" opacity=".32"><path d="M0 12H320V16H0ZM0 90H320V92H0Z" fill="#DCF0FA"/>' +
-    '<path d="M0 52H320V56H0ZM0 132H320V135H0Z" fill="#142640"/>' +
-    '<path d="M0 160H109V162H0Z" fill="#5DBECC"/><path d="M176 160H320V162H176Z" fill="#CD78B4"/></g></svg>'
-};
-
-/* ---------------- board renderer ---------------- */
 function renderBoard(el, d, prefix, skin, protos, backlinks){
   if(el._nodeLinks){el._nodeLinks.destroy();el._nodeLinks=null;}
   var SK = SKINS[skinBase(skin)];
@@ -4257,321 +9620,6 @@ function legendHTML(kinds, anyRet, skin, protos){
 }
 
 /* ---------------- pure widget models (node-testable, no DOM) ---------------- */
-function traceIntervalUnion(intervals){
-  var sorted=intervals.filter(function(v){ return v[1]>v[0]; }).map(function(v){ return v.slice(); })
-    .sort(function(a,b){ return a[0]-b[0] || a[1]-b[1]; }), out=[];
-  sorted.forEach(function(v){
-    var last=out[out.length-1];
-    if (last && v[0]<=last[1]) last[1]=Math.max(last[1],v[1]); else out.push(v);
-  });
-  return out;
-}
-function traceTimingModel(panel,state){
-  var data=tracePanelData(panel);
-  if (data.errors.length) return {errors:data.errors,notices:data.notices};
-  var spans=data.spans.sort(function(a,b){ return a.startMs-b.startMs || (a.id<b.id?-1:a.id>b.id?1:0); });
-  var byId=new Map(), children=new Map();
-  spans.forEach(function(s){ byId.set(s.id,s); });
-  spans.forEach(function(s){ if (!children.has(s.parentId)) children.set(s.parentId,[]); children.get(s.parentId).push(s); });
-  var selected=state && state.selected!=null ? byId.get(state.selected) : spans[0];
-  if (!selected) return {errors:['Selected span is unavailable.'],notices:data.notices};
-  function duration(intervals){ return intervals.reduce(function(sum,v){ return sum+(v[1]-v[0]); },0); }
-  function stats(s){
-    var childSpans=children.get(s.id)||[];
-    var covered=traceIntervalUnion(childSpans.map(function(c){ return [Math.max(s.startMs,c.startMs),Math.min(s.startMs+s.ms,c.startMs+c.ms)]; }));
-    var childMs=Math.min(s.ms,duration(covered));
-    return {span:s,covered:covered,childMs:childMs,uncoveredMs:Math.max(0,s.ms-childMs),children:childSpans};
-  }
-  var serviceSpans=spans.filter(function(s){ return s.service===selected.service; });
-  var serviceIntervals=traceIntervalUnion(serviceSpans.map(function(s){ return [s.startMs,s.startMs+s.ms]; }));
-  var serviceStart=Math.min.apply(null,serviceSpans.map(function(s){ return s.startMs; }));
-  var serviceEnd=Math.max.apply(null,serviceSpans.map(function(s){ return s.startMs+s.ms; }));
-  var rows=[];
-  function visit(s,depth){
-    if (s.service===selected.service){ var row=stats(s); row.depth=depth; rows.push(row); }
-    (children.get(s.id)||[]).forEach(function(c){ visit(c,depth+1); });
-  }
-  spans.filter(function(s){ return !s.parentId || !byId.has(s.parentId); }).forEach(function(s){ visit(s,0); });
-  return {errors:[],notices:data.notices,selected:stats(selected),rows:rows,service:selected.service,
-    serviceStart:serviceStart,serviceEnd:serviceEnd,serviceCoverageMs:duration(serviceIntervals)};
-}
-function tracePanelHTML(panel,state,states){
-  var m=traceTimingModel(panel,state);
-  function ms(n){ return String(Math.round(n*1000)/1000)+' ms'; }
-  if (m.errors.length) return '<div class="tr-time"><b>Timing unavailable</b><p>'+esc(m.errors.join(' · '))+'</p></div>';
-  var s=m.selected, duration=s.span.ms, h='<div class="tr-time">';
-  var serviceSteps=new Map(), spanServices=new Map();
-  panel.spans.forEach(function(span){ spanServices.set(span.id,span.service); });
-  (states||[]).forEach(function(st,i){ var service=st && spanServices.get(st.selected); if (service && !serviceSteps.has(service)) serviceSteps.set(service,i); });
-  if (serviceSteps.size>1){
-    h+='<label class="tr-picker">Inspect service<select data-dv-trace-service aria-label="Inspect service">';
-    serviceSteps.forEach(function(i,service){ h+='<option value="'+i+'"'+(service===m.service?' selected':'')+'>'+esc(service)+'</option>'; });
-    h+='</select></label>';
-  }
-  h+='<div class="tr-service">'+esc(m.service)+'</div><p class="tr-coverage">Service span coverage (union): <b>'+ms(m.serviceCoverageMs)+'</b> · '+m.rows.length+' observed span(s)</p>';
-  h+='<div class="tr-selected"><b>'+esc(s.span.name)+'</b><code>'+esc(s.span.id)+'</code><small>Parent: '+esc(s.span.parentId||'none')+'</small></div>';
-  h+='<dl class="tr-metrics"><div><dt>Inclusive</dt><dd>'+ms(duration)+'</dd></div><div><dt>Child-covered</dt><dd>'+ms(s.childMs)+'</dd></div><div><dt>Uncovered</dt><dd>'+ms(s.uncoveredMs)+'</dd></div></dl>';
-  h+='<div class="tr-interval'+(duration===0?' tr-zero':'')+'" role="img" aria-label="'+esc('Selected span: '+ms(duration)+' inclusive, '+ms(s.childMs)+' child-covered, '+ms(s.uncoveredMs)+' uncovered')+'">';
-  s.covered.forEach(function(v){
-    h+='<span class="tr-covered" style="left:'+((v[0]-s.span.startMs)/duration*100).toFixed(4)+'%;width:'+((v[1]-v[0])/duration*100).toFixed(4)+'%"></span>';
-  });
-  h+='</div><p class="tr-key">'+(duration===0?'Zero-duration span; no wall-time interval.':'<span>Blue: child-covered</span> · <span>Hatched: uncovered</span>')+'</p>';
-  h+='<p class="tr-explain">Direct-child intervals count once where they overlap and are clipped to this span. Uncovered wall time can include local work, waiting, and missing instrumentation; it is not CPU time.</p>';
-  m.notices.forEach(function(n){ h+='<p class="tr-notice">'+esc(n)+'</p>'; });
-  h+='<div class="tr-ophead">Service operations · inclusive / uncovered</div><div class="tr-operations">';
-  m.rows.forEach(function(r){
-    var step=(states||[]).findIndex(function(st){ return st && st.selected===r.span.id; });
-    var extent=m.serviceEnd-m.serviceStart, selected=r.span.id===s.span.id;
-    var description=r.span.name+' · '+r.span.id+' · parent '+(r.span.parentId||'none')+' · +'+ms(r.span.startMs)+' · '+ms(r.span.ms)+' inclusive / '+ms(r.uncoveredMs)+' uncovered'+(r.span.error===true?' · recorded error':'');
-    h+='<'+(step>=0?'button type="button" data-dv-trace-step="'+step+'"':'div')+' class="tr-op'+(selected?' tr-current':'')+'" title="'+esc(description)+'"'+(step>=0?' aria-label="Inspect '+esc(description)+'"':'')+'>';
-    h+='<span class="tr-opname">'+(r.depth?'↳ ':'')+esc(r.span.name)+(r.span.error===true?' · ERROR':'')+'</span><span class="tr-opvalues">'+ms(r.span.ms)+' / '+ms(r.uncoveredMs)+'</span>';
-    h+='<span class="tr-optrack"><span style="left:'+(extent?(r.span.startMs-m.serviceStart)/extent*100:0).toFixed(4)+'%;width:'+(extent?r.span.ms/extent*100:0).toFixed(4)+'%"></span></span>';
-    h+='</'+(step>=0?'button':'div')+'>';
-  });
-  h+='</div><p class="tr-explain">Rows share the service’s +'+ms(m.serviceStart)+' to +'+ms(m.serviceEnd)+' scale. Nested spans overlap; row durations must not be added. The parent ID remains in each row’s tooltip.</p>';
-  if (s.children.length){
-    h+='<details class="tr-children"><summary>'+s.children.length+' direct child span(s)</summary><ul>';
-    s.children.forEach(function(c){ h+='<li>'+esc(c.service+' · '+c.name)+' · '+ms(c.ms)+(c.service===m.service?' · same service':' · other service')+'</li>'; });
-    h+='</ul></details>';
-  }
-  return h+'</div>';
-}
-
-function waterfallModel(spans, state){
-  spans = Array.isArray(spans) ? spans : [];
-  state = state || {};
-  var total = 0, cursor = 0;
-  var timed = spans.some(function(s){ return s && isFiniteNum(s.startMs) && s.startMs >= 0; });
-  var measured = spans.map(function(s){
-    var ms = s && isFiniteNum(s.ms) && s.ms > 0 ? s.ms : 0;
-    var start = s && isFiniteNum(s.startMs) && s.startMs >= 0 ? s.startMs : cursor;
-    cursor = start + ms;
-    total = Math.max(total, cursor);
-    return {ms: ms, start: start};
-  });
-  var reveal = (typeof state.reveal === 'number') ? clamp(state.reveal, 0, spans.length) : spans.length;
-  var shown = 0, rows = [];
-  spans.forEach(function(s, i){
-    var ms = measured[i].ms, off = measured[i].start;
-    var revealed = i < reveal;
-    if (revealed) shown = Math.max(shown, off + ms);
-    rows.push({id: s && s.id, label: (s && (s.label || s.id)) || '', ms: ms,
-               startMs: off, error: !!(s && s.error === true),
-               offsetPct: total ? off / total * 100 : 0,
-               widthPct: total ? ms / total * 100 : 0,
-               revealed: revealed, highlight: !!(s && state.highlight === s.id)});
-  });
-  return {rows: rows, totalMs: total, shownMs: shown, timed: timed,
-          totalLabel: state.total != null ? String(state.total) : shown + ' ms'};
-}
-
-function orbitPositions(n, cx, cy, r){
-  var out = [];
-  for (var i = 0; i < n; i++){
-    var a = -Math.PI / 2 + i * 2 * Math.PI / n;
-    out.push({x: cx + r * Math.cos(a), y: cy + r * Math.sin(a)});
-  }
-  return out;
-}
-
-/* zones/layers patches replace the whole array (fold is a shallow merge);
-   the model joins the declared geometry with the latest state array. */
-function zoneModel(declared, stateZones){
-  var ZKINDS = ['armed','ignored','masked'];
-  var st = {};
-  (Array.isArray(stateZones) ? stateZones : []).forEach(function(z){
-    if (z && z.id) st[z.id] = z.state;
-  });
-  return (Array.isArray(declared) ? declared : []).map(function(z){
-    z = z || {};
-    var s = st[z.id] != null ? st[z.id] : (z.state || 'armed');
-    if (ZKINDS.indexOf(s) < 0) s = 'armed';
-    var zpts = (Array.isArray(z.points) ? z.points : []).filter(function(p){
-      return Array.isArray(p) && typeof p[0] === 'number' && isFinite(p[0]) &&
-             typeof p[1] === 'number' && isFinite(p[1]);
-    });
-    return {id: z.id, label: z.label || z.id || '', state: s, points: zpts};
-  });
-}
-
-function xrayModel(declared, stateLayers){
-  var st = {};
-  (Array.isArray(stateLayers) ? stateLayers : []).forEach(function(l){
-    if (l && l.id) st[l.id] = l.open === true;
-  });
-  return (Array.isArray(declared) ? declared : []).map(function(l){
-    l = l || {};
-    return {id: l.id, label: l.label || l.id || '', holder: l.holder || '',
-            open: st[l.id] === true};
-  });
-}
-
-/* pir line-of-sight widget: a mounted IR/PIR sensor projects a field-of-view
-   cone; a subject dot is tested against it and rendered tripped or clear. Pure
-   model (node-testable, no DOM). Frame is 320x180. `facing` is degrees measured
-   clockwise from +x in screen space (y grows downward): 0=right, 90=down,
-   180=left, 270=up. Containment = within range AND within half the spread of
-   the facing direction. An explicit state.tripped overrides the computation. */
-function pirModel(panel, state){
-  panel = panel || {}; state = state || {};
-  var sensor = panel.sensor && typeof panel.sensor.x === 'number' && typeof panel.sensor.y === 'number'
-    ? {x: panel.sensor.x, y: panel.sensor.y} : {x: 298, y: 78};
-  var cone = panel.cone || {};
-  var facing = typeof cone.facing === 'number' ? cone.facing : 180;
-  var spread = typeof cone.spread === 'number' ? clamp(cone.spread, 4, 340) : 66;
-  var range = typeof cone.range === 'number' && cone.range > 0 ? cone.range : 250;
-  var f = facing * Math.PI / 180;
-  var half = spread / 2 * Math.PI / 180;
-  var N = 16, pts = [[sensor.x, sensor.y]];
-  for (var i = 0; i <= N; i++){
-    var a = f - half + (2 * half) * (i / N);
-    pts.push([sensor.x + range * Math.cos(a), sensor.y + range * Math.sin(a)]);
-  }
-  var subj = state.subject && typeof state.subject.x === 'number' && typeof state.subject.y === 'number'
-    ? {x: state.subject.x, y: state.subject.y} : null;
-  var tripped = false;
-  if (subj){
-    var dx = subj.x - sensor.x, dy = subj.y - sensor.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist === 0){ tripped = true; }
-    else if (dist <= range){
-      var diff = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - f), Math.cos(Math.atan2(dy, dx) - f)));
-      if (diff <= half) tripped = true;
-    }
-  }
-  if (state.tripped === true) tripped = true;
-  if (state.tripped === false) tripped = false;
-  return {sensor: sensor, cone: {facing: facing, spread: spread, range: range},
-          conePoints: pts, subject: subj, tripped: tripped,
-          path: (function(){
-            var pp = (Array.isArray(panel.path) ? panel.path : []).filter(function(p){
-              return Array.isArray(p) && typeof p[0] === 'number' && isFinite(p[0]) &&
-                     typeof p[1] === 'number' && isFinite(p[1]);
-            });
-            return pp.length >= 2 ? pp : null;
-          })(),
-          banner: state.banner != null ? String(state.banner) : '',
-          status: state.status != null ? String(state.status) : null};
-}
-
-/* thermo widget: a device temperature readout against warning / critical
-   shutdown thresholds. Pure model (node-testable, no DOM). The engine COMPUTES
-   the zone (ok / warn / crit) from the value and the declared thresholds
-   rather than trusting the author to assert it; `state.label` overrides only
-   the zone-chip caption. A missing value renders as a dash (zone 'na').
-   Reversed warn/crit are swapped (the validator warns). */
-var THERMO_ZONE_LABELS = {ok: 'NOMINAL', warn: 'WARNING', crit: 'CRITICAL', 'cold-warn':'COLD WARNING', 'cold-crit':'TOO COLD', na: 'NO DATA'};
-function thermoModel(panel, state){
-  panel = panel || {}; state = state || {};
-  /* finite-only: JSON overflow literals (1e400) parse to Infinity, which is
-     typeof 'number' but would poison every percentage into NaN and emit
-     invalid SVG/CSS attribute values — treat non-finite as absent */
-  function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
-  var limits = thermoLimits(panel), min = limits.min, max = limits.max;
-  var warn = limits.warn, crit = limits.crit, lowWarn = limits.lowWarn, lowCrit = limits.lowCrit;
-  var value = fin(state.value);
-  var zone = 'na';
-  if (value != null){
-    zone = 'ok';
-    if (lowWarn != null && value <= lowWarn) zone = 'cold-warn';
-    if (lowCrit != null && value <= lowCrit) zone = 'cold-crit';
-    if (warn != null && value >= warn) zone = 'warn';
-    if (crit != null && value >= crit) zone = 'crit';
-  }
-  function pct(v){ return clamp((v - min) / (max - min) * 100, 0, 100); }
-  return {value: value, min: min, max: max, warn: warn, crit: crit, lowWarn:lowWarn, lowCrit:lowCrit, zone: zone,
-          unit: panel.unit != null ? String(panel.unit) : '°C',
-          pct: value != null ? pct(value) : 0,
-          warnPct: warn != null ? pct(warn) : null,
-          critPct: crit != null ? pct(crit) : null,
-          lowWarnPct: lowWarn != null ? pct(lowWarn) : null,
-          lowCritPct: lowCrit != null ? pct(lowCrit) : null,
-          label: state.label != null ? String(state.label) : THERMO_ZONE_LABELS[zone]};
-}
-
-/* battery widget: charge level where LOW is bad — the inverse of thermo's
-   zones. Pure model (node-testable). The engine COMPUTES the zone (ok / low /
-   crit, both thresholds inclusive at-or-below) from the charge and the
-   declared thresholds; `state.label` overrides only the zone-chip caption.
-   Non-finite numbers (JSON 1e400 → Infinity) are treated as absent. Charge
-   is a percentage, clamped to 0–100. Reversed thresholds (crit > low) are
-   swapped (the validator warns). */
-var BATTERY_ZONE_LABELS = {ok: 'NOMINAL', low: 'LOW', crit: 'CRITICAL', na: 'NO DATA'};
-var BATTERY_SOURCES = ['solar', 'wired', 'poe', 'cells'];
-var BATTERY_TRENDS = ['charging', 'draining', 'idle'];
-function batteryModel(panel, state){
-  panel = panel || {}; state = state || {};
-  function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
-  var low = fin(panel.low) != null ? clamp(panel.low, 0, 100) : null;
-  var crit = fin(panel.crit) != null ? clamp(panel.crit, 0, 100) : null;
-  if (low != null && crit != null && crit > low){ var sw = low; low = crit; crit = sw; }
-  var charge = fin(state.charge) != null ? clamp(state.charge, 0, 100) : null;
-  var zone = 'na';
-  if (charge != null){
-    zone = 'ok';
-    if (low != null && charge <= low) zone = 'low';
-    if (crit != null && charge <= crit) zone = 'crit';
-  }
-  var trend = BATTERY_TRENDS.indexOf(state.trend) >= 0 ? state.trend : null;
-  var source = BATTERY_SOURCES.indexOf(state.source) >= 0 ? state.source : null;
-  return {charge: charge, low: low, crit: crit, zone: zone,
-          trend: trend, source: source, cold: state.cold === true,
-          note: state.note != null ? String(state.note) : '',
-          label: state.label != null ? String(state.label) : BATTERY_ZONE_LABELS[zone]};
-}
-
-/* tiles widget: a device-fleet grid — one named tile per device/cohort with
-   a state chip and an optional sub-line. Pure model (node-testable). Tiles
-   and the state vocabulary (states + colors, like the state widget) are
-   DECLARED once; each step patches per tile id (like leds/signal): a patch
-   replaces that tile's whole `{state, sub}` status. A state not in the
-   declared list renders the tile dimmed with '—' (validator warns). */
-function tilesModel(panel, state){
-  panel = panel || {}; state = state || {};
-  var vocab = Array.isArray(panel.states) ? panel.states.map(String) : [];
-  var colors = panel.colors || {};
-  return (Array.isArray(panel.tiles) ? panel.tiles : []).slice(0, 12).map(function(t){
-    t = t || {};
-    var st = (t.id && state[t.id] && typeof state[t.id] === 'object') ? state[t.id] : {};
-    var sname = st.state != null ? String(st.state) : null;
-    var known = sname != null && (vocab.length === 0 || vocab.indexOf(sname) >= 0);
-    return {id: t.id, label: t.label || t.id || '',
-            state: known ? sname : null,
-            color: known && isHex(colors[sname]) ? colors[sname] : null,
-            sub: st.sub != null ? String(st.sub) : ''};
-  }).filter(function(t){ return t.id; });
-}
-
-/* signal widget: link health for 1–6 named radio/wired links. Pure model
-   (node-testable). Links are DECLARED once (id, label, transport tag); each
-   step patches per link id, like the leds widget: a patch value replaces that
-   link's whole status object `{state, bars, note}`. Unknown state tokens fall
-   back to 'ok' (validator warns); bars 0–4 or null (chip-only). */
-var SIGNAL_STATES = ['ok','weak','retrying','lost','jammed'];
-var SIGNAL_TRANSPORTS = ['wifi','subghz','thread','zigbee','zwave','cellular','poe','ethernet','ble'];
-function signalModel(panel, state){
-  panel = panel || {}; state = state || {};
-  function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
-  return (Array.isArray(panel.links) ? panel.links : []).slice(0, 6).map(function(l){
-    l = l || {};
-    var st = (l.id && state[l.id] && typeof state[l.id] === 'object') ? state[l.id] : {};
-    var s = SIGNAL_STATES.indexOf(st.state) >= 0 ? st.state : 'ok';
-    var bars = fin(st.bars) != null ? Math.round(clamp(st.bars, 0, 4)) : null;
-    return {id: l.id, label: l.label || l.id || '',
-            transport: SIGNAL_TRANSPORTS.indexOf(l.transport) >= 0 ? l.transport : null,
-            state: s, bars: bars,
-            note: st.note != null ? String(st.note) : ''};
-  }).filter(function(l){ return l.id; });
-}
-
-/* radar widget: a top-down range view — concentric distance rings inside a
-   wedge, an alert-threshold arc, named zone polygons, and a subject whose
-   distance is measured. Pure model (node-testable). The engine COMPUTES:
-   the subject's distance from the sensor, whether it is inside the alert
-   threshold (state.alert overrides), and which zones contain it
-   (point-in-polygon). The track drawn across steps is render-level (from the
-   folded state history), not part of this model. Frame is 320x180, y down;
-   `facing`/`spread` follow the pir convention (degrees clockwise from +x). */
 function pointInPoly(x, y, points){
   var inside = false;
   for (var i = 0, j = points.length - 1; i < points.length; j = i++){
@@ -4584,742 +9632,6 @@ function pointInPoly(x, y, points){
 /* Whole-home geometry is bounded before any value reaches SVG. */
 /* Specs remain in the 320×180 authoring frame. The taller display spreads
    positions vertically, while device/person glyphs and labels keep their shape. */
-var HOMEMAP_DISPLAY_HEIGHT = 216;
-var HOMEMAP_Y_SCALE = HOMEMAP_DISPLAY_HEIGHT / 180;
-function homemapPointFromDisplay(point){
-  return {x:Math.round(clamp(point.x, 0, 320)), y:Math.round(clamp(point.y / HOMEMAP_Y_SCALE, 0, 180))};
-}
-function homemapModel(panel, state){
-  panel = panel || {}; state = state || {};
-  function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
-  var box = panel.outline || {};
-  var w = fin(box.w) != null ? clamp(box.w, 20, 320) : 300;
-  var h = fin(box.h) != null ? clamp(box.h, 20, 180) : 160;
-  var ox = fin(box.x) != null ? clamp(box.x, 0, 320 - w) : (320 - w) / 2;
-  var oy = fin(box.y) != null ? clamp(box.y, 0, 180 - h) : (180 - h) / 2;
-  var byId = Object.create(null), seen = Object.create(null), devices = [];
-  (Array.isArray(panel.devices) ? panel.devices : []).forEach(function(d){
-    if (!d || typeof d.id !== 'string' || seen[d.id]) return;
-    seen[d.id] = true;
-    if (!homemapDeviceValid(d)) return;
-    var vocab = HOMEMAP_STATES[d.kind];
-    var x = clamp(d.x, 0, 320), y = clamp(d.y, 0, 180);
-    var floorDoor = d.kind === 'entry' && d.display === 'door';
-    var devicePatch = Object.prototype.hasOwnProperty.call(state, d.id) ? state[d.id] : undefined;
-    var operating = panelObject(devicePatch) ? devicePatch.state : devicePatch;
-    var facing = fin(d.facing) != null ? d.facing : floorDoor ? 0 : Math.atan2(90 - y, 160 - x) * 180 / Math.PI;
-    var item = {id: d.id, kind: d.kind, label: String(d.label != null ? d.label : d.id),
-      x: x, y: y, state: vocab.indexOf(operating) >= 0 ? operating : vocab[0],
-      thermal: panelObject(devicePatch) && HOMEMAP_THERMAL.indexOf(devicePatch.thermal) >= 0 ? devicePatch.thermal : 'normal',
-      icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
-      facing: ((facing % 360) + 360) % 360,
-      spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
-      range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70};
-    if (floorDoor){
-      item.display = 'door';
-      item.doorWidth = fin(d.doorWidth) != null ? clamp(d.doorWidth, 8, 48) : 24;
-      item.doorSwing = fin(d.doorSwing) != null && Math.abs(d.doorSwing) >= 15 && Math.abs(d.doorSwing) <= 135 ? d.doorSwing : 90;
-    }
-    byId[d.id] = item; devices.push(item);
-  });
-  var subjects = homemapSubjects(panel).map(function(sub){
-    var value = Object.prototype.hasOwnProperty.call(state, sub.id) ? state[sub.id] : undefined;
-    var position = homemapSubjectPosition(value) ? value : sub;
-    return {id: sub.id, label: String(sub.label != null ? sub.label : sub.id),
-      icon: sub.icon === undefined ? null : (ICON_SET.indexOf(sub.icon) >= 0 ? sub.icon : 'gear'),
-      x: clamp(position.x, 0, 320), y: clamp(position.y, 0, 180), hidden: value === null};
-  });
-  var signals = [];
-  (Array.isArray(state.signals) ? state.signals : []).forEach(function(sig){
-    if (!sig || Array.isArray(sig) || typeof sig.from !== 'string' || typeof sig.to !== 'string') return;
-    var from = byId[sig.from], to = byId[sig.to];
-    if (from && to) signals.push({from: sig.from, to: sig.to,
-      fromXY: {x: from.x, y: from.y}, toXY: {x: to.x, y: to.y}});
-  });
-  return {outline: {x: ox, y: oy, w: w, h: h}, devices: devices, subjects: subjects, signals: signals};
-}
-
-/* Room lighting is a view of the authored scene, not a simulated sensor or
-   containment rule. The highest visible device state wins, then occupancy. */
-function homemapRoomModel(panel, model){
-  return homemapRooms(panel).map(function(room){
-    function inside(item){
-      var house = model.outline;
-      if (room.kind === 'outdoor' && item.x > house.x && item.x < house.x + house.w &&
-          item.y > house.y && item.y < house.y + house.h) return false;
-      return item.x >= room.x && item.y >= room.y &&
-        (item.x < room.x + room.w || (item.x === 320 && room.x + room.w === 320)) &&
-        (item.y < room.y + room.h || (item.y === 180 && room.y + room.h === 180));
-    }
-    var devices = model.devices.filter(inside);
-    var occupied = model.subjects.some(function(s){ return !s.hidden && inside(s); });
-    var tone = devices.some(function(d){ return d.state === 'alert' || d.state === 'detect'; }) ? 'alert' :
-      devices.some(function(d){ return d.state === 'warn'; }) ? 'warn' : occupied ? 'occupied' : 'quiet';
-    return {room:room, tone:tone};
-  });
-}
-
-function homemapThermalHTML(d, scaleY, clearing){
-  var thermal = clearing || d.thermal;
-  if (!thermal || thermal === 'normal') return '';
-  var cold = thermal === 'cold' || thermal === 'freezing';
-  var s = '<g class="hmthermal thermal-' + thermal + (clearing ? ' thermal-clearing' : '') +
-    '" data-home-thermal="' + esc(d.id) + '" data-thermal="' + esc(d.thermal) + '" transform="translate(' + d.x + ' ' + (d.y * scaleY) + ')">' +
-    '<title>' + esc(d.label + ': ' + (clearing ? 'temperature returning to normal' : thermal)) + '</title>' +
-    '<circle class="thermal-halo" r="20"/><circle class="thermal-rim" r="12"/>';
-  if (cold){
-    for (var i = 0; i < 6; i++) s += '<path class="thermal-frost" transform="rotate(' + (i * 60) + ')" d="M0 -11 V-19 M-3 -16 L0 -13 L3 -16"/>';
-    s += '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><path d="M0 -4 V4 M-3.5 -2 L3.5 2 M-3.5 2 L3.5 -2"/></g>';
-  } else {
-    [-8,0,8].forEach(function(x,i){ s += '<path class="thermal-wave" style="animation-delay:-' + (i * .65) + 's" d="M' + x + ' -13 C' + (x-5) + ' -18 ' + (x+5) + ' -21 ' + x + ' -27"/>'; });
-    s += '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><use href="#i-thermo" x="-5" y="-5" width="10" height="10"/></g>';
-  }
-  return s + '</g>';
-}
-function homemapDoorHTML(d, transition, outline, clearing){
-  var w = d.doorWidth, angle = d.doorSwing * Math.PI / 180;
-  var endX = (w * Math.cos(angle)).toFixed(3), endY = (w * Math.sin(angle)).toFixed(3);
-  var body = '<g class="hmdev hm-entry hm-' + esc(d.state) + ' hm-floor-door" data-device="' + esc(d.id) + '">' +
-    '<title>' + esc(d.label) + ': ' + esc(d.state) + '</title>' + homemapThermalHTML(d, HOMEMAP_Y_SCALE, clearing) +
-    '<g transform="translate(' + d.x + ' ' + (d.y * HOMEMAP_Y_SCALE) + ') scale(1 ' + HOMEMAP_Y_SCALE + ') rotate(' + d.facing + ')">' +
-    '<path class="hm-door-threshold" d="M-1 0 H' + (w + 1) + '"/>' +
-    '<path class="hm-door-hit" d="M0 0 H' + w + ' M' + w + ' 0 A' + w + ' ' + w + ' 0 0 ' + (d.doorSwing > 0 ? 1 : 0) + ' ' + endX + ' ' + endY + '"/>' +
-    '<path class="hm-door-arc" d="M' + w + ' 0 A' + w + ' ' + w + ' 0 0 ' + (d.doorSwing > 0 ? 1 : 0) + ' ' + endX + ' ' + endY + '"/>' +
-    '<g class="hm-floor-leaf' + (transition ? ' hm-floor-' + transition : '') + '" style="--hm-door-angle:' + d.doorSwing + 'deg">' +
-    '<path d="M0 0 H' + w + '"/><circle class="hm-door-handle" cx="' + (w - 4) + '" cy="-2" r="1"/></g>' +
-    '<path class="hm-door-jamb" d="M0 -3 V3 M' + w + ' -3 V3"/><circle class="hm-door-hinge" r="1.8"/></g>';
-  var labelX = d.x, labelY = d.y > 139 ? d.y * HOMEMAP_Y_SCALE - 14 : d.y * HOMEMAP_Y_SCALE + 16;
-  var direction = d.facing * Math.PI / 180;
-  if (outline && Math.abs(Math.cos(direction)) > .7){
-    labelX += w * Math.cos(direction) / 2;
-    labelY = (d.y + w * Math.sin(direction) / 2) * HOMEMAP_Y_SCALE + (d.y < outline.y + outline.h / 2 ? -14 : 14);
-  }
-  return body + '<text class="hmlbl" x="' + clamp(labelX, 28, 292) + '" y="' + clamp(labelY, 10, HOMEMAP_DISPLAY_HEIGHT - 5) + '" text-anchor="middle">' + esc(d.label) + '</text></g>';
-}
-
-function radarModel(panel, state){
-  panel = panel || {}; state = state || {};
-  function fin(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
-  var sensor = (panel.sensor && fin(panel.sensor.x) != null && fin(panel.sensor.y) != null)
-    ? {x: panel.sensor.x, y: panel.sensor.y} : {x: 160, y: 168};
-  var facing = fin(panel.facing) != null ? panel.facing : 270;
-  var spread = fin(panel.spread) != null ? clamp(panel.spread, 10, 360) : 120;
-  /* POLAR AUTHORING LAYER: with `scale: {pxPerUnit, unit}` declared, authors
-     write real units everywhere — `range`, `threshold`, and a `rings` ARRAY
-     are unit distances; a zone may be an annular sector {r:[r0,r1],
-     deg:[d0,d1]}; a subject may be {r, deg} (degrees in the same clockwise-
-     from-+x convention). Everything converts to frame pixels HERE; the rest
-     of the model and the renderer stay Cartesian. Without `scale`, all
-     numbers are frame pixels and subjects/zones are Cartesian, as before. */
-  var ppu = (panel.scale && fin(panel.scale.pxPerUnit) != null && panel.scale.pxPerUnit > 0)
-    ? panel.scale.pxPerUnit : null;
-  var toPx = function(v){ return ppu != null ? v * ppu : v; };
-  var fromPolar = function(r, deg){
-    var a = deg * Math.PI / 180;
-    return {x: sensor.x + toPx(r) * Math.cos(a), y: sensor.y + toPx(r) * Math.sin(a)};
-  };
-  var range = fin(panel.range) != null && panel.range > 0 ? toPx(panel.range) : 150;
-  var ringRadii = null, rings = 3;
-  if (Array.isArray(panel.rings)){
-    ringRadii = panel.rings.map(fin).filter(function(v){ return v != null && v > 0; })
-      .map(toPx).filter(function(v){ return v <= range + 0.5; })
-      .map(function(v){ return Math.round(v * 10) / 10; });
-    rings = ringRadii.length || 3;
-    if (!ringRadii.length) ringRadii = null;
-  } else if (fin(panel.rings) != null){
-    rings = Math.round(clamp(panel.rings, 1, 6));
-  }
-  var threshold = fin(panel.threshold) != null && panel.threshold > 0
-    ? Math.min(toPx(panel.threshold), range) : null;
-  /* a step may re-tune the alert line: state.threshold (same units as the
-     declaration) overrides it for that step onward via normal folding */
-  if (fin(state.threshold) != null && state.threshold > 0)
-    threshold = Math.min(toPx(state.threshold), range);
-  var zones = (Array.isArray(panel.zones) ? panel.zones : []).map(function(z){
-    z = z || {};
-    var pts = Array.isArray(z.points) ? z.points : [];
-    /* annular sector → sampled polygon (inner arc out, outer arc back) */
-    if (!pts.length && Array.isArray(z.r) && z.r.length === 2 &&
-        Array.isArray(z.deg) && z.deg.length === 2 &&
-        fin(z.r[0]) != null && fin(z.r[1]) != null && z.r[0] >= 0 && z.r[1] > z.r[0] &&
-        fin(z.deg[0]) != null && fin(z.deg[1]) != null){
-      /* wrapped sectors take the natural short way round ([350,10] spans 20°,
-         not 340°); sampling adapts to the span (≈15° chords) so wide sectors
-         keep the arc tight enough for correct point-in-polygon occupancy */
-      /* span is the clockwise travel from d0 to d1, normalized into (0,360]:
-         [350,10] → 20°, and a full-turn writing ([0,360], [360,0], [10,-350])
-         → 360°. Only literally equal endpoints are degenerate (skipped; the
-         validator warns). */
-      var d0 = z.deg[0], d1 = z.deg[1];
-      var span = ((d1 - d0) % 360 + 360) % 360;
-      if (span === 0){
-        if (d0 === d1) return {id: z.id, label: z.label || z.id || '', points: []};
-        span = 360;
-      }
-      var N = Math.max(6, Math.ceil(span / 15));
-      pts = [];
-      for (var zi = 0; zi <= N; zi++){
-        var p1 = fromPolar(z.r[0], d0 + span * zi / N);
-        pts.push([p1.x, p1.y]);
-      }
-      for (var zj = N; zj >= 0; zj--){
-        var p2 = fromPolar(z.r[1], d0 + span * zj / N);
-        pts.push([p2.x, p2.y]);
-      }
-      pts = pts.map(function(p){ return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]; });
-    }
-    /* numeric-only points: author data goes straight into SVG attributes, so
-       anything non-finite is dropped here (attribute injection impossible) */
-    pts = pts.filter(function(p){
-      return Array.isArray(p) && fin(p[0]) != null && fin(p[1]) != null;
-    }).map(function(p){ return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]; });
-    return {id: z.id, label: z.label || z.id || '', points: pts};
-  }).filter(function(z){ return z.id && z.points.length >= 3; });
-  var subj = null;
-  if (state.subject && fin(state.subject.x) != null && fin(state.subject.y) != null)
-    subj = {x: state.subject.x, y: state.subject.y};
-  else if (state.subject && fin(state.subject.r) != null && fin(state.subject.deg) != null){
-    var sp = fromPolar(state.subject.r, state.subject.deg);
-    subj = {x: Math.round(sp.x * 10) / 10, y: Math.round(sp.y * 10) / 10};
-  }
-  var dist = null, alert = false, occupied = [];
-  if (subj){
-    var dx = subj.x - sensor.x, dy = subj.y - sensor.y;
-    dist = Math.sqrt(dx * dx + dy * dy);
-    if (threshold != null && dist <= threshold) alert = true;
-    zones.forEach(function(z){
-      if (pointInPoly(subj.x, subj.y, z.points)) occupied.push(z.id);
-    });
-  }
-  if (state.alert === true) alert = true;
-  if (state.alert === false) alert = false;
-  return {sensor: sensor, facing: facing, spread: spread, range: range,
-          rings: rings, ringRadii: ringRadii, threshold: threshold, zones: zones,
-          subject: subj, dist: dist, alert: alert, occupied: occupied,
-          banner: state.banner != null ? String(state.banner) : '',
-          status: state.status != null ? String(state.status) : null};
-}
-
-/* buffer widget: a segmented buffer strip — pre-roll rings, store-and-forward
-   queues, storage rotation. Pure model (node-testable). The author declares
-   the segment count once and patches a `cells` array of state tokens per step
-   (REPLACES wholesale, like zones); missing tail cells are `empty`, unknown
-   tokens fall back to `empty` (validator warns). `head` marks the write
-   position. The footer summary (counts per state) is COMPUTED. */
-var BUFFER_CELL_STATES = ['empty','buffered','protected','uploading','uploaded','dropped'];
-function bufferModel(panel, state){
-  panel = panel || {}; state = state || {};
-  var n = (typeof panel.segments === 'number' && isFinite(panel.segments))
-    ? Math.round(clamp(panel.segments, 2, 48)) : 12;
-  /* mark: cumulative inclusive range paints [[i0,i1,"state"],...] applied
-     over the cells base in order (shared bufferPaint helper — the fold
-     compactor uses the same function, so a compacted story renders
-     identically to an uncompacted one). */
-  var cells = bufferPaint(n, state.cells, state.mark);
-  var head = (typeof state.head === 'number' && isFinite(state.head) &&
-              state.head >= 0 && state.head < n) ? Math.round(state.head) : null;
-  var counts = {};
-  cells.forEach(function(c){ counts[c] = (counts[c] || 0) + 1; });
-  var parts = [];
-  BUFFER_CELL_STATES.forEach(function(sname){
-    if (sname !== 'empty' && counts[sname]) parts.push(counts[sname] + ' ' + sname);
-  });
-  return {n: n, cells: cells, head: head, counts: counts,
-          capacity: panel.capacity != null ? String(panel.capacity) : '',
-          note: state.note != null ? String(state.note)
-                : (state.label != null ? String(state.label) : ''),
-          summary: parts.length ? parts.join(' · ') : 'empty'};
-}
-
-/* inflight widget: operations/messages as bars on one shared step axis.
-   foldInflightStates (validator.js) supplies complete history snapshots;
-   this pure model vets that snapshot for the HTML renderer. */
-/* timeline: wall-clock axis over a declared span with periodic cadence
-   beats and event dots; steps sweep a `now` cursor and append events.
-   Pure model (node-testable, no DOM). */
-function timelineLabelRows(events){
-  /* deterministic label collision layout: labels go on row 0, overflow
-     to row 1, and drop to hover-title-only (labelRow null) when both
-     rows are occupied at that x. Widths are estimated from the 8.5px
-     mono glyphs; x positions mirror the renderer's clamp. */
-  var charW = 5.1;
-  var ends = [-Infinity, -Infinity];
-  events.forEach(function(e){
-    if (!e.label){ e.labelRow = null; return; }
-    /* the estimate and the drawing must agree: long labels TRUNCATE to
-       what the estimate measures (the hover title keeps the full text) */
-    e.labelText = e.label.length > 22 ? e.label.slice(0, 21) + '\u2026' : e.label;
-    var x = Math.min(Math.max(6 + e.pct / 100 * 308, 16), 304);
-    var half = e.labelText.length * charW / 2;
-    var xs = x - half, xe = x + half;
-    if (xs >= ends[0] + 4){ e.labelRow = 0; ends[0] = xe; }
-    else if (xs >= ends[1] + 4){ e.labelRow = 1; ends[1] = xe; }
-    else e.labelRow = null;
-  });
-  return events;
-}
-/* cadence lanes: several periodic processes on ONE wall-clock axis,
-   each lane rendered in a density REGIME chosen by its beat count over
-   the span — individual dots, a true-spacing tick comb, a solid band,
-   or an empty row with a "next in …" promise. The regime is the
-   orders-of-magnitude contrast. Pure model. */
-var TL_DOT_MAX = 32;   /* beats drawable as individual dots on the track */
-var TL_COMB_MAX = 120; /* beats drawable as a legible tick comb */
-function timelineLanesModel(panel, state){
-  panel = panel || {}; state = state || {};
-  var span = parseClock(panel.span);
-  if (span == null || span <= 0) span = 3600;
-  if (span > TIMELINE_MAX_SPAN) span = TIMELINE_MAX_SPAN;
-  var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
-  var unit = units[units.length - 1];
-  for (var i = 0; i < units.length; i++){
-    if (span / units[i] <= 8){ unit = units[i]; break; }
-  }
-  var ticks = [];
-  for (var ts = 0; ts <= span + 1e-6 && ticks.length <= 12; ts += unit)
-    ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
-  var nowS = parseClock(state.now);
-  var now = null;
-  if (nowS != null){
-    var nc = Math.min(Math.max(nowS, 0), span);
-    now = {s: nc, pct: nc / span * 100, label: formatClock(nc)};
-  }
-  function normList(list){
-    var out = [];
-    (Array.isArray(list) ? list : []).forEach(function(e){
-      if (!e) return;
-      var at = parseClock(e.at);
-      if (at == null) return;
-      var s = Math.min(Math.max(at, 0), span);
-      out.push({s: s, pct: s / span * 100,
-                lane: e.lane != null ? String(e.lane) : null,
-                label: e.label != null ? String(e.label) : '',
-                kind: ['ok', 'alert', 'info'].indexOf(e.kind) >= 0 ? e.kind : 'info'});
-    });
-    return out;
-  }
-  var allEvents = normList(panel.events).concat(normList(state.events));
-  var misses = normList(state.miss);
-  var seen = Object.create(null);
-  var lanes = [];
-  ((Array.isArray(panel.lanes)) ? panel.lanes : []).forEach(function(l){
-    if (lanes.length >= 4) return;
-    if (!l || typeof l !== 'object' || l.id == null) return;
-    var id = String(l.id);
-    if (seen[id]) return;
-    var every = parseClock(l.every);
-    if (every == null || every <= 0) return;
-    seen[id] = true;
-    var count = Math.floor((span + 1e-6) / every);
-    var regime = count < 1 ? 'sparse' : count <= TL_DOT_MAX ? 'dots' :
-                 count <= TL_COMB_MAX ? 'comb' : 'band';
-    var beats = [];
-    if (regime === 'dots'){
-      for (var b = every; b <= span + 1e-6; b += every)
-        beats.push({s: b, pct: b / span * 100, past: !!(now && b <= now.s + 1e-6)});
-    }
-    var badge;
-    if (regime === 'sparse'){
-      if (now){
-        var nextAt = (Math.floor((now.s + 1e-6) / every) + 1) * every;
-        badge = 'next in ' + formatClock(nextAt - now.s) + ' \u25b8';
-      } else badge = 'every ' + formatClock(every);
-    } else badge = count + '\u00d7';
-    lanes.push({id: id,
-                label: l.label != null ? String(l.label) : id,
-                every: every, everyLabel: formatClock(every),
-                regime: regime, count: count, beats: beats,
-                spacingPct: every / span * 100,
-                badge: badge,
-                misses: misses.filter(function(m){ return m.lane === id; }),
-                events: allEvents.filter(function(e){ return e.lane === id; })});
-  });
-  return {span: span, spanLabel: formatClock(span), ticks: ticks, now: now,
-          lanes: lanes,
-          axisEvents: allEvents.filter(function(e){ return e.lane == null || !seen[e.lane]; })};
-}
-
-function timelineModel(panel, state){
-  panel = panel || {}; state = state || {};
-  var span = parseClock(panel.span);
-  if (span == null || span <= 0) span = 3600;
-  if (span > TIMELINE_MAX_SPAN) span = TIMELINE_MAX_SPAN; /* validator warns */
-  /* tick unit: coarsest table entry giving at most 8 intervals; the top
-     entry (1d) covers the clamped 7d maximum within the bound */
-  var units = [60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
-  var unit = units[units.length - 1];
-  for (var i = 0; i < units.length; i++){
-    if (span / units[i] <= 8){ unit = units[i]; break; }
-  }
-  var ticks = [];
-  for (var ts = 0; ts <= span + 1e-6 && ticks.length <= 12; ts += unit)
-    ticks.push({s: ts, pct: ts / span * 100, label: formatClock(ts)});
-  var every = panel.cadence ? parseClock(panel.cadence.every) : null;
-  var beats = [], beatsOmitted = 0;
-  if (every != null && every > 0){
-    var beatCount = Math.floor((span + 1e-6) / every);
-    if (beatCount > TIMELINE_MAX_BEATS){
-      /* sub-pixel soup — draw none, report the count instead of
-         silently truncating the cadence */
-      beatsOmitted = beatCount;
-    } else {
-      for (var b = every; b <= span + 1e-6; b += every)
-        beats.push({s: b, pct: b / span * 100});
-    }
-  }
-  function norm(list){
-    var out = [];
-    (Array.isArray(list) ? list : []).forEach(function(e){
-      if (!e) return;
-      var at = parseClock(e.at);
-      if (at == null) return;
-      var s = Math.min(Math.max(at, 0), span);
-      out.push({s: s, pct: s / span * 100,
-                label: e.label != null ? String(e.label) : '',
-                kind: ['ok', 'alert', 'info'].indexOf(e.kind) >= 0 ? e.kind : 'info'});
-    });
-    return out;
-  }
-  var events = norm(panel.events).concat(norm(state.events));
-  events.sort(function(a, b){ return a.s - b.s; });
-  timelineLabelRows(events);
-  var nowS = parseClock(state.now);
-  var now = null;
-  if (nowS != null){
-    var c = Math.min(Math.max(nowS, 0), span);
-    now = {s: c, pct: c / span * 100, label: formatClock(c)};
-  }
-  /* detail window: the cadence interval containing `now`, magnified so
-     events BETWEEN two long-running beats spread out legibly. Derived —
-     no spec field. Absent without a cadence or a cursor. */
-  var detail = null;
-  if (every != null && every > 0 && now){
-    var k = Math.floor((now.s + 1e-6) / every);
-    var dStart = k * every;
-    if (dStart >= span) dStart = Math.max(span - every, 0);
-    var dEnd = Math.min(dStart + every, span);
-    if (dEnd > dStart){
-      var dLen = dEnd - dStart;
-      var dEvents = [];
-      events.forEach(function(e){
-        if (e.s >= dStart - 1e-6 && e.s <= dEnd + 1e-6)
-          dEvents.push({s: e.s, pct: (e.s - dStart) / dLen * 100, label: e.label, kind: e.kind});
-      });
-      timelineLabelRows(dEvents);
-      var dUnits = [1, 5, 10, 30, 60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200];
-      var dUnit = dUnits[dUnits.length - 1];
-      for (var di = 0; di < dUnits.length; di++){
-        if (dLen / dUnits[di] <= 6){ dUnit = dUnits[di]; break; }
-      }
-      var dTicks = [];
-      for (var dts = Math.ceil((dStart + 1e-6) / dUnit) * dUnit;
-           dts < dEnd - 1e-6 && dTicks.length <= 8; dts += dUnit)
-        dTicks.push({s: dts, pct: (dts - dStart) / dLen * 100});
-      detail = {start: dStart, end: dEnd,
-                startLabel: formatClock(dStart), endLabel: formatClock(dEnd),
-                startPct: dStart / span * 100, endPct: dEnd / span * 100,
-                ticks: dTicks, events: dEvents,
-                nowPct: Math.min(Math.max((now.s - dStart) / dLen * 100, 0), 100),
-                startPast: now.s >= dStart - 1e-6, endPast: now.s >= dEnd - 1e-6};
-    }
-  }
-  return {span: span, spanLabel: formatClock(span), unit: unit, ticks: ticks,
-          beats: beats, beatsOmitted: beatsOmitted, every: every, events: events, now: now,
-          detail: detail,
-          cadenceLabel: panel.cadence && panel.cadence.label != null ? String(panel.cadence.label) : ''};
-}
-
-function inflightModel(panel, state, stepCount, currentStep){
-  panel = panel || {}; state = state || {};
-  var seen = {};
-  var lanes = (Array.isArray(panel.lanes) ? panel.lanes : []).slice(0, 8).map(function(l){
-    if (!l || !l.id || seen[l.id]) return null;
-    seen[l.id] = true;
-    return {id:String(l.id), label:l.label != null ? String(l.label) : String(l.id), bars:[]};
-  }).filter(Boolean);
-  var byId = {};
-  lanes.forEach(function(l){ byId[l.id] = l; });
-  var n = typeof stepCount === 'number' && isFinite(stepCount) ? Math.max(0, Math.round(stepCount)) :
-          (typeof state.stepCount === 'number' ? Math.max(0, Math.round(state.stepCount)) : 0);
-  var cur = typeof currentStep === 'number' && isFinite(currentStep) ? Math.round(currentStep) :
-            (typeof state.currentStep === 'number' ? Math.round(state.currentStep) : 0);
-  if (n) cur = clamp(cur, 0, n - 1); else cur = 0;
-  (Array.isArray(state.bars) ? state.bars : []).forEach(function(b){
-    if (!b || !byId[b.lane] || !validRevealIndex(b.start)) return;
-    var end = validRevealIndex(b.end) ? b.end : null;
-    var st = INFLIGHT_STATES.indexOf(b.state) >= 0 ? b.state : 'ok';
-    byId[b.lane].bars.push({lane:b.lane, label:b.label != null ? String(b.label) : '',
-      start:b.start, end:end, state:st, open:end == null});
-  });
-  return {lanes:lanes, stepCount:n, currentStep:cur};
-}
-
-function inflightPanelHTML(panel, state, stepCount, currentStep){
-  var m = inflightModel(panel, state, stepCount, currentStep);
-  if (!m.lanes.length) return '<div class="ifempty">no lanes</div>';
-  var n = Math.max(1, m.stepCount);
-  var h = '<div class="ifbox"><div class="ifaxis"><span class="ifaxislabel">step</span><span class="ifticks">';
-  for (var i = 0; i < m.stepCount; i++){
-    h += '<span class="iftick' + (i === m.currentStep ? ' cur' : '') + '" style="left:' +
-         ((i + 0.5) / n * 100).toFixed(3) + '%">' + i + '</span>';
-  }
-  h += '</span></div>';
-  m.lanes.forEach(function(lane){
-    h += '<div class="ifrow"><span class="iflabel" title="' + esc(lane.label) + '">' + esc(lane.label) +
-         '</span><span class="iftrack">';
-    if (m.stepCount) h += '<i class="ifnow" style="left:' + (m.currentStep / n * 100).toFixed(3) +
-      '%;width:' + (100 / n).toFixed(3) + '%"></i>';
-    for (var gi = 1; gi < n; gi++) h += '<i class="ifgrid" style="left:' + (gi / n * 100).toFixed(3) + '%"></i>';
-    lane.bars.forEach(function(bar){
-      var last = bar.open ? m.currentStep : bar.end;
-      last = Math.max(bar.start, Math.min(n - 1, last));
-      var left = bar.start / n * 100;
-      var width = (last - bar.start + 1) / n * 100;
-      h += '<b class="ifbar s-' + bar.state + (bar.open ? ' open' : '') + '" style="left:' +
-           left.toFixed(3) + '%;width:' + width.toFixed(3) + '%" title="' + esc(bar.label || lane.label) +
-           ' · steps ' + bar.start + (bar.open ? '+' : '–' + bar.end) + '">' + esc(bar.label) + '</b>';
-    });
-    h += '</span></div>';
-  });
-  return h + '</div>';
-}
-
-/* Stable presentation keys and target widths for inflight bars. These frames
-   are never folded back into state; they only let a rebuilt bar begin at its
-   previous painted width during an adjacent transition. */
-function inflightBarFrames(model){
-  var frames = [], seen = {}, n = Math.max(1, model.stepCount);
-  model.lanes.forEach(function(lane){
-    lane.bars.forEach(function(bar){
-      var base = lane.id + '\n' + bar.start + '\n' + bar.label;
-      var ordinal = seen[base] || 0;
-      seen[base] = ordinal + 1;
-      var last = bar.open ? model.currentStep : bar.end;
-      last = Math.max(bar.start, Math.min(n - 1, last));
-      frames.push({key:base + '\n' + ordinal,
-        width:(last - bar.start + 1) / n * 100});
-    });
-  });
-  return frames;
-}
-
-/* phone widget: a generic handset lock screen backed by the absolute unread
-   stack produced by foldPhoneStates. The model keeps the full count for the
-   computed badge while exposing only the three cards that can fit. */
-function phoneBrand(panel){
-  var brand = panel && panel.brand;
-  if (!phoneBrandIsPlainObject(brand)) return null;
-  var out = {};
-  if (typeof brand.app === 'string') out.app = brand.app;
-  if (typeof brand.logo === 'string' && brand.logo.length >= 1 && brand.logo.length <= 4)
-    out.logo = brand.logo;
-  /* These values enter an inline style: accept only literal hex colors. */
-  ['accent', 'bg', 'fg'].forEach(function(k){
-    if (typeof brand[k] === 'string' && (brand[k].length === 4 || brand[k].length === 7) &&
-        /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k]))
-      out[k] = brand[k];
-  });
-  return Object.keys(out).length ? out : null;
-}
-
-function phoneModel(panelOrState, stepsOrState, currentStep){
-  var state;
-  /* Public fold form: phoneModel(panel, diagramSteps, targetIndex). This is
-     useful to callers/tests that need the complete target state without
-     first reaching through foldPanelStates. Omit targetIndex for the end. */
-  if (Array.isArray(stepsOrState)){
-    var folded = foldPhoneStates(panelOrState || {}, stepsOrState);
-    var target = typeof currentStep === 'number' && isFinite(currentStep) ? Math.round(currentStep) : folded.length - 1;
-    state = folded[clamp(target, 0, folded.length - 1)] || {};
-  } else if (stepsOrState && typeof stepsOrState === 'object' && !Array.isArray(stepsOrState)){
-    /* Conventional widget-model form: phoneModel(panel, absoluteState). */
-    state = stepsOrState;
-  } else {
-    /* Compact renderer form: phoneModel(absoluteState). */
-    state = panelOrState || {};
-  }
-  var notifications = (Array.isArray(state.notifications) ? state.notifications : []).map(function(n){
-    if (!n || typeof n !== 'object' || Array.isArray(n) || typeof n.app !== 'string' || !n.app) return null;
-    return {app:n.app,
-      title:typeof n.title === 'string' ? n.title : '',
-      text:typeof n.text === 'string' ? n.text : ''};
-  }).filter(Boolean);
-  return {
-    clock:typeof state.clock === 'string' ? state.clock : '',
-    notifications:notifications,
-    cards:notifications.slice(0, 3),
-    count:notifications.length,
-    badge:notifications.length,
-    overflow:Math.max(0, notifications.length - 3),
-    added:typeof state._phoneAdded === 'number' ? Math.max(0, Math.round(state._phoneAdded)) : 0
-  };
-}
-
-function phonePanelHTML(panel, state, fresh){
-  panel = panel || {};
-  var m = phoneModel(panel, state);
-  var brand = phoneBrand(panel);
-  var styles = [];
-  if (brand){
-    if (brand.accent) styles.push('--phacc:' + brand.accent);
-    if (brand.bg) styles.push('--phbg:' + brand.bg);
-    if (brand.fg) styles.push('--phfg:' + brand.fg);
-  }
-  var label = m.count ? 'Phone with ' + m.count + ' unread notification' + (m.count === 1 ? '' : 's') :
-    'Phone with no notifications';
-  if (brand && brand.app) label = brand.app + ' phone' + label.slice(5);
-  var h = '<div class="phoneframe"' + (styles.length ? ' style="' + styles.join(';') + '"' : '') +
-    ' role="img" aria-label="' + esc(label) + '">' +
-    '<span class="phonespeaker" aria-hidden="true"></span>' +
-    '<div class="phonestatus"><span class="phoneclock">' + esc(m.clock) + '</span>' +
-    '<span class="phoneglyphs" aria-hidden="true"><span class="phonesignal"><i></i><i></i><i></i></span>' +
-    '<span class="phonebattery"><i></i></span></span></div>';
-  if (brand && (brand.app || brand.logo))
-    h += '<div class="phonebrand">' +
-      (brand.logo ? '<span class="phonelogo" aria-hidden="true">' + esc(brand.logo) + '</span>' : '') +
-      (brand.app ? '<span class="phonebrandname">' + esc(brand.app) + '</span>' : '') + '</div>';
-  if (m.count)
-    h += '<span class="phonebadge" aria-hidden="true">' + m.badge + '</span>';
-  h += '<div class="phonecards">';
-  if (!m.cards.length){
-    h += '<div class="phoneempty">no notifications</div>';
-  } else {
-    m.cards.forEach(function(card, i){
-      h += '<div class="phonecard' + (fresh && i === 0 ? ' fresh' : '') + '">' +
-        '<div class="phoneapp" title="' + esc(card.app) + '">' + esc(card.app) + '</div>' +
-        (card.title ? '<div class="phonetitle" title="' + esc(card.title) + '">' + esc(card.title) + '</div>' : '') +
-        (card.text ? '<div class="phonetext" title="' + esc(card.text) + '">' + esc(card.text) + '</div>' : '') +
-        '</div>';
-    });
-  }
-  h += '</div>';
-  if (m.overflow) h += '<div class="phoneoverflow">+' + m.overflow + ' more</div>';
-  return h + '<span class="phonehome" aria-hidden="true"></span></div>';
-}
-
-/* Camera-details UI with field-level provenance. Everything is authored data;
-   even endpoint labels are inert text. Source selection is local viewer state. */
-function deviceAppModel(panel,state){
-  panel=panel || {};state=state || {};
-  var str=function(v,fallback){return typeof v==='string'?v:(fallback || '');};
-  var palette=['#5865d8','#168878','#bd6716','#a354b5','#287fbe','#b95164'];
-  var sources=deviceAppItems(panel,'sources').map(function(s,i){return {
-    id:s.id,label:str(s.label,s.id),letter:String.fromCharCode(65+i),
-    color:typeof s.color==='string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(s.color)?s.color:palette[i],
-    node:str(s.node),endpoint:str(s.endpoint),detail:str(s.detail)
-  };});
-  var fields=deviceAppItems(panel,'fields').map(function(f){
-    var v=panelObject(state[f.id])?state[f.id]:{},battery=f.kind==='battery';
-    var source=sources.find(function(s){return s.id===(v.source==null?f.source:v.source);});
-    var valid=v.value!=null && (typeof v.value==='string' || isFiniteNum(v.value) || typeof v.value==='boolean');
-    if(battery)valid=isFiniteNum(v.value) && v.value>=0 && v.value<=100;
-    return {id:f.id,label:str(f.label,f.id),source:source || null,battery:battery,
-      icon:ICON_SET.indexOf(f.icon)>=0?f.icon:null,value:valid?String(v.value)+(battery?'%':str(f.unit)): '—',
-      pct:battery && valid?v.value:0,status:DEVICEAPP_STATUSES.indexOf(v.status)>=0?v.status:'unknown',
-      detail:str(v.detail),updated:Array.isArray(state._updated) && state._updated.indexOf(f.id)>=0};
-  });
-  return {device:str(panel.device,'Camera'),subtitle:str(panel.subtitle,'Device health'),clock:str(state.clock,'9:41'),note:str(state.note),sources:sources,fields:fields};
-}
-function deviceAppPanelHTML(panel,state,fresh){
-  var m=deviceAppModel(panel,state),labels={unknown:'No data',loading:'Loading',ready:'Current',stale:'Cached',error:'Unavailable'};
-  function badge(s){return '<span class="da-badge" aria-hidden="true">'+(s?s.letter:'?')+'</span>';}
-  function props(s){return ' data-da-source="'+esc(s?s.id:'')+'" style="--da-color:'+(s?s.color:'#78808d')+'"';}
-  var h='<div class="deviceapp"><div class="da-phone"><div class="da-statusbar"><span>'+esc(m.clock)+'</span><span aria-hidden="true">▂▄▆ · ▰</span></div>'+
-    '<div class="da-heading"><span class="da-eyebrow">CAMERA DETAILS</span><h3>'+esc(m.device)+'</h3><span>'+esc(m.subtitle)+'</span></div><div class="da-fields">';
-  m.fields.forEach(function(f){
-    h+='<button type="button" class="da-field da-'+f.status+(f.updated?' da-updated':'')+(fresh && f.updated?' fresh':'')+'" data-da-field="'+esc(f.id)+'"'+props(f.source)+' aria-pressed="false" aria-label="'+esc(f.label+': '+f.value+'. '+labels[f.status]+'. Source: '+(f.source?f.source.label:'Unmapped'))+'">'+
-      '<span class="da-field-top"><span>'+esc(f.label)+'</span>'+badge(f.source)+'</span>'+
-      '<span class="da-value">'+(f.icon?'<svg class="da-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-'+f.icon+'"/></svg>':'')+esc(f.value)+'</span>'+
-      (f.battery?'<span class="da-meter" aria-hidden="true"><i style="width:'+f.pct+'%"></i></span>':'')+
-      '<span class="da-meta"><span class="da-state">'+labels[f.status]+'</span>'+(f.updated?'<span class="da-update-label">Updated</span>':'')+'</span>'+
-      (f.detail?'<span class="da-detail">'+esc(f.detail)+'</span>':'')+'</button>';
-  });
-  h+='</div><div class="da-home" aria-hidden="true"></div></div><div class="da-provenance"><div class="da-eyebrow">WHERE THE DATA COMES FROM</div>'+
-    '<h3>One screen. Multiple sources.</h3><p class="da-help">Select a field or source to trace its data'+(m.sources.some(function(s){return s.node;})?' and highlight its service in the diagram':'')+'.</p><div class="da-sources">';
-  m.sources.forEach(function(s){
-    var fields=m.fields.filter(function(f){return f.source && f.source.id===s.id;});
-    h+='<button type="button" class="da-source"'+props(s)+' aria-pressed="false"><span class="da-source-title">'+badge(s)+'<strong>'+esc(s.label)+'</strong></span>'+
-      (s.endpoint?'<code>'+esc(s.endpoint)+'</code>':'')+(s.detail?'<span class="da-detail">'+esc(s.detail)+'</span>':'')+
-      '<span class="da-source-fields">'+esc(fields.length?fields.map(function(f){return f.label+' · '+labels[f.status];}).join(' / '):'No fields in this step')+'</span></button>';
-  });
-  return h+'</div>'+(m.note?'<p class="da-note">'+esc(m.note)+'</p>':'')+'</div></div>';
-}
-function bindDeviceAppSources(host,panel,state){
-  if(typeof host.querySelectorAll!=='function')return;
-  if(host._daClear)host._daClear();
-  var nodes=[],m=deviceAppModel(panel,state);
-  var buttons=Array.from(host.querySelectorAll('[data-da-source]'));
-  function clearNodes(){nodes.forEach(function(n){if(n._daOwners){n._daOwners.delete(host);if(!n._daOwners.size)n.classList.remove('da-node-focus');}});nodes=[];}
-  host._daClear=clearNodes;
-  function select(id){
-    clearNodes();host._daSource=id;
-    buttons.forEach(function(b){var on=!!id && b.getAttribute('data-da-source')===id;b.setAttribute('aria-pressed',String(on));});
-    var source=m.sources.find(function(s){return s.id===id;});
-    var section=host.closest && host.closest('.doc-sec');
-    if(section && source && source.node)Array.from(section.querySelectorAll('[data-dv-node]')).forEach(function(n){
-      if(n.getAttribute('data-dv-node')!==source.node)return;
-      if(!n._daOwners)n._daOwners=new Set();n._daOwners.add(host);n.classList.add('da-node-focus');nodes.push(n);
-    });
-  }
-  buttons.forEach(function(b){b.addEventListener('click',function(){var id=b.getAttribute('data-da-source');select(host._daSource===id?null:id);});});
-  select(host._daSource);
-}
-
-/* queue widget: mailbox — a message enqueued, held, dequeued. Pure model +
-   markup builder so node tests cover them without a DOM. Directional context:
-   `from` shows during enqueue (arrival side), `to` during dequeue (departure
-   side), `reason` while held (the waiting-on line). Carried like any patch
-   field; only the state-relevant one renders. Non-strings are ignored (the
-   validator warns). */
-function queueModel(state){
-  state = state || {};
-  var s = QUEUE_STATES.indexOf(String(state.state)) >= 0 ? String(state.state) : 'empty';
-  function str(v){ return typeof v === 'string' ? v : ''; }
-  return {state: s, label: state.label != null ? String(state.label) : '',
-          from: str(state.from), to: str(state.to), reason: str(state.reason)};
-}
-
-function queuePanelHTML(panel, state){
-  var qm = queueModel(state);
-  var h = '<div class="qbox s-' + qm.state + '">';
-  h += '<div class="qtrack">';
-  h += '<span class="qarr qarr-in" aria-hidden="true">&#8594;</span>';
-  h += '<div class="qslot">';
-  if (qm.state === 'empty') h += '<span class="qempty">empty</span>';
-  else h += '<span class="qmsg">' + esc(qm.label || 'message') + '</span>';
-  h += '</div>';
-  h += '<span class="qarr qarr-out" aria-hidden="true">&#8594;</span>';
-  h += '</div>';
-  /* directional context row: arrival label on the in-side during enqueue,
-     departure label on the out-side during dequeue. Both spans are ALWAYS
-     emitted (populated only in the relevant state) so the row reserves a
-     fixed height and the panel never changes size between steps — otherwise
-     the panel column and the step bar below it reflow. Static text, so it is
-     reduced-motion safe. */
-  var ctxIn = (qm.state === 'enqueue') ? esc(qm.from) : '';
-  var ctxOut = (qm.state === 'dequeue') ? esc(qm.to) : '';
-  h += '<div class="qctx"><span class="qside qside-in">' + ctxIn + '</span>' +
-       '<span class="qside qside-out">' + ctxOut + '</span></div>';
-  h += '<div class="qstatecap">' + qm.state + '</div>';
-  /* waiting-on line, shown while held; container always emitted (empty
-     otherwise) and clamped to a fixed height so its length cannot reflow. */
-  var reason = (qm.state === 'held') ? esc(qm.reason) : '';
-  h += '<div class="qreason">' + reason + '</div>';
-  h += '</div>';
-  return h;
-}
-
-/* inline markup: a small, safe subset for prose. The whole string is ESCAPED
-   FIRST, then a fixed set of substitutions is applied, so labels/URLs are
-   always HTML-safe and only http/https links are ever emitted (never
-   javascript:/data:). Supported:
-     [label](https://url)  ->  underlined anchor
-     **bold**              ->  <strong>
-     *italic*              ->  <em>   (single star; snake_case is untouched
-                                       because italics use * not _)
-     `code`                ->  <code>
-   Plain prose with none of these is simply escaped, so this is a drop-in
-   replacement for esc() in prose contexts. */
 function inlineMarkup(s){
   var e = esc(s);
   e = e.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(m, label, url){
@@ -5422,1339 +9734,14 @@ function contractCardHTML(contract, sectionReference){
   return h;
 }
 
-var ZF_SEQ = 0;
 
 /* ---------------- software state panels ---------------- */
-function replicaModel(panel,state){
-  state = panelObject(state) ? state : {};
-  var ref = replicaCursor(state.reference), unit = replicaSeries(panel.unit) || 'positions';
-  var rows = replicaPanelItems(panel).map(function(r){
-    var s = panelOwn(state.replicas,r.id) && panelObject(state.replicas[r.id]) ? state.replicas[r.id] : {};
-    var cur = replicaCursor(s), delta = ref && cur && ref.series === cur.series ? cur.position-ref.position : null;
-    return {id:r.id, label:typeof r.label === 'string' ? r.label : r.id,
-      position:replicaPosition(s.position), series:replicaSeries(s.series),
-      role:typeof s.role === 'string' ? s.role : '', observedAt:typeof s.observedAt === 'string' ? s.observedAt : '',
-      status:REPLICA_STATUSES.indexOf(s.status) >= 0 ? s.status : 'unknown',
-      lagMs:isFiniteNum(s.lagMs) && s.lagMs >= 0 ? s.lagMs : null,
-      delta:delta, comparison:delta !== null ? (delta === 0 ? 'equal' : delta < 0 ? 'behind' : 'ahead') :
-        !cur ? 'unknown' : !ref ? 'no-reference' : 'different-series'};
-  });
-  var comparable = rows.filter(function(r){ return r.delta !== null; });
-  var positions = comparable.map(function(r){ return r.position; });
-  if (ref) positions.push(ref.position);
-  var min = positions.length ? Math.min.apply(null,positions) : null;
-  var max = positions.length ? Math.max.apply(null,positions) : null;
-  function pct(value){ return min === max ? 50 : (value-min)/(max-min)*100; }
-  rows.forEach(function(r){ r.pct = r.delta !== null ? pct(r.position) : null; });
-  return {reference:ref, rows:rows, comparable:comparable.length, min:min, max:max,
-    referencePct:ref ? pct(ref.position) : null, unit:unit, note:typeof state.note === 'string' ? state.note : ''};
-}
-function replicaPanelHTML(panel,state){
-  var m = replicaModel(panel,state), ref = m.reference;
-  var h = '<div class="replicas-view"><div class="rep-reference"><b>'+
-    (ref ? 'Reference '+esc(String(ref.position))+' '+esc(m.unit) : 'Reference unavailable')+'</b>'+
-    (ref ? '<div>Sequence: '+esc(ref.series)+'</div>' : '<div>A position and sequence identity are required.</div>')+'</div>';
-  if (ref) h += '<div class="rep-scale">Position window: '+esc(String(m.min))+' – '+esc(String(m.max))+
-    ' '+esc(m.unit)+' · dashed marker = reference</div>';
-  h += '<div class="rep-list" tabindex="0" role="region" aria-label="Replica observations">';
-  m.rows.forEach(function(r){
-    var comparison = r.comparison === 'equal' ? 'At reference' : r.delta !== null ? Math.abs(r.delta)+' '+m.unit+' '+r.comparison :
-      r.comparison === 'different-series' ? 'Different sequence · not compared' : r.comparison === 'no-reference' ? 'No reference · not compared' : 'Position or sequence unknown';
-    h += '<div class="rep-row"><div class="rep-head"><b>'+esc(r.label)+'</b><span class="rep-status">'+esc(r.status)+'</span></div>'+
-      (r.role ? '<div class="rep-role">'+esc(r.role)+'</div>' : '')+
-      '<div class="rep-value">Position '+(r.position === null ? 'unknown' : esc(String(r.position)))+'</div>'+
-      '<div class="rep-series">Sequence: '+(r.series === null ? 'unknown' : esc(r.series))+'</div>'+
-      '<div class="rep-track" aria-hidden="true">'+(ref ? '<i class="rep-reference-mark" style="left:'+m.referencePct+'%"></i>' : '')+
-      (r.pct !== null ? '<i class="rep-position-mark" style="left:'+r.pct+'%"></i>' : '')+'</div>'+
-      '<div class="rep-comparison">'+esc(comparison)+'</div><div class="rep-lag">Reported lag: '+
-      (r.lagMs === null ? 'unknown' : esc(String(r.lagMs))+' ms')+'</div><div class="rep-observed">Observed: '+
-      (r.observedAt ? esc(r.observedAt) : 'time unknown')+'</div></div>';
-  });
-  if (!m.rows.length) h += '<div class="swempty">No replicas declared</div>';
-  h += '</div><p class="rep-note">'+m.comparable+' / '+m.rows.length+' positions comparable. Position equality does not prove availability, commit, or read safety. Lag is supplied separately; it is not a catch-up estimate.</p>';
-  if (m.note) h += '<p class="rep-note">'+esc(m.note)+'</p>';
-  return h+'</div>';
-}
-function tableModel(panel, state){
-  state = state || {};
-  var columns = softwarePanelItems(panel), seen = Object.create(null);
-  var rows = (Array.isArray(state.rows) ? state.rows : []).slice(0, 12).filter(function(row){
-    if (!panelObject(row) || typeof row.id !== 'string' || !row.id || seen[row.id]) return false;
-    seen[row.id] = true;
-    return true;
-  }).map(function(row){
-    return {id: row.id, status: TABLE_STATUSES.indexOf(row.status) >= 0 ? row.status : 'neutral',
-      cells: columns.map(function(col){
-        if (!panelOwn(row.cells, col.id)) return '—';
-        var v = row.cells[col.id];
-        if (v === null) return 'null';
-        return typeof v === 'object' ? JSON.stringify(v) : String(v);
-      })};
-  });
-  return {columns: columns, rows: rows};
-}
-function checksModel(panel, state){
-  state = state || {};
-  return softwarePanelItems(panel).map(function(check){
-    var result = panelOwn(state.results, check.id) && panelObject(state.results[check.id])
-      ? state.results[check.id] : {};
-    return {id: check.id, label: check.label || check.id,
-      status: CHECK_STATUSES.indexOf(result.status) >= 0 ? result.status : 'pending',
-      detail: result.detail == null ? '' : String(result.detail)};
-  });
-}
-function budgetModel(panel, state){
-  state = state || {};
-  return softwarePanelItems(panel).map(function(metric){
-    var raw = panelOwn(state.values, metric.id) ? state.values[metric.id] : null;
-    var value = isFiniteNum(raw) && raw >= 0 ? raw : null;
-    var max = isFiniteNum(metric.max) && metric.max > 0 ? metric.max : null;
-    var warn = max !== null && isFiniteNum(metric.warn) && metric.warn >= 0 && metric.warn <= max ? metric.warn : null;
-    var status = value === null ? 'unknown' : max === null ? 'unbounded' :
-      value > max ? 'over' : value === max ? 'limit' : warn !== null && value >= warn ? 'warn' : 'ok';
-    return {id: metric.id, label: metric.label || metric.id, unit: metric.unit || '',
-      value: value, max: max, warn: warn, status: status,
-      pct: value !== null && max !== null ? Math.min(value / max, 1) * 100 : 0,
-      remaining: value !== null && max !== null ? max - value : null};
-  });
-}
-function softwarePanelHTML(panel, state){
-  state = state || {};
-  var h = '<div class="swpanel">';
-  if (panel.type === 'table'){
-    var table = tableModel(panel, state);
-    h += '<div class="swtablewrap" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Data state') + '">' +
-      '<table class="swtable"><caption class="swcaption">' + esc(panel.title || 'Data state') + '</caption><thead><tr>';
-    table.columns.forEach(function(col){ h += '<th scope="col">' + esc(col.label || col.id) + '</th>'; });
-    h += '<th scope="col">Change</th></tr></thead><tbody>';
-    table.rows.forEach(function(row){
-      h += '<tr class="swrow-' + row.status + '">';
-      row.cells.forEach(function(cell){ h += '<td>' + esc(cell) + '</td>'; });
-      h += '<td><span class="swbadge sw-' + row.status + '">' +
-        (row.status === 'neutral' ? '—' : row.status) + '</span></td></tr>';
-    });
-    if (!table.rows.length) h += '<tr><td colspan="' + (table.columns.length + 1) + '" class="swempty">No rows at this step</td></tr>';
-    h += '</tbody></table></div>';
-  } else if (panel.type === 'checks'){
-    var checks = checksModel(panel, state), passed = checks.filter(function(c){ return c.status === 'pass'; }).length;
-    h += '<div class="swsummary">' + passed + ' / ' + checks.length + ' passed <span>Authored outcomes</span></div><ul class="swchecks">';
-    checks.forEach(function(check){
-      h += '<li><div class="swcheckhead"><span>' + esc(check.label) + '</span>' +
-        '<span class="swbadge sw-' + check.status + '">' + check.status + '</span></div>' +
-        (check.detail ? '<div class="swdetail">' + esc(check.detail) + '</div>' : '') + '</li>';
-    });
-    h += '</ul>';
-    if (!checks.length) h += '<div class="swempty">No checks declared</div>';
-  } else if (panel.type === 'budget'){
-    var metrics = budgetModel(panel, state);
-    var labels = {unknown:'NO DATA', unbounded:'NO LIMIT', over:'OVER LIMIT', limit:'AT LIMIT', warn:'NEAR LIMIT', ok:'WITHIN LIMIT'};
-    metrics.forEach(function(metric){
-      var tone = metric.status === 'over' ? 'fail' : ['warn','limit'].indexOf(metric.status) >= 0 ? 'warn' :
-        metric.status === 'ok' ? 'pass' : 'pending';
-      h += '<div class="swmetric"><div class="swcheckhead"><span>' + esc(metric.label) + '</span>' +
-        '<span class="swbadge sw-' + tone + '">' + labels[metric.status] + '</span></div>' +
-        '<div class="swmeasure"><strong>' + (metric.value === null ? '—' : esc(String(metric.value))) + '</strong>' +
-        ' / ' + (metric.max === null ? '—' : esc(String(metric.max))) + ' ' + esc(metric.unit) + '</div>';
-      if (metric.value !== null && metric.max !== null){
-        h += '<div class="swtrack" role="img" aria-label="' + esc(metric.label + ': ' + metric.value + ' of ' + metric.max + ' ' + metric.unit + ', ' + labels[metric.status]) + '">' +
-          '<div class="swfill sw-' + tone + '" style="width:' + metric.pct.toFixed(2) + '%"></div>';
-        if (metric.warn !== null) h += '<span class="swthreshold" style="left:' + (metric.warn / metric.max * 100).toFixed(2) + '%" title="Warning at ' + esc(String(metric.warn)) + '"></span>';
-        h += '</div><div class="swdetail">' + esc(String(Number(Math.abs(metric.remaining).toPrecision(6)))) +
-          ' ' + esc(metric.unit) + (metric.remaining < 0 ? ' over budget' : ' remaining') + '</div>';
-      }
-      h += '</div>';
-    });
-    if (!metrics.length) h += '<div class="swempty">No budgets declared</div>';
-  }
-  if (state.note) h += '<div class="swnote">' + esc(String(state.note)) + '</div>';
-  return h + '</div>';
-}
-
 /* ---------------- inspector panel widgets ----------------
    Each widget renders ABSOLUTE state (from foldPanelStates) — no deltas, so
    any step jump is consistent. renderPanelBody rebuilds the widget's DOM.
    `states`/`stepIdx` (optional) are the panel's FULL folded per-step state
    array and the current index — the thermo sparkline plots the whole series
    and reveals it up to the current step. */
-function renderPanelBody(host, panel, state, skin, states, stepIdx, animatePresentation){
-  var type = PANEL_TYPES.indexOf(panel.type) >= 0 ? panel.type : null;
-  var h = '';
-  /* All panel motion consumes an already-folded target state. The previous
-     DOM/value is used only as a visual starting point and never feeds state. */
-  var animate = animatePresentation !== false && !RM;
-  var pulseSelector = null, pulseChanged = false;
-  var waterfallEntrants = null;
-  var inflightFramesNow = null, inflightFramesPrev = null;
-  /* when a branch emits one-shot transient markup (pir's fresh/ghost/trail/
-     ripple/glide), it sets hBaseline to the steady-state form of the SAME
-     render; that is what gets stored for the unchanged-markup comparison so
-     the following identical step skips the rebuild */
-  var hBaseline = null;
-  state = state || {};
-  if (type === 'trace'){
-    h = tracePanelHTML(panel,state,states);
-  } else if (type === 'replicas'){
-    h = replicaPanelHTML(panel,state);
-  } else if (['table','checks','budget'].indexOf(type) >= 0){
-    h = softwarePanelHTML(panel, state);
-  } else if (type === 'image'){
-    var imageSrc = embeddedImageSource(panel.src);
-    h = '<figure class="pimage">';
-    if (imageSrc) h += '<img src="' + esc(imageSrc) + '" alt="' + esc(panel.alt || '') + '" decoding="async">';
-    else h += '<div class="pimage-empty">Add an embedded PNG, JPEG or WebP image</div>';
-    if (panel.caption) h += '<figcaption>' + esc(panel.caption) + '</figcaption>';
-    var imageLink = typeof FlowCanon !== 'undefined' && FlowCanon.http(panel.link);
-    if (imageLink) h += '<a class="pimage-link" href="' + esc(imageLink) + '" target="_blank" rel="noopener noreferrer">Open reference ↗</a>';
-    h += '</figure>';
-  } else if (type === 'state'){
-    var cur = state.state != null ? String(state.state) : '—';
-    pulseSelector = '.pchip.cur';
-    pulseChanged = Object.prototype.hasOwnProperty.call(host, '_stateCur') && host._stateCur !== cur;
-    host._stateCur = cur;
-    var colors = panel.colors || {};
-    var col = isHex(colors[cur]) ? colors[cur] : null;
-    h += '<div class="preadout"' + (col ? ' style="color:' + col + '"' : '') + '>' + esc(cur) + '</div>';
-    h += '<div class="prail">';
-    (panel.states || []).forEach(function(st){
-      h += '<span class="pchip' + (st === cur ? ' cur' : '') + '">' + esc(st) + '</span>';
-    });
-    h += '</div>';
-  } else if (type === 'leds'){
-    h += '<div class="ledrow">';
-    (panel.leds || []).forEach(function(l){
-      var mode = String(state[l.id] || 'off');
-      if (['on','off','tx','rx'].indexOf(mode) < 0) mode = 'off';
-      h += '<span class="led"><span class="leddot ' + mode + '"></span>' + esc(l.label || l.id) + '</span>';
-    });
-    h += '</div>';
-  } else if (type === 'gauge'){
-    var v = typeof state.value === 'number' ? state.value : 0;
-    var max = typeof panel.max === 'number' && panel.max > 0 ? panel.max : 100;
-    var pct = clamp(v / max * 100, 0, 100);
-    h += '<div class="gaugeval">' + esc(String(v)) + (panel.unit ? ' <span class="gaugeunit">' + esc(panel.unit) + '</span>' : '') + '</div>';
-    h += '<div class="gaugebar"><div class="gaugefill" style="width:' + pct.toFixed(1) + '%"></div></div>';
-  } else if (type === 'thermo'){
-    var tm = thermoModel(panel, state);
-    var idx = typeof stepIdx === 'number' ? stepIdx : 0;
-    var tv = tm.value != null ? String(Math.round(tm.value * 10) / 10) : null;
-    h += '<div class="thhead"><div class="thval z-' + tm.zone + '">' +
-         (tv != null ? esc(tv) : '&#8212;') + '<span class="thunit">' + esc(tm.unit) + '</span></div>' +
-         '<span class="thzone z-' + tm.zone + '">' + esc(tm.label) + '</span></div>';
-    /* threshold track: shaded warn/crit bands under the value fill, threshold
-       ticks over it, numeric scale beneath */
-    h += '<div class="thbar">';
-    if (tm.lowWarnPct != null || tm.lowCritPct != null){
-      var safeStart = tm.lowWarnPct != null ? tm.lowWarnPct : tm.lowCritPct;
-      var safeEnd = tm.warnPct != null ? tm.warnPct : tm.critPct != null ? tm.critPct : 100;
-      h += '<span class="thband safe" style="left:' + safeStart.toFixed(1) + '%;width:' + (safeEnd-safeStart).toFixed(1) + '%"></span>';
-    }
-    if (tm.lowWarnPct != null) h += '<span class="thband cold-warn" style="left:' + (tm.lowCritPct || 0).toFixed(1) + '%;width:' + (tm.lowWarnPct-(tm.lowCritPct || 0)).toFixed(1) + '%"></span>';
-    if (tm.lowCritPct != null) h += '<span class="thband cold-crit" style="left:0;width:' + tm.lowCritPct.toFixed(1) + '%"></span>';
-    if (tm.warnPct != null)
-      h += '<span class="thband warn" style="left:' + tm.warnPct.toFixed(1) + '%;width:' +
-           ((tm.critPct != null ? tm.critPct : 100) - tm.warnPct).toFixed(1) + '%"></span>';
-    if (tm.critPct != null)
-      h += '<span class="thband crit" style="left:' + tm.critPct.toFixed(1) + '%;width:' +
-           (100 - tm.critPct).toFixed(1) + '%"></span>';
-    if (tm.value != null)
-      h += '<span class="thfill z-' + tm.zone + '" style="width:' + tm.pct.toFixed(1) + '%"></span>';
-    if (tm.warnPct != null) h += '<span class="thtick warn" style="left:' + tm.warnPct.toFixed(1) + '%"></span>';
-    if (tm.critPct != null) h += '<span class="thtick crit" style="left:' + tm.critPct.toFixed(1) + '%"></span>';
-    ['lowWarn','lowCrit'].forEach(function(key){
-      if (tm[key] != null) h += '<span class="thtick ' + (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') + '" style="left:' + tm[key+'Pct'].toFixed(1) + '%" title="' + (key === 'lowWarn' ? 'Cold warning' : 'Cold critical') + ': ' + esc(String(tm[key]) + tm.unit) + '"></span>';
-    });
-    h += '</div>';
-    h += '<div class="thscale"><span class="lo">' + esc(String(tm.min)) + '</span>';
-    if (tm.warn != null) h += '<span class="warn" style="left:' + tm.warnPct.toFixed(1) + '%">' + esc(String(tm.warn)) + '</span>';
-    if (tm.crit != null) h += '<span class="crit" style="left:' + tm.critPct.toFixed(1) + '%">' + esc(String(tm.crit)) + '</span>';
-    ['lowWarn','lowCrit'].forEach(function(key){
-      if (tm[key] != null) h += '<span class="' + (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') + '" style="left:' + tm[key+'Pct'].toFixed(1) + '%">' + esc(String(tm[key])) + '</span>';
-    });
-    h += '<span class="hi">' + esc(String(tm.max)) + '</span></div>';
-    if (tm.lowWarn != null || tm.lowCrit != null) h += '<div class="thrange-key"><span>Cold limits</span><span>Safe interval</span><span>' + (tm.warn != null || tm.crit != null ? 'Hot limits' : '') + '</span></div>';
-    /* step-history sparkline: every step's value plots as a faint frame (dots
-       + ghost line) so the axis is stable; the bright line and dots reveal
-       only up to the current step, so stepping tells the thermal story and a
-       jump to any step re-renders consistently */
-    /* same finite-only rule as thermoModel: an Infinity value renders as
-       NO DATA in the readout, so it must not plot as a history point either */
-    var hist = Array.isArray(states) ? states.map(function(s){
-      return s && typeof s.value === 'number' && isFinite(s.value) ? s.value : null;
-    }) : [];
-    if (hist.length > 1){
-      var sX = function(i){ return 6 + 248 * i / (hist.length - 1); };
-      var sY = function(vv){ return 54 - clamp((vv - tm.min) / (tm.max - tm.min), 0, 1) * 46; };
-      h += '<svg class="thspark" viewBox="0 0 260 62" role="img" aria-label="temperature per step">';
-      ['lowWarn','lowCrit'].forEach(function(key){
-        if (tm[key] != null) h += '<line class="thguide ' + (key === 'lowWarn' ? 'cold-warn' : 'cold-crit') + '" x1="6" x2="254" y1="' + sY(tm[key]).toFixed(1) + '" y2="' + sY(tm[key]).toFixed(1) + '"/>';
-      });
-      if (tm.warn != null)
-        h += '<line class="thguide warn" x1="6" x2="254" y1="' + sY(tm.warn).toFixed(1) + '" y2="' + sY(tm.warn).toFixed(1) + '"/>';
-      if (tm.crit != null)
-        h += '<line class="thguide crit" x1="6" x2="254" y1="' + sY(tm.crit).toFixed(1) + '" y2="' + sY(tm.crit).toFixed(1) + '"/>';
-      /* a null slot (step with no finite value) BREAKS the line: segments are
-         emitted per run of consecutive finite values, so the line never
-         bridges a no-data step */
-      var ghostSegs = [], litSegs = [], gSeg = null, lSeg = null;
-      hist.forEach(function(vv, i){
-        if (vv == null){ gSeg = null; lSeg = null; return; }
-        var pt = sX(i).toFixed(1) + ',' + sY(vv).toFixed(1);
-        if (!gSeg){ gSeg = []; ghostSegs.push(gSeg); }
-        gSeg.push(pt);
-        if (i <= idx){
-          if (!lSeg){ lSeg = []; litSegs.push(lSeg); }
-          lSeg.push(pt);
-        } else lSeg = null;
-      });
-      ghostSegs.forEach(function(seg){
-        if (seg.length > 1) h += '<polyline class="thline ghost" points="' + seg.join(' ') + '"/>';
-      });
-      litSegs.forEach(function(seg){
-        if (seg.length > 1) h += '<polyline class="thline" points="' + seg.join(' ') + '"/>';
-      });
-      hist.forEach(function(vv, i){
-        if (vv == null) return;
-        var zc = thermoModel(panel, {value: vv}).zone;
-        var isCur = i === idx;
-        h += '<circle class="thdot z-' + zc + (i <= idx ? ' on' : '') + (isCur ? ' cur' : '') +
-             '" cx="' + sX(i).toFixed(1) + '" cy="' + sY(vv).toFixed(1) + '" r="' + (isCur ? 4 : 2.4) + '"/>';
-      });
-      h += '</svg>';
-    }
-  } else if (type === 'battery'){
-    var bm = batteryModel(panel, state);
-    var bidx = typeof stepIdx === 'number' ? stepIdx : 0;
-    var bv = bm.charge != null ? String(Math.round(bm.charge)) : null;
-    h += '<div class="bthead"><div class="btval z-' + bm.zone + '">' +
-         (bv != null ? esc(bv) : '&#8212;') + '<span class="btunit">%</span>' +
-         (bm.trend === 'charging' ? '<span class="btbolt" aria-label="charging">&#9889;</span>' : '') +
-         (bm.cold ? '<span class="btcold" aria-label="cold-limited">&#10052;</span>' : '') +
-         '</div><span class="btzone z-' + bm.zone + '">' + esc(bm.label) + '</span></div>';
-    /* battery glyph: shell + terminal nub + zone-colored fill; low/crit
-       threshold ticks on the shell like thermo's bands */
-    h += '<div class="btglyph"><div class="btshell">';
-    if (bm.charge != null)
-      h += '<span class="btfill z-' + bm.zone + '" style="width:' + bm.charge.toFixed(1) + '%"></span>';
-    if (bm.low != null) h += '<span class="bttick low" style="left:' + bm.low.toFixed(1) + '%"></span>';
-    if (bm.crit != null) h += '<span class="bttick crit" style="left:' + bm.crit.toFixed(1) + '%"></span>';
-    h += '</div><span class="btnub"></span></div>';
-    /* context row: power source badge + trend word + forecast note; all
-       containers always emitted so the panel height is constant */
-    h += '<div class="btctx"><span class="btsrc">' + (bm.source ? esc(bm.source.toUpperCase()) : '') + '</span>' +
-         '<span class="bttrend">' + (bm.trend ? esc(bm.trend) : '') + '</span>' +
-         '<span class="btnote">' + esc(bm.note) + '</span></div>';
-    /* step-history sparkline, same reveal semantics as thermo: every step's
-       folded charge plots faintly, bright up to the current step, gaps break
-       the line */
-    var bhist = Array.isArray(states) ? states.map(function(s){
-      return s && typeof s.charge === 'number' && isFinite(s.charge) ? clamp(s.charge, 0, 100) : null;
-    }) : [];
-    if (bhist.length > 1){
-      var bX = function(i){ return 6 + 248 * i / (bhist.length - 1); };
-      var bY = function(vv){ return 54 - (vv / 100) * 46; };
-      h += '<svg class="btspark" viewBox="0 0 260 62" role="img" aria-label="charge per step">';
-      if (bm.low != null)
-        h += '<line class="btguide low" x1="6" x2="254" y1="' + bY(bm.low).toFixed(1) + '" y2="' + bY(bm.low).toFixed(1) + '"/>';
-      if (bm.crit != null)
-        h += '<line class="btguide crit" x1="6" x2="254" y1="' + bY(bm.crit).toFixed(1) + '" y2="' + bY(bm.crit).toFixed(1) + '"/>';
-      var bGhost = [], bLit = [], bg = null, bl = null;
-      bhist.forEach(function(vv, i){
-        if (vv == null){ bg = null; bl = null; return; }
-        var pt = bX(i).toFixed(1) + ',' + bY(vv).toFixed(1);
-        if (!bg){ bg = []; bGhost.push(bg); }
-        bg.push(pt);
-        if (i <= bidx){
-          if (!bl){ bl = []; bLit.push(bl); }
-          bl.push(pt);
-        } else bl = null;
-      });
-      bGhost.forEach(function(seg){
-        if (seg.length > 1) h += '<polyline class="btline ghost" points="' + seg.join(' ') + '"/>';
-      });
-      bLit.forEach(function(seg){
-        if (seg.length > 1) h += '<polyline class="btline" points="' + seg.join(' ') + '"/>';
-      });
-      bhist.forEach(function(vv, i){
-        if (vv == null) return;
-        var bz = batteryModel(panel, {charge: vv}).zone;
-        var bCur = i === bidx;
-        h += '<circle class="btdot z-' + bz + (i <= bidx ? ' on' : '') + (bCur ? ' cur' : '') +
-             '" cx="' + bX(i).toFixed(1) + '" cy="' + bY(vv).toFixed(1) + '" r="' + (bCur ? 4 : 2.4) + '"/>';
-      });
-      h += '</svg>';
-    }
-  } else if (type === 'buffer'){
-    var bfm = bufferModel(panel, state);
-    /* head row: one marker slot per cell so the ▼ sits over the write head */
-    h += '<div class="bfhead">';
-    for (var bh = 0; bh < bfm.n; bh++)
-      h += '<span class="bfmark' + (bfm.head === bh ? ' on' : '') + '">' + (bfm.head === bh ? '&#9660;' : '') + '</span>';
-    h += '</div>';
-    h += '<div class="bfrow">';
-    bfm.cells.forEach(function(c){ h += '<span class="bfcell s-' + c + '"></span>'; });
-    h += '</div>';
-    h += '<div class="bffoot"><span class="bfsum">' + esc(bfm.summary) + '</span>' +
-         (bfm.capacity ? '<span class="bfcap">' + esc(bfm.capacity) + '</span>' : '') + '</div>';
-    /* note line always emitted (fixed height — never reflows the column) */
-    h += '<div class="bfnote">' + esc(bfm.note) + '</div>';
-  } else if (type === 'log'){
-    var tags = panel.tags || {};
-    h += '<div class="plog">';
-    (state.log || []).forEach(function(line){
-      var tag = line && line.tag ? String(line.tag) : '';
-      var col2 = isHex(tags[tag]) ? tags[tag] : null;
-      h += '<div class="plogline">' +
-           (tag ? '<span class="plogtag"' + (col2 ? ' style="color:' + col2 + '"' : '') + '>' + esc(tag) + '</span>' : '') +
-           '<span>' + esc(line && line.text != null ? line.text : String(line)) + '</span></div>';
-    });
-    h += '</div>';
-  } else if (type === 'screen'){
-    var mode = String(state.mode || 'off');
-    if (SCREEN_MODES.indexOf(mode) < 0) mode = 'off';
-    var sceneName = SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
-    var scrClass = 'screenbox m-' + mode +
-      (state.scenePlayback === 'waiting' && ['active','live','rec','save'].indexOf(mode) >= 0 ? ' scene-waiting' : '');
-    /* overlays are built separately from the scene so a mode change between
-       two scene-showing modes can swap ONLY the overlays (surgical path
-       below) and keep the scene subtree's animation state (the walker) */
-    var scrOvl = '';
-    if (mode === 'active') scrOvl += '<span class="ovl activechip">ACTIVE</span>';
-    if (mode === 'live') scrOvl += '<span class="ovl livechip">LIVE</span>';
-    if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
-    if (mode === 'save') scrOvl += '<span class="ovl banner">' + esc(state.banner || 'SAVING CLIP') + '</span>';
-    if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
-    if (mode === 'unavailable') scrOvl += '<div class="ovl screen-unavailable" role="status">' +
-      '<svg viewBox="0 0 40 32" aria-hidden="true"><rect x="6" y="9" width="24" height="17" rx="4"/><path d="M12 9 L15 5 H23 L26 9 M3 3 L36 30"/><circle cx="18" cy="17" r="5"/></svg>' +
-      '<strong>Camera unavailable</strong><span>' + esc(typeof state.reason === 'string' && state.reason.trim() ? state.reason : 'Video is temporarily unavailable.') + '</span></div>';
-    h += '<div class="' + scrClass + '">';
-    if (mode === 'boot') h += SCENES['static-noise'];
-    else if (mode === 'active' || mode === 'live' || mode === 'rec' || mode === 'save') h += SCENES[sceneName];
-    h += scrOvl + '</div>';
-  } else if (type === 'timeline' && Array.isArray(panel.lanes) && panel.lanes.length){
-    var lnm = timelineLanesModel(panel, state);
-    var LX0 = 70, LX1 = 252, LW = LX1 - LX0;   /* track range; labels left, badges right */
-    function lx(pct){ return (LX0 + pct / 100 * LW).toFixed(1); }
-    var rowsTop = 22, rowH = 18;
-    var rowsBottom = rowsTop + lnm.lanes.length * rowH;
-    var tlH = rowsBottom + 14;
-    h += '<svg class="tlsvg" viewBox="0 0 320 ' + tlH + '" role="img" aria-label="cadence lanes">';
-    /* shared axis strip on top */
-    h += '<line class="tlaxis" x1="' + LX0 + '" y1="12" x2="' + LX1 + '" y2="12"/>';
-    lnm.ticks.forEach(function(tk){
-      h += '<line class="tltickline" x1="' + lx(tk.pct) + '" y1="8" x2="' + lx(tk.pct) + '" y2="16"/>';
-    });
-    lnm.axisEvents.forEach(function(ev){
-      h += '<circle class="tlev tl-' + ev.kind + '" cx="' + lx(ev.pct) + '" cy="12" r="2.6"><title>' +
-           esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
-    });
-    /* lane rows */
-    lnm.lanes.forEach(function(ln, li){
-      var cy = rowsTop + li * rowH + 9;
-      var labText = ln.label.length > 13 ? ln.label.slice(0, 12) + '\u2026' : ln.label;
-      h += '<text class="tllane" x="2" y="' + (cy + 3) + '">' + esc(labText) +
-           '<title>' + esc(ln.label + ' — every ' + ln.everyLabel) + '</title></text>';
-      h += '<line class="tlrowline" x1="' + LX0 + '" y1="' + cy + '" x2="' + LX1 + '" y2="' + cy + '"/>';
-      var splitX = lnm.now ? parseFloat(lx(lnm.now.pct)) : LX0;
-      if (ln.regime === 'dots'){
-        ln.beats.forEach(function(bt){
-          h += '<circle class="tlbeat' + (bt.past ? ' past' : '') + '" cx="' + lx(bt.pct) + '" cy="' + cy + '" r="2.6"/>';
-        });
-      } else if (ln.regime === 'comb'){
-        var spacing = ln.spacingPct / 100 * LW;
-        var pid = 'tlp' + (++ZF_SEQ);
-        h += '<defs><pattern id="' + pid + '" x="' + LX0 + '" width="' + spacing.toFixed(3) +
-             '" height="' + rowH + '" patternUnits="userSpaceOnUse">' +
-             '<line class="tlcombline" x1="' + spacing.toFixed(3) + '" y1="3" x2="' + spacing.toFixed(3) + '" y2="15"/></pattern></defs>';
-        if (splitX > LX0)
-          h += '<rect class="tlpast" x="' + LX0 + '" y="' + (cy - 9) + '" width="' + (splitX - LX0).toFixed(1) +
-               '" height="' + rowH + '" fill="url(#' + pid + ')"/>';
-        if (splitX < LX1)
-          h += '<rect class="tlfuture" x="' + splitX.toFixed(1) + '" y="' + (cy - 9) + '" width="' + (LX1 - splitX).toFixed(1) +
-               '" height="' + rowH + '" fill="url(#' + pid + ')"/>';
-      } else if (ln.regime === 'band'){
-        if (splitX > LX0)
-          h += '<rect class="tlbandfill tlpast" x="' + LX0 + '" y="' + (cy - 4) + '" width="' + (splitX - LX0).toFixed(1) + '" height="8" rx="2"/>';
-        if (splitX < LX1)
-          h += '<rect class="tlbandfill tlfuture" x="' + splitX.toFixed(1) + '" y="' + (cy - 4) + '" width="' + (LX1 - splitX).toFixed(1) + '" height="8" rx="2"/>';
-      }
-      /* sparse: the badge carries the promise; nothing on the track */
-      ln.misses.forEach(function(m){
-        if (ln.regime === 'dots'){
-          h += '<circle class="tlmissring" cx="' + lx(m.pct) + '" cy="' + cy + '" r="4"><title>' +
-               esc('missed — expected ' + formatClock(m.s)) + '</title></circle>';
-        } else {
-          h += '<line class="tlmiss" x1="' + lx(m.pct) + '" y1="' + (cy - 8) + '" x2="' + lx(m.pct) + '" y2="' + (cy + 8) + '"><title>' +
-               esc('missed — expected ' + formatClock(m.s)) + '</title></line>';
-        }
-      });
-      ln.events.forEach(function(ev){
-        h += '<circle class="tlev tl-' + ev.kind + '" cx="' + lx(ev.pct) + '" cy="' + cy + '" r="3"><title>' +
-             esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
-      });
-      h += '<text class="tlbadge" x="318" y="' + (cy + 3) + '" text-anchor="end">' + esc(ln.badge) + '</text>';
-    });
-    /* the now cursor runs through the axis and every row */
-    if (lnm.now){
-      var lnx = lx(lnm.now.pct);
-      h += '<line class="tlnow" x1="' + lnx + '" y1="6" x2="' + lnx + '" y2="' + rowsBottom + '"/>' +
-           '<circle class="tlnowhead" cx="' + lnx + '" cy="6" r="3"/>';
-    }
-    /* tick labels under the rows */
-    lnm.ticks.forEach(function(tk){
-      h += '<text class="tltick" x="' + lx(tk.pct) + '" y="' + (rowsBottom + 10) + '" text-anchor="middle">' + esc(tk.label) + '</text>';
-    });
-    h += '</svg>';
-    var lmeta = [];
-    if (lnm.now) lmeta.push('now ' + lnm.now.label);
-    lmeta.push('span ' + lnm.spanLabel);
-    h += '<div class="tlmeta">' + esc(lmeta.join(' \u00b7 ')) + '</div>';
-  } else if (type === 'timeline'){
-    var tlm = timelineModel(panel, state);
-    function tlx(pct){ return (6 + pct / 100 * 308).toFixed(1); }
-    if (tlm.detail){
-      /* overview strip on top, the CURRENT cadence interval magnified
-         below — events between two long-running beats spread out there */
-      var dm = tlm.detail;
-      h += '<svg class="tlsvg" viewBox="0 0 320 100" role="img" aria-label="timeline">';
-      /* overview strip */
-      if (tlm.now)
-        h += '<rect class="tlelapsed" x="6" y="9" width="' + (tlm.now.pct / 100 * 308).toFixed(1) + '" height="6" rx="2"/>';
-      h += '<rect class="tlband" x="' + tlx(dm.startPct) + '" y="3" width="' +
-           ((dm.endPct - dm.startPct) / 100 * 308).toFixed(1) + '" height="18"/>';
-      h += '<line class="tlaxis" x1="6" y1="12" x2="314" y2="12"/>';
-      tlm.ticks.forEach(function(tk){
-        h += '<line class="tltickline" x1="' + tlx(tk.pct) + '" y1="9" x2="' + tlx(tk.pct) + '" y2="15"/>';
-      });
-      tlm.beats.forEach(function(bt){
-        var past = tlm.now && bt.s <= tlm.now.s + 1e-6;
-        h += '<circle class="tlbeat' + (past ? ' past' : '') + '" cx="' + tlx(bt.pct) + '" cy="12" r="2.2"/>';
-      });
-      tlm.events.forEach(function(ev){
-        h += '<circle class="tlev tl-' + ev.kind + '" cx="' + tlx(ev.pct) + '" cy="12" r="1.7"/>';
-      });
-      if (tlm.now){
-        var onx = tlx(tlm.now.pct);
-        h += '<line class="tlnow" x1="' + onx + '" y1="4" x2="' + onx + '" y2="20"/>';
-      }
-      /* zoom connectors from the band to the detail axis */
-      h += '<line class="tlzoom" x1="' + tlx(dm.startPct) + '" y1="21" x2="6" y2="46"/>' +
-           '<line class="tlzoom" x1="' + tlx(dm.endPct) + '" y1="21" x2="314" y2="46"/>';
-      /* detail: one interval, beat to beat */
-      h += '<line class="tlaxis" x1="6" y1="68" x2="314" y2="68"/>';
-      dm.ticks.forEach(function(tk){
-        h += '<line class="tltickline" x1="' + tlx(tk.pct) + '" y1="64" x2="' + tlx(tk.pct) + '" y2="72"/>';
-      });
-      h += '<circle class="tlbeat' + (dm.startPast ? ' past' : '') + '" cx="6" cy="68" r="4.2"/>' +
-           '<circle class="tlbeat' + (dm.endPast ? ' past' : '') + '" cx="314" cy="68" r="4.2"/>' +
-           '<text class="tltick" x="6" y="84" text-anchor="start">' + esc(dm.startLabel) + '</text>' +
-           '<text class="tltick" x="314" y="84" text-anchor="end">' + esc(dm.endLabel) + '</text>';
-      dm.events.forEach(function(ev){
-        var x = tlx(ev.pct);
-        h += '<circle class="tlev tl-' + ev.kind + '" cx="' + x + '" cy="54" r="4"><title>' +
-             esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
-        if (ev.label && ev.labelRow != null)
-          h += '<text class="tlevlab" x="' + Math.min(Math.max(parseFloat(x), 16), 304) +
-               '" y="' + (ev.labelRow === 0 ? 43 : 32) + '" text-anchor="middle">' + esc(ev.labelText || ev.label) + '</text>';
-      });
-      var dnx = tlx(dm.nowPct);
-      h += '<line class="tlnow" x1="' + dnx + '" y1="47" x2="' + dnx + '" y2="74"/>' +
-           '<circle class="tlnowhead" cx="' + dnx + '" cy="47" r="3"/>';
-      h += '</svg>';
-    } else {
-      h += '<svg class="tlsvg" viewBox="0 0 320 64" role="img" aria-label="timeline">';
-      if (tlm.now)
-        h += '<rect class="tlelapsed" x="6" y="36" width="' + (tlm.now.pct / 100 * 308).toFixed(1) + '" height="8" rx="2"/>';
-      h += '<line class="tlaxis" x1="6" y1="40" x2="314" y2="40"/>';
-      tlm.ticks.forEach(function(tk){
-        var x = tlx(tk.pct);
-        h += '<line class="tltickline" x1="' + x + '" y1="36" x2="' + x + '" y2="44"/>' +
-             '<text class="tltick" x="' + x + '" y="56" text-anchor="middle">' + esc(tk.label) + '</text>';
-      });
-      tlm.beats.forEach(function(bt){
-        var past = tlm.now && bt.s <= tlm.now.s + 1e-6;
-        h += '<circle class="tlbeat' + (past ? ' past' : '') + '" cx="' + tlx(bt.pct) + '" cy="40" r="2.6"/>';
-      });
-      tlm.events.forEach(function(ev){
-        var x = tlx(ev.pct);
-        h += '<circle class="tlev tl-' + ev.kind + '" cx="' + x + '" cy="26" r="4"><title>' +
-             esc(formatClock(ev.s) + (ev.label ? ' — ' + ev.label : '')) + '</title></circle>';
-        if (ev.label && ev.labelRow != null)
-          h += '<text class="tlevlab" x="' + Math.min(Math.max(parseFloat(x), 16), 304) +
-               '" y="' + (ev.labelRow === 0 ? 15 : 6) + '" text-anchor="middle">' + esc(ev.labelText || ev.label) + '</text>';
-      });
-      if (tlm.now){
-        var nx = tlx(tlm.now.pct);
-        h += '<line class="tlnow" x1="' + nx + '" y1="18" x2="' + nx + '" y2="46"/>' +
-             '<circle class="tlnowhead" cx="' + nx + '" cy="18" r="3"/>';
-      }
-      h += '</svg>';
-    }
-    var tlmeta = [];
-    if (tlm.every != null && tlm.every > 0){
-      var cad = (tlm.cadenceLabel || 'beat') + ' every ' + formatClock(tlm.every);
-      if (tlm.beatsOmitted) cad += ' (' + tlm.beatsOmitted + ' beats — too dense to draw)';
-      tlmeta.push(cad);
-    }
-    if (tlm.detail) tlmeta.push('window ' + tlm.detail.startLabel + '\u2013' + tlm.detail.endLabel);
-    if (tlm.now) tlmeta.push('now ' + tlm.now.label);
-    tlmeta.push('span ' + tlm.spanLabel);
-    h += '<div class="tlmeta">' + esc(tlmeta.join(' · ')) + '</div>';
-  } else if (type === 'waterfall'){
-    var wm = waterfallModel(panel.spans, state);
-    var wfPrev = host._wfRevealed || null;
-    var wfNow = wm.rows.map(function(r){ return r.revealed; });
-    waterfallEntrants = wfPrev ? wfNow.map(function(on, i){ return on && !wfPrev[i]; }) : null;
-    host._wfRevealed = wfNow;
-    h += '<div class="wfall' + (wm.timed ? ' wf-timed' : '') + '">';
-    wm.rows.forEach(function(r){
-      h += '<div class="wfrow' + (r.revealed ? ' on' : '') + (r.highlight ? ' hl' : '') + (r.error ? ' wf-error' : '') +
-           '" title="' + esc(r.label + ' · start +' + r.startMs + ' ms · duration ' + r.ms + ' ms' + (r.error ? ' · recorded error' : '')) + '">' +
-           '<span class="wflabel">' + esc(r.label) + '</span>' +
-           '<span class="wftrack"><span class="wfbar" style="margin-left:' + r.offsetPct.toFixed(2) +
-           '%;width:' + Math.max(r.widthPct, wm.timed ? 0 : 1.2).toFixed(2) + '%"></span></span>' +
-           '<span class="wfms">' + (r.revealed ? (r.error ? '! ' : '') + esc(String(r.ms)) + ' ms' : '&#8212;') + '</span></div>';
-    });
-    h += '<div class="wftotal">' + (wm.timed ? 'elapsed extent ' : 'total ') + '<b>' + esc(wm.totalLabel) + '</b></div></div>';
-  } else if (type === 'orbit'){
-    var ostates = Array.isArray(panel.states) ? panel.states : [];
-    var ocur = state.state != null ? String(state.state) : null;
-    pulseSelector = '.odot.cur';
-    pulseChanged = Object.prototype.hasOwnProperty.call(host, '_orbitCur') && host._orbitCur !== ocur;
-    host._orbitCur = ocur;
-    var ocolors = panel.colors || {};
-    var opos = orbitPositions(ostates.length, 110, 78, 54);
-    h += '<svg class="orbit" viewBox="0 0 220 156" role="img" aria-label="' + esc(panel.title || 'state machine') + '">';
-    h += '<circle class="oring" cx="110" cy="78" r="54"/>';
-    ostates.forEach(function(sname, i){
-      var p = opos[i];
-      var isCur = String(sname) === ocur;
-      var col = isHex(ocolors[sname]) ? ocolors[sname] : null;
-      var anchor = p.x < 100 ? 'end' : (p.x > 120 ? 'start' : 'middle');
-      var lx = p.x + (anchor === 'end' ? -11 : (anchor === 'start' ? 11 : 0));
-      var ly = anchor === 'middle' ? (p.y < 78 ? p.y - 10 : p.y + 16) : p.y + 3.5;
-      h += '<circle class="odot' + (isCur ? ' cur' : '') + '" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) +
-           '" r="' + (isCur ? 7 : 4.5) + '"' + (isCur && col ? ' style="fill:' + col + '"' : '') + '/>';
-      h += '<text class="olbl' + (isCur ? ' cur' : '') + '" x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) +
-           '" text-anchor="' + anchor + '">' + esc(String(sname)) + '</text>';
-    });
-    h += '<text class="ocur" x="110" y="75" text-anchor="middle"' +
-         (ocur && isHex(ocolors[ocur]) ? ' style="fill:' + ocolors[ocur] + '"' : '') + '>' + esc(ocur || '—') + '</text>';
-    if (state.via) h += '<text class="ovia" x="110" y="91" text-anchor="middle">via ' + esc(String(state.via)) + '</text>';
-    h += '</svg>';
-  } else if (type === 'zoneframe'){
-    var zm = zoneModel(panel.zones, state.zones);
-    /* pattern id is per-HOST, not per-render: a fresh id every render would
-       make otherwise-identical markup unequal and defeat the unchanged-skip */
-    var hid = host._zfId || (host._zfId = 'zfh' + (++ZF_SEQ));
-    h += '<div class="zfbox"><svg class="zframe" viewBox="0 0 320 180" role="img" aria-label="' + esc(panel.title || 'camera zones') + '">';
-    h += '<defs><pattern id="' + hid + '" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
-         '<line x1="0" y1="0" x2="0" y2="8" stroke="#94A3B8" stroke-width="2" opacity=".5"/></pattern></defs>';
-    h += '<rect width="320" height="180" fill="#0A0F14"/><rect y="150" width="320" height="30" fill="#131A21"/>';
-    h += '<rect x="118" y="28" width="84" height="124" rx="3" fill="#10161D" stroke="#26313C" stroke-width="2"/>';
-    zm.forEach(function(z){
-      var pts = z.points.map(function(p){ return p[0] + ',' + p[1]; }).join(' ');
-      h += '<polygon class="zone ' + z.state + '" points="' + pts + '"' +
-           (z.state === 'masked' ? ' fill="url(#' + hid + ')"' : '') + '/>';
-      if (z.points.length)
-        h += '<text class="zlbl" x="' + (z.points[0][0] + 5) + '" y="' + (z.points[0][1] + 13) + '">' + esc(z.label) + '</text>';
-    });
-    if (state.subject && typeof state.subject.x === 'number' && typeof state.subject.y === 'number')
-      h += '<circle class="zsubject" cx="' + state.subject.x + '" cy="' + state.subject.y + '" r="6"/>';
-    var ZVERDICTS = {alert: 'ALERT SENT', suppress: 'IGNORED — OUTSIDE ARMED ZONES',
-                     'never-captured': 'MASKED — PIXELS NEVER CAPTURED'};
-    if (ZVERDICTS[state.verdict]){
-      h += '<rect class="zverbg ' + state.verdict + '" x="0" y="0" width="320" height="22"/>' +
-           '<text class="zvertext" x="8" y="15">' + ZVERDICTS[state.verdict] + '</text>';
-    }
-    h += '</svg></div>';
-  } else if (type === 'pir'){
-    var pm = pirModel(panel, state);
-    var trip = pm.tripped ? 'tripped' : 'clear';
-    /* one-shot cues (cone flash, subject ripple, status blink) fire only on a
-       clear→tripped transition, not on every re-render while tripped and not
-       on a first render that starts tripped (host._pirTrip === false means
-       the PREVIOUS render was explicitly clear; undefined means no previous
-       render). The previous render's tripped/subject live on the host. */
-    var pirFresh = animate && pm.tripped && host._pirTrip === false;
-    var pirPrev = host._pirPrev || null;
-    var pirMoved = animate && pirPrev && pm.subject &&
-                   (pirPrev.x !== pm.subject.x || pirPrev.y !== pm.subject.y);
-    host._pirTrip = pm.tripped;
-    host._pirPrev = pm.subject ? {x: pm.subject.x, y: pm.subject.y} : null;
-    /* the widget markup is built twice: once WITH the one-shot transients
-       (fresh classes, ghost, trail, ripple, glide offset) for the DOM, and
-       once WITHOUT them as the comparison baseline (hBaseline) — the step
-       AFTER a trip or a move produces exactly the steady form, so it matches
-       the baseline and skips the rebuild instead of restarting the ambient
-       sweep/ping animations. */
-    var buildPir = function(transient){
-      var s = '<div class="pirbox"><svg class="pirframe" viewBox="0 0 320 180" role="img" aria-label="' + esc(panel.title || 'IR sensor line of sight') + '">';
-      s += '<rect width="320" height="180" class="pirbg"/><rect y="150" width="320" height="30" class="pirground"/>';
-      if (pm.path)
-        s += '<path class="pirpath" d="M' + pm.path.map(function(p){ return p[0] + ' ' + p[1]; }).join(' L') + '"/>';
-      s += '<polygon class="pircone ' + trip + (transient && pirFresh ? ' fresh' : '') + '" points="' + cpts + '"/>';
-      /* scanning beam sweeping the cone + detection pings from the sensor —
-         ambient life while the step is parked; suppressed under reduced motion */
-      if (!RM){
-        var fr = pm.cone.facing * Math.PI / 180;
-        var swx = pm.sensor.x + (pm.cone.range - 4) * Math.cos(fr);
-        var swy = pm.sensor.y + (pm.cone.range - 4) * Math.sin(fr);
-        s += '<g class="pirsweep ' + trip + '" style="transform-origin:' + pm.sensor.x + 'px ' + pm.sensor.y +
-             'px;--sw:' + Math.max(0, pm.cone.spread / 2 - 3).toFixed(1) + 'deg">' +
-             '<line x1="' + pm.sensor.x + '" y1="' + pm.sensor.y + '" x2="' + swx.toFixed(1) + '" y2="' + swy.toFixed(1) + '"/></g>';
-        s += '<circle class="pirping" cx="' + pm.sensor.x + '" cy="' + pm.sensor.y + '" r="5"/>' +
-             '<circle class="pirping p2" cx="' + pm.sensor.x + '" cy="' + pm.sensor.y + '" r="5"/>';
-      }
-      s += '<circle class="pirsensor" cx="' + pm.sensor.x + '" cy="' + pm.sensor.y + '" r="5"/>';
-      s += '<text class="pirsensorlbl" x="' + (pm.sensor.x - 9) + '" y="' + (pm.sensor.y - 8) + '" text-anchor="end">IR</text>';
-      if (pm.subject){
-        /* between steps the subject glides from its previous position: it is
-           rendered offset back to the old spot via an inline transform, which
-           the post-render hook releases on the next frame (CSS transition).
-           A fading ghost + dashed trail mark where it came from. */
-        if (transient && pirMoved){
-          s += '<line class="pirtrail" x1="' + pirPrev.x + '" y1="' + pirPrev.y +
-               '" x2="' + pm.subject.x + '" y2="' + pm.subject.y + '"/>';
-          s += '<circle class="pirghost" cx="' + pirPrev.x + '" cy="' + pirPrev.y + '" r="6"/>';
-        }
-        s += '<circle class="pirsubject ' + trip + '" cx="' + pm.subject.x + '" cy="' + pm.subject.y + '" r="6"' +
-             ((transient && pirMoved) ? ' style="transform:translate(' + (pirPrev.x - pm.subject.x) +
-              'px,' + (pirPrev.y - pm.subject.y) + 'px)"' : '') + '/>';
-        if (transient && !RM && pirFresh)
-          s += '<circle class="pirripple" cx="' + pm.subject.x + '" cy="' + pm.subject.y + '" r="6"/>';
-      }
-      var pstat = pm.status != null ? pm.status : (pm.subject ? (pm.tripped ? 'IR TRIPPED' : 'IR CLEAR') : '');
-      if (pstat){
-        s += '<rect class="pirstatusbg ' + trip + (transient && pirFresh ? ' fresh' : '') + '" x="0" y="0" width="132" height="20"/>' +
-             '<text class="pirstatustext" x="8" y="14">' + esc(pstat) + '</text>';
-      }
-      if (pm.banner){
-        s += '<rect class="pirbannerbg" x="0" y="150" width="320" height="30"/>' +
-             '<text class="pirbannertext" x="160" y="169" text-anchor="middle">' + esc(pm.banner) + '</text>';
-      }
-      return s + '</svg></div>';
-    };
-    var cpts = pm.conePoints.map(function(p){ return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
-    var pirTransients = pirFresh || pirMoved;
-    h += buildPir(true);
-    hBaseline = pirTransients ? buildPir(false) : null;
-  } else if (type === 'tiles'){
-    var tlm = tilesModel(panel, state);
-    h += '<div class="tlgrid">';
-    tlm.forEach(function(t){
-      h += '<div class="tltile' + (t.state == null ? ' dim' : '') + '">';
-      h += '<span class="tllabel">' + esc(t.label) + '</span>';
-      h += '<span class="tlstate"' + (t.color ? ' style="color:' + t.color + ';border-color:' + t.color + '"' : '') + '>' +
-           (t.state != null ? esc(t.state) : '&#8212;') + '</span>';
-      h += '<span class="tlsub">' + esc(t.sub) + '</span>';
-      h += '</div>';
-    });
-    h += '</div>';
-  } else if (type === 'signal'){
-    var sgm = signalModel(panel, state);
-    h += '<div class="sgrows">';
-    sgm.forEach(function(l){
-      h += '<div class="sgrow s-' + l.state + '">';
-      h += '<span class="sgtag">' + (l.transport ? esc(l.transport.toUpperCase()) : '') + '</span>';
-      h += '<span class="sglabel">' + esc(l.label) + '</span>';
-      h += '<span class="sgbars">';
-      for (var sb = 1; sb <= 4; sb++)
-        h += '<span class="sgbar b' + sb + (l.bars != null && sb <= l.bars ? ' on' : '') + '"></span>';
-      h += '</span>';
-      h += '<span class="sgstate">' + l.state.toUpperCase() + '</span>';
-      h += '<span class="sgnote">' + esc(l.note) + '</span>';
-      h += '</div>';
-    });
-    h += '</div>';
-  } else if (type === 'homemap'){
-    var hm = homemapModel(panel, state);
-    var hmThermalPrev = host._hmThermal || Object.create(null), hmThermalNow = Object.create(null), hmClearing = Object.create(null);
-    var hmPrev = host._hmStates || Object.create(null), hmNow = Object.create(null);
-    var hmFresh = Object.create(null), hmHasFresh = false, hmDoors = Object.create(null);
-    hm.devices.forEach(function(d){
-      hmThermalNow[d.id] = d.thermal;
-      if (animate && d.thermal === 'normal' && hmThermalPrev[d.id] && hmThermalPrev[d.id] !== 'normal'){
-        hmClearing[d.id] = hmThermalPrev[d.id]; hmHasFresh = true;
-      }
-      hmNow[d.id] = d.state;
-      if (animate && d.kind === 'entry' && hmPrev[d.id] !== undefined &&
-          ((d.state === 'open') !== (hmPrev[d.id] === 'open'))){
-        hmDoors[d.id] = d.state === 'open' ? 'opening' : 'closing'; hmHasFresh = true;
-      }
-      if (animate && hmPrev[d.id] !== undefined && hmPrev[d.id] !== d.state &&
-          ((d.kind === 'camera' && d.state === 'detect') ||
-           (d.kind === 'entry' && d.state === 'alert') || (d.kind === 'hub' && d.state === 'rx') ||
-           (d.kind === 'sensor' && ['warn','alert'].indexOf(d.state) >= 0))){
-        hmFresh[d.id] = true; hmHasFresh = true;
-      }
-    });
-    host._hmStates = hmNow;
-    host._hmThermal = hmThermalNow;
-    var hmSubjPrev = host._hmSubjPrev || Object.create(null), hmSubjNow = Object.create(null);
-    var hmMoved = Object.create(null), hmHasMoved = false;
-    hm.subjects.forEach(function(sub){
-      if (sub.hidden) return;
-      var prev = hmSubjPrev[sub.id];
-      hmSubjNow[sub.id] = {x: sub.x, y: sub.y};
-      if (animate && prev && (prev.x !== sub.x || prev.y !== sub.y)){
-        hmMoved[sub.id] = true; hmHasMoved = true;
-      }
-    });
-    /* Hidden/removed subjects lose their previous position before reappearing. */
-    host._hmSubjPrev = hmSubjNow;
-    var hmSignals = animate && typeof stepIdx === 'number' && stepIdx >= 0 ? hm.signals : [];
-    var buildHomemap = function(transient){
-      var o = hm.outline;
-      var sy = HOMEMAP_Y_SCALE;
-      var s = '<svg class="hmframe" viewBox="0 0 320 ' + HOMEMAP_DISPLAY_HEIGHT + '" role="img" aria-label="' + esc(panel.title || 'Home device map') + '">';
-      var spaces = homemapRoomModel(panel, hm);
-      function drawSpace(space){
-        var room = space.room, outdoor = room.kind === 'outdoor';
-        s += '<g class="hmspace hm-room-' + space.tone + (outdoor ? ' hm-outdoor' : '') + '" data-home-room="' + panel.rooms.indexOf(room) + '">';
-        s += '<rect class="hmroom" x="' + room.x + '" y="' + (room.y * sy) + '" width="' + room.w + '" height="' + (room.h * sy) + '" rx="2"/>';
-        if (!outdoor) s += '<path class="hmroomwall" d="M' + (room.x + 2) + ' ' + ((room.y + room.h) * sy - 2) + ' V' + (room.y * sy + 2) + ' H' + (room.x + room.w - 2) + '"/>';
-        s += '<text class="hmroomlabel" x="' + (room.x + 6) + '" y="' + (room.y * sy + 10) + '">' + esc(room.label || '') + '</text></g>';
-      }
-      spaces.filter(function(space){return space.room.kind === 'outdoor';}).forEach(drawSpace);
-      s += '<rect class="hmfoundation" x="' + o.x + '" y="' + (o.y * sy + 2) + '" width="' + o.w + '" height="' + (o.h * sy) + '" rx="9"/>';
-      s += '<rect class="hmoutline" x="' + o.x + '" y="' + (o.y * sy) + '" width="' + o.w + '" height="' + (o.h * sy) + '" rx="9"/>';
-      spaces.filter(function(space){return space.room.kind !== 'outdoor';}).forEach(drawSpace);
-      if (transient && hmHasMoved) hm.subjects.forEach(function(sub){
-        if (!hmMoved[sub.id]) return;
-        var prev = hmSubjPrev[sub.id];
-        s += '<path class="hmtrail" d="M' + prev.x + ' ' + (prev.y * sy) + ' L' + sub.x + ' ' + (sub.y * sy) + '"/>';
-      });
-      /* Direction remains readable while paused and under reduced motion.
-         Animated step paints add traveling packets over the route. */
-      if (typeof stepIdx === 'number' && stepIdx >= 0) hm.signals.forEach(function(sig){
-        var fromY = sig.fromXY.y * sy, toY = sig.toXY.y * sy;
-        var dx = sig.toXY.x - sig.fromXY.x, dy = toY - fromY;
-        var length = Math.sqrt(dx * dx + dy * dy); if (length < 24) return;
-        var ux = dx / length, uy = dy / length;
-        var x = sig.toXY.x - ux * 13, y = toY - uy * 13;
-        s += '<g class="hmlink"><title>' + esc(sig.from + ' → ' + sig.to) + '</title>' +
-          '<path class="hmlinkglow" d="M' + (sig.fromXY.x + ux * 12) + ' ' + (fromY + uy * 12) + ' L' + x + ' ' + y + '"/>' +
-          '<path class="hmlinkroute" d="M' + (sig.fromXY.x + ux * 12) + ' ' + (fromY + uy * 12) + ' L' + x + ' ' + y + '"/>' +
-          '<path class="hmlinktip" d="M' + (x - ux * 5 - uy * 3) + ' ' + (y - uy * 5 + ux * 3) +
-          ' L' + x + ' ' + y + ' L' + (x - ux * 5 + uy * 3) + ' ' + (y - uy * 5 - ux * 3) + '"/></g>';
-      });
-      /* Wedges below all markers, so one camera cannot obscure another. */
-      hm.devices.forEach(function(d){
-        if (d.kind !== 'camera' || ['scan', 'detect', 'rec'].indexOf(d.state) < 0) return;
-        var a1 = (d.facing - d.spread / 2) * Math.PI / 180;
-        var a2 = (d.facing + d.spread / 2) * Math.PI / 180;
-        var mid = d.facing * Math.PI / 180;
-        s += '<g class="hmdev hm-camera hm-' + esc(d.state) + '" transform="scale(1 ' + sy + ')">';
-        s += '<path class="hmwedge" d="M' + d.x + ' ' + d.y +
-          ' L' + (d.x + d.range * Math.cos(a1)).toFixed(1) + ' ' + (d.y + d.range * Math.sin(a1)).toFixed(1) +
-          ' A' + d.range + ' ' + d.range + ' 0 0 1 ' + (d.x + d.range * Math.cos(a2)).toFixed(1) + ' ' +
-          (d.y + d.range * Math.sin(a2)).toFixed(1) + ' Z"/>';
-        if (!RM) s += '<g class="hmsweep" style="transform-origin:' + d.x + 'px ' + d.y + 'px;--sw:' +
-          (d.spread / 2 - 2) + 'deg"><line x1="' + d.x + '" y1="' + d.y + '" x2="' +
-          (d.x + (d.range - 3) * Math.cos(mid)).toFixed(1) + '" y2="' +
-          (d.y + (d.range - 3) * Math.sin(mid)).toFixed(1) + '"/></g>';
-        s += '</g>';
-      });
-      hm.devices.forEach(function(d){
-        if (d.display === 'door'){ s += homemapDoorHTML(d, transient ? hmDoors[d.id] : null, hm.outline, transient ? hmClearing[d.id] : null); return; }
-        s += '<g class="hmdev hm-' + esc(d.kind) + ' hm-' + esc(d.state) + '" data-device="' + esc(d.id) + '" transform="translate(0 ' + (d.y * (sy - 1)).toFixed(3) + ')">' +
-          '<title>' + esc(d.label) + ': ' + esc(d.state) + (d.thermal !== 'normal' ? ' · ' + d.thermal : '') + '</title>';
-        s += homemapThermalHTML(d, 1, transient ? hmClearing[d.id] : null);
-        s += '<circle class="hmdevice-aura" cx="' + d.x + '" cy="' + d.y + '" r="13"/>';
-        if (transient && hmFresh[d.id]) s += '<circle class="' + (d.kind === 'hub' ? 'hmglow' : 'hmripple') +
-          '" cx="' + d.x + '" cy="' + d.y + '" r="6"/>';
-        s += '<circle class="hmmarker" cx="' + d.x + '" cy="' + d.y + '" r="8.5"/>';
-        if (d.kind === 'hub') s += '<circle class="hmhubring" cx="' + d.x + '" cy="' + d.y + '" r="10"/>';
-        /* tx: steady looping broadcast waves — part of the baseline, so an
-           unchanged step repaint leaves the animation running */
-        if (d.kind === 'hub' && d.state === 'tx')
-          s += '<circle class="hmtxring" cx="' + d.x + '" cy="' + d.y + '" r="8"/>' +
-               '<circle class="hmtxring hmtxring2" cx="' + d.x + '" cy="' + d.y + '" r="8"/>';
-        /* rec: the classic blinking recording light beside the camera dot —
-           steady markup, so the blink survives unchanged step repaints */
-        if (d.kind === 'camera' && d.state === 'rec')
-          s += '<circle class="hmrecdot" cx="' + (d.x + 7) + '" cy="' + (d.y - 7) + '" r="2.5"/>';
-        if (d.kind === 'entry'){
-          s += '<path class="hmentry" d="M' + (d.x - 3.5) + ' ' + (d.y + 5) + ' v-10 h7 v10"/>';
-          s += '<path class="hmdoorleaf' + (transient && hmDoors[d.id] ? ' hmdoor-' + hmDoors[d.id] : '') + '" style="transform-origin:' + (d.x - 3.5) + 'px ' + (d.y + 5) +
-            'px" d="M' + (d.x - 3.5) + ' ' + (d.y + 5) + ' h7"/>';
-        } else {
-          var deviceIcon = d.kind === 'camera' ? 'camera' : d.kind === 'hub' ? 'router' : d.icon;
-          s += '<use class="hmicon hmdeviceglyph" href="#i-' + esc(deviceIcon) + '" x="' +
-            (d.x - 6) + '" y="' + (d.y - 6) + '" width="12" height="12"/>';
-        }
-        var labelY = d.y > 139 ? d.y - 25 : d.y + 20;
-        var labelX = clamp(d.x, 28, 292);
-        s += '<text class="hmlbl" x="' + labelX + '" y="' + labelY +
-          '" text-anchor="middle">' + esc(d.label) + '</text></g>';
-      });
-      hm.subjects.forEach(function(sub){
-        if (sub.hidden) return;
-        var prev = hmSubjPrev[sub.id];
-        s += '<g transform="translate(0 ' + (sub.y * (sy - 1)).toFixed(3) + ')"><g class="hmsubject" data-subject="' + esc(sub.id) + '"' +
-          ((transient && hmMoved[sub.id]) ? ' style="transform:translate(' + (prev.x - sub.x) +
-            'px,' + ((prev.y - sub.y) * sy) + 'px)"' : '') + '><title>' + esc(sub.label) + '</title>';
-        s += '<ellipse class="hmactor-shadow" cx="' + sub.x + '" cy="' + (sub.y + 9) + '" rx="7" ry="2.2"/>';
-        s += '<circle class="hmsubjectdot" cx="' + sub.x + '" cy="' + sub.y + '" r="7"/>';
-        if (sub.icon) s += '<use class="hmactor-icon" href="#i-' + esc(sub.icon) + '" x="' +
-          (sub.x - 5) + '" y="' + (sub.y - 5) + '" width="10" height="10"/>';
-        else s += '<circle class="hmactor-icon" cx="' + sub.x + '" cy="' + (sub.y - 2.2) + '" r="1.8"/>' +
-          '<path class="hmactor-icon" d="M' + (sub.x - 3.4) + ' ' + (sub.y + 4) + ' v-1 a3.4 3.4 0 0 1 6.8 0 v1 Z"/>';
-        if (panel.showSubjectLabels === true)
-          s += '<text class="hmlbl hmactor-label" x="' + clamp(sub.x, 24, 296) + '" y="' + (sub.y > 146 ? sub.y - 12 : sub.y + 19) +
-            '" text-anchor="middle">' + esc(sub.label) + '</text>';
-        s += '</g></g>';
-      });
-      if (!hm.devices.length) s += '<text class="hmlbl" x="160" y="' + (HOMEMAP_DISPLAY_HEIGHT / 2 + 4) + '" text-anchor="middle">No devices configured</text>';
-      if (transient) hmSignals.forEach(function(sig, i){
-        s += '<circle class="hmsig" r="3" style="--hx1:' + sig.fromXY.x + 'px;--hy1:' + (sig.fromXY.y * sy) +
-          'px;--hx2:' + sig.toXY.x + 'px;--hy2:' + (sig.toXY.y * sy) + 'px;animation-delay:' + (i * 0.25) + 's"/>';
-      });
-      return s + '</svg>';
-    };
-    h += buildHomemap(true);
-    hBaseline = (hmHasFresh || hmHasMoved || hmSignals.length) ? buildHomemap(false) : null;
-  } else if (type === 'radar'){
-    var rm2 = radarModel(panel, state);
-    var ridx = typeof stepIdx === 'number' ? stepIdx : 0;
-    /* one-shot ripple + glide fire on the clear→alert transition / a move,
-       with a steady baseline stored so the following unchanged step skips
-       (same discipline as pir) */
-    var rdFresh = animate && rm2.alert && host._rdAlert === false;
-    var rdPrev = host._rdPrev || null;
-    var rdMoved = animate && rdPrev && rm2.subject &&
-                  (rdPrev.x !== rm2.subject.x || rdPrev.y !== rm2.subject.y);
-    host._rdAlert = rm2.alert;
-    host._rdPrev = rm2.subject ? {x: rm2.subject.x, y: rm2.subject.y} : null;
-    var rdA1 = (rm2.facing - rm2.spread / 2) * Math.PI / 180;
-    var rdA2 = (rm2.facing + rm2.spread / 2) * Math.PI / 180;
-    var rdFull = rm2.spread >= 359.9;
-    var rdArc = function(r){
-      if (rdFull) return null;
-      var x1 = rm2.sensor.x + r * Math.cos(rdA1), y1 = rm2.sensor.y + r * Math.sin(rdA1);
-      var x2 = rm2.sensor.x + r * Math.cos(rdA2), y2 = rm2.sensor.y + r * Math.sin(rdA2);
-      return 'M' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' A' + r.toFixed(1) + ' ' + r.toFixed(1) +
-             ' 0 ' + ((rdA2 - rdA1) > Math.PI ? 1 : 0) + ' 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1);
-    };
-    /* track: the subject positions of every folded step up to the current
-       one — engine-derived, so any step jump redraws it consistently */
-    var rdTrack = [];
-    if (Array.isArray(states)){
-      for (var rti = 0; rti <= Math.min(ridx, states.length - 1); rti++){
-        /* run each folded step through the model so POLAR subjects convert
-           exactly like the live one; dedupe parked positions so unchanged
-           steps keep identical markup (rebuild skip) */
-        var rsub = radarModel(panel, states[rti]).subject;
-        var last = rdTrack.length ? rdTrack[rdTrack.length - 1] : undefined;
-        if (rsub){
-          if (!(last && last[0] === rsub.x && last[1] === rsub.y))
-            rdTrack.push([rsub.x, rsub.y]);
-        } else if (last !== null && rdTrack.length){
-          rdTrack.push(null);
-        }
-      }
-    }
-    var buildRadar = function(transient){
-      var s = '<div class="rdbox"><svg class="rdframe" viewBox="0 0 320 180" role="img" aria-label="' +
-              esc(panel.title || 'radar range view') + '">';
-      s += '<rect width="320" height="180" class="rdbg"/>';
-      rm2.zones.forEach(function(z){
-        var zpts = z.points.map(function(p){ return p[0] + ',' + p[1]; }).join(' ');
-        var occ = rm2.occupied.indexOf(z.id) >= 0;
-        s += '<polygon class="rdzone' + (occ ? ' occ' : '') + '" points="' + zpts + '"/>';
-        s += '<text class="rdzlbl' + (occ ? ' occ' : '') + '" x="' + (z.points[0][0] + 5) +
-             '" y="' + (z.points[0][1] + 13) + '">' + esc(z.label) + '</text>';
-      });
-      var radii = rm2.ringRadii;
-      for (var ri = 1; ri <= rm2.rings; ri++){
-        var rr = radii ? radii[ri - 1] : rm2.range * ri / rm2.rings;
-        if (rdFull) s += '<circle class="rdring" cx="' + rm2.sensor.x + '" cy="' + rm2.sensor.y + '" r="' + rr.toFixed(1) + '"/>';
-        else s += '<path class="rdring" d="' + rdArc(rr) + '"/>';
-      }
-      if (!rdFull){
-        [rdA1, rdA2].forEach(function(a){
-          s += '<line class="rdedge" x1="' + rm2.sensor.x + '" y1="' + rm2.sensor.y +
-               '" x2="' + (rm2.sensor.x + rm2.range * Math.cos(a)).toFixed(1) +
-               '" y2="' + (rm2.sensor.y + rm2.range * Math.sin(a)).toFixed(1) + '"/>';
-        });
-      }
-      if (rm2.threshold != null){
-        if (rdFull) s += '<circle class="rdthresh" cx="' + rm2.sensor.x + '" cy="' + rm2.sensor.y + '" r="' + rm2.threshold.toFixed(1) + '"/>';
-        else s += '<path class="rdthresh" d="' + rdArc(rm2.threshold) + '"/>';
-      }
-      if (!RM){
-        var rmid = rm2.facing * Math.PI / 180;
-        s += '<g class="rdsweep" style="transform-origin:' + rm2.sensor.x + 'px ' + rm2.sensor.y +
-             'px;--sw:' + Math.max(0, Math.min(rm2.spread, 358) / 2 - 2).toFixed(1) + 'deg">' +
-             '<line x1="' + rm2.sensor.x + '" y1="' + rm2.sensor.y +
-             '" x2="' + (rm2.sensor.x + (rm2.range - 3) * Math.cos(rmid)).toFixed(1) +
-             '" y2="' + (rm2.sensor.y + (rm2.range - 3) * Math.sin(rmid)).toFixed(1) + '"/></g>';
-      }
-      s += '<circle class="rdsensor" cx="' + rm2.sensor.x + '" cy="' + rm2.sensor.y + '" r="5"/>';
-      /* track dots + connecting segments (broken at steps with no subject) */
-      var seg = [];
-      var flushSeg = function(){
-        if (seg.length > 1) s += '<polyline class="rdtrack" points="' + seg.join(' ') + '"/>';
-        seg = [];
-      };
-      rdTrack.forEach(function(p){
-        if (!p){ flushSeg(); return; }
-        seg.push(p[0] + ',' + p[1]);
-        s += '<circle class="rdtrackdot" cx="' + p[0] + '" cy="' + p[1] + '" r="2"/>';
-      });
-      flushSeg();
-      if (rm2.subject){
-        s += '<circle class="rdsubject ' + (rm2.alert ? 'alert' : 'clear') + '" cx="' + rm2.subject.x +
-             '" cy="' + rm2.subject.y + '" r="6"' +
-             ((transient && rdMoved) ? ' style="transform:translate(' + (rdPrev.x - rm2.subject.x) +
-              'px,' + (rdPrev.y - rm2.subject.y) + 'px)"' : '') + '/>';
-        if (transient && !RM && rdFresh)
-          s += '<circle class="rdripple" cx="' + rm2.subject.x + '" cy="' + rm2.subject.y + '" r="6"/>';
-      }
-      var rstat = rm2.status != null ? rm2.status : (rm2.subject ? (rm2.alert ? 'RANGE ALERT' : 'CLEAR') : '');
-      if (rstat){
-        s += '<rect class="rdstatusbg ' + (rm2.alert ? 'alert' : 'clear') +
-             (transient && rdFresh ? ' fresh' : '') + '" x="0" y="0" width="132" height="20"/>' +
-             '<text class="rdstatustext" x="8" y="14">' + esc(rstat) + '</text>';
-      }
-      if (rm2.banner){
-        s += '<rect class="rdbannerbg" x="0" y="150" width="320" height="30"/>' +
-             '<text class="rdbannertext" x="160" y="169" text-anchor="middle">' + esc(rm2.banner) + '</text>';
-      }
-      return s + '</svg></div>';
-    };
-    h += buildRadar(true);
-    hBaseline = (rdFresh || rdMoved) ? buildRadar(false) : null;
-  } else if (type === 'xray'){
-    var xm = xrayModel(panel.layers, state.layers);
-    var xopen = '', xclose = '';
-    xm.forEach(function(l){
-      xopen += '<div class="xlayer ' + (l.open ? 'open' : 'sealed') + '">' +
-               '<div class="xhead"><span class="xstate">' + (l.open ? 'OPEN' : 'SEALED') + '</span>' +
-               '<span class="xname">' + esc(l.label) + '</span>' +
-               (l.holder ? '<span class="xholder">key: ' + esc(l.holder) + '</span>' : '') + '</div>';
-      xclose = '</div>' + xclose;
-    });
-    h += '<div class="xray">' + xopen + '<div class="xcore">payload</div>' + xclose + '</div>';
-    if (state.hop != null){
-      var readable = xm.length > 0 && xm.every(function(l){ return l.open; });
-      h += '<div class="xfoot' + (readable ? ' yes' : ' no') + '">at <b>' + esc(String(state.hop)) + '</b> — payload ' +
-           (readable ? 'READABLE here' : 'NOT readable here') + '</div>';
-    }
-  } else if (type === 'queue'){
-    h += queuePanelHTML(panel, state);
-  } else if (type === 'inflight'){
-    var ifmNow = inflightModel(panel, state, Array.isArray(states) ? states.length : state.stepCount, stepIdx);
-    inflightFramesNow = inflightBarFrames(ifmNow);
-    inflightFramesPrev = host._ifFrames || null;
-    host._ifFrames = {};
-    inflightFramesNow.forEach(function(frame){ host._ifFrames[frame.key] = frame.width; });
-    h += inflightPanelHTML(panel, state, Array.isArray(states) ? states.length : state.stepCount, stepIdx);
-  } else if (type === 'deviceapp'){
-    var daFresh=animate && validRevealIndex(host._daStep) && validRevealIndex(stepIdx) && stepIdx===host._daStep+1;
-    host._daStep=validRevealIndex(stepIdx)?stepIdx:null;
-    h+=deviceAppPanelHTML(panel,state,daFresh);
-    hBaseline=daFresh?deviceAppPanelHTML(panel,state,false):null;
-  } else if (type === 'phone'){
-    var phm = phoneModel(state);
-    /* Like pir/radar, entry is derived from the transition we actually
-       painted, never from the target snapshot's `_phoneAdded` marker. That
-       marker is also present when navigating backward onto its source step.
-       Requiring an adjacent forward step and a strictly deeper stack keeps
-       backward navigation, jumps/deep links, and settled export renders free
-       of one-shot markup. */
-    var phonePrevStack = Array.isArray(host._phoneStack) ? host._phoneStack : null;
-    var phoneDeeper = phonePrevStack !== null && phm.notifications.length > phonePrevStack.length &&
-      phonePrevStack.every(function(previousCard, previousIndex){
-        var nextCard = phm.notifications[phm.notifications.length - phonePrevStack.length + previousIndex];
-        return nextCard && nextCard.app === previousCard.app &&
-          nextCard.title === previousCard.title && nextCard.text === previousCard.text;
-      });
-    var phoneFresh = animate && validRevealIndex(host._phoneStep) &&
-      validRevealIndex(stepIdx) && stepIdx === host._phoneStep + 1 && phoneDeeper;
-    host._phoneStep = validRevealIndex(stepIdx) ? stepIdx : null;
-    host._phoneStack = phm.notifications.map(function(card){
-      return {app:card.app, title:card.title, text:card.text};
-    });
-    h += phonePanelHTML(panel, state, phoneFresh);
-    hBaseline = phoneFresh ? phonePanelHTML(panel, state, false) : null;
-  } else {
-    h += '<div class="punknown">unknown panel type: ' + esc(String(panel.type)) + '</div>';
-  }
-
-  /* An immediate jump must also cancel a presentation that may still be in
-     flight from the preceding click. Do this before the unchanged-markup
-     return: _lastHTML already represents the absolute target while the live
-     DOM may temporarily carry tween widths, numbers, or one-shot classes. */
-  if (!animate){
-    if (host._thTween && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(host._thTween);
-    host._thTween = null;
-    if (host._pulseTimer){ clearTimeout(host._pulseTimer); host._pulseTimer = null; }
-    host._ifEpoch = (host._ifEpoch || 0) + 1;
-    if (typeof host.querySelectorAll === 'function'){
-      var transientEls = host.querySelectorAll('.dv-chip-pulse,.dv-bar-enter,.pirghost,.pirtrail,.pirripple,.rdripple,.hmripple,.hmglow,.hmsig,.hmtrail');
-      for (var te = transientEls.length - 1; te >= 0; te--){
-        var transientEl = transientEls[te];
-        if (transientEl.classList){
-          transientEl.classList.remove('dv-chip-pulse');
-          transientEl.classList.remove('dv-bar-enter');
-        }
-        if (/^(pirghost|pirtrail|pirripple|rdripple|hmripple|hmglow|hmsig|hmtrail)$/.test(transientEl.getAttribute('class') || '') &&
-            transientEl.parentNode) transientEl.parentNode.removeChild(transientEl);
-      }
-      var freshEls = host.querySelectorAll('.fresh');
-      for (var fe = 0; fe < freshEls.length; fe++) freshEls[fe].classList.remove('fresh');
-    }
-    var settleLevel = function(fillSel, pctNow, valSel, valNow){
-      var fill = host.querySelector(fillSel);
-      if (fill){ fill.style.transition = 'none'; fill.style.width = pctNow.toFixed(1) + '%'; }
-      var value = host.querySelector(valSel);
-      if (value && value.firstChild && valNow != null) value.firstChild.nodeValue = String(valNow);
-    };
-    if (type === 'thermo') settleLevel('.thfill', tm.pct, '.thval', tv);
-    else if (type === 'battery') settleLevel('.btfill', bm.charge != null ? bm.charge : 0, '.btval', bv);
-    else if (type === 'gauge') settleLevel('.gaugefill', pct, '.gaugeval', v);
-    var subjectEl = host.querySelector(type === 'pir' ? '.pirsubject' : (type === 'radar' ? '.rdsubject' : '.dv-no-subject'));
-    if (subjectEl) subjectEl.style.transform = 'translate(0,0)';
-    if (type === 'homemap' && typeof host.querySelectorAll === 'function'){
-      var hmLeaves = host.querySelectorAll('.hmdoor-opening,.hmdoor-closing');
-      for (var hl = 0; hl < hmLeaves.length; hl++){
-        hmLeaves[hl].classList.remove('hmdoor-opening'); hmLeaves[hl].classList.remove('hmdoor-closing');
-      }
-      var hmSettle = host.querySelectorAll('.hmsubject[style]');
-      for (var hs = 0; hs < hmSettle.length; hs++){
-        hmSettle[hs].style.transition = 'none';
-        hmSettle[hs].style.transform = 'translate(0,0)';
-      }
-    }
-    if (type === 'inflight' && inflightFramesNow && typeof host.querySelectorAll === 'function'){
-      var settleBars = host.querySelectorAll('.ifbar');
-      inflightFramesNow.forEach(function(frame, i){
-        if (!settleBars[i]) return;
-        settleBars[i].style.transition = 'none';
-        settleBars[i].style.width = frame.width.toFixed(3) + '%';
-        settleBars[i].style.opacity = '1';
-      });
-    }
-  }
-  /* unchanged markup: leave the DOM alone entirely, so running animations
-     and timers (viewfinder walker + REC timecode, pir sweep/pings, led
-     pulses) CONTINUE across a step change instead of restarting */
-  if (host._lastHTML === h) return;
-
-  /* screen surgical path: consecutive modes that both show the SAME scene
-     (active / live / rec / save) swap only the mode class and the overlay chips,
-     keeping the scene subtree — the walker's animation state survives.
-     Any other transition (off/boot involved, or a first render) rebuilds. */
-  var surgical = false;
-  var SCENE_SHOWING = {active: true, live: true, rec: true, save: true};
-  if (type === 'screen' && host._lastHTML != null &&
-      sceneName === host._scrScene && SCENE_SHOWING[mode] && SCENE_SHOWING[host._scrMode]){
-    var scrBox = host.querySelector('.screenbox');
-    if (scrBox){
-      surgical = true;
-      scrBox.className = scrClass;
-      if (scrOvl !== host._scrOverlay){
-        var oldOvls = scrBox.querySelectorAll('.ovl');
-        for (var ov = oldOvls.length - 1; ov >= 0; ov--)
-          oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
-        if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
-      }
-    }
-  }
-  host._scrMode = (type === 'screen') ? mode : undefined;
-  host._scrScene = (type === 'screen') ? sceneName : undefined;
-  host._scrOverlay = (type === 'screen') ? scrOvl : undefined;
-  host._lastHTML = (hBaseline != null) ? hBaseline : h;
-  if (!surgical) host.innerHTML = h;
-  if (type === 'deviceapp') bindDeviceAppSources(host,panel,state);
-
-  /* Release each subject offset after a painted frame to start its glide. */
-  if ((type === 'pir' || type === 'radar' || type === 'homemap') && animate){
-    var glideEls = [];
-    if (type === 'homemap'){
-      if (typeof host.querySelectorAll === 'function') glideEls = host.querySelectorAll('.hmsubject[style]');
-    } else {
-      var glideEl = host.querySelector(type === 'pir' ? '.pirsubject[style]' : '.rdsubject[style]');
-      if (glideEl) glideEls = [glideEl];
-    }
-    if (glideEls.length){
-      /* Force offsets into layout before the double-rAF release. */
-      for (var ge = 0; ge < glideEls.length; ge++) void glideEls[ge].getBoundingClientRect();
-      requestAnimationFrame(function(){ requestAnimationFrame(function(){
-        for (var gi = 0; gi < glideEls.length; gi++) glideEls[gi].style.transform = 'translate(0,0)';
-      }); });
-    }
-  }
-
-  /* thermo + battery: animate the fill bar from the previous step's width
-     and count the numeric readout toward the new value, so a step change
-     reads as the level moving rather than snapping (skipped under reduced
-     motion). `decimals` controls the readout rounding (thermo 1, battery 0). */
-  if (host._thTween){ cancelAnimationFrame(host._thTween); host._thTween = null; }
-  var tweenLevel = function(pctNow, valNow, fillSel, valSel, decimals){
-    var prev = host._thPrev;
-    host._thPrev = {pct: pctNow, value: valNow};
-    if (!animate || !prev || valNow == null) return;
-    var fillEl = host.querySelector(fillSel);
-    if (fillEl && typeof prev.pct === 'number' && Math.abs(prev.pct - pctNow) > 0.05){
-      fillEl.style.transition = 'none';
-      fillEl.style.width = prev.pct.toFixed(1) + '%';
-      void fillEl.getBoundingClientRect(); /* paint the start width first */
-      requestAnimationFrame(function(){ requestAnimationFrame(function(){
-        fillEl.style.transition = '';
-        fillEl.style.width = pctNow.toFixed(1) + '%';
-      }); });
-    }
-    var valEl = host.querySelector(valSel);
-    if (valEl && typeof prev.value === 'number' && prev.value !== valNow && valEl.firstChild){
-      var mul = Math.pow(10, decimals);
-      var from = prev.value, t0 = Date.now(), node = valEl.firstChild;
-      var tick = function(){
-        var k = Math.min(1, (Date.now() - t0) / 500);
-        k = 1 - (1 - k) * (1 - k); /* ease-out */
-        node.nodeValue = String(Math.round((from + (valNow - from) * k) * mul) / mul);
-        if (k < 1) host._thTween = requestAnimationFrame(tick);
-        else host._thTween = null;
-      };
-      host._thTween = requestAnimationFrame(tick);
-    }
-  };
-  if (type === 'thermo'){
-    var tmNow = thermoModel(panel, state);
-    tweenLevel(tmNow.pct, tmNow.value, '.thfill', '.thval', 1);
-  } else if (type === 'battery'){
-    var bmNow = batteryModel(panel, state);
-    tweenLevel(bmNow.charge != null ? bmNow.charge : 0, bmNow.charge, '.btfill', '.btval', 0);
-  } else if (type === 'gauge'){
-    var gvNow = typeof state.value === 'number' ? state.value : 0;
-    var gmNow = typeof panel.max === 'number' && panel.max > 0 ? panel.max : 100;
-    var gs = String(gvNow), gd = gs.indexOf('.') >= 0 ? Math.min(3, gs.length - gs.indexOf('.') - 1) : 0;
-    tweenLevel(clamp(gvNow / gmNow * 100, 0, 100), gvNow, '.gaugefill', '.gaugeval', gd);
-  }
-
-  /* State-machine changes get one brief emphasis after the absolute target
-     markup is installed. The transient class is never part of _lastHTML. */
-  if (animate && pulseChanged && pulseSelector){
-    var pulseEl = host.querySelector(pulseSelector);
-    if (pulseEl && pulseEl.classList){
-      if (host._pulseTimer) clearTimeout(host._pulseTimer);
-      pulseEl.classList.add('dv-chip-pulse');
-      host._pulseTimer = setTimeout(function(){
-        pulseEl.classList.remove('dv-chip-pulse');
-        host._pulseTimer = null;
-      }, 620);
-    }
-  }
-
-  /* A waterfall row that becomes revealed grows its bar from the leading
-     edge. Rows already revealed do not replay when unrelated state changes. */
-  if (animate && waterfallEntrants && typeof host.querySelectorAll === 'function'){
-    var wfRows = host.querySelectorAll('.wfrow');
-    waterfallEntrants.forEach(function(enters, i){
-      if (!enters || !wfRows[i]) return;
-      var wfBar = wfRows[i].querySelector('.wfbar');
-      if (wfBar) wfBar.classList.add('dv-bar-enter');
-    });
-  }
-
-  /* Inflight markup is rebuilt from the folded snapshot. On an adjacent step,
-     seed matching bars with their previous width (or zero for a new bar),
-     then release them to the target width. Jumps skip this hook entirely. */
-  if (animate && inflightFramesPrev && inflightFramesNow &&
-      typeof host.querySelectorAll === 'function' && typeof requestAnimationFrame === 'function'){
-    var ifEls = host.querySelectorAll('.ifbar'), ifTweens = [];
-    inflightFramesNow.forEach(function(frame, i){
-      var ifEl = ifEls[i];
-      if (!ifEl) return;
-      var fromWidth = inflightFramesPrev[frame.key];
-      var isNew = typeof fromWidth !== 'number';
-      if (isNew) fromWidth = 0;
-      if (!isNew && Math.abs(fromWidth - frame.width) < 0.001) return;
-      ifEl.style.transition = 'none';
-      ifEl.style.width = fromWidth.toFixed(3) + '%';
-      if (isNew) ifEl.style.opacity = '0';
-      ifTweens.push({el:ifEl, width:frame.width, fresh:isNew});
-    });
-    if (ifTweens.length){
-      var ifEpoch = (host._ifEpoch || 0) + 1;
-      host._ifEpoch = ifEpoch;
-      void ifTweens[0].el.getBoundingClientRect();
-      requestAnimationFrame(function(){ requestAnimationFrame(function(){
-        if (host._ifEpoch !== ifEpoch) return;
-        ifTweens.forEach(function(tween){
-          tween.el.style.transition = '';
-          tween.el.style.width = tween.width.toFixed(3) + '%';
-          if (tween.fresh) tween.el.style.opacity = '1';
-        });
-      }); });
-    }
-  }
-
-  /* log: the body is fixed-height and scrolls internally — keep the newest
-     appended lines in view after a rebuild */
-  if (type === 'log'){
-    var plogEl = host.querySelector('.plog');
-    if (plogEl && typeof plogEl.scrollHeight === 'number') plogEl.scrollTop = plogEl.scrollHeight;
-  }
-
-}
-
-/* log panels are the only widgets that GROW as steps append lines, so they
-   always render at the BOTTOM of the panel column — nothing below them can
-   be pushed around. Relative order within each group is preserved. */
-function panelOrder(panels){
-  var fixed = [], growing = [];
-  (panels || []).forEach(function(p){
-    ((p && p.type === 'log') ? growing : fixed).push(p);
-  });
-  return fixed.concat(growing);
-}
-
-function buildPanels(asideEl, d, skin, primaryHost, primaryId){
-  var folded = foldPanelStates(d);
-  var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
-  var hosts = {};
-  panelOrder(d.panels).forEach(function(p){
-    if (!p || !p.id) return;
-    var card = document.createElement('div');
-    card.className = 'pwidget pt-' + (PANEL_TYPES.indexOf(p.type) >= 0 ? p.type : 'unknown');
-    /* spec index, not render order — log panels are reordered to the end */
-    card.setAttribute('data-dv-panel', String((d.panels || []).indexOf(p)));
-    if (p.title){
-      var t = document.createElement('div');
-      t.className = 'ptitle'; t.textContent = p.title;
-      card.appendChild(t);
-    }
-    var body = document.createElement('div');
-    body.className = 'pbody';
-    card.appendChild(body);
-    (primaryHost && p.id === (primaryId || d.primaryPanel) ? primaryHost : asideEl).appendChild(card);
-    hosts[p.id] = {panel: p, body: body};
-    /* Homemap ambient state precedes step zero; other widgets keep their
-       established first-folded-step preview. */
-    var home = p.type === 'homemap';
-    renderPanelBody(body, p, home ? p.initial : (folded[p.id] || [])[0],
-      skin, p.type === 'trace' && !traceNavigation ? [] : folded[p.id] || [], home ? -1 : 0, false);
-  });
-  return {
-    setDiagram: function(next){
-      folded = foldPanelStates(next);
-      traceNavigation = (next.steps || []).length && next.view !== 'ambient-only';
-    },
-    setStep: function(i, animate, ambient){
-      Object.keys(hosts).forEach(function(pid){
-        var states = folded[pid] || [];
-        var si = Math.min(i, states.length - 1);
-        var panel = hosts[pid].panel;
-        var homeAmbient = ambient && panel.type === 'homemap';
-        renderPanelBody(hosts[pid].body, panel, homeAmbient ? panel.initial : states[si], skin,
-          panel.type === 'trace' && !traceNavigation ? [] : states, homeAmbient ? -1 : si, animate);
-      });
-    }
-  };
-}
-
 /* Runtime evidence is transient per-step state. Labels remain readable when
    animation is reduced or the service board is hidden behind a Home view. */
 function renderRuntimeConditions(board, host, conditions){
@@ -7685,7 +10672,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var lg = document.createElement('div'); lg.className = 'lg';
   var bwrap = document.createElement('div');
   bwrap.className = 'boardcanvas';
-  result.destroy=function(){if(bwrap._nodeLinks){bwrap._nodeLinks.destroy();bwrap._nodeLinks=null;}};
+  result.destroy=function(){if(panelCtl)panelCtl.destroy();if(bwrap._nodeLinks){bwrap._nodeLinks.destroy();bwrap._nodeLinks=null;}};
   boardDiv.appendChild(lg); boardDiv.appendChild(bwrap);
   boardLayout.diagramHost.appendChild(boardDiv);
 

@@ -1,3 +1,4 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -5,7 +6,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const root=path.join(__dirname,'..'), context={};
 vm.createContext(context);
-vm.runInContext(['validator.js','engine.js'].map(name=>fs.readFileSync(path.join(root,'src',name),'utf8')).join('\n'),context);
+vm.runInContext(['validator.js','engine.js'].map(name=>readSource(name)).join('\n'),context);
 const spec=JSON.parse(fs.readFileSync(path.join(root,'src/starters/rollout.json'),'utf8'));
 const diagrams=spec.page.blocks[0].tabs.map(tab=>tab.sections[0].diagram);
 const folded=diagrams.map(d=>context.foldPanelStates(d));

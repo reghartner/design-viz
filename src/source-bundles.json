@@ -1,0 +1,3 @@
+{
+  "engine.js": ["panels/shared.js", "panels/types/*.js", "engine.js"]
+}

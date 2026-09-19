@@ -13,7 +13,7 @@
         "heading": "What this page is",
         "accent": "slate",
         "text": [
-          "A reference gallery: all 19 inspector widgets, grouped in four tabs, each driven by a small step-through so you can watch every widget update. The device (**Kit-1**) and its cloud (**Bench**) are fictional demo stand-ins — the stories exist only to exercise the widgets."
+          "A reference gallery of 18 inspector widget types, grouped in four tabs, each driven by a small step-through so you can watch every widget update. The device (**Kit-1**) and its cloud (**Bench**) are fictional demo stand-ins — the stories exist only to exercise the widgets."
         ]
       },
       {
@@ -84,10 +84,10 @@
             "label": "Camera & detection",
             "sections": [
               {
-                "heading": "screen · pir · zoneframe · radar",
+                "heading": "screen · radar · zoneframe",
                 "accent": "violet",
                 "text": [
-                  "The four camera-and-sensing widgets. `pir` and `radar` COMPUTE their outcomes from geometry — the subject positions below are chosen so the trip and the range alert happen exactly where the captions say. `zoneframe` is authored: its zones and verdict banner are stated, not computed."
+                  "Four camera-and-sensing views. Two `radar` panels show a PIR sensor’s field of view and a measured range; each alert is authored explicitly at the beat where the sensor reports it. Moving a subject or changing a threshold does not trigger an alert. `zoneframe` likewise shows authored zones and a stated verdict banner."
                 ],
                 "diagram": {
                   "view": "step",
@@ -102,11 +102,10 @@
                   "panels": [
                     {"id": "vf", "type": "screen", "title": "screen — viewfinder",
                      "scene": "person-at-door-night", "initial": {"mode": "off"}},
-                    {"id": "ir", "type": "pir", "title": "pir — IR cone (computed trip)",
+                    {"id": "ir", "type": "radar", "title": "radar — PIR field of view (authored alert)",
                      "sensor": {"x": 160, "y": 168},
-                     "cone": {"facing": 270, "spread": 80, "range": 140},
-                     "path": [[40, 60], [160, 60], [160, 160]],
-                     "initial": {"subject": {"x": 40, "y": 60}}},
+                     "facing": 270, "spread": 80, "range": 140,
+                     "initial": {"subject": {"x": 40, "y": 60}, "alert": false}},
                     {"id": "zf", "type": "zoneframe", "title": "zoneframe — authored zones",
                      "zones": [
                        {"id": "walk", "label": "walkway", "state": "armed",
@@ -114,22 +113,22 @@
                        {"id": "street", "label": "street", "state": "ignored",
                         "points": [[8, 8], [312, 8], [312, 56], [8, 56]]}
                      ]},
-                    {"id": "rr", "type": "radar", "title": "radar — range (computed alert)",
+                    {"id": "rr", "type": "radar", "title": "radar — range (authored alert)",
                      "sensor": {"x": 160, "y": 170}, "facing": 270, "spread": 110,
                      "scale": {"pxPerUnit": 30, "unit": "m"},
                      "range": 5, "threshold": 3, "rings": [1, 2, 3, 4, 5],
                      "zones": [{"id": "porch", "label": "porch", "r": [0.5, 2.0], "deg": [240, 300]}],
-                     "initial": {"subject": {"r": 4.6, "deg": 265}}}
+                     "initial": {"subject": {"r": 4.6, "deg": 265}, "alert": false}}
                   ],
                   "steps": [
-                    {"nodes": ["cam"], "text": "Idle. Screen off; radar tracks a subject at 4.6 m — outside the 3 m alert line, so CLEAR is computed; the PIR subject is far left of the cone.",
+                    {"nodes": ["cam"], "text": "Idle. Screen off; radar tracks a subject at 4.6 m outside the 3 m reference line. Both sensing views are explicitly clear; the PIR subject is far left of its field of view.",
                      "panels": {}},
-                    {"nodes": ["cam"], "text": "The subject walks in: radar reads 2.6 m — inside 3 m, RANGE ALERT computes on; still outside the PIR cone.",
-                     "panels": {"rr": {"subject": {"r": 2.6, "deg": 265}},
-                                "ir": {"subject": {"x": 160, "y": 96}}}},
-                    {"edge": "cam->hub", "text": "Closer still: the subject enters the IR cone — the trip is COMPUTED, and the camera boots.",
-                     "panels": {"ir": {"subject": {"x": 160, "y": 130}},
-                                "rr": {"subject": {"r": 1.4, "deg": 265}},
+                    {"nodes": ["cam"], "text": "The subject walks in: radar reads 2.6 m and reports a range alert. This step sets the range view alert on; the PIR sensor has not reported motion yet.",
+                     "panels": {"rr": {"subject": {"r": 2.6, "deg": 265}, "alert": true},
+                                "ir": {"subject": {"x": 160, "y": 96}, "alert": false}}},
+                    {"edge": "cam->hub", "text": "Closer still: the PIR sensor reports motion. This step sets its field-of-view alert on and boots the camera.",
+                     "panels": {"ir": {"subject": {"x": 160, "y": 130}, "alert": true},
+                                "rr": {"subject": {"r": 1.4, "deg": 265}, "alert": true},
                                 "vf": {"mode": "boot"}}},
                     {"nodes": ["cam"], "text": "Live view; the zoneframe shows the subject inside the armed walkway and the authored ALERT verdict banner.",
                      "panels": {"vf": {"mode": "live"},

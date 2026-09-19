@@ -692,36 +692,21 @@
           "panels": [
             {
               "id": "los",
-              "type": "pir",
+              "type": "radar",
               "title": "PIR — field of view (plan)",
               "sensor": {
                 "x": 160,
                 "y": 146
               },
-              "cone": {
-                "facing": 270,
-                "spread": 66,
-                "range": 130
-              },
-              "path": [
-                [
-                  30,
-                  30
-                ],
-                [
-                  60,
-                  40
-                ],
-                [
-                  135,
-                  70
-                ]
-              ],
+              "facing": 270,
+              "spread": 66,
+              "range": 130,
               "initial": {
                 "subject": {
                   "x": 30,
                   "y": 30
-                }
+                },
+                "alert": false
               }
             },
             {
@@ -780,7 +765,8 @@
                   "subject": {
                     "x": 60,
                     "y": 40
-                  }
+                  },
+                  "alert": false
                 }
               }
             },
@@ -794,7 +780,8 @@
                     "x": 135,
                     "y": 70
                   },
-                  "banner": "MOTION — WAKE VISION HP"
+                  "banner": "MOTION — WAKE VISION HP",
+                  "alert": true
                 },
                 "hp2": {
                   "state": "BOOT"
@@ -894,7 +881,8 @@
                   "subject": {
                     "x": 60,
                     "y": 40
-                  }
+                  },
+                  "alert": false
                 }
               }
             },
@@ -907,7 +895,8 @@
                   "value": 73
                 },
                 "los": {
-                  "subject": null
+                  "subject": null,
+                  "alert": false
                 }
               }
             },

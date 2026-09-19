@@ -199,7 +199,8 @@
                       "threshold": 15,
                       "initial": {
                         "subject": null,
-                        "status": "SCANNING"
+                        "status": "SCANNING",
+                        "alert": false
                       }
                     },
                     {
@@ -249,7 +250,8 @@
                             "r": 21,
                             "deg": 260
                           },
-                          "status": "TRACKING"
+                          "status": "TRACKING",
+                          "alert": false
                         },
                         "leds": {
                           "radar": "tx"
@@ -273,7 +275,8 @@
                       "panels": {
                         "rd": {
                           "subject": null,
-                          "status": "CLEAR"
+                          "status": "CLEAR",
+                          "alert": false
                         },
                         "leds": {
                           "radar": "on"
@@ -298,7 +301,8 @@
                             "r": 14.6,
                             "deg": 250
                           },
-                          "status": "INSIDE 15 FT"
+                          "status": "INSIDE 15 FT",
+                          "alert": true
                         },
                         "leds": {
                           "radar": "tx"
@@ -353,7 +357,8 @@
                           "subject": {
                             "r": 9,
                             "deg": 250
-                          }
+                          },
+                          "alert": true
                         },
                         "log": {
                           "log": [
@@ -578,7 +583,8 @@
                           "r": 26,
                           "deg": 300
                         },
-                        "status": "TRACKING"
+                        "status": "TRACKING",
+                        "alert": false
                       }
                     },
                     {
@@ -624,7 +630,8 @@
                             "r": 22,
                             "deg": 295
                           },
-                          "status": "TRACKING"
+                          "status": "TRACKING",
+                          "alert": false
                         }
                       }
                     },
@@ -650,7 +657,8 @@
                             "r": 14,
                             "deg": 255
                           },
-                          "status": "INSIDE 15 FT"
+                          "status": "INSIDE 15 FT",
+                          "alert": true
                         },
                         "log": {
                           "log": [
@@ -751,7 +759,8 @@
                             "r": 6,
                             "deg": 250
                           },
-                          "status": "AT THE DOOR"
+                          "status": "AT THE DOOR",
+                          "alert": true
                         }
                       }
                     }
@@ -939,7 +948,8 @@
                           "r": 16,
                           "deg": 249
                         },
-                        "status": "TRACKING"
+                        "status": "TRACKING",
+                        "alert": false
                       }
                     },
                     {
@@ -1010,7 +1020,8 @@
                             "r": 14.6,
                             "deg": 250
                           },
-                          "status": "INBOUND 3.1 FT/S"
+                          "status": "INBOUND 3.1 FT/S",
+                          "alert": true
                         },
                         "wf": {
                           "reveal": 1
@@ -1047,7 +1058,8 @@
                           "subject": {
                             "r": 12,
                             "deg": 251
-                          }
+                          },
+                          "alert": true
                         }
                       }
                     },
@@ -1082,7 +1094,8 @@
                           "subject": {
                             "r": 9,
                             "deg": 252
-                          }
+                          },
+                          "alert": true
                         }
                       }
                     },
@@ -1103,7 +1116,8 @@
                         },
                         "rdc": {
                           "subject": null,
-                          "status": "CLEAR"
+                          "status": "CLEAR",
+                          "alert": false
                         }
                       }
                     }
@@ -1361,7 +1375,8 @@
                       "threshold": 15,
                       "initial": {
                         "subject": null,
-                        "status": "SCANNING"
+                        "status": "SCANNING",
+                        "alert": false
                       }
                     },
                     {
@@ -1395,7 +1410,8 @@
                             "r": 14.8,
                             "deg": 285
                           },
-                          "status": "INSIDE 15 FT"
+                          "status": "INSIDE 15 FT",
+                          "alert": true
                         },
                         "log": {
                           "log": [
@@ -1417,7 +1433,8 @@
                       "panels": {
                         "rdt": {
                           "subject": null,
-                          "status": "SCANNING"
+                          "status": "SCANNING",
+                          "alert": false
                         }
                       }
                     },
@@ -1512,7 +1529,8 @@
                           "to": "→ Scout RD"
                         },
                         "rdt": {
-                          "threshold": 11
+                          "threshold": 11,
+                          "alert": false
                         },
                         "log": {
                           "log": [
@@ -1536,7 +1554,8 @@
                             "r": 14.8,
                             "deg": 285
                           },
-                          "status": "OUTSIDE — QUIET"
+                          "status": "OUTSIDE — QUIET",
+                          "alert": false
                         },
                         "mbx": {
                           "state": "empty"

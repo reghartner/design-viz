@@ -1,0 +1,51 @@
+app:
+  title: Doorbell Engineering · Flowview Rehearsal
+  baseUrl: http://localhost:3000
+  packages: all
+organization:
+  name: Fictional Home Company
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+    host: 127.0.0.1
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+  reading:
+    allow:
+      - host: '127.0.0.1:7010'
+        paths: ['/files/']
+  auth:
+    externalAccess:
+      - type: static
+        options:
+          token: ${REHEARSAL_CATALOG_TOKEN}
+          subject: flowview-ci-seeding
+        accessRestrictions:
+          - plugin: catalog
+            permissionAttribute:
+              action: [read]
+auth:
+  providers:
+    guest: {}
+proxy:
+  endpoints:
+    '/flowview':
+      target: http://127.0.0.1:7020/api/canon
+      credentials: require
+      allowedMethods: [GET]
+      headers:
+        Authorization: 'Bearer ${REHEARSAL_READ_TOKEN}'
+catalog:
+  rules:
+    - allow: [Component, API, Location, Group]
+  locations:
+    - type: url
+      target: http://127.0.0.1:7010/files/catalog-info.yaml
+permission:
+  enabled: true

@@ -1,0 +1,59 @@
+name: source-drift
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        type: choice
+        options: [main, codex/rehearsal-refactor, codex/rehearsal-timeout]
+        default: main
+        description: Main for ordinary scans; the other branches are explicit fictional experiments
+      dry_run:
+        type: boolean
+        default: false
+        description: Report without opening PRs
+  schedule:
+    - cron: '23 8 * * *'
+      timezone: America/New_York
+  pull_request_target:
+    types: [closed, labeled, edited]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: source-drift
+  cancel-in-progress: false
+jobs:
+  scan:
+    if: github.event_name != 'pull_request_target' || (github.event.pull_request.state == 'closed' && startsWith(github.event.pull_request.head.ref, 'flowview/drift/'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: __MOCK_REPOSITORY__
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || 'main' }}
+          path: .local/mock-source
+          fetch-depth: 0
+          ssh-key: ${{ secrets.MOCK_SOURCE_SSH_KEY }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read Git objects and report or record a maintainer decision
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FLOWVIEW_REGISTRY: registry.json
+          FLOWVIEW_LOCAL_SOURCES: .flowview/local-sources.json
+          FLOWVIEW_COMMAND: ${{ github.event_name == 'pull_request_target' && 'decision' || 'scan' }}
+          FLOWVIEW_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+        run: node tools/canon/github.mjs "$FLOWVIEW_COMMAND"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drift-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .local/canon-github/
+          include-hidden-files: true
+          retention-days: 30

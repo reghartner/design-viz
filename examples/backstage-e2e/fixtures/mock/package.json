@@ -1,0 +1,13 @@
+{
+  "name": "__MOCK_NAME__",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test contract.test.mjs tests/*.test.mjs",
+    "start": "node mock/server.mjs",
+    "demo": "node run.mjs"
+  },
+  "dependencies": {
+    "yaml": "2.9.1"
+  }
+}

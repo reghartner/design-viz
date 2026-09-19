@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: recording-service
+  namespace: home
+  title: Recording service
+  annotations:
+    flowview.io/telemetry-service: doorbell-recording
+spec:
+  type: service
+  lifecycle: production
+  owner: home-team
+  providesApis: [recording-api]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: notification-service
+  namespace: home
+spec:
+  type: service
+  lifecycle: production
+  owner: home-team

@@ -104,6 +104,10 @@ See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions
 The [visual panel library](docs/workbench-panel-picker.md) opens from **+ panel**:
 browse actual panel previews, select a type, and confirm with **Add panel**.
 
+[Repository catalog sync](docs/workbench-catalog-sync.md) reads company catalog/API
+files from GitHub, proposes an updated service catalog, and bundles the approved
+snapshot with the nginx editor. New projects load those dropdown choices automatically.
+
 The [effective-state inspector](docs/workbench-state-inspector.md) explains
 the panel values at a selected step, including inherited and transient values,
 with links to their authored JSON and read-only snapshots.

@@ -1,0 +1,14 @@
+openapi: 3.0.3
+info:
+  title: Fictional recording API
+  version: '1.0'
+servers:
+  - url: https://recording.example.test
+    x-environment: development
+paths:
+  /recordings:
+    post:
+      operationId: createRecording
+      responses:
+        '201':
+          description: Recording created

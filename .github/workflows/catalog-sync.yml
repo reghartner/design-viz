@@ -1,0 +1,89 @@
+name: workbench-catalog-sync
+on:
+  workflow_dispatch:
+    inputs:
+      allow_empty:
+        description: Intentionally replace the catalog with zero services
+        type: boolean
+        default: false
+      allow_warnings:
+        description: Accept incomplete API metadata (warnings appear in the PR)
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [flowview-catalog-changed]
+  schedule:
+    - cron: '17 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: workbench-catalog-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: vars.FLOWVIEW_CATALOG_SYNC_ENABLED == 'true'
+    runs-on: ${{ vars.FLOWVIEW_CATALOG_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      # Dispatch payloads and PR heads never choose code, hosts, or output paths.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --prefix tools/catalog-sync --ignore-scripts --no-fund --no-audit
+      - name: Require explicit source App repository scope
+        if: vars.FLOWVIEW_SOURCE_APP_CLIENT_ID != ''
+        env:
+          SOURCE_REPOSITORIES: ${{ vars.FLOWVIEW_SOURCE_REPOSITORIES }}
+        run: test -n "$SOURCE_REPOSITORIES" || { echo 'Set FLOWVIEW_SOURCE_REPOSITORIES to the listed source repositories.'; exit 1; }
+      - name: Create a read-only source token
+        if: vars.FLOWVIEW_SOURCE_APP_CLIENT_ID != ''
+        id: source-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.FLOWVIEW_SOURCE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.FLOWVIEW_SOURCE_APP_PRIVATE_KEY }}
+          owner: ${{ vars.FLOWVIEW_SOURCE_OWNER || github.repository_owner }}
+          repositories: ${{ vars.FLOWVIEW_SOURCE_REPOSITORIES }}
+          github-api-url: ${{ vars.FLOWVIEW_CATALOG_GITHUB_API_URL || github.api_url }}
+          permission-contents: read
+      - name: Export and validate repository catalog files
+        env:
+          FLOWVIEW_CATALOG_SOURCES: ${{ vars.FLOWVIEW_CATALOG_SOURCES || '.flowview/catalog-sources.json' }}
+          FLOWVIEW_CATALOG_SOURCE_TOKEN: ${{ steps.source-token.outputs.token || secrets.FLOWVIEW_CATALOG_SOURCE_TOKEN }}
+          FLOWVIEW_CATALOG_GITHUB_API_URL: ${{ vars.FLOWVIEW_CATALOG_GITHUB_API_URL || 'https://api.github.com' }}
+          ALLOW_EMPTY: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_empty }}
+          ALLOW_WARNINGS: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_warnings }}
+        shell: bash
+        run: |
+          options=()
+          if [[ "$ALLOW_EMPTY" == true ]]; then options+=(--allow-empty); fi
+          if [[ "$ALLOW_WARNINGS" == true ]]; then options+=(--allow-warnings); fi
+          node tools/canon/catalog-sync.mjs --sources "$FLOWVIEW_CATALOG_SOURCES" --output workbench/catalog.json --report "$RUNNER_TEMP/catalog-sync.md" "${options[@]}"
+      - name: Create a repository-scoped PR token
+        if: vars.FLOWVIEW_CATALOG_APP_CLIENT_ID != ''
+        id: pr-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.FLOWVIEW_CATALOG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.FLOWVIEW_CATALOG_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Require a bot identity for normal PR checks
+        env:
+          PR_TOKEN: ${{ steps.pr-token.outputs.token || secrets.FLOWVIEW_CATALOG_PR_TOKEN }}
+        run: test -n "$PR_TOKEN" || { echo 'Configure FLOWVIEW_CATALOG_APP_CLIENT_ID/private key or FLOWVIEW_CATALOG_PR_TOKEN.'; exit 1; }
+      - name: Open or update the catalog review
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ steps.pr-token.outputs.token || secrets.FLOWVIEW_CATALOG_PR_TOKEN }}
+          branch: flowview/catalog-sync
+          base: ${{ github.event.repository.default_branch }}
+          add-paths: workbench/catalog.json
+          delete-branch: true
+          commit-message: Refresh bundled Backstage catalog
+          title: Refresh workbench service catalog
+          body-path: ${{ runner.temp }}/catalog-sync.md

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "backstageAppUrl": "https://backstage.company.example",
+  "githubUrl": "https://github.com",
+  "sources": [
+    { "repository": "your-company/doorbell-services", "paths": ["catalog-info.yaml"] },
+    { "repository": "your-company/api-definitions", "ref": "main", "paths": ["catalog/apis.yaml"] }
+  ]
+}

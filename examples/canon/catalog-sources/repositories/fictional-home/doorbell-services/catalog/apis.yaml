@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: recording-api
+  namespace: home
+spec:
+  type: openapi
+  lifecycle: production
+  owner: home-team
+  definition:
+    $text: ../openapi/recording.yaml

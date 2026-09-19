@@ -48,6 +48,8 @@ async function checkPublicFileBoundaries(directory, modulePath, createName, pref
       assert.doesNotMatch(response.body, /FICTIONAL_PRIVATE_CANARY/);
     }
     assert.equal((await rawGet(port, prefix + '%')).status, 400);
+    assert.equal((await rawGet(port, '//[')).status, 400);
+    assert.equal((await rawGet(port, '/health')).status, 200);
     assert.equal((await rawGet(port, validPath)).status, 200, 'Malformed URLs must not crash the server');
   } finally {
     await new Promise(resolve => server.close(resolve));
@@ -96,6 +98,25 @@ test('fresh portable repositories seed over HTTP, pin real code, and detect both
   await run('npm', ['test'], designer);
   await checkPublicFileBoundaries(mock, 'mock/server.mjs', 'createMockServer', '/files/catalog/', 'catalog', '/files/catalog-info.yaml');
   await checkPublicFileBoundaries(designer, 'server/server.mjs', 'createDesignerServer', '/workbench/', 'workbench', '/workbench/catalog.json');
+  // Valid mixed-case IDs must work through both association and revision reads.
+  const {createDesignerServer} = await import(pathToFileURL(path.join(designer, 'server/server.mjs')));
+  const specFile = path.join(designer, 'specs/doorbell.json'), originalSpec = await readFile(specFile, 'utf8');
+  const mixed = structuredClone(spec); mixed.page.canon.id = 'Doorbell';
+  const caseServer = createDesignerServer({token: 'fictional-test'});
+  await new Promise(resolve => caseServer.listen(0, '127.0.0.1', resolve));
+  try {
+    await writeFile(specFile, JSON.stringify(mixed));
+    const base = 'http://127.0.0.1:' + caseServer.address().port;
+    const headers = {Authorization: 'Bearer fictional-test'};
+    const indexed = await (await fetch(base + '/api/canon/entity-diagrams?entityRef=component:home/recording-service', {headers})).json();
+    assert.equal(indexed.diagrams[0].id, 'Doorbell');
+    const published = await fetch(base + '/api/canon/specs/Doorbell?revision=' + indexed.diagrams[0].revision, {headers});
+    assert.equal(published.status, 200);
+    assert.equal((await published.json()).page.canon.id, 'Doorbell');
+  } finally {
+    await writeFile(specFile, originalSpec);
+    await new Promise(resolve => caseServer.close(resolve));
+  }
   const sources = new LocalGitSources({'https://github.com/fixture-company/sample.mock': mock});
   assert.equal((await scan([spec], sources)).findings.length, 0);
   await run('git', ['switch', 'codex/rehearsal-refactor'], mock);

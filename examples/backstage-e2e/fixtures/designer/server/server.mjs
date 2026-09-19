@@ -14,8 +14,10 @@ export function createDesignerServer({token=process.env.FLOWVIEW_READ_TOKEN,publ
  if(!token)throw new Error('Set FLOWVIEW_READ_TOKEN for the Backstage proxy.');
  const session=randomBytes(24).toString('hex');
  return createServer(async(req,res)=>{
-  const url=new URL(req.url,'http://localhost');
   const json=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+  let url;
+  try {url=new URL(req.url,'http://localhost');}
+  catch {return json(400,{error:'Malformed URL'});}
   if(req.method!=='GET')return json(405,{error:'Read-only rehearsal host'});
   if(url.pathname==='/health')return json(200,{status:'ok',rehearsal:true});
   if(url.pathname.startsWith('/api/canon/')){
@@ -28,7 +30,7 @@ export function createDesignerServer({token=process.env.FLOWVIEW_READ_TOKEN,publ
      const spec=reg.specs.find(s=>s.page.canon.id===url.searchParams.get('id'));
      return spec?json(200,{spec,revision:digest(spec),catalog:JSON.parse(await readFile(path.join(root,'workbench/catalog.json'))),simulated:true}):json(404,{error:'Unknown diagram'});
     }
-    const match=/^\/api\/canon\/specs\/([a-z0-9_.-]+)$/.exec(url.pathname);
+    const match=/^\/api\/canon\/specs\/([a-z0-9_.-]+)$/i.exec(url.pathname);
     if(match){const spec=reg.specs.find(s=>s.page.canon.id===match[1]);if(!spec)return json(404,{error:'Unknown diagram'});if(url.searchParams.has('revision')&&url.searchParams.get('revision')!==digest(spec))return json(409,{error:'Published revision changed. Refresh diagrams.'});return json(200,spec);}
     return json(404,{error:'Unknown route'});
    }catch(e){return json(400,{error:e.message});}

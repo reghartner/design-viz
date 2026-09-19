@@ -7,7 +7,10 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 export function createMockServer({token=process.env.MOCK_CATALOG_TOKEN}={}){
  if(!token)throw new Error('Set MOCK_CATALOG_TOKEN (fictional test credential; keep it out of commits).');
  return createServer(async(req,res)=>{
-  const url=new URL(req.url,'http://localhost'),send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+  const send=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+  let url;
+  try {url=new URL(req.url,'http://localhost');}
+  catch {return send(400,{error:{name:'InputError',message:'Malformed URL'}});}
   if(req.method!=='GET')return send(405,{error:{name:'NotAllowedError',message:'Read only'}});
   if(url.pathname==='/health')return send(200,{status:'ok',fixture:true});
   if(url.pathname.startsWith('/files/')){

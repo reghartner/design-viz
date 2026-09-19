@@ -9,6 +9,14 @@ of the same time-aware data — an ambient always-animating view and a guided st
 
 ## Connected company flows
 
+For the complete reproducible integration, use the
+[portable Backstage/GitHub rehearsal](examples/backstage-e2e/README.md). It creates
+fresh mock-company and designer repositories, seeds the workbench through a real
+HTTP GET, runs an actual Backstage app with the Flowview plugin, and includes
+daily catalog/drift workflows plus harmless and breaking source experiments.
+Repository names are configurable; no access to private demo repos is needed.
+All resulting PRs are left for human review and manual merge.
+
 Run `node apps/backstage-mock/server.mjs` and open port 8766 for a fictional central
 repository with catalog-seeded editing, code drift reviews, approved reference
 traces, and incident alternates. No company sandbox is needed. See the

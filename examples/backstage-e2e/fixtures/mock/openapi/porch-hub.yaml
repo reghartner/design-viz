@@ -1,0 +1,30 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Porch hub fictional HTTP contract",
+    "version": "1.0.0",
+    "description": "Fictional contract for diagram seeding. The executable sample uses in-process functions; these are not deployed services."
+  },
+  "servers": [
+    {
+      "url": "https://porch-hub.example.test",
+      "x-environment": "fictional"
+    }
+  ],
+  "paths": {
+    "/button": {
+      "post": {
+        "operationId": "receiveButton",
+        "summary": "Porch hub",
+        "responses": {
+          "200": {
+            "description": "Accepted"
+          },
+          "500": {
+            "description": "Fake failure"
+          }
+        }
+      }
+    }
+  }
+}

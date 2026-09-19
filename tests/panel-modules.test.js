@@ -13,7 +13,7 @@ function core(overrides = {}) {
 }
 test('every supported panel has one discoverable renderer and duplicate registration fails', () => {
   const c = core();
-  const files = sourceFiles('engine.js').filter(file => file.startsWith('panels/types/'));
+  const files = sourceFiles('validator.js').filter(file => file.startsWith('panels/types/'));
   assert.deepEqual(files.map(file => path.basename(file, '.js')).sort(), Array.from(c.PANEL_TYPES).sort());
   assert.deepEqual(Array.from(c.PanelViews.types()).sort(), Array.from(c.PANEL_TYPES).sort());
   assert.throws(() => c.PanelViews.register('gauge', () => ({})), /Duplicate/);
@@ -28,11 +28,13 @@ test('adding a renderer file needs no assembly-list or shared lifecycle edit', (
     fs.mkdirSync(path.join(root,'panels/types'),{recursive:true});
     fs.copyFileSync(path.join(__dirname,'../src/source-bundles.json'),path.join(root,'source-bundles.json'));
     fs.copyFileSync(path.join(__dirname,'../src/panels/shared.js'),path.join(root,'panels/shared.js'));
+    fs.copyFileSync(path.join(__dirname,'../src/panels/registry.js'),path.join(root,'panels/registry.js'));
+    fs.copyFileSync(path.join(__dirname,'../src/validator.js'),path.join(root,'validator.js'));
     fs.writeFileSync(path.join(root,'engine.js'),'var RM = true;');
     const file = path.join(root,'panels/types/probe.js');
     fs.writeFileSync(file,"PanelViews.register('probe',function(host,panel,state){return {html:esc(state.text)};});");
     const context = {};
-    vm.runInNewContext(readSource('validator.js') + '\n' + readSource('engine.js',root),context);
+    vm.runInNewContext(readSource('validator.js',root) + '\n' + readSource('engine.js',root),context);
     let writes=0;
     const host={querySelector(){return null;},querySelectorAll(){return [];},set innerHTML(html){this.html=html;writes++;}};
     context.renderPanelBody(host,{type:'probe'},{text:'<ready>'},'pastel',[],0,false);

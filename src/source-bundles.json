@@ -1,3 +1,11 @@
 {
-  "engine.js": ["panels/shared.js", "panels/types/*.js", "engine.js"]
+  "validator.js": [
+    "panels/registry.js",
+    "validator.js",
+    "panels/shared.js",
+    "panels/types/*.js"
+  ],
+  "engine.js": [
+    "engine.js"
+  ]
 }

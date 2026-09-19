@@ -25,7 +25,8 @@ await build({
     build.onLoad({filter:/.*/,namespace:'flowview'},()=>({contents:core,loader:'js'}));
   }}]
 });
-const css = await Promise.all(['src/style.flowview.css','src/style.core.css','apps/confluence/src/app.css'].map(name=>readFile(path.join(root,name),'utf8')));
+const css = await Promise.all(['src/style.flowview.css','src/style.core.css','apps/confluence/src/app.css'].map(name=>
+  name==='src/style.core.css' ? sourceLoader.readStyles('style.core.css') : readFile(path.join(root,name),'utf8')));
 await writeFile(path.join(outdir,'style.css'),css.join('\n'));
 const html = (await readFile(path.join(app,'src/index.html'),'utf8'))
   .replace('<!-- ICONS -->',await readFile(path.join(root,'src/icons.svg'),'utf8'));

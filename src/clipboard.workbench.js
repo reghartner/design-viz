@@ -125,7 +125,7 @@ function planPasteBuilderClipboard(text,raw,data,destination){
         var panels = d.panels || (d.panels=[]), taken = Object.create(null);
         panels.forEach(function(p){taken[p.id]=true;});
         value.panels.forEach(function(p){var copy=builderClone(p);copy.id=builderClipboardFresh(taken,p.id || p.type);
-          if(copy.type==='deviceapp' && Array.isArray(copy.sources))copy.sources.forEach(function(s){if(s && !Object.prototype.hasOwnProperty.call(d.nodes,s.node))delete s.node;});
+          panelRemapReferences(copy,'nodes',null,function(ref){return Object.prototype.hasOwnProperty.call(d.nodes,ref);});
           panels.push(copy);});
         target = {kind:'panel',section:destination.section,index:panels.length-value.panels.length};
       } else if (data.kind === 'home'){

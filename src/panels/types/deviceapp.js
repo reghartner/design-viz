@@ -1,3 +1,206 @@
+/* deviceapp validation and pure state helpers. */
+/* Device app values are authored UI data, with explicit per-field provenance.
+   A source node is a diagram reference, never an instruction to fetch an API. */
+var DEVICEAPP_STATUSES = ['unknown', 'loading', 'ready', 'stale', 'error'];
+function deviceAppItems(panel, key) {
+  var seen = Object.create(null),
+    reserved = ['clock', 'note', 'constructor', 'prototype'];
+  return (Array.isArray(panel && panel[key]) ? panel[key] : [])
+    .filter(function (item) {
+      if (
+        !panelObject(item) ||
+        typeof item.id !== 'string' ||
+        !/^[A-Za-z][A-Za-z0-9_-]*$/.test(item.id) ||
+        seen[item.id] ||
+        reserved.indexOf(item.id) >= 0
+      )
+        return false;
+      seen[item.id] = true;
+      return true;
+    })
+    .slice(0, key === 'sources' ? 6 : 12);
+}
+function deviceAppPatchWarnings(obj, path, panel, warnings) {
+  if (obj == null) return;
+  if (!panelObject(obj)) {
+    warnings.push(path + ': expected an object — ignored');
+    return;
+  }
+  var fields = deviceAppItems(panel, 'fields'),
+    sources = deviceAppItems(panel, 'sources');
+  Object.keys(obj).forEach(function (key) {
+    if (key === 'clock' || key === 'note') {
+      if (typeof obj[key] !== 'string')
+        warnings.push(path + '.' + key + ': expected text — ignored');
+      return;
+    }
+    var f = fields.find(function (field) {
+        return field.id === key;
+      }),
+      v = obj[key],
+      p = path + '.' + key;
+    if (!f) {
+      warnings.push(p + ': unknown deviceapp field — ignored');
+      return;
+    }
+    if (v === null) return;
+    if (!panelObject(v)) {
+      warnings.push(p + ': expected {value, status?, source?, detail?} or null — ignored');
+      return;
+    }
+    Object.keys(v).forEach(function (k) {
+      if (['value', 'status', 'source', 'detail'].indexOf(k) < 0)
+        warnings.push(p + '.' + k + ': unknown field property — ignored');
+    });
+    if (
+      panelOwn(v, 'value') &&
+      v.value !== null &&
+      !(typeof v.value === 'string' || isFiniteNum(v.value) || typeof v.value === 'boolean')
+    )
+      warnings.push(p + '.value: expected text, finite number, boolean or null — ignored');
+    if (
+      f.kind === 'battery' &&
+      v.value != null &&
+      (!isFiniteNum(v.value) || v.value < 0 || v.value > 100)
+    )
+      warnings.push(p + '.value: battery expects 0–100 — invalid values display as unknown');
+    if (panelOwn(v, 'status') && DEVICEAPP_STATUSES.indexOf(v.status) < 0)
+      warnings.push(p + '.status: expected ' + DEVICEAPP_STATUSES.join(', ') + ' — ignored');
+    if (
+      panelOwn(v, 'source') &&
+      v.source !== null &&
+      !sources.some(function (s) {
+        return s.id === v.source;
+      })
+    )
+      warnings.push(p + '.source: unknown source ID — ignored');
+    if (panelOwn(v, 'detail') && v.detail !== null && typeof v.detail !== 'string')
+      warnings.push(p + '.detail: expected text or null — ignored');
+  });
+}
+function deviceAppWarnings(panel, d, path, warnings) {
+  ['device', 'subtitle'].forEach(function (k) {
+    if (panel[k] != null && typeof panel[k] !== 'string')
+      warnings.push(path + '.' + k + ': expected text — ignored');
+  });
+  ['sources', 'fields'].forEach(function (key) {
+    var items = deviceAppItems(panel, key),
+      raw = panel[key];
+    if (!Array.isArray(raw) || !raw.length)
+      warnings.push(
+        path +
+          '.' +
+          key +
+          ': declare ' +
+          (key === 'sources' ? '1–6 data sources' : '1–12 phone fields')
+      );
+    else if (items.length !== raw.length)
+      warnings.push(
+        path +
+          '.' +
+          key +
+          ': use unique letter-led IDs and at most ' +
+          (key === 'sources' ? 6 : 12) +
+          ' entries; clock/note/constructor/prototype are reserved — invalid entries ignored'
+      );
+    items.forEach(function (item, i) {
+      var p = path + '.' + key + '[' + i + ']';
+      ['label', 'detail', 'endpoint', 'unit'].forEach(function (k) {
+        if (item[k] != null && typeof item[k] !== 'string')
+          warnings.push(p + '.' + k + ': expected text — ignored');
+      });
+      if (key === 'sources') {
+        if (
+          item.color != null &&
+          (typeof item.color !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(item.color))
+        )
+          warnings.push(p + '.color: use #RGB or #RRGGBB — using palette color');
+        if (item.node != null && (typeof item.node !== 'string' || !panelOwn(d.nodes, item.node)))
+          warnings.push(p + '.node: unknown diagram node — no node highlight');
+      } else {
+        if (item.kind != null && ['text', 'battery'].indexOf(item.kind) < 0)
+          warnings.push(p + '.kind: expected text or battery — using text');
+        if (item.icon != null && ICON_SET.indexOf(item.icon) < 0)
+          warnings.push(p + '.icon: unknown icon — ignored');
+        if (
+          item.source != null &&
+          !deviceAppItems(panel, 'sources').some(function (s) {
+            return s.id === item.source;
+          })
+        )
+          warnings.push(p + '.source: unknown source ID — shown as unmapped');
+      }
+    });
+  });
+  deviceAppPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+}
+function foldDeviceAppStates(panel, steps) {
+  var fields = deviceAppItems(panel, 'fields'),
+    sources = deviceAppItems(panel, 'sources'),
+    carried = Object.create(null),
+    states = [];
+  function apply(patch) {
+    var updated = [];
+    if (!panelObject(patch)) return updated;
+    ['clock', 'note'].forEach(function (k) {
+      if (typeof patch[k] === 'string') carried[k] = patch[k];
+    });
+    fields.forEach(function (f) {
+      if (!panelOwn(patch, f.id)) return;
+      var v = patch[f.id],
+        next = Object.assign({}, carried[f.id] || {});
+      if (v === null) next = { value: null, status: 'unknown', detail: '', source: null };
+      else if (panelObject(v)) {
+        if (
+          panelOwn(v, 'value') &&
+          (v.value === null ||
+            typeof v.value === 'string' ||
+            isFiniteNum(v.value) ||
+            typeof v.value === 'boolean')
+        )
+          next.value = v.value;
+        if (DEVICEAPP_STATUSES.indexOf(v.status) >= 0) next.status = v.status;
+        if (
+          panelOwn(v, 'source') &&
+          (v.source === null ||
+            sources.some(function (s) {
+              return s.id === v.source;
+            }))
+        )
+          next.source = v.source;
+        if (v.detail === null || typeof v.detail === 'string') next.detail = v.detail || '';
+      } else return;
+      if (JSON.stringify(next) !== JSON.stringify(carried[f.id] || {})) updated.push(f.id);
+      carried[f.id] = next;
+    });
+    return updated;
+  }
+  function snapshot(updated) {
+    var out = Object.create(null);
+    Object.keys(carried).forEach(function (k) {
+      out[k] = panelObject(carried[k]) ? Object.assign({}, carried[k]) : carried[k];
+    });
+    out._updated = updated;
+    return out;
+  }
+  apply(panel.initial);
+  (steps || []).forEach(function (st) {
+    states.push(snapshot(apply((stepPanelPatch(st) || {})[panel.id])));
+  });
+  if (!states.length) states.push(snapshot([]));
+  return states;
+}
+
+PanelRegistry.extend('deviceapp', {
+  validateDeclaration: function (p, PP, warnings, errors, d) {
+    deviceAppWarnings(p, d, PP, warnings);
+  },
+  validatePatch: function (patch, path, panel, warnings, context) {
+    deviceAppPatchWarnings(patch, path, panel, warnings);
+  },
+  fold: foldDeviceAppStates,
+});
+
 /* deviceapp panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
 function deviceAppModel(panel, state) {
   panel = panel || {};
@@ -5,22 +208,14 @@ function deviceAppModel(panel, state) {
   var str = function (v, fallback) {
     return typeof v === 'string' ? v : fallback || '';
   };
-  var palette = [
-    '#5865d8',
-    '#168878',
-    '#bd6716',
-    '#a354b5',
-    '#287fbe',
-    '#b95164',
-  ];
+  var palette = ['#5865d8', '#168878', '#bd6716', '#a354b5', '#287fbe', '#b95164'];
   var sources = deviceAppItems(panel, 'sources').map(function (s, i) {
     return {
       id: s.id,
       label: str(s.label, s.id),
       letter: String.fromCharCode(65 + i),
       color:
-        typeof s.color === 'string' &&
-        /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(s.color)
+        typeof s.color === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(s.color)
           ? s.color
           : palette[i],
       node: str(s.node),
@@ -36,9 +231,7 @@ function deviceAppModel(panel, state) {
     });
     var valid =
       v.value != null &&
-      (typeof v.value === 'string' ||
-        isFiniteNum(v.value) ||
-        typeof v.value === 'boolean');
+      (typeof v.value === 'string' || isFiniteNum(v.value) || typeof v.value === 'boolean');
     if (battery) valid = isFiniteNum(v.value) && v.value >= 0 && v.value <= 100;
     return {
       id: f.id,
@@ -50,8 +243,7 @@ function deviceAppModel(panel, state) {
       pct: battery && valid ? v.value : 0,
       status: DEVICEAPP_STATUSES.indexOf(v.status) >= 0 ? v.status : 'unknown',
       detail: str(v.detail),
-      updated:
-        Array.isArray(state._updated) && state._updated.indexOf(f.id) >= 0,
+      updated: Array.isArray(state._updated) && state._updated.indexOf(f.id) >= 0,
     };
   });
   return {
@@ -73,11 +265,7 @@ function deviceAppPanelHTML(panel, state, fresh) {
       error: 'Unavailable',
     };
   function badge(s) {
-    return (
-      '<span class="da-badge" aria-hidden="true">' +
-      (s ? s.letter : '?') +
-      '</span>'
-    );
+    return '<span class="da-badge" aria-hidden="true">' + (s ? s.letter : '?') + '</span>';
   }
   function props(s) {
     return (
@@ -132,9 +320,7 @@ function deviceAppPanelHTML(panel, state, fresh) {
       esc(f.value) +
       '</span>' +
       (f.battery
-        ? '<span class="da-meter" aria-hidden="true"><i style="width:' +
-          f.pct +
-          '%"></i></span>'
+        ? '<span class="da-meter" aria-hidden="true"><i style="width:' + f.pct + '%"></i></span>'
         : '') +
       '<span class="da-meta"><span class="da-state">' +
       labels[f.status] +
@@ -180,10 +366,7 @@ function deviceAppPanelHTML(panel, state, fresh) {
       '</span></button>';
   });
   return (
-    h +
-    '</div>' +
-    (m.note ? '<p class="da-note">' + esc(m.note) + '</p>' : '') +
-    '</div></div>'
+    h + '</div>' + (m.note ? '<p class="da-note">' + esc(m.note) + '</p>' : '') + '</div></div>'
   );
 }
 function bindDeviceAppSources(host, panel, state) {
@@ -214,9 +397,7 @@ function bindDeviceAppSources(host, panel, state) {
     });
     var section = host.closest && host.closest('.doc-sec');
     if (section && source && source.node)
-      Array.from(section.querySelectorAll('[data-dv-node]')).forEach(function (
-        n
-      ) {
+      Array.from(section.querySelectorAll('[data-dv-node]')).forEach(function (n) {
         if (n.getAttribute('data-dv-node') !== source.node) return;
         if (!n._daOwners) n._daOwners = new Set();
         n._daOwners.add(host);
@@ -240,25 +421,223 @@ function bindDeviceAppSources(host, panel, state) {
    field; only the state-relevant one renders. Non-strings are ignored (the
    validator warns). */
 
-PanelViews.register(
-  'deviceapp',
-  function (host, panel, state, skin, states, stepIdx, animate) {
-    var h = '';
-    var hBaseline = null;
-    var daFresh =
-      animate &&
-      validRevealIndex(host._daStep) &&
-      validRevealIndex(stepIdx) &&
-      stepIdx === host._daStep + 1;
-    host._daStep = validRevealIndex(stepIdx) ? stepIdx : null;
-    h += deviceAppPanelHTML(panel, state, daFresh);
-    hBaseline = daFresh ? deviceAppPanelHTML(panel, state, false) : null;
-    return {
-      html: h,
-      baseline: hBaseline,
-      mounted: function () {
-        bindDeviceAppSources(host, panel, state);
+PanelViews.register('deviceapp', function (host, panel, state, skin, states, stepIdx, animate) {
+  var h = '';
+  var hBaseline = null;
+  var daFresh =
+    animate &&
+    validRevealIndex(host._daStep) &&
+    validRevealIndex(stepIdx) &&
+    stepIdx === host._daStep + 1;
+  host._daStep = validRevealIndex(stepIdx) ? stepIdx : null;
+  h += deviceAppPanelHTML(panel, state, daFresh);
+  hBaseline = daFresh ? deviceAppPanelHTML(panel, state, false) : null;
+  return {
+    html: h,
+    baseline: hBaseline,
+    mounted: function () {
+      bindDeviceAppSources(host, panel, state);
+    },
+  };
+});
+
+PanelRegistry.extend('deviceapp', {
+  order: 21,
+  label: 'Camera app',
+  since: '0.1.0',
+  layout: {
+    large: true,
+    height: 23,
+    supporting: false,
+  },
+});
+
+PanelRegistry.extend('deviceapp', {
+  styles: [
+    { order: 375, css: String.raw`.pt-deviceapp{container-type:inline-size;}` },
+    {
+      order: 377,
+      css: String.raw`.da-phone{position:relative;box-sizing:border-box;border:3px solid #9ba7bd;border-radius:34px;padding:14px 15px 30px;background:#f5f7fc;color:#24324b;box-shadow:0 14px 30px #23324b12;}
+.da-phone::before{content:"";position:absolute;top:13px;left:43%;width:14%;height:5px;border-radius:5px;background:#8a96ac;}
+.da-statusbar{display:flex;justify-content:space-between;font:600 10px 'IBM Plex Mono',monospace;padding:0 5px 18px;}
+.da-heading{padding:5px 4px 16px;}
+.da-eyebrow{font:600 10px/1.5 'IBM Plex Mono',monospace;letter-spacing:.12em;opacity:.7;}
+.da-heading h3,.da-provenance h3{font:600 21px/1.2 'Sora',sans-serif;margin:7px 0 5px;letter-spacing:-.5px;}
+.da-heading>span:last-child{font-size:12px;color:#65728a;}
+.da-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}`,
+    },
+    {
+      order: 386,
+      css: String.raw`.da-field{display:flex;flex-direction:column;gap:7px;border:1px solid #dfe4ef;border-top:3px solid var(--da-color);border-radius:12px;padding:10px;background:#fff;color:#24324b;transition:box-shadow .16s;}
+.da-field:first-child{grid-column:1/-1;}
+.da-field:last-child:nth-child(even){grid-column:1/-1;}
+.da-field-top{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px;color:#59677f;}
+.da-badge{display:inline-flex;flex:none;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;border:1px solid var(--da-color);color:var(--da-color);font:700 11px 'IBM Plex Mono',monospace;}
+.da-value{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:600;line-height:1.2;}
+.da-field:first-child .da-value{font-size:29px;}
+.da-icon{width:19px;height:19px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;}
+.da-meter{display:block;height:7px;border-radius:5px;background:#e7ecf4;overflow:hidden;}
+.da-meter i{display:block;height:100%;background:var(--da-color);border-radius:5px;}
+.da-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:9px;}
+.da-state{border-radius:4px;padding:2px 5px;background:#edf0f6;color:#53617a;}
+.da-ready .da-state{background:#e0f3ec;color:#17694c;}
+.da-stale .da-state{background:#fff0d6;color:#915209;}
+.da-error .da-state{background:#fde4e7;color:#a62f46;}
+.da-loading .da-state{background:#e4edff;color:#325dab;}
+.da-update-label{color:#626f87;}
+.da-detail{display:block;font-size:11px;line-height:1.4;opacity:.78;}
+.da-updated{box-shadow:0 0 0 1px color-mix(in srgb,var(--da-color) 35%,transparent);}
+.da-field[aria-pressed="true"],.da-source[aria-pressed="true"]{outline:2px solid var(--da-color);outline-offset:2px;}`,
+    },
+    {
+      order: 407,
+      css: String.raw`.da-field.fresh{animation:da-arrive .6s ease-out;}
+@keyframes da-arrive{from{transform:translateY(4px);background:#e8f1ff;}to{transform:none;background:#fff;}}
+.da-home{position:absolute;bottom:10px;left:37%;width:26%;height:4px;border-radius:4px;background:#8694ab;}
+.da-provenance{align-self:center;min-width:0;}
+.da-help{color:var(--dtext);font-size:12px;margin:10px 0 20px;}
+.da-sources{display:grid;gap:12px;}
+.da-source{display:block;width:100%;border:1px solid color-mix(in srgb,var(--dtext) 22%,transparent);border-left:4px solid var(--da-color);border-radius:12px;padding:13px 15px;color:var(--dink);background:color-mix(in srgb,var(--da-color) 4%,transparent);}
+.da-source-title{display:flex;gap:9px;align-items:center;}
+.da-source code{display:block;font:10px/1.5 'IBM Plex Mono',monospace;margin:8px 0;}
+.da-source .da-detail{margin-top:6px;}
+.da-source-fields{display:block;border-top:1px solid color-mix(in srgb,var(--dtext) 16%,transparent);margin-top:9px;padding-top:9px;font-size:11px;color:var(--dtext);}
+.da-note{font-size:12px;border-left:3px solid var(--acc);padding:9px 13px;background:color-mix(in srgb,var(--acc) 6%,transparent);margin:18px 0 0;}
+.node.da-node-focus .card{stroke:var(--acc)!important;stroke-width:4px!important;stroke-dasharray:5 3!important;}`,
+    },
+    {
+      order: 421,
+      css: String.raw`@container (max-width:560px){.da-phone{width:100%;max-width:330px;margin:auto;}}
+@container (max-width:560px){.da-provenance h3{font-size:17px;}}
+@media(prefers-reduced-motion:reduce){.da-field.fresh{animation:none;}}
+@media(prefers-reduced-motion:reduce){.da-field{transition:none;}}
+@media print{.da-field.fresh{animation:none;}}
+@media print{.da-provenance{color:#222;--dink:#222;--dtext:#444;}}
+@media print{.da-phone{box-shadow:none;}}`,
+    },
+    {
+      order: 1257,
+      css: String.raw`@media print{
+  .panelcol .pwidget.pt-deviceapp{display:block !important;background:#fff;border-color:#bbb;}
+}`,
+    },
+  ],
+});
+
+/* deviceapp authoring contract; merged into this panel definition by the bundle. */
+PanelRegistry.extend('deviceapp', {
+  references: { nodes: ['sources.*.node'] },
+  authoring: {
+    template: {
+      title: 'Camera app · data sources',
+      device: 'Front door camera',
+      subtitle: 'Device health',
+      sources: [
+        { id: 'telemetry', label: 'Device telemetry', detail: 'Battery and charging reports' },
+        { id: 'registry', label: 'Device registry', detail: 'Camera configuration' },
+      ],
+      fields: [
+        { id: 'battery', label: 'Battery', kind: 'battery', source: 'telemetry' },
+        { id: 'power', label: 'Charging source', source: 'telemetry' },
+        { id: 'model', label: 'Camera model', icon: 'camera', source: 'registry' },
+        { id: 'firmware', label: 'Firmware', icon: 'chip', source: 'registry' },
+      ],
+      initial: {
+        battery: { value: 68, status: 'ready' },
+        power: { value: 'Solar panel', status: 'ready' },
+        model: { value: 'Doorbell camera', status: 'ready' },
+        firmware: { value: 'v2.4.1', status: 'ready' },
+        note: 'Illustrative values. Select a field to see its source.',
       },
-    };
-  }
-);
+    },
+    setupFields: [
+      ['device', 'text'],
+      ['subtitle', 'text'],
+      [
+        'sources',
+        'rows',
+        {
+          cols: [
+            { k: 'id', req: true },
+            { k: 'label' },
+            { k: 'color' },
+            { k: 'node' },
+            { k: 'endpoint' },
+            { k: 'detail' },
+          ],
+          max: 6,
+        },
+      ],
+      [
+        'fields',
+        'rows',
+        {
+          cols: [
+            { k: 'id', req: true },
+            { k: 'label' },
+            { k: 'kind', kind: 'enum', options: ['text', 'battery'] },
+            { k: 'source' },
+            { k: 'icon', kind: 'icon' },
+            { k: 'unit' },
+          ],
+          max: 12,
+        },
+      ],
+      ['initial', 'json'],
+    ],
+    patchFields: [
+      ['clock', 'text'],
+      ['note', 'text'],
+    ],
+    picker: {
+      order: 25,
+      name: 'Device app',
+      category: 'Devices & interfaces',
+      tagline: 'Values with their sources',
+      description: 'Present device health fields and the backend source that supplied each value.',
+    },
+    expandPatchFields: function (decl) {
+      var sourceIds = (Array.isArray(decl.sources) ? decl.sources : [])
+        .filter(function (s) {
+          return s && typeof s.id === 'string';
+        })
+        .map(function (s) {
+          return s.id;
+        });
+      var appFields = (Array.isArray(decl.fields) ? decl.fields : [])
+        .filter(function (f) {
+          return f && typeof f.id === 'string';
+        })
+        .map(function (f) {
+          return [
+            f.id,
+            'objf',
+            [
+              ['value', f.kind === 'battery' ? 'num' : 'text'],
+              ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
+              ['source', 'enum', sourceIds],
+              ['detail', 'text'],
+            ],
+          ];
+        });
+      return appFields.concat(PANEL_PATCH_FIELDS.deviceapp);
+    },
+    origin: function (p, key, snapshot, context) {
+      var assignment = context.assignment,
+        history = context.history,
+        input = context.input,
+        own = context.own;
+      if (key === '_updated')
+        return { kind: 'engine', label: 'Engine · fields changed at this step', inputs: [] };
+      if (key === 'clock' || key === 'note')
+        return assignment(
+          key,
+          function (v) {
+            return typeof v === 'string';
+          },
+          false
+        );
+      return history([key], true, 'Field value and source history');
+    },
+  },
+});

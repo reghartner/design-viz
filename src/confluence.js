@@ -52,9 +52,9 @@ function confluenceDisplayPage(page, config){
     if (!d) return;
     if (config.focus === 'data') delete d.primaryPanel;
     if (config.focus === 'home'){
-      var homes = (d.panels || []).filter(function(p){return p.type === 'homemap';});
-      var home = homes.find(function(p){return p.id === d.primaryPanel;}) || homes[0];
-      if (home) d.primaryPanel = home.id;
+      var preferred = (d.panels || []).filter(function(p){return panelCapability(p.type,'focusByDefault',false);});
+      var primary = preferred.find(function(p){return p.id === d.primaryPanel;}) || preferred[0];
+      if (primary) d.primaryPanel = primary.id;
     }
   });
   if (config.skin !== 'spec') display.skin = config.skin;

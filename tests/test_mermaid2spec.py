@@ -117,7 +117,7 @@ class TestAcceptance(unittest.TestCase):
     def test_validates_zero_errors_via_engine_validator(self):
         node_script = (
             'const fs=require("fs"),vm=require("vm");'
-            'const code=fs.readFileSync("src/validator.js","utf8")+"\\n"'
+            'const code=require("./tools/source-loader.cjs").readSource("validator.js")+"\\n"'
             '+require("./tools/source-loader.cjs").readSource("engine.js")'
             '+"\\n;__x={validate,normalize};";'
             'const s={console};vm.runInNewContext(code,s);'

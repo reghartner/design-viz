@@ -14,12 +14,9 @@ ROOT = Path(__file__).resolve().parent.parent
 TOOL = ROOT / "tools" / "widget_doc.py"
 CONTRACT = ROOT / "contract" / "authoring-contract.md"
 
-# The engine's panel vocabulary, read from the validator so this test fails
-# the moment the vocabulary and the contract drift apart.
-_validator = (ROOT / "src" / "validator.js").read_text()
-_m = re.search(r"var PANEL_TYPES = \[([^\]]+)\]", _validator)
-PANEL_TYPES = re.findall(r"'([a-z]+)'", _m.group(1))
-assert len(PANEL_TYPES) >= 17, "PANEL_TYPES not parsed from validator.js"
+# Discover authored panel modules; there is no central type allowlist.
+PANEL_TYPES = sorted(p.stem for p in (ROOT / "src/panels/types").glob("*.js"))
+assert len(PANEL_TYPES) >= 17, "panel modules not discovered"
 
 
 def run(*args):

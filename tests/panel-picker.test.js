@@ -56,3 +56,24 @@ test('source, destination, or edit-mode changes invalidate an open picker snapsh
   }
   assert.equal(context.panelPickerCurrent(null,snapshot),false);
 });
+
+
+test('late registered panel metadata drives insertion, field discovery, and isolated picker examples',()=>{
+  context.PanelRegistry.extend('authoring-fixture',{authoring:{
+    template:{title:'Reading',initial:{value:3}},
+    setupFields:[['unit','text'],['initial','json']],patchFields:[['value','num']],
+    expandPatchFields:decl=>[['value','num'],['status','enum',decl.states || ['idle']]],
+    picker:{name:'Reading',category:'Extension fixtures',tagline:'A new panel',description:'A panel discovered from its own authoring contract after the editor scripts loaded.'},
+    example(sample){sample.state.value=7;sample.panel.initial=JSON.parse(JSON.stringify(sample.state));return sample;}
+  }});
+  assert.ok(Object.keys(context.PANEL_TEMPLATES).includes('authoring-fixture'));
+  assert.ok(Object.hasOwn(context.PANEL_SETUP_FIELDS,'authoring-fixture'));
+  assert.deepEqual(plain(context.PANEL_PATCH_FIELDS['authoring-fixture']),[['value','num']]);
+  assert.deepEqual(plain(context.panelPatchFields({type:'authoring-fixture',states:['ready']})),[['value','num'],['status','enum',['ready']]]);
+  assert.ok(context.PANEL_CATALOG.find(entry=>entry.type==='authoring-fixture'));
+  const sample=context.panelPickerExample('authoring-fixture');assert.equal(sample.state.value,7);
+  sample.panel.initial.value=99;
+  assert.equal(context.panelPickerExample('authoring-fixture').state.value,7);
+  const raw={nodes:{},rows:[[]]},plan=context.planAddPanel(JSON.stringify(raw),raw,0,'authoring-fixture');
+  assert.equal(plan.error,undefined);assert.equal(JSON.parse(plan.text).panels[0].initial.value,3);
+});

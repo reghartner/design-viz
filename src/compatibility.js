@@ -6,21 +6,15 @@ var FlowviewCompatibility = (function(){
   'use strict';
   var version = '0.1.0', contract = '1', baseline = '0.1.0';
   var features = Object.create(null);
-  var panelLabels = {
-    state:'State', leds:'LEDs', gauge:'Gauge', log:'Log', screen:'Camera screen',
-    image:'Embedded image', waterfall:'Waterfall', orbit:'Orbit', zoneframe:'Zone frame',
-    xray:'Device internals', queue:'Queue', pir:'Motion sensor', thermo:'Temperature',
-    battery:'Battery', buffer:'Buffer', radar:'Radar', homemap:'Home map', signal:'Signal',
-    tiles:'Tiles', inflight:'In-flight activity', phone:'Phone', deviceapp:'Camera app',
-    timeline:'Timeline', table:'Table', checks:'Checks', budget:'Budget', trace:'Trace', replicas:'Replicas'
-  };
-  Object.keys(panelLabels).forEach(function(type){features['panel.'+type]={label:panelLabels[type]+' panel',since:baseline};});
+  var panelFeatures = /* @panel-features */ {};
+
+  Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
-  // Register future capabilities here with their actual first release, e.g.
-  // features['panel.example']={label:'Example panel',since:'1.2.0'};
+  // Panel capabilities come from their definitions at build time.
+  // Non-panel capabilities and the release version remain owned here.
   function object(v){return !!v && typeof v==='object' && !Array.isArray(v);}
   function pageOf(raw){return object(raw) && object(raw.page) ? raw.page : raw;}
   function parseVersion(value){

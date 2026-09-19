@@ -82,6 +82,23 @@ platform. Company GHES installations may need supported action versions or a UTC
 schedule. Installing/configuring the company App is the remaining company-side
 integration, not something the mock portal can do.
 
+### Read-only source checkouts
+
+For an explicit CI checkout obtained with a repository-scoped SSH deploy key,
+set `FLOWVIEW_LOCAL_SOURCES` to a trusted, default-branch JSON manifest:
+
+```json
+{"version":1,"repositories":{"https://github.com/company/service":".local/source"}}
+```
+
+The workflow must fetch the intended default branch and complete Git history
+before scanning. This adapter reads HEAD and pinned blobs using Git object reads;
+it never executes watched code. Only listed repositories are readable. The same
+mapping is needed for decision jobs to verify exact reviewed evidence. GitHub's
+normal repository token still writes review PRs and authorized decisions in the
+designs repository. This avoids storing a broad personal cross-repository token.
+Checkout directories and manifests must not come from PR payloads.
+
 ## Read the results and record a decision
 
 Each run has a summary with the number of diagrams, code references, findings

@@ -57,8 +57,9 @@ def canon_runtime() -> str:
     return (
         "// GENERATED FILE — python3 tools/build.py; edit src/, not this file.\n"
         "'use strict';\n"
-        + js_bundle("canon.js", "validator.js")
+        + js_bundle("compatibility.js", "canon.js", "validator.js")
         + "\nmodule.exports = FlowCanon;\n"
+        "module.exports.compatibility = FlowviewCompatibility;\n"
         "module.exports.validateSpec = raw => validate(normalize(raw));\n"
         "var viewerRoutingCache;\n"
         "module.exports.viewerRouting = () => {\n"
@@ -108,7 +109,7 @@ def main() -> int:
         "STYLE_CORE": core_css,
         "ICONS": icons,
         "DEMO_SPEC": read("flowview.demo.json").strip(),
-        "JS": js_bundle("canon.js", "validator.js", "engine.js", "boot.flowview.js"),
+        "JS": js_bundle("compatibility.js", "canon.js", "validator.js", "engine.js", "boot.flowview.js"),
     })
     (ROOT / "template" / "flowview.html").write_text(flowview)
 
@@ -116,7 +117,7 @@ def main() -> int:
         "STYLE_PAGE": read("style.workbench.css").rstrip(),
         "STYLE_CORE": core_css,
         "ICONS": icons,
-        "JS": js_bundle("canon.js", "validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "clipboard.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "layout.workbench.js", "canon.workbench.js", "boot.workbench.js"),
+        "JS": js_bundle("compatibility.js", "canon.js", "validator.js", "engine.js", "trace-import.js", "confluence.js", "builder.workbench.js", "clipboard.workbench.js", "steps.workbench.js", "reuse.workbench.js", "workspace.workbench.js", "layout.workbench.js", "canon.workbench.js", "boot.workbench.js"),
         "STARTERS": json.dumps([
             {"name": name, "desc": desc, "spec": json.loads(read(source))}
             for name, desc, source in STARTERS

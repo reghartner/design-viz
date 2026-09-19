@@ -13,8 +13,16 @@ Your typical input is a high-level design document (prose, permalinks, mermaid
 diagrams). Your job is to translate it into this JSON.
 
 **Contract version: 1.** Optionally declare it as `"contract": "1"` inside
-`page`; an engine implementing a different major version warns instead of
-guessing silently.
+`page`; viewers report a different major version instead of guessing silently.
+Backstage blocks rendering when the declared contract major is unsupported.
+
+Declare renderer requirements separately in `page.flowview`:
+`{"authoredWith":"0.1.0","minVersion":"0.1.0","features":["panel.homemap"]}`.
+The editor release is informational; the minimum and feature IDs drive upgrade
+notices. Save/Export stamps these automatically. Agent-authored specs should use
+`tools/compatibility.js --stamp` and then normal validation; preserve existing
+requirements when editing. See [release compatibility](../docs/runtime-compatibility.md)
+for supported capabilities, CI checks and the company fork release workflow.
 
 ## Output rules
 

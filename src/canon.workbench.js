@@ -19,6 +19,7 @@ function initCanonWorkbench(opts){
     try{
       var raw=JSON.parse(opts.src.value), errors=FlowCanon.validate(raw).concat(validate(normalize(raw)).errors);
       if(errors.length) throw new Error(errors.join('\n'));
+      if(typeof FlowviewCompatibility !== 'undefined')raw=FlowviewCompatibility.stamp(raw);
       var response=await fetch('/api/canon/proposals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,review:review,spec:raw,baseRevision:context.revision})});
       var result=await response.json();if(!response.ok)throw new Error(result.error);
       status.textContent='Review '+result.id+' saved. Open the company repository to review it.';

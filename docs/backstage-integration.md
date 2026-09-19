@@ -24,13 +24,15 @@ The guide distinguishes portable implementation from company deployment.
 
 ## Mount the company experience
 
-Keep the company deployment in two repositories: the existing Backstage repository
-owns this frontend plugin, and `flowview-diagrams` owns the authoritative specs,
-registry, traces, drift workflow and company backend/deployment configuration.
-That backend hosts the read API and external workbench/standalone viewer. This
-`design-viz` repository supplies versioned runtime and integration code for both.
-Splitting specs from the service is optional access-policy work, not required by
-this implementation. The company's proper HTTP/auth backend remains authoritative.
+The company fork of Flowview owns engine changes and internal releases. The
+designs repository owns authoritative specs, registry, traces, drift workflow
+and an nginx deployment of the editor built from a pinned Flowview release.
+The existing Backstage repository owns this frontend integration and the
+authenticated adapter that reads authorized specs from the designs repository.
+Backstage pins and upgrades its Flowview dependency through its own PR/release
+cycle. [Spec/runtime compatibility](runtime-compatibility.md) lets a newer spec
+explain which features need an upgrade. The company HTTP/auth backend remains
+authoritative for access; nginx hosting the editor does not supply that policy.
 
 Host the generated `template/flowview.html`, `workbench/flowspec.html`, and portal
 assets behind company authentication. Install the [Flowview entity plugin](../apps/backstage/README.md)

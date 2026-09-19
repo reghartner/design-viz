@@ -11,6 +11,14 @@ workbench** opens the external editor in a new tab. The list refreshes every
 60 seconds while visible, on focus, and on demand. Changing services cancels old
 requests. Failed refreshes retain the last result with a visible warning.
 
+The company fork publishes internal Flowview releases; this Backstage app pins
+its dependency and upgrades through its own PR/release process. Specs can declare
+`page.flowview.minVersion` and feature requirements. The viewer shows an upgrade
+notice with installed/required versions and missing features, keeping the notice
+visible even if rendering fails. Unsupported spec contract majors block rendering.
+See [release compatibility](../../docs/runtime-compatibility.md) for authoring,
+the exported host-independent checker, and the company release checklist.
+
 Walk through the [interactive lifecycle guide](../../docs/diagrams/backstage/backstage.html) for catalog authoring,
 service discovery, GitHub scans, human decisions, refusal gates and trace evidence.
 The guide distinguishes portable implementation from company deployment.

@@ -13,7 +13,8 @@ on:
   repository_dispatch:
     types: [flowview-catalog-changed]
   schedule:
-    - cron: '17 * * * *'
+    - cron: '17 8 * * *'
+      timezone: America/New_York
 permissions:
   contents: read
 concurrency:

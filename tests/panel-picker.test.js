@@ -77,3 +77,13 @@ test('late registered panel metadata drives insertion, field discovery, and isol
   const raw={nodes:{},rows:[[]]},plan=context.planAddPanel(JSON.stringify(raw),raw,0,'authoring-fixture');
   assert.equal(plan.error,undefined);assert.equal(JSON.parse(plan.text).panels[0].initial.value,3);
 });
+
+
+test('Radar is the sensing choice; the retired PIR panel cannot be added',()=>{
+  const raw={nodes:{},rows:[[]]};
+  assert.ok(context.PANEL_CATALOG.some(entry=>entry.type==='radar'));
+  assert.ok(!context.PANEL_CATALOG.some(entry=>entry.type==='pir'));
+  const planned=context.planAddPanel(JSON.stringify(raw),raw,0,'pir');
+  assert.notEqual(JSON.parse(planned.text).panels[0].type,'pir');
+  assert.ok(context.panelPatchFields({type:'radar'}).some(field=>field[0]==='alert' && field[1]==='bool'));
+});

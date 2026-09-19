@@ -121,15 +121,6 @@ function signalModel(panel, state) {
     });
 }
 
-/* radar widget: a top-down range view — concentric distance rings inside a
-   wedge, an alert-threshold arc, named zone polygons, and a subject whose
-   distance is measured. Pure model (node-testable). The engine COMPUTES:
-   the subject's distance from the sensor, whether it is inside the alert
-   threshold (state.alert overrides), and which zones contain it
-   (point-in-polygon). The track drawn across steps is render-level (from the
-   folded state history), not part of this model. Frame is 320x180, y down;
-   `facing`/`spread` follow the pir convention (degrees clockwise from +x). */
-
 PanelViews.register('signal', function (host, panel, state, skin, states, stepIdx, animate) {
   var h = '';
   var sgm = signalModel(panel, state);

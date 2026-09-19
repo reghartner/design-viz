@@ -22,7 +22,7 @@ function loadCore(overrides = {}){
     ' BUILTIN_PROTOCOLS, SCENES, spreadPositions, resolveLabelCollisions,' +
     ' edgeAutoAdjust, parseHash, buildHash, isValidLinkBase, composeLinkURL, slugify, sectionSlugify, sectionReferences, oneBasedIndex, tabIndexOf, tabReference,' +
     ' stepIndexOf, stepReference, resolveHashTarget, rectsOverlap, overlapArea,' +
-    ' waterfallModel, orbitPositions, zoneModel, xrayModel, pirModel, thermoModel, batteryModel, bufferModel, radarModel, homemapModel, pointInPoly, signalModel, tilesModel, lintPage, CONTRACT_VERSION,' +
+    ' waterfallModel, orbitPositions, zoneModel, xrayModel, thermoModel, batteryModel, bufferModel, radarModel, homemapModel, pointInPoly, signalModel, tilesModel, lintPage, CONTRACT_VERSION,' +
     ' queueModel, queuePanelHTML, contractCardHTML, inlineMarkup, generatedFromHTML, bulletsHTML, renderPanelBody, buildPanels, panelOrder,' +
     ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
     ' foldPhoneStates, phoneBrand, phoneModel, phonePanelHTML, PANEL_TYPES,' +
@@ -2316,36 +2316,6 @@ test('xrayModel: layers default sealed, patch opens by id', () => {
   assert.strictEqual(xm[1].open, false, 'non-boolean open does not open a layer');
 });
 
-test('pirModel: subject inside the cone trips it; outside stays clear', () => {
-  const panel = {sensor: {x: 298, y: 78}, cone: {facing: 175, spread: 66, range: 250}};
-  // a point out along the facing direction (to the left, roughly level) is inside
-  const inside = C.pirModel(panel, {subject: {x: 120, y: 90}});
-  assert.strictEqual(inside.tripped, true, 'straight-ahead subject trips the cone');
-  // a point hugging the wall directly below the sensor (steep angle) is outside
-  const outside = C.pirModel(panel, {subject: {x: 285, y: 150}});
-  assert.strictEqual(outside.tripped, false, 'side/blind-spot subject does not trip');
-});
-
-test('pirModel: beyond range is clear; explicit tripped overrides geometry', () => {
-  const panel = {sensor: {x: 298, y: 78}, cone: {facing: 180, spread: 90, range: 100}};
-  const farAway = C.pirModel(panel, {subject: {x: 10, y: 78}});
-  assert.strictEqual(farAway.tripped, false, 'subject beyond range does not trip');
-  const forced = C.pirModel(panel, {subject: {x: 10, y: 78}, tripped: true});
-  assert.strictEqual(forced.tripped, true, 'explicit tripped:true overrides');
-  const suppressed = C.pirModel(panel, {subject: {x: 120, y: 78}, tripped: false});
-  assert.strictEqual(suppressed.tripped, false, 'explicit tripped:false overrides');
-});
-
-test('pirModel: cone polygon starts at sensor and defaults apply', () => {
-  const m = C.pirModel({}, {});
-  assert.strictEqual(m.conePoints[0][0], m.sensor.x, 'first cone point x is the sensor apex');
-  assert.strictEqual(m.conePoints[0][1], m.sensor.y, 'first cone point y is the sensor apex');
-  assert.ok(m.conePoints.length >= 3, 'cone has an apex plus an arc');
-  assert.strictEqual(m.subject, null, 'no subject when unset');
-  assert.strictEqual(m.tripped, false);
-  assert.strictEqual(m.cone.range > 0, true, 'default range is positive');
-});
-
 test('thermoModel: zone is computed from thresholds; label overrides the caption only', () => {
   const panel = {min: 20, max: 110, warn: 75, crit: 95};
   assert.strictEqual(C.thermoModel(panel, {value: 40}).zone, 'ok');
@@ -2573,7 +2543,7 @@ test('pointInPoly: containment, exterior, non-convex', () => {
   assert.strictEqual(C.pointInPoly(8, 8, ell), false, 'inside the L notch is outside');
 });
 
-test('radarModel: distance/threshold alert, zone occupancy, overrides, defaults', () => {
+test('radarModel: distance and occupancy are computed; alerts are explicit', () => {
   const panel = {sensor: {x: 160, y: 168}, facing: 270, spread: 120, range: 150,
                  threshold: 80,
                  zones: [{id: 'porch', label: 'porch', points: [[120, 100], [200, 100], [200, 160], [120, 160]]},
@@ -2583,13 +2553,13 @@ test('radarModel: distance/threshold alert, zone occupancy, overrides, defaults'
   assert.strictEqual(far.alert, false, 'beyond threshold is clear');
   assert.strictEqual(Math.round(far.dist), 128);
   const near = C.radarModel(panel, {subject: {x: 160, y: 110}});
-  assert.strictEqual(near.alert, true, 'inside threshold alerts');
+  assert.strictEqual(near.alert, false, 'entering the threshold and a zone does not activate an alert');
   assert.strictEqual(near.occupied.join(','), 'porch', 'zone occupancy computed');
   assert.strictEqual(near.zones.length, 2, 'a zone with <3 points is dropped');
   const forced = C.radarModel(panel, {subject: {x: 160, y: 40}, alert: true});
-  assert.strictEqual(forced.alert, true, 'explicit alert:true overrides');
+  assert.strictEqual(forced.alert, true, 'explicit alert:true activates at any distance');
   const off = C.radarModel(panel, {subject: {x: 160, y: 110}, alert: false});
-  assert.strictEqual(off.alert, false, 'explicit alert:false overrides');
+  assert.strictEqual(off.alert, false, 'explicit alert:false clears at any distance');
   const d = C.radarModel({}, {});
   assert.strictEqual(d.sensor.x, 160);
   assert.strictEqual(d.rings, 3);
@@ -2603,7 +2573,7 @@ test('radar render: rings/threshold/track; move+alert one-shots skip next step',
   const host = {innerHTML: '', querySelector: () => null};
   const panel = {id: 'r', type: 'radar', sensor: {x: 160, y: 168}, facing: 270,
                  spread: 120, range: 150, threshold: 80};
-  const states = [{subject: {x: 40, y: 40}}, {subject: {x: 160, y: 110}}, {subject: {x: 160, y: 110}}];
+  const states = [{subject: {x: 40, y: 40}}, {subject: {x: 160, y: 110}, alert: true}, {subject: {x: 160, y: 110}, alert: true}];
   C.renderPanelBody(host, panel, states[0], 'aurora', states, 0);
   assert.ok(host.innerHTML.includes('rdthresh'), 'threshold arc renders');
   assert.strictEqual([...host.innerHTML.matchAll(/rdring/g)].length, 3, 'three rings by default');
@@ -2617,6 +2587,24 @@ test('radar render: rings/threshold/track; move+alert one-shots skip next step',
   C.renderPanelBody(host, panel, states[2], 'aurora', states, 2);
   assert.strictEqual(host.innerHTML, 'SENTINEL',
     'unchanged alert step matches the steady baseline and skips');
+});
+
+test('radar render: crossing or retuning a threshold never flashes an automatic alarm', () => {
+  const host = {innerHTML: '', querySelector: () => null};
+  const panel = {id: 'r', type: 'radar', threshold: 80};
+  const states = [{subject: {x: 160, y: 40}}, {subject: {x: 160, y: 110}},
+    {subject: {x: 160, y: 110}, threshold: 140}];
+  states.forEach((state, index) => {
+    C.renderPanelBody(host, panel, state, 'pastel', states, index, true);
+    assert.ok(host.innerHTML.includes('rdsubject clear'));
+    assert.ok(!host.innerHTML.includes('rdripple'));
+    assert.ok(!host.innerHTML.includes('RANGE ALERT'));
+  });
+  for (const alert of [false, null, 'true', 1, {}]) {
+    assert.strictEqual(C.radarModel(panel, {subject: {x: 160, y: 110}, alert}).alert, false);
+  }
+  C.renderPanelBody(host, panel, {alert: true}, 'pastel', [], 0, false);
+  assert.ok(host.innerHTML.includes('RANGE ALERT'), 'an explicit alarm is visible even without a tracked subject');
 });
 
 test('validator: radar declaration warnings', () => {
@@ -2792,7 +2780,7 @@ test('radarModel polar layer: scale converts units; sector zones; polar subject'
   assert.ok(m.zones[0].points.length >= 12, 'sector sampled into arc points');
   assert.ok(m.subject && isFinite(m.subject.x) && isFinite(m.subject.y),
     'polar subject converted to frame coordinates');
-  assert.strictEqual(m.alert, true, '1.8 m is inside the 2 m threshold');
+  assert.strictEqual(m.alert, false, 'polar proximity does not activate an alert');
   assert.strictEqual(m.occupied.join(','), 'desk', 'occupancy computed in the converted space');
   const noScale = C.radarModel({range: 150}, {subject: {r: 50, deg: 270}});
   assert.ok(noScale.subject, 'polar subject still converts without scale (r read as px)');
@@ -2800,15 +2788,11 @@ test('radarModel polar layer: scale converts units; sector zones; polar subject'
   assert.strictEqual(cart.subject.x, 10, 'cartesian subject passes through untouched');
 });
 
-test('radar/zoneframe/pir: non-finite author points are dropped, never interpolated', () => {
+test('radar/zoneframe: non-finite author points are dropped, never interpolated', () => {
   const rm = C.radarModel({zones: [{id: 'z', points: [[0, 0], ['x"><script>', 5], [10, 0], [10, 10]]}]}, {});
   assert.strictEqual(rm.zones[0].points.length, 3, 'poisoned point dropped, zone survives');
   const zm = C.zoneModel([{id: 'z', points: [[0, 0], ['"><img>', 1], [5, 5], [9, 0]]}], null);
   assert.strictEqual(zm[0].points.length, 3, 'zoneframe drops the poisoned point');
-  const pm = C.pirModel({path: [[0, 0], ['evil', 2], [5, 5]]}, {});
-  assert.strictEqual(pm.path.length, 2, 'pir path drops the poisoned point');
-  const pm2 = C.pirModel({path: [[0, 0], ['evil', 2]]}, {});
-  assert.strictEqual(pm2.path, null, 'a path left with <2 clean points is not drawn');
 });
 
 test('buffer mark paints: ranges over the cells base; fold accumulates them', () => {
@@ -2849,10 +2833,12 @@ test('radar: a step patch re-tunes the threshold in declared units', () => {
   const panel = {sensor: {x: 160, y: 168}, facing: 270, spread: 150,
                  range: 28, threshold: 15, scale: {pxPerUnit: 5, unit: 'ft'}};
   const before = C.radarModel(panel, {subject: {r: 13, deg: 270}});
-  assert.strictEqual(before.alert, true, '13 ft inside the 15 ft line');
+  assert.strictEqual(before.alert, false, '13 ft inside the 15 ft line still requires an authored alert');
   const tuned = C.radarModel(panel, {subject: {r: 13, deg: 270}, threshold: 11});
   assert.strictEqual(tuned.threshold, 55, '11 ft × 5 px/ft');
-  assert.strictEqual(tuned.alert, false, 'same subject clear after tuning to 11 ft');
+  assert.strictEqual(tuned.alert, false, 'tuning changes only the reference arc');
+  assert.strictEqual(C.radarModel(panel, {subject: {r: 13, deg: 270}, threshold: 11, alert: true}).alert, true,
+    'an authored alert stays active outside the adjusted threshold');
 });
 
 test('radar review-cycle-2 fixes: declared radii, polar track, wrapped sectors, compaction', () => {
@@ -2967,20 +2953,6 @@ test('renderPanelBody: unchanged state leaves the DOM alone (animations survive 
     'identical markup skips the rebuild entirely');
   C.renderPanelBody(host, panel, {state: 'OFF'}, 'aurora');
   assert.ok(host.innerHTML.includes('OFF'), 'changed state still re-renders');
-});
-
-test('pir: the step after a trip skips the rebuild (ambient sweep survives)', () => {
-  const host = {innerHTML: '', querySelector: () => null};
-  const panel = {id: 'p', type: 'pir', sensor: {x: 160, y: 146},
-                 cone: {facing: 270, spread: 66, range: 130}};
-  C.renderPanelBody(host, panel, {subject: {x: 60, y: 40}}, 'aurora');
-  C.renderPanelBody(host, panel, {subject: {x: 135, y: 70}}, 'aurora');
-  assert.ok(host.innerHTML.includes('pirripple'), 'trip render carries the one-shot cues');
-  assert.ok(host.innerHTML.includes('pirghost'), 'move render carries the ghost');
-  host.innerHTML = 'SENTINEL';
-  C.renderPanelBody(host, panel, {subject: {x: 135, y: 70}}, 'aurora');
-  assert.strictEqual(host.innerHTML, 'SENTINEL',
-    'the unchanged step AFTER the trip matches the steady baseline and skips');
 });
 
 test('screen widget: live→rec swaps overlays surgically; boot→live rebuilds', () => {

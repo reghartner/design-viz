@@ -1132,9 +1132,9 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .hmlbl{font:600 6.8px 'IBM Plex Sans',system-ui,sans-serif;fill:var(--hm-label);
   paint-order:stroke;stroke:var(--hm-surface);stroke-width:2;stroke-linejoin:round;}
 .hmwedge{fill:currentColor;fill-opacity:.1;stroke:currentColor;stroke-opacity:.22;stroke-width:.7;}
-.hmsweep{transform-box:view-box; animation:pirsweep 3.2s ease-in-out infinite alternate;}
+.hmsweep{transform-box:view-box; animation:sensorSweep 3.2s ease-in-out infinite alternate;}
 .hmsweep line{stroke:currentColor; stroke-width:1.2; opacity:.55; stroke-linecap:round;}
-.hmripple,.hmglow{fill:none; stroke:currentColor; stroke-width:2; animation:pirripple 1s ease-out both;}
+.hmripple,.hmglow{fill:none; stroke:currentColor; stroke-width:2; animation:sensorRipple 1s ease-out both;}
 .hmglow{stroke-width:5;}
 .hmsig{fill:var(--hm-surface);stroke:var(--hm-accent);stroke-width:1.2;filter:drop-shadow(0 0 2px var(--hm-accent)); visibility:hidden; transform-box:view-box;
   animation:hmsignal 1.6s linear infinite;}`,

@@ -1232,7 +1232,7 @@ test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and none
     state: ['state'], leds: [], gauge: ['value'], log: ['log'], screen: ['mode', 'scenePlayback', 'banner', 'reason'],
     waterfall: ['reveal', 'highlight', 'total'], orbit: ['state', 'via'],
     zoneframe: ['zones', 'subject', 'verdict'], xray: ['layers', 'hop'],
-    queue: ['state', 'label', 'from', 'to', 'reason'], pir: ['subject', 'tripped', 'status', 'banner'],
+    queue: ['state', 'label', 'from', 'to', 'reason'],
     thermo: ['value', 'label'], battery: ['charge', 'trend', 'source', 'cold', 'note', 'label'],
     buffer: ['cells', 'mark', 'head', 'note', 'label'], radar: ['subject', 'threshold', 'alert', 'status', 'banner'],
     signal: [], tiles: [], inflight: ['start', 'end', 'mark'], phone: ['clock', 'notify', 'clear'],

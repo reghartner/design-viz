@@ -386,21 +386,15 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 /* @panel-style-order:632 */
 /* zoneframe widget: night-camera frame, committed dark like the scenes */
 /* @panel-style-order:646 */
-/* pir widget: IR/PIR sensor field-of-view cone + subject, committed dark like
-   the scenes/zoneframe (a sensor's-eye view, not a themed surface) */
+/* Shared sensing animations used by Radar and Home. */
 /* @panel-style-order:666 */
-/* pir motion: the engine emits the sweep/ping/ghost/trail/ripple elements only
-   when reduced motion is off; these rules are the belt to that suspender.
-   The subject carries an inline offset transform back to its previous
-   position, released one frame later, so this transition makes it glide. */
+
 /* @panel-style-order:675 */
-@keyframes pirsweep{from{transform:rotate(calc(var(--sw) * -1));} to{transform:rotate(var(--sw));}}
+@keyframes sensorSweep{from{transform:rotate(calc(var(--sw) * -1));} to{transform:rotate(var(--sw));}}
 /* @panel-style-order:678 */
-@keyframes pirping{from{r:4; opacity:.6;} to{r:18; opacity:0;}}
 /* @panel-style-order:681 */
-@keyframes pirfade{from{opacity:.4;} to{opacity:0;}}
 /* @panel-style-order:683 */
-@keyframes pirripple{from{r:6; opacity:.85;} to{r:26; opacity:0;}}
+@keyframes sensorRipple{from{r:6; opacity:.85;} to{r:26; opacity:0;}}
 /* @panel-style-order:685 */
 /* thermo widget: a temperature readout against warning / critical shutdown
    thresholds — numeric readout + zone chip, a threshold track (shaded warn/
@@ -411,7 +405,7 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
    battery glyph (shell + nub + zone-colored fill + threshold ticks), a fixed
    context row (source / trend / forecast note), and a per-step sparkline */
 /* @panel-style-order:826 */
-/* radar widget: top-down range view, committed dark like pir/zoneframe —
+/* radar widget: top-down range view, committed dark like zoneframe —
    wedge rings, threshold arc, zone polygons, engine-derived track, subject */
 /* @panel-style-order:853 */
 /* Whole-home map uses the surrounding skin's device palette. */
@@ -1162,7 +1156,6 @@ body.sk-editorial .sk-aurora .btsrc,
 body.sk-editorial .sk-daylight .btsrc{color:var(--ed-accent);}
 /* @panel-style-order:1373 */
 body.sk-editorial .zfbox,
-body.sk-editorial .pirbox,
 body.sk-editorial .rdbox,
 body.sk-editorial .screenbox{
   border:1px solid var(--ed-rule-strong);
@@ -1170,24 +1163,16 @@ body.sk-editorial .screenbox{
   box-shadow:none;
 }
 /* @panel-style-order:1384 */
-body.sk-editorial .pirbg,
 body.sk-editorial .rdbg{fill:#EFE8DC;}
 /* @panel-style-order:1389 */
-body.sk-editorial .pirsensor,
 body.sk-editorial .rdsensor{fill:var(--ed-accent); filter:none;}
 /* @panel-style-order:1392 */
-body.sk-editorial .pirsubject.clear,
 body.sk-editorial .rdsubject.clear{fill:#6E7773;}
-body.sk-editorial .pirsubject.tripped,
 body.sk-editorial .rdsubject.alert{fill:var(--ed-warn); filter:none;}
-body.sk-editorial .pirsweep line,
 body.sk-editorial .rdsweep line{stroke:var(--ed-accent); opacity:.33;}
 /* @panel-style-order:1398 */
-body.sk-editorial .pirstatusbg.clear,
 body.sk-editorial .rdstatusbg.clear{fill:#56635F;}
-body.sk-editorial .pirstatusbg.tripped,
 body.sk-editorial .rdstatusbg.alert{fill:#8A5513;}
-body.sk-editorial .pirbannerbg,
 body.sk-editorial .rdbannerbg{fill:var(--ed-ink); opacity:.92;}
 /* @panel-style-order:1410 */
 body.sk-editorial .sk-aurora .thline,
@@ -1747,7 +1732,6 @@ body.sk-editorial .errbox{
 
   body.sk-terminal .screenbox,
   body.sk-terminal .zfbox,
-  body.sk-terminal .pirbox,
   body.sk-terminal .rdbox{
     background:var(--tm-ground);
     border:1px solid var(--tm-line);
@@ -1757,44 +1741,33 @@ body.sk-editorial .errbox{
 /* @panel-style-order:1606 */
 @media screen {
 
-  body.sk-terminal .pirbg,
   body.sk-terminal .rdbg{fill:var(--tm-ground);}
 }
 /* @panel-style-order:1608 */
 @media screen {
-  body.sk-terminal .pirpath,
   body.sk-terminal .rdtrack{stroke:var(--tm-line);}
 }
 /* @panel-style-order:1611 */
 @media screen {
-  body.sk-terminal .pirsensor,
   body.sk-terminal .rdsensor{fill:var(--tm-good);}
 }
 /* @panel-style-order:1613 */
 @media screen {
-  body.sk-terminal .pirsubject.clear,
   body.sk-terminal .rdsubject.clear{fill:var(--tm-muted);}
 }
 @media screen {
-  body.sk-terminal .pirsubject.tripped,
   body.sk-terminal .rdsubject.alert{fill:var(--tm-alert);}
 }
 @media screen {
-  body.sk-terminal .pirstatusbg.clear,
   body.sk-terminal .rdstatusbg.clear{fill:var(--tm-line);}
 }
 @media screen {
-  body.sk-terminal .pirstatusbg.tripped,
   body.sk-terminal .rdstatusbg.alert{fill:var(--tm-alert);}
 }
 @media screen {
-  body.sk-terminal .pirsweep line,
-  body.sk-terminal .rdsweep line,
-  body.sk-terminal .pirping{stroke:var(--tm-good);}
+  body.sk-terminal .rdsweep line{stroke:var(--tm-good);}
 }
 @media screen {
-  body.sk-terminal .pirsweep.tripped line,
-  body.sk-terminal .pirripple,
   body.sk-terminal .rdripple{stroke:var(--tm-alert);}
 }
 @media screen {
@@ -1904,7 +1877,6 @@ body.sk-editorial .errbox{
 @media screen {
 
   body.sk-terminal .zverbg.alert + .zvertext,
-  body.sk-terminal .pirstatusbg.tripped + .pirstatustext,
   body.sk-terminal .rdstatusbg.alert + .rdstatustext{fill:var(--tm-ground);}
 }
 @media screen {
@@ -2403,7 +2375,6 @@ body.sk-editorial .errbox{
 
   body.sk-pastel .screenbox,
   body.sk-pastel .zfbox,
-  body.sk-pastel .pirbox,
   body.sk-pastel .rdbox {
     border:1px solid #D6DFEB;
     border-radius:13px;
@@ -2413,43 +2384,32 @@ body.sk-editorial .errbox{
 /* @panel-style-order:1816 */
 @media screen {
 
-  body.sk-pastel .pirbg,
   body.sk-pastel .rdbg { fill:#142033; }
 }
 /* @panel-style-order:1821 */
 @media screen {
-  body.sk-pastel .pirsensor,
   body.sk-pastel .rdsensor { fill:#82CBE0; filter:drop-shadow(0 0 4px rgba(130,203,224,.58)); }
 }
 /* @panel-style-order:1823 */
 @media screen {
-  body.sk-pastel .pirsubject.clear,
   body.sk-pastel .rdsubject.clear { fill:#AAB8C8; }
 }
 @media screen {
-  body.sk-pastel .pirsubject.tripped,
   body.sk-pastel .rdsubject.alert { fill:#F0BE78; filter:drop-shadow(0 0 4px rgba(240,190,120,.6)); }
 }
 @media screen {
-  body.sk-pastel .pirstatusbg.clear,
   body.sk-pastel .rdstatusbg.clear { fill:#53667E; }
 }
 @media screen {
-  body.sk-pastel .pirstatusbg.tripped,
   body.sk-pastel .rdstatusbg.alert { fill:#B6752E; }
 }
 @media screen {
-  body.sk-pastel .pirbannerbg,
   body.sk-pastel .rdbannerbg { fill:#1A2940; }
 }
 @media screen {
-  body.sk-pastel .pirsweep line,
-  body.sk-pastel .rdsweep line,
-  body.sk-pastel .pirping { stroke:#82CBE0; }
+  body.sk-pastel .rdsweep line { stroke:#82CBE0; }
 }
 @media screen {
-  body.sk-pastel .pirsweep.tripped line,
-  body.sk-pastel .pirripple,
   body.sk-pastel .rdripple { stroke:#F0BE78; }
 }
 /* @panel-style-order:1838 */
@@ -3120,7 +3080,6 @@ body.sk-editorial .errbox{
 
   body.sk-blueprint .screenbox,
   body.sk-blueprint .zfbox,
-  body.sk-blueprint .pirbox,
   body.sk-blueprint .rdbox{
     border:1px solid #63C7DF;
     border-radius:0;
@@ -3129,33 +3088,33 @@ body.sk-editorial .errbox{
 }
 /* @panel-style-order:2050 */
 @media screen {
-  body.sk-blueprint .zlbl,body.sk-blueprint .rdzlbl,body.sk-blueprint .pirsensorlbl{font-family:'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.03em;}
+  body.sk-blueprint .zlbl,body.sk-blueprint .rdzlbl{font-family:'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.03em;}
 }
 /* @panel-style-order:2052 */
 @media screen {
-  body.sk-blueprint .zsubject,body.sk-blueprint .pirsubject.tripped,body.sk-blueprint .rdsubject.alert{fill:#FFD166;}
+  body.sk-blueprint .zsubject,body.sk-blueprint .rdsubject.alert{fill:#FFD166;}
 }
 /* @panel-style-order:2054 */
 @media screen {
-  body.sk-blueprint .zverbg.suppress,body.sk-blueprint .pirstatusbg.clear,body.sk-blueprint .rdstatusbg.clear{fill:#27577A;}
+  body.sk-blueprint .zverbg.suppress,body.sk-blueprint .rdstatusbg.clear{fill:#27577A;}
 }
 /* @panel-style-order:2056 */
 @media screen {
-  body.sk-blueprint .pirbg,body.sk-blueprint .rdbg{fill:#031B3A;}
+  body.sk-blueprint .rdbg{fill:#031B3A;}
 }
 /* @panel-style-order:2061 */
 @media screen {
-  body.sk-blueprint .pirsensor,body.sk-blueprint .rdsensor{fill:#58E7FF;}
+  body.sk-blueprint .rdsensor{fill:#58E7FF;}
 }
 /* @panel-style-order:2063 */
 @media screen {
-  body.sk-blueprint .pirsubject.clear,body.sk-blueprint .rdsubject.clear{fill:#B6D4E3;}
+  body.sk-blueprint .rdsubject.clear{fill:#B6D4E3;}
 }
 @media screen {
-  body.sk-blueprint .pirstatusbg.tripped,body.sk-blueprint .rdstatusbg.alert{fill:#B56A00;}
+  body.sk-blueprint .rdstatusbg.alert{fill:#B56A00;}
 }
 @media screen {
-  body.sk-blueprint .pirbannerbg,body.sk-blueprint .rdbannerbg{fill:#052956;}
+  body.sk-blueprint .rdbannerbg{fill:#052956;}
 }
 /* @panel-style-order:2073 */
 @media screen {

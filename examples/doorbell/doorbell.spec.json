@@ -555,10 +555,10 @@
         "source": "https://github.com/doorbuzz-cloud/chime/blob/main/docs/hld.md#thermal",
         "text": [
           "Vision HP's H.264 encoder can outrun its cooling on a hot afternoon. Firmware throttles the encoder at 75 °C and hard-powers the chip off at 95 °C — but the doorbell never leaves the network, because Sentry LP owns the radio and keeps talking while its big sibling cools.",
-          "The temperature panel tracks the die across every step against the declared warning and shutdown thresholds; the PIR panel shows the visit that started the load."
+          "The temperature panel tracks the die across every step against the declared warning and shutdown thresholds; the Radar sensing view shows the visit that started the load."
         ],
         "bullets": [
-          "The PIR cone computes tripped vs clear from geometry — the walk-up stays outside sensor range until step 3",
+          "The Radar view follows the walk-up; step 3 explicitly turns on the alert when the PIR sensor reports motion",
           "Warning and critical thresholds are declared once on the panel; the engine colors every step from the value alone",
           "Steps 8–9 are the point: the always-on chip narrates the shutdown while the hot chip is completely off"
         ],

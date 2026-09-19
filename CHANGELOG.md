@@ -1,5 +1,16 @@
 # Changelog
 
+## Radar sensing panels and manual alarms (2026-09-19)
+
+- Radar is the supported sensing panel; the old `pir` panel is retired from
+  the renderer and picker. Repository examples now use Radar. For older specs,
+  see the [migration recipe](cookbook/motion-detection.md).
+- Subject movement, zone occupancy, and threshold changes no longer activate
+  alarms. Set a panel's `alert: true` in a step to turn it on and `alert: false`
+  to clear it. The state carries forward along the selected path.
+- Authoring and review skills now describe manual Radar alarms and the complete
+  panel modules, including shared helpers and builds for every viewer host.
+
 ## Live Home / Data flow views (2026-09-14)
 
 - Readers can switch between a large home map and a large service diagram on

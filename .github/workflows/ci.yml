@@ -41,6 +41,8 @@ jobs:
       - run: npm ci --no-fund --no-audit
       - run: npm run check:viewer
       - run: npm run verify
+      - run: node --test ../../tests/canon-bundle.test.mjs
+      - run: node ../../tools/verify-backstage-copy.mjs
 
   confluence-app:
     runs-on: ubuntu-latest

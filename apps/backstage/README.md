@@ -196,6 +196,13 @@ approved local decisions; unapproved proposals never appear.
 - Display names, source-repository URLs and telemetry names do not create inferred
   associations. Removed/rebound nodes remove the old service association.
 
+## Maintenance
+
+See [module ownership and verification boundaries](ARCHITECTURE.md) before changing
+request lifecycle, selection, or the viewer protocol. The upstream
+[panel modularity proposal](../../docs/panel-modularity.md) describes the next engine
+refactor; it is not an available extension API yet.
+
 ## Verify
 
 ```sh

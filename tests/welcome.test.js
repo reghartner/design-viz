@@ -1,7 +1,9 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
+
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const context={URL};vm.createContext(context);
-for(const name of ['validator.js','welcome.workbench.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src',name),'utf8'),context);
+for(const name of ['validator.js','welcome.workbench.js'])vm.runInContext(readSource(name),context);
 const plain=value=>JSON.parse(JSON.stringify(value));
 test('agent guidance links to the selected GitHub fork and revision, including enterprise hosts',()=>{
   const r=context.welcomeRepository('https://github.company.test/platform/flowview.git/','feature/welcome');

@@ -1,8 +1,9 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 function context(extra={}){
   const c={URL,TextEncoder,...extra};vm.createContext(c);
-  for(const name of ['canon','validator','engine','builder.workbench','clipboard.workbench'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/'+name+'.js'),'utf8'),c);
+  for(const name of ['canon','validator','engine','builder.workbench','clipboard.workbench'])vm.runInContext(readSource(name+'.js'),c);
   return c;
 }
 const C=context(),plain=v=>JSON.parse(JSON.stringify(v));

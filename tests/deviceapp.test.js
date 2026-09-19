@@ -1,6 +1,7 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const C=vm.createContext({URL,TextEncoder});
-for(const f of ['canon','validator','engine','builder.workbench','clipboard.workbench','confluence'])vm.runInContext(fs.readFileSync(__dirname+'/../src/'+f+'.js','utf8'),C);
+for(const f of ['canon','validator','engine','builder.workbench','clipboard.workbench','confluence'])vm.runInContext(readSource(f+'.js'),C);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const panel=()=>({...plain(C.PANEL_TEMPLATES.deviceapp),id:'app',type:'deviceapp'});
 const spec=p=>({page:{blocks:[{heading:'Camera',diagram:{nodes:{api:{title:'Telemetry'}},rows:[['api']],edges:[],panels:[p],steps:[{id:'start',nodes:['api']}]}}]}});

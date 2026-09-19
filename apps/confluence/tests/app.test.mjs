@@ -1,4 +1,5 @@
 import test from 'node:test';
+import sourceLoader from '../../../tools/source-loader.cjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
@@ -10,7 +11,7 @@ const home=await readFile(new URL('src/starters/homemap-story.json',root),'utf8'
 const trace=await readFile(new URL('src/starters/complex-trace.json',root),'utf8');
 const names=['buildConfluenceExport','buildConfluenceConfig','confluenceSections','confluenceDisplayPage',
   'confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','DEFAULT_SKIN','renderPage','applySkinClasses'];
-const source=(await Promise.all(['canon','validator','engine','confluence'].map(n=>readFile(new URL('src/'+n+'.js',root),'utf8')))).join('\n');
+const source=(await Promise.all(['canon','validator','engine','confluence'].map(n=>sourceLoader.readSource(n+'.js')))).join('\n');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,5));
 async function setup(t,{config={},configuring=true,submit,contextError=false,reducedMotion=true}={}){
   const dom=new JSDOM(html,{url:'https://forge.example/viewer/',runScripts:'outside-only',pretendToBeVisual:true});

@@ -1,3 +1,4 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const C=require('../tools/canon/core.cjs');
 const spec=()=>JSON.parse(fs.readFileSync('examples/canon/specs/doorbell.json'));
@@ -89,7 +90,7 @@ test('runtime badges clear between steps and labels remain text, including unkno
     const e={tag,attrs:{},children:[],setAttribute(k,v){this.attrs[k]=String(v);},getAttribute(k){return this.attrs[k];},appendChild(n){n.parent=this;this.children.push(n);},remove(){this.parent.children=this.parent.children.filter(n=>n!==this);},querySelector(){return {getAttribute:k=>k==='width'?'160':'60'};},querySelectorAll(){return this.children.filter(n=>n.attrs.class?.includes('runtime-node-badge'));}};
     Object.defineProperty(e,'textContent',{get(){return e.text || '';},set(v){e.text=String(v);e.children=[];}});return e;
   }
-  const document={createElement:element,createElementNS:(_,tag)=>element(tag)},context={document};vm.createContext(context);vm.runInContext(fs.readFileSync('src/engine.js','utf8'),context);
+  const document={createElement:element,createElementNS:(_,tag)=>element(tag)},context={document};vm.createContext(context);vm.runInContext(readSource('engine.js'),context);
   const node=element('g'),host=element('span'),board={nodeEls:{queue:node}};
   context.renderRuntimeConditions(board,host,[{nodeId:'queue',kind:'queue-buildup',label:'240 messages'},{nodeId:'queue',kind:'backpressure',label:'<script>not markup</script>'}]);
   assert.equal(node.children.length,1);assert.equal(host.children.length,2);assert.equal(host.children[1].textContent,'⇤ <script>not markup</script>');

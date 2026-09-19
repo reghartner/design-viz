@@ -1,4 +1,6 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,7 +10,7 @@ const ROOT = path.join(__dirname, '..');
 function load(extra = {}){
   const ctx = {...extra};
   vm.runInNewContext(['validator.js', 'engine.js', 'builder.workbench.js'].map(f =>
-    fs.readFileSync(path.join(ROOT, 'src', f), 'utf8')).join('\n'), ctx);
+    readSource(f)).join('\n'), ctx);
   return ctx;
 }
 const C = load();

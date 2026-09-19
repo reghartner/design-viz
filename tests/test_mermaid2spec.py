@@ -118,7 +118,7 @@ class TestAcceptance(unittest.TestCase):
         node_script = (
             'const fs=require("fs"),vm=require("vm");'
             'const code=fs.readFileSync("src/validator.js","utf8")+"\\n"'
-            '+fs.readFileSync("src/engine.js","utf8")'
+            '+require("./tools/source-loader.cjs").readSource("engine.js")'
             '+"\\n;__x={validate,normalize};";'
             'const s={console};vm.runInNewContext(code,s);'
             'const spec=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));'

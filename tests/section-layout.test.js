@@ -1,4 +1,5 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -6,7 +7,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 const ctx={console,URLSearchParams};
 for(const file of ['validator.js','builder.workbench.js','layout.workbench.js'])
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src',file),'utf8'),ctx);
+  vm.runInNewContext(readSource(file),ctx);
 const plain=x=>JSON.parse(JSON.stringify(x));
 function diagram(){return {nodes:{a:{title:'Camera'},b:{title:'Cloud'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
   primaryPanel:'home',panels:[{id:'home',type:'homemap'},{id:'phone',type:'phone'},{id:'q',type:'queue'}],

@@ -1,6 +1,7 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const C=vm.createContext({URL,TextEncoder});
-for(const f of ['canon','validator','engine','builder.workbench','confluence'])vm.runInContext(fs.readFileSync(__dirname+'/../src/'+f+'.js','utf8'),C);
+for(const f of ['canon','validator','engine','builder.workbench','confluence'])vm.runInContext(readSource(f+'.js'),C);
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII=';
 const panel=()=>({id:'capture',type:'image',src:png,alt:'A captured interface',caption:'Local demo',link:'https://example.com/docs'});
 const spec=p=>({page:{blocks:[{heading:'Image',diagram:{nodes:{app:{title:'Application'}},rows:[['app']],edges:[],panels:[p],steps:[{nodes:['app']}]}}]}});

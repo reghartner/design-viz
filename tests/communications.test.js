@@ -1,10 +1,11 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const code = ['validator.js','engine.js','builder.workbench.js'].map(n =>
-  fs.readFileSync(path.join(__dirname,'../src',n),'utf8')).join('\n');
+  readSource(n)).join('\n');
 const plain = v => JSON.parse(JSON.stringify(v));
 function load(extra = {}){ const c = {...extra}; vm.createContext(c); vm.runInContext(code,c); return c; }
 function fixture(){ return {view:'step',nodes:{a:{title:'API'},b:{title:'Device'},c:{title:'Audit'}},

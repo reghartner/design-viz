@@ -1,8 +1,9 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'), assert=require('node:assert/strict');
 const fs=require('node:fs'), path=require('node:path'), vm=require('node:vm');
 const C={URL};vm.createContext(C);
-for(const name of ['validator','engine','trace-import','builder.workbench'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/'+name+'.js'),'utf8'),C);
+for(const name of ['validator','engine','trace-import','builder.workbench'])vm.runInContext(readSource(name+'.js'),C);
 const plain=x=>JSON.parse(JSON.stringify(x));
 const inspect=(d,i,pid)=>C.builderEffectivePanelStates(d,i).panels.find(p=>p.id===pid);
 const field=(p,key)=>p.fields.find(f=>f.key===key);

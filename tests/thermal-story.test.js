@@ -1,3 +1,4 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -5,7 +6,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const C = vm.createContext({});
 for (const name of ['validator','engine','builder.workbench'])
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/'+name+'.js'),'utf8'),C);
+  vm.runInContext(readSource(name+'.js'),C);
 const plain = v => JSON.parse(JSON.stringify(v));
 const home = () => ({id:'home',type:'homemap',devices:[{id:'cam',kind:'camera',x:130,y:80}],
   initial:{cam:'scan'}});

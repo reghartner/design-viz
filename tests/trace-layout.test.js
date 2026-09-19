@@ -1,4 +1,5 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,7 +7,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const C = {URL}; vm.createContext(C);
 for (const name of ['validator','engine','trace-import'])
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/'+name+'.js'),'utf8'),C);
+  vm.runInContext(readSource(name+'.js'),C);
 const plain = x => JSON.parse(JSON.stringify(x));
 function graph(ids,pairs){
   const edges=pairs.map(([from,to])=>({from,to}));

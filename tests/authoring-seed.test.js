@@ -1,3 +1,4 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,7 +10,7 @@ const spec = JSON.parse(fs.readFileSync(path.join(root,
   'docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json'), 'utf8'));
 const c = vm.createContext({});
 for (const file of ['validator.js', 'engine.js']) {
-  vm.runInContext(fs.readFileSync(path.join(root, 'src', file), 'utf8'), c);
+  vm.runInContext(readSource(file), c);
 }
 const diagram = spec.page.sections[0].diagram;
 function at(pathId, stepId) {

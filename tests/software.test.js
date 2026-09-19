@@ -1,4 +1,6 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,7 +11,7 @@ const root = path.join(__dirname, '..');
 const context = {URL, console};
 vm.createContext(context);
 for (const file of ['validator.js','engine.js','trace-import.js','builder.workbench.js'])
-  vm.runInContext(fs.readFileSync(path.join(root, 'src', file), 'utf8'), context);
+  vm.runInContext(readSource(file), context);
 const C = context;
 const plain = v => JSON.parse(JSON.stringify(v));
 const clone = v => JSON.parse(JSON.stringify(v));

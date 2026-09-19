@@ -1,104 +1,106 @@
-# Panel modules: proposed incremental architecture
+# Panel modules and shared presentation code
 
-Status: design proposal, not an implemented panel extension API. Existing specs
-and releases keep their current behavior while modules are extracted in separately
-reviewable changes.
-
-## Why splitting engine.js is insufficient
-
-The current renderer is about 6,000 lines; the workbench builder is about 7,000.
-The 28 panel types have definitions in several places:
-
-| Concern | Current owner |
-| --- | --- |
-| Type list, normalization, validation and state folding | `src/validator.js` |
-| Models, markup, animation, cleanup and panel placement | `src/engine.js` |
-| Templates, setup fields, step fields and custom inspectors | `src/builder.workbench.js` |
-| Picker descriptions and preview examples | `src/panel-picker.workbench.js` |
-| Styles | `src/style.core.css` |
-| Version requirements and feature names | `src/compatibility.js` |
-
-The extension unit should own all of these panel-specific concerns. Moving only
-the rendering switch into smaller files would leave the same coordination burden.
-
-## Proposed source structure
+The renderer extraction is implemented. All 28 panel types have one source file
+under `src/panels/types/`. Each owns its presentation model, markup, and specific
+interaction hooks. Screen also owns the stock camera scenes. The common panel
+lifecycle is implemented once in `src/panels/shared.js`.
 
 ```text
 src/panels/
-  sdk/                     shared contract and safe UI/animation helpers
-  gauge/
-    manifest.json          type, release, label, description, category, capabilities
-    state.js               normalize, validate, initial state, fold step patch
-    view.js                create/update/destroy renderer
-    editor.js              setup/step fields; optional custom inspector
-    style.css              styles scoped to this panel type
-    example.spec.json      picker preview and executable example
-    tests/                 state, lifecycle, authoring and visual expectations
-  phone/...
-src/runtime/               page composition, graph, routing, steps, layout
+  shared.js            registration, DOM reuse, motion, cleanup, panel containers
+  types/
+    gauge.js           gauge model/markup and level-animation description
+    thermo.js          thermal model/markup; uses the same level animation
+    battery.js         battery model/markup; uses the same level animation
+    screen.js          scenes and the scene-preserving overlay update
+    homemap.js         physical scene model/markup and door-specific settling
+    ...                one file for each of the 28 existing panel types
+src/engine.js          graph, geometry, page composition, layouts and playback
+src/source-bundles.json
 ```
 
-Use plain source modules first; adopting TypeScript across the engine is a separate
-choice. Define/check the extension contract with types or JSDoc and runtime build
-validation. Do not require a wholesale framework rewrite to add boundaries.
+The extraction preserves spec fields, feature versions, folded snapshots, and
+single-file exports. **This is not yet a complete authoring plugin API.** Schema
+validation/state folding remain in `validator.js`; templates/inspector fields
+remain in `builder.workbench.js`; picker metadata, CSS and compatibility entries
+also retain their existing owners. Moving those is the next stage, not a promise
+that an entirely new public panel type currently needs only one file.
 
-Build tooling discovers panel folders deterministically and generates the registry.
-It rejects duplicate IDs, incomplete definitions, unscoped styles and incompatible
-contract versions. The manifest generates picker/type lists, capability/version
-entries and documentation metadata. A contributor adds an ordinary new panel's
-folder and tests; no hand-maintained central switch or import list is required.
+## Renderer contract
 
-These are reviewed build-time modules shipped in a Flowview release. A diagram
-spec remains data and cannot name a remote script, import arbitrary code, or
-register a runtime plugin. Backstage keeps its pinned company release and existing
-upgrade warning behavior.
+`PanelViews.register(type, render, options)` rejects duplicate IDs. `render` receives
+`host, panel, state, skin, states, stepIdx, animate` and returns a presentation
+result. `state` is already folded, absolute state. Renderers must not derive story
+state from the previous DOM or start their own copies of shared animation code.
 
-## Contracts to settle before extraction
+| Result field | Shared behavior |
+| --- | --- |
+| `html` | Target markup; unchanged markup preserves the existing DOM |
+| `baseline` | Steady markup for comparison when the painted HTML has transient cues |
+| `level` | Fill width and numeric readout; shared settling, easing and cancellation |
+| `glide` | One or several subject transforms released after painting |
+| `pulse` | Brief emphasis after a state change |
+| `enterBars` | One-shot emphasis for newly revealed rows |
+| `bars` | Matching duration bars grow from prior visual widths |
+| `transient` | Selector for temporary nodes removed when settling |
+| `settle` | Additional panel-specific cleanup on an immediate jump |
+| `patch` | Optional surgical DOM update; return true when no rebuild is needed |
+| `mounted` | Bind panel-specific interactions after changed markup is installed |
 
-- **State:** normalization and validation remain pure and usable in Node. A reducer
-  receives the declaration, prior state and step patch. It returns the next snapshot
-  without touching the DOM. Existing replace/append/reset and transient-event
-  semantics must survive arbitrary jumps, shared steps and alternate paths.
-- **View:** `create(host, declaration, context)` returns `update(snapshot, transition)`
-  and `destroy()`. Transitions distinguish narrative movement from a refresh or
-  resize. Shared helpers own cancellation, reduced motion, hidden-view pausing,
-  SVG IDs, escaping and explicit evidence links. Presentation state cannot become
-  the source of truth for step state.
-- **Editor:** declarative setup and step fields cover common panels. Complex
-  inspectors receive narrow commands for changing declarations/patches, selection,
-  undo and drag operations. They do not reach into arbitrary builder globals.
-- **Layout:** declare sizing/aspect and supported placements. The layout runtime
-  positions panels and couples step controls; a panel cannot rewrite sibling layout.
-- **Compatibility:** preserve every existing `panel.<type>` identity and its original
-  release version. Moving code is not a new spec feature. Unknown-panel placeholders
-  and upgrade notices keep working.
-- **Delivery:** one source manifest feeds the standalone viewer, workbench, Backstage,
-  Forge and Node runtime builds. Node entry points include pure state/validation;
-  routing helpers are separate from DOM rendering. No deployment-time source reads.
+Options declare shared container behavior: `growing` places accumulating panels
+last; `ambientInitial` renders initial state outside step mode;
+`historyRequiresSteps` avoids showing step history in an ambient-only diagram.
+See [gauge](../src/panels/types/gauge.js), [phone](../src/panels/types/phone.js), and
+[screen](../src/panels/types/screen.js) for simple, transient, and surgical examples.
 
-## Migration sequence and gates
+Shared code owns requestAnimationFrame/timer cancellation. A settled jump or panel
+teardown invalidates pending releases so an earlier animation cannot overwrite a
+new target. Pure models remain callable by the existing workbench and tests;
+these modules use the existing browser-fragment scope, not remote imports.
 
-1. Establish the shared build manifest and contract using a small panel such as
-   gauge. Replace its central branches with registry adapters while legacy panels
-   continue working. Build and verify every host and production backend bundle.
-2. Move the gauge's state, view, inspector, styles, picker metadata and example into
-   its folder. Compare state and visible output before/after, including alternate
-   jumps, reduced motion, hide/show and teardown.
-3. Add a disposable test panel using only a new folder. Prove build discovery,
-   validation, picker preview, editing, state patches, feature reporting and rendering
-   without modifying existing sources. This is the acceptance test for extensibility.
-4. Migrate an animated panel such as phone to exercise notifications, time-based
-   transitions and lifecycle cleanup. Improve the shared SDK only where that real
-   case needs it. Then migrate families of simpler panels in bounded PRs.
-5. Move Home last: its physical geometry, cameras, doors, subject motion and direct
-   manipulation need focused behavioral and visual coverage. Split graph routing,
-   page composition and playback independently after panel ownership is established.
+## One assembly manifest for every host
 
-Keep the exported single-file HTML format. Modular source can still compile to
-self-contained HTML and the pinned Backstage snapshot with its generated CSP hash.
-Check custom layouts, attached controls, hidden steps, alternate paths, arbitrary
-navigation, export/GIF capture and Forge sizing as migration acceptance surfaces.
+`src/source-bundles.json` expands the `engine.js` source entry into shared panel
+code, alphabetically discovered `panels/types/*.js`, and the engine. There is no
+per-panel handwritten import list. Python's page builder and the Node build/test
+loader read that same manifest. Backstage and Forge consume it too.
 
-An ordinary panel should need no edits to existing source. A genuinely new shared
-capability may still require an explicit SDK change; the goal is to make that
-exception visible rather than hiding dependencies behind global access.
+Adding a **renderer implementation** means adding its file. A test creates a new
+renderer file in an isolated source tree and verifies discovery plus common DOM
+reuse without changing the manifest or shared code. Another test ensures every
+existing supported type has exactly one renderer. Existing model, state, scene,
+layout and playback tests continue to exercise the assembled source.
+
+Assembly happens only during builds/tests. The shipped HTML, pinned Backstage
+viewer and `generated-runtime.cjs` contain the expanded source; production backend
+bundles do not read sibling source files. Changing renderer code regenerates the
+Backstage script hash, so its host CSP must be updated when upgrading the artifact.
+
+```sh
+python3 tools/build.py
+node --test tests/*.test.js
+python3 -m unittest discover -s tests -v
+npm run build:viewer --prefix apps/backstage
+npm run verify --prefix apps/backstage
+node --test tests/canon-bundle.test.mjs
+npm run verify --prefix apps/confluence
+```
+
+Use Node 24 and install each app's locked dependencies first. Compare representative
+browser scenes before and after extraction; pure-function tests cannot establish
+visual parity. Tests include immediate/animated jumps, alternate state isolation,
+DOM preservation, reduced motion, pending-release cancellation and teardown.
+
+## Remaining separation
+
+Move declaration/step-field metadata and picker examples into the corresponding
+panel definition, with common inspector field rendering. Then introduce a pure
+state/validation registration layer so Node scanners do not need view modules for
+schema work. Preserve shared reducers for append/reset/transient behavior rather
+than copying them into each panel. Extract genuinely repeated presentation pieces
+(such as history plots) into common helpers when migrating those responsibilities.
+Keep common themes/layout rules shared; do not create 28 independent panel engines.
+
+A new public panel should eventually need only its definition and tests, while a
+new shared capability may require an explicit common API change. No spec may load
+remote code. Company releases and Backstage's pinned upgrade cycle remain intact.

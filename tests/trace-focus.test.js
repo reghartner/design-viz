@@ -1,9 +1,11 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
+
 const test=require('node:test'), assert=require('node:assert/strict');
 const fs=require('node:fs'), vm=require('node:vm'), path=require('node:path'), os=require('node:os');
 const {spawnSync}=require('node:child_process');
 const root=path.join(__dirname,'..'), C={URL}; vm.createContext(C);
-for(const name of ['validator','engine','trace-import']) vm.runInContext(fs.readFileSync(path.join(root,'src',name+'.js'),'utf8'),C);
+for(const name of ['validator','engine','trace-import']) vm.runInContext(readSource(name+'.js'),C);
 const plain=x=>JSON.parse(JSON.stringify(x));
 const fixture=JSON.parse(fs.readFileSync(path.join(root,'examples/traces/complex-checkout.events.json'),'utf8'));
 const event=(id,parent,service,start,duration)=>({'trace.trace_id':'large','trace.span_id':id,'trace.parent_id':parent,'service.name':service,name:'operation '+id,timestamp:start/1000,duration_ms:duration});

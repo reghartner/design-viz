@@ -1,4 +1,6 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
+
 /* Unit tests for the pure spec-source utilities in src/builder.workbench.js
    (JSON locator, section-path walker, insert planners), loaded via vm so the
    browser fragment runs without a DOM.
@@ -907,7 +909,7 @@ const V = loadValidator();
 
 test('starter specs parse and validate with zero errors and warnings', () => {
   for (const source of ['starters/minimal.json', 'starters/panels-tour.json', 'flowview.demo.json']){
-    const spec = JSON.parse(fs.readFileSync(path.join(ROOT, 'src', source), 'utf8'));
+    const spec = JSON.parse(readSource(source));
     const result = V.validate(V.normalize(spec));
     assert.deepStrictEqual(plain(result.errors), [], source);
     assert.deepStrictEqual(plain(result.warnings), [], source);

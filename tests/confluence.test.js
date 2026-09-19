@@ -1,9 +1,11 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
+
 const test=require('node:test'), assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),os=require('node:os');
 const {spawnSync}=require('node:child_process');
 const root=path.join(__dirname,'..'), C={TextEncoder,URL};vm.createContext(C);
-for(const file of ['validator.js','confluence.js']) vm.runInContext(fs.readFileSync(path.join(root,'src',file),'utf8'),C);
+for(const file of ['validator.js','confluence.js']) vm.runInContext(readSource(file),C);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const home=()=>JSON.parse(fs.readFileSync(path.join(root,'src/starters/homemap-story.json'),'utf8'));
 

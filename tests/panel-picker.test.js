@@ -1,7 +1,9 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
+
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const context={};vm.createContext(context);
-for(const name of ['validator.js','builder.workbench.js','panel-picker.workbench.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src',name),'utf8'),context);
+for(const name of ['validator.js','builder.workbench.js','panel-picker.workbench.js'])vm.runInContext(readSource(name),context);
 const plain=value=>JSON.parse(JSON.stringify(value));
 
 test('visual catalog covers each supported panel exactly once with useful descriptions',()=>{

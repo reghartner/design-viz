@@ -200,8 +200,8 @@ approved local decisions; unapproved proposals never appear.
 
 See [module ownership and verification boundaries](ARCHITECTURE.md) before changing
 request lifecycle, selection, or the viewer protocol. The upstream
-[panel modularity proposal](../../docs/panel-modularity.md) describes the next engine
-refactor; it is not an available extension API yet.
+[panel module guide](../../docs/panel-modularity.md) describes the renderer modules
+and shared lifecycle, plus the remaining authoring/schema extraction.
 
 ## Verify
 

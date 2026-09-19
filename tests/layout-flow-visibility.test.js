@@ -1,5 +1,6 @@
+const {readSource}=require('../tools/source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const ctx={};vm.createContext(ctx);for(const file of ['validator','engine'])vm.runInContext(fs.readFileSync('src/'+file+'.js','utf8'),ctx);
+const ctx={};vm.createContext(ctx);for(const file of ['validator','engine'])vm.runInContext(readSource(file+'.js'),ctx);
 const plain=x=>JSON.parse(JSON.stringify(x));
 const flow={x:0,y:12,w:8,h:12},home={panel:'home',x:0,y:0,w:8,h:12},steps={controls:'steps',x:0,y:24,w:8,h:6};
 test('hiding the flow reclaims its rows while keeping panels, controls, and source geometry',()=>{

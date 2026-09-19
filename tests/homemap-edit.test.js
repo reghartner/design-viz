@@ -1,9 +1,10 @@
 'use strict';
+const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
 const C = {URL}; vm.createContext(C);
 for (const name of ['validator', 'engine', 'builder.workbench'])
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/' + name + '.js'), 'utf8'), C);
+  vm.runInContext(readSource(name+'.js'), C);
 const plain = value => JSON.parse(JSON.stringify(value));
 const fixture = () => JSON.parse(fs.readFileSync(path.join(__dirname, '../src/starters/homemap-story.json'), 'utf8'));
 const diagram = spec => spec.page.sections[0].diagram;

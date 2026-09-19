@@ -1,3 +1,4 @@
+const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -5,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const C = {URL}; vm.createContext(C);
 for (const file of ['validator','engine','builder.workbench'])
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/'+file+'.js'),'utf8'),C);
+  vm.runInContext(readSource(file+'.js'),C);
 const plain = x=>JSON.parse(JSON.stringify(x));
 const panel = {id:'copies',type:'replicas',unit:'records',replicas:[{id:'a',label:'Primary'},{id:'b',label:'Follower'},{id:'c',label:'Remote'}]};
 const cursor = (position,series='orders/a')=>({position,series});

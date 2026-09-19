@@ -1,0 +1,30 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Notification service fictional HTTP contract",
+    "version": "1.0.0",
+    "description": "Fictional contract for diagram seeding. The executable sample uses in-process functions; these are not deployed services."
+  },
+  "servers": [
+    {
+      "url": "https://notification-service.example.test",
+      "x-environment": "fictional"
+    }
+  ],
+  "paths": {
+    "/notifications": {
+      "post": {
+        "operationId": "notifyResident",
+        "summary": "Notification service",
+        "responses": {
+          "200": {
+            "description": "Accepted"
+          },
+          "500": {
+            "description": "Fake failure"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Recording service fictional HTTP contract",
+    "version": "1.0.0",
+    "description": "Fictional contract for diagram seeding. The executable sample uses in-process functions; these are not deployed services."
+  },
+  "servers": [
+    {
+      "url": "https://recording-service.example.test",
+      "x-environment": "fictional"
+    }
+  ],
+  "paths": {
+    "/recordings": {
+      "post": {
+        "operationId": "createRecording",
+        "summary": "Recording service",
+        "responses": {
+          "200": {
+            "description": "Accepted"
+          },
+          "500": {
+            "description": "Fake failure"
+          }
+        }
+      }
+    },
+    "/recordings/{recordingId}": {
+      "get": {
+        "operationId": "getRecording",
+        "summary": "Read fake recording metadata",
+        "parameters": [
+          {
+            "name": "recordingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved recording metadata"
+          },
+          "404": {
+            "description": "Recording not found"
+          }
+        }
+      }
+    }
+  }
+}

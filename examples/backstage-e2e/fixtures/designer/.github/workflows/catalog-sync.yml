@@ -1,0 +1,60 @@
+name: seed-workbench-from-backstage
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * *'
+      timezone: America/New_York
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: catalog-seeding
+  cancel-in-progress: false
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: __MOCK_REPOSITORY__
+          ref: main
+          path: .local/mock-source
+          ssh-key: ${{ secrets.MOCK_SOURCE_SSH_KEY }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --prefix tools/catalog-sync --ignore-scripts
+      - run: npm ci --prefix .local/mock-source --ignore-scripts
+      - name: Start the fictional catalog GET API
+        env:
+          MOCK_CATALOG_TOKEN: fictional-ci-catalog-token
+        run: |
+          node .local/mock-source/mock/server.mjs &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:7010/health; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Seed with an actual authenticated GET
+        env:
+          FLOWVIEW_BACKSTAGE_BACKEND_URL: http://127.0.0.1:7010
+          FLOWVIEW_BACKSTAGE_APP_URL: http://localhost:3000
+          FLOWVIEW_BACKSTAGE_TOKEN: fictional-ci-catalog-token
+        run: node tools/canon/catalog-sync.mjs --backstage --output workbench/catalog.json --report "$RUNNER_TEMP/catalog-report.md"
+      - run: npm test
+      - name: Propose the approved catalog snapshot
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: flowview/catalog-sync
+          base: ${{ github.event.repository.default_branch }}
+          add-paths: workbench/catalog.json
+          delete-branch: true
+          commit-message: Seed workbench from Backstage catalog API
+          title: Refresh workbench service and API choices
+          body-path: ${{ runner.temp }}/catalog-report.md

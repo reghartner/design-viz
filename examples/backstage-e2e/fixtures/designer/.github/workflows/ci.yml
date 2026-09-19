@@ -1,0 +1,31 @@
+name: designer-contracts
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+  nginx-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/workbench/Dockerfile -t backstage-designer-workbench .
+      - name: Verify the image serves the approved catalog and editor
+        run: |
+          docker run --detach --name workbench --publish 8080:80 backstage-designer-workbench
+          for attempt in {1..20}; do
+            if curl --fail --silent http://localhost:8080/workbench/catalog.json --output /tmp/image-catalog.json; then break; fi
+            sleep 1
+          done
+          cmp workbench/catalog.json /tmp/image-catalog.json
+          curl --fail --silent http://localhost:8080/workbench/flowspec.html --output /tmp/image-editor.html
+          cmp workbench/flowspec.html /tmp/image-editor.html
+          curl --fail --silent http://localhost:8080/src/starters/minimal.json --output /dev/null

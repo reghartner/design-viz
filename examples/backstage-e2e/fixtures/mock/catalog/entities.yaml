@@ -1,0 +1,138 @@
+{
+  "apiVersion": "backstage.io/v1alpha1",
+  "kind": "Component",
+  "metadata": {
+    "name": "porch-hub",
+    "namespace": "home",
+    "title": "Porch hub",
+    "annotations": {
+      "github.com/project-slug": "__MOCK_REPOSITORY__",
+      "backstage.io/source-location": "url:https://github.com/__MOCK_REPOSITORY__/tree/main/",
+      "flowview.io/telemetry-service": "porch-hub"
+    }
+  },
+  "spec": {
+    "type": "service",
+    "lifecycle": "experimental",
+    "owner": "group:home/home-team",
+    "providesApis": [
+      "porch-hub-api"
+    ]
+  }
+}
+---
+{
+  "apiVersion": "backstage.io/v1alpha1",
+  "kind": "API",
+  "metadata": {
+    "name": "porch-hub-api",
+    "namespace": "home",
+    "title": "Porch hub API"
+  },
+  "spec": {
+    "type": "openapi",
+    "lifecycle": "experimental",
+    "owner": "group:home/home-team",
+    "definition": {
+      "$text": "../openapi/porch-hub.yaml"
+    }
+  }
+}
+---
+{
+  "apiVersion": "backstage.io/v1alpha1",
+  "kind": "Component",
+  "metadata": {
+    "name": "recording-service",
+    "namespace": "home",
+    "title": "Recording service",
+    "annotations": {
+      "github.com/project-slug": "__MOCK_REPOSITORY__",
+      "backstage.io/source-location": "url:https://github.com/__MOCK_REPOSITORY__/tree/main/",
+      "flowview.io/telemetry-service": "recording-service"
+    }
+  },
+  "spec": {
+    "type": "service",
+    "lifecycle": "experimental",
+    "owner": "group:home/home-team",
+    "providesApis": [
+      "recording-service-api"
+    ]
+  }
+}
+---
+{
+  "apiVersion": "backstage.io/v1alpha1",
+  "kind": "API",
+  "metadata": {
+    "name": "recording-service-api",
+    "namespace": "home",
+    "title": "Recording service API"
+  },
+  "spec": {
+    "type": "openapi",
+    "lifecycle": "experimental",
+    "owner": "group:home/home-team",
+    "definition": {
+      "$text": "../openapi/recording-service.yaml"
+    }
+  }
+}
+---
+{
+  "apiVersion": "backstage.io/v1alpha1",
+  "kind": "Component",
+  "metadata": {
+    "name": "notification-service",
+    "namespace": "home",
+    "title": "Notification service",
+    "annotations": {
+      "github.com/project-slug": "__MOCK_REPOSITORY__",
+      "backstage.io/source-location": "url:https://github.com/__MOCK_REPOSITORY__/tree/main/",
+      "flowview.io/telemetry-service": "notification-service"
+    }
+  },
+  "spec": {
+    "type": "service",
+    "lifecycle": "experimental",
+    "owner": "group:home/home-team",
+    "providesApis": [
+      "notification-service-api"
+    ]
+  }
+}
+---
+{
+  "apiVersion": "backstage.io/v1alpha1",
+  "kind": "API",
+  "metadata": {
+    "name": "notification-service-api",
+    "namespace": "home",
+    "title": "Notification service API"
+  },
+  "spec": {
+    "type": "openapi",
+    "lifecycle": "experimental",
+    "owner": "group:home/home-team",
+    "definition": {
+      "$text": "../openapi/notification-service.yaml"
+    }
+  }
+}
+---
+{
+  "apiVersion": "backstage.io/v1alpha1",
+  "kind": "Group",
+  "metadata": {
+    "name": "home-team",
+    "namespace": "home"
+  },
+  "spec": {
+    "type": "team",
+    "profile": {
+      "displayName": "Fictional Home Team"
+    },
+    "children": []
+  }
+}

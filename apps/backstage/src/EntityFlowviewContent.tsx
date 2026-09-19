@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import {useMemo} from 'react';
 import {useApi,discoveryApiRef,fetchApiRef,configApiRef} from '@backstage/frontend-plugin-api';
 import {useEntity} from '@backstage/plugin-catalog-react';
 import {stringifyEntityRef} from '@backstage/catalog-model';

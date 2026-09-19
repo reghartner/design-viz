@@ -1,4 +1,3 @@
-import React from 'react';
 import {createFrontendPlugin} from '@backstage/frontend-plugin-api';
 import {EntityContentBlueprint} from '@backstage/plugin-catalog-react/alpha';
 

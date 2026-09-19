@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && tsc --project tsconfig.host.json",
     "test": "vitest run",
     "verify": "npm run check && npm test",
     "build:viewer": "node build-viewer.mjs",

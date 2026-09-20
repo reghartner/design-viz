@@ -297,8 +297,9 @@
               alt="Real local Backstage displaying the native Flowview diagram and its code and API links"
           /></a>
           <figcaption>
-            Actual native plugin in real local Backstage. Fictional doorbell
-            services, with local Guest sign-in.
+            Actual native plugin in real local Backstage. Fictional data and
+            Guest sign-in; reference proxy adapter, not the company GitHub
+            loader.
           </figcaption>
         </figure>
       </section>
@@ -320,9 +321,9 @@
             <span class="number">01</span>
             <h2>Ownership</h2>
             <p>
-              Company layout: backstage-diagrams is the Flowview fork, with the
-              engine, editor and diagram specs together. The separate Backstage
-              app pins its installed viewer.
+              Company layout: backstage-diagrams holds the engine, editor and
+              specs in GitHub. It serves the static workbench; the Backstage
+              plugin pulls spec JSON from GitHub.
             </p>
             <div class="card-links">
               <a
@@ -369,8 +370,10 @@
             <span class="number">03</span>
             <h2>Backstage</h2>
             <p>
-              Discovery and reads belong to the host. The native renderer
-              displays the selected spec and follows explicit user actions.
+              Company target: the Backstage plugin reads specs from
+              backstage-diagrams in GitHub, matches service bindings, and
+              renders with its installed engine. No diagram API is hosted by
+              backstage-diagrams.
             </p>
             <div class="card-links">
               <a
@@ -490,8 +493,9 @@
             <span class="number">08</span>
             <h2>Rehearsal</h2>
             <p>
-              The package can be recreated from the public repo. Production SSO,
-              access policy and deployment remain company integration checks.
+              Existing local rehearsal: fictional code, real Backstage and the
+              reference proxy adapter. It proves rendering and drift; the
+              company GitHub spec loader needs its own integration check.
             </p>
             <div class="card-links">
               <a
@@ -521,9 +525,10 @@
       <footer class="footer">
         Source: Flowview implementation at aac72e037a8b ·
         <a href="flowview-platform.spec.json">Editable JSON</a> ·
-        <a href="flowview-platform.ledger.md">Evidence ledger</a><br />These
-        diagrams describe the implemented toolkit and company integration
-        pattern. Company deployment and policy acceptance remain separate.
+        <a href="flowview-platform.ledger.md">Evidence ledger</a
+        ><br />Implementation baseline plus company topology amendments A1/A2:
+        specs come from GitHub; backstage-diagrams hosts no APIs. Company source
+        integration and deployment remain separate.
       </footer>
     </main>
   </body>

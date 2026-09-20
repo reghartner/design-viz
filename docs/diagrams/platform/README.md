@@ -2,7 +2,7 @@
 
 Presentation edition, September 20, 2026. Based on implementation commit
 `aac72e037a8b9cbc885135b9f8b59b4611dd8ed8`, with the company repository topology
-clarified by the operator on September 20 (ledger amendment A1).
+clarified by the operator on September 20 (ledger amendments A1 and A2).
 
 Open [the presentation overview](index.html), then launch the
 [interactive tour](flowview-platform.html). The HTML is self-contained and can
@@ -27,14 +27,14 @@ speaking time, not system latency.
 
 | Chapter | Time | Talk track | Show |
 |---|---|---|---|
-| 1 · Ownership | 1½ min | “backstage-diagrams is our Flowview fork: engine, editor, specs and evidence live together. The separate Backstage app pins its installed viewer.” | Start in Ambient for the whole map, then Step through the release and JSON-read boundaries. |
+| 1 · Ownership | 1½ min | “backstage-diagrams is our Flowview fork: engine, editor, specs and evidence live together. The separate Backstage app pins its installed viewer.” | Start in Ambient for the whole map, then Step through the static editor build, pinned plugin release, and GitHub spec reads. |
 | 2 · Author | 1½ min | “Catalog import seeds identities and API choices. The author still owns behavior and code references.” | Walk the catalog PR into the nginx image; switch to **Refresh failed** to show the approved snapshot survives. |
-| 3 · Backstage | 2 min | “A service knows which diagrams mention it. Readers can follow the story and jump to code, APIs or the external editor.” | Use **Backstage close-up**, then return to Presentation. Show **Revision changed** ending before native mount. |
+| 3 · Backstage | 2 min | “The plugin pulls specs from GitHub and matches service bindings. Readers follow the story and jump to code, APIs or the external editor.” | Use **Backstage close-up**, then return to Presentation. Show **GitHub read failed**, an illustrative first-load failure ending before native mount. |
 | 4 · Detect drift | 1½ min | “We watch the code that supports a step. A changed region produces a diff and every affected story.” | Compare **Changed source**, **No drift**, and **Reference unreadable**. A source scan does not prove behavioral impact. |
 | 5 · Human review | 2 min | “The same source diff can mean a harmless refactor, a regression, or a deliberate new design.” | Show the four disposition chips. No-impact advances the reviewed pin; regression preserves expected behavior; intended change gets a spec PR. Plain closure accepts nothing. |
 | 6 · Trace evidence | 1 min | “Canon is what we expect; traces are what we observed. An incident becomes a separate alternate for review.” | Step to the isolated overlay. Missing telemetry stays unknown. The screenshot is an authored timeout example, not a trace-generated incident. |
 | 7 · Ship features | 1 min | “Add the panel in backstage-diagrams and deploy its editor build. Backstage picks up the internal plugin release through its own PR.” | Show **Backstage behind**: compatibility messaging explains the gap without downloading executable code. |
-| 8 · Rehearsal | 1½ min | “We can reproduce the loop with fictional doorbell code and a real Backstage installation.” | Compare **Non-breaking change** with **Breaking change**. Source tests establish sample behavior; the scanner establishes source drift. |
+| 8 · Rehearsal | 1½ min | “The local rehearsal proves native rendering and drift with fictional doorbell code. Its older proxy adapter does not verify the company GitHub loader.” | Compare **Non-breaking change** with **Breaking change**. Source tests establish sample behavior; the scanner establishes source drift. |
 
 For a shorter executive walkthrough, use chapters **1 → 3 → 4 → 5 → 8**.
 For an engineering follow-up, add **2 → 6 → 7**.
@@ -61,10 +61,11 @@ Full-size product captures are also included:
 [node code/API links](assets/backstage-native-links.jpg), and
 [storage timeout](assets/backstage-native-timeout.jpg).
 
-The captures use the current native plugin in an isolated **real local Backstage**
+The captures use the native plugin in an isolated **real local Backstage**
 host with the fictional doorbell rehearsal data and Guest sign-in. They are not
 company production screenshots. The capture verified a native viewer and zero
-iframes. Company SSO, visibility rules, installed CSP and deployment require the
+iframes using the existing reference proxy adapter. It does not prove the company
+GitHub spec-loading path. Company SSO, visibility rules, installed CSP and deployment require the
 company's integration acceptance.
 
 ## Details worth keeping precise
@@ -78,9 +79,15 @@ company's integration acceptance.
   editor or designs repo. The mock repo holds the separate fake service code.
 - HLD designs and reviewed canonical flows coexist. Appearance in Backstage does
   not itself confer canonical approval.
-- Backstage fetches authorized, revision-pinned JSON through its host proxy.
-  Its trusted, bundled renderer mounts in an owned ShadowRoot. Shadow DOM is
-  style/DOM ownership, not a security sandbox.
+- The company plugin reads spec JSON from **GitHub**. `backstage-diagrams`
+  hosts the static workbench and **no APIs**. GitHub access belongs to the
+  Backstage integration; its installed renderer mounts in an owned ShadowRoot.
+  Shadow DOM is style/DOM ownership, not a security sandbox.
+- The reference plugin in this public toolkit still defaults to proxy-based
+  loaders. The company integration supplies its GitHub loader. Chapters 1 and 3
+  depict that target; chapter 8 and the screenshots depict the existing rehearsal.
+  The read-failure alternate is an illustrative integration case, not a recorded
+  incident or an asserted GitHub HTTP status.
 - Catalog seeding is daily. The shared drift workflow runs weekday mornings;
   the portable rehearsal has a separate daily drift template. These schedules
   are configured workflows, not a real-time monitoring guarantee.

@@ -1,5 +1,17 @@
 # Flowview entity diagrams for Backstage
 
+**Company source: GitHub.** The company fork `backstage-diagrams` contains the
+engine, editor and specs, and hosts the static workbench with no APIs. The
+Backstage plugin pulls diagram specs from that GitHub repository; the Backstage
+app separately pins and ships its renderer dependency.
+
+**Current reference transport:** this source package's `EntityFlowviewContent`
+still wires the proxy-based loaders in `src/api/client.ts`. The company agent
+supplies GitHub-backed `loadDiagrams` and `loadSpec` functions for
+`FlowviewEntityDiagrams` (contracts in `src/api/types.ts`). The mock and existing
+local screenshots test native rendering through the reference adapter, not
+the company GitHub loader. See the [company source handoff](../../docs/backstage-integration.md#github-source-integration-status).
+
 This source workspace plugin adds a **Diagrams** tab to Component and API entity
 pages. It discovers published diagrams from explicit spec bindings; no per-service
 list, catalog annotation, or manual Backstage link maintenance is required.
@@ -19,9 +31,9 @@ visible even if rendering fails. Unsupported spec contract majors block renderin
 See [release compatibility](../../docs/runtime-compatibility.md) for authoring,
 the exported host-independent checker, and the company release checklist.
 
-Walk through the [interactive lifecycle guide](../../docs/diagrams/backstage/backstage.html) for catalog authoring,
-service discovery, GitHub scans, human decisions, refusal gates and trace evidence.
-The guide distinguishes portable implementation from company deployment.
+Walk through the [current platform presentation](../../docs/diagrams/platform/index.html)
+for the GitHub-backed company topology. The [earlier lifecycle guide](../../docs/diagrams/backstage/backstage.html)
+retains the reference adapter's read-API topology.
 
 ## Try the mock
 
@@ -38,14 +50,14 @@ Run `node apps/backstage-mock/server.mjs` from the repository root and open:
 
 The mock has the same association API and demonstrates the service experience;
 it is not a running Backstage installation. The package below is the actual
-Backstage frontend integration, ready for the company agent to install.
+Backstage frontend integration; the company agent connects its GitHub source.
 
 ## Install in the company Backstage app
 
 Copy this directory into your Backstage workspace as `plugins/flowview`, or bring
 it into that workspace through your normal internal package process. Keep
-`tools/canon/entity-diagrams.mjs` and its dependencies in the central repository
-backend, including the committed `tools/canon/generated-runtime.cjs`. Its static
+`tools/canon/entity-diagrams.mjs` and its dependencies with the Backstage-side
+indexing code if reused, including the committed `tools/canon/generated-runtime.cjs`. Its static
 import makes the shared runtime available to production bundlers without a
 runtime `src/` directory; see [backend production packaging](../../docs/backstage-integration.md#backend-production-packaging)
 for the company image acceptance check. Align the Backstage dependency versions
@@ -66,7 +78,8 @@ const app = createApp({
 });
 ```
 
-This registers the tab for Component and API entities automatically, including
+This registers the default tab using the reference proxy loaders. Wire the
+company GitHub loaders before using it for the company deployment. It includes
 entities that currently have zero diagrams. Keep the empty tab: it explains how
 a service becomes associated instead of suggesting that the integration is absent.
 
@@ -82,14 +95,16 @@ import {EntityFlowviewContent} from '@flowview/backstage-plugin';
 ```
 
 The component gets the entity from Backstage's `useEntity`; it does not guess
-identity from display names. It uses `FetchApi` and discovers the proxy base on
+identity from display names. Its current reference wiring uses `FetchApi` and discovers the proxy base on
 each request. The optional frontend `flowview.proxyPath` defaults to `/flowview`.
 `config.d.ts` declares that path's frontend visibility; it contains no credentials.
 
-## Connect the read API
+## Reference proxy adapter
 
-Enable the normal authenticated Backstage proxy backend, and configure a read-only
-route to the company's authenticated central repository API:
+The following configuration documents the existing API-based reference adapter
+and local rehearsal. It is not the GitHub-backed company architecture, and does
+not require `backstage-diagrams` to host a read API. For deployments deliberately
+using this adapter, configure a read-only Backstage proxy route:
 
 ```yaml
 proxy:
@@ -108,7 +123,7 @@ a substitute for diagram-level authorization. Authoring/viewer URLs must also
 have the company's normal access controls. Do not point a production proxy at
 the no-auth mock server.
 
-Expose these GET endpoints from the company adapter:
+This reference adapter expects these GET endpoints:
 
 ```
 /api/canon/entity-diagrams?entityRef=component%3Adefault%2Frecording-service
@@ -151,8 +166,8 @@ revision asks the reader to refresh diagrams.
 
 ## Rendering and browser policy
 
-The plugin uses Backstage `FetchApi` through the authenticated backend proxy to
-read revision-pinned JSON, then passes that inert data to `mountNativeViewer`.
+The source loader passes inert JSON to `mountNativeViewer`. The company loader
+reads GitHub; the current reference loader uses the authenticated backend proxy.
 The statically compiled renderer mounts inside a dedicated ShadowRoot. It loads
 no hosted viewer, remote script or stylesheet, and uses no runtime `eval` or
 `Function` compilation. Fonts and SVG symbols ship in the package; authored

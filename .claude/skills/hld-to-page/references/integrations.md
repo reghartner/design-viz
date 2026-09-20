@@ -35,6 +35,13 @@ parallel manual diagram list or infer service associations from display names.
 Backstage mounts inert specs with trusted bundled native code in an owned
 ShadowRoot; describe the actual host policy and explicit links, not a sandboxed
 frame or network-blocking iframe CSP. Company installation remains separate.
+For the current company topology, `backstage-diagrams` is one Flowview fork
+containing engine/editor/specs, with a static nginx workbench and no hosted APIs.
+The Backstage plugin reads diagram specs from GitHub and renders them with its
+installed engine. The public toolkit's proxy/read-API adapter is a reference
+rehearsal, not that company topology; label it accordingly. Consult
+`docs/backstage-integration.md` for the GitHub-loader handoff and distinguish
+operator-specified target architecture from verified implementation evidence.
 Bound nodes expose saved Backstage/API/source/code destinations through
 right-click and a keyboard/touch **…** button. Preserve `binding` URLs and
 immutable `codeRefs`; do not invent destinations from node titles. Code from

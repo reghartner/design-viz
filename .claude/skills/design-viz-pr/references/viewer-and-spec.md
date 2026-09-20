@@ -12,6 +12,9 @@
   dependent Canon, path, layout or panel traversal. Preserve the authored input
   and existing warning semantics; do not catch unexpected programming errors.
   Verify source/package parity and an invalid-first/valid-second CLI batch.
+- Board-owned link menus must release document/scroll listeners and timers on
+  path replacement and section/page destruction. Check both derived backlinks
+  and authored-reference menus, including hover, pin and keyboard focus return.
 - For paths, read `docs/alternate-paths.md`: step bodies form a shared registry;
   paths reference IDs. The first unique reference is the first branch column.
   Recompute state from initial values along the selected path; another outcome's

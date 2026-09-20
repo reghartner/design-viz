@@ -2,6 +2,7 @@
   "validator.js": [
     "panels/registry.js",
     "validator.js",
+    "core/geometry.js",
     "panels/shared.js",
     "panels/types/*.js"
   ],

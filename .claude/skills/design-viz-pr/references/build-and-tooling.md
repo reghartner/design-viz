@@ -16,6 +16,10 @@
   Load the navigation leaf alone for pure reference/hash operations; backend
   `viewerRouting()` must not initialize the DOM renderer. Keep static packaging,
   source/package parity and temporary source-tree fixtures in sync with moves.
+- Pure geometry lives in `core/geometry.js`, included once in the validator
+  bundle after shared helpers; its existing `clamp()` dependency is call-time.
+  Validator/lint tooling must use that bundle without loading the DOM engine.
+  Preserve algorithm bodies, candidate order and diagnostics during extraction.
 - Tool/CLI changes: check actual callers, exit codes, input/output formats,
   escaping, destination safety and reproducibility. Run matching Python/Node
   tests; shared Python helpers may warrant

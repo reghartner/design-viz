@@ -91,8 +91,12 @@ validator bundle includes DOM-free definitions; the viewer adds the engine and
 the workbench adds generic editing code. Node/Python builders use the same manifest
 and asset collector. Use `readSource('validator.js')` from
 `tools/source-loader.cjs` for headless tools/tests; it assembles the registry,
-validator, shared helpers and type definitions. Add `readSource('engine.js')`
-when player/layout helpers are needed; that logical bundle includes
+validator, pure geometry, shared helpers and type definitions. Geometry lives in
+`core/geometry.js` and uses the validator's existing `clamp()` helper at call time.
+It is included once, after the validator helpers and before panel definitions,
+so `layout`, routing, collision helpers and `lintPage` work without the renderer.
+The validation CLI uses this headless assembly. Add `readSource('engine.js')`
+when player/renderer helpers are needed; that logical bundle includes
 `core/navigation.js` before the renderer. The navigation leaf can also load alone
 for pure reference/hash operations (link-base canonicalization needs `URL`).
 Reading raw bundle files directly skips their manifest dependencies.

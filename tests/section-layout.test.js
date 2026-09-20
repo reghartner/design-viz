@@ -5,9 +5,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
-const ctx={console,URLSearchParams};
-for(const file of ['validator.js','builder.workbench.js','layout.workbench.js'])
-  vm.runInNewContext(readSource(file),ctx);
+const commandContext = require('./workbench-command-context.cjs');
+const ctx=commandContext(['graph','narrative','layout']);
 const plain=x=>JSON.parse(JSON.stringify(x));
 function diagram(){return {nodes:{a:{title:'Camera'},b:{title:'Cloud'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
   primaryPanel:'home',panels:[{id:'home',type:'homemap'},{id:'phone',type:'phone'},{id:'q',type:'queue'}],
@@ -208,6 +207,8 @@ test('malformed names, IDs, defaults and hidden controls warn safely; stale edit
 });
 
 test('visibility checklist binds each checkbox to its own tile, exposes hidden panels and names the edited layout',()=>{
+  const ctx=commandContext(['layout']);
+  vm.runInContext(readSource('layout.workbench.js'),ctx);
   const changes=[],d=diagram();d.panels[0].title='Home';d.panels[1].title='Home';
   const items=ctx.sectionLayoutPreset(d,'default');items.find(t=>ctx.sectionLayoutKey(t)==='diagram').hidden=true;
   function element(tag){return {tag,children:[],attrs:{},events:{},appendChild(child){this.children.push(child);},setAttribute(k,v){this.attrs[k]=v;},addEventListener(k,fn){this.events[k]=fn;}};}

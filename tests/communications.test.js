@@ -1,3 +1,4 @@
+const commandContext = require('./workbench-command-context.cjs');
 const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -127,7 +128,7 @@ test('playback suppresses explicit successful packets on failed hops and cleans 
   sp.enterStep(false);sp.jump(0);sp.destroy();assert.equal(b.failureEffects.length,0);
 });
 test('delivery edits preserve the other fan-out branch and caption; removing a failed hop removes its outcome',()=>{
-  const c=load(),d=fixture(),before=JSON.stringify(d);
+  const c=commandContext(['graph','narrative']),d=fixture(),before=JSON.stringify(d);
   let p=c.planStepCommunication(before,d,0,1,'a->b','blocked'),next=JSON.parse(p.text);
   assert.deepEqual(next.steps[1].failures,{'a->b':'blocked'});assert.equal(next.steps[1].edge,'a->c');
   assert.equal(next.steps[1].text,d.steps[1].text);
@@ -143,7 +144,7 @@ test('delivery edits preserve the other fan-out branch and caption; removing a f
   assert.equal(JSON.stringify(d),before);
 });
 test('node rename, edge retarget and deletions cascade through failure keys',()=>{
-  const c=load(),d=fixture(),text=JSON.stringify(d);
+  const c=commandContext(['graph','narrative']),d=fixture(),text=JSON.stringify(d);
   let next=JSON.parse(c.planRenameNode(text,d,0,'b','device').text);
   assert.deepEqual(next.steps[1].failures,{'a->device':'dropped'});
   next=JSON.parse(c.planSetEdgeEndpoint(text,d,0,0,'from','c').text);

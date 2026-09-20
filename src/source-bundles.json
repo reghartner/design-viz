@@ -21,10 +21,15 @@
     "workbench/commands/graph.js",
     "workbench/commands/document.js",
     "workbench/commands/narrative.js",
+    "workbench/commands/layout.js",
     "builder.workbench.js"
   ],
   "clipboard.workbench.js": [
     "workbench/commands/clipboard.js",
     "clipboard.workbench.js"
+  ],
+  "reuse.workbench.js": [
+    "workbench/commands/reuse.js",
+    "reuse.workbench.js"
   ]
 }

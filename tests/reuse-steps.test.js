@@ -1,9 +1,8 @@
 const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'), assert=require('node:assert/strict');
 const fs=require('node:fs'), path=require('node:path'), vm=require('node:vm');
-const c={};vm.createContext(c);
-for(const name of ['validator','engine','builder.workbench','reuse.workbench'])
-  vm.runInContext(readSource(name+'.js'),c);
+const commandContext = require('./workbench-command-context.cjs');
+const c=commandContext(['narrative','reuse']);
 const plain=x=>JSON.parse(JSON.stringify(x));
 function fixture(){return {view:'step',nodes:{hub:{}},rows:[['hub']],panels:[
   {id:'state',type:'state',states:['ready','sent','lost'],initial:{state:'ready'}},
@@ -194,4 +193,51 @@ test('making a shared step independent carries view membership, and path removal
   d.layouts[0].steps=['lost'];
   assert.match(c.planPathStepEdit(JSON.stringify(d),d,0,'offline',4,'remove').error,/view/);
   assert.match(c.planPathOccurrenceEdit(JSON.stringify(d),d,0,'offline',4,'remove').error,/view/);
+});
+
+test('path and reuse results keep source indices, route occurrences and filtered stops distinct in nested CRLF source',()=>{
+  const d=fixture();d.paths[1].steps=['start','done','lost'];
+  d.layouts=[{id:'brief',name:'Brief',steps:['done'],sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];
+  const raw={page:{title:'Keep "escapes"',blocks:[{heading:'Prose',text:'Untouched'},
+    {tabs:[{label:'Hidden',sections:[{diagram:d},{heading:'After',text:'Also untouched'}]}]}]}};
+  const text=JSON.stringify(raw,null,3).replace(/\n/g,'\r\n'),before=JSON.stringify(raw);
+  const path=['page','blocks',1,'tabs',0,'sections',0,'diagram'],oldRange=c.jsonLocate(text,path);
+  const plans=[
+    c.planPathStepEdit(text,raw,1,'offline',3,'later'),
+    c.planPathOccurrenceEdit(text,raw,1,'offline',3,'independent'),
+    c.planReuseSteps(text,raw,1,'offline',3,{sourcePath:'happy',stepIds:['record'],mode:'copy',placement:'after'})
+  ];
+  for(const plan of plans){
+    assert.equal(plan.error,undefined);assert.equal(plan.kind,'step');assert.equal(plan.pathId,'offline');
+    const resultRaw=JSON.parse(plan.text),next=c.specValueAt(resultRaw,path),range=c.jsonLocate(plan.text,path);
+    assert.equal(plan.text.slice(0,range.start),text.slice(0,oldRange.start));
+    assert.equal(plan.text.slice(range.end),text.slice(oldRange.end));
+    assert.deepEqual(JSON.parse(plan.text.slice(plan.start,plan.end)),next.steps[plan.index]);
+    assert.equal(JSON.stringify(raw),before);
+  }
+  assert.equal(plans[0].index,3);assert.equal(Object.hasOwn(plans[0],'position'),false);
+  assert.equal(Object.hasOwn(plans[0],'insertedIds'),false);
+  const reordered=c.specValueAt(JSON.parse(plans[0].text),path);
+  assert.equal(reordered.paths[1].steps.indexOf('done'),2);
+  assert.equal(reordered.paths[1].steps.filter(id=>reordered.layouts[0].steps.includes(id)).indexOf('done'),0);
+  assert.equal(plans[1].index,5);assert.equal(plans[1].position,1);assert.deepEqual(plain(plans[1].insertedIds),[]);
+  const independent=c.specValueAt(JSON.parse(plans[1].text),path);
+  assert.deepEqual(independent.layouts[0].steps,['done','done-copy1']);
+  assert.equal(plans[2].index,5);assert.equal(plans[2].position,2);
+  assert.deepEqual(plain(plans[2].insertedIds),['record-copy1']);
+  assert.deepEqual(c.specValueAt(JSON.parse(plans[2].text),path).layouts,d.layouts,'ordinary copies retain their existing view-membership policy');
+});
+
+test('failed final path or view validation publishes no partial edit or selection metadata',()=>{
+  const d=fixture();d.layouts=[{id:'brief',name:'Brief',steps:['lost'],sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];
+  const text=JSON.stringify(d,null,2),before=JSON.stringify(d);
+  const error='Choose another step in view "Brief" before removing its last reachable step or path.';
+  for(const plan of [c.planPathStepEdit(text,d,0,'offline',4,'remove'),
+    c.planPathOccurrenceEdit(text,d,0,'offline',4,'remove')])
+    assert.deepEqual(plain(plan),{error});
+  assert.equal(JSON.stringify(d),before);
+  d.paths[1].steps.push('missing');
+  const invalid=JSON.stringify(d),errors=[];c.validatePaths(d,'diagram',errors);
+  const plan=c.planPathStepEdit(invalid,d,0,'offline',4,'metadata',{label:'Would change',color:'#abcdef'});
+  assert.deepEqual(plain(plan),{error:errors.join('\n')});assert.equal(JSON.stringify(d),invalid);
 });

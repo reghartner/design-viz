@@ -106,7 +106,8 @@ Feature metadata and CSS are collected at build time for
 standalone, workbench, Backstage and Forge.
 
 The logical `builder.workbench.js` bundle loads source-edit, raw-target and command
-leaves before the generic builder. Use that assembled source for editor and
+leaves before the generic builder. Pure layout/reuse/clipboard planners share
+those source owners with their satellite controllers. Use assembled source for editor and
 cross-family tests; [workbench modules](workbench-modules.md) describes the pure
 command test surface, clipboard bundle and source-preservation contract.
 

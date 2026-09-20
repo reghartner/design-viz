@@ -2,19 +2,8 @@
 /* These command families load core/data leaves without the builder inspector. */
 const test = require('node:test');
 const assert = require('node:assert');
-const vm = require('node:vm');
-const {readSource} = require('../tools/source-loader.cjs');
-function commands(){
-  const context = {URL};
-  for (const name of ['document', 'window'])
-    Object.defineProperty(context, name, {get(){ throw new Error('Unexpected DOM access: ' + name); }});
-  vm.createContext(context);
-  for (const name of ['validator.js', 'workbench/source-edit.js', 'workbench/targets.js',
-    'workbench/commands/common.js', 'workbench/commands/graph.js',
-    'workbench/commands/document.js', 'workbench/commands/narrative.js'])
-    vm.runInContext(readSource(name), context);
-  return context;
-}
+const commandContext = require('./workbench-command-context.cjs');
+const commands = () => commandContext(['graph', 'document', 'narrative']);
 const B = commands();
 const V = B;
 const plain = value => JSON.parse(JSON.stringify(value));

@@ -22,6 +22,8 @@
     "workbench/commands/document.js",
     "workbench/commands/narrative.js",
     "workbench/commands/layout.js",
+    "workbench/persistence.js",
+    "workbench/session.js",
     "builder.workbench.js"
   ],
   "clipboard.workbench.js": [

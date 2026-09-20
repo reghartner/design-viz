@@ -19,6 +19,15 @@
   filtered visible stop distinct. Occurrence removal retains the registry body;
   independent copies carry applicable view membership. Check action-specific
   errors/no-ops and each actual editor action's single Undo/selection behavior.
+- Session/history/project and draft lifetime live in `src/workbench/session.js`
+  and `persistence.js`. Test these leaves without DOM code; actual controls must
+  publish through `session.accept()` once. Snapshot the current exact source,
+  including invalid handwriting; keep render freshness tied to the last successful
+  preview. Check ordinary manual writes as well as `applyPlan`, caller-specific
+  focus/no-op policies, 800 ms autosave, pending-draft first Undo, matching baseline
+  recovery and cancelled/disposed callbacks. Browser API adapters must preserve
+  the native receiver. Inspector, I/O operation generations and gesture/observer
+  resources remain controller-owned; session destroy is not full editor teardown.
 - Keep shared Home layout/initial state distinct from per-step overrides. Use
   `docs/homemap-workbench.md` only for those controls. Test the context being
   edited, including non-step selection when affected.

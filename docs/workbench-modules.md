@@ -4,7 +4,7 @@ The workbench uses ordered plain JavaScript fragments. Its existing public
 function names remain available in the shared browser scope. Use the logical
 `builder.workbench.js` bundle from `tools/source-loader.cjs` when a tool or test
 needs the editor; pure planner tests load only their required leaves. Reading
-the physical builder file omits its source-edit, raw-target and command
+the physical builder file omits its source-edit, raw-target, command and session
 dependencies.
 
 `src/source-bundles.json` expands that bundle in this order:
@@ -16,9 +16,10 @@ dependencies.
 5. `workbench/commands/document.js`: page/section/tab edits and templates.
 6. `workbench/commands/narrative.js`: steps, paths, hops, tones and patches.
 7. `workbench/commands/layout.js`: row/node placement, section layouts and views.
-8. `builder.workbench.js`: presentation, inspector read models and the editor
-   initializer. Callers load the validator/panel assembly first. Inspector/session
-   ownership is unchanged.
+8. `workbench/persistence.js`: injected draft storage and debounce lifetime.
+9. `workbench/session.js`: live source, authored selection, history and project policy.
+10. `builder.workbench.js`: presentation, inspector read models, gestures and the
+    editor composition root. Callers load the validator/panel assembly first.
 
 The logical `clipboard.workbench.js` bundle loads
 `workbench/commands/clipboard.js` before its existing clipboard transport UI.
@@ -154,14 +155,68 @@ the original diagram. Clipboard paste validates the complete copied document and
 retains its existing full-document serialization policy, including wrapping a
 bare diagram when copied protocol/lane definitions need a page.
 
-The editor accepts one successful result through its existing outer transaction:
+The editor accepts one successful result through `session.accept()` at its outer transaction:
 preserve form focus, push one Undo snapshot, publish text, render once, run the
 operation's selection callback, restore markers/labels, synchronize the story list
 and scroll the result range without focusing the source textarea. Bulk edits,
 reuse and gestures each retain one outer history application. Preview, cancel,
 stale rejection and errors do not apply an edit. Project replacement, import,
 source typing and history navigation retain their separate existing policies;
-this command split does not move session or inspector ownership.
+the policies are owned by the session below, while focus and inspector work stay
+in the controllers.
+
+## Session and persistence
+
+`createBuilderSession()` and `createBuilderPersistence()` are DOM-free leaves.
+Load these two files alone for session tests; they do not need commands, panels,
+inspector code or the renderer. The builder composition root injects a source
+adapter (`read`/`write`), render callback, persistence instance and UI callbacks.
+It wraps native timers when injecting `schedule`/`cancel`, so a leaf never invokes
+a browser method with the options object as its receiver. Storage and clock
+access are also injected; storage denial keeps the existing editing behavior.
+
+The source adapter is authoritative. `text()`, `parse()` and `snapshot()` read
+current exact textarea contents, including invalid JSON and handwritten whitespace
+that never passed through a command. `snapshot()` returns
+`{text, raw, error, project, renderedText}`; `raw` and offsets belong to that text.
+`renderedText` is the injected **last successful** preview identity, not a promise
+that calling render succeeded. Invalid rendering does not make a stale board
+fresh. Existing geometry and dialog checks still guard their own render/selection
+identities; a project counter does not replace independent operation generations.
+
+`target` and `insertSection` hold authored addresses and section ordinals, without
+DOM references. The controller separately owns highlighted elements, field focus,
+selection ranges, multiselection and gesture state. `invalidateProject()` increments
+the project generation, invokes the controller's operation/preview retirement hook
+and clears the selected authored target itself. `replaceProject()` also resets
+insertion to section zero and cancels a pending draft save.
+
+| Session entrypoint | Publication and history policy |
+| --- | --- |
+| `accept(plan, hooks)` | Rejects missing/error plans and, when `hooks.snapshot` is supplied, changed exact source or project. Success pushes one Undo snapshot, runs `beforePublish`, writes once, renders once, saves, then runs `afterRender`. Successful unchanged text retains its existing history behavior; there is no universal no-op filter. |
+| `importText(text, hooks)` | Adds one Undo entry while keeping the original baseline. Runs caller-specific before/after-render hooks; only Mermaid requests the imported-text keyboard shortcut marker. File/trace parsing, cancellation and dialogs remain in their I/O controllers. |
+| `undo()` / `redo()` | Captures the current exact adapter text on the opposite stack before writing the historical text, rendering, clearing the authored target, notifying the UI and saving. Intervening invalid handwriting remains reachable. New actions cap Undo at thirty and clear Redo. |
+| `noteInput()` | Marks the project live immediately, clears the import shortcut and schedules the 800 ms save. Typing adds no builder history and is not parsed, rewritten or rendered by the session. |
+| `replaceProject()` / `restoreDraft()` | Retires the previous project, publishes once, changes the baseline and runs project-specific hooks. If recovery is still pending, the first Undo target is the recovered draft rather than the boot demo. Typing makes the current text win over pending recovery. |
+| `markSaved()` / `save()` | Marks the current exact source as the comparison baseline, or persists the current draft and baseline pair. Saving does not require valid JSON. |
+
+All ordinary builder writes use `accept()`: the common `applyPlan()` path,
+connect, row/node/group/edge-label drags, generic insertion and tabs insertion.
+Inspector edits keep their current field focus and scroll the resulting source
+range without taking source focus. Insertion/connect still select their source
+range when the source panel is visible; drags keep their existing selection and
+focus policies. Errors, cancel and stale gesture rejection do not publish.
+Pure bulk/reuse/clipboard planners continue to reach one outer application.
+
+Persistence retains the existing `dv-workbench-draft` and
+`dv-workbench-baseline` records. A baseline is recovered only when its `draftText`
+matches the saved draft; older drafts without a matching baseline use their own
+text and retain the UI's existing explanation. The timer generation makes
+already-queued cancelled saves inert. `session.destroy()` retires the session and
+its persistence timer, so queued saves and later mutation calls cannot publish.
+This is a session lifetime API: the current builder still owns its listeners,
+observers, inspector refreshes and gestures. It does not yet expose a complete
+editor teardown; those resources must be retired by their owning controllers.
 
 ## Tests and regeneration
 
@@ -178,6 +233,12 @@ UI harnesses add only their needed controllers or the logical builder bundle;
 the visibility-control test, reuse picker, step list and full inspector tests
 continue to exercise actual consumers. Clipboard tests likewise keep pure
 planning separate from browser transport.
+`tests/workbench-session.test.js` loads only session/persistence with throwing DOM
+globals and injected storage/timers. It covers exact source snapshots, stale project
+and text refusal, invalid handwriting on Redo, pending recovery, debounce retirement,
+baselines and disposed callbacks. Actual builder harness tests drive connect, all
+insertion families and row/node/group/label gestures, checking one exact Undo/Redo
+and each focus policy; a receiver-sensitive timer fake checks the browser adapter.
 
 Run the source-edit and builder tests plus the relevant clipboard, step-reuse,
 layout and panel-reference suites when these boundaries change. Shared workbench

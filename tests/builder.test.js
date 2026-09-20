@@ -697,6 +697,7 @@ test('mermaidToSpec converts the cumulus HLD and validates skeletons with zero e
 
 /* Minimal event DOM: exercise the real import/history/mode handlers without a browser. */
 function importHarness(ctl, boardSpec){
+  const scheduled = [], cancelled = [];
   const elements = {}, listeners = {}, windowListeners = {}, doc = {activeElement: null};
   let observer;
   function element(tag = 'div', id = ''){
@@ -720,7 +721,7 @@ function importHarness(ctl, boardSpec){
       hasAttribute(k){ return Object.hasOwn(attrs, k); },
       remove(){ if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(c => c !== this); },
       focus(){ doc.activeElement = this; },
-      setSelectionRange(){},
+      setSelectionRange(start,end){ this.selectionStart=start; this.selectionEnd=end; },
       contains(child){ return child === this || this.children.some(c => c.contains(child)); },
       matches(selector){
         if (selector.includes(',')) return selector.split(',').some(s => this.matches(s.trim()));
@@ -772,9 +773,10 @@ function importHarness(ctl, boardSpec){
   doc.querySelector = () => null;
   doc.addEventListener = (type, fn, capture) => { (listeners[type] ||= []).push({fn, capture}); };
   for (const id of ['docview', 'src', 'guide', 'btarget', 'msgs', 'importbox', 'import-mermaid-text',
-    'import-mermaid', 'import-mermaid-convert', 'import-mermaid-cancel', 'undo-builder', 'redo-builder']){
+    'import-mermaid', 'import-mermaid-convert', 'import-mermaid-cancel', 'undo-builder', 'redo-builder',
+    'add-step', 'add-section', 'add-edge', 'add-tabs']){
     const tag = id === 'src' || id === 'import-mermaid-text' ? 'textarea' :
-      id.includes('builder') || id.startsWith('import-mermaid') ? 'button' : 'div';
+      id.includes('builder') || id.startsWith('import-mermaid') || id.startsWith('add-') ? 'button' : 'div';
     doc.body.appendChild(element(tag, id));
   }
   elements.importbox.hidden = true;
@@ -805,7 +807,10 @@ function importHarness(ctl, boardSpec){
   const saved = {};
   const sandbox = {console, document: doc,
     window: {addEventListener(type, fn){ (windowListeners[type] ||= []).push(fn); }},
-    MutationObserver: class {constructor(fn){ observer = fn; } observe(){}}, setTimeout(){}, clearTimeout(){},
+    MutationObserver: class {constructor(fn){ observer = fn; } observe(){}},
+    // Browser timers must be called through the UI adapter, not as leaf-option methods.
+    setTimeout(fn,ms){ 'use strict'; assert.equal(this,undefined); scheduled.push({fn,ms}); return scheduled.length; },
+    clearTimeout(id){ 'use strict'; assert.equal(this,undefined); cancelled.push(id); },
     getComputedStyle(){ return {}; },
     localStorage: {getItem(k){ return saved[k] || null; }, setItem(k, v){ saved[k] = v; }}};
   vm.runInNewContext(readSource('validator.js') + '\n' +
@@ -817,7 +822,7 @@ function importHarness(ctl, boardSpec){
     const finding = element('li'); finding.textContent = 'existing validator warning';
     elements.msgs.appendChild(finding);
   }});
-  return {elements, doc, element, saved, cards, svg, sandbox, get renders(){ return renders; },
+  return {elements, doc, element, saved, scheduled, cancelled, cards, svg, sandbox, get renders(){ return renders; },
     rerender(){ observer(); },
     move(x, y, over = null){
       doc.over = over;
@@ -838,6 +843,63 @@ test('editing source or focusing an inspector pauses every preview without rende
   assert.strictEqual(h.elements.src.value,before);
   assert.strictEqual(h.renders,0);
   assert.strictEqual(h.elements['undo-builder'].disabled,true);
+});
+
+test('source typing uses the browser timer adapter and replaces its 800 ms draft save', () => {
+  const h=importHarness(), e=h.elements;
+  e.src.value=' { broken'; e.src.fire('input'); e.src.fire('input');
+  assert.deepEqual(h.scheduled.map(t=>t.ms),[800,800]);
+  assert.deepEqual(h.cancelled,[1]);
+  h.scheduled[0].fn();
+  assert.notEqual(JSON.parse(h.saved['dv-workbench-draft']).text,e.src.value);
+  h.scheduled[1].fn();
+  assert.equal(JSON.parse(h.saved['dv-workbench-draft']).text,e.src.value);
+  assert.equal(e['undo-builder'].disabled,true);
+  assert.equal(h.renders,0);
+});
+
+function assertOneBuilderUndo(h,before){
+  const changed=h.elements.src.value;
+  assert.notEqual(changed,before);
+  assert.equal(h.renders,1);
+  assert.equal(JSON.parse(h.saved['dv-workbench-draft']).text,changed);
+  h.click('undo-builder');
+  assert.equal(h.elements.src.value,before);
+  assert.equal(h.elements['undo-builder'].disabled,true);
+  h.click('redo-builder');
+  assert.equal(h.elements.src.value,changed);
+  assert.equal(h.elements['redo-builder'].disabled,true);
+}
+
+test('actual connect commits once and focuses its source range; Escape cancels without history', () => {
+  const spec={nodes:{a:{},b:{}},rows:[['a','b']],steps:[{nodes:['a'],text:'start'}]};
+  const h=importHarness(null,spec), before='  '+JSON.stringify(spec,null,2)+'\r\n';
+  h.elements.src.value=before;
+  h.click('add-edge'); h.cards.a.fire('click');
+  h.doc.body.fire('keydown',{key:'Escape'});
+  assert.equal(h.elements.src.value,before);
+  assert.equal(h.renders,0);
+  assert.equal(h.elements['undo-builder'].disabled,true);
+  h.click('add-edge'); h.cards.a.fire('click'); h.cards.b.fire('click');
+  assert.deepEqual(JSON.parse(h.elements.src.value).edges,[{from:'a',to:'b',kind:'int',label:'describe the hop'}]);
+  assert.equal(h.doc.activeElement,h.elements.src);
+  assert.ok(h.elements.src.selectionEnd>h.elements.src.selectionStart);
+  assertOneBuilderUndo(h,before);
+});
+
+test('actual step, section and tabs insertion keep their selected source ranges and one exact Undo', () => {
+  for(const action of ['add-step','add-section','add-tabs']){
+    const h=importHarness(), before=' \n'+JSON.stringify({page:{sections:[{heading:'First',diagram:{
+      nodes:{a:{}},rows:[['a']],steps:[{nodes:['a'],text:'start'}]}}]}},null,2)+'\r\n';
+    h.elements.src.value=before; h.click(action);
+    const raw=JSON.parse(h.elements.src.value);
+    if(action==='add-step')assert.equal(raw.page.sections[0].diagram.steps.length,2);
+    if(action==='add-section')assert.equal(raw.page.sections.length,2);
+    if(action==='add-tabs')assert.equal(raw.page.sections.at(-1).tabs.length,2);
+    assert.equal(h.doc.activeElement,h.elements.src);
+    assert.ok(h.elements.src.selectionEnd>h.elements.src.selectionStart);
+    assertOneBuilderUndo(h,before);
+  }
 });
 
 test('Mermaid import UI opens focuses cancels and preserves editor and history on failure', () => {
@@ -1379,6 +1441,9 @@ test('node gap drag shows serpentine slot and row lines and commits with undo an
     ['f', 550, 375, 'dv-slotline', [['a', 'b'], ['f', 'c', 'd']]]
   ]){
     const h = importHarness(null, nodePlacementFixture());
+    const before='  '+JSON.stringify(nodePlacementFixture(),null,2)+'\r\n';
+    h.elements.src.value=before;
+    const focused=h.elements.guide.appendChild(h.element('input')); focused.focus();
     h.cards[id].fire('mousedown', {button: 0, clientX: 120, clientY: 120});
     h.move(x, y);
     const line = h.svg.querySelector('line.' + lineClass);
@@ -1391,8 +1456,34 @@ test('node gap drag shows serpentine slot and row lines and commits with undo an
     assert.equal(h.svg.querySelector('.dv-ghost'), null);
     assert.ok(h.cards[id].classList.contains('dv-sel'));
     assert.equal(h.renders, 1);
-    h.click('undo-builder');
-    assert.deepStrictEqual(JSON.parse(h.elements.src.value), nodePlacementFixture());
+    assert.equal(h.doc.activeElement,focused);
+    assertOneBuilderUndo(h,before);
+  }
+});
+
+test('actual row, group and edge-label drags each preserve form focus and publish one exact Undo', () => {
+  for(const kind of ['row','group','label']){
+    const spec=nodePlacementFixture();
+    spec.groups={pair:{title:'Pair'}}; spec.nodes.a.group='pair'; spec.nodes.b.group='pair';
+    const h=importHarness(null,spec), before=' \n'+JSON.stringify(spec,null,2)+'\r\n';
+    h.elements.src.value=before;
+    const focused=h.elements.guide.appendChild(h.element('input')); focused.focus();
+    let target;
+    if(kind==='row')target=h.svg.querySelector('g.dv-rowgrab[data-dv-row="0"]');
+    else{
+      target=h.svg.appendChild(h.element(kind==='group'?'g':'text'));
+      target.ownerSVGElement=h.svg;
+      target.className=kind==='group'?'grp':'lbl';
+      target.setAttribute(kind==='group'?'data-dv-group':'data-dv-edge',kind==='group'?'pair':'0');
+    }
+    assert.ok(target);
+    target.fire('mousedown',{button:0,clientX:120,clientY:120});
+    h.move(kind==='label'?140:300,kind==='label'?150:450); h.release();
+    const result=JSON.parse(h.elements.src.value);
+    if(kind==='label')assert.deepEqual([result.edges[0].labelDx,result.edges[0].labelDy],[20,30]);
+    else assert.deepEqual(result.rows,[['c','d'],['a','b']]);
+    assert.equal(h.doc.activeElement,focused);
+    assertOneBuilderUndo(h,before);
   }
 });
 

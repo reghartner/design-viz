@@ -987,18 +987,27 @@ function initWorkbenchBuilder(opts){
     if (secInspect) secInspect.hidden = true;
   }
   var selectedEl = null;
-  var currentTarget = null; /* {section, kind, id?, index?} — survives re-renders */
   var clipboardHomeTarget = null;
   var panelEditors = Object.create(null); /* lazy editor instances, isolated per workbench */
   var inspectorScrollKey = null; /* target of the last-rendered inspector form */
   var invalidateEffectiveState = null;
-  var insertSection = 0;    /* zero-based ordinal of the section inserts target */
-  var undoStack = [];
 
-  function parseEditor(){
-    try { return {raw: JSON.parse(src.value)}; }
-    catch (ex){ return {error: 'the JSON in the editor does not parse (' + ex.message + ')'}; }
-  }
+  var session=createBuilderSession({
+    source:{read:function(){return src.value;},write:function(text){src.value=text;}},
+    persistence:createBuilderPersistence({storage:function(){return localStorage;},
+      schedule:function(fn,ms){return setTimeout(fn,ms);},
+      cancel:function(timer){clearTimeout(timer);},now:function(){return Date.now();}}),
+    deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
+    historyChanged:function(undo,redo){
+      if(undoBtn)undoBtn.disabled=!undo;
+      if(redoBtn)redoBtn.disabled=!redo;
+    },
+    afterHistory:function(message){
+      setSelected(null);clearMultiSelect();clearStepMarkers();inspectorMessage(message);
+    },
+    invalidateProject:retireProjectUI
+  });
+  function parseEditor(){return session.snapshot();}
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
     selectedEl = el || null;
@@ -1026,7 +1035,7 @@ function initWorkbenchBuilder(opts){
     /* a marker span's offsetTop is the selection line's TOP edge in the
        textarea's scroll space (offsetHeight would add the marker line's
        own height and the bottom padding) */
-    mirror.appendChild(document.createTextNode(src.value.slice(0, start)));
+    mirror.appendChild(document.createTextNode(session.text().slice(0, start)));
     var marker = document.createElement('span');
     marker.textContent = '​';
     mirror.appendChild(marker);
@@ -1052,8 +1061,8 @@ function initWorkbenchBuilder(opts){
     if (panelPicker) panelPicker.refresh();
     if (!targetLabel) return;
     if (addToStep){ addToStepStatus(); return; } /* armed mode owns the label */
-    var desc = builderInsertTargetText(raw || {}, insertSection);
-    targetLabel.textContent = (desc || 'into section ' + (insertSection + 1)) +
+    var desc = builderInsertTargetText(raw || {}, session.insertSection);
+    targetLabel.textContent = (desc || 'into section ' + (session.insertSection + 1)) +
       ' — click a section to retarget';
     markInsertTarget();
   }
@@ -1061,85 +1070,26 @@ function initWorkbenchBuilder(opts){
     /* frame the section inserts land in, on the board */
     var prev = view.querySelectorAll('.doc-sec.dv-inserttarget');
     for (var i = 0; i < prev.length; i++) prev[i].classList.remove('dv-inserttarget');
-    var el = view.querySelector('.doc-sec[data-dv-section="' + insertSection + '"]');
+    var el = view.querySelector('.doc-sec[data-dv-section="' + session.insertSection + '"]');
     if (el) el.classList.add('dv-inserttarget');
   }
 
-  /* ---- undo/redo: one snapshot of the editor text per builder action.
-     Hand edits in the textarea are not snapshotted, but undo pushes the
-     CURRENT text onto the redo stack first, so nothing is discarded. ---- */
+  /* Session owns history and persistence; controls retain DOM/focus policy. */
   var redoBtn = document.getElementById('redo-builder');
-  var redoStack = [];
-  function updateHistoryButtons(){
-    if (undoBtn) undoBtn.disabled = !undoStack.length;
-    if (redoBtn) redoBtn.disabled = !redoStack.length;
-  }
-  function pushUndo(){
-    importedText = null;
-    undoStack.push(src.value);
-    if (undoStack.length > 30) undoStack.shift();
-    redoStack.length = 0; /* a new action invalidates the redo line */
-    updateHistoryButtons();
-  }
-  function historyStep(fromStack, toStack, message){
-    if (!fromStack.length) return;
-    toStack.push(src.value);
-    src.value = fromStack.pop();
-    updateHistoryButtons();
-    render();
-    setSelected(null); currentTarget = null;
-    clearMultiSelect();
-    clearStepMarkers();
-    inspectorMessage(message);
-    autosaveDraft();
-  }
-  function doUndo(){ historyStep(undoStack, redoStack, 'undid the last builder action — board re-rendered'); }
-  function doRedo(){ historyStep(redoStack, undoStack, 'redid the builder action — board re-rendered'); }
+  function doUndo(){return session.undo();}
+  function doRedo(){return session.redo();}
   if (undoBtn) undoBtn.addEventListener('click', doUndo);
   if (redoBtn) redoBtn.addEventListener('click', doRedo);
-
-  /* ---- draft autosave + recovery offer ---- */
-  var DRAFT_KEY = 'dv-workbench-draft', BASELINE_KEY = 'dv-workbench-baseline';
-  var baselineText = src.value;
-  var projectOpen = !opts.deferInitialSave, projectUndoText = null;
-  var initialDraft = readDraft(), recoveredBaseline = null;
-  try {
-    var savedBaseline = JSON.parse(localStorage.getItem(BASELINE_KEY));
-    if (savedBaseline && typeof savedBaseline.text === 'string' && initialDraft &&
-        savedBaseline.draftText === initialDraft.text) recoveredBaseline = savedBaseline.text;
-  } catch (ex){}
-  if (initialDraft && initialDraft.text === src.value && recoveredBaseline != null)
-    baselineText = recoveredBaseline;
-  function autosaveDraft(){
-    projectOpen = true;
-    try {
-      localStorage.setItem(BASELINE_KEY, JSON.stringify({text: baselineText, draftText: src.value}));
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({text: src.value, at: Date.now()}));
-    }
-    catch (ex){ /* storage unavailable: the feature degrades to nothing */ }
-  }
-  function readDraft(){
-    try {
-      var d = JSON.parse(localStorage.getItem(DRAFT_KEY));
-      return d && typeof d.text === 'string' ? d : null;
-    } catch (ex){ return null; }
-  }
-  function clearDraft(){
-    try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(BASELINE_KEY); } catch (ex){}
-  }
-  var draftTimer = null;
+  function autosaveDraft(){session.save();}
   src.addEventListener('input', function(){
-    projectOpen = true; /* an edit is live before the debounced disk snapshot */
+    session.noteInput();
     if (invalidateEffectiveState) invalidateEffectiveState();
-    importedText = null;
     hideDiff();
-    if (draftTimer) clearTimeout(draftTimer);
-    draftTimer = setTimeout(autosaveDraft, 800);
   });
   (function offerDraft(){
     var bar = document.getElementById('draftbar');
-    var draft = initialDraft; /* captured once — later autosaves cannot swap it */
-    if (!bar || !draft || draft.text === src.value) return;
+    var draft = session.draft(); /* captured once — later autosaves cannot swap it */
+    if (!bar || !draft || draft.text === session.text()) return;
     bar.innerHTML = '';
     var label = document.createElement('span');
     label.textContent = 'unsaved draft from ' + new Date(draft.at || 0).toLocaleString() + ' —';
@@ -1151,15 +1101,13 @@ function initWorkbenchBuilder(opts){
     var discard = document.createElement('button');
     discard.type = 'button'; discard.className = 'bbtn'; discard.textContent = 'discard';
     discard.addEventListener('click', function(){
-      clearDraft();
-      initialDraft = null;
-      autosaveDraft();
+      session.discardDraft();
       bar.hidden = true;
     });
     bar.appendChild(label); bar.appendChild(restore); bar.appendChild(discard);
     bar.hidden = false;
   })();
-  if (!opts.deferInitialSave && (!initialDraft || initialDraft.text === src.value)) autosaveDraft();
+  session.saveInitial();
 
   /* ---- open a .spec.json / save the editor to disk ---- */
   var fileReadVersion = 0;
@@ -1189,7 +1137,7 @@ function initWorkbenchBuilder(opts){
       /* Stamp the downloaded snapshot; preserve the live source and unfinished JSON. */
       var parsed = parseEditor();
       var name = specFileName(parsed.error ? null : parsed.raw);
-      var savedText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(src.value) : src.value;
+      var savedText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(session.text()) : session.text();
       var blob = new Blob([savedText], {type: 'application/json'});
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
@@ -1197,7 +1145,7 @@ function initWorkbenchBuilder(opts){
       document.body.appendChild(a);
       a.click();
       a.remove();
-      baselineText = src.value;
+      session.markSaved();
       hideDiff();
       autosaveDraft();
       setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
@@ -1259,7 +1207,7 @@ function initWorkbenchBuilder(opts){
   var confluenceCopyRun = 0;
   function confluenceHandoff(copy){
     var run = ++confluenceCopyRun;
-    var handoffText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(src.value) : src.value;
+    var handoffText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(session.text()) : session.text();
     var built = buildConfluenceExport(handoffText);
     if (built.error){
       if (confluenceBox) confluenceBox.hidden = true;
@@ -1298,7 +1246,7 @@ function initWorkbenchBuilder(opts){
   if (exportBtn) exportBtn.addEventListener('click', function(){
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage('export needs valid JSON — ' + parsed.error); return; }
-    var exportText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(src.value) : src.value;
+    var exportText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(session.text()) : session.text();
     var jsonName = specFileName(parsed.raw);
     var htmlName = jsonName.replace(/\.spec\.json$/, '') + '.html';
     /* the folder picker needs the click's transient activation, which a
@@ -1340,7 +1288,6 @@ function initWorkbenchBuilder(opts){
   var importText = document.getElementById('import-mermaid-text');
   var importConvert = document.getElementById('import-mermaid-convert');
   var importCancel = document.getElementById('import-mermaid-cancel');
-  var importedText = null;
   function importMessage(cls, message){
     var list = document.getElementById('msgs');
     if (!list) return;
@@ -1367,17 +1314,16 @@ function initWorkbenchBuilder(opts){
         importMessage('e', ex.message);
         return;
       }
-      pushUndo();
-      src.value = JSON.stringify(spec, null, 2);
-      importedText = src.value;
-      setSelected(null); currentTarget = null; insertSection = 0;
-      if (connect) cancelConnect(null);
-      closePalette();
-      clearStepMarkers();
-      if (guide) guide.hidden = true;
-      render();
-      updateTargetLabel(spec);
-      autosaveDraft();
+      session.importText(JSON.stringify(spec, null, 2),{
+        rememberImport:true,
+        beforeRender:function(){
+          setSelected(null); session.target = null; session.insertSection = 0;
+          if (connect) cancelConnect(null);
+          closePalette();clearStepMarkers();
+          if (guide) guide.hidden = true;
+        },
+        afterRender:function(){updateTargetLabel(spec);}
+      });
       importBox.hidden = true;
       importBtn.focus();
       if (spec.todos.length) importMessage('w', spec.todos.length + ' todo(s) added to the spec — enrich by hand');
@@ -1386,7 +1332,7 @@ function initWorkbenchBuilder(opts){
       if (opts.isActive && !opts.isActive()) return;
       /* Programmatic replacement has no native textarea undo entry. */
       if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
-      if (addToStep || importedText == null || src.value !== importedText) return;
+      if (addToStep || !session.imported()) return;
       if (document.activeElement !== src && document.activeElement !== importBtn) return;
       ev.preventDefault();
       doUndo();
@@ -1507,14 +1453,16 @@ function initWorkbenchBuilder(opts){
         var verdict = validate(normalize(result.spec));
         if (verdict.errors.length) throw new Error(verdict.errors.join('\n'));
       } catch (ex){ traceFeedback.textContent = ex.message; return; }
-      pushUndo();
-      src.value = JSON.stringify(result.spec, null, 2);
-      setSelected(null); currentTarget = null; insertSection = 0;
-      if (connect) cancelConnect(null);
-      clearMultiSelect(); clearStepMarkers();
-      if (guide) guide.hidden = true;
-      retireInspector();
-      render(); updateTargetLabel(result.spec); autosaveDraft();
+      session.importText(JSON.stringify(result.spec, null, 2),{
+        beforeRender:function(){
+          setSelected(null); session.target = null; session.insertSection = 0;
+          if (connect) cancelConnect(null);
+          clearMultiSelect();clearStepMarkers();
+          if (guide) guide.hidden = true;
+          retireInspector();
+        },
+        afterRender:function(){updateTargetLabel(result.spec);}
+      });
       closeTrace();
       inspectorMessage('Imported ' + result.stats.spans + ' spans across ' + result.stats.services + ' services. ' +
         result.stats.elapsedMs + ' ms observed extent. ' + (result.warnings.join(' ') || 'Select a step to inspect its source span.'));
@@ -1532,7 +1480,7 @@ function initWorkbenchBuilder(opts){
     closePalette();
     if (guide) guide.hidden = true;
     diffbox.innerHTML = '';
-    var result = diffSpecTexts(baselineText, src.value);
+    var result = diffSpecTexts(session.baseline(), session.text());
     if (result.error || !result.findings.length){
       var line = document.createElement('div');
       line.textContent = result.error || 'no changes';
@@ -1586,7 +1534,7 @@ function initWorkbenchBuilder(opts){
                                   '[data-dv-panel="' + t.index + '"]';
     try { return secEl.querySelector(sel); } catch (ex){ return null; }
   }
-  function rehighlight(){ setSelected(findTargetEl(currentTarget)); }
+  function rehighlight(){ setSelected(findTargetEl(session.target)); }
   function flashPositionLine(){
     /* one background pulse on the "step 2 of 3" line — the visible proof
        that a move happened when the form fields themselves look the same */
@@ -1624,7 +1572,7 @@ function initWorkbenchBuilder(opts){
        view at that index — and keep it there across the builder's own
        re-renders, which otherwise reopen the diagram's default
        (usually ambient) view */
-    var t = currentTarget;
+    var t = session.target;
     if (!t || t.kind !== 'step') return;
     var stepper = stepperFor(t.section);
     if (!stepper) return;
@@ -1635,7 +1583,7 @@ function initWorkbenchBuilder(opts){
   }
   function applyStepMarkers(){
     clearStepMarkers();
-    var t = currentTarget;
+    var t = session.target;
     if (!t || t.kind !== 'step') return;
     var parsed = parseEditor();
     if (parsed.error) return;
@@ -1691,50 +1639,48 @@ function initWorkbenchBuilder(opts){
 
   /* apply a plan produced by a pure planner; keeps form focus (no textarea
      focus steal), re-renders, re-applies the board highlight */
-  function applyPlan(plan, opt){
+  function applyPlan(plan, opt, snapshot){
     if (!plan || plan.error){ formError(plan ? plan.error : 'edit failed'); return false; }
     formError('');
-    pushUndo();
-    if (addToStep) addModeSurvive = true; /* builder-internal render — keep the mode */
-    multiSurvive = true; /* plan application — the multi-selection stays */
-    src.value = plan.text;
-    render();
-    autosaveDraft();
-    if (opt && opt.after) opt.after(plan);
-    rehighlight();
-    syncBoardToSelectedStep();
-    applyStepMarkers();
-    var parsed = parseEditor();
-    if (!parsed.error) updateTargetLabel(parsed.raw);
-    /* the story list indexes the editor text; every applied plan changes
-       that text, so re-sync or its rows and highlight go stale */
-    if (stepList) stepList.sync();
-    if (plan.start != null) scrollTextareaTo(plan.start);
-    return true;
+    return session.accept(plan,{
+      snapshot:snapshot,
+      beforePublish:function(){
+        if (addToStep) addModeSurvive = true; /* internal render keeps the mode */
+        multiSurvive = true;
+      },
+      afterRender:function(){
+        if (opt && opt.after) opt.after(plan);
+        rehighlight();syncBoardToSelectedStep();applyStepMarkers();
+        var parsed = parseEditor();
+        if (!parsed.error) updateTargetLabel(parsed.raw);
+        if (stepList) stepList.sync();
+        if (plan.start != null) scrollTextareaTo(plan.start);
+      }
+    });
   }
   function commitSimple(key, valueTextOrNull){
     var parsed = parseEditor();
     if (parsed.error){ formError(parsed.error); return false; }
-    var path = builderTargetPath(parsed.raw, currentTarget);
+    var path = builderTargetPath(parsed.raw, session.target);
     if (!path){ formError('element not found — click Render, then reselect'); return false; }
-    return applyPlan(planSetField(src.value, parsed.raw, path, key, valueTextOrNull));
+    return applyPlan(planSetField(parsed.text, parsed.raw, path, key, valueTextOrNull),null,parsed);
   }
   function commitCascade(planFor, opt){
     var parsed = parseEditor();
     if (parsed.error){ formError(parsed.error); return false; }
-    return applyPlan(planFor(parsed.raw), opt);
+    return applyPlan(planFor(parsed.raw), opt, parsed);
   }
   function clipboardSelection(){
     if (multiSel.length > 1) return multiSel;
-    if (clipboardHomeTarget && clipboardHomeTarget.text === src.value && currentTarget &&
-        currentTarget.kind === 'panel' && clipboardHomeTarget.target.section === currentTarget.section && clipboardHomeTarget.target.index === currentTarget.index)
+    if (clipboardHomeTarget && clipboardHomeTarget.text === session.text() && session.target &&
+        session.target.kind === 'panel' && clipboardHomeTarget.target.section === session.target.section && clipboardHomeTarget.target.index === session.target.index)
       return [clipboardHomeTarget.target];
-    return currentTarget ? [currentTarget] : [];
+    return session.target ? [session.target] : [];
   }
-  function homeClipboardSelect(target){clipboardHomeTarget={text:src.value,target:target};}
+  function homeClipboardSelect(target){clipboardHomeTarget={text:session.text(),target:target};}
   function clipboardDestination(targets){
     var selected=targets && targets[0] || clipboardSelection()[0];
-    return {section:selected ? selected.section : insertSection,index:selected && ['panel','home'].indexOf(selected.kind)>=0 ? selected.index : undefined};
+    return {section:selected ? selected.section : session.insertSection,index:selected && ['panel','home'].indexOf(selected.kind)>=0 ? selected.index : undefined};
   }
   function applyClipboardPlan(plan){
     return applyPlan(plan,{after:function(){
@@ -1748,18 +1694,18 @@ function initWorkbenchBuilder(opts){
   }
   var objectClipboard = typeof initBuilderClipboard === 'function' ? initBuilderClipboard(document,{
     isActive:opts.isActive,
-    text:function(){return src.value;},selection:clipboardSelection,destination:clipboardDestination,
+    text:function(){return session.text();},selection:clipboardSelection,destination:clipboardDestination,
     blocked:function(){return !!(addToStep || connect || rowDrag || nodeDrag || groupDrag || Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);}));},
     destinationLabel:function(dest){
       var parsed=parseEditor(),panel;
-      if(!parsed.error){var got=builderDiagram(src.value,parsed.raw,dest.section);if(!got.error)panel=(got.d.panels || [])[dest.index];}
+      if(!parsed.error){var got=builderDiagram(session.text(),parsed.raw,dest.section);if(!got.error)panel=(got.d.panels || [])[dest.index];}
       return 'Destination: section '+(dest.section+1)+(panel ? ' · '+(panel.title || panel.id) : '')+'. Select a Home panel first to paste a room, device, or subject.';
     },apply:applyClipboardPlan,
     duplicate:function(targets){
       if(targets.length !== 1 || ['node','section','step'].indexOf(targets[0].kind)<0)return null;
       var t=targets[0];return commitCascade(function(raw){
-        var plan=t.kind === 'node' ? planDuplicateNode(src.value,raw,t.section,t.id) :
-          t.kind === 'section' ? planDuplicateSection(src.value,raw,t.section) : planDuplicateStep(src.value,raw,t.section,t.index,stepperFor(t.section) && stepperFor(t.section).path());
+        var plan=t.kind === 'node' ? planDuplicateNode(session.text(),raw,t.section,t.id) :
+          t.kind === 'section' ? planDuplicateSection(session.text(),raw,t.section) : planDuplicateStep(session.text(),raw,t.section,t.index,stepperFor(t.section) && stepperFor(t.section).path());
         return plan;
       },{after:function(plan){clearMultiSelect();selectTarget({kind:t.kind,section:t.kind === 'section' ? plan.index : t.section,id:plan.id,index:plan.index},false);}});
     }
@@ -1768,9 +1714,9 @@ function initWorkbenchBuilder(opts){
     /* replace the selected element's WHOLE value (bullet string, paragraph) */
     var parsed = parseEditor();
     if (parsed.error){ formError(parsed.error); return false; }
-    var path = builderTargetPath(parsed.raw, currentTarget);
+    var path = builderTargetPath(parsed.raw, session.target);
     if (!path){ formError('element not found — click Render, then reselect'); return false; }
-    return applyPlan(planReplaceValue(src.value, parsed.raw, path, valueText));
+    return applyPlan(planReplaceValue(session.text(), parsed.raw, path, valueText));
   }
 
   /* ---- form controls ---- */
@@ -1909,33 +1855,33 @@ function initWorkbenchBuilder(opts){
     return input;
   }
   function groupForm(val, ctx){
-    var t = currentTarget;
+    var t = session.target;
     var members = Object.keys((ctx.diagram && ctx.diagram.nodes) || {}).filter(function(id){
       return ctx.diagram.nodes[id] && ctx.diagram.nodes[id].group === t.id;
     });
     var memberRow = chipRow('members', members.map(function(id){ return {key: id, label: id}; }),
       'no members — select nodes and set their group', function(id){
-        return commitGroup(function(raw){ return planSetNodeGroup(src.value, raw, t.section, id, null); },
+        return commitGroup(function(raw){ return planSetNodeGroup(session.text(), raw, t.section, id, null); },
           {after: function(){ renderInspector(); }});
       }, null, 'group');
     memberRow.classList.add('groupctl');
     var parentOptions = builderGroupParentOptions(ctx.diagram && ctx.diagram.groups, t.id);
     var parentControl = selectControl(parentOptions, parentOptions.indexOf(val.parent) >= 0 ? val.parent : '', function(v){
-      return commitGroup(function(raw){ return planSetGroupParent(src.value, raw, t.section, t.id, v); },
+      return commitGroup(function(raw){ return planSetGroupParent(session.text(), raw, t.section, t.id, v); },
         {after: function(){ renderInspector(); }});
     }, true);
     parentControl.firstChild.textContent = 'top-level';
     return [
       frow('key', groupControl(t.id, function(v){
-        return commitGroup(function(raw){ return planRenameGroup(src.value, raw, t.section, t.id, v); },
+        return commitGroup(function(raw){ return planRenameGroup(session.text(), raw, t.section, t.id, v); },
           {after: function(){ t.id = v.trim(); renderInspector(); }});
       }, {required: 'a group needs a key'})),
       frow('title', groupControl(val.title, function(v){
-        return commitGroup(function(raw){ return planSetGroupTitle(src.value, raw, t.section, t.id, v); },
+        return commitGroup(function(raw){ return planSetGroupTitle(session.text(), raw, t.section, t.id, v); },
           {after: function(){ renderInspector(); }});
       }, {list: null})),
       frow('icon', selectControl(ICON_SET, val.icon || '', function(v){
-        return commitGroup(function(raw){ return planSetGroupIcon(src.value, raw, t.section, t.id, v); },
+        return commitGroup(function(raw){ return planSetGroupIcon(session.text(), raw, t.section, t.id, v); },
           {after: function(){ renderInspector(); }});
       }, true)),
       frow('parent (nesting)', parentControl),
@@ -1976,14 +1922,14 @@ function initWorkbenchBuilder(opts){
     return rows;
   }
   function nodeForm(val, ctx){
-    var t = currentTarget;
+    var t = session.target;
     ensureGroupDatalist([ctx.diagram]);
     var floatSide = '';
     ((ctx.diagram && ctx.diagram.floats) || []).forEach(function(f){
       if (f && f.id === t.id) floatSide = f.side === 'below' ? 'below' : 'above';
     });
     var floatControl = selectControl(['above', 'below'], floatSide, function(v){
-      return commitCascade(function(raw){ return planSetNodeFloat(src.value, raw, t.section, t.id, v); },
+      return commitCascade(function(raw){ return planSetNodeFloat(session.text(), raw, t.section, t.id, v); },
         {after: function(){ renderInspector(); }});
     }, true);
     floatControl.firstChild.textContent = 'in rows';
@@ -1991,13 +1937,13 @@ function initWorkbenchBuilder(opts){
       frow('id', textControl(t.id, function(v){
         if (v == null){ formError('a node needs an id'); return false; }
         if (v === t.id){ formError(''); return true; }
-        return commitCascade(function(raw){ return planRenameNode(src.value, raw, t.section, t.id, v); },
+        return commitCascade(function(raw){ return planRenameNode(session.text(), raw, t.section, t.id, v); },
           {after: function(){ t.id = v; renderInspector(); }});
       }, {required: 'a node needs an id'})),
       frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); })),
       frow('group', groupControl(val.group, function(v){
-        return commitGroup(function(raw){ return planSetNodeGroup(src.value, raw, t.section, t.id, v); },
-          {after: function(){ ensureGroupDatalist([builderDiagram(src.value, JSON.parse(src.value), t.section).d]); }});
+        return commitGroup(function(raw){ return planSetNodeGroup(session.text(), raw, t.section, t.id, v); },
+          {after: function(){ ensureGroupDatalist([builderDiagram(session.text(), JSON.parse(session.text()), t.section).d]); }});
       })),
       frow('float', floatControl),
       frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
@@ -2008,13 +1954,13 @@ function initWorkbenchBuilder(opts){
     ].concat(catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
   }
   function edgeForm(val, ctx){
-    var t = currentTarget;
+    var t = session.target;
     var ids = Object.keys((ctx.diagram && ctx.diagram.nodes) || {});
     function endpoint(field){
       return selectControl(ids, val[field], function(v){
         if (v == null) return true; /* endpoint kept — nothing to commit */
         return commitCascade(function(raw){
-          return planSetEdgeEndpoint(src.value, raw, t.section, t.index, field, v);
+          return planSetEdgeEndpoint(session.text(), raw, t.section, t.index, field, v);
         });
       });
     }
@@ -2058,10 +2004,10 @@ function initWorkbenchBuilder(opts){
     return frow(labelText, box);
   }
   function stepForm(val, ctx){
-    var t = currentTarget;
+    var t = session.target;
     function toggled(planFn){
       return function(key){
-        commitCascade(function(raw){ return planFn(src.value, raw, t.section, t.index, key); },
+        commitCascade(function(raw){ return planFn(session.text(), raw, t.section, t.index, key); },
           {after: function(){ renderInspector(); }});
       };
     }
@@ -2097,7 +2043,7 @@ function initWorkbenchBuilder(opts){
       });
       input.value = failures[key] || 'delivered';
       input.addEventListener('change',function(){
-        commitCascade(function(raw){return planStepCommunication(src.value,raw,t.section,t.index,key,input.value);},
+        commitCascade(function(raw){return planStepCommunication(session.text(),raw,t.section,t.index,key,input.value);},
           {after:function(){renderInspector();}});
       });
       return input;
@@ -2112,7 +2058,7 @@ function initWorkbenchBuilder(opts){
     addFailure.disabled = addFailure.children.length < 2;
     addFailure.addEventListener('change',function(){
       if (!addFailure.value) return;
-      commitCascade(function(raw){return planStepCommunication(src.value,raw,t.section,t.index,addFailure.value,'dropped');},
+      commitCascade(function(raw){return planStepCommunication(session.text(),raw,t.section,t.index,addFailure.value,'dropped');},
         {after:function(){renderInspector();}});
     });
     rows.push(frow('Add failed communication',addFailure));
@@ -2144,7 +2090,7 @@ function initWorkbenchBuilder(opts){
       } else input.value = '';
       input.addEventListener('change', function(){
         commitCascade(function(raw){
-          return planStepTone(src.value, raw, t.section, t.index, id, input.value === '' ? null : input.value);
+          return planStepTone(session.text(), raw, t.section, t.index, id, input.value === '' ? null : input.value);
         }, {after: function(){ renderInspector(); }});
       });
       return input;
@@ -2162,7 +2108,7 @@ function initWorkbenchBuilder(opts){
     addTone.addEventListener('change', function(){
       if (!addTone.value) return;
       commitCascade(function(raw){
-        return planStepTone(src.value, raw, t.section, t.index, addTone.value, 'alert');
+        return planStepTone(session.text(), raw, t.section, t.index, addTone.value, 'alert');
       }, {after: function(){ renderInspector(); }});
     });
     rows.push(frow('Add node tone', addTone));
@@ -2200,15 +2146,15 @@ function initWorkbenchBuilder(opts){
       var button=document.createElement('button'); button.type='button'; button.className='bbtn effective-source';
       button.textContent=source.label; button.title=builderPathString(base.concat(source.path));
       button.addEventListener('click',function(){
-        if (src.value!==indexedText){ stale(); return; }
-        var loc=jsonLocate(src.value,base.concat(source.path));
+        if (session.text()!==indexedText){ stale(); return; }
+        var loc=jsonLocate(session.text(),base.concat(source.path));
         if (loc) selectRange(loc,true);
       });
       return button;
     }
     function populate(){
       var parsed=parseEditor(), refs=parsed.error?[]:specSectionPaths(parsed.raw), rec=refs[target.section];
-      body.textContent=''; indexedText=src.value; populated=true;
+      body.textContent=''; indexedText=session.text(); populated=true;
       if (parsed.error || !rec){ note.textContent='Fix the JSON source before inspecting effective state.'; return; }
       var d=specValueAt(parsed.raw,rec.diagram), model=builderEffectivePanelStates(d,target.index,stepperFor(target.section) && stepperFor(target.section).path());
       if (model.error){ note.textContent=model.error; return; }
@@ -2236,7 +2182,7 @@ function initWorkbenchBuilder(opts){
         var rawLabel=document.createElement('summary'); rawLabel.textContent='Folded JSON'; raw.appendChild(rawLabel);
         var area=document.createElement('textarea'); area.className='fctl'; area.readOnly=true; area.rows=6; area.value=JSON.stringify(p.state,null,2); area.setAttribute('aria-label','Effective JSON for '+p.id); raw.appendChild(area);
         var select=document.createElement('button'); select.type='button'; select.className='bbtn'; select.textContent='Select JSON';
-        select.addEventListener('click',function(){ if (src.value!==indexedText){ stale(); return; } area.focus(); area.select(); }); raw.appendChild(select);
+        select.addEventListener('click',function(){ if (session.text()!==indexedText){ stale(); return; } area.focus(); area.select(); }); raw.appendChild(select);
         box.appendChild(raw); body.appendChild(box);
       });
     }
@@ -2244,7 +2190,7 @@ function initWorkbenchBuilder(opts){
     outer.addEventListener('toggle',function(ev){
       if (ev.target!==outer || !guide.contains(outer)) return;
       OPEN_EFFECTIVE_STATE=outer.open;
-      if (outer.open && (!populated || indexedText!==src.value)) populate();
+      if (outer.open && (!populated || indexedText!==session.text())) populate();
     });
     if (outer.open) populate();
     return outer;
@@ -2281,7 +2227,7 @@ function initWorkbenchBuilder(opts){
           if (value === undefined) delete next[key];
           else next[key] = value;
         }
-        return planStepSetPanelPatch(src.value, raw, target.section, target.index, pid, JSON.stringify(next));
+        return planStepSetPanelPatch(session.text(), raw, target.section, target.index, pid, JSON.stringify(next));
       });
       if (ok) refreshFormSoon();
       return ok;
@@ -2399,7 +2345,7 @@ function initWorkbenchBuilder(opts){
      never go stale against each other. Deferred a tick so the change event
      finishes on a still-attached input. */
   function refreshFormSoon(){
-    setTimeout(function(){ if (currentTarget) renderInspector(); }, 0);
+    setTimeout(function(){ if (session.target) renderInspector(); }, 0);
   }
   function rawJsonFallback(key, cur, jsonKind){
     var det = document.createElement('details');
@@ -2654,7 +2600,7 @@ function initWorkbenchBuilder(opts){
     var factory=panelAuthoring(type).editor, cached=panelEditors[type];
     if(cached && cached.factory===factory) return cached.value;
     var context={
-      source:function(){return src.value;}, target:function(){return currentTarget;},
+      source:function(){return session.text();}, target:function(){return session.target;},
       editingBlocked:function(){return !!addToStep;}, parse:parseEditor,
       commit:commitSimple, transact:commitCascade, error:formError,
       refresh:refreshFormSoon, inspect:renderInspector, select:selectTarget,
@@ -2718,12 +2664,12 @@ function initWorkbenchBuilder(opts){
     });
   }
   function panelForm(val, ctx){
-    var t = currentTarget;
+    var t = session.target;
     var rows = [
       frow('id', textControl(val.id, function(v){
         if (v == null){ formError('a panel needs an id'); return false; }
         if (v === val.id){ formError(''); return true; }
-        return commitCascade(function(raw){ return planRenamePanel(src.value, raw, t.section, t.index, v); },
+        return commitCascade(function(raw){ return planRenamePanel(session.text(), raw, t.section, t.index, v); },
           {after: function(){ renderInspector(); }});
       }, {required: 'a panel needs an id'})),
       frow('type', selectControl(PANEL_TYPES, val.type, function(v){
@@ -2734,7 +2680,7 @@ function initWorkbenchBuilder(opts){
       frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
     ];
     rows.push(frow('Presentation', selectControl(['Sidebar', 'Centerpiece'], ctx.diagram.primaryPanel === val.id ? 'Centerpiece' : 'Sidebar', function(v){
-      return commitCascade(function(raw){ return planPrimaryPanel(src.value, raw, t.section, v === 'Centerpiece' ? val.id : null); },
+      return commitCascade(function(raw){ return planPrimaryPanel(session.text(), raw, t.section, v === 'Centerpiece' ? val.id : null); },
         {after:function(){ renderInspector(); }});
     })));
     var editor=panelEditor(val.type);
@@ -2791,7 +2737,7 @@ function initWorkbenchBuilder(opts){
   }
 
   function tabForm(val, ctx){
-    var t = currentTarget;
+    var t = session.target;
     return [
       frow('label', textControl(val.label, function(v){
         if (v == null){ formError('a tab needs a label'); return false; }
@@ -2817,11 +2763,11 @@ function initWorkbenchBuilder(opts){
   }
 
   function deletePlanFor(t, raw){
-    return builderDeletePlan(src.value, raw, t);
+    return builderDeletePlan(session.text(), raw, t);
   }
 
   function deleteCurrent(){
-    var t = currentTarget;
+    var t = session.target;
     if (!t) return;
     if (t.kind === 'group' && addToStep){
       formError('finish ADD TO STEP first (DONE or Esc) — delete is paused while the mode is armed');
@@ -2829,8 +2775,8 @@ function initWorkbenchBuilder(opts){
     }
     commitCascade(function(raw){ return deletePlanFor(t, raw); },
       {after: function(){
-        currentTarget = null; setSelected(null);
-        if (t.kind === 'section') insertSection = 0;
+        session.target = null; setSelected(null);
+        if (t.kind === 'section') session.insertSection = 0;
         inspectorMessage(t.kind + ' deleted — undo restores it');
       }});
   }
@@ -2885,17 +2831,17 @@ function initWorkbenchBuilder(opts){
     /* a mismatched modifier-click against an existing SINGLE selection is
        refused the same way — it must leave that selection standing, never
        silently replace it */
-    if (!multiSel.length && currentTarget && currentTarget.kind !== target.kind){
+    if (!multiSel.length && session.target && session.target.kind !== target.kind){
       inspectorMessage('multi-select works within one kind — the current selection is a ' +
-        currentTarget.kind + '; plain-click to switch');
+        session.target.kind + '; plain-click to switch');
       return;
     }
     /* a shift-click after a plain click grows the pair naturally: seed the
        set with the current single selection when the kinds match. The
        single-selection ring is dropped FIRST — the seed then re-rings the
        same element as a multi member. */
-    var prev = currentTarget;
-    currentTarget = null;
+    var prev = session.target;
+    session.target = null;
     setSelected(null);
     if (!multiSel.length && prev && prev.kind === target.kind &&
         multiIdent(prev) !== multiIdent(target)){
@@ -2929,12 +2875,12 @@ function initWorkbenchBuilder(opts){
     renderMultiInspector();
   }
   function applyBulkField(key, valueTextOrNull){
-    var plan = planBulkSetField(src.value, multiSel, key, valueTextOrNull);
+    var plan = planBulkSetField(session.text(), multiSel, key, valueTextOrNull);
     return applyPlan(plan); /* the re-render observer re-rings + re-renders the multi form */
   }
   function bulkDeleteSelected(){
     var n = multiSel.length, kind = multiSel[0].kind;
-    var plan = planBulkDelete(src.value, multiSel);
+    var plan = planBulkDelete(session.text(), multiSel);
     if (applyPlan(plan)){
       clearMultiSelect();
       inspectorMessage(n + ' ' + kind + (n > 1 ? 's' : '') + ' deleted — undo restores them');
@@ -2964,7 +2910,7 @@ function initWorkbenchBuilder(opts){
       var parsed = parseEditor();
       var values = [], diagrams = [];
       if (!parsed.error) multiSel.forEach(function(t){
-        var got = builderDiagram(src.value, parsed.raw, t.section);
+        var got = builderDiagram(session.text(), parsed.raw, t.section);
         if (!got.error){
           diagrams.push(got.d);
           values.push(((got.d.nodes || {})[t.id] || {}).group || '');
@@ -2973,7 +2919,7 @@ function initWorkbenchBuilder(opts){
       ensureGroupDatalist(diagrams);
       var mixed = values.some(function(v){ return v !== values[0]; });
       form.appendChild(frow('group', groupControl(mixed ? null : values[0], function(v){
-        return commitGroup(function(raw){ return planBulkSetGroup(src.value, raw, multiSel, v); });
+        return commitGroup(function(raw){ return planBulkSetGroup(session.text(), raw, multiSel, v); });
       }, {placeholder: mixed ? 'mixed — empty removes' : 'group key — empty removes', commitUnchanged: mixed})));
       form.appendChild(frow('tint', selectControl(['cmd', 'auth', 'data', 'mqtt', 'dev'], null, function(v){
         return applyBulkField('tint', v == null ? null : JSON.stringify(v));
@@ -3017,7 +2963,7 @@ function initWorkbenchBuilder(opts){
         }
         var sec = multiSel[0].section;
         var ids = multiSel.map(function(t){ return t.id; });
-        commitGroup(function(raw){ return planStackNodes(src.value, raw, sec, ids); });
+        commitGroup(function(raw){ return planStackNodes(session.text(), raw, sec, ids); });
       }));
     }
     acts.appendChild(actionButton('delete ' + multiSel.length + ' ' + kind + 's',
@@ -3028,8 +2974,8 @@ function initWorkbenchBuilder(opts){
   function renderInspector(){
     invalidateEffectiveState=null;
     hideDiff();
-    if (!guide || !currentTarget) return;
-    var t = currentTarget;
+    if (!guide || !session.target) return;
+    var t = session.target;
     /* wiping the content clamps the .guide scroll box to the top, so a
        form refresh after a control commit jumped the inspector. Keep the
        scroll position when re-rendering the SAME element; a new
@@ -3048,16 +2994,16 @@ function initWorkbenchBuilder(opts){
 
     var parsed = parseEditor();
     var path = parsed.error ? null : builderTargetPath(parsed.raw, t);
-    var loc = path ? jsonLocate(src.value, path) : null;
+    var loc = path ? jsonLocate(session.text(), path) : null;
 
     var p = document.createElement(loc ? 'button' : 'span');
     p.className = 'gpath';
     p.textContent = path ? builderPathString(path) + (loc ? ' ↗ JSON' : '') : '';
     if (loc){
-      var sourceAtSelection = src.value;
+      var sourceAtSelection = session.text();
       p.type = 'button'; p.setAttribute('aria-label', 'Show selected element in JSON');
       p.addEventListener('click', function(){
-        if (src.value !== sourceAtSelection){ formError('Source changed. Click Render and reselect this element.'); return; }
+        if (session.text() !== sourceAtSelection){ formError('Source changed. Click Render and reselect this element.'); return; }
         selectRange(loc, true);
       });
     }
@@ -3077,7 +3023,7 @@ function initWorkbenchBuilder(opts){
 
     if (parsed.error){
       formError(parsed.error + ' — fix it to edit this element');
-    } else if (!loc && !(t.kind === 'group' && !builderDiagram(src.value, parsed.raw, t.section).error)){
+    } else if (!loc && !(t.kind === 'group' && !builderDiagram(session.text(), parsed.raw, t.section).error)){
       formError('definition not found in the editor text — the render and the editor may be out of sync (click Render)');
     } else if (t.kind === 'section' && path.length === 0){
       formError('bare diagram — wrap it as {"page": {"blocks": [ ... ]}} to edit heading and accent');
@@ -3124,19 +3070,19 @@ function initWorkbenchBuilder(opts){
       }
       if (t.kind === 'node'){
         acts.appendChild(actionButton('duplicate', function(){
-          commitCascade(function(raw){ return planDuplicateNode(src.value, raw, t.section, t.id); },
+          commitCascade(function(raw){ return planDuplicateNode(session.text(), raw, t.section, t.id); },
             {after: function(plan){
-              currentTarget = {section: t.section, kind: 'node', id: plan.id};
+              session.target = {section: t.section, kind: 'node', id: plan.id};
               renderInspector();
             }});
         }));
       }
       if (t.kind === 'section'){
         acts.appendChild(actionButton('duplicate', function(){
-          commitCascade(function(raw){ return planDuplicateSection(src.value, raw, t.section); },
+          commitCascade(function(raw){ return planDuplicateSection(session.text(), raw, t.section); },
             {after: function(plan){
-              currentTarget = {section: plan.index, kind: 'section'};
-              insertSection = plan.index;
+              session.target = {section: plan.index, kind: 'section'};
+              session.insertSection = plan.index;
               renderInspector();
             }});
         }));
@@ -3144,7 +3090,7 @@ function initWorkbenchBuilder(opts){
            is recomputed because moving over a tabs container hops all of
            its sections at once */
         var moveSection = function(delta){
-          commitCascade(function(raw){ return planMoveSection(src.value, raw, t.section, delta); },
+          commitCascade(function(raw){ return planMoveSection(session.text(), raw, t.section, delta); },
             {after: function(plan){
               var parsed = parseEditor();
               if (!parsed.error){
@@ -3153,8 +3099,8 @@ function initWorkbenchBuilder(opts){
                   if (JSON.stringify(rec.section) === key) t.section = i;
                 });
               }
-              currentTarget = {section: t.section, kind: 'section'};
-              insertSection = t.section;
+              session.target = {section: t.section, kind: 'section'};
+              session.insertSection = t.section;
               rehighlight();
               renderInspector();
               flashPositionLine();
@@ -3165,18 +3111,18 @@ function initWorkbenchBuilder(opts){
       }
       if (t.kind === 'tab'){
         acts.appendChild(actionButton('+ tab', function(){
-          commitCascade(function(raw){ return planAddTab(src.value, raw, t.block, t.tab); },
+          commitCascade(function(raw){ return planAddTab(session.text(), raw, t.block, t.tab); },
             {after: function(plan){
-              currentTarget = {kind: 'tab', block: plan.block, tab: plan.index};
+              session.target = {kind: 'tab', block: plan.block, tab: plan.index};
               renderInspector();
             }});
         }));
         acts.appendChild(actionButton('← move left', function(){
-          commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, -1); },
+          commitCascade(function(raw){ return planMoveTab(session.text(), raw, t.block, t.tab, -1); },
             {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('→ move right', function(){
-          commitCascade(function(raw){ return planMoveTab(src.value, raw, t.block, t.tab, 1); },
+          commitCascade(function(raw){ return planMoveTab(session.text(), raw, t.block, t.tab, 1); },
             {after: function(plan){ t.tab = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
@@ -3199,15 +3145,15 @@ function initWorkbenchBuilder(opts){
           acts.appendChild(removeHere);
         }
         acts.appendChild(actionButton('duplicate step', function(){
-          commitCascade(function(raw){ return planDuplicateStep(src.value, raw, t.section, t.index, stepperFor(t.section) && stepperFor(t.section).path()); },
+          commitCascade(function(raw){ return planDuplicateStep(session.text(), raw, t.section, t.index, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('↑ move up', function(){
-          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, -1, stepperFor(t.section) && stepperFor(t.section).path()); },
+          commitCascade(function(raw){ return planMoveStep(session.text(), raw, t.section, t.index, -1, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
         acts.appendChild(actionButton('↓ move down', function(){
-          commitCascade(function(raw){ return planMoveStep(src.value, raw, t.section, t.index, 1, stepperFor(t.section) && stepperFor(t.section).path()); },
+          commitCascade(function(raw){ return planMoveStep(session.text(), raw, t.section, t.index, 1, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
@@ -3257,7 +3203,7 @@ function initWorkbenchBuilder(opts){
     }
     var transport = ev.target.closest && ev.target.closest('.tbtn');
     if (transport && /^(Previous|Next) step$/.test(transport.getAttribute('aria-label') || '') &&
-        currentTarget && currentTarget.kind === 'step'){
+        session.target && session.target.kind === 'step'){
       var activeSection = transport.closest('.doc-sec');
       if (activeSection){
         var ordinal = Number(activeSection.getAttribute('data-dv-section')), player = stepperFor(ordinal);
@@ -3338,16 +3284,16 @@ function initWorkbenchBuilder(opts){
     if (opts.workspace && !keepTool) opts.workspace.showTool('inspect', {closeUtilities:true});
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
-    currentTarget = {section: target.section, kind: target.kind,
+    session.target = {section: target.section, kind: target.kind,
                      id: target.id, index: target.index,
                      block: target.block, tab: target.tab};
-    if (target.kind !== 'tab') insertSection = target.section;
+    if (target.kind !== 'tab') session.insertSection = target.section;
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
     syncBoardToSelectedStep();
-    if (currentTarget.kind === 'step'){
-      var sp = stepperFor(currentTarget.section);
-      if (sp && sp.path) currentTarget.pathId = sp.path();
+    if (session.target.kind === 'step'){
+      var sp = stepperFor(session.target.section);
+      if (sp && sp.path) session.target.pathId = sp.path();
     }
     renderInspector();
     applyStepMarkers();
@@ -3357,8 +3303,8 @@ function initWorkbenchBuilder(opts){
       if(editor.selected) editor.selected(target,parsed.raw);
     }
     if (focusEditor === false) return;
-    var path = parsed.error ? null : builderTargetPath(parsed.raw, currentTarget);
-    var loc = path ? jsonLocate(src.value, path) : null;
+    var path = parsed.error ? null : builderTargetPath(parsed.raw, session.target);
+    var loc = path ? jsonLocate(session.text(), path) : null;
     if (loc) selectRange(loc);
   }
 
@@ -3370,9 +3316,9 @@ function initWorkbenchBuilder(opts){
   function refreshOutline(){
     if (!outlineResults) return;
     outlineResults.innerHTML = '';
-    var indexedText = src.value;
+    var indexedText = session.text();
     var entries;
-    try { entries = builderOutline(JSON.parse(src.value), outlineSearch.value); }
+    try { entries = builderOutline(JSON.parse(session.text()), outlineSearch.value); }
     catch (ex){ outlineStatus.textContent = 'Fix the JSON source to browse its outline.'; return; }
     outlineStatus.textContent = entries.length ? Math.min(entries.length, 200) + ' of ' + entries.length + ' items' : 'No matching items';
     entries.slice(0, 200).forEach(function(entry){
@@ -3384,15 +3330,15 @@ function initWorkbenchBuilder(opts){
       button.title = builderPathString(entry.path);
       button.addEventListener('click', function(){
         if (addToStep) return;
-        if (src.value !== indexedText){
+        if (session.text() !== indexedText){
           refreshOutline();
           outlineStatus.textContent = 'Source changed; outline refreshed. Select the item again.';
           return;
         }
         /* Never map fresh JSON onto stale rendered section ordinals. */
-        if (opts.renderedText && opts.renderedText() !== src.value){
+        if (opts.renderedText && opts.renderedText() !== session.text()){
           render();
-          if (opts.renderedText() !== src.value){ inspectorMessage('Fix validation errors before navigating the preview.'); return; }
+          if (opts.renderedText() !== session.text()){ inspectorMessage('Fix validation errors before navigating the preview.'); return; }
         }
         if (connect) cancelConnect(null);
         clearMultiSelect();
@@ -3402,7 +3348,7 @@ function initWorkbenchBuilder(opts){
         }
         var el = findTargetEl(entry.target);
         selectTarget(Object.assign({}, entry.target, {el: el}), false);
-        var loc = jsonLocate(src.value, entry.path);
+        var loc = jsonLocate(session.text(), entry.path);
         if (loc && sourceVisible()){
           src.setSelectionRange(loc.start, loc.end);
           scrollTextareaTo(loc.start);
@@ -3437,18 +3383,18 @@ function initWorkbenchBuilder(opts){
     view:view, src:src, renderedText:opts.renderedText,
     configure:function(plan, section){
       /* A previous inspector selection must not pull settings back to another section. */
-      if (currentTarget && currentTarget.section !== section){
-        currentTarget=null; setSelected(null); clearMultiSelect(); if (guide) guide.hidden=true;
+      if (session.target && session.target.section !== section){
+        session.target=null; setSelected(null); clearMultiSelect(); if (guide) guide.hidden=true;
       }
       return applyPlan(plan);
     },
     pause:pausePreview,
     inspect:function(){ if (opts.workspace) opts.workspace.showTool('inspect', {focus:true}); },
-    selection:function(){ return currentTarget; },
+    selection:function(){ return session.target; },
     locked:function(){ return !!addToStep || !!connect; },
     path:function(section){var sp=stepperFor(section);return sp && sp.path();},
     selectPath:function(section,id){
-      currentTarget=null; clearMultiSelect(); if(guide) guide.hidden=true;
+      session.target=null; clearMultiSelect(); if(guide) guide.hidden=true;
       var sp=stepperFor(section); if(sp) sp.selectPath(id);
       applyRowGrabs(); clearStepMarkers();
     },
@@ -3461,7 +3407,7 @@ function initWorkbenchBuilder(opts){
       if(entry.pathId){var sp=stepperFor(entry.target.section);if(sp) sp.selectPath(entry.pathId,entry.position);}
       var el = findTargetEl(entry.target);
       selectTarget(Object.assign({}, entry.target, {el:el}), false, true);
-      var loc = jsonLocate(src.value, entry.path);
+      var loc = jsonLocate(session.text(), entry.path);
       if (loc && sourceVisible()){
         src.setSelectionRange(loc.start, loc.end); scrollTextareaTo(loc.start);
       }
@@ -3470,14 +3416,14 @@ function initWorkbenchBuilder(opts){
     apply:function(plan, section){
       clearMultiSelect();
       return applyPlan(plan, {after:function(){
-        var story = builderStorySections(JSON.parse(src.value)).find(function(entry){ return entry.section === section; });
+        var story = builderStorySections(JSON.parse(session.text())).find(function(entry){ return entry.section === section; });
         if (story && story.tab){
           var tabButton = document.getElementById('tab-' + story.tab.block + '-' + story.tab.tab);
           if (tabButton) tabButton.click();
         }
-        currentTarget = {kind:'step', section:section, index:plan.index};
-        if(plan.pathId){currentTarget.pathId=plan.pathId;var sp=stepperFor(section);if(sp) sp.jumpSource(plan.index,plan.pathId);}
-        insertSection = section;
+        session.target = {kind:'step', section:section, index:plan.index};
+        if(plan.pathId){session.target.pathId=plan.pathId;var sp=stepperFor(section);if(sp) sp.jumpSource(plan.index,plan.pathId);}
+        session.insertSection = section;
         renderInspector();
       }});
     }
@@ -3487,35 +3433,35 @@ function initWorkbenchBuilder(opts){
     view:view,src:src,ctl:opts.ctl,render:render,renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!addToStep || !!connect;},
     commit:function(section,target,items,id){
-      return commitCascade(function(raw){return planSectionLayout(src.value,raw,section,target,items,id);});
+      return commitCascade(function(raw){return planSectionLayout(session.text(),raw,section,target,items,id);});
     },
     rename:function(section,name,id){
-      return commitCascade(function(raw){return planSectionLayoutName(src.value,raw,section,name,id);});
+      return commitCascade(function(raw){return planSectionLayoutName(session.text(),raw,section,name,id);});
     },
-    ensureView:function(section,target){return commitCascade(function(raw){return planEnsureSectionView(src.value,raw,section,target);});},
+    ensureView:function(section,target){return commitCascade(function(raw){return planEnsureSectionView(session.text(),raw,section,target);});},
     steps:function(section,id,indices){
-      var prior=currentTarget;currentTarget=null;
-      var ok=commitCascade(function(raw){return planSectionViewSteps(src.value,raw,section,id,indices);});
-      if(!ok)currentTarget=prior;else{clearMultiSelect();clearStepMarkers();if(guide)guide.hidden=true;}
+      var prior=session.target;session.target=null;
+      var ok=commitCascade(function(raw){return planSectionViewSteps(session.text(),raw,section,id,indices);});
+      if(!ok)session.target=prior;else{clearMultiSelect();clearStepMarkers();if(guide)guide.hidden=true;}
       return ok;
     },
     duplicate:function(section,id){
-      var nextId,ok=commitCascade(function(raw){var plan=planDuplicateSectionLayout(src.value,raw,section,id);nextId=plan.layoutId;return plan;});return ok?nextId:null;
+      var nextId,ok=commitCascade(function(raw){var plan=planDuplicateSectionLayout(session.text(),raw,section,id);nextId=plan.layoutId;return plan;});return ok?nextId:null;
     },
-    remove:function(section,id){return commitCascade(function(raw){return planDeleteSectionLayout(src.value,raw,section,id);});},
-    makeDefault:function(section,id){return commitCascade(function(raw){return planDefaultSectionLayout(src.value,raw,section,id);});}
+    remove:function(section,id){return commitCascade(function(raw){return planDeleteSectionLayout(session.text(),raw,section,id);});},
+    makeDefault:function(section,id){return commitCascade(function(raw){return planDefaultSectionLayout(session.text(),raw,section,id);});}
 
   }) : null;
   view.addEventListener('dv:pathrender',applyRowGrabs);
   view.addEventListener('click',function(ev){
-    if(!ev.target.closest('[data-view-layout]') || !currentTarget || currentTarget.kind!=='step')return;
+    if(!ev.target.closest('[data-view-layout]') || !session.target || session.target.kind!=='step')return;
     var section=ev.target.closest('.doc-sec'),index=section && Number(section.getAttribute('data-dv-section'));
     var player=section && stepperFor(index);
-    if(player && currentTarget.section===index){currentTarget={kind:'step',section:index,index:player.sourceIndex(),pathId:player.path()};renderInspector();applyStepMarkers();}
+    if(player && session.target.section===index){session.target={kind:'step',section:index,index:player.sourceIndex(),pathId:player.path()};renderInspector();applyStepMarkers();}
   });
   view.addEventListener('dv:pathchange',function(ev){
-    var followStep = currentTarget && currentTarget.kind === 'step';
-    currentTarget=null;clearMultiSelect();if(guide) guide.hidden=true;
+    var followStep = session.target && session.target.kind === 'step';
+    session.target=null;clearMultiSelect();if(guide) guide.hidden=true;
     if(addToStep) cancelAddToStep(null);if(connect) cancelConnect(null);
     applyRowGrabs();clearStepMarkers();if(stepList) stepList.sync();
     var section = ev.target.closest('.doc-sec');
@@ -3599,19 +3545,19 @@ function initWorkbenchBuilder(opts){
     var mode = addToStep;
     var plan = null;
     if (target.kind === 'node'){
-      plan = planStepToggleNode(src.value, parsed.raw, mode.section, mode.step, target.id);
+      plan = planStepToggleNode(session.text(), parsed.raw, mode.section, mode.step, target.id);
     } else if (target.kind === 'edge'){
       var rec = specSectionPaths(parsed.raw)[mode.section];
       var edges = rec ? (specValueAt(parsed.raw, rec.diagram) || {}).edges : null;
       var e = Array.isArray(edges) ? edges[target.index] : null;
       if (!e){ formError('edge not found — the render and the editor may be out of sync'); return; }
-      plan = planStepToggleHop(src.value, parsed.raw, mode.section, mode.step, builderEdgeKey(e));
+      plan = planStepToggleHop(session.text(), parsed.raw, mode.section, mode.step, builderEdgeKey(e));
     } else {
       var rec2 = specSectionPaths(parsed.raw)[mode.section];
       var panels = rec2 ? (specValueAt(parsed.raw, rec2.diagram) || {}).panels : null;
       var pn = Array.isArray(panels) ? panels[target.index] : null;
       if (!pn || !pn.id){ formError('panel not found — the render and the editor may be out of sync'); return; }
-      plan = planStepTogglePanel(src.value, parsed.raw, mode.section, mode.step, pn.id);
+      plan = planStepTogglePanel(session.text(), parsed.raw, mode.section, mode.step, pn.id);
     }
     var ok = applyPlan(plan, {after: function(){ renderInspector(); }});
     if (!ok) return;
@@ -3654,16 +3600,12 @@ function initWorkbenchBuilder(opts){
       return;
     }
     var fromId = connect.fromId;
-    insertSection = target.section;
+    session.insertSection = target.section;
     var parsed = parseEditor();
     if (parsed.error){ cancelConnect(parsed.error); return; }
-    var plan = planAddEdgeBetween(src.value, parsed.raw, target.section, fromId, target.id);
+    var plan = planAddEdgeBetween(session.text(), parsed.raw, target.section, fromId, target.id);
     if (plan.error){ cancelConnect(plan.error); return; }
-    pushUndo();
-    clearMultiSelect(); /* this action establishes a single selection */
-    src.value = plan.text;
-    render();
-    autosaveDraft();
+    if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
     cancelConnect(null);
     var el = findTargetEl({section: target.section, kind: 'edge', index: plan.index});
     selectTarget({section: target.section, kind: 'edge', index: plan.index, el: el}, false);
@@ -3947,7 +3889,7 @@ function initWorkbenchBuilder(opts){
     if (!gd.rows){
       var parsed = parseEditor();
       if (parsed.error){ cancelGroupDrag(); inspectorMessage(parsed.error); return; }
-      var got = builderDiagram(src.value, parsed.raw, gd.gi);
+      var got = builderDiagram(session.text(), parsed.raw, gd.gi);
       if (got.error){ cancelGroupDrag(); inspectorMessage(got.error); return; }
       if (JSON.stringify(got.d.rows) !== gd.rowsJSON || gd.rowsJSON !== gd.renderRowsJSON){
         cancelGroupDrag();
@@ -3956,7 +3898,7 @@ function initWorkbenchBuilder(opts){
       }
       gd.rows = got.d.rows;
       gd.raw = parsed.raw;
-      gd.text = src.value;
+      gd.text = session.text();
       gd.members = Object.create(null);
       Object.keys(got.d.nodes || {}).forEach(function(id){
         if (got.d.nodes[id] && got.d.nodes[id].group === gd.key){
@@ -3978,7 +3920,7 @@ function initWorkbenchBuilder(opts){
     if (nd.target) return;
     var parsed = parseEditor();
     if (parsed.error){ cancelNodeDrag(); inspectorMessage(parsed.error); return; }
-    var got = builderDiagram(src.value, parsed.raw, nd.gi);
+    var got = builderDiagram(session.text(), parsed.raw, nd.gi);
     if (got.error){ cancelNodeDrag(); inspectorMessage(got.error); return; }
     if (JSON.stringify(got.d.rows) !== nd.rowsJSON || nd.rowsJSON !== nd.renderRowsJSON){
       cancelNodeDrag();
@@ -3988,7 +3930,7 @@ function initWorkbenchBuilder(opts){
     nd.rows = got.d.rows;
     if (!nd.svg || !nd.svg.getScreenCTM) return;
     updateGapDrag(nd, ev, function(pick){
-      return planMoveNode(src.value, parsed.raw, nd.gi, nd.id, pick);
+      return planMoveNode(session.text(), parsed.raw, nd.gi, nd.id, pick);
     }, cancelNodeDrag);
   }
   function updateGapDrag(gd, ev, planFor, cancel){
@@ -4155,13 +4097,9 @@ function initWorkbenchBuilder(opts){
         inspectorMessage('the JSON rows changed since the last render — click Render, then drag');
         return;
       }
-      var rdPlan = planMoveRow(src.value, rdParsed.raw, rd.gi, rd.row, to);
+      var rdPlan = planMoveRow(session.text(), rdParsed.raw, rd.gi, rd.row, to);
       if (rdPlan.error){ inspectorMessage(rdPlan.error); return; }
-      pushUndo();
-      clearMultiSelect(); /* the board rearranges under the selection */
-      src.value = rdPlan.text;
-      render();
-      autosaveDraft();
+      if(!session.accept(rdPlan,{snapshot:rdParsed,beforePublish:clearMultiSelect}))return;
       rehighlight();
       return;
     }
@@ -4176,26 +4114,22 @@ function initWorkbenchBuilder(opts){
       if (ndParsed.error){ inspectorMessage(ndParsed.error); return; }
       var ndPlan;
       if (nd.target){
-        ndPlan = planSwapNodes(src.value, ndParsed.raw, nd.gi, nd.id,
+        ndPlan = planSwapNodes(session.text(), ndParsed.raw, nd.gi, nd.id,
                                  nd.target.getAttribute('data-dv-node'));
       } else {
-        var ndGot = builderDiagram(src.value, ndParsed.raw, nd.gi);
+        var ndGot = builderDiagram(session.text(), ndParsed.raw, nd.gi);
         if (ndGot.error){ inspectorMessage(ndGot.error); return; }
         if (JSON.stringify(ndGot.d.rows) !== nd.rowsJSON || nd.rowsJSON !== nd.renderRowsJSON){
           inspectorMessage('the JSON rows changed since the last render — click Render, then drag');
           return;
         }
-        ndPlan = planMoveNode(src.value, ndParsed.raw, nd.gi, nd.id, nd.pick);
+        ndPlan = planMoveNode(session.text(), ndParsed.raw, nd.gi, nd.id, nd.pick);
         if (ndPlan.error === 'already there') return;
       }
       if (ndPlan.error){ inspectorMessage(ndPlan.error); return; }
-      pushUndo();
-      clearMultiSelect(); /* this action establishes a single selection */
-      src.value = ndPlan.text;
-      render();
-      autosaveDraft();
-      currentTarget = {section: nd.gi, kind: 'node', id: nd.id};
-      insertSection = nd.gi;
+      if(!session.accept(ndPlan,{snapshot:ndParsed,beforePublish:clearMultiSelect}))return;
+      session.target = {section: nd.gi, kind: 'node', id: nd.id};
+      session.insertSection = nd.gi;
       rehighlight();
       renderInspector();
       return;
@@ -4215,18 +4149,14 @@ function initWorkbenchBuilder(opts){
         return;
       }
       if (!gd.pick) return;
-      var gdPlan = planMoveGroup(src.value, gdParsed.raw, gd.gi, gd.key, gd.pick);
+      var gdPlan = planMoveGroup(session.text(), gdParsed.raw, gd.gi, gd.key, gd.pick);
       if (gdPlan.error){
         if (gdPlan.error !== 'already there') inspectorMessage(gdPlan.error);
         return;
       }
-      pushUndo();
-      clearMultiSelect();
-      src.value = gdPlan.text;
-      render();
-      autosaveDraft();
-      currentTarget = {section: gd.gi, kind: 'group', id: gd.key};
-      insertSection = gd.gi;
+      if(!session.accept(gdPlan,{snapshot:gdParsed,beforePublish:clearMultiSelect}))return;
+      session.target = {section: gd.gi, kind: 'group', id: gd.key};
+      session.insertSection = gd.gi;
       rehighlight();
       renderInspector();
       return;
@@ -4253,18 +4183,14 @@ function initWorkbenchBuilder(opts){
     var newDx = Math.round((typeof e.labelDx === 'number' ? e.labelDx : 0) + d.dx);
     var newDy = Math.round((typeof e.labelDy === 'number' ? e.labelDy : 0) + d.dy);
     if (!isFinite(newDx) || !isFinite(newDy)) return; /* never write NaN into the spec */
-    var plan = planSetFields(src.value, parsed.raw, path, [
+    var plan = planSetFields(session.text(), parsed.raw, path, [
       ['labelDx', newDx === 0 ? null : String(newDx)],
       ['labelDy', newDy === 0 ? null : String(newDy)]
     ]);
     if (plan.error){ inspectorMessage(plan.error); return; }
-    pushUndo();
-    clearMultiSelect(); /* this action establishes a single selection */
-    src.value = plan.text;
-    render();
-    autosaveDraft();
-    currentTarget = target;
-    insertSection = gi;
+    if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
+    session.target = target;
+    session.insertSection = gi;
     rehighlight();
     renderInspector();
   });
@@ -4334,8 +4260,8 @@ function initWorkbenchBuilder(opts){
       if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
       if (connect){ cancelConnect('connect cancelled'); return; }
       if (multiSel.length){ clearMultiSelect(); dropMultiUI(); return; }
-      if (currentTarget){
-        currentTarget = null;
+      if (session.target){
+        session.target = null;
         setSelected(null);
         if (guide) guide.hidden = true;
         retireInspector();
@@ -4355,7 +4281,7 @@ function initWorkbenchBuilder(opts){
         bulkDeleteSelected();
         return;
       }
-      if (!currentTarget) return;
+      if (!session.target) return;
       ev.preventDefault();
       if (addToStep){
         formError('finish ADD TO STEP first (DONE or Esc) — delete is paused while the mode is armed');
@@ -4373,16 +4299,12 @@ function initWorkbenchBuilder(opts){
     if (kind !== 'section' && !specSectionPaths(parsed.raw).length){
       inspectorMessage('no sections found in the editor text'); return;
     }
-    var plan = kind === 'section' ? planAddSection(src.value, parsed.raw)
-                                  : planFn(src.value, parsed.raw, insertSection, kind === 'step' && stepperFor(insertSection) ? stepperFor(insertSection).path() : undefined);
+    var plan = kind === 'section' ? planAddSection(session.text(), parsed.raw)
+                                  : planFn(session.text(), parsed.raw, session.insertSection, kind === 'step' && stepperFor(session.insertSection) ? stepperFor(session.insertSection).path() : undefined);
     if (plan.error){ inspectorMessage(plan.error); return; }
-    pushUndo();
-    clearMultiSelect(); /* this action establishes a single selection */
-    src.value = plan.text;
-    render();
-    autosaveDraft();
-    if (plan.kind === 'section') insertSection = plan.index;
-    var identity = {section: plan.kind === 'section' ? plan.index : insertSection,
+    if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
+    if (plan.kind === 'section') session.insertSection = plan.index;
+    var identity = {section: plan.kind === 'section' ? plan.index : session.insertSection,
                     kind: plan.kind, id: plan.id, index: plan.index};
     var el = findTargetEl(identity);
     selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
@@ -4409,14 +4331,10 @@ function initWorkbenchBuilder(opts){
   if (tabsBtn) tabsBtn.addEventListener('click', function(){
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
-    var plan = planAddTabs(src.value, parsed.raw);
+    var plan = planAddTabs(session.text(), parsed.raw);
     if (plan.error){ inspectorMessage(plan.error); return; }
-    pushUndo();
-    clearMultiSelect(); /* this action establishes a single selection */
-    src.value = plan.text;
-    render();
-    autosaveDraft();
-    insertSection = plan.index; /* inserts now land in the first new tab's section */
+    if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
+    session.insertSection = plan.index; /* inserts now land in the first new tab's section */
     var el = findTargetEl({kind: 'tab', block: plan.block, tab: 0});
     selectTarget({kind: 'tab', block: plan.block, tab: 0, el: el}, false);
     selectRange(plan);
@@ -4426,11 +4344,11 @@ function initWorkbenchBuilder(opts){
   document.addEventListener('keydown', function(ev){
     if (opts.isActive && !opts.isActive()) return;
     if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
-    if (addToStep || projectUndoText === null || src.value !== projectUndoText || !undoStack.length) return;
+    if (addToStep || !session.canUndoProject()) return;
     var ae = document.activeElement;
     if (ae && ae !== src && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
     ev.preventDefault();
-    projectUndoText = null;
+    session.clearProjectUndo();
     doUndo();
   });
 
@@ -4483,9 +4401,9 @@ function initWorkbenchBuilder(opts){
       if (parsed.error) return {error:parsed.error + ' — fix it before inserting'};
       var findings = validate(normalize(parsed.raw));
       if (findings.errors.length) return {error:'Fix the diagram’s validation errors before adding a panel.'};
-      var rec = specSectionPaths(parsed.raw)[insertSection];
+      var rec = specSectionPaths(parsed.raw)[session.insertSection];
       if (!rec || !specValueAt(parsed.raw,rec.diagram)) return {error:'Choose a section with a diagram before adding a panel.'};
-      return {text:src.value,section:insertSection,label:builderInsertTargetText(parsed.raw,insertSection).replace(/^into /,'')};
+      return {text:session.text(),section:session.insertSection,label:builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'')};
     },
     insert:function(type){runInsert('panel',function(text,raw,si){return planAddPanel(text,raw,si,type);});}
   }) : null;
@@ -4499,7 +4417,7 @@ function initWorkbenchBuilder(opts){
   BUILDER_JUMP_TO_FINDING = function(message, rawPath){
     var parsed = parseEditor();
     if (parsed.error) return;
-    var loc = findingLocation(src.value, parsed.raw, message, rawPath);
+    var loc = findingLocation(session.text(), parsed.raw, message, rawPath);
     if (!loc) return;
     selectRange(loc, true);
     if (!loc.exact) inspectorMessage('the exact field is not in the editor text — selected its nearest parent', true);
@@ -4508,7 +4426,8 @@ function initWorkbenchBuilder(opts){
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);
   applyRowGrabs(); /* the boot render happened before this wiring ran */
-  function prepareWelcome(){
+  function prepareWelcome(){session.invalidateProject();}
+  function retireProjectUI(){
     fileReadVersion++;
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();
     pausePreview();
@@ -4516,32 +4435,20 @@ function initWorkbenchBuilder(opts){
     if (connect) cancelConnect(null);
     cancelNodeDrag(); cancelGroupDrag(); cancelRowDrag();
     closePalette(); if (panelPicker) panelPicker.close(); hideDiff(); clearMultiSelect(); clearStepMarkers();
-    setSelected(null); currentTarget = null; retireInspector();
+    setSelected(null); retireInspector();
     if (importBox) importBox.hidden = true;
     if (traceBox) traceBox.hidden = true;
   }
-  function replaceProject(text, baseline){
-    prepareWelcome();
-    if (draftTimer){ clearTimeout(draftTimer); draftTimer = null; }
-    /* Keep a pending recovered draft as the undo target, never the boot demo. */
-    if (!projectOpen && initialDraft) src.value = initialDraft.text;
-    pushUndo();
-    src.value = text;
-    baselineText = baseline == null ? text : baseline;
-    projectUndoText = text;
-    initialDraft = null;
-    insertSection = 0;
-    if (opts.beforeProjectLoad) opts.beforeProjectLoad();
-    render();
-    var parsed = parseEditor();
-    updateTargetLabel(parsed.error ? null : parsed.raw);
-    if (guide) guide.hidden = true;
-    var bar = document.getElementById('draftbar');
-    if (bar) bar.hidden = true;
-    autosaveDraft();
-    if (stepList) stepList.sync();
-    return true;
-  }
+  function projectHooks(){return {
+    beforeRender:opts.beforeProjectLoad,
+    afterRender:function(){
+      var parsed=parseEditor();updateTargetLabel(parsed.error?null:parsed.raw);
+      if(guide)guide.hidden=true;
+      var bar=document.getElementById('draftbar');if(bar)bar.hidden=true;
+    },
+    afterSave:function(){if(stepList)stepList.sync();}
+  };}
+  function replaceProject(text, baseline){return session.replaceProject(text,baseline,projectHooks());}
   function loadText(text){
     var raw;
     try { raw = JSON.parse(text); }
@@ -4551,25 +4458,25 @@ function initWorkbenchBuilder(opts){
     return replaceProject(text);
   }
   function restoreDraft(){
-    if (!initialDraft) return false;
-    var draft = initialDraft, missingBaseline = recoveredBaseline == null;
-    replaceProject(draft.text, missingBaseline ? draft.text : recoveredBaseline);
-    if (missingBaseline) inspectorMessage('original baseline unavailable — diff starts from the recovered draft');
+    var restored=session.restoreDraft(projectHooks());
+    if(!restored)return false;
+    if(restored.missingBaseline)inspectorMessage('original baseline unavailable — diff starts from the recovered draft');
     return true;
   }
   return {
     loadSpec:function(raw){ return loadText(JSON.stringify(raw, null, 2)); },
     refreshCatalog:function(){
-      if(!currentTarget || currentTarget.kind!=='node')return;
+      if(!session.target || session.target.kind!=='node')return;
       var active=document.activeElement;
       if(active && guide && guide.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)){
         active.addEventListener('blur',refreshFormSoon,{once:true});
       }else refreshFormSoon();
     },
     loadText:loadText, restoreDraft:restoreDraft, prepareWelcome:prepareWelcome,
-    isProjectOpen:function(){ return projectOpen; },
-    draft:function(){ return initialDraft ? {text:initialDraft.text, at:initialDraft.at} : null; },
+    isProjectOpen:session.isProjectOpen,
+    draft:session.draft,
     draftInfo:function(){
+      var initialDraft=session.draft();
       if (!initialDraft) return null;
       var title = 'Unfinished diagram';
       try { var raw = JSON.parse(initialDraft.text); title = (raw.page || raw).title || 'Untitled diagram'; } catch (ex){}

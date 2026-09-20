@@ -42,8 +42,11 @@ function initCanonWorkbench(opts){
     status.textContent='Local project · not attached to a repository review.';
     /* Reload must resume this local draft, not silently reopen the old design. */
     if(typeof history !== 'undefined' && history.replaceState){
-      var localUrl=new URL(location.href);localUrl.searchParams.delete('canon');localUrl.searchParams.delete('review');
-      history.replaceState(history.state,'',localUrl.pathname+localUrl.search+localUrl.hash);
+      var localUrl=new URL(location.href);
+      if(localUrl.searchParams.has('canon') || localUrl.searchParams.has('review')){
+        localUrl.searchParams.delete('canon');localUrl.searchParams.delete('review');
+        history.replaceState(history.state,'',localUrl.pathname+localUrl.search+localUrl.hash);
+      }
     }
   };
   var save=button('Propose spec update',async function(){

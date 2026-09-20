@@ -5,6 +5,14 @@
   for builder destroy/remount. Keep test-only lifecycle access in that fixture,
   never production globals; compare resources with separately mounted owners.
   Its README describes pinned-browser setup and failure artifacts.
+- Welcome screen routes live in `src/welcome.workbench.js` and namespaced
+  `history.state`; URLs retain their existing query/fragment. Initial entry uses
+  replacement, explicit transitions push, and Back/Forward only restore views.
+  Check same-tab reload/draft fallback, mounted form text and source/Undo retention,
+  initial Back leaving the app, and pending welcome/editor file reads after leaving.
+  Canon visits must retire on local replacement, including older traversed entries
+  and blocked session storage, without affecting unrelated future visits; late
+  Canon completion must not reopen a hidden editor. See `docs/workbench-welcome.md`.
 - Follow the user action through selection, the mutation planner, JSON write,
   rerender and restored selection. Check one Undo/Redo per logical operation,
   invalid-input preservation and stale dialogs after source/section changes.

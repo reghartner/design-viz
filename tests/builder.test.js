@@ -915,9 +915,12 @@ test('welcome does not autosave a boot demo or replace an existing draft before 
   const empty = diffWorkbench(new Map(), {deferInitialSave:true});
   assert.strictEqual(empty.storage.has('dv-workbench-draft'), false);
   assert.strictEqual(empty.builder.isProjectOpen(), false);
+  empty.builder.prepareWelcome();
+  assert.strictEqual(empty.storage.has('dv-workbench-draft'), false);
   const saved = {text:'{ unfinished', at:123};
   const storage = new Map([['dv-workbench-draft', JSON.stringify(saved)]]);
   const w = diffWorkbench(storage, {deferInitialSave:true});
+  w.builder.prepareWelcome();
   assert.deepStrictEqual(plain(w.builder.draft()), saved);
   assert.deepStrictEqual(plain(w.builder.draftInfo()), {title:'Unfinished diagram',savedAt:123});
   assert.strictEqual(storage.get('dv-workbench-draft'), JSON.stringify(saved));
@@ -925,6 +928,20 @@ test('welcome does not autosave a boot demo or replace an existing draft before 
   assert.strictEqual(w.ids.src.value, saved.text);
   assert.strictEqual(w.builder.isProjectOpen(), true);
   assert.strictEqual(w.builder.draft(), null);
+});
+
+test('leaving the editor flushes exact unfinished source before the autosave delay without changing undo', () => {
+  const w = diffWorkbench(new Map(), {deferInitialSave:true});
+  const initial = JSON.stringify(diffFixture());
+  w.builder.loadText(initial);
+  const replacement = diffFixture(); replacement.page.title = 'Edited title';
+  w.builder.loadSpec(replacement);
+  const unfinished = w.ids.src.value + '\r\n  { unfinished';
+  w.ids.src.value = unfinished; w.ids.src.fire('input');
+  w.builder.prepareWelcome();
+  assert.strictEqual(JSON.parse(w.storage.get('dv-workbench-draft')).text, unfinished);
+  w.ids['undo-builder'].click(); assert.strictEqual(w.ids.src.value, initial);
+  w.ids['redo-builder'].click(); assert.strictEqual(w.ids.src.value, unfinished);
 });
 
 test('welcome imports validate before mutation and preserve the pending draft in one undo', () => {

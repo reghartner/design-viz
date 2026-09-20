@@ -1001,7 +1001,7 @@ function initWorkbenchBuilder(opts){
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);
   applyRowGrabs(); /* the boot render happened before this wiring ran */
-  function prepareWelcome(){session.invalidateProject();}
+  function prepareWelcome(){if(session.isProjectOpen())session.save();session.invalidateProject();}
   function retireProjectUI(){
     io.retireProject();
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();

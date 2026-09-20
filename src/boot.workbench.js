@@ -325,7 +325,10 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
   beforeProjectLoad:function(){
     workbenchPreview.forgetDocument();
-    if(canonContext && canonContext.detach && !loadingCanon)canonContext.detach();
+    if(!loadingCanon){
+      if(welcome && welcome.localProjectOpened)welcome.localProjectOpened();
+      if(canonContext && canonContext.detach)canonContext.detach();
+    }
   },
   renderedText:workbenchPreview.renderedText,
   ctl:workbenchPreview.controller});
@@ -333,6 +336,6 @@ var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WOR
   workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
 canonContext=initCanonWorkbench({src:src,catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){
   loadingCanon=true;
-  try{var result=workbenchBuilder.loadSpec(raw);welcome.enterEditor();return result;}
+  try{var result=workbenchBuilder.loadSpec(raw);welcome.canonicalLoaded();return result;}
   finally{loadingCanon=false;}
 }});

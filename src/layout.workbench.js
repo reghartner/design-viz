@@ -276,5 +276,5 @@ function initSectionLayoutEditor(opts){
   document.addEventListener('keydown',function(ev){if(drag&&ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();}},true);
   window.addEventListener('blur',cancel);window.addEventListener('resize',cancel);opts.src.addEventListener('input',cancel);
   var query=new URLSearchParams(window.location.search).get('layout');if(['backstage','confluence'].indexOf(query)>=0)target.value=query;
-  setFrame();return {refresh:refresh};
+  setFrame();return {refresh:refresh,cancel:cancel};
 }

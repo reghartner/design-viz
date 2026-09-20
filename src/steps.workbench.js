@@ -297,7 +297,6 @@ function initWorkbenchStepList(opts){
   opts.src.addEventListener('input', function(){ invalidate(); });
   box.addEventListener('focusin', function(){ if (opts.pause) opts.pause(); });
   box.addEventListener('toggle', function(){ if (box.open) refresh(); });
-  new MutationObserver(refresh).observe(opts.view, {childList:true});
   /* Mode transitions do not replace the page; re-evaluate button availability. */
   document.addEventListener('click', controls);
   document.addEventListener('keydown', function(ev){
@@ -305,5 +304,5 @@ function initWorkbenchStepList(opts){
     if (ev.key === 'Escape') setTimeout(sync, 0);
   });
   refresh();
-  return {sync:sync, editPathStep:editPathStep};
+  return {sync:sync,refresh:refresh, editPathStep:editPathStep};
 }

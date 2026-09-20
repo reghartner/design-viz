@@ -49,6 +49,18 @@
   blocked. Never delete or roll back user files. Check listener, object-URL and
   failed-request cleanup; dispatched clipboard/download effects are not recallable.
   I/O destroy is separate from interaction/observer and whole-page teardown.
+- Controlled rendering lives in `src/workbench/preview.js`, prepended by the
+  logical workspace bundle. Boot sends one completion per attempt and a
+  before-replacement notification only when replacement begins, across manual,
+  skin, layout-host and session renders. Check explicit
+  `{ok,replaced,text,origin,reason?}` outcomes: parse/validation refusal preserves
+  prior preview identity; failure after teardown invalidates the retired
+  controller and never reports success. Accepted source/history remains repairable.
+  Retention belongs to that operation, without child-list observers or survival
+  flags. Preserve `dv:pathrender` versus `dv:pathchange` semantics.
+  Hidden-route authoring and restore call `jumpSource(sourceIndex,pathId)` without
+  requiring `selectPath()` first; keep raw indices, route occurrences, visible
+  stops, unique-step restoration and the existing view filter distinct.
 - Keep shared Home layout/initial state distinct from per-step overrides. Use
   `docs/homemap-workbench.md` only for those controls. Test the context being
   edited, including non-step selection when affected.

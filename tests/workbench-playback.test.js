@@ -387,3 +387,21 @@ test('switching to a shorter view at its final stop finishes without replaying t
   h.stepper.enterStep(false);h.stepper.toggleAuto();h.tick();assert.equal(h.stepper.current().id,'second');
   h.stepper.setVisibleSteps(['first','second']);assert.equal(h.stepper.current().id,'second');assert.equal(h.intervals.size,0);assert.equal(h.term.playbackStatus.textContent,'Finished');
 });
+
+test('hidden alternate authoring and preview restoration keep exact source indices and the selected view subset',()=>{
+  const diagram={nodes:{a:{},b:{}},steps:[{id:'done',text:'Done'},{id:'failed',text:'Failure'},{id:'start',text:'Start'}],
+    paths:[{id:'happy',steps:['start','done']},{id:'failed',steps:['failed']}]};
+  const old=stepperHarness({autoplay:false},false,diagram),s=old.stepper;
+  s.enterStep(false);s.setVisibleSteps(['done']);assert.equal(s.selectPath('failed'),false,'viewer playback keeps its empty-visible-route rule');
+  assert.equal(s.jumpSource(1,'failed'),true);assert.equal(s.path(),'failed');assert.equal(s.sourceIndex(),1);
+  const page={title:'Hidden story',sections:[{heading:'Flow',diagram}]};
+  const saved=old.context.workbenchPreviewSnapshot(page,{sections:[{number:1,stepper:s}]});
+  const after=copy(page);after.sections[0].diagram.steps.unshift({id:'new',text:'New'});
+  const next=stepperHarness({autoplay:false},false,after.sections[0].diagram);
+  next.stepper.enterStep(false);next.stepper.setVisibleSteps(['done']);
+  next.context.restoreWorkbenchPreview(after,{sections:[{number:1,stepper:next.stepper}]},saved);
+  assert.equal(next.stepper.path(),'failed');assert.equal(next.stepper.sourceIndex(),2);assert.equal(next.stepper.current().id,'failed');
+  assert.equal(next.paints.at(-1).tween,false,'restoration settles instead of replaying a transition');
+  next.stepper.setVisibleSteps(['done']);assert.equal(next.stepper.path(),'happy');assert.equal(next.stepper.current().id,'done');
+  assert.equal(next.stepper.selectPath('failed'),false,'authoring did not rewrite the subset');
+});

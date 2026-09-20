@@ -399,7 +399,7 @@ var BUILDER_JUMP_TO_FINDING = null;
 
 function initWorkbenchBuilder(opts){
   var view = opts.view, src = opts.src;
-  function render(){ hideDiff(); opts.render(); }
+  function render(request){ hideDiff(); return opts.render(request || {origin:'navigation'}); }
   var guide = document.getElementById('guide');
   var diffbox = document.getElementById('diffbox');
   var diffBtn = document.getElementById('spec-diff');
@@ -759,10 +759,7 @@ function initWorkbenchBuilder(opts){
     formError('');
     return session.accept(plan,{
       snapshot:snapshot,
-      beforePublish:function(){
-        if (addToStep) addModeSurvive = true; /* internal render keeps the mode */
-        multiSurvive = true;
-      },
+      retention:{multi:true,addMode:!!addToStep},
       afterRender:function(){
         if (opt && opt.after) opt.after(plan);
         rehighlight();syncBoardToSelectedStep();applyStepMarkers();
@@ -835,17 +832,6 @@ function initWorkbenchBuilder(opts){
 
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
-  var multiSurvive = false; /* set by builder-internal renders; a render
-     WITHOUT it (Render button, hand-pasted source) clears the set —
-     coinciding identities in replaced content must never stay selected */
-  /* the flag is consumed by the mutation observer — but a builder render
-     that FAILS validation mutates nothing and would leave it stale, so an
-     explicit user render request invalidates it first (capture phase runs
-     before boot's own Render handler) */
-  (function(){
-    var goBtn = document.getElementById('go');
-    if (goBtn) goBtn.addEventListener('click', function(){ multiSurvive = false; }, true);
-  })();
   function multiIdent(t){
     return t.section + '|' + t.kind + '|' + (t.kind === 'node' ? t.id : t.index);
   }
@@ -1112,7 +1098,6 @@ function initWorkbenchBuilder(opts){
     });
     var outlineTimer;
     src.addEventListener('input', function(){ clearTimeout(outlineTimer); outlineTimer = setTimeout(refreshOutline, 200); });
-    new MutationObserver(refreshOutline).observe(view, {childList: true});
     document.addEventListener('keydown', function(ev){
       if (opts.isActive && !opts.isActive()) return;
       if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || addToStep) return;
@@ -1140,7 +1125,10 @@ function initWorkbenchBuilder(opts){
     path:function(section){var sp=stepperFor(section);return sp && sp.path();},
     selectPath:function(section,id){
       session.target=null; clearMultiSelect(); if(guide) guide.hidden=true;
-      var sp=stepperFor(section); if(sp) sp.selectPath(id);
+      var parsed=parseEditor(),story=!parsed.error && builderStorySections(parsed.raw).find(function(entry){return entry.section===section;});
+      var route=story && diagramPathList(story.diagram).find(function(path){return path.id===id;});
+      var sp=stepperFor(section);
+      if(sp && route && route.indices.length)sp.jumpSource(route.indices[0],id);
       applyRowGrabs(); clearStepMarkers();
     },
     navigate:function(entry){
@@ -1149,7 +1137,7 @@ function initWorkbenchBuilder(opts){
         var tabButton = document.getElementById('tab-' + entry.tab.block + '-' + entry.tab.tab);
         if (tabButton) tabButton.click();
       }
-      if(entry.pathId){var sp=stepperFor(entry.target.section);if(sp) sp.selectPath(entry.pathId,entry.position);}
+      if(entry.pathId){var sp=stepperFor(entry.target.section);if(sp) sp.jumpSource(entry.index,entry.pathId);}
       var el = findTargetEl(entry.target);
       selectTarget(Object.assign({}, entry.target, {el:el}), false, true);
       var loc = jsonLocate(session.text(), entry.path);
@@ -1175,7 +1163,7 @@ function initWorkbenchBuilder(opts){
   }) : null;
 
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
-    view:view,src:src,ctl:opts.ctl,render:render,renderedText:opts.renderedText,pause:pausePreview,
+    view:view,src:src,ctl:opts.ctl,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!addToStep || !!connect;},
     commit:function(section,target,items,id){
       return commitCascade(function(raw){return planSectionLayout(session.text(),raw,section,target,items,id);});
@@ -1218,7 +1206,6 @@ function initWorkbenchBuilder(opts){
 
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
-  var addModeSurvive = false; /* set around this mode's own re-renders */
   function addToStepStatus(){
     if (targetLabel && addToStep)
       targetLabel.textContent = 'ADD TO STEP ' + (addToStep.step + 1) +
@@ -1360,8 +1347,8 @@ function initWorkbenchBuilder(opts){
   /* ---- drag an edge label to set its labelDx/labelDy nudges;
           drag a node onto another to swap, or into a row/slot gap ---- */
   var drag = null, nodeDrag = null, groupDrag = null, suppressClick = false;
-  /* one cancellation path for the node drag: Escape, and every observed
-     re-render (which detaches the dragged elements), both land here */
+  /* one cancellation path for the node drag: Escape, and every controlled
+     replacement (which detaches the dragged elements), both land here */
   function cancelNodeDrag(){
     if (!nodeDrag) return;
     var nd = nodeDrag;
@@ -1961,35 +1948,31 @@ function initWorkbenchBuilder(opts){
     selectTarget(target);
   });
 
-  /* a re-render outside the connect flow (Render button, skin switch)
-     rebuilds the DOM and can renumber sections — a stale armed connect
-     must not wire an edge from the old render. Builder-driven renders
-     clear the state synchronously before this observer runs, so only
-     stale arming is cancelled. */
-  new MutationObserver(function(){
-    if (panelPicker) panelPicker.invalidate();
-    cancelNodeDrag(); /* the dragged elements just got detached */
-    cancelGroupDrag();
-    cancelRowDrag();  /* row handles and the drop line got detached too */
-    hideDiff(); /* the diff panel's jump targets got detached too */
-    if (!multiSurvive && multiSel.length){
-      /* a render the builder did not initiate replaced the DOM */
-      clearMultiSelect();
-      dropMultiUI();
+  /* Controlled preview replacement is explicit; rejected source leaves the board intact. */
+  function beforePreviewReplace(request){
+    var retention=request && request.retention || {};
+    if(panelPicker)panelPicker.invalidate();
+    cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
+    if(drag){drag.lbl.removeAttribute('transform');drag=null;}
+    if(sectionLayoutEditor && sectionLayoutEditor.cancel)sectionLayoutEditor.cancel();
+    hideDiff();
+    if(!retention.multi && multiSel.length){clearMultiSelect();dropMultiUI();}
+    if(connect)cancelConnect('connect cancelled — the page re-rendered');
+    if(addToStep && !retention.addMode)cancelAddToStep('add-to-step ended — the page re-rendered');
+    setSelected(null);
+  }
+  function previewRendered(outcome){
+    hideDiff();
+    if(outlineSearch)refreshOutline();
+    if(!outcome.ok){
+      if(outcome.replaced){clearMultiSelect();clearStepMarkers();if(addToStep)cancelAddToStep(null);}
+      if(stepList)stepList.refresh();
+      return;
     }
-    multiSurvive = false;
-    if (connect) cancelConnect('connect cancelled — the page re-rendered');
-    if (addToStep && !addModeSurvive)
-      cancelAddToStep('add-to-step ended — the page re-rendered');
-    addModeSurvive = false;
-    setTimeout(function(){
-      syncBoardToSelectedStep(); /* a selected step keeps its step view */
-      applyStepMarkers();        /* markers live in the rebuilt DOM */
-      reapplyMultiSel();         /* multi-selection rings live there too */
-      applyRowGrabs();           /* row grab-handles live there too */
-      markInsertTarget();        /* the insert-target frame lives there too */
-    }, 0);
-  }).observe(view, {childList: true});
+    rehighlight();syncBoardToSelectedStep();applyStepMarkers();reapplyMultiSel();
+    applyRowGrabs();markInsertTarget();
+    if(stepList)stepList.refresh();
+  }
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
@@ -2216,6 +2199,7 @@ function initWorkbenchBuilder(opts){
       }else refreshFormSoon();
     },
     loadText:loadText, restoreDraft:restoreDraft, prepareWelcome:prepareWelcome,
+    beforePreviewReplace:beforePreviewReplace,previewRendered:previewRendered,
     isProjectOpen:session.isProjectOpen,
     draft:session.draft,
     draftInfo:function(){

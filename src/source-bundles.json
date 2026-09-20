@@ -40,5 +40,9 @@
   "reuse.workbench.js": [
     "workbench/commands/reuse.js",
     "reuse.workbench.js"
+  ],
+  "workspace.workbench.js": [
+    "workbench/preview.js",
+    "workspace.workbench.js"
   ]
 }

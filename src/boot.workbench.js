@@ -213,9 +213,11 @@ var view = document.getElementById('docview');
 var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
 var activeSkin = null; /* null = follow spec */
-var lastPage = null;
-var lastRenderedText = null;
-var lastCtl = null;  /* renderPage controller of the current render, for tab restore */
+var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,
+  present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
+  beforeReplace:function(request){if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
+  completed:function(outcome){if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);}
+});
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears
    here without touching the skeleton */
@@ -230,10 +232,7 @@ var skinBtns = {};
     b.textContent = name.toUpperCase() + (name === DEFAULT_SKIN ? ' (default)' : '');
     b.addEventListener('click', function(){
       activeSkin = name; setSkinButtons(name);
-      if (lastPage){
-        lastCtl = renderWorkbenchPreview(view, lastPage, name, lastPage, lastCtl);
-        applySkinClasses(document.body, view, name);
-      }
+      workbenchPreview.repaint(name);
     });
     holder.appendChild(b);
     skinBtns[name] = b;
@@ -306,26 +305,8 @@ function showMsgs(v){
   v.warnings.forEach(function(m){ add('w', 'warn ', m); });
 }
 
-function go(fromText){
-  var raw;
-  msgs.innerHTML = '';
-  try {
-    raw = JSON.parse(src.value);
-  } catch (ex){
-    showMsgs({errors:['JSON parse: ' + ex.message], warnings:[]});
-    return;
-  }
-  var page = normalize(raw);
-  var v = validate(page);
-  var lint = v.errors.length ? [] : lintPage(page);
-  showMsgs({errors: v.errors, warnings: v.warnings.concat(lint)});
-  if (v.errors.length) return;
-  var skin = currentSkin(page);
-  setSkinButtons(skin);
-  lastCtl = renderWorkbenchPreview(view, page, skin, lastPage, lastCtl);
-  lastPage = page;
-  applySkinClasses(document.body, view, skin);
-  lastRenderedText = src.value;
+function go(fromText,request){
+  return workbenchPreview.render(src.value,request || {origin:'manual'});
 }
 
 document.getElementById('go').addEventListener('click', function(){ go(true); });
@@ -338,16 +319,16 @@ applySkinClasses(document.body, view, currentSkin(null));
    its definition in the editor; INSERT buttons splice ready-made snippets */
 var workspace = initWorkbenchWorkspace();
 var canonContext, loadingCanon=false;
-var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }, workspace:workspace,
+var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(request){return go(true,request);}, workspace:workspace,
   catalog:function(){return canonContext && canonContext.catalog;},
   deferInitialSave:true,
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
   beforeProjectLoad:function(){
-    lastPage=null;
+    workbenchPreview.forgetDocument();
     if(canonContext && canonContext.detach && !loadingCanon)canonContext.detach();
   },
-  renderedText: function(){ return lastRenderedText; },
-  ctl: function(){ return lastCtl; }});
+  renderedText:workbenchPreview.renderedText,
+  ctl:workbenchPreview.controller});
 var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,
   workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
 canonContext=initCanonWorkbench({src:src,catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){

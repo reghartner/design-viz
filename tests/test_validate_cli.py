@@ -5,8 +5,10 @@ field-path errors, example specs must exit 0 with 0 errors, lint findings
 must fire on the seeded crowded fixture, and --quiet must suppress them.
 """
 import pathlib
+import json
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -78,6 +80,31 @@ class ValidateCliTest(unittest.TestCase):
         r = run_cli()
         self.assertEqual(r.returncode, 2)
         self.assertIn("usage:", r.stderr)
+
+    def test_structurally_invalid_file_does_not_abort_the_batch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            bad = pathlib.Path(temp) / "bad.json"
+            good = pathlib.Path(temp) / "good.json"
+            good.write_text(json.dumps({"nodes": {"a": {}}, "rows": [["a"]]}))
+            cases = [
+                ({"page": {"blocks": {}}}, "page.blocks: must be an array"),
+                ({"page": {"sections": "oops"}}, "page.sections: must be an array"),
+                ({"nodes": {"a": {}}, "rows": [["a"]], "steps": {}},
+                 "sections[0].diagram.steps: must be an array"),
+                ({"page": {"blocks": [{"tabs": [None]}]}},
+                 "blocks[0].tabs[0]: must be an object"),
+            ]
+            for raw, expected in cases:
+                for quiet in (False, True):
+                    with self.subTest(raw=raw, quiet=quiet):
+                        bad.write_text(json.dumps(raw))
+                        r = run_cli(*(["--quiet"] if quiet else []), str(bad), str(good))
+                        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+                        self.assertEqual(r.stderr, "")
+                        self.assertIn(f"{bad}: ERROR {expected}", r.stdout)
+                        self.assertIn(f"{bad}: 1 errors, 0 warnings", r.stdout)
+                        self.assertIn(f"{good}: 0 errors, 0 warnings", r.stdout)
+                        self.assertLess(r.stdout.index(str(bad)), r.stdout.index(str(good)))
 
 
 class ContractCardCliTest(unittest.TestCase):

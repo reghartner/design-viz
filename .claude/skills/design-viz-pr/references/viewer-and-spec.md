@@ -8,6 +8,10 @@
 - Trace changed fields through normalization, validation, state folding and
   rendering. Check old specs that omit new fields, safe text/URL handling and
   round trips. Contract changes need matching authoring guidance and an example.
+- Validation must return findings for malformed JSON container shapes before
+  dependent Canon, path, layout or panel traversal. Preserve the authored input
+  and existing warning semantics; do not catch unexpected programming errors.
+  Verify source/package parity and an invalid-first/valid-second CLI batch.
 - For paths, read `docs/alternate-paths.md`: step bodies form a shared registry;
   paths reference IDs. The first unique reference is the first branch column.
   Recompute state from initial values along the selected path; another outcome's

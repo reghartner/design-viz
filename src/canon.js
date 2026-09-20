@@ -15,8 +15,8 @@ var FlowCanon = (function(){
     if (!p) return out;
     function walk(items){ (Array.isArray(items) ? items : []).forEach(function(s){
       if (!object(s)) return;
-      if (s.diagram) out.push(s);
-      (Array.isArray(s.tabs) ? s.tabs : []).forEach(function(t){ walk(t.sections || t.blocks); });
+      if (object(s.diagram)) out.push(s);
+      (Array.isArray(s.tabs) ? s.tabs : []).forEach(function(t){ if (object(t)) walk(t.sections || t.blocks); });
     }); }
     walk(p.blocks || p.sections);
     return out;
@@ -138,7 +138,7 @@ var FlowCanon = (function(){
         if(m!=null){
           if(!object(m) || typeof m.serviceName!=='string' || !m.serviceName.trim() || typeof m.operation!=='string' || !m.operation.trim() || !st.id)errors.push('traceMatch: stable step ID, serviceName and operation required');
           else {
-            if(m.panelId && !(Array.isArray(d.panels)?d.panels:[]).some(function(p){return p.id===m.panelId && p.type==='queue';}))errors.push('traceMatch.panelId: expected a declared queue panel');
+            if(m.panelId && !(Array.isArray(d.panels)?d.panels:[]).some(function(p){return p && p.id===m.panelId && p.type==='queue';}))errors.push('traceMatch.panelId: expected a declared queue panel');
             if(m.nodeId && !Object.prototype.hasOwnProperty.call(d.nodes || {},m.nodeId))errors.push('traceMatch: unknown nodeId '+m.nodeId);
             if(m.parentStepId && (!ids.has(m.parentStepId) || m.parentStepId===st.id))errors.push('traceMatch: unknown or self parentStepId');
             ['maxDurationMs','maxQueueDepth'].forEach(function(k){if(m[k]!=null && (typeof m[k]!=='number' || !Number.isFinite(m[k]) || m[k]<0))errors.push('traceMatch.'+k+': nonnegative number required');});

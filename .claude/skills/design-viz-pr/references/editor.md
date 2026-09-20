@@ -3,6 +3,11 @@
 - Follow the user action through selection, the mutation planner, JSON write,
   rerender and restored selection. Check one Undo/Redo per logical operation,
   invalid-input preservation and stale dialogs after source/section changes.
+- Source scanners/splices and raw addressing live in `src/workbench/source-edit.js`
+  and `targets.js`; see `docs/workbench-modules.md`. Load those leaves directly for
+  pure source tests and the logical `builder.workbench.js` bundle for planners/UI.
+  Preserve raw wrapper/bare-diagram paths, surrounding source bytes and result
+  offsets; normalized viewer section records are not editor addresses.
 - Keep shared Home layout/initial state distinct from per-step overrides. Use
   `docs/homemap-workbench.md` only for those controls. Test the context being
   edited, including non-step selection when affected.

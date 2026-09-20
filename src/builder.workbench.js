@@ -23,9 +23,10 @@ function panelAuthoringCatalog(){
    to its definition in the spec editor (with per-element authoring guidance),
    and insert ready-made node/edge/step/panel/section snippets.
 
-   The top half is pure text/JSON utilities (unit-tested in
-   tests/builder.test.js); initWorkbenchBuilder at the bottom wires the DOM
-   and is only called by boot.workbench.js. */
+   Source splices and raw addressing live in workbench/source-edit.js and
+   workbench/targets.js, assembled before this file by source-bundles.json.
+   Domain planners remain here; initWorkbenchBuilder at the bottom wires the
+   DOM and is only called by boot.workbench.js. */
 
 /* ---------------- Mermaid sequence skeleton ---------------- */
 
@@ -112,179 +113,6 @@ function mermaidToSpec(text){
   }]}, todos: todos};
 }
 
-/* ---------------- JSON source locator ----------------
-   A tolerant scanner over the RAW editor text: given a path (array of object
-   keys / array indices), find the character range of the value so the
-   textarea can select it. Whitespace-agnostic; strings with escapes are
-   skipped correctly. On duplicate keys the FIRST occurrence wins (JSON.parse
-   keeps the last — hand-authored specs do not duplicate keys, and a miss
-   only mis-places the selection). */
-
-function jsonSkipWS(text, i){
-  while (i < text.length && ' \t\n\r'.indexOf(text[i]) >= 0) i++;
-  return i;
-}
-function jsonSkipString(text, i){
-  /* i at the opening quote; returns the index just past the closing quote */
-  i++;
-  while (i < text.length){
-    if (text[i] === '\\') i += 2;
-    else if (text[i] === '"') return i + 1;
-    else i++;
-  }
-  return i;
-}
-function jsonSkipValue(text, i){
-  /* i at the first char of a value; returns the index just past it */
-  i = jsonSkipWS(text, i);
-  var c = text[i];
-  if (c === '"') return jsonSkipString(text, i);
-  if (c === '{' || c === '['){
-    var open = c, close = c === '{' ? '}' : ']', depth = 0;
-    while (i < text.length){
-      c = text[i];
-      if (c === '"'){ i = jsonSkipString(text, i); continue; }
-      if (c === open) depth++;
-      else if (c === close){ depth--; if (!depth) return i + 1; }
-      i++;
-    }
-    return i;
-  }
-  while (i < text.length && ',}] \t\n\r'.indexOf(text[i]) < 0) i++;
-  return i;
-}
-function jsonContainer(text, i){
-  /* Parse the container ({...} or [...]) starting at/after i. Returns
-     {isObj, open, close, members:[{key, keyStart, valStart, valEnd}]} —
-     key is the decoded object key or the array index — or null. */
-  i = jsonSkipWS(text, i);
-  var c = text[i];
-  if (c !== '{' && c !== '[') return null;
-  var isObj = c === '{';
-  var members = [];
-  var j = i + 1, idx = 0;
-  while (j < text.length){
-    j = jsonSkipWS(text, j);
-    if (j >= text.length) break;
-    var ch = text[j];
-    if (ch === (isObj ? '}' : ']')) return {isObj: isObj, open: i, close: j, members: members};
-    if (ch === ','){ j++; continue; }
-    if (isObj){
-      if (ch !== '"'){ j++; continue; }
-      var keyStart = j, keyEnd = jsonSkipString(text, j);
-      var key;
-      try { key = JSON.parse(text.slice(keyStart, keyEnd)); } catch (ex){ key = null; }
-      j = jsonSkipWS(text, keyEnd);
-      if (text[j] === ':') j++;
-      j = jsonSkipWS(text, j);
-      var valStart = j, valEnd = jsonSkipValue(text, j);
-      members.push({key: key, keyStart: keyStart, valStart: valStart, valEnd: valEnd});
-      j = valEnd;
-    } else {
-      var vs = jsonSkipWS(text, j), ve = jsonSkipValue(text, vs);
-      members.push({key: idx++, keyStart: vs, valStart: vs, valEnd: ve});
-      j = ve;
-    }
-  }
-  return null; /* unterminated container */
-}
-function jsonLocate(text, path){
-  /* Character range {start, end, keyStart} of the value at path; [] means
-     the whole document. null when any path segment is absent. */
-  var start = jsonSkipWS(text, 0);
-  if (start >= text.length) return null;
-  var node = {keyStart: start, valStart: start, valEnd: jsonSkipValue(text, start)};
-  for (var p = 0; p < path.length; p++){
-    var cont = jsonContainer(text, node.valStart);
-    if (!cont) return null;
-    var found = null;
-    for (var m = 0; m < cont.members.length; m++){
-      if (cont.members[m].key === path[p]){ found = cont.members[m]; break; }
-    }
-    if (!found) return null;
-    node = found;
-  }
-  return {start: node.valStart, end: node.valEnd, keyStart: node.keyStart};
-}
-
-/* ---------------- insertion ---------------- */
-
-function jsonIndentFor(text, cont){
-  /* Indent for a new member: copy the last member's line indent, else the
-     opening bracket's line indent plus two spaces. */
-  var anchor = cont.members.length ? cont.members[cont.members.length - 1].keyStart : -1;
-  if (anchor < 0){
-    var ls = text.lastIndexOf('\n', cont.open) + 1;
-    return (text.slice(ls, cont.open).match(/^[ \t]*/) || [''])[0] + '  ';
-  }
-  var ls2 = text.lastIndexOf('\n', anchor) + 1;
-  return (text.slice(ls2, anchor).match(/^[ \t]*/) || [''])[0];
-}
-function jsonInsertMember(text, path, keyOrNull, valueText){
-  /* Append a member to the object (keyOrNull = key) or array (null) at
-     path. valueText may be multi-line with two-space relative indents.
-     Returns {text, start, end} — start/end select the inserted value. */
-  var loc = path.length ? jsonLocate(text, path) : {start: jsonSkipWS(text, 0)};
-  var cont = loc ? jsonContainer(text, loc.start) : null;
-  if (!cont || cont.isObj !== (keyOrNull != null)) return null;
-  var indent = jsonIndentFor(text, cont);
-  var keyPart = keyOrNull != null ? JSON.stringify(keyOrNull) + ': ' : '';
-  var adjVal = valueText.split('\n').join('\n' + indent);
-  var insertAt, prefix;
-  if (cont.members.length){
-    insertAt = cont.members[cont.members.length - 1].valEnd;
-    prefix = ',\n' + indent;
-  } else {
-    insertAt = cont.open + 1;
-    prefix = '\n' + indent;
-  }
-  var start = insertAt + prefix.length + keyPart.length;
-  return {text: text.slice(0, insertAt) + prefix + keyPart + adjVal + text.slice(insertAt),
-          start: start, end: start + adjVal.length};
-}
-function jsonInsertListItemOrCreate(text, ownerPath, key, itemText){
-  /* Append itemText to the array ownerPath.key, creating the array first
-     when the key is absent. */
-  var listPath = ownerPath.concat([key]);
-  if (!jsonLocate(text, listPath)){
-    var made = jsonInsertMember(text, ownerPath, key, '[]');
-    if (!made) return null;
-    text = made.text;
-  }
-  return jsonInsertMember(text, listPath, null, itemText);
-}
-
-/* ---------------- spec shape walking ----------------
-   Mirrors normalize() + blocksOf(): the raw editor JSON may be
-   {page:{blocks|sections}}, a bare {blocks|sections} page, or a bare
-   diagram ({nodes, rows}). One entry per rendered section, in render
-   order — the same order buildSection assigns gi. */
-
-function specSectionPaths(raw){
-  var base, page;
-  if (raw && raw.page){ page = raw.page; base = ['page']; }
-  else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
-  else if (raw && raw.nodes && raw.rows) return [{section: [], diagram: []}];
-  else return [];
-  var key = page.blocks ? 'blocks' : 'sections';
-  var out = [];
-  (page[key] || []).forEach(function(b, i){
-    if (b && Array.isArray(b.tabs)){
-      b.tabs.forEach(function(t, j){
-        ((t && Array.isArray(t.sections)) ? t.sections : []).forEach(function(sec, k){
-          out.push({section: base.concat([key, i, 'tabs', j, 'sections', k])});
-        });
-      });
-    } else out.push({section: base.concat([key, i])});
-  });
-  out.forEach(function(rec){ rec.diagram = rec.section.concat(['diagram']); });
-  return out;
-}
-function specValueAt(raw, path){
-  var v = raw;
-  for (var i = 0; i < path.length && v != null; i++) v = v[path[i]];
-  return v;
-}
 function starterCountLine(spec){
   var nodes = 0, steps = 0, panels = 0;
   specSectionPaths(spec).forEach(function(rec){
@@ -297,34 +125,6 @@ function starterCountLine(spec){
   return nodes + (nodes === 1 ? ' node · ' : ' nodes · ') +
     steps + (steps === 1 ? ' step · ' : ' steps · ') + panels + (panels === 1 ? ' panel' : ' panels');
 }
-function builderTargetPath(raw, target){
-  /* target: {section:<zero-based ordinal>, kind, id?, index?} → path array
-     into the raw editor JSON, or null. Tabs address by block index
-     instead of section ordinal. */
-  if (target.kind === 'tab') return builderTabPath(raw, target.block, target.tab);
-  var rec = specSectionPaths(raw)[target.section];
-  if (!rec) return null;
-  if (target.kind === 'section') return rec.section;
-  var d = rec.diagram;
-  if (target.kind === 'node') return d.concat(['nodes', target.id]);
-  if (target.kind === 'group'){
-    var groups = specValueAt(raw, d.concat(['groups']));
-    return groups && Object.prototype.hasOwnProperty.call(groups, target.id)
-      ? d.concat(['groups', target.id]) : null;
-  }
-  if (target.kind === 'edge') return d.concat(['edges', target.index]);
-  if (target.kind === 'step') return d.concat(['steps', target.index]);
-  if (target.kind === 'panel') return d.concat(['panels', target.index]);
-  if (target.kind === 'bullet') return rec.section.concat(['bullets', target.index]);
-  if (target.kind === 'para'){
-    var sec = specValueAt(raw, rec.section);
-    if (sec && typeof sec.text === 'string') return rec.section.concat(['text']);
-    return rec.section.concat(['text', target.index]);
-  }
-  if (target.kind === 'crow') return rec.section.concat(['contract', 'fields', target.index]);
-  return null;
-}
-
 /* Search the source tree, including nodes omitted from layout and hidden
    tabs. Keep raw paths and rendered section ordinals together. */
 function builderOutline(raw, query){
@@ -356,12 +156,6 @@ function builderOutline(raw, query){
     });
   });
   return entries;
-}
-function builderPathString(path){
-  return path.length ? path.map(function(seg, i){
-    if (typeof seg === 'number') return '[' + seg + ']';
-    return (i ? '.' : '') + (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(seg) ? seg : JSON.stringify(seg));
-  }).join('') : '(whole document)';
 }
 function builderInsertTargetText(raw, sectionIdx){
   /* the descriptive part of the insert-target label: "section N · heading",
@@ -435,14 +229,6 @@ function builderFlatRowIds(rows){
   });
   return ids;
 }
-function builderDiagram(text, raw, sectionIdx){
-  var rec = specSectionPaths(raw)[sectionIdx];
-  if (!rec) return {error: 'no section to insert into — click a section first'};
-  if (!jsonLocate(text, rec.diagram))
-    return {error: 'this section has no diagram yet — add "diagram": {"nodes": {...}, "rows": [[...]]} inside it first'};
-  return {path: rec.diagram, d: specValueAt(raw, rec.diagram)};
-}
-
 function planAddNode(text, raw, sectionIdx, preset){
   /* preset (optional): {icon, tint, title} from NODE_PRESETS — the id stem
      follows the icon so the spec reads well (db1, antenna1, ...) */
@@ -577,46 +363,6 @@ function planAddSection(text, raw){
    value — usually the section's diagram object — from a mutated copy,
    serialized with two-space indents and re-indented to the container
    depth. */
-
-function jsonReplaceValue(text, path, valueText){
-  /* Replace the value at path; multi-line valueText is re-indented to the
-     member's line indent. Returns {text, start, end} or null. */
-  var loc = jsonLocate(text, path);
-  if (!loc) return null;
-  var ls = text.lastIndexOf('\n', loc.keyStart) + 1;
-  var indent = (text.slice(ls, loc.keyStart).match(/^[ \t]*/) || [''])[0];
-  var adj = valueText.split('\n').join('\n' + indent);
-  return {text: text.slice(0, loc.start) + adj + text.slice(loc.end),
-          start: loc.start, end: loc.start + adj.length};
-}
-function jsonRemoveMember(text, containerPath, key){
-  /* Remove one member (and the comma that binds it) from the object or
-     array at containerPath. Returns {text} or null when absent. */
-  var loc = containerPath.length ? jsonLocate(text, containerPath) : {start: jsonSkipWS(text, 0)};
-  var cont = loc ? jsonContainer(text, loc.start) : null;
-  if (!cont) return null;
-  var idx = -1;
-  for (var m = 0; m < cont.members.length; m++){
-    if (cont.members[m].key === key){ idx = m; break; }
-  }
-  if (idx < 0) return null;
-  var mem = cont.members[idx], from, to;
-  if (cont.members.length === 1){ from = cont.open + 1; to = cont.close; }
-  else if (idx === cont.members.length - 1){ from = cont.members[idx - 1].valEnd; to = mem.valEnd; }
-  else { from = mem.keyStart; to = cont.members[idx + 1].keyStart; }
-  return {text: text.slice(0, from) + text.slice(to)};
-}
-function jsonSetField(text, objPath, key, valueTextOrNull){
-  /* Set (replace or insert) one field of the object at objPath; null value
-     removes the field. Returns {text, start?, end?} or null. */
-  var exists = jsonLocate(text, objPath.concat([key]));
-  if (valueTextOrNull == null){
-    if (!exists) return {text: text};
-    return jsonRemoveMember(text, objPath, key);
-  }
-  if (exists) return jsonReplaceValue(text, objPath.concat([key]), valueTextOrNull);
-  return jsonInsertMember(text, objPath, key, valueTextOrNull);
-}
 
 function builderClone(v){ return JSON.parse(JSON.stringify(v)); }
 function builderRewrite(text, raw, path, mutate){
@@ -1313,24 +1059,6 @@ var PANEL_TEMPLATES = panelAuthoringMap('template');
 
 /* ---------------- pass 3: direct-manipulation planners ---------------- */
 
-function jsonInsertArrayItemAfter(text, arrPath, afterIdx, itemText){
-  /* Insert itemText into the array at arrPath directly AFTER member
-     afterIdx (jsonInsertMember only appends at the end). */
-  var loc = arrPath.length ? jsonLocate(text, arrPath) : {start: jsonSkipWS(text, 0)};
-  var cont = loc ? jsonContainer(text, loc.start) : null;
-  if (!cont || cont.isObj) return null;
-  var anchor = cont.members[afterIdx];
-  if (!anchor) return null;
-  var ls = text.lastIndexOf('\n', anchor.keyStart) + 1;
-  var indent = (text.slice(ls, anchor.keyStart).match(/^[ \t]*/) || [''])[0];
-  var adjVal = itemText.split('\n').join('\n' + indent);
-  var prefix = ',\n' + indent;
-  var insertAt = anchor.valEnd;
-  var start = insertAt + prefix.length;
-  return {text: text.slice(0, insertAt) + prefix + adjVal + text.slice(insertAt),
-          start: start, end: start + adjVal.length};
-}
-
 function planReplaceValue(text, raw, path, valueText){
   /* Replace one whole value (a bullet string, a paragraph) in place. */
   if (!jsonLocate(text, path))
@@ -1802,17 +1530,6 @@ function diffSpecTexts(baselineText, currentText){
    button's id "tab-<block>-<tab>") plus the tab index inside that
    block's tabs list. */
 
-function builderTabPath(raw, blockIdx, tabIdx){
-  var base, page;
-  if (raw && raw.page){ page = raw.page; base = ['page']; }
-  else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
-  else return null;
-  var key = page.blocks ? 'blocks' : 'sections';
-  var block = (page[key] || [])[blockIdx];
-  if (!block || !Array.isArray(block.tabs) || !block.tabs[tabIdx]) return null;
-  return base.concat([key, blockIdx, 'tabs', tabIdx]);
-}
-
 var BUILDER_TAB_TEMPLATE = [
   '{',
   '  "label": "New tab",',
@@ -1891,24 +1608,6 @@ function planMoveTab(text, raw, blockIdx, tabIdx, delta){
 }
 
 /* ---------------- reordering ---------------- */
-
-/* swap two items of one JSON array textually — each item keeps its own
-   formatting, only the two spans trade places. Returns the swapped text
-   plus the new spans: first = the slot at the SMALLER index, second = the
-   slot at the larger. */
-function jsonSwapListItems(text, listPath, i, j){
-  if (i === j) return null;
-  if (i > j){ var t = i; i = j; j = t; }
-  var a = jsonLocate(text, listPath.concat([i]));
-  var b = jsonLocate(text, listPath.concat([j]));
-  if (!a || !b) return null;
-  return {
-    text: text.slice(0, a.start) + text.slice(b.start, b.end) +
-          text.slice(a.end, b.start) + text.slice(a.start, a.end) + text.slice(b.end),
-    first: {start: a.start, end: a.start + (b.end - b.start)},
-    second: {start: b.end - (a.end - a.start), end: b.end}
-  };
-}
 
 /* move a section one slot within ITS OWN list (the top-level blocks list,
    or its tab's sections list). A neighbor blocks-list entry may be a tabs

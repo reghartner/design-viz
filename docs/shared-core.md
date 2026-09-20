@@ -55,7 +55,8 @@ Canon's `sections()` intentionally returns only diagram-bearing sections for
 evidence and trace operations. Keep its ordering separate from viewer numbering.
 The editor's `specSectionPaths()` still addresses raw authored JSON, including
 wrappers and bare diagrams; do not replace those addresses with normalized-page
-record paths.
+record paths. Its source owner is `workbench/targets.js`; see
+[workbench modules](workbench-modules.md) for raw addressing and source splices.
 
 ## Exact source-step lookup
 

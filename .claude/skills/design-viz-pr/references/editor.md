@@ -1,5 +1,10 @@
 # Editor
 
+- The required browser suite in `tools/browser-tests` exercises committed HTML
+  for source/focus/history/hidden paths and a production named-assembly fixture
+  for builder destroy/remount. Keep test-only lifecycle access in that fixture,
+  never production globals; compare resources with separately mounted owners.
+  Its README describes pinned-browser setup and failure artifacts.
 - Follow the user action through selection, the mutation planner, JSON write,
   rerender and restored selection. Check one Undo/Redo per logical operation,
   invalid-input preservation and stale dialogs after source/section changes.

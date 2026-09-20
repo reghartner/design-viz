@@ -31,5 +31,11 @@ changing a host API rather than inferring it from the mock.
   style isolation is not a security sandbox. Run the copied-plugin check as well
   as package verification; portable tests must not import upstream source files.
 
+The required `tools/browser-tests` suite exercises the actual native React
+component and a copied normal Forge resource using a pinned downloaded Chromium.
+Keep its strict error/network assertions and baseline resource accounting. The
+existing full Backstage rehearsal remains separate; do not recreate that host
+sandbox inside the thin required suite.
+
 Report local evidence separately from installed-host acceptance. Company-side
 deployment cannot be claimed from a simulated bridge or unauthenticated portal.

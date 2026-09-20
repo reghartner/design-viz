@@ -5,6 +5,42 @@ on:
   pull_request:
 
 jobs:
+  browser-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            tools/browser-tests/package-lock.json
+            apps/backstage/package-lock.json
+            apps/confluence/package-lock.json
+      - run: npm ci --prefix tools/browser-tests --no-fund --no-audit
+      - run: npm ci --prefix apps/backstage --no-fund --no-audit
+      - run: npm ci --prefix apps/confluence --no-fund --no-audit
+      - name: Install the pinned Playwright Chromium and Linux dependencies
+        run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
+      - name: Verify committed production artifacts
+        run: |
+          python3 tools/build.py
+          npm run check:viewer --prefix apps/backstage
+          git diff --exit-code -- template/ workbench/ tools/canon/generated-runtime.cjs apps/backstage/src/generated/
+      - name: Required browser contracts (no retries or missing-browser skips)
+        run: npm test --prefix tools/browser-tests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-contract-results
+          path: |
+            tools/browser-tests/playwright-report/
+            tools/browser-tests/test-results/
+            tools/browser-tests/report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
   backstage-rehearsal:
     runs-on: ubuntu-latest
     steps:

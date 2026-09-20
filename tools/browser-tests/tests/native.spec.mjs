@@ -1,0 +1,34 @@
+import {test,expect,trackResources,resources} from '../helpers/test.mjs';
+test('actual React native viewers isolate styles/navigation and retire stale revisions and resources',async({page,server})=>{
+  await page.setViewportSize({width:1920,height:1400});await page.addInitScript(trackResources);
+  await page.goto(server.origin+'/native/index.html#host-route');await page.waitForFunction(()=>!!window.__host);
+  const baseline=await resources(page),hostStyle=await page.locator('#host-sentinel').evaluate(e=>({font:getComputedStyle(e).fontSize,bg:getComputedStyle(e).backgroundColor}));
+  await page.evaluate(()=>{__host.left(true);__host.right(true);});
+  const alpha=page.locator('#alpha'),beta=page.locator('#beta');
+  await expect(alpha.locator('.preadout')).toHaveText('Success');await expect(beta.locator('.preadout')).toHaveText('Success');
+  await expect(page.locator('iframe')).toHaveCount(0);
+  const styles=await Promise.all([alpha,beta].map(view=>view.locator('.doc-title').evaluate(e=>({size:getComputedStyle(e).fontSize,family:getComputedStyle(e).fontFamily}))));
+  expect(styles[0].size).not.toBe('5px');expect(styles[1].size).not.toBe('5px');expect(styles[0].family).not.toBe(styles[1].family);
+  expect(await alpha.locator('svg').first().evaluate(e=>getComputedStyle(e).display)).not.toBe('none');
+  await page.evaluate(()=>document.fonts.ready);expect((await resources(page)).fonts).toBeGreaterThan(baseline.fonts);
+  await page.evaluate(()=>__host.navigate({section:'delivery-2',path:'failed',step:'failure'}));
+  await expect(alpha.locator('.stepid')).toHaveText('failure');await expect(alpha.locator('.preadout')).toHaveText('Failed');await expect(beta.locator('.preadout')).toHaveText('Success');
+  await page.evaluate(()=>__host.navigate({section:'missing',path:'happy'}));await expect(alpha.getByRole('alert')).toBeVisible();await expect(alpha.locator('.preadout')).toHaveText('Failed');
+  await page.evaluate(()=>__host.navigate({section:'delivery-2',path:'happy',step:'2'}));
+  await expect(alpha.locator('.stepid')).toHaveText('2');await expect(alpha.locator('.preadout')).toHaveText('Quiet');
+  await page.evaluate(()=>__host.navigate({section:'delivery-2',path:'happy',step:'done'}));await expect(alpha.locator('.preadout')).toHaveText('Success');
+  await page.evaluate(()=>__host.revision('r2'));await page.waitForFunction(()=>__host.requests.some(r=>r.revision==='r2'));
+  await page.evaluate(()=>__host.revision('r3'));await expect(alpha.locator('.doc-title')).toHaveText('alpha newest');
+  expect(await page.evaluate(()=>__host.requests.find(r=>r.revision==='r2').signal.aborted)).toBe(true);
+  // The fixture flushes a host commit after the held promise reaction runs.
+  await page.evaluate(()=>__host.resolveOld());await expect(page.locator('#host-columns')).toHaveAttribute('data-response-barrier','1');
+  await expect(alpha.locator('.doc-title')).toHaveText('alpha newest');
+  await page.evaluate(()=>__host.left(false));await expect(alpha.locator('.docview')).toHaveCount(0);await expect(beta.locator('.preadout')).toHaveText('Success');
+  await page.evaluate(()=>__host.left(true));await expect(alpha.locator('.doc-title')).toHaveText('alpha newest');
+  await alpha.getByRole('button',{name:'Fit width',exact:true}).click();await expect(beta.getByRole('button',{name:'Auto',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.evaluate(()=>{__host.left(false);__host.right(false);});
+  await expect(alpha.locator('.docview')).toHaveCount(0);await expect(beta.locator('.docview')).toHaveCount(0);
+  await expect.poll(()=>resources(page)).toEqual(baseline);
+  expect(await page.evaluate(()=>document.body.className)).toBe('host-theme');expect(new URL(page.url()).hash).toBe('#host-route');
+  expect(await page.locator('#host-sentinel').evaluate(e=>({font:getComputedStyle(e).fontSize,bg:getComputedStyle(e).backgroundColor}))).toEqual(hostStyle);
+});

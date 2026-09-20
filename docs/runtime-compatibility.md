@@ -1,10 +1,13 @@
 # Flowview releases and spec compatibility
 
-The company fork of Flowview owns engine, panel, editor and compatibility changes.
-Publish internal releases from that fork. The designs repository owns diagram
-specs and the nginx deployment of the editor built from a pinned release.
-Backstage pins its own Flowview dependency and upgrades through its normal PR,
-testing and deployment cycle. Viewing a newer diagram does not download or
+The company fork, **`backstage-diagrams`**, contains the engine, panels, editor,
+compatibility declarations and diagram specs in one repository. It publishes
+internal Flowview releases and builds the nginx editor image from the same
+versioned source. Catalog snapshots, trace evidence and drift automation also
+live in this repo.
+
+The separate company Backstage app repository pins its Flowview dependency
+and upgrades through its normal PR, testing and deployment cycle. Viewing a newer diagram does not download or
 execute a newer renderer.
 
 ## Three independent versions
@@ -111,8 +114,10 @@ set; it does not reconstruct historical introduction versions.
 4. Run `python3 tools/build.py` and, in `apps/backstage`, `npm run build:viewer`.
    Commit all generated runtime, compatibility and viewer artifacts. Run the
    tests and package the editor/viewer from that same commit.
-5. Publish the internal release. The designs repo and Backstage update their
-   pins independently; compatibility notices cover the interval between them.
+5. Publish the internal release from `backstage-diagrams` and deploy its editor
+   image. The separate Backstage app repo updates its plugin pin through its own
+   PR and release cycle; compatibility notices cover the interval between the
+   editor deployment and the Backstage upgrade.
 
 New behavior within an existing panel also needs its own feature ID and detector
 when old renderers would omit or misinterpret it. No versioning system can infer

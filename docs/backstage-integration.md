@@ -12,7 +12,8 @@ The guide distinguishes portable implementation from company deployment.
 
 ## Boundaries and authority
 
-- **Central Git repository:** authoritative specs, registry, reviewed source pins,
+- **`backstage-diagrams` (company Flowview fork):** engine/editor code alongside
+  authoritative specs, registry, reviewed source pins,
   reference traces and audit decisions. Keep HLD provenance and canonical ownership
   explicit. Suggested layouts are `registry.json`, `specs/`, and `.flowview/`.
 - **Backstage:** service/API identities, owners, catalog links and declared endpoints.
@@ -24,11 +25,13 @@ The guide distinguishes portable implementation from company deployment.
 
 ## Mount the company experience
 
-The company fork of Flowview owns engine changes and internal releases. The
-designs repository owns authoritative specs, registry, traces, drift workflow
-and an nginx deployment of the editor built from a pinned Flowview release.
-The existing Backstage repository owns this frontend integration and the
-authenticated adapter that reads authorized specs from the designs repository.
+The company uses one **`backstage-diagrams`** repository: the Flowview fork also
+holds authoritative specs, registry, catalog snapshots, traces and drift
+automation. Engine and panel changes happen here; this repo publishes internal
+releases and builds the nginx editor image from the same versioned source.
+The separate Backstage app repository owns installation of the frontend plugin
+and the authenticated adapter that reads authorized specs from
+`backstage-diagrams`.
 Backstage pins and upgrades its Flowview dependency through its own PR/release
 cycle. [Spec/runtime compatibility](runtime-compatibility.md) lets a newer spec
 explain which features need an upgrade. The company HTTP/auth backend remains

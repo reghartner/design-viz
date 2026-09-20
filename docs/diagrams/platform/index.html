@@ -310,22 +310,23 @@
         <article>
           <a
             class="preview"
-            href="flowview-platform.html#d=one-story-three-ownership-boundaries&m=step"
+            href="flowview-platform.html#d=one-company-fork-holds-the-engine-and-the-stories&m=step"
             ><img
               src="assets/diagram-01.png"
-              alt="One story, three ownership boundaries"
+              alt="One company fork holds the engine and the stories"
               loading="lazy"
           /></a>
           <div class="card-body">
             <span class="number">01</span>
             <h2>Ownership</h2>
             <p>
-              The designs repo owns the content. The Flowview fork owns
-              rendering. Backstage owns its installed app version.
+              Company layout: backstage-diagrams is the Flowview fork, with the
+              engine, editor and diagram specs together. The separate Backstage
+              app pins its installed viewer.
             </p>
             <div class="card-links">
               <a
-                href="flowview-platform.html#d=one-story-three-ownership-boundaries&m=step"
+                href="flowview-platform.html#d=one-company-fork-holds-the-engine-and-the-stories&m=step"
                 >Walk through →</a
               ><a href="assets/diagram-01.png" download>PNG ↓</a>
             </div>
@@ -464,8 +465,9 @@
             <span class="number">07</span>
             <h2>Ship features</h2>
             <p>
-              The company fork releases code. Designs and Backstage adopt that
-              release independently; compatibility metadata explains the gap.
+              backstage-diagrams builds the editor and publishes internal
+              renderer releases. The separate Backstage app adopts a release
+              through its own PR; compatibility metadata explains any gap.
             </p>
             <div class="card-links">
               <a

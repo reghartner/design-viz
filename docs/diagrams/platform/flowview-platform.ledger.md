@@ -1,6 +1,6 @@
 # Flowview platform — presentation coverage ledger
 
-Source: repository implementation and guides at `aac72e037a8b9cbc885135b9f8b59b4611dd8ed8`. Updated September 20, 2026.
+Source: repository implementation and guides at `aac72e037a8b9cbc885135b9f8b59b4611dd8ed8`. Company topology follows operator amendment A1 below. Updated September 20, 2026.
 
 Audience: engineers and stakeholders presenting the platform this week. Question: how do designs become discoverable, reviewable stories that stay connected to code? This is an implementation-grounded platform walkthrough and company deployment pattern, not a claim of company rollout. All diagram timings are illustrative. Custom edge kinds distinguish API transport from conceptual data/build/review handoffs.
 
@@ -8,7 +8,7 @@ Audience: engineers and stakeholders presenting the platform this week. Question
 
 | ID | class | HLD anchor | fact | state |
 |---|---|---|---|---|
-| 1 | flow | [docs/runtime-compatibility.md](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) — "The company fork of Flowview owns engine, panel, editor and compatibility changes." | Fork/designs/Backstage ownership | covered @ page.blocks[0].tabs[0] |
+| 1 | flow | amendment A1 — “Sorry it’s called backstage-diagrams” | One company fork holds engine/editor/specs; the Backstage app has its own repo and release cycle | covered @ page.blocks[0].tabs[0] and tabs[6] |
 | 2 | flow | [docs/workbench-catalog-sync.md](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md) — "The static editor never needs to contact Backstage." | Reviewed catalog snapshot is bundled in nginx | covered @ page.blocks[0].tabs[1] |
 | 3 | flow | [apps/backstage/README.md](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/apps/backstage/README.md) — "The renderer has no request transport." | Host-owned reads and trusted native rendering | covered @ page.blocks[0].tabs[2] |
 | 4 | flow | [docs/github-drift-automation.md](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/github-drift-automation.md) — "It does not run watched code" | Source scanning produces evidence only | covered @ page.blocks[0].tabs[3] |
@@ -17,15 +17,26 @@ Audience: engineers and stakeholders presenting the platform this week. Question
 | 7 | flow | [docs/build-entrypoints.md](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/build-entrypoints.md) — "entrypoints" | Shared assembly of host artifacts | covered @ page.blocks[0].tabs[6] |
 | 8 | flow | [examples/backstage-e2e/README.md](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/examples/backstage-e2e/README.md) — "Neither setup nor CI merges PRs automatically." | Portable two-repository integration rehearsal | covered @ page.blocks[0].tabs[7] |
 
+## Amendments
+
+| # | question | operator answer | date | applied at | status |
+|---|---|---|---|---|---|
+| A1 | Company fork and designs ownership? | “The fork is going to have the designs that’s a single repo” followed by “Sorry it’s called backstage-diagrams”. | 09-20-2026 | Chapters 1 and 7; paired integration/release guides, cover and speaker notes | active |
+
+A1 is a user description from this conversation, not a fact in the older pinned
+implementation guides. It supersedes their separate fork/designs-repo topology.
+The native plugin and read/auth boundaries remain unchanged. Rehearsal fixture
+names describe existing test assets, not additional company design repositories.
+
 ## Storyboard
 
 | Tab / step ID | Actor/action | Incoming state → visible change | Evidence |
 |---|---|---|---|
-| 1 · Ownership / engine | Build engine and panel features in the company Flowview fork; publish a versioned release. | Prior state on this path → ownership: A new panel starts in the Flowview fork. | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) |
-| 1 · Ownership / editor-release | The designs repo pins that release and builds the external workbench into its nginx image. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md) |
-| 1 · Ownership / editor-host | Authors open the workbench from the designs deployment. Backstage remains the reading surface. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md) |
-| 1 · Ownership / approved-data | The authenticated read service exposes approved specs from the designs repo. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/apps/backstage/README.md) |
-| 1 · Ownership / plugin-release | Backstage upgrades its pinned plugin through its own PR and app release. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) |
+| 1 · Ownership / engine | Build engine and panel features in backstage-diagrams, the same company fork that holds the specs. | Prior state on this path → ownership: A new panel and its example specs live in backstage-diagrams. | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) + amendment A1 |
+| 1 · Ownership / editor-release | The same backstage-diagrams checkout builds the external workbench into its nginx image. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md) + amendment A1 |
+| 1 · Ownership / editor-host | Authors open that hosted workbench. Backstage remains the reading surface. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md) + amendment A1 |
+| 1 · Ownership / approved-data | The authenticated read service exposes approved specs from backstage-diagrams. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/apps/backstage/README.md) + amendment A1 |
+| 1 · Ownership / plugin-release | backstage-diagrams publishes the plugin release. The separate Backstage app repo pins it through its own PR. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) + amendment A1 |
 | 1 · Ownership / ship-backstage | The Backstage deployment contains its renderer, styles, icons and fonts. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/apps/backstage/README.md) |
 | 1 · Ownership / read | At viewing time, Backstage fetches authorized JSON. It executes only its installed renderer. | Prior state on this path → ownership: Spec revision and renderer version are independent. | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/apps/backstage/README.md) |
 | 2 · Author / fetch | A daily CI job requests processed Backstage catalog entities; repository-file mode is also available. | Prior state on this path → stage: IMPORT | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md) |
@@ -66,11 +77,11 @@ Audience: engineers and stakeholders presenting the platform this week. Question
 | 6 · Trace evidence / incident | Supply a new incident trace. Environment mismatches block comparison; missing measurements remain unknown. | Prior state on this path → selected node / edge focus | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/canon.md) |
 | 6 · Trace evidence / overlay | Build an isolated alternate at the first differing beat. Preserve only the unchanged prefix and use independent divergent steps. | Prior state on this path → status: PROPOSE | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/backstage-integration.md) |
 | 6 · Trace evidence / propose | A human or agent may edit the alternate and propose it through normal spec review; comparison alone never changes canon. | Prior state on this path → status: REVIEW, limits: snapshot update | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/canon.md) |
-| 7 · Ship features / module | Add a panel type in its own module. Reuse shared folding, controls and lifecycle helpers. | Prior state on this path → stage: MODULE | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/panel-modularity.md) |
+| 7 · Ship features / module | In backstage-diagrams, add a panel type in its own module. Reuse shared folding, controls and lifecycle helpers. | Prior state on this path → stage: MODULE | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/panel-modularity.md) + amendment A1 |
 | 7 · Ship features / assemble | Named entrypoints assemble standalone, workbench, backend, native Backstage and Forge artifacts. | Prior state on this path → stage: BUILD | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/build-entrypoints.md) |
 | 7 · Ship features / verify | Review source changes and run the host tests plus pinned Chromium browser contracts. | Prior state on this path → stage: VERIFY | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/tools/browser-tests/README.md) |
 | 7 · Ship features / release | Register the feature requirement, bump the renderer release, regenerate artifacts and publish internally. | Prior state on this path → stage: RELEASE | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) |
-| 7 · Ship features / author | The designs repo upgrades its editor. Exports stamp the spec with its required renderer features. | Prior state on this path → stage: AUTHOR | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) |
+| 7 · Ship features / author | backstage-diagrams deploys its editor build. Exports stamp each spec with its required renderer features. | Prior state on this path → stage: AUTHOR | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) + amendment A1 |
 | 7 · Ship features / upgrade | Backstage upgrades through its own PR and release. Its installed renderer can show the new capability. | Prior state on this path → stage: COMPATIBLE | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) |
 | 7 · Ship features / older | If Backstage is older, show an upgrade notice and supported content. An unsupported contract major prevents rendering. | Prior state on this path → stage: UPGRADE NEEDED | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md) |
 | 8 · Rehearsal / create | Generate two local Git repos: a mock company and a designer. The sample main branch remains healthy. | Prior state on this path → stage: CREATE | [source](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/examples/backstage-e2e/README.md) |
@@ -122,12 +133,18 @@ Actual local Backstage running the plugin copied from `aac72e037a8b9cbc885135b9f
 
 - Detailed installation commands, exhaustive routes, credential configuration, retry mechanics and every review refusal are linked rather than repeated; this is a presentation tour, not an operations manual.
 - The shared scanner schedule is weekdays at 08:23 America/New_York. The portable rehearsal has its own daily drift template; catalog refresh is daily. These are separate configured workflows.
-- Company repo and host labels denote roles, not newly created repositories or deployed production services.
+- `backstage-diagrams` is the operator-supplied company repo name. Host labels denote deployment roles; these diagrams do not create repos or assert a production rollout.
 - The existing detailed `../backstage/` guide remains historical authoring provenance; this is a newly sourced presentation, not a silent rewrite of that ledger.
 - Presentation uses a full-width diagram with attached step controls; Diagram + panels preserves the supporting side-by-side view. Backstage close-up retains the same steps while showing the capture at readable size.
 - The full illustrated spec exceeds the manual Forge snapshot budget; use the portable HTML or individual text-only chapters for that route. No export limit is changed.
 
 ## Validation
+
+The original presentation passed the complete checks below. For amendment A1,
+chapters 1 and 7 were rebuilt and rechecked: 19 path-step visits, all three path
+endpoints, and all 10 affected layout/width combinations at 1600 and 1100 pixels.
+The two affected PNGs were recaptured. The cover links/assets, offline opening
+and presenter mode were checked again; no JavaScript or HTTP errors occurred.
 
 - Normal page build: zero validator errors and zero warnings; compatibility metadata derived with the stamping CLI.
 - Independent SOL review found no actionable factual or branch-state errors against the pinned implementation.

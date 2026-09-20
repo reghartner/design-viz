@@ -56,6 +56,7 @@ function panelPickerPreview(type, referenceImage, skin){
      renderer expando; the detached original is then collectible. CSS motion is
      paused on the clone. Never instantiate buildPanels or a playback timer. */
   var snapshot = panelPickerNamespace(host.cloneNode(true));
+  cancelPanelMotion(host);
   var widget = document.createElement('div'); widget.className = 'pwidget pt-' + type;
   var title = document.createElement('div'); title.className = 'ptitle'; title.textContent = sample.panel.title;
   widget.appendChild(title); widget.appendChild(snapshot);
@@ -67,13 +68,15 @@ function panelPickerCurrent(snapshot, current){
 }
 
 function initPanelPicker(opts){
+  var life=createWorkbenchLifetime(),cardsLife=createWorkbenchLifetime(),filtersLife=createWorkbenchLifetime();
+  life.own(function(){cardsLife.destroy();});life.own(function(){filtersLife.destroy();});
   var dialog = document.getElementById('panel-picker');
   if (!dialog) return null;
   var grid = document.getElementById('panel-picker-grid'), search = document.getElementById('panel-picker-search');
   var filters = document.getElementById('panel-picker-filters'), detail = document.getElementById('panel-picker-preview');
   var add = document.getElementById('panel-picker-add'), status = document.getElementById('panel-picker-status');
   var snapshot = null, selected = null, category = 'All panels', opener = null, invalid = false, referenceImage = null;
-  var resize = typeof ResizeObserver === 'function' ? new ResizeObserver(fitPreviews) : null;
+  var resize = typeof ResizeObserver === 'function' ? new ResizeObserver(life.guard(fitPreviews)) : null;
   function el(id){ return document.getElementById(id); }
   function fitPreviews(){
     dialog.querySelectorAll('.panel-picker-art').forEach(function(frame){
@@ -110,6 +113,7 @@ function initPanelPicker(opts){
     fitPreviews();
   }
   function paintGrid(){
+    cardsLife.destroy();cardsLife=createWorkbenchLifetime();
     var query = search.value.trim().toLowerCase();
     var entries = PANEL_CATALOG.filter(function(entry){return (category === 'All panels' || entry.category === category) &&
       (!query || [entry.name,entry.type,entry.category,entry.description].join(' ').toLowerCase().indexOf(query) >= 0);});
@@ -122,7 +126,7 @@ function initPanelPicker(opts){
       var name = document.createElement('strong'); name.textContent = entry.name; copy.appendChild(name);
       var check = document.createElement('span'); check.className = 'panel-picker-check'; check.textContent = '✓'; check.setAttribute('aria-hidden','true'); copy.appendChild(check);
       var tagline = document.createElement('span'); tagline.textContent = entry.tagline; copy.appendChild(tagline);
-      card.appendChild(copy); card.addEventListener('click',function(){select(entry.type);}); grid.appendChild(card);
+      card.appendChild(copy); cardsLife.listen(card,'click',function(){select(entry.type);}); grid.appendChild(card);
     });
     filters.querySelectorAll('button').forEach(function(button){button.setAttribute('aria-pressed',String(button.textContent === category));});
     el('panel-picker-count').textContent = entries.length + (entries.length === 1 ? ' panel' : ' panels');
@@ -136,13 +140,14 @@ function initPanelPicker(opts){
     status.hidden = false;
   }
   function cleanup(){
+    cardsLife.destroy();filtersLife.destroy();
     if (resize) resize.disconnect();
     grid.replaceChildren(); detail.replaceChildren(); snapshot = null; selected = null; referenceImage = null;
   }
-  function close(){
+  function close(focus){
     if (!dialog.open) return;
     dialog.close(); cleanup();
-    if (opener && opener.isConnected) opener.focus({preventScroll:true});
+    if (focus!==false && opener && opener.isConnected) opener.focus({preventScroll:true});
   }
   function open(){
     var current = opts.context();
@@ -164,29 +169,31 @@ function initPanelPicker(opts){
     dialog.querySelector('.panel-picker-content').scrollTop = 0;
   }
   function paintFilters(){
+    filtersLife.destroy();filtersLife=createWorkbenchLifetime();
     filters.replaceChildren();
   ['All panels'].concat(Array.from(new Set(PANEL_CATALOG.map(function(entry){return entry.category;})))).forEach(function(name){
     var button = document.createElement('button'); button.type = 'button'; button.textContent = name;
-    button.addEventListener('click',function(){category = name;paintGrid();}); filters.appendChild(button);
+    filtersLife.listen(button,'click',function(){category = name;paintGrid();}); filters.appendChild(button);
   });
   }
-  search.addEventListener('input',paintGrid);
-  el('panel-picker-clear').addEventListener('click',function(){search.value = '';category = 'All panels';paintGrid();search.focus();});
-  el('panel-picker-close').addEventListener('click',close);
-  el('panel-picker-cancel').addEventListener('click',close);
-  add.addEventListener('click',function(){
+  life.listen(search,'input',paintGrid);
+  life.listen(el('panel-picker-clear'),'click',function(){search.value = '';category = 'All panels';paintGrid();search.focus();});
+  life.listen(el('panel-picker-close'),'click',close);
+  life.listen(el('panel-picker-cancel'),'click',close);
+  life.listen(add,'click',function(){
     if (invalid || !selected) return;
     if (!panelPickerCurrent(snapshot,opts.context())){invalidate();return;}
     var type = selected.type;
     close(); opts.insert(type);
   });
-  dialog.addEventListener('cancel',function(ev){ev.preventDefault();close();});
-  dialog.addEventListener('close',function(){if (!dialog.open) cleanup();});
+  life.listen(dialog,'cancel',function(ev){ev.preventDefault();close();});
+  life.listen(dialog,'close',function(){if (!dialog.open) cleanup();});
   /* Keep Escape, Delete, and editor/history shortcuts inside the modal. Native
      dialog behavior handles focus containment; Escape also closes from a
      populated search field instead of only clearing its search text. */
-  dialog.addEventListener('keydown',function(ev){ev.stopPropagation();if (ev.key === 'Escape'){ev.preventDefault();close();}});
-  dialog.addEventListener('click',function(ev){ev.stopPropagation();});
-  opts.src.addEventListener('input',invalidate);
-  return {open:open,close:close,refresh:function(){if(dialog.open && !panelPickerCurrent(snapshot,opts.context())) invalidate();},invalidate:invalidate};
+  life.listen(dialog,'keydown',function(ev){ev.stopPropagation();if (ev.key === 'Escape'){ev.preventDefault();close();}});
+  life.listen(dialog,'click',function(ev){ev.stopPropagation();});
+  life.listen(opts.src,'input',invalidate);
+  return {open:life.guard(open),close:life.guard(close),refresh:life.guard(function(){if(dialog.open && !panelPickerCurrent(snapshot,opts.context())) invalidate();}),invalidate:life.guard(invalidate),
+    destroy:function(){if(!life.alive())return;life.destroy();close(false);cleanup();opener=null;filters.replaceChildren();}};
 }

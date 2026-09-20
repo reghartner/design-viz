@@ -4,7 +4,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function context(extra={}, transport=false){
   const c={URL,TextEncoder,...extra};vm.createContext(c);
   for(const name of ['canon.js','validator.js','workbench/source-edit.js','workbench/targets.js',
-    'workbench/commands/common.js',transport ? 'clipboard.workbench.js' : 'workbench/commands/clipboard.js'])
+    'workbench/commands/common.js',...(transport ? ['workbench/lifetime.js'] : []),transport ? 'clipboard.workbench.js' : 'workbench/commands/clipboard.js'])
     vm.runInContext(readSource(name),c);
   return c;
 }
@@ -157,4 +157,16 @@ test('a copy failure after leaving the project does not open an obsolete fallbac
   h.ctl.copy();h.ctl.cancelPending();h.active=false;
   reject(new Error('Clipboard denied'));await Promise.resolve();await Promise.resolve();
   assert.equal(h.elements['object-clipboard'].open,false);
+});
+
+test('destroy retires pending clipboard reads, rejected writes and every public/old control without focus return',async()=>{
+  let resolve,reject;const h=harness({readText:()=>new Promise(yes=>{resolve=yes;}),writeText:()=>new Promise((yes,no)=>{reject=no;})});
+  h.ctl.copy();h.ctl.open();h.elements['object-clipboard-read'].fire('click');
+  const before=h.text,active=h.document.activeElement;
+  h.ctl.destroy();h.ctl.destroy();resolve('late clipboard');reject(Error('denied'));
+  await Promise.resolve();await Promise.resolve();
+  h.ctl.copy();h.ctl.duplicate();h.ctl.open();h.elements['object-paste'].fire('click');
+  h.event('keydown',{metaKey:true,key:'d'});
+  assert.equal(h.document.activeElement,active);assert.equal(h.text,before);assert.equal(h.undo.length,0);
+  assert.equal(h.elements['object-clipboard'].open,false);assert.notEqual(h.elements['object-clipboard-text'].value,'late clipboard');
 });

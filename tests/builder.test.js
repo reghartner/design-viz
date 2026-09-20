@@ -402,6 +402,7 @@ function importHarness(ctl, boardSpec, extraGlobals){
     const el = {tagName: tag.toUpperCase(), id, className: '', children: [], style: {},
       value: '', hidden: false, disabled: false, textContent: '',
       addEventListener(type, fn){ (handlers[type] ||= []).push(fn); },
+      removeEventListener(type,fn){handlers[type]=(handlers[type] || []).filter(f=>f!==fn);},
       appendChild(child){ this.children.push(child); child.parentNode = this; return child; },
       setAttribute(k, v){ if (k === 'class') this.className = String(v); else attrs[k] = String(v); },
       removeAttribute(k){ delete attrs[k]; },
@@ -468,7 +469,8 @@ function importHarness(ctl, boardSpec, extraGlobals){
   doc.createTextNode = text => Object.assign(element('span'), {textContent: text});
   doc.getElementById = id => elements[id] || doc.body.querySelector('#' + id);
   doc.querySelector = () => null;
-  doc.addEventListener = (type, fn, capture) => { (listeners[type] ||= []).push({fn, capture}); };
+  doc.addEventListener = (type, fn, capture) => { (listeners[type] ||= []).push({fn, capture:!!capture}); };
+  doc.removeEventListener=(type,fn,capture)=>{listeners[type]=(listeners[type] || []).filter(r=>r.fn!==fn || r.capture!==!!capture);};
   for (const id of ['docview', 'src', 'guide', 'btarget', 'msgs', 'importbox', 'import-mermaid-text',
     'import-mermaid', 'import-mermaid-convert', 'import-mermaid-cancel', 'undo-builder', 'redo-builder',
     'add-step', 'add-section', 'add-edge', 'add-tabs']){
@@ -503,7 +505,7 @@ function importHarness(ctl, boardSpec, extraGlobals){
   }
   const saved = {};
   const sandbox = {console, document: doc,
-    window: {addEventListener(type, fn){ (windowListeners[type] ||= []).push(fn); }},
+    window: {addEventListener(type, fn){ (windowListeners[type] ||= []).push(fn); },removeEventListener(type,fn){windowListeners[type]=(windowListeners[type] || []).filter(f=>f!==fn);}},
     // Browser timers must be called through the UI adapter, not as leaf-option methods.
     setTimeout(fn,ms){ 'use strict'; assert.equal(this,undefined); scheduled.push({fn,ms}); return scheduled.length; },
     clearTimeout(id){ 'use strict'; assert.equal(this,undefined); cancelled.push(id); },
@@ -513,15 +515,17 @@ function importHarness(ctl, boardSpec, extraGlobals){
     readSource('builder.workbench.js')+'\n'+readSource('steps.workbench.js'), sandbox);
   if(extraGlobals)Object.assign(sandbox,extraGlobals);
   let renders = 0;
-  const builder=sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, ctl:()=>ctl, render(request){
+  let builder;
+  function mount(){return builder=sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, ctl:()=>ctl, render(request){
     builder.beforePreviewReplace(request);renders++;
     elements.msgs.innerHTML = '';
     const finding = element('li'); finding.textContent = 'existing validator warning';
     elements.msgs.appendChild(finding);
     const outcome={ok:true,replaced:true,text:elements.src.value,origin:request.origin};
     builder.previewRendered(outcome);return outcome;
-  }});
-  return {elements, doc, element, saved, scheduled, cancelled, cards, svg, sandbox, get renders(){ return renders; },
+  }});}
+  mount();
+  return {mount,get builder(){return builder;},listeners,windowListeners,elements, doc, element, saved, scheduled, cancelled, cards, svg, sandbox, get renders(){ return renders; },
     rerender(){builder.beforePreviewReplace({origin:'manual'});builder.previewRendered({ok:true,replaced:true,text:elements.src.value});},
     move(x, y, over = null){
       doc.over = over;
@@ -1420,4 +1424,31 @@ test('actual builder story callbacks select hidden alternate source indices with
   story.navigate(entry);assert.equal(path,'failed');assert.equal(index,2);
   assert.deepStrictEqual(plain(story.selection()),{section:0,kind:'step',index:2,pathId:'failed'});
   assert.equal(h.renders,0,'authoring navigation does not publish a source edit');
+});
+
+test('destroy retires real builder controls, held graph release and draft callbacks; remount publishes one Undo',()=>{
+  const spec={nodes:{a:{},b:{}},rows:[['a','b']],steps:[{nodes:['a'],text:'start'}]},h=importHarness(null,spec),e=h.elements;
+  const before=e.src.value;
+  e.src.fire('input');const draft=h.scheduled.at(-1).fn;
+  h.cards.a.fire('mousedown',{button:0,clientX:100,clientY:100});h.move(410,110,h.cards.b);
+  const releases=h.windowListeners.mouseup.slice(),old=h.builder,jump=h.sandbox.BUILDER_JUMP_TO_FINDING;
+  e.src.focus();old.destroy();old.destroy();
+  assert.equal(h.doc.activeElement,e.src);assert.equal(h.svg.querySelector('.dv-ghost'),null);
+  assert.equal(Object.values(h.listeners).flat().length,0);assert.equal(Object.values(h.windowListeners).flat().length,0);
+  releases.forEach(fn=>fn({}));draft();h.click('add-step');old.loadSpec(spec);old.refreshCatalog();old.previewRendered({ok:true,replaced:true});jump('old',[]);
+  assert.equal(e.src.value,before);assert.equal(h.renders,0);assert.equal(old.loadText('{invalid'),false);
+  assert.equal(h.sandbox.BUILDER_JUMP_TO_FINDING,null);
+  for(let i=0;i<3;i++){
+    const current=h.mount();assert.notEqual(h.sandbox.BUILDER_JUMP_TO_FINDING,jump);old.destroy();
+    h.click('add-step');assert.notEqual(e.src.value,before);h.click('undo-builder');assert.equal(e.src.value,before);
+    assert.equal(e['undo-builder'].disabled,true);current.destroy();
+    assert.equal(Object.values(h.listeners).flat().length,0);assert.equal(Object.values(h.windowListeners).flat().length,0);
+  }
+});
+
+test('a throwing satellite destroy does not strand other builder resources or the source session',()=>{
+  const h=importHarness(null,null,{initPanelPicker:()=>({refresh(){},destroy(){throw Error('panel cleanup failed');}})}),old=h.builder,before=h.elements.src.value;
+  assert.throws(()=>old.destroy(),/panel cleanup failed/);assert.equal(Object.values(h.listeners).flat().length,0);
+  assert.equal(Object.values(h.windowListeners).flat().length,0);assert.equal(h.sandbox.BUILDER_JUMP_TO_FINDING,null);
+  assert.equal(old.loadText('{}'),false);h.click('add-step');assert.equal(h.elements.src.value,before);old.destroy();
 });

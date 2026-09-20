@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['validator','workbench/source-edit','workbench/targets','workbench/commands/common',
   'workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/inspector'];
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
   function element(tag = 'div', id = ''){
@@ -11,6 +11,7 @@ function environment(){
     const el = {tagName: tag.toUpperCase(), id, className: '', children: [], style: {}, scrollTop:0, scrollLeft:0,
       value: '', hidden: false, disabled: false, textContent: '',
       addEventListener(type, fn){ (handlers[type] ||= []).push(fn); },
+      removeEventListener(type,fn){handlers[type]=(handlers[type] || []).filter(f=>f!==fn);},
       appendChild(child){ this.children.push(child); child.parentNode = this; return child; },
       setAttribute(k, v){ if (k === 'class') this.className = String(v); else attrs[k] = String(v); },
       removeAttribute(k){ delete attrs[k]; },
@@ -80,7 +81,7 @@ function environment(){
   for(const name of pureNames)vm.runInContext(readSource(name+'.js'),C);
   function mount(spec){
     const guide=doc.body.appendChild(element()),timers=new Map(),scheduled=[];
-    let text=JSON.stringify(spec,null,2),next=0,inspector,reveals=0,selectionCalls=0;
+    let text=JSON.stringify(spec,null,2),next=0,inspector,reveals=0,selectionCalls=0,retireCalls=0;
     const session=C.createBuilderSession({source:{read:()=>text,write:value=>text=value},render(){},
       persistence:C.createBuilderPersistence({storage:()=>({getItem:()=>null,setItem(){},removeItem(){}}),now:()=>0,schedule(){},cancel(){}}),
       invalidateProject(){inspector.retire();}});
@@ -88,12 +89,12 @@ function environment(){
     inspector=C.createBuilderInspector({document:doc,guide,session,
       apply(plan,opt,snapshot){return session.accept(plan,{snapshot,afterRender(){if(opt?.after)opt.after(plan);}});},
       schedule(fn){timers.set(++next,fn);scheduled.push(fn);return next;},cancel:id=>timers.delete(id),
-      surface:{show(){},reveal(){reveals++;},hideDiff(){},retire(){}},
+      surface:{show(){},reveal(){reveals++;},hideDiff(){},retire(){retireCalls++;}},
       selection:{select(){selectionCalls++;},range(){selectionCalls++;},rehighlight(){selectionCalls++;},remove(){},removeMany(){}},
       preview:{stepper:()=>null,targetElement:()=>null},
       modes:{adding:()=>null,connecting:()=>null,toggleAdding(){},editPathStep(){}},
       clipboard:{current:()=>null,selectHome(){selectionCalls++;},clearHome(){}}});
-    return {inspector,session,guide,timers,scheduled,get text(){return text;},get reveals(){return reveals;},get selectionCalls(){return selectionCalls;},
+    return {inspector,session,guide,timers,scheduled,get text(){return text;},get reveals(){return reveals;},get retireCalls(){return retireCalls;},get selectionCalls(){return selectionCalls;},
       flush(){const run=[...timers.values()];timers.clear();run.forEach(fn=>fn());}};
   }
   return {C,doc,element,mount};
@@ -180,7 +181,7 @@ test('inspector expansion and panel factory caches are per instance, and held co
   assert.equal(held.clipboard(),null);assert.equal(held.stepper(0),null);
   held.refresh();held.inspect();held.select({kind:'step'});held.rehighlight();held.selectClipboard({kind:'panel'});
   a.inspector.renderMulti([{kind:'node',id:'a'},{kind:'node',id:'b'}]);a.inspector.panel('test-inspector');
-  assert.equal(held.commit('title','"retired"'),false);assert.equal(held.transact(()=>({text:'{}'})),false);
+  assert.equal(held.commit('title','"retired"'),false);assert.equal(held.transact(()=>{throw Error('retired transaction invoked planner');}),false);
   assert.equal(a.guide.children.length,0);assert.equal(a.timers.size,0);assert.equal(a.selectionCalls,selection);
   assert.equal(a.text,before);assert.equal(made,3);assert.equal(b.inspector.panel('test-inspector').identity,4);
 });
@@ -211,4 +212,38 @@ test('same multiselection refresh keeps its active field and scroll, while chang
   h.inspector.renderMulti([targets[0],{kind:'node',section:0,id:'c'}]);
   assert.notEqual(e.doc.activeElement,tint());assert.equal(h.guide.scrollTop,0);
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
+test('replacing a form releases its controls and registered panel resources, without retiring another inspector',()=>{
+  const e=environment(),h=e.mount(home()),other=e.mount(home());let retired=0,called=0;
+  const ctx=[];e.C.PanelRegistry.define('form-owner',{authoring:{editor(context){ctx.push(context);return {};}}});
+  h.inspector.panel('form-owner');other.inspector.panel('form-owner');
+  h.inspector.render();other.inspector.render();
+  const sibling=e.element('button');ctx[1].listen(sibling,'click',()=>called++);
+  for(let i=0;i<6;i++){
+    const old=named(h.guide,'Width'),held=old.handlers.change[0],before=h.text;
+    ctx[0].onFormRetire(()=>retired++);
+    h.inspector.render();assert.equal(old.handlers.change.length,0);
+    old.value='349';held({});assert.equal(h.text,before);
+  }
+  assert.equal(retired,6);h.inspector.destroy();sibling.fire('click');assert.equal(called,1);
+  ctx[0].listen(sibling,'click',()=>called++);assert.equal(sibling.handlers.click.length,1);
+  other.inspector.destroy();assert.equal(sibling.handlers.click.length,0);
+});
+
+test('retired inspector public methods cannot hide a new owner or run a planner',()=>{
+  const e=environment(),old=e.mount(home());old.inspector.render();old.inspector.destroy();const retired=old.retireCalls;
+  const current=e.mount(home());current.inspector.render();const before=current.guide.children.slice();
+  old.inspector.retire();old.inspector.sourceChanged();old.inspector.render();old.inspector.refresh();
+  assert.equal(old.inspector.transact(()=>{throw Error('retired planner');}),false);
+  assert.deepEqual(current.guide.children,before);assert.equal(current.guide.hidden,false);assert.equal(old.retireCalls,retired);
+});
+
+test('catalog refresh waits for the active field, and replacing that form retires its pending blur listener',()=>{
+  const e=environment(),h=e.mount({nodes:{a:{title:'One'}},rows:[['a']]});h.session.target={kind:'node',section:0,id:'a'};
+  h.inspector.render();const old=h.guide.querySelector('input');old.focus();h.inspector.refreshCatalog();
+  const held=old.handlers.blur.at(-1);assert.equal(h.timers.size,0);
+  h.inspector.render();assert.equal(old.handlers.blur.length,0);held({});assert.equal(h.timers.size,0);
+  const current=h.guide.querySelector('input');current.focus();h.inspector.refreshCatalog();current.fire('blur');
+  assert.equal(h.timers.size,1);h.flush();h.inspector.destroy();h.inspector.refreshCatalog();assert.equal(h.timers.size,0);
 });

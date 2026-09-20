@@ -1,5 +1,8 @@
 /* Native dialog keeps background selection and builder shortcuts out of a reuse edit. */
 function initWorkbenchStepReuse(opts){
+  var life=createWorkbenchLifetime(),rowsLife=createWorkbenchLifetime(),surface=null;
+  life.own(function(){rowsLife.destroy();});
+  function clearPreview(){if(surface)cancelPanelMotion(surface);surface=null;}
   var dialog = document.getElementById('step-reuse');
   if (!dialog) return null;
   function el(id){ return document.getElementById('reuse-' + id); }
@@ -24,12 +27,12 @@ function initWorkbenchStepReuse(opts){
     if (!isCurrent()){ invalidate(); return; }
     if (!model) return;
     var i = Number(beat.value), decl = (model.diagram.panels || []).find(function(p){ return p.id === panel.value; });
-    panelHost.textContent = ''; state.textContent = '';
+    clearPreview();panelHost.textContent = ''; state.textContent = '';
     if (!decl){ panelHost.textContent = 'This diagram has no panels. Review the destination steps above.'; return; }
     var snapshots = model.states[decl.id] || [], value = snapshots[i] || {};
     /* Renderers cache markup on their host. A fresh surface also prevents
        a previous panel type from contributing its presentation state. */
-    var surface = document.createElement('div'); panelHost.appendChild(surface);
+    surface = document.createElement('div'); panelHost.appendChild(surface);
     renderPanelBody(surface, decl, value, 'daylight', snapshots, i, false);
     state.textContent = JSON.stringify(value, null, 2);
   }
@@ -61,6 +64,7 @@ function initWorkbenchStepReuse(opts){
     paintPanel();
   }
   function paintRows(){
+    rowsLife.destroy();rowsLife=createWorkbenchLifetime();
     list.innerHTML = ''; rows = [];
     var sourcePath = currentSource(), terms = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
     var byId = new Map(); snapshot.diagram.steps.forEach(function(s){ if (s && s.id) byId.set(s.id, s); });
@@ -73,7 +77,7 @@ function initWorkbenchStepReuse(opts){
       var item = document.createElement('div'); item.className = 'reuse-step';
       var label = document.createElement('label'), check = document.createElement('input'); check.type = 'checkbox'; check.checked = selected.has(row.id);
       check.setAttribute('aria-label', 'Reuse step ' + (row.index + 1) + ': ' + (row.step.text || row.id));
-      check.addEventListener('click', function(ev){
+      rowsLife.listen(check,'click', function(ev){
         if (!isCurrent()){ invalidate(); return; }
         var anchor = filtered.findIndex(function(r){ return r.index === lastIndex; });
         var at = filtered.findIndex(function(r){ return r.index === row.index; });
@@ -88,7 +92,7 @@ function initWorkbenchStepReuse(opts){
       caption.appendChild(meta); label.appendChild(check); label.appendChild(caption); item.appendChild(label);
       var rest = document.createElement('button'); rest.type = 'button'; rest.className = 'bbtn'; rest.textContent = 'Continue from here';
       rest.setAttribute('aria-label', 'Continue from source step ' + (row.index + 1));
-      rest.addEventListener('click', function(){
+      rowsLife.listen(rest,'click', function(){
         if (!isCurrent()){ invalidate(); return; }
         selected = new Set(sourcePath.steps.slice(row.index)); placement.value = 'rest'; lastIndex = row.index;
         paintRows(); updatePreview();
@@ -99,7 +103,7 @@ function initWorkbenchStepReuse(opts){
     el('previous').disabled = page === 0; el('next').disabled = (page + 1) * pageSize >= filtered.length;
     el('paging').hidden = filtered.length <= pageSize;
   }
-  function close(){ dialog.close(); snapshot = null; plan = null; model = null; panelHost.textContent = ''; if (opener) opener.focus({preventScroll:true}); }
+  function close(focus){ clearPreview();rowsLife.destroy();rowsLife=createWorkbenchLifetime();dialog.close(); snapshot = null; plan = null; model = null; panelHost.textContent = ''; if (focus!==false && opener) opener.focus({preventScroll:true});opener=null; }
   function open(){
     var ctx = opts.context();
     if (!ctx) return;
@@ -111,21 +115,22 @@ function initWorkbenchStepReuse(opts){
     el('destination').textContent = 'Into ' + snapshot.label + ' · selected step ' + (snapshot.position + 1) + ': ' + (snapshot.diagram.steps[snapshot.index].text || snapshot.diagram.steps[snapshot.index].id);
     paintRows(); updatePreview(); if (opts.pause) opts.pause(); dialog.showModal(); source.focus();
   }
-  source.addEventListener('change', function(){ if (!isCurrent()){ invalidate(); return; } selected.clear(); lastIndex = null; page = 0; search.value = ''; paintRows(); updatePreview(); });
-  search.addEventListener('input', function(){ if (!isCurrent()){ invalidate(); return; } page = 0; paintRows(); });
-  el('clear').addEventListener('click', function(){ if (!isCurrent()){ invalidate(); return; } selected.clear(); lastIndex = null; paintRows(); updatePreview(); });
-  mode.addEventListener('change', updatePreview); placement.addEventListener('change', updatePreview);
-  beat.addEventListener('change', paintPanel); panel.addEventListener('change', paintPanel);
-  ['previous','next'].forEach(function(name){ el(name).addEventListener('click', function(){ if (!isCurrent()){ invalidate(); return; } page += name === 'next' ? 1 : -1; paintRows(); }); });
-  el('cancel').addEventListener('click', close);
-  dialog.addEventListener('cancel', function(ev){ ev.preventDefault(); close(); });
-  dialog.addEventListener('keydown', function(ev){ ev.stopPropagation(); });
-  dialog.addEventListener('click', function(ev){ ev.stopPropagation(); });
-  opts.src.addEventListener('input', function(){ if (dialog.open) invalidate(); });
-  apply.addEventListener('click', function(){
+  life.listen(source,'change', function(){ if (!isCurrent()){ invalidate(); return; } selected.clear(); lastIndex = null; page = 0; search.value = ''; paintRows(); updatePreview(); });
+  life.listen(search,'input', function(){ if (!isCurrent()){ invalidate(); return; } page = 0; paintRows(); });
+  life.listen(el('clear'),'click', function(){ if (!isCurrent()){ invalidate(); return; } selected.clear(); lastIndex = null; paintRows(); updatePreview(); });
+  life.listen(mode,'change', updatePreview); life.listen(placement,'change', updatePreview);
+  life.listen(beat,'change', paintPanel); life.listen(panel,'change', paintPanel);
+  ['previous','next'].forEach(function(name){ life.listen(el(name),'click', function(){ if (!isCurrent()){ invalidate(); return; } page += name === 'next' ? 1 : -1; paintRows(); }); });
+  life.listen(el('cancel'),'click', close);
+  life.listen(dialog,'cancel', function(ev){ ev.preventDefault(); close(); });
+  life.listen(dialog,'keydown', function(ev){ ev.stopPropagation(); });
+  life.listen(dialog,'click', function(ev){ ev.stopPropagation(); });
+  life.listen(opts.src,'input', function(){ if (dialog.open) invalidate(); });
+  life.listen(apply,'click', function(){
     if (!isCurrent()){ invalidate(); return; }
     if (!plan || plan.error || apply.disabled) return;
     var pending = plan, section = snapshot.section; close(); opts.apply(pending, section);
   });
-  return {open:open, refresh:function(){ if (dialog.open && !isCurrent()) invalidate(); }};
+  return {open:life.guard(open), refresh:life.guard(function(){ if (dialog.open && !isCurrent()) invalidate(); }),
+    destroy:function(){if(!life.alive())return;life.destroy();close(false);rowsLife.destroy();list.innerHTML='';}};
 }

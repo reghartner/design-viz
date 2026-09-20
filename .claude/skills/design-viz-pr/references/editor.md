@@ -48,7 +48,7 @@
   writes finish/close safely, failures abort, and stale follow-on files/UI are
   blocked. Never delete or roll back user files. Check listener, object-URL and
   failed-request cleanup; dispatched clipboard/download effects are not recallable.
-  I/O destroy is separate from interaction/observer and whole-page teardown.
+  Builder destruction composes I/O destruction; whole-page teardown is separate.
 - Controlled rendering lives in `src/workbench/preview.js`, prepended by the
   logical workspace bundle. Boot sends one completion per attempt and a
   before-replacement notification only when replacement begins, across manual,
@@ -61,6 +61,15 @@
   Hidden-route authoring and restore call `jumpSource(sourceIndex,pathId)` without
   requiring `selectPath()` first; keep raw indices, route occurrences, visible
   stops, unique-step restoration and the existing view filter distinct.
+- `createBuilderInteractions()` owns board selection/markers, modes and graph
+  gestures. Builder `destroy()` composes its satellites, inspector, I/O and session;
+  preview/boot/workspace/welcome/Canon remain separate owners. Verify actual
+  destroy/remount on the same DOM, one Undo, held callbacks and pointer capture,
+  no focus return, and listener/timer/ResizeObserver cleanup. Local lifetime scopes
+  must release replaced dynamic controls during normal refresh, not retain every
+  old DOM node until destroy. Cleanup errors must not strand later owners.
+  Custom panel controls use context `listen`/`onFormRetire` and `clearClipboard`;
+  preserve registry dispatch and per-instance caches. See `docs/panel-modularity.md`.
 - Keep shared Home layout/initial state distinct from per-step overrides. Use
   `docs/homemap-workbench.md` only for those controls. Test the context being
   edited, including non-step selection when affected.

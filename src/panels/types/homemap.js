@@ -1779,6 +1779,10 @@ PanelRegistry.extend('homemap', {
     },
     editor: function (context) {
       var homeElementFolds = Object.create(null);
+      function listen(target,type,fn,options){
+        if(context.listen)return context.listen(target,type,fn,options);
+        target.addEventListener(type,fn,options);
+      }
       function homemapLayoutControl(panel, target) {
         var box = document.createElement('fieldset');
         box.className = 'home-edit';
@@ -1894,7 +1898,8 @@ PanelRegistry.extend('homemap', {
           paint(null);
           if (map.hasPointerCapture(id)) map.releasePointerCapture(id);
         }
-        map.addEventListener('pointerdown', function (ev) {
+        if(context.onFormRetire)context.onFormRetire(function(){cancel();cancelPanelMotion(map);});
+        listen(map,'pointerdown', function (ev) {
           if (ev.button !== 0) return;
           var el = ev.target.closest(
             '[data-device],[data-subject],[data-home-room],[data-home-outline]'
@@ -1935,7 +1940,7 @@ PanelRegistry.extend('homemap', {
             copyItem.disabled = duplicateItem.disabled = false;
           } else {
             picked = null;
-            clipboardHomeTarget = null;
+            if(context.clearClipboard)context.clearClipboard();
             copyItem.disabled = duplicateItem.disabled = true;
             pickLabel.textContent = 'House outline';
           }
@@ -1954,7 +1959,7 @@ PanelRegistry.extend('homemap', {
           };
           map.classList.add('moving');
         });
-        map.addEventListener('pointermove', function (ev) {
+        listen(map,'pointermove', function (ev) {
           if (!moving || ev.pointerId !== moving.pointer) return;
           var at = eventPoint(ev);
           if (!at) return;
@@ -1970,7 +1975,7 @@ PanelRegistry.extend('homemap', {
           });
           paint(moving);
         });
-        map.addEventListener('pointerup', function (ev) {
+        listen(map,'pointerup', function (ev) {
           if (!moving || ev.pointerId !== moving.pointer) return;
           var done = moving;
           cancel();
@@ -2002,9 +2007,9 @@ PanelRegistry.extend('homemap', {
             }
           );
         });
-        map.addEventListener('pointercancel', cancel);
-        map.addEventListener('lostpointercapture', cancel);
-        map.addEventListener('keydown', function (ev) {
+        listen(map,'pointercancel', cancel);
+        listen(map,'lostpointercapture', cancel);
+        listen(map,'keydown', function (ev) {
           if (ev.key === 'Escape' && moving) {
             ev.preventDefault();
             ev.stopPropagation();
@@ -2105,7 +2110,7 @@ PanelRegistry.extend('homemap', {
           b.type = 'button';
           b.className = 'bbtn';
           b.textContent = label;
-          b.addEventListener('click', action);
+          listen(b,'click', action);
           return b;
         }
         function choice(pairs, value, label, action) {
@@ -2119,7 +2124,7 @@ PanelRegistry.extend('homemap', {
             select.appendChild(o);
           });
           select.value = value;
-          select.addEventListener('change', function () {
+          listen(select,'change', function () {
             action(select.value);
           });
           return select;
@@ -2276,7 +2281,8 @@ PanelRegistry.extend('homemap', {
           previewMove(null);
           if (map.hasPointerCapture(pointer)) map.releasePointerCapture(pointer);
         }
-        map.addEventListener('pointerdown', function (ev) {
+        if(context.onFormRetire)context.onFormRetire(function(){cancelMove();armedSubject=null;map.classList.remove('placing');cancelPanelMotion(map);});
+        listen(map,'pointerdown', function (ev) {
           if (ev.button !== 0 || armedSubject !== null) return;
           var el = ev.target.closest('[data-subject], [data-device], [data-home-room]');
           if (!el) return;
@@ -2318,7 +2324,7 @@ PanelRegistry.extend('homemap', {
           };
           map.classList.add('moving');
         });
-        map.addEventListener('pointermove', function (ev) {
+        listen(map,'pointermove', function (ev) {
           if (!moving || ev.pointerId !== moving.pointer) return;
           var at = eventPoint(ev);
           if (!at) return;
@@ -2331,7 +2337,7 @@ PanelRegistry.extend('homemap', {
           moving.changed = moving.point.x !== moving.item.x || moving.point.y !== moving.item.y;
           previewMove(moving);
         });
-        map.addEventListener('pointerup', function (ev) {
+        listen(map,'pointerup', function (ev) {
           if (!moving || ev.pointerId !== moving.pointer) return;
           var done = moving;
           cancelMove();
@@ -2340,9 +2346,9 @@ PanelRegistry.extend('homemap', {
             commit(done.key, done.point, done.kind === 'subject' ? null : done.kind);
           }
         });
-        map.addEventListener('pointercancel', cancelMove);
-        map.addEventListener('lostpointercapture', cancelMove);
-        box.addEventListener('keydown', function (ev) {
+        listen(map,'pointercancel', cancelMove);
+        listen(map,'lostpointercapture', cancelMove);
+        listen(box,'keydown', function (ev) {
           if (ev.key !== 'Escape') return;
           if (moving || armedSubject !== null) {
             ev.preventDefault();
@@ -2356,7 +2362,7 @@ PanelRegistry.extend('homemap', {
             placementNote.textContent = 'Placement cancelled.';
           }
         });
-        map.addEventListener('click', function (ev) {
+        listen(map,'click', function (ev) {
           if (swallowClick) {
             swallowClick = false;
             return;
@@ -2443,7 +2449,7 @@ PanelRegistry.extend('homemap', {
           key[0].toUpperCase() + key.slice(1) + ' (' + (Array.isArray(cur) ? cur.length : 0) + ')';
         group.appendChild(summary);
         group.appendChild(context.controls.rows(key, cur, shape, homeRowOptions(key, state)));
-        group.addEventListener('toggle', function () {
+        listen(group,'toggle', function () {
           if (group.isConnected) state.open = group.open;
         });
         return group;
@@ -2505,7 +2511,7 @@ PanelRegistry.extend('homemap', {
                   ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>'
                   : '<svg viewBox="0 0 24 24"><use href="#i-' + icon + '"/></svg>';
             };
-            input.addEventListener('change', ref.syncIcon);
+            listen(input,'change', ref.syncIcon);
 
             return true;
           },
@@ -2516,7 +2522,7 @@ PanelRegistry.extend('homemap', {
               ref = info.ref;
             if (ref.syncIcon) {
               ref.syncIcon();
-              if (ref.inputs.kind) ref.inputs.kind.addEventListener('change', ref.syncIcon);
+              if (ref.inputs.kind) listen(ref.inputs.kind,'change', ref.syncIcon);
             }
             if (base && context.clipboard()) {
               var homeTarget = {
@@ -2553,7 +2559,7 @@ PanelRegistry.extend('homemap', {
                   rowClipboard('duplicate');
                 })
               );
-              line.addEventListener('focusin', function () {
+              listen(line,'focusin', function () {
                 context.selectClipboard(homeTarget);
               });
 
@@ -2596,10 +2602,10 @@ PanelRegistry.extend('homemap', {
             fold.appendChild(summary);
             fold.appendChild(line);
             if (ref.clipboardTarget)
-              summary.addEventListener('click', function () {
+              listen(summary,'click', function () {
                 context.selectClipboard(ref.clipboardTarget);
               });
-            fold.addEventListener('toggle', function () {
+            listen(fold,'toggle', function () {
               if (fold.isConnected) folds.items[info.refs.indexOf(ref)] = fold.open;
             });
             return fold;
@@ -2643,7 +2649,7 @@ PanelRegistry.extend('homemap', {
           editStep.textContent = 'Edit home at current step';
           var sp = context.stepper(t.section);
           editStep.disabled = !sp;
-          editStep.addEventListener('click', function () {
+          listen(editStep,'click', function () {
             var current = context.stepper(t.section);
             if (!current) return;
             context.select(

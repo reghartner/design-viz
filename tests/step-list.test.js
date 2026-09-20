@@ -77,6 +77,7 @@ function harness(raw=fixture()){
       appendChild(child){ this.children.push(child); child.parentNode=this; return child; },
       setAttribute(k,v){ attrs[k]=String(v); },getAttribute:k=>attrs[k] ?? null,
       addEventListener(k,fn){ (handlers[k] ||= []).push(fn); },
+      removeEventListener(k,fn){handlers[k]=(handlers[k] || []).filter(f=>f!==fn);},
       querySelector(selector){ return this.children.find(child=>selector==='[aria-current="step"]' && child.getAttribute('aria-current')==='step') || null; },
       closest(selector){ return selector==='.story-step' && this.className==='story-step' ? this : null; },
       focus(){ doc.activeElement=this; },scrollIntoView(){ this.scrolled=true; },
@@ -89,7 +90,7 @@ function harness(raw=fixture()){
     Object.defineProperty(node,'firstChild',{get(){ return this.children[0]; }});
     if(id) elements[id]=node; return node;
   }
-  const root=el(); doc.addEventListener=root.addEventListener.bind(root);
+  const root=el(); doc.addEventListener=root.addEventListener.bind(root);doc.removeEventListener=root.removeEventListener.bind(root);
   doc.createElement=el; doc.getElementById=id=>elements[id] || null;
   for(const id of ['sec-steps','steps-section','steps-search','steps-list','steps-status','steps-paging',
     'steps-add','steps-duplicate','steps-earlier','steps-later','steps-previous','steps-next','steps-inspect',
@@ -98,7 +99,7 @@ function harness(raw=fixture()){
     'steps-autoplay','steps-opening-view','src','view']) root.appendChild(el('div',id));
   const src=elements.src; src.value=JSON.stringify(raw,null,2);
   let rendered=src.value, target=null, locked=false, activePath=null, ui;
-  const c=load({document:doc,setTimeout:fn=>timers.push(fn),MutationObserver:class {constructor(){throw new Error('Controlled refresh must not observe DOM');}}});
+  const c=load({document:doc,setTimeout:fn=>timers.push(fn),clearTimeout(){},MutationObserver:class {constructor(){throw new Error('Controlled refresh must not observe DOM');}}});
   ui=c.initWorkbenchStepList({src,view:elements.view,renderedText:()=>rendered,selection:()=>target,locked:()=>locked,
     path:()=>activePath,selectPath(section,id){activePath=id;target=null;},
     inspect(){ inspections.push(target); },
@@ -277,4 +278,18 @@ test('keyboard list navigation moves focus without edits; search keeps native ed
   assert.equal(e['steps-search'].fire('keydown',{key:'ArrowLeft'}).prevented,undefined);
   assert.equal(rows[1].fire('keydown',{key:'Home',metaKey:true}).prevented,undefined);
   assert.equal(h.history.length,0); assert.equal(h.navigation.length,0);
+});
+
+test('repeated list rebuilding removes old listeners, then destroy retires controls and queued sync',()=>{
+  const h=harness(),e=h.e;
+  for(let i=0;i<6;i++){
+    const old=e['steps-list'].firstChild,held=old.handlers.click[0];
+    e['steps-search'].value=i%2?'':'First';e['steps-search'].fire('input');
+    assert.equal(old.handlers.click.length,0);held({});assert.equal(h.navigation.length,0);
+  }
+  e['steps-search'].value='';e['steps-search'].fire('input');
+  const before=e.src.value,rows=e['steps-list'].children.slice();h.root.fire('keydown',{key:'Escape'});h.ui.destroy();h.ui.destroy();
+  h.ui.refresh();h.ui.sync();h.ui.editPathStep('independent');e['steps-add'].fire('click');
+  rows.forEach(row=>row.fire('click'));h.flushTimers();
+  assert.equal(e.src.value,before);assert.equal(h.history.length,0);assert.equal(e['steps-list'].children.length,0);
 });

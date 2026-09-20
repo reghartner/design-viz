@@ -5,7 +5,7 @@ function names remain available in the shared browser scope. Use the logical
 `builder.workbench.js` bundle from `tools/source-loader.cjs` when a tool or test
 needs the editor; pure planner tests load only their required leaves. Reading
 the physical builder file omits its source-edit, raw-target, command, session and
-inspector and I/O dependencies.
+inspector, I/O, interaction and lifetime dependencies.
 
 `src/source-bundles.json` expands that bundle in this order:
 
@@ -20,19 +20,23 @@ inspector and I/O dependencies.
 9. `workbench/session.js`: live source, authored selection, history and project policy.
 10. `workbench/field-values.js`: pure field collection and registry metadata views.
 11. `workbench/inspector-model.js`: pure position, effective-state and field-help models.
-12. `workbench/controls.js`: shared commit event policy.
-13. `workbench/inspector.js`: instance-owned forms, panel editor cache and refresh lifetime.
-14. `workbench/io-model.js`: pure Mermaid preparation, filenames and HTML injection.
-15. `workbench/io-browser.js`: bound browser resource adapters.
-16. `workbench/io.js`: import/export controls and independent operation lifetimes.
-17. `builder.workbench.js`: composition, outline, gestures and preview coordination.
+12. `workbench/lifetime.js`: local listener, delay and cleanup ownership.
+13. `workbench/controls.js`: shared commit event policy.
+14. `workbench/inspector.js`: forms, panel editor cache and refresh lifetime.
+15. `workbench/io-model.js`: pure Mermaid preparation, filenames and HTML injection.
+16. `workbench/io-browser.js`: bound browser resource adapters.
+17. `workbench/io.js`: import/export controls and independent operation lifetimes.
+18. `workbench/interactions.js`: selection, board markers, modes and graph gestures.
+19. `builder.workbench.js`: composition, outline, source focus, insertion and preview coordination.
     Callers load the validator/panel assembly first.
 
 The logical `clipboard.workbench.js` bundle loads
 `workbench/commands/clipboard.js` before its existing clipboard transport UI.
 The logical `reuse.workbench.js` bundle similarly loads `commands/reuse.js`
 before its dialog controller. The physical `layout.workbench.js` contains only
-controls and gestures; its pure helpers come from the builder assembly above.
+controls and gestures; its pure helpers and lifetime helper come from the builder
+assembly above. Standalone satellite UI tests load `workbench/lifetime.js`
+explicitly; shipped satellite bundles do not duplicate it.
 The logical `workspace.workbench.js` bundle prepends `workbench/preview.js` to
 the workspace layout/preferences controller. Preview identity and render attempts
 live in that leaf; workspace layout never owns authored source. Browser boot and
@@ -282,9 +286,56 @@ It never substitutes a visible-stop ordinal. Existing ambiguity refusal, tab,
 layout and named-view subset preferences remain intact; authoring does not rewrite
 the view filter or change the viewer's refusal to play an empty visible route.
 
-This slice makes replacement explicit. Interaction state still lives in the
-builder; composed builder/satellite teardown is a separate remaining task. The
-preview renderer, boot, workspace, welcome and Canon have their own lifetimes.
+## Interaction and builder lifetime
+
+`createBuilderInteractions()` owns board hit testing, single/multiple selection
+rings, step-member markers, ADD TO STEP and connect state, graph label/node/group/
+row gestures and their temporary SVG elements. It receives the live session,
+inspector, source-range action, preview lookup, apply transaction and small
+composition callbacks for story/layout refresh, insertion status and overlays.
+No gesture state escapes into the builder closure. Mode/selection reads and
+semantic selection, cancellation, decoration and replacement operations are
+available to composition; callers cannot mutate raw drag state.
+
+`beforeReplace(request)` cancels temporary gestures and reconciles the operation's
+explicit multi/add retention policy. `retire()` clears selection and modes without
+committing. `destroy()` also removes owned events, delays, markers and editor-only
+row/Home buttons. Held listeners and public interaction operations become inert.
+The existing planners, exact source snapshots, per-action focus policies and one
+outer session transaction remain unchanged.
+
+`initWorkbenchBuilder()` now returns an idempotent `destroy()`. It composes the
+interaction, section-layout, step-list/reuse, panel-picker, clipboard, inspector,
+I/O and session lifetimes, plus its own source/history/insertion/outline/palette
+controls. It clears `BUILDER_JUMP_TO_FINDING` only if the installed callback still
+belongs to this mount. Old public mutation/render callbacks and retained controls
+cannot publish after destroy. Remounting the same editor DOM installs one live
+set of controls and one history stack. Cleanup attempts every owner before
+rethrowing the first cleanup error; it never leaves later owners active merely
+because an extension cleanup failed.
+
+`createWorkbenchLifetime()` is a local resource ledger, not a shared application
+state store. `listen()` normalizes listener capture/duplicates, returns a remover,
+and guards retained callbacks; `delay()`/`cancelDelay()` guard queued callbacks;
+`own()` registers explicit cleanup. `destroy()` first retires the owner, removes
+listeners and cancels timers, then runs all registered cleanup functions. Each
+inspector form, step/reuse row list, picker card/filter list and outline/palette/
+diff rebuild replaces its child scope. Section-layout controls retain only the
+current section DOM and field scopes. Normal rerendering therefore releases
+old control listeners rather than retaining every previous form until unmount.
+
+Section-layout teardown releases pointer capture, cancels deferred keyboard focus,
+removes arranger chrome and unwraps its preview sizing frame. The step list owns
+its reuse dialog; the picker disconnects its ResizeObserver and releases frozen
+preview clones. Reuse and Home forms cancel panel motion on their original render
+surfaces. Clipboard teardown invalidates pending platform responses. Dialog
+destruction does not explicitly return focus to its former opener.
+
+Builder teardown is **not whole-page teardown**. The preview renderer, boot,
+workspace, welcome and Canon remain separately mounted and have their own
+lifetimes. A host retiring the page must retire those owners separately. Builder
+destruction does not destroy the preview controller or assume ownership of the
+host's document, storage or global event resources.
 
 ## Inspector ownership
 
@@ -297,14 +348,15 @@ The inspector builds and validates field edits itself; its host does not pass
 individual form builders or its initializer closure. Gesture state stays with
 the interaction owner and is read through mode capabilities.
 
-The public surface is `render`, `renderMulti`, `refresh`, `retire`,
+The public surface is `render`, `renderMulti`, `refresh`, `refreshCatalog`, `retire`,
 `sourceChanged`, `message`, `error`, `commit`, `transact`, panel lookup/busy methods
 and `destroy`. Current builder entrypoints delegate to this owner. Rendering a
 multiple selection receives its authored targets, without taking ownership of
 selection rings or gesture state. `retire()` cancels queued refreshes and hides
 the inspector surface; `destroy()` also retires its form DOM and cache. Held
 render, refresh, mutation and panel-selection callbacks cannot recreate a
-destroyed inspector. This does not replace the later interaction/preview teardown.
+destroyed inspector. Builder destruction calls this owner; preview destruction
+is still separate.
 
 The existing registered panel editor context remains intact: live source,
 target, parse, commit/transact, selection/preview helpers and shared controls.
@@ -324,13 +376,16 @@ retains the user's new destination. If focus has moved outside the inspector, th
 refresh does not take it back. Single and multiselection forms share this view
 lifecycle; multiselection identity is the project and sorted authored target set,
 without DOM elements. New selection/project contexts do not inherit a previous
-form's focus or scroll.
+form's focus or scroll. Catalog refresh waits for an active node field's blur
+through the same form scope, so replacing that field also retires its held blur
+callback.
 
 `wireBuilderCommit(input, commit, options)` owns Enter/change deduplication and
 retry after a rejected value. Blur is opt-in (`blur:true`) for typed row/object
 editors; ordinary fields keep their original change/Enter policy.
 `commitUnchanged:true` preserves controls that intentionally commit an unchanged
-value. Enter in a textarea remains a newline. No field policy imposes a new
+value. The optional `listen` capability binds controls to the current form
+lifetime. Enter in a textarea remains a newline. No field policy imposes a new
 history/no-op rule on session acceptance.
 
 `field-values.js` collects typed values without DOM or inspector code, retaining
@@ -349,7 +404,7 @@ session, source element, document and bound browser adapters, plus small hooks f
 project replacement, messages, saved-baseline UI, palette closure, active-workbench
 keyboard policy and before/after-import selection. It does not receive the
 builder's closure or duplicate session history. The returned API is
-`retireProject()` and `destroy()`; future editor teardown must call the latter.
+`retireProject()` and `destroy()`; builder teardown calls the latter.
 Neither method is a claim that the whole editor or page has been torn down.
 
 `io-model.js` retains the existing `mermaidToSpec()`, `specFileName()`,
@@ -430,7 +485,8 @@ insertion families and row/node/group/label gestures, checking one exact Undo/Re
 and each focus policy; a receiver-sensitive timer fake checks the browser adapter.
 `tests/workbench-inspector.test.js` exercises the actual inspector factory with
 two instances, factory replacement, independent expansion/datalists, held retired
-callbacks, deferred Enter/Tab/outside focus and same-set multiselection focus. The Home control test loads the
+callbacks, repeated form listener disposal, registered panel cleanup, deferred
+Enter/Tab/outside focus and same-set multiselection focus. The Home control test loads the
 real commit helper rather than slicing a private function out of source text.
 `tests/workbench-io-model.test.js` loads the pure preparation leaf with throwing
 browser globals. `tests/workbench-io.test.js` loads the real I/O owner and session
@@ -441,6 +497,15 @@ Actual builder harnesses retain import mode, one-Undo and keyboard coverage.
 replacement exceptions and session history/persistence after a failed render.
 Builder/story harnesses invoke the explicit lifecycle; playback tests use real
 steppers for hidden-route restoration, source reordering and unchanged view filters.
+
+`tests/workbench-lifetime.test.js` checks capture/once semantics, independent
+owners, retained callbacks, queued delays and cleanup errors. Actual builder
+harnesses destroy during a graph gesture, invoke held callbacks, remount on the
+same DOM and verify one Undo; step-list tests repeatedly replace rows and assert
+old listener removal. Clipboard tests hold successful reads and rejected writes
+across destroy. Browser acceptance additionally holds real pointer capture in
+Home/layout controls and measures listeners, timers, observers and remounts while
+leaving the separately owned preview/workspace/Canon mounted.
 
 Run the source-edit and builder tests plus the relevant clipboard, step-reuse,
 layout and panel-reference suites when these boundaries change. Shared workbench

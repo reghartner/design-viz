@@ -34,6 +34,8 @@ function builderStorySteps(section, query, pathId){
 }
 
 function initWorkbenchStepList(opts){
+  var life=createWorkbenchLifetime(),rowsLife=createWorkbenchLifetime();
+  life.own(function(){rowsLife.destroy();});
   var box = document.getElementById('sec-steps'), select = document.getElementById('steps-section');
   var search = document.getElementById('steps-search'), list = document.getElementById('steps-list');
   var status = document.getElementById('steps-status'), paging = document.getElementById('steps-paging');
@@ -55,8 +57,8 @@ function initWorkbenchStepList(opts){
     if (plan.error){ status.textContent = plan.error; playbackSettings(); return; }
     if (opts.configure && opts.configure(plan, chosen.section)) refresh(); else playbackSettings();
   }
-  if (autoplayInput) autoplayInput.addEventListener('change', function(){ configurePlayback('autoplay', autoplayInput.checked); });
-  if (openingView) openingView.addEventListener('change', function(){ configurePlayback('view', openingView.value); });
+  if (autoplayInput) life.listen(autoplayInput,'change', function(){ configurePlayback('autoplay', autoplayInput.checked); });
+  if (openingView) life.listen(openingView,'change', function(){ configurePlayback('view', openingView.value); });
   var inspectButton = document.getElementById('steps-inspect');
   var reuseButton = document.getElementById('steps-reuse'), independentButton = document.getElementById('steps-independent');
   var removeOccurrence = document.getElementById('steps-remove-occurrence'), sharingBox = document.getElementById('steps-sharing');
@@ -87,10 +89,10 @@ function initWorkbenchStepList(opts){
   }
   var reuse = typeof initWorkbenchStepReuse === 'function' ? initWorkbenchStepReuse({
     src:opts.src, context:reuseContext, apply:applyPathPlan, pause:opts.pause}) : null;
-  if (reuseButton) reuseButton.addEventListener('click', function(){ if (ready() && reuse && !reuseButton.disabled) reuse.open(); });
-  if (independentButton) independentButton.addEventListener('click', function(){ editPathStep('independent'); });
-  if (removeOccurrence) removeOccurrence.addEventListener('click', function(){ editPathStep('remove'); });
-  if (inspectButton) inspectButton.addEventListener('click', function(){
+  if (reuseButton) life.listen(reuseButton,'click', function(){ if (ready() && reuse && !reuseButton.disabled) reuse.open(); });
+  if (independentButton) life.listen(independentButton,'click', function(){ editPathStep('independent'); });
+  if (removeOccurrence) life.listen(removeOccurrence,'click', function(){ editPathStep('remove'); });
+  if (inspectButton) life.listen(inspectButton,'click', function(){
     if (ready() && current() >= 0 && opts.inspect) opts.inspect();
   });
   function route(){
@@ -139,7 +141,7 @@ function initWorkbenchStepList(opts){
     if (reuse) reuse.refresh();
   }
   function invalidate(message){
-    stale = true; list.innerHTML = ''; paging.hidden = true;
+    stale = true; rowsLife.destroy();rowsLife=createWorkbenchLifetime();list.innerHTML = ''; paging.hidden = true;
     select.disabled = true; search.disabled = true;
     status.textContent = message || 'Source changed. Click Render before editing story steps.';
     controls();
@@ -155,6 +157,7 @@ function initWorkbenchStepList(opts){
     return true;
   }
   function paint(){
+    rowsLife.destroy();rowsLife=createWorkbenchLifetime();
     list.innerHTML = '';
     var index = current();
     entries.slice(offset, offset + pageSize).forEach(function(entry){
@@ -173,7 +176,7 @@ function initWorkbenchStepList(opts){
         shared.textContent = 'Shared with ' + entry.sharedWith.join(', '); text.appendChild(shared);
       }
       button.title = entry.caption + '\n' + meta.textContent;
-      button.addEventListener('click', function(){
+      rowsLife.listen(button,'click', function(){
         if (!ready()) return;
         opts.navigate(entry);
         var selected = list.querySelector('[aria-current="step"]');
@@ -234,16 +237,16 @@ function initWorkbenchStepList(opts){
     });
     controls();
   }
-  select.addEventListener('change', function(){
+  life.listen(select,'change', function(){
     if (!ready()){ if (chosen) select.value = String(chosen.section); return; }
     chosen = sections.find(function(s){ return String(s.section) === select.value; }) || null;
     search.value = ''; pathControls(); filter(false);
   });
-  search.addEventListener('input', function(){ if (ready()) filter(false); });
-  search.addEventListener('keydown', function(ev){
+  life.listen(search,'input', function(){ if (ready()) filter(false); });
+  life.listen(search,'keydown', function(ev){
     if ((ev.key === 'ArrowDown' || ev.key === 'Enter') && list.firstChild){ ev.preventDefault(); list.firstChild.focus(); }
   });
-  list.addEventListener('keydown', function(ev){
+  life.listen(list,'keydown', function(ev){
     var row = ev.target.closest && ev.target.closest('.story-step');
     var rows = Array.prototype.slice.call(list.children), at = rows.indexOf(row), next;
     if (at < 0 || ev.altKey || ev.metaKey || ev.ctrlKey) return;
@@ -254,13 +257,13 @@ function initWorkbenchStepList(opts){
     else return;
     ev.preventDefault(); rows[next].focus();
   });
-  ['previous','next'].forEach(function(name){ buttons[name].addEventListener('click', function(){
+  ['previous','next'].forEach(function(name){ life.listen(buttons[name],'click', function(){
     if (!ready()) return;
     offset = Math.max(0, Math.min(Math.floor((entries.length - 1) / pageSize) * pageSize,
       offset + (name === 'next' ? pageSize : -pageSize)));
     paint(); if (list.firstChild) list.firstChild.focus();
   }); });
-  ['add','duplicate','earlier','later'].forEach(function(name){ buttons[name].addEventListener('click', function(){
+  ['add','duplicate','earlier','later'].forEach(function(name){ life.listen(buttons[name],'click', function(){
     if (!ready() || !chosen || buttons[name].disabled) return;
     var index = current(), section = chosen.section;
     var plan = name === 'add' ? planAddStep(indexedText, raw, section, route().id) : name === 'duplicate' ?
@@ -274,12 +277,12 @@ function initWorkbenchStepList(opts){
       /* a moved row's text looks identical in its new slot — pulse it so
          the click visibly landed */
       selected.className = 'story-step story-moved';
-      setTimeout(function(){ selected.className = 'story-step'; }, 900);
+      rowsLife.delay(function(){ selected.className = 'story-step'; }, 900);
     }
     if (!buttons[name].disabled) buttons[name].focus(); else if (selected) selected.focus();
   }); });
   if(pathSelect){
-    pathSelect.addEventListener('change',function(){
+    life.listen(pathSelect,'change',function(){
       if(!ready()) return;
       if(opts.selectPath) opts.selectPath(chosen.section,pathSelect.value);
       search.value='';pathControls();filter(false);
@@ -290,19 +293,20 @@ function initWorkbenchStepList(opts){
       if(plan.error){status.textContent=plan.error;return;}
       if(opts.apply(plan,chosen.section)){search.value='';refresh();}
     }
-    forkButton.addEventListener('click',function(){pathEdit('fork');});
-    savePath.addEventListener('click',function(){pathEdit('metadata');});
-    removePath.addEventListener('click',function(){pathEdit('remove');});
+    life.listen(forkButton,'click',function(){pathEdit('fork');});
+    life.listen(savePath,'click',function(){pathEdit('metadata');});
+    life.listen(removePath,'click',function(){pathEdit('remove');});
   }
-  opts.src.addEventListener('input', function(){ invalidate(); });
-  box.addEventListener('focusin', function(){ if (opts.pause) opts.pause(); });
-  box.addEventListener('toggle', function(){ if (box.open) refresh(); });
+  life.listen(opts.src,'input', function(){ invalidate(); });
+  life.listen(box,'focusin', function(){ if (opts.pause) opts.pause(); });
+  life.listen(box,'toggle', function(){ if (box.open) refresh(); });
   /* Mode transitions do not replace the page; re-evaluate button availability. */
-  document.addEventListener('click', controls);
-  document.addEventListener('keydown', function(ev){
+  life.listen(document,'click', controls);
+  life.listen(document,'keydown', function(ev){
     /* The builder's Escape handler is registered later; read its settled mode. */
-    if (ev.key === 'Escape') setTimeout(sync, 0);
+    if (ev.key === 'Escape') life.delay(sync, 0);
   });
   refresh();
-  return {sync:sync,refresh:refresh, editPathStep:editPathStep};
+  return {sync:life.guard(sync),refresh:life.guard(refresh),editPathStep:life.guard(editPathStep),
+    destroy:function(){if(!life.alive())return;life.own(function(){if(reuse)reuse.destroy();});life.destroy();list.innerHTML='';sections=[];entries=[];chosen=null;raw=null;}};
 }

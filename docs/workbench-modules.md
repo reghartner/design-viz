@@ -4,8 +4,8 @@ The workbench uses ordered plain JavaScript fragments. Its existing public
 function names remain available in the shared browser scope. Use the logical
 `builder.workbench.js` bundle from `tools/source-loader.cjs` when a tool or test
 needs the editor; pure planner tests load only their required leaves. Reading
-the physical builder file omits its source-edit, raw-target, command and session
-dependencies.
+the physical builder file omits its source-edit, raw-target, command, session and
+inspector dependencies.
 
 `src/source-bundles.json` expands that bundle in this order:
 
@@ -18,8 +18,12 @@ dependencies.
 7. `workbench/commands/layout.js`: row/node placement, section layouts and views.
 8. `workbench/persistence.js`: injected draft storage and debounce lifetime.
 9. `workbench/session.js`: live source, authored selection, history and project policy.
-10. `builder.workbench.js`: presentation, inspector read models, gestures and the
-    editor composition root. Callers load the validator/panel assembly first.
+10. `workbench/field-values.js`: pure field collection and registry metadata views.
+11. `workbench/inspector-model.js`: pure position, effective-state and field-help models.
+12. `workbench/controls.js`: shared commit event policy.
+13. `workbench/inspector.js`: instance-owned forms, panel editor cache and refresh lifetime.
+14. `builder.workbench.js`: composition, imports/exports, outline, gestures and
+    preview coordination. Callers load the validator/panel assembly first.
 
 The logical `clipboard.workbench.js` bundle loads
 `workbench/commands/clipboard.js` before its existing clipboard transport UI.
@@ -214,9 +218,65 @@ matches the saved draft; older drafts without a matching baseline use their own
 text and retain the UI's existing explanation. The timer generation makes
 already-queued cancelled saves inert. `session.destroy()` retires the session and
 its persistence timer, so queued saves and later mutation calls cannot publish.
-This is a session lifetime API: the current builder still owns its listeners,
-observers, inspector refreshes and gestures. It does not yet expose a complete
-editor teardown; those resources must be retired by their owning controllers.
+This is a session lifetime API. Inspector refreshes and form DOM have their own
+owner below; the builder still owns I/O, interaction listeners, observers and
+gestures. It does not yet expose a complete editor teardown; each controller must
+retire its own resources.
+
+## Inspector ownership
+
+`createBuilderInspector()` owns form DOM, errors, shared controls, deferred
+refreshes, patch/effective-state expansion preferences and the panel editor
+cache. These are per instance. The initializer passes the live session and the
+existing ordinary `apply` transaction, plus bounded capabilities for the editor
+surface, selection/source ranges, preview lookup, modes and object clipboard.
+The inspector builds and validates field edits itself; its host does not pass
+individual form builders or its initializer closure. Gesture state stays with
+the interaction owner and is read through mode capabilities.
+
+The public surface is `render`, `renderMulti`, `refresh`, `retire`,
+`sourceChanged`, `message`, `error`, `commit`, `transact`, panel lookup/busy methods
+and `destroy`. Current builder entrypoints delegate to this owner. Rendering a
+multiple selection receives its authored targets, without taking ownership of
+selection rings or gesture state. `retire()` cancels queued refreshes and hides
+the inspector surface; `destroy()` also retires its form DOM and cache. Held
+render, refresh, mutation and panel-selection callbacks cannot recreate a
+destroyed inspector. This does not replace the later interaction/preview teardown.
+
+The existing registered panel editor context remains intact: live source,
+target, parse, commit/transact, selection/preview helpers and shared controls.
+Factories are cached per inspector by panel type and factory identity, so a new
+registered factory replaces that instance's cache entry. Panel-specific fields,
+read-model attribution and busy behavior remain registry-dispatched. Group and
+accent datalists belong to the inspector DOM and have instance-specific IDs;
+one editor cannot replace another editor's suggestions.
+
+A deferred refresh is coalesced and captures project plus authored target
+identity, including path ID. Source changes, explicit retirement and replacement
+renders cancel it. On a valid same-target refresh, focus is captured **when the
+callback runs**, using stable field/control descriptors. The new matching control
+receives the caret, input scroll and focus with `preventScroll`; the guide scroll
+is restored afterward. Enter therefore retains the edited field, while Tab
+retains the user's new destination. If focus has moved outside the inspector, the
+refresh does not take it back. Single and multiselection forms share this view
+lifecycle; multiselection identity is the project and sorted authored target set,
+without DOM elements. New selection/project contexts do not inherit a previous
+form's focus or scroll.
+
+`wireBuilderCommit(input, commit, options)` owns Enter/change deduplication and
+retry after a rejected value. Blur is opt-in (`blur:true`) for typed row/object
+editors; ordinary fields keep their original change/Enter policy.
+`commitUnchanged:true` preserves controls that intentionally commit an unchanged
+value. Enter in a textarea remains a newline. No field policy imposes a new
+history/no-op rule on session acceptance.
+
+`field-values.js` collects typed values without DOM or inspector code, retaining
+false/zero/null handling, unknown authored keys, enum preservation and the
+existing optional clock-parser fallback. `inspector-model.js` owns position and
+effective-state attribution with raw source paths; load the shared core and
+registry-backed common command adapters before it. These read models do not fold
+preview state back into authored JSON or substitute visible stops for source
+step indices.
 
 ## Tests and regeneration
 
@@ -229,6 +289,9 @@ explicit command leaves with throwing DOM globals. Common/graph/document tests
 use it, as do the pure narrative/layout, reuse, named-view and selected path/hop
 regressions. These tests cover hostile IDs, reference cascades, rollback, CRLF
 outside-subtree bytes, result ranges and source-index/occurrence/view distinctions.
+The effective-state suite loads only the core, common adapters, source/target
+and read-model leaves with throwing DOM globals. Field-value regressions likewise
+load their pure leaf, preserving the explicit clock-parser-present/absent cases.
 UI harnesses add only their needed controllers or the logical builder bundle;
 the visibility-control test, reuse picker, step list and full inspector tests
 continue to exercise actual consumers. Clipboard tests likewise keep pure
@@ -239,6 +302,10 @@ and text refusal, invalid handwriting on Redo, pending recovery, debounce retire
 baselines and disposed callbacks. Actual builder harness tests drive connect, all
 insertion families and row/node/group/label gestures, checking one exact Undo/Redo
 and each focus policy; a receiver-sensitive timer fake checks the browser adapter.
+`tests/workbench-inspector.test.js` exercises the actual inspector factory with
+two instances, factory replacement, independent expansion/datalists, held retired
+callbacks, deferred Enter/Tab/outside focus and same-set multiselection focus. The Home control test loads the
+real commit helper rather than slicing a private function out of source text.
 
 Run the source-edit and builder tests plus the relevant clipboard, step-reuse,
 layout and panel-reference suites when these boundaries change. Shared workbench
@@ -246,6 +313,8 @@ extractions also run the full root Node suite and Python build tests. Rebuild wi
 `python3 tools/build.py` and commit generated changes; a source-only workbench
 extraction should leave the standalone viewer and backend runtime unchanged.
 Browser verification should include a nested-tab inspector edit, exact source
-preservation, Undo/Redo and repair after invalid source. Also verify path reuse,
+preservation, Undo/Redo and repair after invalid source. For deferred form refresh,
+wait for the old control to disconnect before asserting replacement focus, caret,
+scroll and the Tab destination; an immediate assertion can race the refresh. Also verify path reuse,
 occurrence independence/removal, layout gestures and clipboard actions each
 restore the exact prior source with one Undo.

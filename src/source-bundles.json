@@ -24,6 +24,10 @@
     "workbench/commands/layout.js",
     "workbench/persistence.js",
     "workbench/session.js",
+    "workbench/field-values.js",
+    "workbench/inspector-model.js",
+    "workbench/controls.js",
+    "workbench/inspector.js",
     "builder.workbench.js"
   ],
   "clipboard.workbench.js": [

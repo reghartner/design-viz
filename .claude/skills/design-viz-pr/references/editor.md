@@ -26,8 +26,18 @@
   preview. Check ordinary manual writes as well as `applyPlan`, caller-specific
   focus/no-op policies, 800 ms autosave, pending-draft first Undo, matching baseline
   recovery and cancelled/disposed callbacks. Browser API adapters must preserve
-  the native receiver. Inspector, I/O operation generations and gesture/observer
-  resources remain controller-owned; session destroy is not full editor teardown.
+  the native receiver. Session destroy is not full editor teardown.
+- `createBuilderInspector()` in `src/workbench/inspector.js` owns forms, per-instance
+  expansion/cache state and deferred refresh. Preserve the registered panel editor
+  context and factory-identity cache. `controls.js` owns commit policy with explicit
+  blur/unchanged behavior; field values and effective-state models load without
+  inspector/DOM code. Test two instances and held callbacks after retirement or
+  destroy. Deferred refresh captures the latest active field at execution: wait
+  for replacement DOM before checking Enter caret/scroll, Tab destination and no
+  focus steal from outside. Single and multiple forms must share that view
+  lifecycle while changed authored target sets start fresh. Source/project/target/path changes must retire stale
+  refreshes. I/O generations and gesture/observer resources still have separate
+  owners; inspector destroy must not be described as complete editor teardown.
 - Keep shared Home layout/initial state distinct from per-step overrides. Use
   `docs/homemap-workbench.md` only for those controls. Test the context being
   edited, including non-step selection when affected.

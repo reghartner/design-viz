@@ -92,8 +92,11 @@ the workbench adds generic editing code. Node/Python builders use the same manif
 and asset collector. Use `readSource('validator.js')` from
 `tools/source-loader.cjs` for headless tools/tests; it assembles the registry,
 validator, shared helpers and type definitions. Add `readSource('engine.js')`
-when player/layout helpers are needed. Reading either raw file directly omits
-panel modules. Feature metadata and CSS are collected at build time for
+when player/layout helpers are needed; that logical bundle includes
+`core/navigation.js` before the renderer. The navigation leaf can also load alone
+for pure reference/hash operations (link-base canonicalization needs `URL`).
+Reading raw bundle files directly skips their manifest dependencies.
+Feature metadata and CSS are collected at build time for
 standalone, workbench, Backstage and Forge.
 
 Radar's module keeps geometry and alert state separate: the model computes
@@ -103,7 +106,9 @@ convert old declarations and events explicitly as described in the authoring
 contract rather than adding a runtime alias or inferred alarm rule.
 
 The packaged backend contains generated code and has no runtime source-file or
-VM dependency. Backstage's standalone compatibility checker contains generated
+VM dependency. Its cached `viewerRouting()` facade loads only the navigation leaf,
+using document/path helpers already in the validator scope; it never initializes
+the DOM renderer. Backstage's standalone compatibility checker contains generated
 feature metadata, not a second handwritten list. Company release and upgrade PR
 boundaries are unchanged. Rebuilding the viewer changes its script hash; refresh
 the host's configured CSP hash when upgrading.

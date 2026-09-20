@@ -12,6 +12,10 @@
   compatibility metadata to portable pages and host builds. See
   `docs/panel-modularity.md` and `tests/panel-extension.test.js` for the complete
   single-file extension contract, including headless backend packaging.
+- The logical engine bundle includes `core/navigation.js` before `engine.js`.
+  Load the navigation leaf alone for pure reference/hash operations; backend
+  `viewerRouting()` must not initialize the DOM renderer. Keep static packaging,
+  source/package parity and temporary source-tree fixtures in sync with moves.
 - Tool/CLI changes: check actual callers, exit codes, input/output formats,
   escaping, destination safety and reproducibility. Run matching Python/Node
   tests; shared Python helpers may warrant

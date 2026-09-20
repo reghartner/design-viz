@@ -4,16 +4,24 @@ The workbench uses ordered plain JavaScript fragments. Its existing public
 function names remain available in the shared browser scope. Use the logical
 `builder.workbench.js` bundle from `tools/source-loader.cjs` when a tool or test
 needs planners or the inspector; reading the physical builder file omits its
-source-edit and raw-target dependencies.
+source-edit, raw-target and command dependencies.
 
 `src/source-bundles.json` expands that bundle in this order:
 
 1. `workbench/source-edit.js`: JSON scanning, locations and text splices.
 2. `workbench/targets.js`: addresses in the raw authored document.
-3. `builder.workbench.js`: domain planners, presentation helpers and the editor
-   initializer. It still uses the shared validator/panel assembly, which callers
-   load first. The inspector/session and command-family boundaries are unchanged
-   in this slice.
+3. `workbench/commands/common.js`: shared editing helpers and bulk dispatch.
+4. `workbench/commands/graph.js`: graph identity and reference cascades.
+5. `workbench/commands/document.js`: page/section/tab edits and templates.
+6. `workbench/commands/narrative.js`: shared-step deletion for bulk dispatch.
+7. `builder.workbench.js`: remaining narrative/layout planners, presentation
+   helpers and the editor initializer. Callers load the validator/panel assembly
+   first. Inspector/session ownership is unchanged.
+
+The logical `clipboard.workbench.js` bundle loads
+`workbench/commands/clipboard.js` before its existing clipboard transport UI.
+Browser boot and tests use these same implementations; no helper is duplicated
+between the builder and clipboard fragments.
 
 The manifest lists physical files, not nested logical bundles. Portable builds
 expand it into the offline workbench; there is no runtime loader or filesystem
@@ -63,12 +71,55 @@ identity. Those records and Canon's diagram-only ordering cannot replace editor
 raw paths. `specValueAt()` returns the original value; addressing does not clone or
 mutate the authored object.
 
+## Pure command families
+
+The command leaves use the shared core, source splices and raw targets. They do
+not access the DOM, history, storage or clipboard APIs. Pure command tests load
+the required leaves instead of the builder initializer or DOM renderer.
+
+| Owner | Responsibility |
+| --- | --- |
+| `commands/common.js` | Shared ID/row helpers, registry-backed panel-authoring views, cloning/subtree rewrite, field/list edits and bulk dispatch |
+| `commands/graph.js` | Node/edge/group/panel creation, identity changes, deletion cascades, node duplication and insert templates |
+| `commands/document.js` | Page/section/tab insertion, deletion, duplication and movement, with raw-list addresses and rendered landing ordinals |
+| `commands/narrative.js` | `planDeleteStep()` only in this slice, so common bulk dispatch is fully headless; other narrative planners remain in the builder |
+| `commands/clipboard.js` | Clipboard envelope parsing, declaration copying, validation, ID/reference remapping and paste planning |
+
+Panel reference changes use registered metadata through `panelRemapReferences()`.
+Shared commands must not add a per-panel-type switch. The common panel-authoring
+views are registry-backed compatibility adapters used by commands and inspector
+controls; they do not cache a panel-type list.
+
+A planner accepts current text and its matching parsed raw document, and returns
+`{error}` or `{text, start?, end?, ...existing metadata}`. Failure publishes no
+partial text. The editor applies a successful result through its existing history,
+render and selection policy. Result offsets refer to resulting text; metadata
+retains its command meaning, such as a list index, raw tab block, rendered section
+ordinal, `newPath`, clipboard `target`, or bulk `count`.
+
+Field edits splice text. `builderRewrite()` mutates a deep clone of one selected
+subtree and preserves all bytes outside that subtree. Bulk operations reparse
+their evolving local text and return only the final success; indexed deletion
+proceeds from highest to lowest index. They remain one outer editor transaction.
+
+Copying policies remain distinct. Node duplication copies its declaration and
+placement; it does not copy story steps. Section duplication includes its authored
+timelines. Clipboard Home elements carry initial state, while timeline patches
+remain with the original diagram. Clipboard paste validates the complete copied
+document and retains its existing full-document serialization policy, including
+wrapping a bare diagram when copied protocol/lane definitions need a page.
+
 ## Tests and regeneration
 
 `tests/source-edit.test.js` loads only the two pure leaves. It covers locations,
 escaped text, missing paths, commas, indentation, exact surrounding bytes, CRLF,
-result offsets and wrapped/bare/tab addresses. Planner and UI tests load the
-logical builder bundle through `readSource()` so they call the same implementations.
+result offsets and wrapped/bare/tab addresses. Editor and cross-family tests load
+the logical builder bundle through `readSource()` so they call the same implementations.
+`tests/workbench-commands.test.js` exercises common/graph/document and shared-step
+deletion without the inspector, including reference cascades, hostile own IDs,
+bulk rollback and source ranges. Clipboard planner tests load the pure clipboard
+leaf; transport tests add only its browser adapter. Remaining cross-family and
+editor-action tests continue to use the complete logical builder bundle.
 
 Run the source-edit and builder tests plus the relevant clipboard, step-reuse,
 layout and panel-reference suites when these boundaries change. Shared workbench

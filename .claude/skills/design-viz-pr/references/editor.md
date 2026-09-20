@@ -8,6 +8,12 @@
   pure source tests and the logical `builder.workbench.js` bundle for planners/UI.
   Preserve raw wrapper/bare-diagram paths, surrounding source bytes and result
   offsets; normalized viewer section records are not editor addresses.
+- Common/graph/document commands and clipboard planning live under
+  `src/workbench/commands/`. Shared-step deletion also lives there so bulk
+  dispatch runs without the inspector; other narrative/layout planners remain
+  in the builder until their extraction. Preserve registry reference rewrites,
+  distinct copy policies and bulk failure without partial publication. Test
+  pure leaves plus the actual editor action's single Undo/selection behavior.
 - Keep shared Home layout/initial state distinct from per-step overrides. Use
   `docs/homemap-workbench.md` only for those controls. Test the context being
   edited, including non-step selection when affected.

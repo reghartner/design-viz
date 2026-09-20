@@ -27000,7 +27000,11 @@ function builderTabPath(raw, blockIdx, tabIdx){
   if (!block || !Array.isArray(block.tabs) || !block.tabs[tabIdx]) return null;
   return base.concat([key, blockIdx, 'tabs', tabIdx]);
 }
-/* ---- src/builder.workbench.js ---- */
+/* ---- src/workbench/commands/common.js ---- */
+/* Shared pure command helpers and bulk dispatch. Load source edits, raw
+   targets and the validator/panel core first; dispatch calls the graph,
+   document and narrative command leaves at call time. No UI/session access. */
+
 /* Registry-backed compatibility views. No editor caches a list of panel types. */
 function panelAuthoring(type){
   var definition = PanelRegistry.get(type);
@@ -27016,206 +27020,6 @@ function panelAuthoringMap(key){
     }
   });
 }
-function panelAuthoringCatalog(){
-  return PanelRegistry.types().filter(function(type){return !!panelAuthoring(type).picker;}).map(function(type){
-    return Object.assign({type:type},panelAuthoring(type).picker);
-  }).sort(function(a,b){return (a.order || 0)-(b.order || 0) || a.type.localeCompare(b.type);});
-}
-
-/* builder.workbench.js — workbench builder: click a rendered element to jump
-   to its definition in the spec editor (with per-element authoring guidance),
-   and insert ready-made node/edge/step/panel/section snippets.
-
-   Source splices and raw addressing live in workbench/source-edit.js and
-   workbench/targets.js, assembled before this file by source-bundles.json.
-   Domain planners remain here; initWorkbenchBuilder at the bottom wires the
-   DOM and is only called by boot.workbench.js. */
-
-/* ---------------- Mermaid sequence skeleton ---------------- */
-
-function mermaidToSpec(text){
-  if (typeof text !== 'string') throw new Error('line 1: expected mermaid text');
-  /* Match the CLI: the first mermaid fence wins, even if it is not a sequence. */
-  var fence = /^```mermaid\s*$([\s\S]*?)^```\s*$/m.exec(text);
-  var lines = (fence ? fence[1] : text).split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/)
-    .map(function(ln){ return ln.trim(); }).filter(function(ln){ return ln; });
-  if (!lines.length || lines[0] !== 'sequenceDiagram')
-    throw new Error('line 1: not a sequenceDiagram (first line is ' +
-      JSON.stringify(lines[0] || '<empty>') + '); only mermaid sequenceDiagram input is supported');
-  var order = [], titles = Object.create(null), messages = [], todos = [];
-  var depth = 0, skipped = 0, header = null, blockLine = 0, n = 1;
-  function ensure(pid, title){
-    var id = pid.toLowerCase().replace(/[^a-z0-9]+/g, '');
-    if (!id) throw new Error('line ' + n + ': participant id ' + JSON.stringify(pid) + ' slugs to nothing');
-    if (!Object.prototype.hasOwnProperty.call(titles, id)){
-      order.push(id);
-      titles[id] = title || pid;
-    } else if (title) titles[id] = title;
-    return id;
-  }
-  for (var i = 1; i < lines.length; i++){
-    var ln = lines[i];
-    n = i + 1; /* CLI line numbers count nonblank lines. */
-    if (ln === 'autonumber') continue;
-    if (/^Note\b/i.test(ln)){
-      todos.push('note not converted: ' + ln);
-      continue;
-    }
-    var b = /^(alt|opt|loop|par)\b\s*(.*)$/.exec(ln);
-    if (b){
-      if (!depth){ header = (b[1] + ' ' + b[2]).trim(); skipped = 0; blockLine = n; }
-      depth++;
-      continue;
-    }
-    if (ln === 'else' || ln.indexOf('else ') === 0){
-      if (!depth) throw new Error('line ' + n + ": 'else' outside a block");
-      continue;
-    }
-    if (ln === 'end'){
-      if (!depth) throw new Error('line ' + n + ": 'end' without an open block");
-      depth--;
-      if (!depth) todos.push(header + ' block not converted (' + skipped + ' message(s) inside) — add by hand');
-      continue;
-    }
-    var p = /^participant\s+(\S+?)(?:\s+as\s+(.+?))?\s*$/.exec(ln);
-    if (p){
-      if (!depth) ensure(p[1], p[2]);
-      continue;
-    }
-    var m = /^(\S+?)\s*(-->>|->>)\s*(\S+?)\s*:\s*(.+?)\s*$/.exec(ln);
-    if (m){
-      if (depth){ skipped++; continue; }
-      messages.push({from: ensure(m[1]), to: ensure(m[3]), ret: m[2] === '-->>', text: m[4]});
-      continue;
-    }
-    throw new Error('line ' + n + ': unsupported syntax ' + JSON.stringify(ln) +
-      ' — supported: participant, ->> / -->> messages, autonumber, alt/opt/loop/par blocks, Note');
-  }
-  if (depth) throw new Error('line ' + blockLine + ': unclosed alt/opt/loop/par block');
-  if (!messages.length) throw new Error('line ' + n + ': no messages found outside alt/opt/loop/par blocks');
-  var edges = [], pairs = Object.create(null), steps = [];
-  messages.forEach(function(m){
-    var key = m.from + '->' + m.to;
-    if (!pairs[key]){
-      var kind = /https?|POST|GET/i.test(m.text) ? 'https' :
-        /publish|subscribe|mqtt|qos/i.test(m.text) ? 'mqtt' : 'int';
-      var edge = {from: m.from, to: m.to, kind: kind, label: m.text};
-      if (m.ret) edge.ret = true;
-      pairs[key] = true;
-      edges.push(edge);
-    }
-    steps.push({edge: key, text: m.text});
-  });
-  var half = Math.floor((order.length + 1) / 2), rows = [order.slice(0, half)], nodes = {};
-  if (order.length > half) rows.push(order.slice(half));
-  order.forEach(function(id){ nodes[id] = {title: titles[id], sub: '', icon: 'gear', tint: 'cmd'}; });
-  var title = 'Converted sequence';
-  return {page: {title: title, sections: [{heading: title,
-    text: ['Skeleton generated by mermaid2spec.py — enrich titles, subs, icons, tints, protocols, and prose before use.'],
-    diagram: {view: 'ambient', nodes: nodes, rows: rows, edges: edges, steps: steps}
-  }]}, todos: todos};
-}
-
-function starterCountLine(spec){
-  var nodes = 0, steps = 0, panels = 0;
-  specSectionPaths(spec).forEach(function(rec){
-    var d = specValueAt(spec, rec.diagram);
-    if (!d) return;
-    nodes += Object.keys(d.nodes || {}).length;
-    steps += (d.steps || []).length;
-    panels += (d.panels || []).length;
-  });
-  return nodes + (nodes === 1 ? ' node · ' : ' nodes · ') +
-    steps + (steps === 1 ? ' step · ' : ' steps · ') + panels + (panels === 1 ? ' panel' : ' panels');
-}
-/* Search the source tree, including nodes omitted from layout and hidden
-   tabs. Keep raw paths and rendered section ordinals together. */
-function builderOutline(raw, query){
-  var entries = [], terms = String(query || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
-  specSectionPaths(raw).forEach(function(rec, section){
-    var sec = specValueAt(raw, rec.section) || {}, d = specValueAt(raw, rec.diagram) || {};
-    var ti = rec.section.indexOf('tabs');
-    var tab = ti >= 0 ? {block: rec.section[ti - 1], tab: rec.section[ti + 1]} : null;
-    var parent = ti >= 0 ? specValueAt(raw, rec.section.slice(0, ti + 2)) : null;
-    var context = (parent && parent.label ? parent.label + ' / ' : '') + (sec.heading || 'Section ' + (section + 1));
-    function add(kind, label, extra){
-      var target = Object.assign({section: section, kind: kind}, extra || {});
-      var path = builderTargetPath(raw, target);
-      var haystack = (kind + ' ' + label + ' ' + context + ' ' + builderPathString(path)).toLowerCase();
-      if (terms.every(function(term){ return haystack.indexOf(term) >= 0; }))
-        entries.push({label: label, context: context, target: target, path: path, tab: tab});
-    }
-    add('section', sec.heading || 'Section ' + (section + 1));
-    Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || id) + ' · ' + id, {id: id}); });
-    Object.keys(d.groups || {}).forEach(function(id){ add('group', ((d.groups[id] || {}).title || id) + ' · ' + id, {id: id}); });
-    (Array.isArray(d.edges) ? d.edges : []).forEach(function(e, index){
-      if (e) add('edge', e.from + ' → ' + e.to + (e.label ? ' · ' + e.label : ''), {index: index});
-    });
-    (Array.isArray(d.panels) ? d.panels : []).forEach(function(p, index){
-      if (p) add('panel', (p.title || p.id) + ' · ' + p.type + ' · ' + p.id, {index: index});
-    });
-    (Array.isArray(d.steps) ? d.steps : []).forEach(function(s, index){
-      if (s) add('step', (index + 1) + '. ' + (s.text || s.id || 'Untitled step'), {index: index});
-    });
-  });
-  return entries;
-}
-function builderInsertTargetText(raw, sectionIdx){
-  /* the descriptive part of the insert-target label: "section N · heading",
-     prefixed with the tab name when the target section lives inside a tabs
-     block. A blank/whitespace tab label falls back to "tab N". Returns null
-     when the section ordinal has no section. */
-  var rec = specSectionPaths(raw || {})[sectionIdx];
-  if (!rec) return null;
-  var sec = specValueAt(raw, rec.section);
-  var name = sec && typeof sec.heading === 'string' && sec.heading ? ' · ' + sec.heading : '';
-  var tabName = '';
-  var path = rec.section;
-  var ti = path.indexOf('tabs');
-  if (ti >= 0 && typeof path[ti + 1] === 'number'){
-    var tabsArr = specValueAt(raw, path.slice(0, ti + 1));
-    var tab = Array.isArray(tabsArr) ? tabsArr[path[ti + 1]] : null;
-    var raw2 = tab && typeof tab.label === 'string' ? tab.label.trim() : '';
-    var label = raw2 || ('tab ' + (path[ti + 1] + 1));
-    tabName = 'tab “' + label + '” › ';
-  }
-  return 'into ' + tabName + 'section ' + (sectionIdx + 1) + name;
-}
-function builderPositionLine(raw, target){
-  /* which slot the selected element occupies among its siblings — only
-     the kinds with move buttons get one */
-  if (!target) return null;
-  if (target.kind === 'step'){
-    var rec = specSectionPaths(raw)[target.section];
-    if (!rec) return null;
-    var d = specValueAt(raw, rec.diagram);
-    if (!d || !Array.isArray(d.steps) || !d.steps[target.index]) return null;
-    if (d.paths){
-      var route = diagramPathList(d).find(function(p){return p.id === target.pathId && p.indices.indexOf(target.index) >= 0;}) ||
-        diagramPathList(d).find(function(p){return p.indices.indexOf(target.index) >= 0;});
-      if (route) return 'step ' + (route.indices.indexOf(target.index) + 1) + ' of ' + route.indices.length + ' · ' + route.label;
-      return 'unused step · registry slot ' + (target.index + 1);
-    }
-    return 'step ' + (target.index + 1) + ' of ' + d.steps.length;
-  }
-  if (target.kind === 'section'){
-    var n = specSectionPaths(raw).length;
-    if (typeof target.section !== 'number' || target.section < 0 || target.section >= n) return null;
-    return 'section ' + (target.section + 1) + ' of ' + n;
-  }
-  if (target.kind === 'tab'){
-    var page = raw && raw.page ? raw.page : raw;
-    var key = page && page.blocks ? 'blocks' : 'sections';
-    var block = page && Array.isArray(page[key]) ? page[key][target.block] : null;
-    if (!block || !Array.isArray(block.tabs) || !block.tabs[target.tab]) return null;
-    return 'tab ' + (target.tab + 1) + ' of ' + block.tabs.length;
-  }
-  return null;
-}
-
-/* ---------------- insert planners ----------------
-   Each takes the CURRENT editor text plus its parsed form and returns
-   {text, start, end, ...} on success or {error} with a plain sentence. */
 
 function builderUniqueKey(taken, stem){
   var n = 1;
@@ -27232,6 +27036,132 @@ function builderFlatRowIds(rows){
   });
   return ids;
 }
+
+/* ---------------- field edits, renames, deletes, reorders ----------------
+   Two edit strategies. Single-field edits are SURGICAL: replace, insert, or
+   remove one member's text and leave the rest of the document byte-for-byte
+   untouched. Edits that must stay consistent across several diagram keys
+   (renaming a node id, deleting a node, retargeting an edge) REWRITE one
+   value — usually the section's diagram object — from a mutated copy,
+   serialized with two-space indents and re-indented to the container
+   depth. */
+
+function builderClone(v){ return JSON.parse(JSON.stringify(v)); }
+function builderRewrite(text, raw, path, mutate){
+  /* Rewrite the value at path from a mutated deep copy. mutate(copy) edits
+     in place and may return {error}. */
+  var cur = specValueAt(raw, path);
+  if (cur == null || typeof cur !== 'object')
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var copy = builderClone(cur);
+  var out = mutate(copy);
+  if (out && out.error) return out;
+  var r = jsonReplaceValue(text, path, JSON.stringify(copy, null, 2));
+  if (!r) return {error: 'could not rewrite the editor text'};
+  return r;
+}
+
+function planSetField(text, raw, targetPath, key, valueTextOrNull){
+  /* Surgical single-field edit on the object at targetPath. */
+  if (!jsonLocate(text, targetPath))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var r = jsonSetField(text, targetPath, key, valueTextOrNull);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+
+function planReplaceValue(text, raw, path, valueText){
+  /* Replace one whole value (a bullet string, a paragraph) in place. */
+  if (!jsonLocate(text, path))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var r = jsonReplaceValue(text, path, valueText);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+function planSetFields(text, raw, targetPath, pairs){
+  /* Several surgical field edits on one object under a single undo step
+     (the label drag commits labelDx and labelDy together). */
+  if (!jsonLocate(text, targetPath))
+    return {error: 'element not found in the editor text (click Render, then reselect)'};
+  var out = text;
+  for (var i = 0; i < pairs.length; i++){
+    var r = jsonSetField(out, targetPath, pairs[i][0], pairs[i][1]);
+    if (!r) return {error: 'could not edit the editor text'};
+    out = r.text;
+  }
+  return {text: out};
+}
+function planDeleteListItem(text, raw, containerPath, index){
+  /* Remove one entry from a plain list (bullets, text paragraphs,
+     contract fields). */
+  if (!jsonLocate(text, containerPath))
+    return {error: 'list not found in the editor text'};
+  var r = jsonRemoveMember(text, containerPath, index);
+  if (!r) return {error: 'no such entry'};
+  return r;
+}
+
+/* ---------------- multi-select: bulk planners ----------------
+   A multi-selection is HOMOGENEOUS (one kind) — mixed-kind bulk deletes
+   interact with cascades (a node delete prunes edges/steps) in ways that
+   silently invalidate sibling targets. Deletes apply highest-index-first
+   per section so earlier deletions cannot shift later targets. */
+var BUILDER_MULTI_KINDS = ['node', 'edge', 'step', 'panel', 'bullet', 'crow'];
+
+function builderDeletePlan(text, raw, t){
+  if (t.kind === 'tab') return planDeleteTab(text, raw, t.block, t.tab);
+  if (t.kind === 'group') return planDeleteGroup(text, raw, t.section, t.id);
+  if (t.kind === 'node') return planDeleteNode(text, raw, t.section, t.id);
+  if (t.kind === 'edge') return planDeleteEdge(text, raw, t.section, t.index);
+  if (t.kind === 'step') return planDeleteStep(text, raw, t.section, t.index);
+  if (t.kind === 'panel') return planDeletePanel(text, raw, t.section, t.index);
+  var rec = specSectionPaths(raw)[t.section];
+  if (!rec) return {error: 'no such section'};
+  if (t.kind === 'bullet') return planDeleteListItem(text, raw, rec.section.concat(['bullets']), t.index);
+  if (t.kind === 'para'){
+    var sec = specValueAt(raw, rec.section);
+    if (sec && typeof sec.text === 'string') return planSetField(text, raw, rec.section, 'text', null);
+    return planDeleteListItem(text, raw, rec.section.concat(['text']), t.index);
+  }
+  if (t.kind === 'crow') return planDeleteListItem(text, raw, rec.section.concat(['contract', 'fields']), t.index);
+  return planDeleteSection(text, raw, t.section);
+}
+
+function planBulkSetField(text, targets, key, valueTextOrNull){
+  var cur = text;
+  for (var i = 0; i < targets.length; i++){
+    var raw;
+    try { raw = JSON.parse(cur); }
+    catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
+    var path = builderTargetPath(raw, targets[i]);
+    if (!path) return {error: 'selection ' + (i + 1) + ' no longer resolves — re-render and reselect'};
+    var plan = planSetField(cur, raw, path, key, valueTextOrNull);
+    if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
+    cur = plan.text;
+  }
+  return {text: cur, count: targets.length};
+}
+
+function planBulkDelete(text, targets){
+  var list = targets.slice().sort(function(a, b){
+    if ((a.section || 0) !== (b.section || 0)) return (b.section || 0) - (a.section || 0);
+    return (typeof b.index === 'number' ? b.index : 0) - (typeof a.index === 'number' ? a.index : 0);
+  });
+  var cur = text;
+  for (var i = 0; i < list.length; i++){
+    var raw;
+    try { raw = JSON.parse(cur); }
+    catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
+    var plan = builderDeletePlan(cur, raw, list[i]);
+    if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
+    cur = plan.text;
+  }
+  return {text: cur, count: list.length};
+}
+/* ---- src/workbench/commands/graph.js ---- */
+/* Pure graph identity, reference cascades and insert templates. Uses common
+   commands, raw targets, source edits and registry-owned panel rewrites. */
+
 function planAddNode(text, raw, sectionIdx, preset){
   /* preset (optional): {icon, tint, title} from NODE_PRESETS — the id stem
      follows the icon so the spec reads well (db1, antenna1, ...) */
@@ -27285,31 +27215,7 @@ function planAddEdge(text, raw, sectionIdx){
   return {text: r.text, start: r.start, end: r.end, kind: 'edge',
           index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
 }
-function planAddStep(text, raw, sectionIdx, pathId){
-  var got = builderDiagram(text, raw, sectionIdx);
-  if (got.error) return got;
-  if (got.d.paths) return planPathStepEdit(text,raw,sectionIdx,pathId,-1,'add');
-  var edges = Array.isArray(got.d.edges) ? got.d.edges : [];
-  /* prefer an edge no step uses as its FIRST hop, so the new numbered coin
-     gets its own midpoint (two steps sharing a first hop stack coins) */
-  var used = {};
-  (got.d.steps || []).forEach(function(st){
-    var k = st && (st.edge || (Array.isArray(st.edges) && st.edges[0]));
-    if (typeof k === 'string') used[k] = true;
-  });
-  var pick = null;
-  for (var i = 0; i < edges.length; i++){
-    var e = edges[i] || {};
-    var k = e.from + '->' + e.to;
-    if (!used[k]){ pick = k; break; }
-  }
-  if (!pick && edges.length) pick = (edges[0] || {}).from + '->' + (edges[0] || {}).to;
-  var item = JSON.stringify(Object.assign(pick ? {edge:pick} : {}, {text:'Describe what happens in this step'}));
-  var r = jsonInsertListItemOrCreate(text, got.path, 'steps', item);
-  if (!r) return {error: 'could not edit steps in the editor text'};
-  return {text: r.text, start: r.start, end: r.end, kind: 'step',
-          index: (got.d.steps || []).length};
-}
+
 function planAddPanel(text, raw, sectionIdx, type){
   /* type (optional): a PANEL_TEMPLATES key; default queue */
   var got = builderDiagram(text, raw, sectionIdx);
@@ -27325,70 +27231,6 @@ function planAddPanel(text, raw, sectionIdx, type){
   if (!r) return {error: 'could not edit panels in the editor text'};
   return {text: r.text, start: r.start, end: r.end, kind: 'panel',
           index: (got.d.panels || []).length};
-}
-var BUILDER_SECTION_TEMPLATE = [
-  '{',
-  '  "heading": "New section",',
-  '  "accent": "cyan",',
-  '  "text": ["What this flow does, in one or two sentences."],',
-  '  "diagram": {',
-  '    "nodes": {',
-  '      "svc1": {"title": "Service A", "sub": "does a thing", "icon": "gear", "tint": "cmd"},',
-  '      "svc2": {"title": "Service B", "sub": "stores it", "icon": "db", "tint": "data"}',
-  '    },',
-  '    "rows": [["svc1", "svc2"]],',
-  '    "edges": [{"from": "svc1", "to": "svc2", "kind": "int", "label": "call"}],',
-  '    "steps": [{"edge": "svc1->svc2", "text": "Service A calls Service B"}]',
-  '  }',
-  '}'
-].join('\n');
-function planAddSection(text, raw){
-  var base, page;
-  if (raw && raw.page){ page = raw.page; base = ['page']; }
-  else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
-  else if (raw && raw.nodes && raw.rows)
-    return {error: 'this spec is a bare diagram — wrap it as {"page": {"blocks": [ {...} ]}} to hold more than one section'};
-  else return {error: 'no page to add a section to'};
-  var key = page.blocks ? 'blocks' : 'sections';
-  if (!jsonLocate(text, base.concat([key])))
-    return {error: 'could not find the ' + key + ' list in the editor text'};
-  var r = jsonInsertMember(text, base.concat([key]), null, BUILDER_SECTION_TEMPLATE);
-  if (!r) return {error: 'could not edit the ' + key + ' list in the editor text'};
-  return {text: r.text, start: r.start, end: r.end, kind: 'section',
-          index: specSectionPaths(raw).length};
-}
-
-/* ---------------- field edits, renames, deletes, reorders ----------------
-   Two edit strategies. Single-field edits are SURGICAL: replace, insert, or
-   remove one member's text and leave the rest of the document byte-for-byte
-   untouched. Edits that must stay consistent across several diagram keys
-   (renaming a node id, deleting a node, retargeting an edge) REWRITE one
-   value — usually the section's diagram object — from a mutated copy,
-   serialized with two-space indents and re-indented to the container
-   depth. */
-
-function builderClone(v){ return JSON.parse(JSON.stringify(v)); }
-function builderRewrite(text, raw, path, mutate){
-  /* Rewrite the value at path from a mutated deep copy. mutate(copy) edits
-     in place and may return {error}. */
-  var cur = specValueAt(raw, path);
-  if (cur == null || typeof cur !== 'object')
-    return {error: 'element not found in the editor text (click Render, then reselect)'};
-  var copy = builderClone(cur);
-  var out = mutate(copy);
-  if (out && out.error) return out;
-  var r = jsonReplaceValue(text, path, JSON.stringify(copy, null, 2));
-  if (!r) return {error: 'could not rewrite the editor text'};
-  return r;
-}
-
-function planSetField(text, raw, targetPath, key, valueTextOrNull){
-  /* Surgical single-field edit on the object at targetPath. */
-  if (!jsonLocate(text, targetPath))
-    return {error: 'element not found in the editor text (click Render, then reselect)'};
-  var r = jsonSetField(text, targetPath, key, valueTextOrNull);
-  if (!r) return {error: 'could not edit the editor text'};
-  return r;
 }
 
 function builderGroupsShapeError(d){
@@ -27749,10 +27591,269 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
   });
 }
 
-function builderViewStepsError(d){
-  var view=(d.layouts || []).find(function(v){return Array.isArray(v.steps) && !sectionViewStepsReachable(d,v.steps);});
-  return view?{error:'Choose another step in view "'+view.name+'" before removing its last reachable step or path.'}:null;
+/* ---------------- pass 4: insert palettes ----------------
+   One node preset per icon (with the tint that icon usually carries) and
+   one working starter template per panel widget type. The templates must
+   validate with zero errors AND zero warnings — tests/builder.test.js
+   runs the real validator over every one. */
+
+var NODE_PRESETS = [
+  {icon: 'terminal', tint: 'cmd',  title: 'Console'},
+  {icon: 'cloud',    tint: 'cmd',  title: 'API'},
+  {icon: 'shield',   tint: 'auth', title: 'Auth'},
+  {icon: 'gear',     tint: 'cmd',  title: 'Service'},
+  {icon: 'db',       tint: 'data', title: 'Store'},
+  {icon: 'antenna',  tint: 'mqtt', title: 'Broker'},
+  {icon: 'thermo',   tint: 'dev',  title: 'Sensor'},
+  {icon: 'pump',     tint: 'dev',  title: 'Actuator'},
+  {icon: 'router',   tint: 'dev',  title: 'Gateway'},
+  {icon: 'package',  tint: 'data', title: 'Artifact'},
+  {icon: 'key',      tint: 'auth', title: 'Signer'},
+  {icon: 'server',   tint: 'cmd',  title: 'Server'},
+  {icon: 'chip',     tint: 'dev',  title: 'MCU'},
+  {icon: 'phone',    tint: 'dev',  title: 'Phone'}
+];
+
+var PANEL_TEMPLATES = panelAuthoringMap('template');
+
+function planAddEdgeBetween(text, raw, sectionIdx, fromId, toId){
+  /* Connect mode: the operator clicked the exact source and target. */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var nodes = got.d.nodes || {};
+  if (!Object.prototype.hasOwnProperty.call(nodes, fromId))
+    return {error: 'unknown node id "' + fromId + '"'};
+  if (!Object.prototype.hasOwnProperty.call(nodes, toId))
+    return {error: 'unknown node id "' + toId + '"'};
+  if (fromId === toId) return {error: 'source and target are the same node'};
+  var key = fromId + '->' + toId;
+  if ((got.d.edges || []).some(function(e){ return e && builderEdgeKey(e) === key; }))
+    return {error: 'edge "' + key + '" already exists \u2014 click it to edit'};
+  var item = '{"from": ' + JSON.stringify(fromId) + ', "to": ' + JSON.stringify(toId) +
+             ', "kind": "int", "label": "describe the hop"}';
+  var r = jsonInsertListItemOrCreate(text, got.path, 'edges', item);
+  if (!r) return {error: 'could not edit edges in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'edge',
+          index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
 }
+
+function planDuplicateNode(text, raw, sectionIdx, id){
+  /* Copy a node definition under a fresh id and place the copy right
+     beside the original (same row slot, same stack, or floats list). */
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var d = got.d;
+  if (!d.nodes || !Object.prototype.hasOwnProperty.call(d.nodes, id))
+    return {error: 'node "' + id + '" not found'};
+  var newId = builderUniqueKey(d.nodes, id);
+  var placed = null;
+  (d.rows || []).forEach(function(row, r){
+    if (placed) return;
+    row.forEach(function(slot, s){
+      if (placed) return;
+      if (slot === id) placed = {path: got.path.concat(['rows', r]), after: s};
+      else if (Array.isArray(slot)){
+        var k = slot.indexOf(id);
+        if (k >= 0) placed = {path: got.path.concat(['rows', r, s]), after: k};
+      }
+    });
+  });
+  var out;
+  if (placed){
+    out = jsonInsertArrayItemAfter(text, placed.path, placed.after, JSON.stringify(newId));
+    if (!out) return {error: 'could not edit rows in the editor text'};
+  } else {
+    var floats = d.floats || [];
+    var fi = -1;
+    floats.forEach(function(f, i){ if (fi < 0 && f && f.id === id) fi = i; });
+    if (fi < 0) return {error: 'node "' + id + '" has no row or float placement to copy'};
+    /* clone the WHOLE float entry (side plus any nudge fields), fresh id,
+       placed directly after the original like the row cases */
+    var entry = builderClone(floats[fi]);
+    entry.id = newId;
+    out = jsonInsertArrayItemAfter(text, got.path.concat(['floats']), fi, JSON.stringify(entry));
+    if (!out) return {error: 'could not edit floats in the editor text'};
+  }
+  var def = jsonInsertMember(out.text, got.path.concat(['nodes']), newId,
+    JSON.stringify(builderClone(d.nodes[id])));
+  if (!def) return {error: 'could not edit nodes in the editor text'};
+  return {text: def.text, start: def.start, end: def.end, kind: 'node', id: newId};
+}
+/* ---- src/workbench/commands/document.js ---- */
+/* Pure page/section/tab commands. Preserve raw source block/list addresses
+   and rendered section ordinals; common commands supply clone/rewrite. */
+
+var BUILDER_SECTION_TEMPLATE = [
+  '{',
+  '  "heading": "New section",',
+  '  "accent": "cyan",',
+  '  "text": ["What this flow does, in one or two sentences."],',
+  '  "diagram": {',
+  '    "nodes": {',
+  '      "svc1": {"title": "Service A", "sub": "does a thing", "icon": "gear", "tint": "cmd"},',
+  '      "svc2": {"title": "Service B", "sub": "stores it", "icon": "db", "tint": "data"}',
+  '    },',
+  '    "rows": [["svc1", "svc2"]],',
+  '    "edges": [{"from": "svc1", "to": "svc2", "kind": "int", "label": "call"}],',
+  '    "steps": [{"edge": "svc1->svc2", "text": "Service A calls Service B"}]',
+  '  }',
+  '}'
+].join('\n');
+function planAddSection(text, raw){
+  var base, page;
+  if (raw && raw.page){ page = raw.page; base = ['page']; }
+  else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
+  else if (raw && raw.nodes && raw.rows)
+    return {error: 'this spec is a bare diagram — wrap it as {"page": {"blocks": [ {...} ]}} to hold more than one section'};
+  else return {error: 'no page to add a section to'};
+  var key = page.blocks ? 'blocks' : 'sections';
+  if (!jsonLocate(text, base.concat([key])))
+    return {error: 'could not find the ' + key + ' list in the editor text'};
+  var r = jsonInsertMember(text, base.concat([key]), null, BUILDER_SECTION_TEMPLATE);
+  if (!r) return {error: 'could not edit the ' + key + ' list in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'section',
+          index: specSectionPaths(raw).length};
+}
+
+function planDeleteSection(text, raw, sectionIdx){
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'no such section'};
+  if (!rec.section.length)
+    return {error: 'this spec is one bare diagram — clear the editor instead of deleting'};
+  var parentPath = rec.section.slice(0, -1);
+  var key = rec.section[rec.section.length - 1];
+  var r = jsonRemoveMember(text, parentPath, key);
+  if (!r) return {error: 'could not edit the editor text'};
+  return r;
+}
+
+function planDuplicateSection(text, raw, sectionIdx){
+  /* Deep-copy a section directly after the original; the copy renders as
+     the next section ordinal (render order is depth-first list order). */
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'no such section'};
+  if (!rec.section.length)
+    return {error: 'this spec is one bare diagram \u2014 wrap it as {"page": {"blocks": [ ... ]}} first'};
+  var clone = builderClone(specValueAt(raw, rec.section));
+  if (clone && typeof clone.heading === 'string') clone.heading += ' (copy)';
+  var parentPath = rec.section.slice(0, -1);
+  var idx = rec.section[rec.section.length - 1];
+  var r = jsonInsertArrayItemAfter(text, parentPath, idx, JSON.stringify(clone, null, 2));
+  if (!r) return {error: 'could not edit the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'section', index: sectionIdx + 1};
+}
+
+/* ---------------- tab management ----------------
+   Tabs are addressed by BLOCK index (the position in the page's
+   blocks/sections list — the same index the engine bakes into each tab
+   button's id "tab-<block>-<tab>") plus the tab index inside that
+   block's tabs list. */
+
+var BUILDER_TAB_TEMPLATE = [
+  '{',
+  '  "label": "New tab",',
+  '  "sections": [' + BUILDER_SECTION_TEMPLATE.split('\n').join('\n  ') + ']',
+  '}'
+].join('\n');
+
+/* a whole tabs container: two tabs, one starter section each — the
+   "+ tab" button on a selected tab grows it from there */
+var BUILDER_TABS_TEMPLATE = [
+  '{',
+  '  "tabs": [',
+  '    ' + BUILDER_TAB_TEMPLATE.replace('"New tab"', '"Tab one"').split('\n').join('\n    ') + ',',
+  '    ' + BUILDER_TAB_TEMPLATE.replace('"New tab"', '"Tab two"').split('\n').join('\n    '),
+  '  ]',
+  '}'
+].join('\n');
+
+function planAddTabs(text, raw){
+  /* append a tabs container to the page's block list — same shape rules
+     as planAddSection */
+  var base, page;
+  if (raw && raw.page){ page = raw.page; base = ['page']; }
+  else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
+  else if (raw && raw.nodes && raw.rows)
+    return {error: 'this spec is a bare diagram — wrap it as {"page": {"blocks": [ {...} ]}} to hold tabs'};
+  else return {error: 'no page to add tabs to'};
+  var key = page.blocks ? 'blocks' : 'sections';
+  if (!jsonLocate(text, base.concat([key])))
+    return {error: 'could not find the ' + key + ' list in the editor text'};
+  var r = jsonInsertMember(text, base.concat([key]), null, BUILDER_TABS_TEMPLATE);
+  if (!r) return {error: 'could not edit the ' + key + ' list in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'tabs',
+          block: (page[key] || []).length,
+          index: specSectionPaths(raw).length};
+}
+
+function planAddTab(text, raw, blockIdx, afterIdx){
+  /* insert a renderable tab (one starter section) directly after the
+     tab the operator is looking at */
+  var path = builderTabPath(raw, blockIdx, afterIdx);
+  if (!path) return {error: 'tab not found — reselect and try again'};
+  var tabsPath = path.slice(0, -1);
+  var r = jsonInsertArrayItemAfter(text, tabsPath, afterIdx, BUILDER_TAB_TEMPLATE);
+  if (!r) return {error: 'could not edit the tabs list in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'tab',
+          block: blockIdx, index: afterIdx + 1};
+}
+
+function planDeleteTab(text, raw, blockIdx, tabIdx){
+  var path = builderTabPath(raw, blockIdx, tabIdx);
+  if (!path) return {error: 'tab not found — reselect and try again'};
+  var tabsPath = path.slice(0, -1);
+  var tabs = specValueAt(raw, tabsPath);
+  if (Array.isArray(tabs) && tabs.length === 1)
+    return {error: 'this is the block\u2019s last tab — delete its sections instead, or remove the whole tabs block in the JSON'};
+  var r = jsonRemoveMember(text, tabsPath, tabIdx);
+  if (!r) return {error: 'could not edit the tabs list in the editor text'};
+  return r;
+}
+
+function planMoveTab(text, raw, blockIdx, tabIdx, delta){
+  var path = builderTabPath(raw, blockIdx, tabIdx);
+  if (!path) return {error: 'tab not found — reselect and try again'};
+  var tabsPath = path.slice(0, -1);
+  var tabs = specValueAt(raw, tabsPath);
+  var to = tabIdx + delta;
+  if (to < 0 || to >= tabs.length) return {error: 'already at that end'};
+  var r = builderRewrite(text, raw, tabsPath, function(copy){
+    var item = copy.splice(tabIdx, 1)[0];
+    copy.splice(to, 0, item);
+  });
+  if (r.error) return r;
+  r.kind = 'tab'; r.block = blockIdx; r.index = to;
+  return r;
+}
+
+/* move a section one slot within ITS OWN list (the top-level blocks list,
+   or its tab's sections list). A neighbor blocks-list entry may be a tabs
+   container — the move hops over it whole. Returns newPath (the section's
+   list slot after the move); the caller recomputes the flat ordinal from
+   it, because hopping a tabs container shifts ordinals by its section
+   count. */
+function planMoveSection(text, raw, sectionIdx, delta){
+  var rec = specSectionPaths(raw)[sectionIdx];
+  if (!rec) return {error: 'section not found — reselect and try again'};
+  var spath = rec.section;
+  if (!spath.length) return {error: 'a bare-diagram page has only one section'};
+  var listPath = spath.slice(0, -1);
+  var idx = spath[spath.length - 1];
+  var list = specValueAt(raw, listPath);
+  if (!Array.isArray(list)) return {error: 'section list not found in the editor text'};
+  var to = idx + delta;
+  if (to < 0) return {error: 'already first in its list'};
+  if (to >= list.length) return {error: 'already last in its list'};
+  var swap = jsonSwapListItems(text, listPath, idx, to);
+  if (!swap) return {error: 'could not locate both sections in the editor text'};
+  var span = delta < 0 ? swap.first : swap.second;
+  return {text: swap.text, start: span.start, end: span.end,
+          kind: 'section', newPath: listPath.concat([to])};
+}
+/* ---- src/workbench/commands/narrative.js ---- */
+/* Pure shared-step deletion, used by common bulk dispatch. Remaining
+   narrative planners still live in builder.workbench.js until the next slice. */
+
 function planDeleteStep(text, raw, sectionIdx, stepIdx){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
@@ -27770,7 +27871,238 @@ function planDeleteStep(text, raw, sectionIdx, stepIdx){
     (d.layouts || []).forEach(function(v){if(Array.isArray(v.steps))v.steps=v.steps.filter(function(ref){return ref!==id;});});
   });
 }
+/* ---- src/builder.workbench.js ---- */
+function panelAuthoringCatalog(){
+  return PanelRegistry.types().filter(function(type){return !!panelAuthoring(type).picker;}).map(function(type){
+    return Object.assign({type:type},panelAuthoring(type).picker);
+  }).sort(function(a,b){return (a.order || 0)-(b.order || 0) || a.type.localeCompare(b.type);});
+}
 
+/* builder.workbench.js — workbench builder: click a rendered element to jump
+   to its definition in the spec editor (with per-element authoring guidance),
+   and insert ready-made node/edge/step/panel/section snippets.
+
+   Source splices and raw addressing live in workbench/source-edit.js and
+   workbench/targets.js, assembled before this file by source-bundles.json.
+   Graph/document/common commands are assembled from workbench/commands/.
+   Remaining narrative/layout planners stay here; initWorkbenchBuilder wires
+   the DOM and is only called by boot.workbench.js. */
+
+/* ---------------- Mermaid sequence skeleton ---------------- */
+
+function mermaidToSpec(text){
+  if (typeof text !== 'string') throw new Error('line 1: expected mermaid text');
+  /* Match the CLI: the first mermaid fence wins, even if it is not a sequence. */
+  var fence = /^```mermaid\s*$([\s\S]*?)^```\s*$/m.exec(text);
+  var lines = (fence ? fence[1] : text).split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/)
+    .map(function(ln){ return ln.trim(); }).filter(function(ln){ return ln; });
+  if (!lines.length || lines[0] !== 'sequenceDiagram')
+    throw new Error('line 1: not a sequenceDiagram (first line is ' +
+      JSON.stringify(lines[0] || '<empty>') + '); only mermaid sequenceDiagram input is supported');
+  var order = [], titles = Object.create(null), messages = [], todos = [];
+  var depth = 0, skipped = 0, header = null, blockLine = 0, n = 1;
+  function ensure(pid, title){
+    var id = pid.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!id) throw new Error('line ' + n + ': participant id ' + JSON.stringify(pid) + ' slugs to nothing');
+    if (!Object.prototype.hasOwnProperty.call(titles, id)){
+      order.push(id);
+      titles[id] = title || pid;
+    } else if (title) titles[id] = title;
+    return id;
+  }
+  for (var i = 1; i < lines.length; i++){
+    var ln = lines[i];
+    n = i + 1; /* CLI line numbers count nonblank lines. */
+    if (ln === 'autonumber') continue;
+    if (/^Note\b/i.test(ln)){
+      todos.push('note not converted: ' + ln);
+      continue;
+    }
+    var b = /^(alt|opt|loop|par)\b\s*(.*)$/.exec(ln);
+    if (b){
+      if (!depth){ header = (b[1] + ' ' + b[2]).trim(); skipped = 0; blockLine = n; }
+      depth++;
+      continue;
+    }
+    if (ln === 'else' || ln.indexOf('else ') === 0){
+      if (!depth) throw new Error('line ' + n + ": 'else' outside a block");
+      continue;
+    }
+    if (ln === 'end'){
+      if (!depth) throw new Error('line ' + n + ": 'end' without an open block");
+      depth--;
+      if (!depth) todos.push(header + ' block not converted (' + skipped + ' message(s) inside) — add by hand');
+      continue;
+    }
+    var p = /^participant\s+(\S+?)(?:\s+as\s+(.+?))?\s*$/.exec(ln);
+    if (p){
+      if (!depth) ensure(p[1], p[2]);
+      continue;
+    }
+    var m = /^(\S+?)\s*(-->>|->>)\s*(\S+?)\s*:\s*(.+?)\s*$/.exec(ln);
+    if (m){
+      if (depth){ skipped++; continue; }
+      messages.push({from: ensure(m[1]), to: ensure(m[3]), ret: m[2] === '-->>', text: m[4]});
+      continue;
+    }
+    throw new Error('line ' + n + ': unsupported syntax ' + JSON.stringify(ln) +
+      ' — supported: participant, ->> / -->> messages, autonumber, alt/opt/loop/par blocks, Note');
+  }
+  if (depth) throw new Error('line ' + blockLine + ': unclosed alt/opt/loop/par block');
+  if (!messages.length) throw new Error('line ' + n + ': no messages found outside alt/opt/loop/par blocks');
+  var edges = [], pairs = Object.create(null), steps = [];
+  messages.forEach(function(m){
+    var key = m.from + '->' + m.to;
+    if (!pairs[key]){
+      var kind = /https?|POST|GET/i.test(m.text) ? 'https' :
+        /publish|subscribe|mqtt|qos/i.test(m.text) ? 'mqtt' : 'int';
+      var edge = {from: m.from, to: m.to, kind: kind, label: m.text};
+      if (m.ret) edge.ret = true;
+      pairs[key] = true;
+      edges.push(edge);
+    }
+    steps.push({edge: key, text: m.text});
+  });
+  var half = Math.floor((order.length + 1) / 2), rows = [order.slice(0, half)], nodes = {};
+  if (order.length > half) rows.push(order.slice(half));
+  order.forEach(function(id){ nodes[id] = {title: titles[id], sub: '', icon: 'gear', tint: 'cmd'}; });
+  var title = 'Converted sequence';
+  return {page: {title: title, sections: [{heading: title,
+    text: ['Skeleton generated by mermaid2spec.py — enrich titles, subs, icons, tints, protocols, and prose before use.'],
+    diagram: {view: 'ambient', nodes: nodes, rows: rows, edges: edges, steps: steps}
+  }]}, todos: todos};
+}
+
+function starterCountLine(spec){
+  var nodes = 0, steps = 0, panels = 0;
+  specSectionPaths(spec).forEach(function(rec){
+    var d = specValueAt(spec, rec.diagram);
+    if (!d) return;
+    nodes += Object.keys(d.nodes || {}).length;
+    steps += (d.steps || []).length;
+    panels += (d.panels || []).length;
+  });
+  return nodes + (nodes === 1 ? ' node · ' : ' nodes · ') +
+    steps + (steps === 1 ? ' step · ' : ' steps · ') + panels + (panels === 1 ? ' panel' : ' panels');
+}
+/* Search the source tree, including nodes omitted from layout and hidden
+   tabs. Keep raw paths and rendered section ordinals together. */
+function builderOutline(raw, query){
+  var entries = [], terms = String(query || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  specSectionPaths(raw).forEach(function(rec, section){
+    var sec = specValueAt(raw, rec.section) || {}, d = specValueAt(raw, rec.diagram) || {};
+    var ti = rec.section.indexOf('tabs');
+    var tab = ti >= 0 ? {block: rec.section[ti - 1], tab: rec.section[ti + 1]} : null;
+    var parent = ti >= 0 ? specValueAt(raw, rec.section.slice(0, ti + 2)) : null;
+    var context = (parent && parent.label ? parent.label + ' / ' : '') + (sec.heading || 'Section ' + (section + 1));
+    function add(kind, label, extra){
+      var target = Object.assign({section: section, kind: kind}, extra || {});
+      var path = builderTargetPath(raw, target);
+      var haystack = (kind + ' ' + label + ' ' + context + ' ' + builderPathString(path)).toLowerCase();
+      if (terms.every(function(term){ return haystack.indexOf(term) >= 0; }))
+        entries.push({label: label, context: context, target: target, path: path, tab: tab});
+    }
+    add('section', sec.heading || 'Section ' + (section + 1));
+    Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || id) + ' · ' + id, {id: id}); });
+    Object.keys(d.groups || {}).forEach(function(id){ add('group', ((d.groups[id] || {}).title || id) + ' · ' + id, {id: id}); });
+    (Array.isArray(d.edges) ? d.edges : []).forEach(function(e, index){
+      if (e) add('edge', e.from + ' → ' + e.to + (e.label ? ' · ' + e.label : ''), {index: index});
+    });
+    (Array.isArray(d.panels) ? d.panels : []).forEach(function(p, index){
+      if (p) add('panel', (p.title || p.id) + ' · ' + p.type + ' · ' + p.id, {index: index});
+    });
+    (Array.isArray(d.steps) ? d.steps : []).forEach(function(s, index){
+      if (s) add('step', (index + 1) + '. ' + (s.text || s.id || 'Untitled step'), {index: index});
+    });
+  });
+  return entries;
+}
+function builderInsertTargetText(raw, sectionIdx){
+  /* the descriptive part of the insert-target label: "section N · heading",
+     prefixed with the tab name when the target section lives inside a tabs
+     block. A blank/whitespace tab label falls back to "tab N". Returns null
+     when the section ordinal has no section. */
+  var rec = specSectionPaths(raw || {})[sectionIdx];
+  if (!rec) return null;
+  var sec = specValueAt(raw, rec.section);
+  var name = sec && typeof sec.heading === 'string' && sec.heading ? ' · ' + sec.heading : '';
+  var tabName = '';
+  var path = rec.section;
+  var ti = path.indexOf('tabs');
+  if (ti >= 0 && typeof path[ti + 1] === 'number'){
+    var tabsArr = specValueAt(raw, path.slice(0, ti + 1));
+    var tab = Array.isArray(tabsArr) ? tabsArr[path[ti + 1]] : null;
+    var raw2 = tab && typeof tab.label === 'string' ? tab.label.trim() : '';
+    var label = raw2 || ('tab ' + (path[ti + 1] + 1));
+    tabName = 'tab “' + label + '” › ';
+  }
+  return 'into ' + tabName + 'section ' + (sectionIdx + 1) + name;
+}
+function builderPositionLine(raw, target){
+  /* which slot the selected element occupies among its siblings — only
+     the kinds with move buttons get one */
+  if (!target) return null;
+  if (target.kind === 'step'){
+    var rec = specSectionPaths(raw)[target.section];
+    if (!rec) return null;
+    var d = specValueAt(raw, rec.diagram);
+    if (!d || !Array.isArray(d.steps) || !d.steps[target.index]) return null;
+    if (d.paths){
+      var route = diagramPathList(d).find(function(p){return p.id === target.pathId && p.indices.indexOf(target.index) >= 0;}) ||
+        diagramPathList(d).find(function(p){return p.indices.indexOf(target.index) >= 0;});
+      if (route) return 'step ' + (route.indices.indexOf(target.index) + 1) + ' of ' + route.indices.length + ' · ' + route.label;
+      return 'unused step · registry slot ' + (target.index + 1);
+    }
+    return 'step ' + (target.index + 1) + ' of ' + d.steps.length;
+  }
+  if (target.kind === 'section'){
+    var n = specSectionPaths(raw).length;
+    if (typeof target.section !== 'number' || target.section < 0 || target.section >= n) return null;
+    return 'section ' + (target.section + 1) + ' of ' + n;
+  }
+  if (target.kind === 'tab'){
+    var page = raw && raw.page ? raw.page : raw;
+    var key = page && page.blocks ? 'blocks' : 'sections';
+    var block = page && Array.isArray(page[key]) ? page[key][target.block] : null;
+    if (!block || !Array.isArray(block.tabs) || !block.tabs[target.tab]) return null;
+    return 'tab ' + (target.tab + 1) + ' of ' + block.tabs.length;
+  }
+  return null;
+}
+
+/* ---------------- insert planners ----------------
+   Each takes the CURRENT editor text plus its parsed form and returns
+   {text, start, end, ...} on success or {error} with a plain sentence. */
+
+function planAddStep(text, raw, sectionIdx, pathId){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  if (got.d.paths) return planPathStepEdit(text,raw,sectionIdx,pathId,-1,'add');
+  var edges = Array.isArray(got.d.edges) ? got.d.edges : [];
+  /* prefer an edge no step uses as its FIRST hop, so the new numbered coin
+     gets its own midpoint (two steps sharing a first hop stack coins) */
+  var used = {};
+  (got.d.steps || []).forEach(function(st){
+    var k = st && (st.edge || (Array.isArray(st.edges) && st.edges[0]));
+    if (typeof k === 'string') used[k] = true;
+  });
+  var pick = null;
+  for (var i = 0; i < edges.length; i++){
+    var e = edges[i] || {};
+    var k = e.from + '->' + e.to;
+    if (!used[k]){ pick = k; break; }
+  }
+  if (!pick && edges.length) pick = (edges[0] || {}).from + '->' + (edges[0] || {}).to;
+  var item = JSON.stringify(Object.assign(pick ? {edge:pick} : {}, {text:'Describe what happens in this step'}));
+  var r = jsonInsertListItemOrCreate(text, got.path, 'steps', item);
+  if (!r) return {error: 'could not edit steps in the editor text'};
+  return {text: r.text, start: r.start, end: r.end, kind: 'step',
+          index: (got.d.steps || []).length};
+}
+function builderViewStepsError(d){
+  var view=(d.layouts || []).find(function(v){return Array.isArray(v.steps) && !sectionViewStepsReachable(d,v.steps);});
+  return view?{error:'Choose another step in view "'+view.name+'" before removing its last reachable step or path.'}:null;
+}
 function planMoveStep(text, raw, sectionIdx, stepIdx, delta, pathId){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
@@ -28023,155 +28355,7 @@ function builderSlotGapXs(boxes, reversed){
   return xs;
 }
 
-function planDeleteSection(text, raw, sectionIdx){
-  var rec = specSectionPaths(raw)[sectionIdx];
-  if (!rec) return {error: 'no such section'};
-  if (!rec.section.length)
-    return {error: 'this spec is one bare diagram — clear the editor instead of deleting'};
-  var parentPath = rec.section.slice(0, -1);
-  var key = rec.section[rec.section.length - 1];
-  var r = jsonRemoveMember(text, parentPath, key);
-  if (!r) return {error: 'could not edit the editor text'};
-  return r;
-}
-
-/* ---------------- pass 4: insert palettes ----------------
-   One node preset per icon (with the tint that icon usually carries) and
-   one working starter template per panel widget type. The templates must
-   validate with zero errors AND zero warnings — tests/builder.test.js
-   runs the real validator over every one. */
-
-var NODE_PRESETS = [
-  {icon: 'terminal', tint: 'cmd',  title: 'Console'},
-  {icon: 'cloud',    tint: 'cmd',  title: 'API'},
-  {icon: 'shield',   tint: 'auth', title: 'Auth'},
-  {icon: 'gear',     tint: 'cmd',  title: 'Service'},
-  {icon: 'db',       tint: 'data', title: 'Store'},
-  {icon: 'antenna',  tint: 'mqtt', title: 'Broker'},
-  {icon: 'thermo',   tint: 'dev',  title: 'Sensor'},
-  {icon: 'pump',     tint: 'dev',  title: 'Actuator'},
-  {icon: 'router',   tint: 'dev',  title: 'Gateway'},
-  {icon: 'package',  tint: 'data', title: 'Artifact'},
-  {icon: 'key',      tint: 'auth', title: 'Signer'},
-  {icon: 'server',   tint: 'cmd',  title: 'Server'},
-  {icon: 'chip',     tint: 'dev',  title: 'MCU'},
-  {icon: 'phone',    tint: 'dev',  title: 'Phone'}
-];
-
-var PANEL_TEMPLATES = panelAuthoringMap('template');
-
 /* ---------------- pass 3: direct-manipulation planners ---------------- */
-
-function planReplaceValue(text, raw, path, valueText){
-  /* Replace one whole value (a bullet string, a paragraph) in place. */
-  if (!jsonLocate(text, path))
-    return {error: 'element not found in the editor text (click Render, then reselect)'};
-  var r = jsonReplaceValue(text, path, valueText);
-  if (!r) return {error: 'could not edit the editor text'};
-  return r;
-}
-function planSetFields(text, raw, targetPath, pairs){
-  /* Several surgical field edits on one object under a single undo step
-     (the label drag commits labelDx and labelDy together). */
-  if (!jsonLocate(text, targetPath))
-    return {error: 'element not found in the editor text (click Render, then reselect)'};
-  var out = text;
-  for (var i = 0; i < pairs.length; i++){
-    var r = jsonSetField(out, targetPath, pairs[i][0], pairs[i][1]);
-    if (!r) return {error: 'could not edit the editor text'};
-    out = r.text;
-  }
-  return {text: out};
-}
-function planDeleteListItem(text, raw, containerPath, index){
-  /* Remove one entry from a plain list (bullets, text paragraphs,
-     contract fields). */
-  if (!jsonLocate(text, containerPath))
-    return {error: 'list not found in the editor text'};
-  var r = jsonRemoveMember(text, containerPath, index);
-  if (!r) return {error: 'no such entry'};
-  return r;
-}
-
-function planAddEdgeBetween(text, raw, sectionIdx, fromId, toId){
-  /* Connect mode: the operator clicked the exact source and target. */
-  var got = builderDiagram(text, raw, sectionIdx);
-  if (got.error) return got;
-  var nodes = got.d.nodes || {};
-  if (!Object.prototype.hasOwnProperty.call(nodes, fromId))
-    return {error: 'unknown node id "' + fromId + '"'};
-  if (!Object.prototype.hasOwnProperty.call(nodes, toId))
-    return {error: 'unknown node id "' + toId + '"'};
-  if (fromId === toId) return {error: 'source and target are the same node'};
-  var key = fromId + '->' + toId;
-  if ((got.d.edges || []).some(function(e){ return e && builderEdgeKey(e) === key; }))
-    return {error: 'edge "' + key + '" already exists \u2014 click it to edit'};
-  var item = '{"from": ' + JSON.stringify(fromId) + ', "to": ' + JSON.stringify(toId) +
-             ', "kind": "int", "label": "describe the hop"}';
-  var r = jsonInsertListItemOrCreate(text, got.path, 'edges', item);
-  if (!r) return {error: 'could not edit edges in the editor text'};
-  return {text: r.text, start: r.start, end: r.end, kind: 'edge',
-          index: Array.isArray(got.d.edges) ? got.d.edges.length : 0};
-}
-
-function planDuplicateNode(text, raw, sectionIdx, id){
-  /* Copy a node definition under a fresh id and place the copy right
-     beside the original (same row slot, same stack, or floats list). */
-  var got = builderDiagram(text, raw, sectionIdx);
-  if (got.error) return got;
-  var d = got.d;
-  if (!d.nodes || !Object.prototype.hasOwnProperty.call(d.nodes, id))
-    return {error: 'node "' + id + '" not found'};
-  var newId = builderUniqueKey(d.nodes, id);
-  var placed = null;
-  (d.rows || []).forEach(function(row, r){
-    if (placed) return;
-    row.forEach(function(slot, s){
-      if (placed) return;
-      if (slot === id) placed = {path: got.path.concat(['rows', r]), after: s};
-      else if (Array.isArray(slot)){
-        var k = slot.indexOf(id);
-        if (k >= 0) placed = {path: got.path.concat(['rows', r, s]), after: k};
-      }
-    });
-  });
-  var out;
-  if (placed){
-    out = jsonInsertArrayItemAfter(text, placed.path, placed.after, JSON.stringify(newId));
-    if (!out) return {error: 'could not edit rows in the editor text'};
-  } else {
-    var floats = d.floats || [];
-    var fi = -1;
-    floats.forEach(function(f, i){ if (fi < 0 && f && f.id === id) fi = i; });
-    if (fi < 0) return {error: 'node "' + id + '" has no row or float placement to copy'};
-    /* clone the WHOLE float entry (side plus any nudge fields), fresh id,
-       placed directly after the original like the row cases */
-    var entry = builderClone(floats[fi]);
-    entry.id = newId;
-    out = jsonInsertArrayItemAfter(text, got.path.concat(['floats']), fi, JSON.stringify(entry));
-    if (!out) return {error: 'could not edit floats in the editor text'};
-  }
-  var def = jsonInsertMember(out.text, got.path.concat(['nodes']), newId,
-    JSON.stringify(builderClone(d.nodes[id])));
-  if (!def) return {error: 'could not edit nodes in the editor text'};
-  return {text: def.text, start: def.start, end: def.end, kind: 'node', id: newId};
-}
-
-function planDuplicateSection(text, raw, sectionIdx){
-  /* Deep-copy a section directly after the original; the copy renders as
-     the next section ordinal (render order is depth-first list order). */
-  var rec = specSectionPaths(raw)[sectionIdx];
-  if (!rec) return {error: 'no such section'};
-  if (!rec.section.length)
-    return {error: 'this spec is one bare diagram \u2014 wrap it as {"page": {"blocks": [ ... ]}} first'};
-  var clone = builderClone(specValueAt(raw, rec.section));
-  if (clone && typeof clone.heading === 'string') clone.heading += ' (copy)';
-  var parentPath = rec.section.slice(0, -1);
-  var idx = rec.section[rec.section.length - 1];
-  var r = jsonInsertArrayItemAfter(text, parentPath, idx, JSON.stringify(clone, null, 2));
-  if (!r) return {error: 'could not edit the editor text'};
-  return {text: r.text, start: r.start, end: r.end, kind: 'section', index: sectionIdx + 1};
-}
 
 /* ---------------- durability: filenames ---------------- */
 
@@ -28527,115 +28711,7 @@ function diffSpecTexts(baselineText, currentText){
   return {findings: diffSpecs(oldObj, newObj)};
 }
 
-/* ---------------- tab management ----------------
-   Tabs are addressed by BLOCK index (the position in the page's
-   blocks/sections list — the same index the engine bakes into each tab
-   button's id "tab-<block>-<tab>") plus the tab index inside that
-   block's tabs list. */
-
-var BUILDER_TAB_TEMPLATE = [
-  '{',
-  '  "label": "New tab",',
-  '  "sections": [' + BUILDER_SECTION_TEMPLATE.split('\n').join('\n  ') + ']',
-  '}'
-].join('\n');
-
-/* a whole tabs container: two tabs, one starter section each — the
-   "+ tab" button on a selected tab grows it from there */
-var BUILDER_TABS_TEMPLATE = [
-  '{',
-  '  "tabs": [',
-  '    ' + BUILDER_TAB_TEMPLATE.replace('"New tab"', '"Tab one"').split('\n').join('\n    ') + ',',
-  '    ' + BUILDER_TAB_TEMPLATE.replace('"New tab"', '"Tab two"').split('\n').join('\n    '),
-  '  ]',
-  '}'
-].join('\n');
-
-function planAddTabs(text, raw){
-  /* append a tabs container to the page's block list — same shape rules
-     as planAddSection */
-  var base, page;
-  if (raw && raw.page){ page = raw.page; base = ['page']; }
-  else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
-  else if (raw && raw.nodes && raw.rows)
-    return {error: 'this spec is a bare diagram — wrap it as {"page": {"blocks": [ {...} ]}} to hold tabs'};
-  else return {error: 'no page to add tabs to'};
-  var key = page.blocks ? 'blocks' : 'sections';
-  if (!jsonLocate(text, base.concat([key])))
-    return {error: 'could not find the ' + key + ' list in the editor text'};
-  var r = jsonInsertMember(text, base.concat([key]), null, BUILDER_TABS_TEMPLATE);
-  if (!r) return {error: 'could not edit the ' + key + ' list in the editor text'};
-  return {text: r.text, start: r.start, end: r.end, kind: 'tabs',
-          block: (page[key] || []).length,
-          index: specSectionPaths(raw).length};
-}
-
-function planAddTab(text, raw, blockIdx, afterIdx){
-  /* insert a renderable tab (one starter section) directly after the
-     tab the operator is looking at */
-  var path = builderTabPath(raw, blockIdx, afterIdx);
-  if (!path) return {error: 'tab not found — reselect and try again'};
-  var tabsPath = path.slice(0, -1);
-  var r = jsonInsertArrayItemAfter(text, tabsPath, afterIdx, BUILDER_TAB_TEMPLATE);
-  if (!r) return {error: 'could not edit the tabs list in the editor text'};
-  return {text: r.text, start: r.start, end: r.end, kind: 'tab',
-          block: blockIdx, index: afterIdx + 1};
-}
-
-function planDeleteTab(text, raw, blockIdx, tabIdx){
-  var path = builderTabPath(raw, blockIdx, tabIdx);
-  if (!path) return {error: 'tab not found — reselect and try again'};
-  var tabsPath = path.slice(0, -1);
-  var tabs = specValueAt(raw, tabsPath);
-  if (Array.isArray(tabs) && tabs.length === 1)
-    return {error: 'this is the block\u2019s last tab — delete its sections instead, or remove the whole tabs block in the JSON'};
-  var r = jsonRemoveMember(text, tabsPath, tabIdx);
-  if (!r) return {error: 'could not edit the tabs list in the editor text'};
-  return r;
-}
-
-function planMoveTab(text, raw, blockIdx, tabIdx, delta){
-  var path = builderTabPath(raw, blockIdx, tabIdx);
-  if (!path) return {error: 'tab not found — reselect and try again'};
-  var tabsPath = path.slice(0, -1);
-  var tabs = specValueAt(raw, tabsPath);
-  var to = tabIdx + delta;
-  if (to < 0 || to >= tabs.length) return {error: 'already at that end'};
-  var r = builderRewrite(text, raw, tabsPath, function(copy){
-    var item = copy.splice(tabIdx, 1)[0];
-    copy.splice(to, 0, item);
-  });
-  if (r.error) return r;
-  r.kind = 'tab'; r.block = blockIdx; r.index = to;
-  return r;
-}
-
 /* ---------------- reordering ---------------- */
-
-/* move a section one slot within ITS OWN list (the top-level blocks list,
-   or its tab's sections list). A neighbor blocks-list entry may be a tabs
-   container — the move hops over it whole. Returns newPath (the section's
-   list slot after the move); the caller recomputes the flat ordinal from
-   it, because hopping a tabs container shifts ordinals by its section
-   count. */
-function planMoveSection(text, raw, sectionIdx, delta){
-  var rec = specSectionPaths(raw)[sectionIdx];
-  if (!rec) return {error: 'section not found — reselect and try again'};
-  var spath = rec.section;
-  if (!spath.length) return {error: 'a bare-diagram page has only one section'};
-  var listPath = spath.slice(0, -1);
-  var idx = spath[spath.length - 1];
-  var list = specValueAt(raw, listPath);
-  if (!Array.isArray(list)) return {error: 'section list not found in the editor text'};
-  var to = idx + delta;
-  if (to < 0) return {error: 'already first in its list'};
-  if (to >= list.length) return {error: 'already last in its list'};
-  var swap = jsonSwapListItems(text, listPath, idx, to);
-  if (!swap) return {error: 'could not locate both sections in the editor text'};
-  var span = delta < 0 ? swap.first : swap.second;
-  return {text: swap.text, start: span.start, end: span.end,
-          kind: 'section', newPath: listPath.concat([to])};
-}
 
 /* swap the LAYOUT positions of two nodes: every appearance in rows
    (slots and stacks) and floats trades ids. Node definitions, edges, and
@@ -28730,64 +28806,6 @@ function planStackNodes(text, raw, sectionIdx, nodeIds){
   if (plan.error) return plan;
   plan.kind = 'node';
   return plan;
-}
-
-/* ---------------- multi-select: bulk planners ----------------
-   A multi-selection is HOMOGENEOUS (one kind) — mixed-kind bulk deletes
-   interact with cascades (a node delete prunes edges/steps) in ways that
-   silently invalidate sibling targets. Deletes apply highest-index-first
-   per section so earlier deletions cannot shift later targets. */
-var BUILDER_MULTI_KINDS = ['node', 'edge', 'step', 'panel', 'bullet', 'crow'];
-
-function builderDeletePlan(text, raw, t){
-  if (t.kind === 'tab') return planDeleteTab(text, raw, t.block, t.tab);
-  if (t.kind === 'group') return planDeleteGroup(text, raw, t.section, t.id);
-  if (t.kind === 'node') return planDeleteNode(text, raw, t.section, t.id);
-  if (t.kind === 'edge') return planDeleteEdge(text, raw, t.section, t.index);
-  if (t.kind === 'step') return planDeleteStep(text, raw, t.section, t.index);
-  if (t.kind === 'panel') return planDeletePanel(text, raw, t.section, t.index);
-  var rec = specSectionPaths(raw)[t.section];
-  if (!rec) return {error: 'no such section'};
-  if (t.kind === 'bullet') return planDeleteListItem(text, raw, rec.section.concat(['bullets']), t.index);
-  if (t.kind === 'para'){
-    var sec = specValueAt(raw, rec.section);
-    if (sec && typeof sec.text === 'string') return planSetField(text, raw, rec.section, 'text', null);
-    return planDeleteListItem(text, raw, rec.section.concat(['text']), t.index);
-  }
-  if (t.kind === 'crow') return planDeleteListItem(text, raw, rec.section.concat(['contract', 'fields']), t.index);
-  return planDeleteSection(text, raw, t.section);
-}
-
-function planBulkSetField(text, targets, key, valueTextOrNull){
-  var cur = text;
-  for (var i = 0; i < targets.length; i++){
-    var raw;
-    try { raw = JSON.parse(cur); }
-    catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
-    var path = builderTargetPath(raw, targets[i]);
-    if (!path) return {error: 'selection ' + (i + 1) + ' no longer resolves — re-render and reselect'};
-    var plan = planSetField(cur, raw, path, key, valueTextOrNull);
-    if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
-    cur = plan.text;
-  }
-  return {text: cur, count: targets.length};
-}
-
-function planBulkDelete(text, targets){
-  var list = targets.slice().sort(function(a, b){
-    if ((a.section || 0) !== (b.section || 0)) return (b.section || 0) - (a.section || 0);
-    return (typeof b.index === 'number' ? b.index : 0) - (typeof a.index === 'number' ? a.index : 0);
-  });
-  var cur = text;
-  for (var i = 0; i < list.length; i++){
-    var raw;
-    try { raw = JSON.parse(cur); }
-    catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
-    var plan = builderDeletePlan(cur, raw, list[i]);
-    if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
-    cur = plan.text;
-  }
-  return {text: cur, count: list.length};
 }
 
 /* ---------------- step contract editing ----------------
@@ -33168,7 +33186,7 @@ function initPanelPicker(opts){
   opts.src.addEventListener('input',invalidate);
   return {open:open,close:close,refresh:function(){if(dialog.open && !panelPickerCurrent(snapshot,opts.context())) invalidate();},invalidate:invalidate};
 }
-/* ---- src/clipboard.workbench.js ---- */
+/* ---- src/workbench/commands/clipboard.js ---- */
 /* Object clipboard. The envelope travels as plain text; only explicitly
    copied declarations are pasted. Initial state travels with a Home element,
    while timeline patches remain owned by their original diagram. */
@@ -33348,7 +33366,7 @@ function planPasteBuilderClipboard(text,raw,data,destination){
     return {text:JSON.stringify(next,null,2),target:target};
   } catch(ex){return {error:ex.message};}
 }
-
+/* ---- src/clipboard.workbench.js ---- */
 /* Browser transport is separate from the pure planners so native clipboard
    events, denied permissions, and stale destinations can be tested directly. */
 function initBuilderClipboard(document, options){

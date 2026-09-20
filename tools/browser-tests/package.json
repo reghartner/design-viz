@@ -1,0 +1,8 @@
+{
+  "name": "flowview-browser-contracts",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "playwright test", "install:browser": "playwright install chromium"},
+  "devDependencies": {"@playwright/test": "1.63.0"},
+  "engines": {"node": ">=24"}
+}

@@ -109,6 +109,8 @@ Run `python3 tools/build.py`, the matching shared Node/Python suites,
 `npm run verify --prefix apps/confluence` when changing assembly. Check Backstage
 freshness with `npm run check:viewer --prefix apps/backstage`; upstream CJS/ESM
 backend and isolated plugin-copy checks verify source-unavailable distribution.
-Keep emitted-content assertions alongside source-level tests. Required pinned
-browser CI is a separate follow-up; local browser probes do not establish company
-host or CSP acceptance.
+Keep emitted-content assertions alongside source-level tests. The required
+[browser contracts](../tools/browser-tests/README.md) use a pinned downloaded
+Chromium across offline HTML, workbench/lifetime, native React and copied Forge
+resources. Its CI job must pass alongside freshness and pure checks. These
+fixtures do not establish company host or CSP acceptance.

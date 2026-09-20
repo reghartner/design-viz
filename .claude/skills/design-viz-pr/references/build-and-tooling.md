@@ -51,6 +51,14 @@
 - Dependency changes: examine manifests and lockfile delta, runtime/import
   compatibility and resulting build. Use the affected app's install/verify
   commands. A lockfile-only diff can still change runtime behavior.
+- Required browser contracts live in the isolated `tools/browser-tests` package.
+  Follow its README for locked dependencies and the matching downloaded Chromium;
+  no ambient browser fallback, retries or missing-browser skips are allowed.
+  The `browser-contracts` job runs on every PR, preserving existing pure/host
+  gates. Review fixtures against their production artifact and named-assembly
+  owners, strict error/network audit, resource baseline and failure traces.
+  Check the new job is green on the reviewed head before merging; local Chrome
+  evidence alone does not satisfy the required CI contract.
 - Workflow changes: check event/ref selection, permissions, secret availability,
   concurrency and failure propagation. Pull-request content must not acquire
   privileged execution via changed triggers. `canon-drift.yml` also requires

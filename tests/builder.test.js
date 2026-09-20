@@ -1,5 +1,5 @@
 'use strict';
-const {readSource} = require('../tools/source-loader.cjs');
+const {readSource, entrypoint} = require('../tools/source-loader.cjs');
 
 /* Tests for assembled editor behavior and inspector/read-model helpers. Pure
    command and source suites load only their corresponding workbench leaves.
@@ -14,36 +14,13 @@ const vm = require('node:vm');
 const ROOT = path.join(__dirname, '..');
 
 function loadBuilder(extraGlobals){
-  const code =
-    readSource('builder.workbench.js') + '\n' +
-    ';__exports = {mermaidToSpec, jsonLocate, jsonContainer, jsonInsertMember, jsonInsertListItemOrCreate,' +
-    ' specSectionPaths, specValueAt, starterCountLine, builderTargetPath, builderPathString,' +
-    ' builderPositionLine, builderInsertTargetText,' +
-    ' builderUniqueKey, builderFlatRowIds, builderSlotGapXs,' +
-    ' planAddNode, planAddEdge, planAddStep, planAddPanel, planAddSection,' +
-    ' jsonReplaceValue, jsonRemoveMember, jsonSetField, planSetField,' +
-    ' planSetNodeGroup, planBulkSetGroup, planSetGroupTitle, planSetGroupIcon, planRenameGroup, planDeleteGroup,' +
-    ' planSetGroupParent, builderGroupParentOptions,' +
-    ' planSetEdgeEndpoint, planRenameNode, planRenamePanel,' +
-    ' planDeleteNode, planDeleteEdge, planDeletePanel, planDeleteStep,' +
-    ' planMoveStep, planMoveRow, planMoveGroup, planMoveNode, planSetNodeFloat, planDeleteSection, builderEdgeKey, builderRetargetStepKeys,' +
-    ' jsonInsertArrayItemAfter, planReplaceValue, planSetFields, planDeleteListItem,' +
-    ' planAddEdgeBetween, planDuplicateNode, planDuplicateSection,' +
-    ' NODE_PRESETS, PANEL_TEMPLATES,' +
-    ' specFileName, parseValidationPath, findingLocation, diffSpecs, diffSpecTexts, parseStarterManifest, buildExportHtml,' +
-    ' builderTabPath, planAddTab, planDeleteTab, planMoveTab, BUILDER_TAB_TEMPLATE, planAddTabs, BUILDER_TABS_TEMPLATE,' +
-    ' builderStepHops, planStepToggleHop, planStepToggleNode, planStepTogglePanel, planStepSetPanelPatch, planStepTone,' +
-    ' PANEL_SETUP_FIELDS, PANEL_PATCH_FIELDS, patchSummaryLine, panelPatchFields, patchFieldsCollect, SCENE_TOKENS,' +
-    ' builderSectionPrefs,' +
-    ' rowsEditorCollect, mapEditorCollect, objFieldsCollect, builderRowMerge, jsonSwapListItems, planMoveSection, planSwapNodes, planStackNodes, builderDeletePlan, planBulkSetField, planBulkDelete, BUILDER_MULTI_KINDS,' +
-    ' BUILDER_GUIDES, BUILDER_SECTION_TEMPLATE};';
+  const code = entrypoint('workbench').body;
   const sandbox = {console};
-  vm.runInNewContext(readSource('validator.js'), sandbox);
+  vm.runInNewContext(code, sandbox);
   // This utility harness deliberately tests the no-clock-parser fallback.
   sandbox.parseClock = undefined;
   if (extraGlobals) Object.assign(sandbox, extraGlobals);
-  vm.runInNewContext(code, sandbox);
-  return sandbox.__exports;
+  return sandbox;
 }
 const B = loadBuilder();
 
@@ -164,12 +141,10 @@ const PROSE_TEXT = JSON.stringify(PROSE, null, 2);
 /* ================= pass 4: insert palettes ================= */
 
 function loadValidator(){
-  const code =
-    readSource('validator.js') + '\n' +
-    ';__exports = {validate, normalize, parseClock, ICON_SET, TINT_SET, PANEL_TYPES};';
+  const code = readSource('validator.js');
   const sandbox = {console};
   vm.runInNewContext(code, sandbox);
-  return sandbox.__exports;
+  return sandbox;
 }
 const V = loadValidator();
 
@@ -693,8 +668,9 @@ test('Mermaid import UI blocks opening and conversion while ADD TO STEP is armed
 test('generated workbench validates imported skeletons and retains expected authoring lint', () => {
   const html = fs.readFileSync(path.join(ROOT, 'workbench/flowspec.html'), 'utf8');
   const sandbox = {console};
-  vm.runInNewContext(html.slice(html.indexOf('/* ---- src/panels/registry.js ---- */'),
-    html.indexOf('/* ---- src/boot.workbench.js ---- */')), sandbox);
+  const entry = entrypoint('workbench');
+  assert.ok(html.includes(entry.source), 'the exact named composition is emitted in the committed workbench');
+  vm.runInNewContext(entry.body, sandbox);
   const hld = fs.readFileSync(path.join(ROOT, 'examples/cumulus/cumulus-hld.md'), 'utf8');
   const page = sandbox.normalize(sandbox.mermaidToSpec(hld));
   assert.deepStrictEqual(plain(sandbox.validate(page)), {errors: [], warnings: []});

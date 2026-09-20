@@ -15240,18 +15240,18 @@ PanelRegistry.extend('zoneframe', {
     },
   },
 });
-module.exports = FlowCanon;
-module.exports.compatibility = FlowviewCompatibility;
-module.exports.validateSpec = raw => validate(normalize(raw));
+/* ---- src/core/backend.js ---- */
+/* Static backend facade. This shares the outer pure core and never initializes
+   the DOM renderer; consumers do not need source files at runtime. */
+function validateSpec(raw){return validate(normalize(raw));}
 var viewerRoutingCache;
-module.exports.viewerRouting = () => {
-  if (!viewerRoutingCache) viewerRoutingCache = createViewerRouting();
+function viewerRouting(){
+  if(!viewerRoutingCache)viewerRoutingCache=createViewerRouting();
   return viewerRoutingCache;
-};
-// The facade uses the shared outer pure-core scope, including navigation.
-// Constructing it never initializes the DOM renderer.
-function createViewerRouting(){
-return {normalize, blocksOf, sectionRecords, sectionReferences, parseHash, buildHash,
-  diagramPathList, diagramForPath, resolveSourceStep, stepKeys, stepFailures, stepReference,
-  diagramLayoutViews, sectionLayoutItems, foldNodeTones, foldPanelStates, layout, lintPage};
 }
+function createViewerRouting(){
+  return {normalize, blocksOf, sectionRecords, sectionReferences, parseHash, buildHash,
+    diagramPathList, diagramForPath, resolveSourceStep, stepKeys, stepFailures, stepReference,
+    diagramLayoutViews, sectionLayoutItems, foldNodeTones, foldPanelStates, layout, lintPage};
+}
+module.exports = Object.assign(FlowCanon,{"compatibility":FlowviewCompatibility,"validateSpec":validateSpec,"viewerRouting":viewerRouting});

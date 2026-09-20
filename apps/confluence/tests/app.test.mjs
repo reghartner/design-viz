@@ -9,9 +9,7 @@ const root=new URL('../../../',import.meta.url);
 const html=await readFile(new URL('../src/index.html',import.meta.url),'utf8');
 const home=await readFile(new URL('src/starters/homemap-story.json',root),'utf8');
 const trace=await readFile(new URL('src/starters/complex-trace.json',root),'utf8');
-const names=['buildConfluenceExport','buildConfluenceConfig','confluenceSections','confluenceDisplayPage',
-  'confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','DEFAULT_SKIN','renderPage','applySkinClasses'];
-const source=(await Promise.all(['canon','validator','engine','confluence'].map(n=>sourceLoader.readSource(n+'.js')))).join('\n');
+const entry=sourceLoader.entrypoint('forge'),source=entry.source;
 const settle=()=>new Promise(resolve=>setTimeout(resolve,5));
 async function setup(t,{config={},configuring=true,submit,contextError=false,reducedMotion=true}={}){
   const dom=new JSDOM(html,{url:'https://forge.example/viewer/',runScripts:'outside-only',pretendToBeVisual:true});
@@ -21,7 +19,7 @@ async function setup(t,{config={},configuring=true,submit,contextError=false,red
   win.SVGElement.prototype.getTotalLength=()=>100;
   win.SVGElement.prototype.getPointAtLength=n=>({x:n,y:0});
   win.eval(source);
-  const core=Object.fromEntries(names.map(n=>[n,win[n]])), calls={submits:[],closes:0,urls:[]};
+  const core=Object.fromEntries(Object.entries(entry.exports).map(([name,binding])=>[name,win[binding]])), calls={submits:[],closes:0,urls:[]};
   const bridge={view:{
     getContext:async()=>{if(contextError) throw Error('offline');return {siteUrl:'https://company.atlassian.net',extension:{config,macro:{isConfiguring:configuring}}};},
     submit:async p=>{calls.submits.push(JSON.parse(JSON.stringify(p)));if(submit) await submit(p);},
@@ -329,4 +327,12 @@ test('all row routing modes expose sizing without changing the drawing or requir
     }
     assert.equal(s.calls.submits.length,0,'viewing choices never save macro configuration');
   }
+});
+
+test('production core composition includes complete compatibility metadata as well as its supported exports',async t=>{
+  const s=await setup(t),compatibility=s.win.FlowviewCompatibility;
+  assert.equal(typeof compatibility.check,'function');
+  assert.ok(compatibility.features['panel.homemap']);
+  assert.deepEqual(Array.from(compatibility.check(JSON.parse(home)).missingFeatures),[]);
+  for(const [name,binding] of Object.entries(entry.exports))assert.notEqual(s.win[binding],undefined,name);
 });

@@ -2,111 +2,217 @@
   {
     "family": "IBM Plex Sans",
     "weight": 400,
-    "file": "ibm-plex-sans-latin-400-normal.woff2"
+    "file": "ibm-plex-sans-latin-400-normal.woff2",
+    "license": "ibm-plex-sans-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/ibm-plex-sans/latin-400.css"
   },
   {
     "family": "IBM Plex Sans",
     "weight": 500,
-    "file": "ibm-plex-sans-latin-500-normal.woff2"
+    "file": "ibm-plex-sans-latin-500-normal.woff2",
+    "license": "ibm-plex-sans-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/ibm-plex-sans/latin-500.css"
   },
   {
     "family": "IBM Plex Sans",
     "weight": 600,
-    "file": "ibm-plex-sans-latin-600-normal.woff2"
+    "file": "ibm-plex-sans-latin-600-normal.woff2",
+    "license": "ibm-plex-sans-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/ibm-plex-sans/latin-600.css"
   },
   {
     "family": "IBM Plex Mono",
     "weight": 400,
-    "file": "ibm-plex-mono-latin-400-normal.woff2"
+    "file": "ibm-plex-mono-latin-400-normal.woff2",
+    "license": "ibm-plex-mono-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/ibm-plex-mono/latin-400.css"
   },
   {
     "family": "IBM Plex Mono",
     "weight": 500,
-    "file": "ibm-plex-mono-latin-500-normal.woff2"
+    "file": "ibm-plex-mono-latin-500-normal.woff2",
+    "license": "ibm-plex-mono-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/ibm-plex-mono/latin-500.css"
   },
   {
     "family": "IBM Plex Mono",
     "weight": 600,
-    "file": "ibm-plex-mono-latin-600-normal.woff2"
+    "file": "ibm-plex-mono-latin-600-normal.woff2",
+    "license": "ibm-plex-mono-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/ibm-plex-mono/latin-600.css"
   },
   {
     "family": "IBM Plex Mono",
     "weight": 700,
-    "file": "ibm-plex-mono-latin-700-normal.woff2"
+    "file": "ibm-plex-mono-latin-700-normal.woff2",
+    "license": "ibm-plex-mono-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/ibm-plex-mono/latin-700.css"
   },
   {
     "family": "Sora",
     "weight": 600,
-    "file": "sora-latin-600-normal.woff2"
+    "file": "sora-latin-600-normal.woff2",
+    "license": "sora-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/sora/latin-600.css"
   },
   {
     "family": "Sora",
     "weight": 700,
-    "file": "sora-latin-700-normal.woff2"
+    "file": "sora-latin-700-normal.woff2",
+    "license": "sora-LICENSE.txt",
+    "profiles": [
+      "all",
+      "forge"
+    ],
+    "fontsource": "@fontsource/sora/latin-700.css"
   },
   {
     "family": "Newsreader",
     "weight": 500,
-    "file": "newsreader-latin-500-normal.woff2"
+    "file": "newsreader-latin-500-normal.woff2",
+    "license": "newsreader-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Newsreader",
     "weight": 600,
-    "file": "newsreader-latin-600-normal.woff2"
+    "file": "newsreader-latin-600-normal.woff2",
+    "license": "newsreader-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Newsreader",
     "weight": 700,
-    "file": "newsreader-latin-700-normal.woff2"
+    "file": "newsreader-latin-700-normal.woff2",
+    "license": "newsreader-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Source Sans 3",
     "weight": 400,
-    "file": "source-sans-3-latin-400-normal.woff2"
+    "file": "source-sans-3-latin-400-normal.woff2",
+    "license": "source-sans-3-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Source Sans 3",
     "weight": 500,
-    "file": "source-sans-3-latin-500-normal.woff2"
+    "file": "source-sans-3-latin-500-normal.woff2",
+    "license": "source-sans-3-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Source Sans 3",
     "weight": 600,
-    "file": "source-sans-3-latin-600-normal.woff2"
+    "file": "source-sans-3-latin-600-normal.woff2",
+    "license": "source-sans-3-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Source Sans 3",
     "weight": 700,
-    "file": "source-sans-3-latin-700-normal.woff2"
+    "file": "source-sans-3-latin-700-normal.woff2",
+    "license": "source-sans-3-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Plus Jakarta Sans",
     "weight": 600,
-    "file": "plus-jakarta-sans-latin-600-normal.woff2"
+    "file": "plus-jakarta-sans-latin-600-normal.woff2",
+    "license": "plus-jakarta-sans-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Plus Jakarta Sans",
     "weight": 700,
-    "file": "plus-jakarta-sans-latin-700-normal.woff2"
+    "file": "plus-jakarta-sans-latin-700-normal.woff2",
+    "license": "plus-jakarta-sans-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Plus Jakarta Sans",
     "weight": 800,
-    "file": "plus-jakarta-sans-latin-800-normal.woff2"
+    "file": "plus-jakarta-sans-latin-800-normal.woff2",
+    "license": "plus-jakarta-sans-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Barlow Condensed",
     "weight": 500,
-    "file": "barlow-condensed-latin-500-normal.woff2"
+    "file": "barlow-condensed-latin-500-normal.woff2",
+    "license": "barlow-condensed-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Barlow Condensed",
     "weight": 600,
-    "file": "barlow-condensed-latin-600-normal.woff2"
+    "file": "barlow-condensed-latin-600-normal.woff2",
+    "license": "barlow-condensed-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   },
   {
     "family": "Barlow Condensed",
     "weight": 700,
-    "file": "barlow-condensed-latin-700-normal.woff2"
+    "file": "barlow-condensed-latin-700-normal.woff2",
+    "license": "barlow-condensed-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   }
 ]

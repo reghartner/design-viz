@@ -11,7 +11,11 @@ changing a host API rather than inferring it from the mock.
   app is a viewer with off-platform editing and manual JSON import. Any deliberate
   change to that boundary needs matching architecture/handoff updates. Run
   `tests/confluence.test.js`; in `apps/confluence`, run `npm ci` if needed and
-  `npm run verify` using the Node version in CI.
+  `npm run verify` using the Node version in CI. Forge production and app tests
+  use the same named `forge` module exports; its artifact-only resource checker
+  verifies copied scripts/styles/fonts with upstream reads denied. Preserve the
+  explicit nine-weight font profile and local-resource policy. See
+  `docs/build-entrypoints.md`.
 - **Backstage / catalog / mock:** read the affected section of
   `docs/backstage-integration.md`; plugin work also uses `apps/backstage/README.md`.
   Check fully qualified entity identity, per-viewer visibility, authenticated

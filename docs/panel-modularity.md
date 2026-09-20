@@ -104,8 +104,10 @@ duplicate rules between modules.
 
 `src/source-bundles.json` discovers `panels/types/*.js` deterministically. The
 validator bundle includes DOM-free definitions; the viewer adds the engine and
-the workbench adds generic editing code. Node/Python builders use the same manifest
-and asset collector. Use `readSource('validator.js')` from
+the workbench adds generic editing code. Named entrypoints order these bundles
+and select shared assets and deliberate exports. `tools/source-loader.cjs` owns
+physical expansion and substitution; Python consumes its CLI, and host builders
+use its API. See [build entrypoints](build-entrypoints.md). Use `readSource('validator.js')` from
 `tools/source-loader.cjs` for headless tools/tests; it assembles the registry,
 validator, pure core leaves, shared helpers and type definitions. Geometry lives in
 `core/geometry.js` and uses the validator's existing `clamp()` helper at call time.
@@ -119,7 +121,10 @@ canonicalization needs `URL`). See [shared core](shared-core.md) for ownership,
 section records and the exact source-step lookup.
 Reading raw bundle files directly skips their manifest dependencies.
 Feature metadata and CSS are collected at build time for
-standalone, workbench, Backstage and Forge.
+standalone, workbench, Backstage and Forge. Metadata substitution follows the
+physical `compatibility.js` file even through a logical alias. Core and workbench
+CSS include ordered registry contributions; page CSS remains raw so combining
+page and core does not duplicate panel styles.
 
 The logical `builder.workbench.js` bundle loads source-edit, raw-target and command
 leaves before the generic builder. Pure layout/reuse/clipboard planners share

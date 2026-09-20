@@ -19,11 +19,9 @@ BACKLINK_RE = re.compile(
     r'^(<script type="application/json" id="flowbacklinks">)\n(.*?)\n(</script>)',
     re.S | re.M,
 )
-# The shared chunk is validator.js + engine.js; the workbench additionally
-# bundles builder.workbench.js after the engine, so the chunk ends at the
-# first page-specific fragment marker (builder.* or boot.*).
-ENGINE_CHUNK_RE = re.compile(
-    r"/\* ---- src/validator\.js ---- \*/(.*?)/\* ---- src/(?:builder\.|boot\.|trace-import\.)", re.S)
+def entrypoint(name):
+    return json.loads(subprocess.check_output(
+        ['node', str(ROOT / 'tools/source-loader.cjs'), '--entrypoint', name], text=True))
 
 
 class BuildTests(unittest.TestCase):
@@ -100,13 +98,14 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(json.loads(blocks[0][1]), {"services": {}})
         self.assertNotIn('id="flowbacklinks"', self.texts["flowspec.html"])
 
-    def test_shared_engine_chunk_identical_across_outputs(self):
-        chunks = []
-        for name in ("flowview.html", "flowspec.html"):
-            m = ENGINE_CHUNK_RE.search(self.texts[name])
-            self.assertIsNotNone(m, name)
-            chunks.append(m.group(1))
-        self.assertEqual(chunks[0], chunks[1])
+    def test_named_sources_ship_once_and_shared_viewer_content_is_identical(self):
+        shared = entrypoint('native')['source']
+        for filename, name in [('flowview.html', 'standalone'), ('flowspec.html', 'workbench')]:
+            entry = entrypoint(name)
+            self.assertEqual(self.texts[filename].count(entry['source']), 1, filename)
+            self.assertEqual(self.texts[filename].count(shared), 1, filename)
+            files = [record['file'] for record in entry['records']]
+            self.assertEqual(len(files), len(set(files)), filename)
 
     def test_build_is_deterministic(self):
         before = {p: p.read_text() for p in OUTPUTS}

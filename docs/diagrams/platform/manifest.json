@@ -1,0 +1,23 @@
+{
+  "pages": [
+    {
+      "file": "flowview-platform.html",
+      "spec": "flowview-platform.spec.json",
+      "title": "Flowview · from design to living evidence",
+      "family": "platform",
+      "description": "Eight presentation chapters: ownership, seeded authoring, native Backstage, code drift, human review, trace evidence, shared releases and the real-host rehearsal.",
+      "tags": [
+        "backstage",
+        "github",
+        "drift",
+        "presentation",
+        "architecture"
+      ],
+      "widgets": [
+        "image",
+        "state",
+        "table"
+      ]
+    }
+  ]
+}

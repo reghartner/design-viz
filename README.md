@@ -31,7 +31,13 @@ inside service/API pages, with in-place step jumps and external editing. Its
 native renderer owns a ShadowRoot and makes no background network requests;
 the Backstage host reads specs through the authenticated proxy. The plugin guide includes a local preview.
 
-The [system walkthrough](docs/diagrams/backstage/backstage.html) now includes
+The [presentation edition](docs/diagrams/platform/index.html) covers the current
+platform in eight guided chapters, with real local Backstage screenshots,
+slide-ready diagram images and a [suggested talk track](docs/diagrams/platform/README.md).
+It separates ownership, catalog-seeded authoring, native viewing, code drift,
+human review, trace evidence, shared releases and the end-to-end rehearsal.
+
+The [detailed system walkthrough](docs/diagrams/backstage/backstage.html) includes
 **Deployment** and **Inline viewer** tabs: repository ownership, external editing,
 authenticated reads, native mount ownership and stale-revision handling, alongside
 the existing GitHub drift and trace flows. Its embedded screenshot shows the

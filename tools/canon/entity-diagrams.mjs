@@ -19,13 +19,7 @@ export function buildEntityDiagramIndex(specs,{publicBaseUrl=''}={}){
     const editUrl=base+'/workbench/flowspec.html?canon='+encodeURIComponent(canon.id)+'&layout=backstage';
     // Includes prose-only sections and every tab, exactly as the viewer counts
     // and names them. Duplicate/numeric headings use its canonical references.
-    const sections=[];
-    for(const block of routing.blocksOf(page)){
-      if(block.type==='section')sections.push(block.sec);
-      else for(const tab of block.tabs)sections.push(...tab.sections);
-    }
-    const references=routing.sectionReferences(sections.map(s=>s.heading));
-    sections.forEach((section,sectionIndex)=>{
+    routing.sectionRecords(page).forEach(({section,reference,number})=>{
       const d=section.diagram;if(!d)return;
       const matches=new Map(),nodes=d.nodes || {};
       for(const [id,node] of Object.entries(nodes)){
@@ -37,7 +31,7 @@ export function buildEntityDiagramIndex(specs,{publicBaseUrl=''}={}){
           matches.get(ref).push({id,title:node.title || id,relationship:binding.relationship});
         }
       }
-      const reference=references[sectionIndex],url=viewerUrl+routing.buildHash({d:reference});
+      const url=viewerUrl+routing.buildHash({d:reference});
       for(const [entityRef,matchedNodes] of matches){
         if(!entities.has(entityRef))entities.set(entityRef,new Map());
         const diagrams=entities.get(entityRef);
@@ -65,7 +59,7 @@ export function buildEntityDiagramIndex(specs,{publicBaseUrl=''}={}){
           });
           if(steps.length)paths.push({id:path.id,label:path.label,steps});
         }
-        diagrams.get(canon.id).sections.push({reference,title:section.heading || 'Diagram '+(sectionIndex+1),url,nodes:matchedNodes,paths});
+        diagrams.get(canon.id).sections.push({reference,title:section.heading || 'Diagram '+number,url,nodes:matchedNodes,paths});
       }
     });
   }

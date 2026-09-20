@@ -55,11 +55,17 @@ Do not promote that no-auth development server into the company environment.
 ### Backend production packaging
 
 `tools/canon/core.cjs` imports the committed `generated-runtime.cjs` through a
-static CommonJS dependency. It contains the shared catalog, validation and lazy
-viewer-routing code. Backend bundlers can include it without copying `src/` into
+static CommonJS dependency. It contains the shared catalog, validation and pure
+core code, exposed through a cached viewer-routing facade. Backend bundlers can include it without copying `src/` into
 the image, and it never uses `fs.readFileSync` or `vm` to load renderer source.
 Keep the generated module when vendoring `tools/canon/`; existing import paths
 and the `validateSpec()` / `viewerRouting()` API stay the same.
+
+The entity index and rendering frame use the shared `sectionRecords()` identities
+and `resolveSourceStep()` lookup described in [shared core](shared-core.md).
+Exact source jumps can preview an alternate omitted by the active named view;
+the frame calls `jumpSource()` directly, keeping the view filter intact. Path-only
+requests still require visible stops. Canon evidence indexes remain diagram-only.
 
 Runtime maintainers regenerate it with `python3 tools/build.py` whenever the shared
 sources change, and commit the output. CI checks freshness and runs standalone

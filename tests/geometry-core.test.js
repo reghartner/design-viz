@@ -89,7 +89,6 @@ test('the CLI retains findings and batch exit status when no renderer source is 
     for (const file of ['validate.js', 'source-loader.cjs'])
       fs.copyFileSync(path.join(root, 'tools', file), path.join(isolated, 'tools', file));
     assert.equal(fs.existsSync(path.join(isolated, 'src/engine.js')), false);
-    assert.equal(fs.existsSync(path.join(isolated, 'src/core/navigation.js')), false);
     const inputs = ['tests/fixtures/lint-crowded.json', 'tests/fixtures/warn-malformed-contract.json',
       'tests/fixtures/broken-missing-rows.json', 'src/starters/minimal.json'].map(file => path.join(root, file));
     for (const quiet of [false, true]) {

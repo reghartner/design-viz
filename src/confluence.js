@@ -19,15 +19,11 @@ function buildConfluenceExport(text){
   } catch (ex){ return {error:'Could not read the spec: ' + ex.message}; }
 }
 function confluenceSections(page){
-  var out = [];
-  blocksOf(page).forEach(function(block){
-    function add(sec, tab){
-      out.push({id:String(out.length + 1), label:(tab ? tab + ' / ' : '') + (sec.heading || 'Section ' + (out.length + 1)), section:sec});
-    }
-    if (block.type === 'section') add(block.sec);
-    else block.tabs.forEach(function(tab){ tab.sections.forEach(function(sec){ add(sec,tab.label); }); });
+  return sectionRecords(page).map(function(record){
+    return {id:String(record.number),
+      label:(record.tabLabel ? record.tabLabel + ' / ' : '') + (record.section.heading || 'Section ' + record.number),
+      section:record.section};
   });
-  return out;
 }
 function buildConfluenceConfig(text, values){
   var exported = buildConfluenceExport(text);

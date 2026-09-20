@@ -12,10 +12,11 @@
   compatibility metadata to portable pages and host builds. See
   `docs/panel-modularity.md` and `tests/panel-extension.test.js` for the complete
   single-file extension contract, including headless backend packaging.
-- The logical engine bundle includes `core/navigation.js` before `engine.js`.
-  Load the navigation leaf alone for pure reference/hash operations; backend
-  `viewerRouting()` must not initialize the DOM renderer. Keep static packaging,
-  source/package parity and temporary source-tree fixtures in sync with moves.
+- The logical validator bundle includes the shared `core/` leaves once, including
+  navigation in the same outer scope as document traversal. The engine bundle
+  adds only renderer/player code. Backend `viewerRouting()` exposes this static
+  pure core without initializing the DOM renderer. See `docs/shared-core.md`;
+  keep source/package parity and temporary source fixtures in sync with moves.
 - Pure geometry lives in `core/geometry.js`, included once in the validator
   bundle after shared helpers; its existing `clamp()` dependency is call-time.
   Validator/lint tooling must use that bundle without loading the DOM engine.

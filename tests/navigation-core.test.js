@@ -61,16 +61,16 @@ test('leaf and assembled viewer retain composed diagram/card routing and malform
     assert.equal(core.resolveHashTarget(legacy, manifest).diagram.step, 0);
     assert.equal(core.buildHash(legacy), '#m=step&s=2');
   }
-  assert.equal(sourceFiles('engine.js').filter(file => file === 'core/navigation.js').length, 1);
-  assert.equal(sourceFiles('validator.js').includes('core/navigation.js'), false);
+  assert.equal(sourceFiles('validator.js').filter(file => file === 'core/navigation.js').length, 1);
+  assert.equal(sourceFiles('engine.js').includes('core/navigation.js'), false);
 });
 
 test('packaged routing preserves its public facade and matches assembled source data', () => {
   const source = vm.createContext({URL});
   vm.runInContext(readSource('validator.js') + '\n' + readSource('engine.js'), source);
   const routing = packaged.viewerRouting();
-  assert.deepEqual(Object.keys(routing).sort(),
-    ['blocksOf', 'sectionReferences', 'buildHash', 'diagramPathList', 'stepKeys', 'stepFailures', 'stepReference'].sort());
+  for (const name of ['blocksOf', 'sectionReferences', 'buildHash', 'diagramPathList', 'stepKeys', 'stepFailures', 'stepReference'])
+    assert.equal(typeof routing[name], 'function', 'compatible routing entrypoint: ' + name);
   assert.equal(packaged.viewerRouting(), routing, 'routing facade remains cached');
   const d = {steps: [{id: 'start'}, {id: 'hidden'}, {id: 'end'}],
     paths: [{id: 'happy', steps: ['start', 'end']}, {id: 'failed', steps: ['start', 'hidden']}]};

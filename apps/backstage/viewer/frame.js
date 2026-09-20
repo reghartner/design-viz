@@ -57,27 +57,27 @@
       );
     var sp = section.stepper;
     if (sp && (target.path || target.step)) {
-      var path = sp.paths().find(function (p) {
-        return p.id === (target.path || sp.path());
-      });
-      if (!path)
+      var source = sourceSections.find(function (record) {
+        return record.reference === section.reference;
+      }).section.diagram;
+      var resolved = resolveSourceStep(
+        source,
+        target.path || sp.path(),
+        target.step
+      );
+      if (!resolved)
         throw new Error(
           'This path is no longer in the published diagram. Refresh diagrams.'
         );
+      var path = resolved.path;
       if (target.step) {
-        var source =
-          sourceSections[controller.sections.indexOf(section)].diagram;
-        var ids = path.indices.map(function (i) {
-          return source.steps[i].id;
-        });
-        var index = stepIndexOf(ids, target.step);
-        if (index < 0)
+        if (resolved.sourceIndex < 0)
           throw new Error(
             'This step is no longer in the published diagram. Refresh diagrams.'
           );
         // Preview the exact source step, even when this view hides the entire
         // requested alternate. Selecting the path first can refuse that jump.
-        if (!sp.jumpSource(path.indices[index], path.id))
+        if (!sp.jumpSource(resolved.sourceIndex, path.id))
           throw new Error('This step is unavailable in this diagram.');
       } else if (!sp.selectPath(path.id)) {
         throw new Error(
@@ -146,14 +146,7 @@
       if (result.errors.length) throw new Error(result.errors.join('\n'));
       var skin = SKIN_NAMES.indexOf(page.skin) >= 0 ? page.skin : DEFAULT_SKIN;
       applySkinClasses(document.body, view, skin);
-      sourceSections = [];
-      blocksOf(page).forEach(function (block) {
-        if (block.type === 'section') sourceSections.push(block.sec);
-        else
-          block.tabs.forEach(function (tab) {
-            sourceSections.push.apply(sourceSections, tab.sections);
-          });
-      });
+      sourceSections = sectionRecords(page);
       controller = renderPage(
         view,
         page,

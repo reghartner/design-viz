@@ -91,14 +91,16 @@ validator bundle includes DOM-free definitions; the viewer adds the engine and
 the workbench adds generic editing code. Node/Python builders use the same manifest
 and asset collector. Use `readSource('validator.js')` from
 `tools/source-loader.cjs` for headless tools/tests; it assembles the registry,
-validator, pure geometry, shared helpers and type definitions. Geometry lives in
+validator, pure core leaves, shared helpers and type definitions. Geometry lives in
 `core/geometry.js` and uses the validator's existing `clamp()` helper at call time.
 It is included once, after the validator helpers and before panel definitions,
 so `layout`, routing, collision helpers and `lintPage` work without the renderer.
-The validation CLI uses this headless assembly. Add `readSource('engine.js')`
-when player/renderer helpers are needed; that logical bundle includes
-`core/navigation.js` before the renderer. The navigation leaf can also load alone
-for pure reference/hash operations (link-base canonicalization needs `URL`).
+The validation CLI uses this headless assembly. Document, navigation, path,
+section-layout and state helpers share its outer scope, each declared once.
+Add `readSource('engine.js')` when player/renderer helpers are needed. The navigation
+leaf can also load alone for pure reference/hash operations (link-base
+canonicalization needs `URL`). See [shared core](shared-core.md) for ownership,
+section records and the exact source-step lookup.
 Reading raw bundle files directly skips their manifest dependencies.
 Feature metadata and CSS are collected at build time for
 standalone, workbench, Backstage and Forge.
@@ -110,9 +112,9 @@ convert old declarations and events explicitly as described in the authoring
 contract rather than adding a runtime alias or inferred alarm rule.
 
 The packaged backend contains generated code and has no runtime source-file or
-VM dependency. Its cached `viewerRouting()` facade loads only the navigation leaf,
-using document/path helpers already in the validator scope; it never initializes
-the DOM renderer. Backstage's standalone compatibility checker contains generated
+VM dependency. Its cached `viewerRouting()` facade exposes the shared pure core
+from the validator scope, including navigation; it never initializes the DOM
+renderer. Backstage's standalone compatibility checker contains generated
 feature metadata, not a second handwritten list. Company release and upgrade PR
 boundaries are unchanged. Rebuilding the viewer changes its script hash; refresh
 the host's configured CSP hash when upgrading.

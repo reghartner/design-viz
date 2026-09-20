@@ -210,6 +210,9 @@ Coverage additions: `page.blocks[0].tabs[6].sections[0]` implements hosting step
 
 ## Native host revision (September 19)
 
+Current guide source links pin native implementation revision
+`4176f5df9b9507bd38a7f021475ac4de6827f705`.
+
 The hosting and inline stories now describe the native package boundary: trusted
 static code mounts inert data in an owned ShadowRoot, using host CSP. Historical
 frame/CSP results above describe the previous release. The existing raster still

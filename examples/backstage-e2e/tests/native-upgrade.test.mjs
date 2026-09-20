@@ -30,6 +30,11 @@ test('repeat setup replaces the owned plugin tree without changing sibling files
     assert.equal(await readFile(path.join(mock,'sandbox/backstage/plugins/flowview/src/generated/nativeViewer.js'),'utf8'),'export const native=true;');
     assert.equal(await readFile(path.join(mock,'sandbox/backstage/plugins/other/keep.txt'),'utf8'),'other plugin');
     assert.equal(await readFile(path.join(mock,'.local/secrets.json'),'utf8'),secrets);
+    const alias=path.join(temp,'alias');await mkdir(path.join(alias,'apps'),{recursive:true});
+    await symlink(path.join(mock,'sandbox/backstage/plugins/flowview'),path.join(alias,'apps/backstage'),'dir');
+    await assert.rejects(exec(process.execPath,[setup,alias],{cwd:mock}),/separate source directory/);
+    assert.equal(await readFile(path.join(mock,'sandbox/backstage/plugins/flowview/src/generated/nativeViewer.js'),'utf8'),'export const native=true;');
+
     const {backend:{csp}}=JSON.parse(await readFile(path.join(mock,'sandbox/backstage/app-config.local.yaml'),'utf8'));
     assert.deepEqual(csp['script-src'],["'self'"]);assert.deepEqual(csp['script-src-elem'],["'self'"]);
     assert.ok(csp['font-src'].includes('data:'));assert.ok(csp['img-src'].includes('data:'));assert.equal(csp['frame-src'],undefined);

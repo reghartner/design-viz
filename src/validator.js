@@ -2,46 +2,12 @@
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
    IIFE. Contains no DOM access, so tests load it under Node via vm. */
 
-var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
-var LEFT_X = 110, RIGHT_X = 885;
 var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car'];
 var TINT_SET = ['cmd','auth','data','mqtt','dev'];
 /* Per-step node state is semantic narrative state, never an authored color.
    `base` is the explicit clearing token; null clears too. */
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
-
-/* Shared, pure parent-link tolerance for layout, validation and the inspector.
-   Inspect all chains before dropping cyclic links so declaration order cannot
-   decide which cycle member becomes the outer box. Incoming links survive. */
-function sanitizedGroupParents(groups, ignored){
-  groups = groups && typeof groups === 'object' ? groups : {};
-  var parents = Object.create(null), cyclic = [];
-  Object.keys(groups).forEach(function(key){
-    var meta = groups[key], reason;
-    if (!meta || !Object.prototype.hasOwnProperty.call(meta, 'parent')) return;
-    var parent = meta.parent;
-    if (typeof parent !== 'string') reason = 'must be a string — parent ignored';
-    else if (parent === key) reason = 'a group cannot contain itself — parent ignored';
-    else if (!Object.prototype.hasOwnProperty.call(groups, parent))
-      reason = 'unknown group "' + parent + '" — parent ignored';
-    if (reason){ if (ignored) ignored(key, reason); }
-    else parents[key] = parent;
-  });
-  Object.keys(parents).forEach(function(key){
-    var seen = Object.create(null), cursor = key;
-    while (cursor !== undefined && !seen[cursor]){
-      seen[cursor] = true;
-      cursor = parents[cursor];
-    }
-    if (cursor === key) cyclic.push(key);
-  });
-  cyclic.forEach(function(key){
-    delete parents[key];
-    if (ignored) ignored(key, 'parent chain loops — parent ignored');
-  });
-  return parents;
-}
 
 var SKIN_NAMES = ['aurora','daylight','editorial','terminal','pastel','blueprint'];
 var DEFAULT_SKIN = 'pastel';
@@ -767,7 +733,7 @@ function foldPanelStates(d){
 /* ---------------- lint (advisory warnings, never errors) ----------------
    Layout-aware heuristics for spec authors who cannot see the render — an
    authoring agent gets these from tools/validate.js before any browser is
-   involved. Uses layout()/isWrap() from engine.js (same bundle; call time).
+   involved. Uses layout()/isWrap() from core/geometry.js (same logical bundle).
    Defensive: a diagram that fails basic validation is skipped, never thrown
    on. */
 var LINT_CHAR_PX = 6.35;      /* mono label width estimate, px per char */

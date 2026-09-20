@@ -32,6 +32,7 @@ test('adding a renderer file needs no assembly-list or shared lifecycle edit', (
     fs.copyFileSync(path.join(__dirname,'../src/panels/registry.js'),path.join(root,'panels/registry.js'));
     fs.copyFileSync(path.join(__dirname,'../src/validator.js'),path.join(root,'validator.js'));
     fs.copyFileSync(path.join(__dirname,'../src/core/navigation.js'),path.join(root,'core/navigation.js'));
+    fs.copyFileSync(path.join(__dirname,'../src/core/geometry.js'),path.join(root,'core/geometry.js'));
     fs.writeFileSync(path.join(root,'engine.js'),'var RM = true;');
     const file = path.join(root,'panels/types/probe.js');
     fs.writeFileSync(file,"PanelViews.register('probe',function(host,panel,state){return {html:esc(state.text)};});");

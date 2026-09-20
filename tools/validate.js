@@ -11,8 +11,8 @@ const {readSource} = require('./source-loader.cjs');
 
    This closes the authoring loop for spec-emitting agents: emit JSON, run
    this, fix what it names — no browser involved. It loads the same
-   src/validator.js + src/engine.js the pages ship with, so CLI results and
-   in-page results cannot drift. */
+   validator bundle (including pure geometry) the pages ship with, so CLI
+   results and in-page results cannot drift. No DOM renderer is loaded. */
 
 const fs = require('fs');
 const path = require('path');
@@ -25,7 +25,6 @@ function loadCore(){
     readSource('compatibility.js') + '\n' +
     readSource('canon.js') + '\n' +
     readSource('validator.js') + '\n' +
-    readSource('engine.js') + '\n' +
     ';__exports = {normalize, validate, lintPage, compatibility:FlowviewCompatibility};';
   const sandbox = {console, URL};
   vm.runInNewContext(code, sandbox);

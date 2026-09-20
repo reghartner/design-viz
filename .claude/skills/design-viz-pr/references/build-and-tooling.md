@@ -24,7 +24,8 @@
 - The logical `builder.workbench.js` bundle loads source/target leaves and
   common/graph/document/narrative/layout command leaves, then persistence/session
   leaves, followed by field-value/read-model, control-policy and inspector leaves
-  before the builder. The logical `clipboard.workbench.js` and `reuse.workbench.js`
+  and pure I/O preparation/browser-adapter/I/O-controller leaves before the
+  builder. The logical `clipboard.workbench.js` and `reuse.workbench.js`
   bundles load their pure command leaves before their controllers; layout controls use the builder-owned
   layout leaf. Do not include the same leaf again in a satellite bundle.
   Use `readSource()` for UI harnesses; pure tests load only required leaves. Keep

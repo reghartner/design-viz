@@ -5,7 +5,7 @@ function names remain available in the shared browser scope. Use the logical
 `builder.workbench.js` bundle from `tools/source-loader.cjs` when a tool or test
 needs the editor; pure planner tests load only their required leaves. Reading
 the physical builder file omits its source-edit, raw-target, command, session and
-inspector dependencies.
+inspector and I/O dependencies.
 
 `src/source-bundles.json` expands that bundle in this order:
 
@@ -22,8 +22,10 @@ inspector dependencies.
 11. `workbench/inspector-model.js`: pure position, effective-state and field-help models.
 12. `workbench/controls.js`: shared commit event policy.
 13. `workbench/inspector.js`: instance-owned forms, panel editor cache and refresh lifetime.
-14. `builder.workbench.js`: composition, imports/exports, outline, gestures and
-    preview coordination. Callers load the validator/panel assembly first.
+14. `workbench/io-model.js`: pure Mermaid preparation, filenames and HTML injection.
+15. `workbench/io-browser.js`: bound browser resource adapters.
+16. `workbench/io.js`: import/export controls and independent operation lifetimes.
+17. `builder.workbench.js`: composition, outline, gestures and preview coordination. Callers load the validator/panel assembly first.
 
 The logical `clipboard.workbench.js` bundle loads
 `workbench/commands/clipboard.js` before its existing clipboard transport UI.
@@ -219,8 +221,8 @@ text and retain the UI's existing explanation. The timer generation makes
 already-queued cancelled saves inert. `session.destroy()` retires the session and
 its persistence timer, so queued saves and later mutation calls cannot publish.
 This is a session lifetime API. Inspector refreshes and form DOM have their own
-owner below; the builder still owns I/O, interaction listeners, observers and
-gestures. It does not yet expose a complete editor teardown; each controller must
+owner below; I/O has a separate owner, while the builder still owns interaction
+listeners, observers and gestures. It does not yet expose a complete editor teardown; each controller must
 retire its own resources.
 
 ## Inspector ownership
@@ -278,6 +280,69 @@ registry-backed common command adapters before it. These read models do not fold
 preview state back into authored JSON or substitute visible stops for source
 step indices.
 
+## Import/export ownership
+
+`createBuilderIO()` owns the existing file open/save, HTML export, Mermaid,
+trace importer and manual Confluence handoff controls. Its host injects the live
+session, source element, document and bound browser adapters, plus small hooks for
+project replacement, messages, saved-baseline UI, palette closure, active-workbench
+keyboard policy and before/after-import selection. It does not receive the
+builder's closure or duplicate session history. The returned API is
+`retireProject()` and `destroy()`; future editor teardown must call the latter.
+Neither method is a claim that the whole editor or page has been torn down.
+
+`io-model.js` retains the existing `mermaidToSpec()`, `specFileName()`,
+`exportTemplateOpeners()` and `buildExportHtml()` entrypoints. It loads alone,
+without DOM, session, inspector or renderer code. Shared trace conversion and
+Confluence validation remain in `trace-import.js` and `confluence.js`. The model
+continues to enforce the same HTML injection marker/closing-tag and filename
+rules; it does not rewrite handwritten editor text.
+
+File reads, trace reads, HTML export and Confluence copy each have an independent
+generation. Starting a newer operation retires only that family's pending work.
+Project retirement invalidates all four, aborts pending readers and template
+fetches, closes import/handoff surfaces and retires trace preview/search callbacks.
+Closing the trace importer also retires its reader and preview. Typing trace text
+cancels only its reader; mapping/scope changes invalidate the preview fingerprint.
+A held callback cannot overwrite a new project's trace text or activate a stale
+preview. Closing or editing a Confluence handoff invalidates pending copy feedback
+and fallback selection, so a late rejection cannot take focus.
+
+`destroy()` also removes owned listeners, including dynamically rendered trace
+search listeners, cancels URL-revocation timers and revokes remaining object URLs.
+Already-queued listeners and async completions check their owner/generation;
+retained public methods cannot hide UI belonging to a later mount. Native APIs
+are bound in `createBuilderBrowserIO()`; injected tests use controllable readers,
+Promises, timers, URLs and directory streams without importing the builder.
+
+Publication policies stay distinct:
+
+- **Open file** replaces the project with exact text even if JSON is unfinished,
+  preserving repair and one project Undo. The public validated `loadText()` path
+  still validates before replacement.
+- **Save** downloads the current snapshot, including invalid JSON, and marks the
+  current exact source as the baseline only after download dispatch succeeds.
+  Compatibility stamping affects a valid download snapshot, not the live source.
+- **Mermaid and trace imports** publish through `session.importText()` once and
+  keep the comparison baseline. Only Mermaid sets the imported-text native-Undo
+  shortcut marker. Existing warning, focus and selection differences remain.
+- **HTML export** captures matching JSON/HTML text at the initiating click. Normal
+  source typing does not change that authorized snapshot. Retirement or a newer
+  export blocks later template results, follow-on files and stale status messages.
+- **Confluence handoff** keeps the same validated compact JSON for copy and file
+  download. It is a manual handoff, not a publishing request.
+
+Directory export checks freshness before requesting each file and before starting
+its write. If a writable opens after retirement, it is aborted before writing.
+Once `write()` has started, that authorized snapshot is allowed to finish and the
+stream is closed; a write/close failure attempts `abort()`. Retirement still blocks
+the next file and status update. The controller never deletes or rolls back user
+files. The platform may have already created a file during `getFileHandle()`;
+a dispatched clipboard write or browser download also cannot reliably be recalled.
+Object URLs for dispatched downloads are revoked on their existing one-second
+schedule or immediately on destruction. Cancelling UI work does not claim to undo
+those platform effects.
+
 ## Tests and regeneration
 
 `tests/source-edit.test.js` loads only the two pure leaves. It covers locations,
@@ -306,6 +371,11 @@ and each focus policy; a receiver-sensitive timer fake checks the browser adapte
 two instances, factory replacement, independent expansion/datalists, held retired
 callbacks, deferred Enter/Tab/outside focus and same-set multiselection focus. The Home control test loads the
 real commit helper rather than slicing a private function out of source text.
+`tests/workbench-io-model.test.js` loads the pure preparation leaf with throwing
+browser globals. `tests/workbench-io.test.js` loads the real I/O owner and session
+with injected browser resources, exercising current and retired reads, clipboard
+rejections, template/body races, directory-write boundaries and cleanup failures.
+Actual builder harnesses retain import mode, one-Undo and keyboard coverage.
 
 Run the source-edit and builder tests plus the relevant clipboard, step-reuse,
 layout and panel-reference suites when these boundaries change. Shared workbench

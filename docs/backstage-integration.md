@@ -6,9 +6,10 @@ a paginated Backstage adapter, GitHub drift runner, and deterministic trace mapp
 The mock portal is not an installed Backstage plugin and supplies no company auth.
 The final integration belongs in the company's Backstage/GitHub environment.
 
-Walk through the [interactive lifecycle guide](diagrams/backstage/backstage.html) for catalog authoring,
-service discovery, GitHub scans, human decisions, refusal gates and trace evidence.
-The guide distinguishes portable implementation from company deployment.
+Walk through the [current platform presentation](diagrams/platform/index.html)
+for the company topology, catalog authoring, GitHub scans and human decisions.
+The [earlier lifecycle guide](diagrams/backstage/backstage.html) describes the
+reference adapter; its read-API topology is not the company deployment plan.
 
 ## Boundaries and authority
 
@@ -29,13 +30,14 @@ The company uses one **`backstage-diagrams`** repository: the Flowview fork also
 holds authoritative specs, registry, catalog snapshots, traces and drift
 automation. Engine and panel changes happen here; this repo publishes internal
 releases and builds the nginx editor image from the same versioned source.
-The separate Backstage app repository owns installation of the frontend plugin
-and the authenticated adapter that reads authorized specs from
-`backstage-diagrams`.
+**`backstage-diagrams` hosts the static workbench and no APIs.** The Backstage
+plugin pulls diagram specs from this repository in **GitHub**. The separate
+Backstage app repository owns the plugin installation, GitHub access and app
+deployment. There is no Flowview diagrams service between Backstage and GitHub.
 Backstage pins and upgrades its Flowview dependency through its own PR/release
 cycle. [Spec/runtime compatibility](runtime-compatibility.md) lets a newer spec
-explain which features need an upgrade. The company HTTP/auth backend remains
-authoritative for access; nginx hosting the editor does not supply that policy.
+explain which features need an upgrade. The company Backstage integration owns
+GitHub authentication and reader access; the static nginx site supplies neither.
 
 Host the generated `template/flowview.html`, `workbench/flowspec.html`, and portal
 assets behind company authentication. Install the [Flowview entity plugin](../apps/backstage/README.md)
@@ -44,17 +46,29 @@ development preview. `tools/canon/entity-diagrams.mjs` derives associations from
 `nodes.*.binding.entityRef` and explicit API bindings across every section/tab.
 The tab renders canonical flows and HLD designs inline with jumps to relevant happy
 and alternate steps, and refreshes automatically. Editing stays external. The
-Backstage host fetches JSON through its authenticated proxy and passes inert data
-to its statically bundled native renderer. Each viewer owns a ShadowRoot; no
+company plugin reads spec JSON from GitHub and passes inert data to its statically
+bundled native renderer. Each viewer owns a ShadowRoot; no
 iframe, remote code or runtime code compilation is used. See the plugin guide's
 host script/style/font/image policy and trusted-code boundary. No per-service annotation or
-manually maintained list is needed. Company installation, authenticated proxy
-configuration and per-viewer diagram visibility are described in the plugin guide.
+manually maintained list is needed.
 
-Replace `apps/backstage-mock/server.mjs` with an authenticated backend adapter;
-reuse the data-only modules in `tools/canon/`. The mock's serialized local JSON
-store intentionally stands in for Git proposals and durable review records.
-Do not promote that no-auth development server into the company environment.
+### GitHub source integration status
+
+The company GitHub loader is an integration responsibility, not something proven
+by the public toolkit's existing mock. `apps/backstage/src/EntityFlowviewContent.tsx`
+currently wires the reference proxy loaders from `src/api/client.ts`.
+For the company source, wire GitHub-backed `loadDiagrams` and `loadSpec` functions
+into `FlowviewEntityDiagrams`; their contracts are in `src/api/types.ts` relative
+to `apps/backstage/`. Reuse the association and validation helpers without
+deploying `apps/backstage-mock/server.mjs` as a company service.
+
+Keep the association index and selected spec on a consistent Git snapshot.
+Preserve compatibility declarations and distinguish a failed GitHub read from
+an empty association result. GitHub authentication, repository selection,
+refresh/caching and reader visibility belong to the Backstage integration.
+The [plugin guide](../apps/backstage/README.md) distinguishes this company target
+from the currently wired reference transport. The existing rehearsal verifies
+rendering and drift against fictional data, not the company's GitHub source path.
 
 ### Backend production packaging
 
@@ -78,13 +92,17 @@ directory. Those tests exercise validation and service links into happy/alternat
 steps. Consumers of the committed runtime do not need Python or the source tree
 at runtime.
 
-The company integration must still build its actual backend image and smoke-test
-the authenticated association/spec routes from that image. A development
+If these data-only helpers are used in the Backstage backend, build its actual
+image and smoke-test the GitHub loading/indexing path from that image. A development
 `backstage-cli package start` run alone does not verify production packaging. If
 the host externalizes a Flowview workspace package instead of bundling its code,
 include that package and `generated-runtime.cjs` in the production dependencies.
 
-The browser contract is same-origin `/api/canon/`:
+### Reference mock API (not a company deployment requirement)
+
+The local mock and existing proxy-adapter rehearsal use same-origin `/api/canon/`.
+These routes document that test adapter. The company GitHub-backed deployment
+does not need a service in `backstage-diagrams` exposing them:
 
 | Route | Contract |
 | --- | --- |

@@ -90,11 +90,13 @@ Upgrade messages target the Backstage maintainer, not the reader's browser.
 The installed checker must be upgraded once to establish this baseline:
 previous builds cannot retroactively learn how to show these notices.
 
-The read API should deliver authorized specs and compatibility declarations
-even when its renderer is older. Do not filter newer diagrams out of the list
+The company Backstage plugin reads specs and compatibility declarations from
+`backstage-diagrams` in GitHub; that repository hosts no read API. The GitHub
+loader should retain those declarations even when the installed renderer is
+older. Do not filter newer diagrams out of the list
 or return an empty association set on compatibility mismatch. If company-side
 indexing cannot understand a future format, retain generated association data
-from the designs build and report that format explicitly. Authentication,
+from the `backstage-diagrams` build and report that format explicitly. Authentication,
 per-diagram visibility, content revision checks and payload limits still apply.
 
 ## Releasing a new capability in the company fork

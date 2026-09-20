@@ -9,6 +9,13 @@ names: a mock company containing executable service code and real Backstage,
 and a designer containing approved specs, the external editor, catalog snapshot,
 read API and GitHub workflows. Neither setup nor CI merges PRs automatically.
 
+This is the existing **reference proxy-adapter rehearsal**, not the company
+hosting topology. The company uses one Flowview fork named `backstage-diagrams`,
+serves only the static workbench there, and has its Backstage plugin pull specs
+from GitHub. This rehearsal verifies native rendering and drift; the company
+GitHub loader needs separate integration acceptance. See the
+[current handoff](../../docs/backstage-integration.md#github-source-integration-status).
+
 ## 1. Create and run locally
 
 Requirements: Node **24**, npm, Git, macOS or Linux, npm registry access, and the

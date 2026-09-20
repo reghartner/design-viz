@@ -22,8 +22,10 @@
   Validator/lint tooling must use that bundle without loading the DOM engine.
   Preserve algorithm bodies, candidate order and diagnostics during extraction.
 - The logical `builder.workbench.js` bundle loads source/target leaves and
-  common/graph/document/narrative command leaves before the builder. The logical
-  `clipboard.workbench.js` bundle loads its pure command leaf before transport.
+  common/graph/document/narrative/layout command leaves before the builder. The
+  logical `clipboard.workbench.js` and `reuse.workbench.js` bundles load their pure
+  command leaves before their controllers; layout controls use the builder-owned
+  layout leaf. Do not include the same leaf again in a satellite bundle.
   Use `readSource()` for UI harnesses; pure tests load only required leaves. Keep
   physical file lists flat and preserve registry-before-builder ordering. Workbench module
   ownership and source-preservation contracts are in `docs/workbench-modules.md`.

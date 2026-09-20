@@ -1,3 +1,4 @@
+const commandContext = require('./workbench-command-context.cjs');
 const {readSource} = require('../tools/source-loader.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -35,7 +36,7 @@ test('story model keeps raw section ordinals, tab paths, original indices and mu
 });
 
 test('duplicate preserves complete patches, avoids ID collisions, returns the exact inserted range, and leaves surrounding text intact',()=>{
-  const c=load(), raw=fixture(); dOf(raw).steps.push({id:'two-copy1',text:'Existing copy'});
+  const c=commandContext(['graph','narrative']), raw=fixture(); dOf(raw).steps.push({id:'two-copy1',text:'Existing copy'});
   const text=JSON.stringify(raw,null,2), before=JSON.stringify(raw);
   const plan=c.planDuplicateStep(text,raw,1,1), next=JSON.parse(plan.text), d=dOf(next);
   assert.equal(plan.index,2); assert.equal(d.steps[2].id,'two-copy2');
@@ -51,7 +52,7 @@ test('duplicate preserves complete patches, avoids ID collisions, returns the ex
 });
 
 test('ID-less and unusual-ID duplication works for bare diagrams and invalid selections do not produce edits',()=>{
-  const c=load(), raw={nodes:{n:{}},rows:[['n']],steps:[{text:'Only',panels:{p:{value:0}}}]};
+  const c=commandContext(['narrative']), raw={nodes:{n:{}},rows:[['n']],steps:[{text:'Only',panels:{p:{value:0}}}]};
   let plan=c.planDuplicateStep(JSON.stringify(raw),raw,0,0);
   assert.deepEqual(JSON.parse(plan.text).steps,[raw.steps[0],raw.steps[0]]);
   raw.steps[0].id='__proto__';
@@ -61,7 +62,7 @@ test('ID-less and unusual-ID duplication works for bare diagrams and invalid sel
 });
 
 test('append supports an edgeless state story and creates its steps array without inventing a hop',()=>{
-  const c=load(), raw={nodes:{n:{}},rows:[['n']],panels:[{id:'p',type:'state',states:['ready']}]};
+  const c=commandContext(['narrative']), raw={nodes:{n:{}},rows:[['n']],panels:[{id:'p',type:'state',states:['ready']}]};
   const plan=c.planAddStep(JSON.stringify(raw),raw,0), next=JSON.parse(plan.text);
   assert.equal(plan.index,0); assert.equal(next.steps.length,1);
   assert.equal(next.steps[0].edge,undefined);

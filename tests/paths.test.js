@@ -1,3 +1,4 @@
+const commandContext = require('./workbench-command-context.cjs');
 const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test');
 const assert=require('node:assert/strict');
@@ -50,7 +51,7 @@ test('invalid path references, duplicate identities, empty paths and unsafe colo
   for(const mutate of cases){const d=fixture();mutate(d);const errors=c.validate(c.normalize(d)).errors;assert.ok(errors.some(e=>e.includes('.paths')),errors.join('\n'));}
 });
 test('creating an alternate assigns legacy IDs once and preserves the shared prefix in one edit',()=>{
-  const c=load(),d=fixture();delete d.paths;d.steps=d.steps.slice(0,5);d.steps.forEach(s=>delete s.id);
+  const c=commandContext(['graph','narrative']),d=fixture();delete d.paths;d.steps=d.steps.slice(0,5);d.steps.forEach(s=>delete s.id);
   const before=JSON.stringify(d),p=c.planPathStepEdit(JSON.stringify(d,null,2),d,0,'happy',2,'fork');
   assert.equal(p.error,undefined);const next=JSON.parse(p.text);
   assert.equal(next.paths[0].label,'Happy path');assert.equal(next.paths[1].label,'Dropped signal');
@@ -60,7 +61,7 @@ test('creating an alternate assigns legacy IDs once and preserves the shared pre
   assert.deepEqual(plain(c.validate(c.normalize(next)).errors),[]);assert.equal(JSON.stringify(d),before);
 });
 test('append, duplicate and reorder affect only the selected path, while deleting a shared step prunes all references',()=>{
-  const c=load(),d=fixture(),text=JSON.stringify(d);
+  const c=commandContext(['graph','narrative']),d=fixture(),text=JSON.stringify(d);
   let p=c.planDuplicateStep(text,d,0,2,'dropped'),next=JSON.parse(p.text);
   assert.deepEqual(next.paths[0],d.paths[0]);assert.equal(next.paths[1].steps[3],'three-copy1');
   assert.deepEqual({...next.steps[p.index],id:'three'},d.steps[2]);
@@ -72,7 +73,7 @@ test('append, duplicate and reorder affect only the selected path, while deletin
   assert.ok(next.paths.every(p=>!p.steps.includes('three')));assert.deepEqual(plain(c.validate(c.normalize(next)).errors),[]);
 });
 test('removing the last alternate retains an explicit primary sequence so orphan outcomes never play',()=>{
-  const c=load(),d=fixture(),p=c.planPathStepEdit(JSON.stringify(d),d,0,'dropped',5,'remove');
+  const c=commandContext(['graph','narrative']),d=fixture(),p=c.planPathStepEdit(JSON.stringify(d),d,0,'dropped',5,'remove');
   const next=JSON.parse(p.text);assert.equal(next.paths.length,1);
   assert.deepEqual(plain(c.diagramForPath(next).steps.map(s=>s.id)),['one','two','three','four','five']);
   assert.equal(next.steps.length,6);

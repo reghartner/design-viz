@@ -5,15 +5,20 @@
   invalid-input preservation and stale dialogs after source/section changes.
 - Source scanners/splices and raw addressing live in `src/workbench/source-edit.js`
   and `targets.js`; see `docs/workbench-modules.md`. Load those leaves directly for
-  pure source tests and the logical `builder.workbench.js` bundle for planners/UI.
+  pure source tests; load command leaves for planners and the logical
+  `builder.workbench.js` bundle for editor/UI tests.
   Preserve raw wrapper/bare-diagram paths, surrounding source bytes and result
   offsets; normalized viewer section records are not editor addresses.
-- Common/graph/document commands and clipboard planning live under
-  `src/workbench/commands/`. Shared-step deletion also lives there so bulk
-  dispatch runs without the inspector; other narrative/layout planners remain
-  in the builder until their extraction. Preserve registry reference rewrites,
-  distinct copy policies and bulk failure without partial publication. Test
-  pure leaves plus the actual editor action's single Undo/selection behavior.
+- Pure common/graph/document/narrative/layout/reuse/clipboard commands live under
+  `src/workbench/commands/`. Satellite clipboard and reuse bundles prepend their
+  pure leaves; layout controls use the builder assembly's layout leaf. Pure tests
+  must not load the inspector or renderer. Preserve registry reference rewrites,
+  distinct copy policies, source ranges and bulk failure without publication.
+- Narrative finalization shares path validation, view reachability and result
+  ranges. Keep raw source step index, route identity, occurrence position and
+  filtered visible stop distinct. Occurrence removal retains the registry body;
+  independent copies carry applicable view membership. Check action-specific
+  errors/no-ops and each actual editor action's single Undo/selection behavior.
 - Keep shared Home layout/initial state distinct from per-step overrides. Use
   `docs/homemap-workbench.md` only for those controls. Test the context being
   edited, including non-step selection when affected.

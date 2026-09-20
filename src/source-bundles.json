@@ -26,11 +26,13 @@
     "workbench/session.js",
     "workbench/field-values.js",
     "workbench/inspector-model.js",
+    "workbench/lifetime.js",
     "workbench/controls.js",
     "workbench/inspector.js",
     "workbench/io-model.js",
     "workbench/io-browser.js",
     "workbench/io.js",
+    "workbench/interactions.js",
     "builder.workbench.js"
   ],
   "clipboard.workbench.js": [

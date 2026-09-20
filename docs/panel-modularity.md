@@ -77,6 +77,22 @@ Use those commands so a gesture is one Undo/Redo operation and selection is
 restored consistently. Do not implement another history stack or JSON writer.
 Home uses shared row controls with decorations for its draggable elements.
 
+Custom editor controls register events through `context.listen(target, type,
+callback, options)` and resource cancellation through
+`context.onFormRetire(cleanup)`. Both belong to the currently rendered inspector
+form: replacing/retiring that form removes listeners and cancels pointer capture,
+preview motion or other resources. Retained event callbacks stay inert. Cleanup
+must not commit edits or return focus; the owner attempts all cleanups before
+reporting a thrown cleanup error. Shared `context.controls` already follows this
+lifetime. The per-type editor factory may retain expansion preferences, but must
+not retain retired form DOM.
+
+`context.selectClipboard(target)` selects an authored Home subelement;
+`context.clearClipboard()` clears that selection when choosing an outline or
+another non-copyable element. Access clipboard state through this context rather
+than referencing the builder initializer's private variables. Panel editing stays
+registry-dispatched; do not add type switches to the interaction owner.
+
 ## Styles and assembly
 
 Use a CSS string for a new panel, with a unique class prefix and shared skin

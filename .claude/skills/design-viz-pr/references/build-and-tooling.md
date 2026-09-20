@@ -23,9 +23,10 @@
   Preserve algorithm bodies, candidate order and diagnostics during extraction.
 - The logical `builder.workbench.js` bundle loads source/target leaves and
   common/graph/document/narrative/layout command leaves, then persistence/session
-  leaves, followed by field-value/read-model, control-policy and inspector leaves
-  and pure I/O preparation/browser-adapter/I/O-controller leaves before the
-  builder. The logical `clipboard.workbench.js` and `reuse.workbench.js`
+  leaves, followed by field-value/read-model, local lifetime, control-policy and inspector leaves
+  and pure I/O preparation/browser-adapter/I/O-controller and interaction leaves before the
+  builder. The shared local lifetime leaf is included once; standalone satellite UI
+  tests load it explicitly. The logical `clipboard.workbench.js` and `reuse.workbench.js`
   bundles load their pure command leaves before their controllers; layout controls use the builder-owned
   layout leaf. Do not include the same leaf again in a satellite bundle.
   The logical workspace bundle prepends `workbench/preview.js` for preview

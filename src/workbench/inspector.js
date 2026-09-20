@@ -4,7 +4,9 @@ function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null;
   var OPEN_PATCH_EDITORS=new Set(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
-  var disposed=false,refreshTimer=null,refreshVersion=0;
+  var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
+  function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
+  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
   var accentListId=prefix+'-accents',groupListId=prefix+'-groups';
   function parseEditor(){return session.snapshot();}
@@ -29,6 +31,7 @@ function createBuilderInspector(opts){
   function beginForm(identity){
     var same=identity===inspectorScrollKey;
     var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0};
+    retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
     revealInspector();guide.hidden=false;guide.innerHTML='';
     return previous;
@@ -71,7 +74,7 @@ function createBuilderInspector(opts){
     }
     found.scrollTop=saved.scrollTop;found.scrollLeft=saved.scrollLeft;
   }
-  function retire(){cancelRefresh();invalidateEffectiveState=null;inspectorScrollKey=null;opts.surface.retire();}
+  function retire(){cancelRefresh();retireForm();invalidateEffectiveState=null;inspectorScrollKey=null;opts.surface.retire();}
 
 function flashPositionLine(){
     /* one background pulse on the "step 2 of 3" line — the visible proof
@@ -87,7 +90,7 @@ function flashPositionLine(){
 
   function inspectorMessage(text, keepTool){
     if(disposed)return;
-    cancelRefresh();
+    cancelRefresh();retireForm();
     if (!guide) return;
     opts.surface.show(keepTool);
     revealInspector();
@@ -107,6 +110,7 @@ function formError(text){
   }
 
 function commitSimple(key, valueTextOrNull){
+    if(disposed)return false;
     var parsed = parseEditor();
     if (parsed.error){ formError(parsed.error); return false; }
     var path = builderTargetPath(parsed.raw, session.target);
@@ -115,6 +119,7 @@ function commitSimple(key, valueTextOrNull){
   }
 
 function commitCascade(planFor, opt){
+    if(disposed)return false;
     var parsed = parseEditor();
     if (parsed.error){ formError(parsed.error); return false; }
     return applyPlan(planFor(parsed.raw), opt, parsed);
@@ -141,7 +146,7 @@ function commitValue(valueText){
 
 function commitOnChange(input,getCommitValue,commit,commitUnchanged){
     return wireBuilderCommit(input,function(){return commit(getCommitValue?getCommitValue(input.value):input.value);},
-      {commitUnchanged:commitUnchanged});
+      {commitUnchanged:commitUnchanged,listen:listen});
   }
   function textControl(value, commit, opts){
     var input = document.createElement(opts && opts.textarea ? 'textarea' : 'input');
@@ -203,7 +208,7 @@ function checkboxControl(checked, commit){
     wrap.className = 'fctl fchk';
     var input = document.createElement('input');
     input.type = 'checkbox'; input.checked = !!checked;
-    input.addEventListener('change', function(){
+    formLife.listen(input,'change', function(){
       if (commit(input.checked) === false) input.checked = !input.checked;
     });
     wrap.appendChild(input);
@@ -214,7 +219,7 @@ function actionButton(label, onClick, cls){
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'bbtn ' + (cls || '');
     b.textContent = label;
-    b.addEventListener('click', function(ev){if(!disposed)return onClick.call(this,ev);});
+    formLife.listen(b,'click', function(ev){if(!disposed)return onClick.call(this,ev);});
     return b;
   }
 
@@ -401,13 +406,13 @@ function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){
       var lab = document.createElement('button');
       lab.type = 'button'; lab.className = 'mlab';
       lab.textContent = it.label;
-      if (onBody) lab.addEventListener('click', function(){ onBody(it.key); });
+      if (onBody) formLife.listen(lab,'click', function(){ onBody(it.key); });
       else lab.tabIndex = -1;
       var x = document.createElement('button');
       x.type = 'button'; x.className = 'mx';
       x.textContent = '\u00d7'; x.title = 'remove from this ' + (ownerKind || 'step');
       x.setAttribute('aria-label', 'remove ' + it.label + ' from this ' + (ownerKind || 'step'));
-      x.addEventListener('click', function(){ onRemove(it.key); });
+      formLife.listen(x,'click', function(){ onRemove(it.key); });
       chip.appendChild(lab); chip.appendChild(x);
       box.appendChild(chip);
     });
@@ -453,7 +458,7 @@ function stepForm(val, ctx){
         var option = document.createElement('option'); option.value = pair[0]; option.textContent = pair[1]; input.appendChild(option);
       });
       input.value = failures[key] || 'delivered';
-      input.addEventListener('change',function(){
+      formLife.listen(input,'change',function(){
         commitCascade(function(raw){return planStepCommunication(session.text(),raw,t.section,t.index,key,input.value);},
           {after:function(){renderInspector();}});
       });
@@ -467,7 +472,7 @@ function stepForm(val, ctx){
       var option = document.createElement('option'); option.value = key; option.textContent = key; addFailure.appendChild(option);
     });
     addFailure.disabled = addFailure.children.length < 2;
-    addFailure.addEventListener('change',function(){
+    formLife.listen(addFailure,'change',function(){
       if (!addFailure.value) return;
       commitCascade(function(raw){return planStepCommunication(session.text(),raw,t.section,t.index,addFailure.value,'dropped');},
         {after:function(){renderInspector();}});
@@ -499,7 +504,7 @@ function stepForm(val, ctx){
         extra.value = cur; extra.textContent = cur + ' (unknown)';
         input.appendChild(extra); input.value = cur;
       } else input.value = '';
-      input.addEventListener('change', function(){
+      formLife.listen(input,'change', function(){
         commitCascade(function(raw){
           return planStepTone(session.text(), raw, t.section, t.index, id, input.value === '' ? null : input.value);
         }, {after: function(){ renderInspector(); }});
@@ -516,7 +521,7 @@ function stepForm(val, ctx){
       addTone.appendChild(option);
     });
     addTone.disabled = addTone.children.length < 2;
-    addTone.addEventListener('change', function(){
+    formLife.listen(addTone,'change', function(){
       if (!addTone.value) return;
       commitCascade(function(raw){
         return planStepTone(session.text(), raw, t.section, t.index, addTone.value, 'alert');
@@ -552,7 +557,7 @@ function effectiveStateControl(target){
     function sourceButton(source,base){
       var button=document.createElement('button'); button.type='button'; button.className='bbtn effective-source';
       button.textContent=source.label; button.title=builderPathString(base.concat(source.path));
-      button.addEventListener('click',function(){
+      formLife.listen(button,'click',function(){
         if (session.text()!==indexedText){ stale(); return; }
         var loc=jsonLocate(session.text(),base.concat(source.path));
         if (loc) selectRange(loc,true);
@@ -569,7 +574,7 @@ function effectiveStateControl(target){
       note.textContent='Step '+(route.indices.indexOf(target.index)+1)+(st && st.id?' · '+st.id:'')+': folded state sent to each widget, including panels without a patch here. Widget-specific defaults may still apply. Values are read-only; source buttons select the authored JSON. Computed fields list input history, including superseded or ignored inputs.';
       model.panels.forEach(function(p){
         var box=document.createElement('details'); box.className='effective-panel'; box.open=OPEN_EFFECTIVE_PANELS.has(p.id);
-        box.addEventListener('toggle',function(ev){
+        formLife.listen(box,'toggle',function(ev){
           if (ev.target!==box || !guide.contains(box)) return;
           if (box.open) OPEN_EFFECTIVE_PANELS.add(p.id); else OPEN_EFFECTIVE_PANELS.delete(p.id);
         });
@@ -589,12 +594,12 @@ function effectiveStateControl(target){
         var rawLabel=document.createElement('summary'); rawLabel.textContent='Folded JSON'; raw.appendChild(rawLabel);
         var area=document.createElement('textarea'); area.className='fctl'; area.readOnly=true; area.rows=6; area.value=JSON.stringify(p.state,null,2); area.setAttribute('aria-label','Effective JSON for '+p.id); raw.appendChild(area);
         var select=document.createElement('button'); select.type='button'; select.className='bbtn'; select.textContent='Select JSON';
-        select.addEventListener('click',function(){ if (session.text()!==indexedText){ stale(); return; } area.focus(); area.select(); }); raw.appendChild(select);
+        formLife.listen(select,'click',function(){ if (session.text()!==indexedText){ stale(); return; } area.focus(); area.select(); }); raw.appendChild(select);
         box.appendChild(raw); body.appendChild(box);
       });
     }
-    refresh.addEventListener('click',populate);
-    outer.addEventListener('toggle',function(ev){
+    formLife.listen(refresh,'click',populate);
+    formLife.listen(outer,'toggle',function(ev){
       if (ev.target!==outer || !guide.contains(outer)) return;
       OPEN_EFFECTIVE_STATE=outer.open;
       if (outer.open && (!populated || indexedText!==session.text())) populate();
@@ -608,7 +613,7 @@ function panelPatchControl(pid, patch, decl, target){
     var det = document.createElement('details');
     det.className = 'patchedit';
     det.open = OPEN_PATCH_EDITORS.has(pid);
-    det.addEventListener('toggle', function(ev){
+    formLife.listen(det,'toggle', function(ev){
       if (ev.target !== det || !guide.contains(det)) return;
       if (det.open) OPEN_PATCH_EDITORS.add(pid);
       else OPEN_PATCH_EDITORS.delete(pid);
@@ -807,7 +812,7 @@ function colInput(col, value){
     return input;
   }
 
-function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true});}
+function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,listen:listen});}
   function rowsFieldControl(key, cur, shape, options){
     options=options || {};
     var wrap = document.createElement('div');
@@ -852,7 +857,7 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true})
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'bbtn rowx'; b.textContent = text;
       b.title = title;
-      b.addEventListener('click', function(ev){if(!disposed)return onClick.call(this,ev);});
+      formLife.listen(b,'click', function(ev){if(!disposed)return onClick.call(this,ev);});
       return b;
     }
     function buildRow(base){
@@ -902,7 +907,7 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true})
       wrap.appendChild(buildRow(it && typeof it === 'object' ? it : {}));
     });
     addBtn.type = 'button'; addBtn.className = 'bbtn rowadd'; addBtn.textContent = '+ item';
-    addBtn.addEventListener('click', function(){
+    formLife.listen(addBtn,'click', function(){
       if (shape.max && rowRefs.length >= shape.max){
         formError(key + ': at most ' + shape.max + ' items'); return;
       }
@@ -946,7 +951,7 @@ function mapFieldControl(key, cur, opts){
       var x = document.createElement('button');
       x.type = 'button'; x.className = 'bbtn rowx'; x.textContent = '✕';
       x.title = 'remove this pair';
-      x.addEventListener('click', function(){
+      formLife.listen(x,'click', function(){
         commitPairs(pairRefs.filter(function(p){ return p !== ref; }));
       });
       line.appendChild(keyInput); line.appendChild(valInput); line.appendChild(x);
@@ -956,7 +961,7 @@ function mapFieldControl(key, cur, opts){
     var obj = (cur && typeof cur === 'object' && !Array.isArray(cur)) ? cur : {};
     Object.keys(obj).forEach(function(k){ wrap.appendChild(buildPair(k, obj[k])); });
     addBtn.type = 'button'; addBtn.className = 'bbtn rowadd'; addBtn.textContent = '+ pair';
-    addBtn.addEventListener('click', function(){
+    formLife.listen(addBtn,'click', function(){
       var line = buildPair(null, null);
       wrap.insertBefore(line, addBtn);
       line.querySelector('input').focus();
@@ -1014,6 +1019,9 @@ function objFieldsControl(key, cur, shape){
       refresh:refreshFormSoon, inspect:renderInspector, select:selectTarget,
       rehighlight:rehighlight, stepper:stepperFor,
       clipboard:function(){return clipboard();}, selectClipboard:function(target){if(!disposed)opts.clipboard.selectHome(target);},
+      listen:function(target,type,fn,options){if(!disposed)return listen(target,type,fn,options);},
+      onFormRetire:function(cleanup){if(disposed)cleanup();else formLife.own(cleanup);},
+      clearClipboard:function(){if(!disposed)opts.clipboard.clearHome();},
       controls:{row:frow,block:frowBlock,action:actionButton,text:textControl,
         number:numberControl,select:selectControl,rows:rowsFieldControl}
     };
@@ -1022,6 +1030,7 @@ function objFieldsControl(key, cur, shape){
   }
 
 function panelEditorForTarget(target){
+    if(disposed)return {};
     if(!target || ['panel','home'].indexOf(target.kind)<0) return {};
     var parsed=parseEditor();if(parsed.error)return {};
     var path=builderTargetPath(parsed.raw,{kind:'panel',section:target.section,index:target.index});
@@ -1029,6 +1038,7 @@ function panelEditorForTarget(target){
   }
 
 function panelEditorForCard(card){
+    if(disposed)return {};
     var section=card && card.closest('.doc-sec[data-dv-section]');
     return section ? panelEditorForTarget({kind:'panel',section:Number(section.getAttribute('data-dv-section')),index:Number(card.getAttribute('data-dv-panel'))}) : {};
   }
@@ -1288,7 +1298,7 @@ function renderInspector(){
     if (loc){
       var sourceAtSelection = session.text();
       p.type = 'button'; p.setAttribute('aria-label', 'Show selected element in JSON');
-      p.addEventListener('click', function(){
+      formLife.listen(p,'click', function(){
         if (session.text() !== sourceAtSelection){ formError('Source changed. Click Render and reselect this element.'); return; }
         selectRange(loc, true);
       });
@@ -1473,12 +1483,20 @@ function renderInspector(){
   }
 
 
+  function refreshCatalog(){
+    if(disposed || !session.target || session.target.kind!=='node')return;
+    var active=document.activeElement;
+    if(active && guide && guide.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))
+      formLife.listen(active,'blur',refreshFormSoon,{once:true});
+    else refreshFormSoon();
+  }
+
   return {
-    render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,retire:retire,
-    sourceChanged:function(){cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();},
+    render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
+    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();},
     message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},
-    destroy:function(){if(disposed)return;retire();disposed=true;panelEditors=Object.create(null);if(guide)guide.innerHTML='';}
+    destroy:function(){if(disposed)return;disposed=true;try{retire();}finally{formLife.destroy();panelEditors=Object.create(null);if(guide)guide.innerHTML='';}}
   };
 }

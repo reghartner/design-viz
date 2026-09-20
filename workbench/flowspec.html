@@ -22861,9 +22861,9 @@ function parseBacklinks(raw){
 }
 
 function wireNodeBacklinks(host, svg, diagram, prefix, backlinks){
-  if (!host || !svg || !backlinks) return;
+  if (!host || !svg || !backlinks) return null;
   var triggers = svg.querySelectorAll('.nbackref');
-  if (!triggers.length) return;
+  if (!triggers.length) return null;
   var pop = document.createElement('div');
   pop.className = 'nbackpop';
   pop.id = prefix + '-backlinks';
@@ -22871,9 +22871,14 @@ function wireNodeBacklinks(host, svg, diagram, prefix, backlinks){
   pop.hidden = true;
   host.appendChild(pop);
   var active = null, pinned = false, closeTimer = null, suppressFocusOpen = null;
+  var listeners = [], destroyed = false;
 
+  function listen(target, type, fn){
+    target.addEventListener(type, fn);
+    listeners.push({target:target, type:type, fn:fn});
+  }
   function cancelClose(){
-    if (closeTimer){ clearTimeout(closeTimer); closeTimer = null; }
+    if (closeTimer !== null){ clearTimeout(closeTimer); closeTimer = null; }
   }
   function setExpanded(trigger, expanded){
     if (trigger) trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -22899,6 +22904,7 @@ function wireNodeBacklinks(host, svg, diagram, prefix, backlinks){
     }
   }
   function scheduleClose(){
+    if (destroyed) return;
     cancelClose();
     if (!pinned && !containsTarget(document.activeElement)){
       closeTimer = setTimeout(close, 140);
@@ -22922,6 +22928,7 @@ function wireNodeBacklinks(host, svg, diagram, prefix, backlinks){
     pop.style.top = top + 'px';
   }
   function show(trigger, pin){
+    if (destroyed) return;
     cancelClose();
     if (active !== trigger){
       setExpanded(active, false);
@@ -22954,19 +22961,19 @@ function wireNodeBacklinks(host, svg, diagram, prefix, backlinks){
   for (var i = 0; i < triggers.length; i++){
     (function(trigger){
       trigger.setAttribute('aria-controls', pop.id);
-      trigger.addEventListener('mouseenter', function(){ show(trigger, false); });
-      trigger.addEventListener('mouseleave', scheduleClose);
-      trigger.addEventListener('focus', function(){
+      listen(trigger, 'mouseenter', function(){ show(trigger, false); });
+      listen(trigger, 'mouseleave', scheduleClose);
+      listen(trigger, 'focus', function(){
         if (suppressFocusOpen === trigger) return;
         show(trigger, false);
       });
-      trigger.addEventListener('focusout', closeOnFocusOutside);
-      trigger.addEventListener('click', function(ev){
+      listen(trigger, 'focusout', closeOnFocusOutside);
+      listen(trigger, 'click', function(ev){
         ev.stopPropagation();
         if (active === trigger && pinned) close();
         else show(trigger, true);
       });
-      trigger.addEventListener('keydown', function(ev){
+      listen(trigger, 'keydown', function(ev){
         if (ev.key === 'Enter' || ev.key === ' '){
           ev.preventDefault();
           if (active === trigger && pinned) close();
@@ -22978,21 +22985,33 @@ function wireNodeBacklinks(host, svg, diagram, prefix, backlinks){
       });
     })(triggers[i]);
   }
-  pop.addEventListener('mouseenter', cancelClose);
-  pop.addEventListener('mouseleave', scheduleClose);
-  pop.addEventListener('focusin', cancelClose);
-  pop.addEventListener('focusout', closeOnFocusOutside);
-  pop.addEventListener('keydown', function(ev){
+  listen(pop, 'mouseenter', cancelClose);
+  listen(pop, 'mouseleave', scheduleClose);
+  listen(pop, 'focusin', cancelClose);
+  listen(pop, 'focusout', closeOnFocusOutside);
+  listen(pop, 'keydown', function(ev){
     if (ev.key === 'Escape'){
       ev.preventDefault();
       close(true);
     }
   });
-  document.addEventListener('click', function(ev){
+  listen(document, 'click', function(ev){
     if (!pop.hidden && !containsTarget(ev.target)) close();
   });
   var scrollHost = host.parentNode;
-  if (scrollHost && scrollHost.addEventListener) scrollHost.addEventListener('scroll', close);
+  if (scrollHost && scrollHost.addEventListener) listen(scrollHost, 'scroll', close);
+  return {destroy:function(){
+    if (destroyed) return;
+    destroyed = true;
+    close(false);
+    listeners.forEach(function(listener){ listener.target.removeEventListener(listener.type, listener.fn); });
+    listeners = [];
+    for (var i = 0; i < triggers.length; i++){
+      setExpanded(triggers[i], false);
+      if (triggers[i].getAttribute('aria-controls') === pop.id) triggers[i].removeAttribute('aria-controls');
+    }
+    pop.remove();
+  }};
 }
 
 /* Node references are authored evidence. Related step code is labeled as such,
@@ -24079,8 +24098,16 @@ function resolveHashTarget(st, manifest){
   return out;
 }
 
+/* Both link menus belong to this board, including listeners outside its DOM. */
+function destroyBoardLinks(el){
+  ['_nodeBacklinks', '_nodeLinks'].forEach(function(key){
+    var controller = el[key];
+    el[key] = null;
+    if (controller) controller.destroy();
+  });
+}
 function renderBoard(el, d, prefix, skin, protos, backlinks){
-  if(el._nodeLinks){el._nodeLinks.destroy();el._nodeLinks=null;}
+  destroyBoardLinks(el);
   var SK = SKINS[skinBase(skin)];
   var L = layout(d);
   var ADJ = L.routing === 'lanes' ? laneRoutes(d,L) : edgeAutoAdjust(d.edges || [], L);
@@ -24182,7 +24209,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     var node = document.getElementById(prefix + '-n-' + id);
     if (node) nodeEls[id] = node;
   });
-  wireNodeBacklinks(el, svg, d, prefix, backlinks);
+  el._nodeBacklinks=wireNodeBacklinks(el, svg, d, prefix, backlinks);
   el._nodeLinks=wireNodeReferences(el,svg,d,prefix);
 
   /* measured pass: labels, coins, ambient loop dots, manual step dots */
@@ -25440,7 +25467,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var lg = document.createElement('div'); lg.className = 'lg';
   var bwrap = document.createElement('div');
   bwrap.className = 'boardcanvas';
-  result.destroy=function(){if(panelCtl)panelCtl.destroy();if(bwrap._nodeLinks){bwrap._nodeLinks.destroy();bwrap._nodeLinks=null;}};
+  result.destroy=function(){if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
   boardDiv.appendChild(lg); boardDiv.appendChild(bwrap);
   boardLayout.diagramHost.appendChild(boardDiv);
 

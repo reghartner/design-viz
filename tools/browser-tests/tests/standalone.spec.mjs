@@ -4,7 +4,7 @@ import {access} from 'node:fs/promises';
 import {test,expect} from '../helpers/test.mjs';
 function scrollPosition(row){
   const rowTop=row.getBoundingClientRect().top,rowDocTop=rowTop+scrollY;
-  const maxScroll=Math.max(0,document.scrollingElement.scrollHeight-innerHeight);
+  const maxScroll=Math.max(0,document.scrollingElement.scrollHeight-document.scrollingElement.clientHeight);
   const wantedScroll=Math.min(rowDocTop,maxScroll);
   return {rowTop,rowDocTop,maxScroll,currentScroll:scrollY,wantedScroll,
     aligned:Math.abs(scrollY-wantedScroll)<=1,fonts:document.fonts.status};

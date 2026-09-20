@@ -98,9 +98,9 @@ panel state, and recapture the corresponding PNGs from the actual generated page
 when the diagram changes. Capture screenshot panels only from the authorized
 fictional rehearsal or an explicitly approved source. Preserve their provenance.
 
-Implementation references: [Backstage integration](../../backstage-integration.md),
-[catalog sync](../../workbench-catalog-sync.md),
-[drift automation](../../github-drift-automation.md),
-[release compatibility](../../runtime-compatibility.md),
-[panel modules](../../panel-modularity.md), and
-[portable rehearsal](../../../examples/backstage-e2e/README.md).
+Implementation references: [Backstage integration](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/backstage-integration.md),
+[catalog sync](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md),
+[drift automation](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/github-drift-automation.md),
+[release compatibility](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md),
+[panel modules](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/panel-modularity.md), and
+[portable rehearsal](https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/examples/backstage-e2e/README.md).

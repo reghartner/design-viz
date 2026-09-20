@@ -238,8 +238,8 @@ visibly; omission never means hidden. In a legacy combined diagram/controls tile
 hiding the diagram keeps its live controls visible. Use an explicit controls tile with `attachTo` in new coupled layouts. Panel rename/delete updates every view and host profile.
 
 Named layouts require the updated viewer bundle: re-export standalone HTML or
-update the Backstage/Forge app. Backstage's exported script hash changes with
-this renderer upgrade; update the host CSP alongside the plugin.
+update the Backstage/Forge app. Backstage's native renderer is rebuilt with the
+plugin; its host uses the normal bundled-script and embedded-asset policy.
 
 Optional `layouts[].steps` is a nonempty list of unique existing step IDs. Omit
 it for all steps; list order does not reorder the story. The selection belongs

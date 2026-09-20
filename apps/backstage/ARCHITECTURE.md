@@ -12,39 +12,49 @@ workbench owns editing; the bundled Flowview runtime owns rendering.
 | Public API facade, preserved for consumers | `src/api.ts` |
 | Wire contracts, response validation, proxy clients | `src/api/` |
 | Association refresh, request cancellation, stale results | `src/hooks/useEntityDiagrams.ts` |
-| Spec loading, frame channel, timeout, pause and cleanup | `src/hooks/useInlineViewer.ts` |
+| Spec loading, native mount, pause and cleanup | `src/hooks/useInlineViewer.ts` |
 | Selection and service/step presentation | `src/FlowviewEntityDiagrams.tsx` |
-| Loading, compatibility, error and frame presentation | `src/InlineFlowview.tsx` |
+| Loading, compatibility, error and native host presentation | `src/InlineFlowview.tsx` |
 | Safe explicit evidence links | `src/components/EvidenceLink.tsx` |
 | Host navigation target type | `src/viewer/protocol.ts` |
-| Renderer-side navigation, link protection and sizing | `viewer/frame.js` |
+| Portable renderer artifact and declarations | `src/generated/nativeViewer.js`, `nativeViewer.d.ts` |
+| Upstream native ownership, navigation and link protection | `../../src/native/` |
 
 Keep request ownership in the hooks. Every request has an abort controller; every
-timer, observer, listener and MessagePort has paired cleanup. The entity ID scopes
+timer, observer, listener has paired cleanup. The entity ID scopes
 association results. The diagram ID and published revision scope both a rendered
 viewer and its service-step target. Refreshing a revision discards that target.
 
-## Frame contract
+## Native mount contract
 
-The parent sends one `flowview:init` message containing JSON, an optional target,
-and a private MessagePort to its own sandboxed frame. It sends no credentials.
-Subsequent commands use that port: `navigate` and `pause`. Responses are `rendered`,
-`size`, `error`, `navigation-error`, and `navigated`. The host clamps reported height
-and ignores messages from disconnected channels. A failed jump leaves a valid
-diagram visible. A service-step jump previews the exact source step even if the
-current layout hides it, including a wholly hidden alternate path.
+The hook passes original inert JSON into the trusted static `mountNativeViewer`
+export. The returned handle supports `navigate`, `pause` and idempotent `destroy`.
+The host uses normal document layout for sizing. A failed jump leaves a valid
+diagram visible. Exact step jumps use shared core identity/source lookup and
+preview the raw source step before applying any path-only visibility gate. The
+active named view is retained, including for a wholly hidden alternate path.
+
+The request object scopes loaded data to ID, revision, loader and retry attempt.
+Only the current request can mount; cleanup aborts reads, destroys the native
+handle and disconnects host visibility observers. Late reads and retired mount
+callbacks cannot update the active host.
 
 `src/generated/` is committed build output. Do not hand-edit it. The source build
-embeds the runtime, CSS, SVG icons and fonts, and computes the exact script CSP
-hash. A company build uses the artifact without reading the upstream `src/` tree.
-Changing `viewer/frame.js` also requires `npm run build:viewer` and a host CSP
-hash update. See the README for the current sandbox and inherited CSP contract.
+uses `tools/native-viewer-build.mjs` to compile shared logical source bundles and
+`src/native/` into one ESM artifact, with CSS, SVG icons and namespaced fonts. It
+also assembles the compatibility checker through the panel source loader. Company
+copies use these artifacts without reading the upstream `src/` tree. Changes to
+shared source or native ownership require `npm run build:viewer` upstream.
+ShadowRoot isolation and the host script/style/font/image policy are documented
+in the README; there is no frame channel or generated script hash.
 
 ## Verification boundaries
 
 `npm run verify` works with only this package and its installed dependencies. It
 covers strict types, API validation, refresh/cancellation, selection by revision,
-frame messaging, recoverable navigation and artifact/hash consistency.
+native lifecycle, recoverable exact navigation, inert/unsafe assets and static
+artifact boundaries. Root tests cover real entity-index → shared core → native
+mount navigation; portable plugin tests also render the actual compiled artifact.
 
 From the upstream repository, also run:
 

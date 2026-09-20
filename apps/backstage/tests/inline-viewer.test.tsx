@@ -1,100 +1,110 @@
 // @vitest-environment jsdom
 import React from 'react';
-import {webcrypto} from 'node:crypto';
-import {readFileSync} from 'node:fs';
 import {afterEach,beforeEach,it,expect,vi} from 'vitest';
 import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {InlineFlowview} from '../src/InlineFlowview';
 import {createSpecLoader,type AssociatedDiagram} from '../src/api';
-import {viewerDocument,viewerScriptCsp} from '../src/generated/viewerDocument';
+import {mountNativeViewer} from '../src/generated/nativeViewer';
 import {FlowviewCompatibility} from '../src/generated/compatibility';
+vi.mock('../src/generated/nativeViewer',()=>({mountNativeViewer:vi.fn()}));
+const mount=vi.mocked(mountNativeViewer);
 const diagram:AssociatedDiagram={id:'doorbell',revision:'r1',title:'Doorbell',kind:'canonical',owner:'group:default/home',viewerUrl:'https://flows.test/view',editUrl:'https://flows.test/edit',sections:[]};
 const spec={page:{canon:{id:'doorbell'},title:'</script><img src="https://untrusted.test/">'}};
-class Channel {
-  static all:Channel[]=[];
-  port1={onmessage:null as null|((e:MessageEvent)=>void),postMessage:vi.fn(),close:vi.fn()};
-  port2={postMessage:vi.fn(),close:vi.fn()};
-  constructor(){Channel.all.push(this);}
-}
-beforeEach(()=>{Channel.all=[];vi.stubGlobal('MessageChannel',Channel);});
+const owners:Array<{navigate:ReturnType<typeof vi.fn>;pause:ReturnType<typeof vi.fn>;destroy:ReturnType<typeof vi.fn>}>=[];
+beforeEach(()=>{
+  owners.length=0;mount.mockReset();
+  mount.mockImplementation(host=>{
+    const owner={root:host.attachShadow({mode:'open'}),warnings:[],navigate:vi.fn(),pause:vi.fn(),destroy:vi.fn()};
+    owners.push(owner);return owner;
+  });
+});
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.useRealTimers();});
-it('warns before rendering a newer spec, lists unavailable features, and preserves the original spec',async()=>{
+it('warns before rendering a newer spec, lists unavailable features, and passes the original inert spec',async()=>{
   const future={...spec,page:{...spec.page,contract:'1',flowview:{minVersion:'9.0.0',features:['panel.future']}}};
   const load=vi.fn().mockResolvedValue(future);
   render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
   const notice=await screen.findByRole('alert',{name:'Flowview compatibility'});
   expect(notice.textContent).toContain('9.0.0');expect(notice.textContent).toContain(FlowviewCompatibility.version);
   expect(notice.textContent).toContain('panel.future');expect(notice.textContent).toContain('Backstage administrator');
-  const frame=await screen.findByTitle('Flowview: Doorbell') as HTMLIFrameElement;
-  const post=vi.spyOn(frame.contentWindow!,'postMessage');fireEvent.load(frame);
-  expect(post).toHaveBeenCalledWith({type:'flowview:init',spec:future,target:undefined},'*',[Channel.all.at(-1)!.port2]);
-  act(()=>Channel.all.at(-1)!.port1.onmessage?.({data:{type:'error',message:'Unknown future panel'}} as MessageEvent));
+  expect(mount.mock.calls[0][1]).toBe(future);
+  act(()=>mount.mock.calls[0][2]?.onWarning?.('Bundled viewer fonts could not load.'));
   expect(screen.getByRole('alert',{name:'Flowview compatibility'})).toBeTruthy();
 });
-it('blocks an unsupported spec contract with an upgrade message and clears it on a different diagram',async()=>{
+it('blocks an unsupported contract and clears the warning on a different revision',async()=>{
   const load=vi.fn().mockResolvedValueOnce({page:{...spec.page,contract:'2'}}).mockResolvedValue(spec);
   const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
   expect((await screen.findByRole('alert',{name:'Flowview compatibility'})).textContent).toContain('upgrade required');
-  expect(screen.queryByTitle('Flowview: Doorbell')).toBeNull();
+  expect(mount).not.toHaveBeenCalled();expect(screen.queryByTitle('Flowview: Doorbell')).toBeNull();
   view.rerender(<InlineFlowview diagram={{...diagram,revision:'r2'}} loadSpec={load}/>);
   await screen.findByTitle('Flowview: Doorbell');expect(screen.queryByRole('alert',{name:'Flowview compatibility'})).toBeNull();
 });
-it('does not warn just because a compatible spec was authored in a newer editor',async()=>{
-  const load=vi.fn().mockResolvedValue({page:{...spec.page,contract:'1',flowview:{authoredWith:'9.0.0',minVersion:FlowviewCompatibility.version}}});
+it('recognizes bundled panels and does not warn for a compatible newer authoring version',async()=>{
+  const load=vi.fn().mockResolvedValue({page:{...spec.page,contract:'1',flowview:{authoredWith:'9.0.0',minVersion:FlowviewCompatibility.version,features:['panel.homemap','panel.image']}}});
   render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
   await screen.findByTitle('Flowview: Doorbell');expect(screen.queryByRole('alert',{name:'Flowview compatibility'})).toBeNull();
 });
-it('passes data through the private channel and preserves sandbox isolation with no external assets',async()=>{
+it('owns a native host, recovers from navigation errors, and destroys the mount on unmount',async()=>{
   const load=vi.fn().mockResolvedValue(spec);
   const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
-  const frame=await screen.findByTitle('Flowview: Doorbell') as HTMLIFrameElement;
-  expect(frame.hasAttribute('src')).toBe(false);expect(frame.sandbox?.toString() || frame.getAttribute('sandbox')).not.toContain('allow-same-origin');
-  expect(frame.srcdoc).not.toContain(spec.page.title);expect(frame.srcdoc).not.toContain('fonts.googleapis.com');
-  expect(frame.srcdoc).toContain("connect-src 'none'");expect(frame.srcdoc).toContain('data:font/woff2;base64,');
-  const post=vi.spyOn(frame.contentWindow!,'postMessage');fireEvent.load(frame);
-  expect(post).toHaveBeenCalledWith({type:'flowview:init',spec,target:undefined},'*',[Channel.all.at(-1)!.port2]);
-  const channel=Channel.all.at(-1)!;
-  act(()=>channel.port1.onmessage?.({data:{type:'rendered'}} as MessageEvent));
-  const target={section:'front-door',path:'cold',step:'shutdown'};
+  const host=await screen.findByRole('region',{name:'Flowview: Doorbell'});
+  expect(host.shadowRoot).toBeTruthy();expect(document.querySelector('iframe')).toBeNull();
+  const owner=owners[0],target={section:'front-door',path:'cold',step:'shutdown'};
+  owner.navigate.mockImplementationOnce(()=>{throw new Error('This step is no longer in the published diagram.');});
   view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target}/>);
-  expect(channel.port1.postMessage).toHaveBeenCalledWith({type:'navigate',target});
-  act(()=>channel.port1.onmessage?.({data:{type:'size',height:50000}} as MessageEvent));expect(frame.style.height).toBe('24000px');
-  view.unmount();expect(channel.port1.close).toHaveBeenCalled();
+  expect((await screen.findByRole('alert')).textContent).toContain('no longer');
+  expect(owner.destroy).not.toHaveBeenCalled();
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={{...target,step:'saved'}}/>);
+  expect(owner.navigate).toHaveBeenLastCalledWith({...target,step:'saved'});expect(screen.queryByRole('alert')).toBeNull();
+  view.unmount();expect(owner.destroy).toHaveBeenCalledTimes(1);
 });
-it('aborts old reads and never renders a late response after selection changes',async()=>{
+it('aborts revision races, retires the old mount immediately, and ignores late responses and callbacks',async()=>{
+  const pending:Array<{resolve:(v:unknown)=>void;signal:AbortSignal}>=[];
+  const load=vi.fn((_d:unknown,signal:AbortSignal)=>new Promise<unknown>(resolve=>pending.push({resolve,signal})));
+  const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
+  await act(async()=>pending[0].resolve(spec));expect(mount).toHaveBeenCalledTimes(1);
+  const oldWarning=mount.mock.calls[0][2]?.onWarning;
+  view.rerender(<InlineFlowview diagram={{...diagram,revision:'r2'}} loadSpec={load}/>);
+  expect(owners[0].destroy).toHaveBeenCalledTimes(1);expect(pending[0].signal.aborted).toBe(true);
+  expect(screen.queryByTitle('Flowview: Doorbell')).toBeNull();
+  view.rerender(<InlineFlowview diagram={{...diagram,revision:'r3'}} loadSpec={load}/>);
+  await act(async()=>pending[1].resolve({page:{title:'Stale revision'}}));
+  expect(pending[1].signal.aborted).toBe(true);expect(mount).toHaveBeenCalledTimes(1);
+  await act(async()=>pending[2].resolve(spec));expect(mount).toHaveBeenCalledTimes(2);
+  act(()=>oldWarning?.('Retired font callback'));expect(screen.queryByRole('alert')).toBeNull();
+  view.unmount();expect(pending[2].signal.aborted).toBe(true);expect(owners[1].destroy).toHaveBeenCalledTimes(1);
+});
+it('ignores a late read after unmount',async()=>{
   let resolve:(v:unknown)=>void=()=>{},signal:AbortSignal|undefined;
   const load=vi.fn((_d:unknown,s:AbortSignal)=>{signal=s;return new Promise<unknown>(r=>{resolve=r;});});
   const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);view.unmount();
-  expect(signal?.aborted).toBe(true);await act(async()=>resolve(spec));expect(screen.queryByTitle('Flowview: Doorbell')).toBeNull();
+  expect(signal?.aborted).toBe(true);await act(async()=>resolve(spec));expect(mount).not.toHaveBeenCalled();
 });
-it('shows read errors and retries without sending credentials into the frame',async()=>{
+it('pairs visibility/intersection pause subscriptions with the native mount',async()=>{
+  let callback:IntersectionObserverCallback=()=>{};
+  const disconnect=vi.fn(),observe=vi.fn();
+  vi.stubGlobal('IntersectionObserver',class {constructor(fn:IntersectionObserverCallback){callback=fn;}observe=observe;disconnect=disconnect;});
+  const load=vi.fn().mockResolvedValue(spec),view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
+  const host=await screen.findByTitle('Flowview: Doorbell');expect(observe).toHaveBeenCalledWith(host);
+  act(()=>callback([{isIntersecting:false}] as IntersectionObserverEntry[],{} as IntersectionObserver));
+  expect(owners[0].pause).toHaveBeenCalledTimes(1);
+  view.unmount();expect(disconnect).toHaveBeenCalledTimes(1);
+  act(()=>callback([{isIntersecting:false}] as IntersectionObserverEntry[],{} as IntersectionObserver));
+  expect(owners[0].pause).toHaveBeenCalledTimes(1);
+});
+it('shows read errors and retries through the explicit authenticated loader',async()=>{
   const load=vi.fn().mockRejectedValueOnce(new Error('Diagram read failed (403).')).mockResolvedValue(spec);
   render(<InlineFlowview diagram={diagram} loadSpec={load}/>);expect(await screen.findByRole('alert')).toBeTruthy();
-  expect(screen.queryByTitle('Flowview: Doorbell')).toBeNull();fireEvent.click(screen.getByRole('button',{name:'Retry diagram'}));
+  expect(mount).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Retry diagram'}));
   await screen.findByTitle('Flowview: Doorbell');expect(load).toHaveBeenCalledTimes(2);
 });
-it('bundled script matches its CSP hash',async()=>{
-  const script=viewerDocument.match(/<script>([\s\S]*)<\/script>/)![1];
-  const hash=Buffer.from(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(script))).toString('base64');
-  expect(viewerScriptCsp).toBe("'sha256-"+hash+"'");
-});
-it('initializes SVG and HTML evidence links without navigating the rendering frame',()=>{
-  document.body.innerHTML='<div id="viewer-error" hidden></div><div id="docview"><svg><a href="https://catalog.test/service"><text>Service</text></a></svg><a href="javascript:alert(1)">Unsafe</a></div>';
-  vi.stubGlobal('ResizeObserver',class {observe(){}});
-  vi.stubGlobal('requestAnimationFrame',()=>0);
-  vi.stubGlobal('normalize',(v:unknown)=>v);vi.stubGlobal('validate',()=>({errors:[],warnings:[]}));
-  vi.stubGlobal('SKIN_NAMES',['pastel']);vi.stubGlobal('applySkinClasses',()=>{});
-  vi.stubGlobal('FlowCanon',{http:(v:string)=>v.startsWith('https://')?v:null});
-  vi.stubGlobal('sectionRecords',()=>[]);
-  vi.stubGlobal('renderPage',()=>({sections:[],steppers:[],destroy(){}}));
-  const port={postMessage:vi.fn(),onmessage:null,close:vi.fn()};
-  window.eval(readFileSync('viewer/frame.js','utf8'));
-  window.dispatchEvent(new MessageEvent('message',{source:window,data:{type:'flowview:init',spec:{skin:'pastel'}},ports:[port as unknown as MessagePort]}));
-  expect(port.postMessage).toHaveBeenCalledWith({type:'rendered',warnings:[]});
-  const link=document.querySelector('svg a')!;
-  expect(link.getAttribute('target')).toBe('_blank');expect(link.getAttribute('rel')).toBe('noopener noreferrer');
-  expect(document.querySelector('#docview > a')!.hasAttribute('href')).toBe(false);
-  document.body.replaceChildren();
+it('reports a native mount failure and retries with a fresh host',async()=>{
+  mount.mockImplementationOnce(()=>{throw new Error('Invalid diagram');});
+  const load=vi.fn().mockResolvedValue(spec);
+  render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
+  expect((await screen.findByRole('alert')).textContent).toContain('Invalid diagram');
+  fireEvent.click(screen.getByRole('button',{name:'Retry diagram'}));
+  await screen.findByTitle('Flowview: Doorbell');expect(mount).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole('alert')).toBeNull();
 });
 it('loads a revision through Backstage FetchApi, refuses stale/wrong/oversized specs and ignores viewerUrl as an API destination',async()=>{
   const discovery={getBaseUrl:vi.fn().mockResolvedValue('https://backstage.test/api/proxy')};

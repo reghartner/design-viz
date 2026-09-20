@@ -20,5 +20,12 @@ changing a host API rather than inferring it from the mock.
   not company authorization. Run the relevant catalog/entity tests; plugin work
   also runs `npm run verify` in `apps/backstage` after installing dependencies.
 
+  The native host uses the trusted static `mountNativeViewer` artifact with inert
+  spec data. Read `docs/native-viewer.md` for ShadowRoot/event/font ownership.
+  Verify two mounts, revision races, hidden alternate jumps and cleanup; do not
+  restore an iframe, remote code, runtime compilation or a frame CSP hash. Native
+  style isolation is not a security sandbox. Run the copied-plugin check as well
+  as package verification; portable tests must not import upstream source files.
+
 Report local evidence separately from installed-host acceptance. Company-side
 deployment cannot be claimed from a simulated bridge or unauthenticated portal.

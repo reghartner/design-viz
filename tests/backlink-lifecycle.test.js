@@ -158,3 +158,22 @@ test('section and page destruction release link menus even without a stepper', (
     assert.equal(host._nodeBacklinks, null); assert.equal(host._nodeLinks, null);
   }
 });
+
+test('authored menus track moved scroll ancestors across a native shadow boundary', () => {
+  const h = harness(), scroller = h.element(), mountHost = scroller.appendChild(h.element());
+  scroller.scrollTop = 0; scroller.scrollLeft = 0;
+  const shadowBody = h.element(), host = shadowBody.appendChild(h.element());
+  shadowBody.getRootNode = () => ({host: mountHost});
+  h.document.scrollingElement = scroller;
+  h.c.renderBoard(host, diagram, 'flow', 'aurora', h.c.resolveProtocols({}), {});
+  const trigger = host.querySelector('.nrefs-trigger'), pop = host.querySelector('.node-link-menu');
+  trigger.emit('click'); assert.equal(pop.hidden, false);
+  const nativeDocument = {nodeType: 9};
+  h.document.emit('scroll', {target: nativeDocument});
+  assert.equal(pop.hidden, false, 'queued scroll without movement does not dismiss');
+  scroller.scrollTop = 20; h.document.emit('scroll', {target: nativeDocument});
+  assert.equal(pop.hidden, true, 'host document movement dismisses the anchored menu');
+  trigger.emit('click'); scroller.scrollTop = 40; h.document.emit('scroll', {target: scroller});
+  assert.equal(pop.hidden, true, 'an outer element scroll container is tracked too');
+  host._nodeLinks.destroy(); assert.equal(h.document.count(), 0); assert.equal(h.window.count(), 0);
+});

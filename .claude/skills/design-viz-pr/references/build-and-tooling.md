@@ -41,6 +41,12 @@
   privileged execution via changed triggers. `canon-drift.yml` also requires
   the canon route because it handles review decisions and writes accepted pins.
 
+- Backstage native composition lives in `tools/native-viewer-build.mjs` and
+  `src/native/`; `apps/backstage/build-viewer.mjs` emits the portable static ESM
+  artifact and declarations. Use logical source-loader assemblies, including
+  compatibility panel metadata. Do not hand-edit generated code or restore runtime
+  source evaluation. Rebuild and verify the isolated copy install after changes.
+
 Validate generated freshness from the reviewed head. Keep local build output
 separate from authored changes until explained; don't discard somebody else's
 work to obtain a clean result. Check required remote CI for that same head before

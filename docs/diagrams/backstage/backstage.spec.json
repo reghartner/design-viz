@@ -30,7 +30,7 @@
         "color": "#fb7185"
       },
       "port": {
-        "label": "Private MessagePort",
+        "label": "Native mount call",
         "color": "#0f8b8d"
       }
     },
@@ -2415,7 +2415,7 @@
                     },
                     "bsapp": {
                       "title": "Backstage app",
-                      "sub": "parent + proxy",
+                      "sub": "host + proxy",
                       "icon": "terminal",
                       "tint": "cmd",
                       "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
@@ -2572,7 +2572,7 @@
                           {
                             "id": "3",
                             "cells": {
-                              "field": "Inline frame",
+                              "field": "Native viewer",
                               "value": "Local rendering only"
                             }
                           }
@@ -2651,7 +2651,7 @@
                     },
                     {
                       "id": "inline",
-                      "text": "Backstage ships its own rendering bundle. The parent reads approved JSON through its proxy and transfers it to a local sandboxed frame.",
+                      "text": "Backstage ships trusted renderer code in its app bundle. The host reads approved JSON through its proxy and mounts that inert data inside an owned ShadowRoot.",
                       "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
                       "edge": "bsapp->frame",
                       "panels": {
@@ -2704,12 +2704,12 @@
                 "heading": "Read inside Backstage, follow links, edit elsewhere",
                 "accent": "violet",
                 "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
-                "text": "The iframe is a local bundled document. Only the parent plugin reads the approved spec through Backstage. The capture below shows that actual plugin with fictional data.",
+                "text": "The native viewer is trusted bundled code. Only the host plugin reads the approved spec through Backstage. The capture below shows that actual plugin with fictional data.",
                 "bullets": [
-                  "**No frame egress:** the local frame receives data on a private MessagePort. Fonts, scripts, icons and this screenshot are bundled. connect-src none blocks background fetches.",
-                  "**Links are deliberate navigation:** a service, code or API reference opens a new tab on click. No API operation runs just because a diagram renders. Edit in workbench is a separate parent link.",
+                  "**Inert data, explicit links:** the native renderer receives JSON and has no request transport. Fonts, code, icons and this screenshot are bundled; evidence links open on explicit clicks. Shadow DOM owns styles and DOM; it is not a security sandbox.",
+                  "**Links are deliberate navigation:** a service, code or API reference opens a new tab on click. No API operation runs just because a diagram renders. Edit in workbench is a separate host link.",
                   "**Revision consistency:** the company endpoint returns the requested approved revision or 409. The stale path ends before rendering; refreshing must obtain a new association result.",
-                  "**Host policy:** srcDoc inherits Backstage CSP. Install the generated exact script hash and required style/data-font/image permissions; the plugin guide gives the contract. Company SSO and installed-host acceptance remain company checks."
+                  "**Host policy:** trusted pinned code uses the normal app script policy and required inline-style/data-font/image permissions. No Flowview iframe, script hash or runtime code compilation is required. Company CSP, SSO and installed-host acceptance remain company checks."
                 ],
                 "diagram": {
                   "view": "step",
@@ -2718,7 +2718,7 @@
                   "layoutName": "Viewer walkthrough",
                   "nodes": {
                     "plugin": {
-                      "title": "Plugin parent",
+                      "title": "Plugin host",
                       "sub": "FetchApi",
                       "icon": "terminal",
                       "tint": "cmd",
@@ -2740,7 +2740,7 @@
                     },
                     "frame": {
                       "title": "Local viewer",
-                      "sub": "private port",
+                      "sub": "owned ShadowRoot",
                       "icon": "terminal",
                       "tint": "cmd",
                       "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
@@ -2866,14 +2866,14 @@
                           {
                             "id": "0",
                             "cells": {
-                              "field": "Parent plugin",
+                              "field": "Plugin host",
                               "value": "Reads JSON with FetchApi"
                             }
                           },
                           {
                             "id": "1",
                             "cells": {
-                              "field": "Local frame",
+                              "field": "Native viewer",
                               "value": "Renders data; no network reads"
                             }
                           },
@@ -2947,7 +2947,7 @@
                     },
                     {
                       "id": "forward",
-                      "text": "The backend proxy applies the company authentication contract; tokens and identity handling stay outside the rendering frame.",
+                      "text": "The backend proxy applies the company authentication contract; renderer inputs contain inert spec data, never tokens or identity handling.",
                       "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
                       "edge": "proxy->api",
                       "panels": {
@@ -2980,7 +2980,7 @@
                     },
                     {
                       "id": "render",
-                      "text": "The parent transfers data over a private MessagePort. The bundled local viewer renders steps, paths and panels; it does not fetch the spec.",
+                      "text": "The host calls the bundled native mount with inert data. Each ShadowRoot owns its steps, paths, panels and resource cleanup; the renderer does not fetch the spec.",
                       "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
                       "edge": "plugin->frame",
                       "panels": {

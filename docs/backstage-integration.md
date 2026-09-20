@@ -41,9 +41,10 @@ development preview. `tools/canon/entity-diagrams.mjs` derives associations from
 `nodes.*.binding.entityRef` and explicit API bindings across every section/tab.
 The tab renders canonical flows and HLD designs inline with jumps to relevant happy
 and alternate steps, and refreshes automatically. Editing stays external. The
-Backstage parent fetches JSON through its authenticated proxy and gives it to a
-bundled, network-disabled rendering frame; it does not iframe the hosted viewer
-URL. See the plugin guide's parent CSP/hash requirements. No per-service annotation or
+Backstage host fetches JSON through its authenticated proxy and passes inert data
+to its statically bundled native renderer. Each viewer owns a ShadowRoot; no
+iframe, remote code or runtime code compilation is used. See the plugin guide's
+host script/style/font/image policy and trusted-code boundary. No per-service annotation or
 manually maintained list is needed. Company installation, authenticated proxy
 configuration and per-viewer diagram visibility are described in the plugin guide.
 
@@ -61,10 +62,10 @@ the image, and it never uses `fs.readFileSync` or `vm` to load renderer source.
 Keep the generated module when vendoring `tools/canon/`; existing import paths
 and the `validateSpec()` / `viewerRouting()` API stay the same.
 
-The entity index and rendering frame use the shared `sectionRecords()` identities
+The entity index and native mount use the shared `sectionRecords()` identities
 and `resolveSourceStep()` lookup described in [shared core](shared-core.md).
 Exact source jumps can preview an alternate omitted by the active named view;
-the frame calls `jumpSource()` directly, keeping the view filter intact. Path-only
+the mount calls `jumpSource()` directly, keeping the view filter intact. Path-only
 requests still require visible stops. Canon evidence indexes remain diagram-only.
 
 Runtime maintainers regenerate it with `python3 tools/build.py` whenever the shared
@@ -166,8 +167,8 @@ PRs. Scan evidence alone cannot establish a regression's root cause.
    traces. Verify branch position, independent IDs, unknown outcomes and links.
 5. Run the app's permission checks for readers, authors and reviewers, then exercise
    the embedded Backstage route and manual Confluence export at desktop and real
-   embed widths. Confirm the parent alone reads specs, the frame has no network
-   requests, service step jumps work, and external links/editor open new tabs.
+   embed widths. Confirm the host loader alone reads specs, rendering produces no background
+   network requests, service step jumps work, and external links/editor open new tabs.
 
 Local validation covers core algorithms, HTTP adapter doubles, persistence,
 renderer regression suites and browser interaction. It does not establish company

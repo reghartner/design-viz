@@ -24,8 +24,10 @@ Stop the launcher with Ctrl-C to stop its child services.
 After fresh clones, run `npm ci` here and
 `npm ci --prefix tools/catalog-sync --ignore-scripts` in the designer repository,
 then `node scripts/setup-sandbox.mjs ../__DESIGNER_NAME__` here before installing
-Backstage. Setup copies the designer's actual plugin and configures its exact
-renderer CSP hash. Repeat setup after a reviewed runtime upgrade.
+Backstage. Setup copies the designer's actual native plugin and configures the
+local host's bundled-script and embedded-font/image/style CSP. No iframe or
+Flowview script hash is required. Setup replaces its generated plugin copy; make
+plugin changes in the designer runtime source. Repeat setup after a reviewed runtime upgrade.
 
 ## Verify
 

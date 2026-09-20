@@ -1,7 +1,0 @@
-/* Content-driven height: fixed Home cap avoids iframe/vh resize feedback. */
-html,body{margin:0;min-width:0;min-height:0;background:transparent;}
-body{--home-max-height:560px;}
-body[class] .docview[class]{box-sizing:border-box;width:100%;max-width:none;padding:12px;}
-.docview .copychip,.docview .embedchip{display:none;}
-#viewer-error{padding:20px;font:15px/1.5 'IBM Plex Sans',system-ui,sans-serif;color:#172b4d;background:#fff;white-space:pre-wrap;}
-[hidden]{display:none !important;}

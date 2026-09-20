@@ -298,7 +298,7 @@ function wireNodeReferences(host,svg,diagram,prefix){
   function focusOutside(ev){if(!inside(ev.target))close(false);}
   function escape(ev){if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close(true);}}
   function scroll(ev){
-    var target=ev.target===document?(document.scrollingElement || document.documentElement):ev.target;
+    var target=ev.target===document || (ev.target && ev.target.nodeType===9)?(document.scrollingElement || document.documentElement):ev.target;
     /* Scrolling a narrow board to reach the trigger can queue an event that
        arrives after opening. Dismiss only for movement since the menu opened. */
     if(scrollAtOpen.some(function(s){return s.el===target && (s.x!==target.scrollLeft || s.y!==target.scrollTop);}))close(false);
@@ -321,7 +321,9 @@ function wireNodeReferences(host,svg,diagram,prefix){
     var left=point?point.x:rect.left,top=point?point.y:rect.bottom+6;
     pop.style.left=Math.max(8,Math.min(vw-pop.offsetWidth-8,left))+'px';pop.style.top=Math.max(8,Math.min(vh-pop.offsetHeight-8,top))+'px';
     pop.querySelector('a').focus({preventScroll:true});
-    for(var ancestor=trigger;ancestor;ancestor=ancestor.parentElement)scrollAtOpen.push({el:ancestor,x:ancestor.scrollLeft,y:ancestor.scrollTop});
+    /* Native mounts include scroll containers beyond their shadow boundary. */
+    for(var ancestor=trigger;ancestor;ancestor=ancestor.parentElement || (ancestor.getRootNode && ancestor.getRootNode().host))
+      scrollAtOpen.push({el:ancestor,x:ancestor.scrollLeft,y:ancestor.scrollTop});
     document.addEventListener('pointerdown',outside,true);document.addEventListener('focusin',focusOutside,true);
     document.addEventListener('keydown',escape,true);document.addEventListener('scroll',scroll,true);window.addEventListener('resize',resize);
   }

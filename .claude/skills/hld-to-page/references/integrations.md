@@ -32,6 +32,9 @@ Scanning opens evidence reviews, never automatic behavioral acceptance.
 Published node bindings also drive Backstage's automatic **Diagrams** tab; see
 `apps/backstage/README.md`. Use the full kind/namespace/name identity. Do not add a
 parallel manual diagram list or infer service associations from display names.
+Backstage mounts inert specs with trusted bundled native code in an owned
+ShadowRoot; describe the actual host policy and explicit links, not a sandboxed
+frame or network-blocking iframe CSP. Company installation remains separate.
 Bound nodes expose saved Backstage/API/source/code destinations through
 right-click and a keyboard/touch **…** button. Preserve `binding` URLs and
 immutable `codeRefs`; do not invent destinations from node titles. Code from

@@ -38,7 +38,7 @@ test('service step links select the correct alternate and include both ends of f
   assert.equal(section.paths[1].steps[1].position,2);
 });
 
-test('a real entity link passes through shared core and the Backstage frame to a wholly hidden alternate',async()=>{
+test('a real entity link passes through shared core and the native mount to a wholly hidden alternate',async()=>{
   const {buildEntityDiagramIndex,diagramsForEntity}=await import('../tools/canon/entity-diagrams.mjs');
   const raw=spec(),d=raw.page.blocks[1].tabs[0].sections[0].diagram;
   d.paths[1].steps=['failure'];
@@ -50,35 +50,29 @@ test('a real entity link passes through shared core and the Backstage frame to a
   const target=core.parseHash(new URL(alternate.steps[0].url).hash);
   assert.equal(target.d,'delivery-2');
   assert.deepEqual(core.diagramLayoutViews(d)[0].steps,['save']);
-  const jumps=[],pathSelections=[],tabSelections=[],messages=[],events={};
+  const jumps=[],pathSelections=[],tabSelections=[];
   const stepper={path:()=> 'happy',jumpSource(index,path){jumps.push([index,path]);return true;},
     selectPath(path){pathSelections.push(path);return false;}};
   let destroyed=false,scrolled=0;
   const controller={sections:core.sectionRecords(raw.page).map(record=>({...record,
       stepper:record.section.diagram?stepper:null,sectionEl:{scrollIntoView(){scrolled++;}}})),
     tabBlocks:[{select(...args){tabSelections.push(args);}}],steppers:[],destroy(){destroyed=true;}};
-  const view={addEventListener(){},querySelectorAll:()=>[],replaceChildren(){throw new Error('Valid render was removed');}};
-  const error={hidden:true},window={parent:{},addEventListener(type,listener){events[type]=listener;}};
-  const context={window,document:{body:{},getElementById:id=>id==='docview'?view:error,addEventListener(){}},
-    requestAnimationFrame:()=>0,ResizeObserver:class {observe(){}},
+  const view={querySelectorAll:()=>[]};
+  const environment={body:{appendChild(){}},root:{},fontsReady:Promise.resolve(),listen(){},resources(){},destroy(){this.disposed=true;}};
+  const context={document:{createElement:()=>view},ResizeObserver:class {observe(){}},
     normalize:core.normalize,validate:C.validateSpec,sectionRecords:core.sectionRecords,
-    resolveSourceStep:core.resolveSourceStep,SKIN_NAMES:['pastel'],DEFAULT_SKIN:'pastel',
+    resolveSourceStep:core.resolveSourceStep,resolveSkin:()=> 'pastel',
     applySkinClasses(){},FlowCanon:C,renderPage:()=>controller};
-  const port={postMessage:message=>messages.push(message),close(){}};
-  vm.runInNewContext(await fs.readFile(path.join(__dirname,'../apps/backstage/viewer/frame.js'),'utf8'),context);
-  events.message({source:window.parent,ports:[port],data:{type:'flowview:init',spec:raw,
-    target:{section:target.d,path:target.p,step:target.s}}});
+  vm.runInNewContext(await fs.readFile(path.join(__dirname,'../src/native/mount.js'),'utf8'),context);
+  const viewer=context.mountNativeSpec(environment,raw,{});
+  viewer.navigate({section:target.d,path:target.p,step:target.s});
   assert.deepEqual(jumps,[[2,'failed']],'host jumps to the original source index, not the path position or visible stop');
   assert.deepEqual(pathSelections,[],'a hidden alternate must not be selected before the exact preview');
   assert.deepEqual(tabSelections,[[0,false,false]]);
   assert.equal(scrolled,1);
-  assert.ok(messages.some(message=>message.type==='rendered'));
-  assert.equal(messages.some(message=>message.type==='error'||message.type==='navigation-error'),false);
-  port.onmessage({data:{type:'navigate',target:{section:target.d,path:'failed'}}});
+  assert.throws(()=>viewer.navigate({section:target.d,path:'failed'}),/no visible steps/);
   assert.deepEqual(pathSelections,['failed']);
-  assert.match(messages.at(-1).message,/no visible steps/);
   assert.equal(destroyed,false);
-  assert.equal(error.hidden,true);
   assert.equal(JSON.stringify(raw),before,'exact preview preserves the authored view and source');
 });
 

@@ -9,34 +9,35 @@ test('real Backstage service and API pages render the designer plugin and both o
   await expect(
     page.getByText('Associated diagrams (1)', { exact: true }),
   ).toBeVisible();
-  const frame = page.frameLocator('iframe[title^="Flowview:"]');
+  const viewer = page.getByRole('region', { name: /^Flowview:/ });
+  await expect(page.locator('iframe')).toHaveCount(0);
   await expect(
-    frame.getByRole('button', {
+    viewer.getByRole('button', {
       name: 'Go to step 5 on Happy path',
       exact: true,
     }),
   ).toBeVisible();
-  await frame
+  await viewer
     .getByRole('button', { name: 'Go to step 5 on Happy path', exact: true })
     .click();
   await expect(
-    frame.getByText('Doorbell recording ready', { exact: true }),
+    viewer.getByText('Doorbell recording ready', { exact: true }),
   ).toBeVisible();
-  await frame
+  await viewer
     .getByRole('button', {
       name: 'Go to step 5 on Storage timeout',
       exact: true,
     })
     .click();
   await expect(
-    frame.getByText('Doorbell recording ready', { exact: true }),
+    viewer.getByText('Doorbell recording ready', { exact: true }),
   ).toHaveCount(0);
-  await expect(frame.getByText(/^no notifications$/i)).toBeVisible();
-  await frame.getByRole('button', { name: 'Data flow', exact: true }).click();
-  await frame
+  await expect(viewer.getByText(/^no notifications$/i)).toBeVisible();
+  await viewer.getByRole('button', { name: 'Data flow', exact: true }).click();
+  await viewer
     .getByRole('button', { name: 'Links for Recording service', exact: true })
     .click();
-  const links = frame.getByRole('dialog', {
+  const links = viewer.getByRole('dialog', {
     name: 'Links for Recording service',
     exact: true,
   });
@@ -68,7 +69,7 @@ test('real Backstage service and API pages render the designer plugin and both o
   ).toBeVisible();
   await expect(
     page
-      .frameLocator('iframe[title^="Flowview:"]')
+      .getByRole('region', { name: /^Flowview:/ })
       .getByRole('button', { name: 'Go to step 5 on Happy path', exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);

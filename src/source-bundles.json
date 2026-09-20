@@ -6,6 +6,7 @@
     "panels/types/*.js"
   ],
   "engine.js": [
+    "core/navigation.js",
     "engine.js"
   ]
 }

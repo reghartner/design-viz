@@ -91,10 +91,10 @@ def canon_runtime() -> str:
         "  if (!viewerRoutingCache) viewerRoutingCache = createViewerRouting();\n"
         "  return viewerRoutingCache;\n"
         "};\n"
-        "// Scanners initialize only the evidence/validation code. The viewer's\n"
-        "// routing helpers share that scope and initialize on first use.\n"
+        "// Scanners initialize only the evidence/validation code. Pure navigation\n"
+        "// shares that scope on first use, without initializing the DOM renderer.\n"
         "function createViewerRouting(){\n"
-        + js_bundle("engine.js")
+        + js_bundle("core/navigation.js")
         + "\nreturn {blocksOf, sectionReferences, buildHash, diagramPathList,\n"
         "  stepKeys, stepFailures, stepReference};\n"
         "}\n"

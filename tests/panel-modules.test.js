@@ -26,10 +26,12 @@ test('adding a renderer file needs no assembly-list or shared lifecycle edit', (
   const root = fs.mkdtempSync(path.join(os.tmpdir(),'flowview-panel-module-'));
   try {
     fs.mkdirSync(path.join(root,'panels/types'),{recursive:true});
+    fs.mkdirSync(path.join(root,'core'),{recursive:true});
     fs.copyFileSync(path.join(__dirname,'../src/source-bundles.json'),path.join(root,'source-bundles.json'));
     fs.copyFileSync(path.join(__dirname,'../src/panels/shared.js'),path.join(root,'panels/shared.js'));
     fs.copyFileSync(path.join(__dirname,'../src/panels/registry.js'),path.join(root,'panels/registry.js'));
     fs.copyFileSync(path.join(__dirname,'../src/validator.js'),path.join(root,'validator.js'));
+    fs.copyFileSync(path.join(__dirname,'../src/core/navigation.js'),path.join(root,'core/navigation.js'));
     fs.writeFileSync(path.join(root,'engine.js'),'var RM = true;');
     const file = path.join(root,'panels/types/probe.js');
     fs.writeFileSync(file,"PanelViews.register('probe',function(host,panel,state){return {html:esc(state.text)};});");

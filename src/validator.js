@@ -379,17 +379,67 @@ function sectionLayoutWarnings(d, path, warnings){
     warnings.push(path+'.defaultLayout: name an existing layout ID');
 }
 function normalize(raw){
-  if (raw && raw.page) return raw.page;
-  if (raw && (raw.blocks || raw.sections)) return raw;
-  if (raw && raw.nodes && raw.rows) return {title:'', sections:[{diagram: raw}]};
+  if (!specObject(raw)) return null;
+  if (Object.prototype.hasOwnProperty.call(raw, 'page')) return raw.page;
+  if (Object.prototype.hasOwnProperty.call(raw, 'blocks') || Object.prototype.hasOwnProperty.call(raw, 'sections')) return raw;
+  if (Object.prototype.hasOwnProperty.call(raw, 'nodes') && Object.prototype.hasOwnProperty.call(raw, 'rows')) return {title:'', sections:[{diagram: raw}]};
   return null;
 }
 
+function specObject(value){
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+/* Establish only the containers used by dependent traversal. Never repair or
+   replace authored values: the editor must retain the exact failing source.
+   Optional null diagram fields still mean absent; panel-specific shapes and
+   recoverable presentation fields keep their existing warning semantics. */
+function specStructureErrors(page){
+  var errors = [];
+  function object(value, path){
+    if (specObject(value)) return true;
+    errors.push(path + ': must be an object');
+    return false;
+  }
+  function list(value, path, visit){
+    if (!Array.isArray(value)){ errors.push(path + ': must be an array'); return; }
+    value.forEach(function(item, i){
+      var at = path + '[' + i + ']';
+      if (object(item, at) && visit) visit(item, at);
+    });
+  }
+  function section(sec, path){
+    if (sec.diagram == null) return;
+    var d = sec.diagram, at = path + '.diagram';
+    if (!object(d, at)) return;
+    if (d.nodes != null && object(d.nodes, at + '.nodes'))
+      Object.keys(d.nodes).forEach(function(id){ object(d.nodes[id], at + '.nodes.' + id); });
+    ['edges', 'floats', 'panels', 'steps'].forEach(function(key){
+      if (d[key] != null) list(d[key], at + '.' + key);
+    });
+  }
+  ['blocks', 'sections'].forEach(function(key){
+    if (!Object.prototype.hasOwnProperty.call(page, key)) return;
+    list(page[key], 'page.' + key, function(block, path){
+      // Finding paths within the page retain the existing editor convention.
+      path = path.slice(5);
+      if (Object.prototype.hasOwnProperty.call(block, 'tabs')){
+        list(block.tabs, path + '.tabs', function(tab, at){
+          if (Object.prototype.hasOwnProperty.call(tab, 'sections'))
+            list(tab.sections, at + '.sections', section);
+        });
+      } else section(block, path);
+    });
+  });
+  return errors;
+}
+
 function blocksOf(page){
+  if (!specObject(page)) return [];
   var raw = page.blocks || page.sections || [];
   var pfx = page.blocks ? 'blocks' : 'sections';
   var out = [];
-  raw.forEach(function(b, i){
+  (Array.isArray(raw) ? raw : []).forEach(function(b, i){
     if (b && Array.isArray(b.tabs)){
       out.push({type:'tabs', path:pfx + '[' + i + ']', tabs:b.tabs.map(function(t, j){
         return {label:(t && t.label) || ('Tab ' + (j + 1)),
@@ -611,7 +661,9 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
 
 function validate(page){
   var errors = [], warnings = [];
-  if (!page){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
+  if (!specObject(page)){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
+  errors = specStructureErrors(page);
+  if (errors.length) return {errors:errors, warnings:warnings};
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   var blocks = blocksOf(page);

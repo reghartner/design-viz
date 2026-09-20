@@ -5,6 +5,16 @@
   source is in `src/`; `tools/build.py` builds both committed HTML entry points.
   Generated-only edits need a source explanation or correction, not acceptance
   of a hand patch that the next build erases.
+- Named `standalone`, `workbench`, `backend`, `native`, `forge` and
+  `compatibility` entrypoints in `src/source-bundles.json` own complete source
+  order, explicit boot, public module exports and asset selections.
+  `tools/source-loader.cjs` is the physical expansion/substitution owner; Python
+  calls its CLI. Use `entrypoint().body` for whole-core/UI definition harnesses
+  and `entrypoint().source` for emitted-content assertions, never neighboring
+  comment or private-function slicing. Pure tests still load required leaves.
+  See `docs/build-entrypoints.md` and `tests/source-loader.test.js`. Preserve raw
+  page CSS versus registry-expanded core/workbench CSS, and the explicit all-22
+  versus Forge-nine font profiles with their licenses.
 - Panel discovery follows `src/source-bundles.json`: the assembled validator
   includes `panels/registry.js`, shared helpers and every `panels/types/*.js`.
   Use `tools/source-loader.cjs` (`readSource`) for VM tests and tools; raw-file
@@ -49,7 +59,9 @@
 - Backstage native composition lives in `tools/native-viewer-build.mjs` and
   `src/native/`; `apps/backstage/build-viewer.mjs` emits the portable static ESM
   artifact and declarations. Use logical source-loader assemblies, including
-  compatibility panel metadata. Do not hand-edit generated code or restore runtime
+  physical-file compatibility panel metadata. Export bindings are declared and
+  checked centrally; keep environment/mount/scoping and package wrappers in their
+  native adapters. Do not hand-edit generated code or restore runtime
   source evaluation. Rebuild and verify the isolated copy install after changes.
 
 Validate generated freshness from the reviewed head. Keep local build output

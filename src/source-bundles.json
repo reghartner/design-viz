@@ -46,5 +46,124 @@
   "workspace.workbench.js": [
     "workbench/preview.js",
     "workspace.workbench.js"
-  ]
+  ],
+  "entrypoints": {
+    "standalone": {
+      "sources": [
+        "compatibility.js",
+        "canon.js",
+        "validator.js",
+        "engine.js"
+      ],
+      "boot": "boot.flowview.js",
+      "styles": [
+        "page",
+        "core"
+      ],
+      "fonts": "all",
+      "icons": true
+    },
+    "workbench": {
+      "sources": [
+        "compatibility.js",
+        "canon.js",
+        "validator.js",
+        "engine.js",
+        "trace-import.js",
+        "confluence.js",
+        "builder.workbench.js",
+        "panel-picker.workbench.js",
+        "clipboard.workbench.js",
+        "steps.workbench.js",
+        "reuse.workbench.js",
+        "workspace.workbench.js",
+        "layout.workbench.js",
+        "canon.workbench.js",
+        "welcome.workbench.js"
+      ],
+      "boot": "boot.workbench.js",
+      "styles": [
+        "workbench",
+        "core"
+      ],
+      "fonts": "all",
+      "icons": true
+    },
+    "backend": {
+      "sources": [
+        "compatibility.js",
+        "canon.js",
+        "validator.js",
+        "core/backend.js"
+      ],
+      "exports": {
+        "compatibility": "FlowviewCompatibility",
+        "validateSpec": "validateSpec",
+        "viewerRouting": "viewerRouting"
+      },
+      "defaultExport": "FlowCanon"
+    },
+    "native": {
+      "sources": [
+        "compatibility.js",
+        "canon.js",
+        "validator.js",
+        "engine.js"
+      ],
+      "styles": [
+        "page",
+        "core"
+      ],
+      "fonts": "all",
+      "icons": true
+    },
+    "forge": {
+      "sources": [
+        "compatibility.js",
+        "canon.js",
+        "validator.js",
+        "engine.js",
+        "confluence.js"
+      ],
+      "exports": {
+        "buildConfluenceExport": "buildConfluenceExport",
+        "buildConfluenceConfig": "buildConfluenceConfig",
+        "confluenceSections": "confluenceSections",
+        "confluenceDisplayPage": "confluenceDisplayPage",
+        "confluenceSourceUrl": "confluenceSourceUrl",
+        "CONFLUENCE_INPUT_BYTES": "CONFLUENCE_INPUT_BYTES",
+        "SKIN_NAMES": "SKIN_NAMES",
+        "DEFAULT_SKIN": "DEFAULT_SKIN",
+        "renderPage": "renderPage",
+        "applySkinClasses": "applySkinClasses"
+      },
+      "styles": [
+        "page",
+        "core"
+      ],
+      "fonts": "forge",
+      "icons": true
+    },
+    "compatibility": {
+      "sources": [
+        "compatibility.js"
+      ],
+      "exports": {
+        "FlowviewCompatibility": "FlowviewCompatibility"
+      }
+    }
+  },
+  "assets": {
+    "styles": {
+      "page": "style.flowview.css",
+      "core": "style.core.css",
+      "workbench": "style.workbench.css"
+    },
+    "icons": "icons.svg",
+    "fonts": "fonts/manifest.json",
+    "fontProfiles": [
+      "all",
+      "forge"
+    ]
+  }
 }

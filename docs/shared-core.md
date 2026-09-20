@@ -1,8 +1,10 @@
 # Shared pure core
 
 The viewer, editor, validation CLI and backend share plain JavaScript fragments
-under `src/core/`. `src/source-bundles.json` includes each leaf once in the logical
-`validator.js` bundle. Navigation and document helpers share the same outer scope;
+under `src/core/`. `src/source-bundles.json` includes each shared algorithm leaf
+once in the logical `validator.js` bundle. The backend-only public facade lives
+in `core/backend.js`, included by the named `backend` entrypoint. Navigation and
+document helpers share the same outer scope;
 a document helper can call `sectionReferences()` in both browser and backend builds.
 The logical `engine.js` bundle adds the DOM renderer and player only.
 
@@ -79,7 +81,9 @@ existing refusal if the view has no visible stops.
 
 ## Static backend facade
 
-`tools/canon/core.cjs` statically imports the generated backend runtime. Run
+`tools/canon/core.cjs` statically imports the generated backend runtime. Its
+module exports come from the named `backend` entrypoint and `core/backend.js`;
+see [build entrypoints](build-entrypoints.md). Run
 `python3 tools/build.py` after shared source changes and commit its generated
 output. Production bundles need no source checkout, runtime filesystem reads or
 VM evaluation. Creating the cached `viewerRouting()` facade never initializes the

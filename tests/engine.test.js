@@ -1,5 +1,5 @@
 'use strict';
-const {readSource, readStyles} = require('../tools/source-loader.cjs');
+const {readSource, readStyles, entrypoint} = require('../tools/source-loader.cjs');
 
 /* Unit tests for the pure engine core (src/validator.js + src/engine.js),
    loaded via vm so the browser fragments run without a DOM.
@@ -14,26 +14,10 @@ const vm = require('node:vm');
 const ROOT = path.join(__dirname, '..');
 
 function loadCore(overrides = {}){
-  const code =
-    readSource('validator.js') + '\n' +
-    readSource('engine.js') + '\n' +
-    ';__exports = {validate, normalize, blocksOf, resolveProtocols, resolveLanes, diagramHasDelta,' +
-    ' kindColor, stepKeys, stepTonePatch, foldPanelStates, foldNodeTones, layout, isWrap, edgePath, renderBoard, SKINS,' +
-    ' BUILTIN_PROTOCOLS, SCENES, spreadPositions, resolveLabelCollisions,' +
-    ' edgeAutoAdjust, parseHash, buildHash, isValidLinkBase, composeLinkURL, slugify, sectionSlugify, sectionReferences, oneBasedIndex, tabIndexOf, tabReference,' +
-    ' stepIndexOf, stepReference, resolveHashTarget, rectsOverlap, overlapArea,' +
-    ' waterfallModel, orbitPositions, zoneModel, xrayModel, thermoModel, batteryModel, bufferModel, radarModel, homemapModel, pointInPoly, signalModel, tilesModel, lintPage, CONTRACT_VERSION,' +
-    ' queueModel, queuePanelHTML, contractCardHTML, inlineMarkup, generatedFromHTML, bulletsHTML, renderPanelBody, buildPanels, panelOrder,' +
-    ' fragmentVisible, fragmentAttrs, shouldTweenStep, nodeTonesAt, tonePulseNodes, applyNodeTones, applyStepNodeFocus, foldInflightStates, inflightModel, inflightPanelHTML,' +
-    ' foldPhoneStates, phoneBrand, phoneModel, phonePanelHTML, PANEL_TYPES,' +
-    ' samplePathD, countPathRectHits, resolveEdgeAvoidance, resolveSkin, skinBase, skinClasses, applySkinClasses, fallbackCopy,' +
-    ' activeTabReferences, restoreActiveTabs, embedRequestFromHash, embedTargetSection, parseClock, formatClock, timelineModel, timelineLanesModel,' +
-    ' bindCopyControl, wireDeepLinks, COPY_ICON, COPY_OK_ICON, COPY_FAIL_ICON,' +
-    ' sectionHasProse, sectionIntroHTML, setProseCollapsed, createProseController, TONE_SET,' +
-    ' safeBacklinkHref, parseBacklinks, wireNodeBacklinks, createBoardGrid, SKIN_NAMES, ICON_SET};';
+  const code = entrypoint('native').source;
   const sandbox = {console, URL, ...overrides};
   vm.runInNewContext(code, sandbox);
-  return sandbox.__exports;
+  return sandbox;
 }
 const C = loadCore();
 function plain(value){ return JSON.parse(JSON.stringify(value)); }

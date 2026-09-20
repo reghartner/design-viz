@@ -1,10 +1,12 @@
 # Workbench source modules
 
 The workbench uses ordered plain JavaScript fragments. Its existing public
-function names remain available in the shared browser scope. Use the logical
-`builder.workbench.js` bundle from `tools/source-loader.cjs` when a tool or test
-needs the editor; pure planner tests load only their required leaves. Reading
-the physical builder file omits its source-edit, raw-target, command, session and
+function names remain available in the shared browser scope. The named
+`workbench` entrypoint from `tools/source-loader.cjs` owns the full UI assembly:
+`body` excludes explicit boot, and `source` includes it. Use the logical
+`builder.workbench.js` bundle for focused controller harnesses; pure planner tests
+load only their required leaves. See [build entrypoints](build-entrypoints.md) for
+the common source, export and asset contract. Reading the physical builder file omits its source-edit, raw-target, command, session and
 inspector, I/O, interaction and lifetime dependencies.
 
 `src/source-bundles.json` expands that bundle in this order:
@@ -42,9 +44,10 @@ the workspace layout/preferences controller. Preview identity and render attempt
 live in that leaf; workspace layout never owns authored source. Browser boot and
 tests use these same implementations, each declared once.
 
-The manifest lists physical files, not nested logical bundles. Portable builds
-expand it into the offline workbench; there is no runtime loader or filesystem
-access. Panel-specific authoring remains in the panel registry and type modules.
+Logical bundle arrays list physical files, not nested logical bundles. The named
+workbench entrypoint orders those bundles and the boot file. Portable builds
+expand that entrypoint into the offline workbench; there is no runtime loader or
+filesystem access. Panel-specific authoring remains in the panel registry and type modules.
 
 ## Pure source editing
 
@@ -463,8 +466,10 @@ those platform effects.
 
 `tests/source-edit.test.js` loads only the two pure leaves. It covers locations,
 escaped text, missing paths, commas, indentation, exact surrounding bytes, CRLF,
-result offsets and wrapped/bare/tab addresses. Editor and cross-family tests load
-the logical builder bundle through `readSource()` so they call the same implementations.
+result offsets and wrapped/bare/tab addresses. The full builder harness loads
+the named `workbench` body; focused controller and cross-family tests use `readSource()` for their required logical bundles.
+The emitted-workbench regression asserts the complete named source occurs once
+in the HTML before exercising its definitions, without neighboring-comment slicing.
 `tests/workbench-command-context.cjs` loads the core, source, raw-target and
 explicit command leaves with throwing DOM globals. Common/graph/document tests
 use it, as do the pure narrative/layout, reuse, named-view and selected path/hop

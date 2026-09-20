@@ -7,10 +7,10 @@ import {scopeNativeCss} from './native-viewer-styles.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=name=>readFile(path.join(root,name),'utf8');
 export async function nativeViewerSource(){
-  const manifest=JSON.parse(await read('src/fonts/manifest.json'));
-  const fonts=await Promise.all(manifest.map(async font=>({family:'Flowview Native '+font.family,weight:font.weight,
-    source:'url(data:font/woff2;base64,'+(await readFile(path.join(root,'src/fonts',font.file))).toString('base64')+') format("woff2")'})));
-  let css=await read('src/style.flowview.css')+'\n'+sourceLoader.readStyles('style.core.css');
+  const shared=sourceLoader.entrypointAssets('native'),manifest=shared.fonts;
+  const fonts=manifest.map(font=>({family:'Flowview Native '+font.family,weight:font.weight,
+    source:'url(data:font/woff2;base64,'+font.data+') format("woff2")'}));
+  let css=shared.styles.map(style=>style.source).join('\n');
   // Authored selector heads only. Type selectors keep type specificity; :root
   // becomes the internal class so its specificity and rule order are retained.
   css=scopeNativeCss(css);
@@ -19,8 +19,8 @@ export async function nativeViewerSource(){
   css=':host{display:block;isolation:isolate;}flowview-root{all:initial;display:block;'+variables.map(name=>name+':initial;').join('')+'}\n'+css+
     '\nflowview-root{--home-max-height:560px;}flowview-root[class] .docview[class]{box-sizing:border-box;width:100%;max-width:none;padding:12px;}'+
     '.docview .copychip,.docview .embedchip{display:none;}[hidden]{display:none!important;}';
-  const assets={css,fonts,icons:await read('src/icons.svg')};
-  const sources=['compatibility.js','canon.js','validator.js','engine.js'].map(name=>sourceLoader.readSource(name)).join('\n');
+  const assets={css,fonts,icons:shared.icons};
+  const sources=sourceLoader.entrypoint('native').source;
   return '// Generated trusted native renderer; inert specs are passed to mountNativeViewer.\n'+await read('src/native/environment.js')+
     '\nconst nativeAssets='+JSON.stringify(assets)+';\nfunction nativeRuntime(environment){\n'+
     'const {document,window,setTimeout,clearTimeout,setInterval,clearInterval,requestAnimationFrame,cancelAnimationFrame,ResizeObserver,MutationObserver,CustomEvent}=environment;\n'+

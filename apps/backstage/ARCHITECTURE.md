@@ -40,9 +40,12 @@ handle and disconnects host visibility observers. Late reads and retired mount
 callbacks cannot update the active host.
 
 `src/generated/` is committed build output. Do not hand-edit it. The source build
-uses `tools/native-viewer-build.mjs` to compile shared logical source bundles and
-`src/native/` into one ESM artifact, with CSS, SVG icons and namespaced fonts. It
-also assembles the compatibility checker through the panel source loader. Company
+uses `tools/native-viewer-build.mjs` to combine the shared named `native`
+entrypoint and asset inventory with `src/native/` into one ESM artifact. The
+adapter owns CSS scoping, namespaced fonts and instance mount/environment code.
+The named `compatibility` entrypoint supplies the checker and its panel metadata.
+Source order, exports and font profiles are described in the upstream
+[build guide](../../docs/build-entrypoints.md). Company
 copies use these artifacts without reading the upstream `src/` tree. Changes to
 shared source or native ownership require `npm run build:viewer` upstream.
 ShadowRoot isolation and the host script/style/font/image policy are documented

@@ -182,8 +182,10 @@ valid diagram available for another jump.
 `FONT-LICENSES.txt` travel with the plugin. Company builds do not need this
 repository's source tree. Runtime maintainers run `npm run build:viewer` here;
 CI checks freshness with `npm run check:viewer`. The artifact includes the shared
-engine, validation, styles, icons and licensed Latin fonts. Workbench boot code
-is excluded. The reusable `mountNativeViewer(host, spec, options)` export returns
+engine, validation, styles, icons and licensed Latin fonts selected by the shared
+named `native` entrypoint. The adapter retains mount/environment and CSS/font
+ownership; see the upstream [build guide](../../docs/build-entrypoints.md).
+Workbench boot code is excluded. The reusable `mountNativeViewer(host, spec, options)` export returns
 `navigate`, `pause`, `destroy`, `root` and validation `warnings`; call `destroy()`
 before reusing the dedicated host. See the upstream
 [native renderer guide](../../docs/native-viewer.md) for implementation ownership.

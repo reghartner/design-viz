@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import {afterEach,beforeEach,it,expect,vi} from 'vitest';
-import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
+import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import {InlineFlowview} from '../src/InlineFlowview';
 import {createSpecLoader,type AssociatedDiagram} from '../src/api';
 import {mountNativeViewer} from '../src/generated/nativeViewer';
@@ -26,6 +26,7 @@ it('warns before rendering a newer spec, lists unavailable features, and passes 
   const notice=await screen.findByRole('alert',{name:'Flowview compatibility'});
   expect(notice.textContent).toContain('9.0.0');expect(notice.textContent).toContain(FlowviewCompatibility.version);
   expect(notice.textContent).toContain('panel.future');expect(notice.textContent).toContain('Backstage administrator');
+  await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));
   expect(mount.mock.calls[0][1]).toBe(future);
   act(()=>mount.mock.calls[0][2]?.onWarning?.('Bundled viewer fonts could not load.'));
   expect(screen.getByRole('alert',{name:'Flowview compatibility'})).toBeTruthy();
@@ -47,6 +48,7 @@ it('owns a native host, recovers from navigation errors, and destroys the mount 
   const load=vi.fn().mockResolvedValue(spec);
   const view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
   const host=await screen.findByRole('region',{name:'Flowview: Doorbell'});
+  await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));
   expect(host.shadowRoot).toBeTruthy();expect(document.querySelector('iframe')).toBeNull();
   const owner=owners[0],target={section:'front-door',path:'cold',step:'shutdown'};
   owner.navigate.mockImplementationOnce(()=>{throw new Error('This step is no longer in the published diagram.');});
@@ -84,7 +86,8 @@ it('pairs visibility/intersection pause subscriptions with the native mount',asy
   const disconnect=vi.fn(),observe=vi.fn();
   vi.stubGlobal('IntersectionObserver',class {constructor(fn:IntersectionObserverCallback){callback=fn;}observe=observe;disconnect=disconnect;});
   const load=vi.fn().mockResolvedValue(spec),view=render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
-  const host=await screen.findByTitle('Flowview: Doorbell');expect(observe).toHaveBeenCalledWith(host);
+  const host=await screen.findByTitle('Flowview: Doorbell');
+  await waitFor(()=>expect(observe).toHaveBeenCalledWith(host));
   act(()=>callback([{isIntersecting:false}] as IntersectionObserverEntry[],{} as IntersectionObserver));
   expect(owners[0].pause).toHaveBeenCalledTimes(1);
   view.unmount();expect(disconnect).toHaveBeenCalledTimes(1);
@@ -103,7 +106,8 @@ it('reports a native mount failure and retries with a fresh host',async()=>{
   render(<InlineFlowview diagram={diagram} loadSpec={load}/>);
   expect((await screen.findByRole('alert')).textContent).toContain('Invalid diagram');
   fireEvent.click(screen.getByRole('button',{name:'Retry diagram'}));
-  await screen.findByTitle('Flowview: Doorbell');expect(mount).toHaveBeenCalledTimes(2);
+  await screen.findByTitle('Flowview: Doorbell');
+  await waitFor(()=>expect(mount).toHaveBeenCalledTimes(2));
   expect(screen.queryByRole('alert')).toBeNull();
 });
 it('loads a revision through Backstage FetchApi, refuses stale/wrong/oversized specs and ignores viewerUrl as an API destination',async()=>{

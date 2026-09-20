@@ -1,6 +1,6 @@
 {
   "page": {
-    "title": "Flowview · from design to living evidence",
+    "title": "Flowview \u00b7 from design to living evidence",
     "contract": "1",
     "generatedFrom": {
       "url": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/backstage-integration.md",
@@ -54,28 +54,20 @@
       {
         "tabs": [
           {
-            "label": "1 · Ownership",
+            "label": "1 \u00b7 Ownership",
             "sections": [
               {
-                "heading": "One story, three ownership boundaries",
-                "text": "The designs repo owns the content. The Flowview fork owns rendering. Backstage owns its installed app version.",
-                "source": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md",
+                "heading": "One company fork holds the engine and the stories",
+                "text": "Company layout: backstage-diagrams is the Flowview fork, with the engine, editor and diagram specs together. The separate Backstage app pins its installed viewer.",
                 "accent": "blue",
                 "diagram": {
                   "nodes": {
-                    "fork": {
-                      "title": "Flowview",
-                      "sub": "engine + panels",
+                    "repo": {
+                      "title": "Company repo",
+                      "sub": "Flowview + specs",
                       "icon": "package",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md"
-                    },
-                    "designs": {
-                      "title": "Designs repo",
-                      "sub": "specs + evidence",
-                      "icon": "db",
-                      "tint": "data",
-                      "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md"
+                      "group": "company"
                     },
                     "editor": {
                       "title": "Workbench",
@@ -108,8 +100,7 @@
                   },
                   "rows": [
                     [
-                      "fork",
-                      "designs",
+                      "repo",
                       "editor"
                     ],
                     [
@@ -120,29 +111,23 @@
                   ],
                   "edges": [
                     {
-                      "from": "fork",
-                      "to": "designs",
-                      "label": "Pin editor release",
-                      "kind": "release"
-                    },
-                    {
-                      "from": "fork",
-                      "to": "bsrepo",
-                      "label": "Pin plugin release",
-                      "kind": "release",
-                      "labelDx": 45
-                    },
-                    {
-                      "from": "designs",
+                      "from": "repo",
                       "to": "editor",
-                      "label": "Build editor image",
+                      "label": "Build nginx editor",
                       "kind": "release"
                     },
                     {
-                      "from": "designs",
+                      "from": "repo",
                       "to": "api",
                       "label": "Approved specs",
                       "kind": "data"
+                    },
+                    {
+                      "from": "repo",
+                      "to": "bsrepo",
+                      "label": "Pin plugin release",
+                      "kind": "release",
+                      "labelDx": 50
                     },
                     {
                       "from": "bsrepo",
@@ -177,7 +162,7 @@
                     {
                       "id": "ownership",
                       "type": "table",
-                      "title": "Three clear owners",
+                      "title": "One fork, separate app releases",
                       "columns": [
                         {
                           "id": "topic",
@@ -193,22 +178,22 @@
                           {
                             "id": "0",
                             "cells": {
-                              "topic": "Flowview fork",
-                              "meaning": "Rendering behavior and authoring tools"
+                              "topic": "backstage-diagrams",
+                              "meaning": "Engine, panels, editor, specs and evidence"
                             }
                           },
                           {
                             "id": "1",
                             "cells": {
-                              "topic": "Designs repo",
-                              "meaning": "Reviewed stories and their evidence"
+                              "topic": "Same company repo",
+                              "meaning": "Catalog snapshot, drift jobs and nginx editor build"
                             }
                           },
                           {
                             "id": "2",
                             "cells": {
-                              "topic": "Backstage repo",
-                              "meaning": "Installed plugin and app deployment"
+                              "topic": "Backstage app repo",
+                              "meaning": "Pinned plugin, host auth and app deployment"
                             }
                           }
                         ]
@@ -218,40 +203,42 @@
                   "steps": [
                     {
                       "id": "engine",
-                      "text": "Build engine and panel features in the company Flowview fork; publish a versioned release.",
+                      "text": "Build engine and panel features in backstage-diagrams, the same company fork that holds the specs.",
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md",
                       "nodes": [
-                        "fork"
+                        "repo"
                       ],
                       "panels": {
                         "ownership": {
-                          "note": "A new panel starts in the Flowview fork."
+                          "note": "A new panel and its example specs live in backstage-diagrams."
                         }
                       }
                     },
                     {
                       "id": "editor-release",
-                      "text": "The designs repo pins that release and builds the external workbench into its nginx image.",
+                      "text": "The same backstage-diagrams checkout builds the external workbench into its nginx image.",
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md",
-                      "edge": "fork->designs"
+                      "edge": "repo->editor"
                     },
                     {
                       "id": "editor-host",
-                      "text": "Authors open the workbench from the designs deployment. Backstage remains the reading surface.",
+                      "text": "Authors open that hosted workbench. Backstage remains the reading surface.",
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/workbench-catalog-sync.md",
-                      "edge": "designs->editor"
+                      "nodes": [
+                        "editor"
+                      ]
                     },
                     {
                       "id": "approved-data",
-                      "text": "The authenticated read service exposes approved specs from the designs repo.",
+                      "text": "The authenticated read service exposes approved specs from backstage-diagrams.",
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/apps/backstage/README.md",
-                      "edge": "designs->api"
+                      "edge": "repo->api"
                     },
                     {
                       "id": "plugin-release",
-                      "text": "Backstage upgrades its pinned plugin through its own PR and app release.",
+                      "text": "backstage-diagrams publishes the plugin release. The separate Backstage app repo pins it through its own PR.",
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md",
-                      "edge": "fork->bsrepo"
+                      "edge": "repo->bsrepo"
                     },
                     {
                       "id": "ship-backstage",
@@ -448,13 +435,18 @@
                   "defaultLayout": "presentation",
                   "view": "step",
                   "autoplay": false,
-                  "routing": "lanes"
+                  "routing": "lanes",
+                  "groups": {
+                    "company": {
+                      "title": "backstage-diagrams"
+                    }
+                  }
                 }
               }
             ]
           },
           {
-            "label": "2 · Author",
+            "label": "2 \u00b7 Author",
             "sections": [
               {
                 "heading": "Seed identities, author behavior",
@@ -889,7 +881,7 @@
             ]
           },
           {
-            "label": "3 · Backstage",
+            "label": "3 \u00b7 Backstage",
             "sections": [
               {
                 "heading": "Read the story where the service lives",
@@ -1336,7 +1328,7 @@
             ]
           },
           {
-            "label": "4 · Detect drift",
+            "label": "4 \u00b7 Detect drift",
             "sections": [
               {
                 "heading": "Code changes become reviewable evidence",
@@ -1766,7 +1758,7 @@
             ]
           },
           {
-            "label": "5 · Human review",
+            "label": "5 \u00b7 Human review",
             "sections": [
               {
                 "heading": "A diff asks a question; a human answers",
@@ -2297,7 +2289,7 @@
             ]
           },
           {
-            "label": "6 · Trace evidence",
+            "label": "6 \u00b7 Trace evidence",
             "sections": [
               {
                 "heading": "Compare an incident with the expected story",
@@ -2801,12 +2793,12 @@
             ]
           },
           {
-            "label": "7 · Ship features",
+            "label": "7 \u00b7 Ship features",
             "sections": [
               {
                 "heading": "A new panel travels through one shared engine",
-                "text": "The company fork releases code. Designs and Backstage adopt that release independently; compatibility metadata explains the gap.",
-                "source": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md",
+                "text": "backstage-diagrams builds the editor and publishes internal renderer releases. The separate Backstage app adopts a release through its own PR; compatibility metadata explains any gap.",
+                "source": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/build-entrypoints.md",
                 "accent": "green",
                 "diagram": {
                   "nodes": {
@@ -2839,8 +2831,8 @@
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md"
                     },
                     "designs": {
-                      "title": "Editor pin",
-                      "sub": "new authoring",
+                      "title": "Editor deploy",
+                      "sub": "same company repo",
                       "icon": "terminal",
                       "tint": "cmd",
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md"
@@ -2887,7 +2879,7 @@
                     {
                       "from": "release",
                       "to": "designs",
-                      "label": "Pin editor version",
+                      "label": "Deploy editor build",
                       "kind": "release"
                     },
                     {
@@ -2981,7 +2973,7 @@
                   "steps": [
                     {
                       "id": "module",
-                      "text": "Add a panel type in its own module. Reuse shared folding, controls and lifecycle helpers.",
+                      "text": "In backstage-diagrams, add a panel type in its own module. Reuse shared folding, controls and lifecycle helpers.",
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/panel-modularity.md",
                       "nodes": [
                         "panel"
@@ -3027,7 +3019,7 @@
                     },
                     {
                       "id": "author",
-                      "text": "The designs repo upgrades its editor. Exports stamp the spec with its required renderer features.",
+                      "text": "backstage-diagrams deploys its editor build. Exports stamp each spec with its required renderer features.",
                       "link": "https://github.com/reghartner/design-viz/blob/aac72e037a8b9cbc885135b9f8b59b4611dd8ed8/docs/runtime-compatibility.md",
                       "edge": "release->designs",
                       "panels": {
@@ -3233,7 +3225,7 @@
             ]
           },
           {
-            "label": "8 · Rehearsal",
+            "label": "8 \u00b7 Rehearsal",
             "sections": [
               {
                 "heading": "Prove the loop with a small doorbell system",

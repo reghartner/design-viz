@@ -98,7 +98,7 @@ function harness(raw=fixture()){
     'steps-autoplay','steps-opening-view','src','view']) root.appendChild(el('div',id));
   const src=elements.src; src.value=JSON.stringify(raw,null,2);
   let rendered=src.value, target=null, locked=false, activePath=null, ui;
-  const c=load({document:doc,setTimeout:fn=>timers.push(fn),MutationObserver:class {constructor(fn){ observers.push(fn); } observe(){}}});
+  const c=load({document:doc,setTimeout:fn=>timers.push(fn),MutationObserver:class {constructor(){throw new Error('Controlled refresh must not observe DOM');}}});
   ui=c.initWorkbenchStepList({src,view:elements.view,renderedText:()=>rendered,selection:()=>target,locked:()=>locked,
     path:()=>activePath,selectPath(section,id){activePath=id;target=null;},
     inspect(){ inspections.push(target); },
@@ -111,7 +111,7 @@ function harness(raw=fixture()){
       if(plan.pathId) activePath=plan.pathId;
       target={kind:'step',section,index:plan.index}; return true; }});
   return {c,ui,doc,e:elements,src,history,navigation,inspections,root,
-    render(){ rendered=src.value; observers.forEach(fn=>fn()); },
+    render(){ rendered=src.value; ui.refresh(); },
     select(index,section=1){ target={kind:'step',section,index}; ui.sync(); },
     selectPath(id){activePath=id;ui.sync();},
     lock(value){ locked=value; root.fire('click'); },

@@ -394,10 +394,9 @@ const MERMAID_SEQ = 'sequenceDiagram\nparticipant A as Alpha Svc\nparticipant B\
 
 
 /* Minimal event DOM: exercise the real import/history/mode handlers without a browser. */
-function importHarness(ctl, boardSpec){
+function importHarness(ctl, boardSpec, extraGlobals){
   const scheduled = [], cancelled = [];
   const elements = {}, listeners = {}, windowListeners = {}, doc = {activeElement: null};
-  let observer;
   function element(tag = 'div', id = ''){
     const attrs = {}, handlers = {};
     const el = {tagName: tag.toUpperCase(), id, className: '', children: [], style: {},
@@ -505,23 +504,25 @@ function importHarness(ctl, boardSpec){
   const saved = {};
   const sandbox = {console, document: doc,
     window: {addEventListener(type, fn){ (windowListeners[type] ||= []).push(fn); }},
-    MutationObserver: class {constructor(fn){ observer = fn; } observe(){}},
     // Browser timers must be called through the UI adapter, not as leaf-option methods.
     setTimeout(fn,ms){ 'use strict'; assert.equal(this,undefined); scheduled.push({fn,ms}); return scheduled.length; },
     clearTimeout(id){ 'use strict'; assert.equal(this,undefined); cancelled.push(id); },
     getComputedStyle(){ return {}; },
     localStorage: {getItem(k){ return saved[k] || null; }, setItem(k, v){ saved[k] = v; }}};
   vm.runInNewContext(readSource('validator.js') + '\n' +
-    readSource('builder.workbench.js'), sandbox);
+    readSource('builder.workbench.js')+'\n'+readSource('steps.workbench.js'), sandbox);
+  if(extraGlobals)Object.assign(sandbox,extraGlobals);
   let renders = 0;
-  sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, ctl:()=>ctl, render(){
-    renders++;
+  const builder=sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, ctl:()=>ctl, render(request){
+    builder.beforePreviewReplace(request);renders++;
     elements.msgs.innerHTML = '';
     const finding = element('li'); finding.textContent = 'existing validator warning';
     elements.msgs.appendChild(finding);
+    const outcome={ok:true,replaced:true,text:elements.src.value,origin:request.origin};
+    builder.previewRendered(outcome);return outcome;
   }});
   return {elements, doc, element, saved, scheduled, cancelled, cards, svg, sandbox, get renders(){ return renders; },
-    rerender(){ observer(); },
+    rerender(){builder.beforePreviewReplace({origin:'manual'});builder.previewRendered({ok:true,replaced:true,text:elements.src.value});},
     move(x, y, over = null){
       doc.over = over;
       for (const fn of windowListeners.mousemove || []) fn({clientX: x, clientY: y});
@@ -851,7 +852,6 @@ function diffWorkbench(storage = new Map(), options = {}){
     URL: {createObjectURL(){ return 'blob:test'; }, revokeObjectURL(){}},
     getComputedStyle(){ return {}; },
     setTimeout(fn){ timers.set(++timerId, fn); return timerId; }, clearTimeout(id){ timers.delete(id); },
-    MutationObserver: class {constructor(fn){ observer = fn; } observe(){}},
     FileReader: class {readAsText(file){ this.result = file.text; readers.push(this); if(!options.deferredFileRead)this.onload(); }},
     localStorage: {
       getItem(k){ if (options.storageThrows) throw Error('blocked'); return storage.get(k) || null; },
@@ -863,13 +863,16 @@ function diffWorkbench(storage = new Map(), options = {}){
   vm.runInNewContext(readSource('builder.workbench.js'), sandbox);
   ids.src.value = JSON.stringify(diffFixture());
   const builder = sandbox.initWorkbenchBuilder({view: element(), src: ids.src,
-    deferInitialSave: options.deferInitialSave, isActive:options.isActive, render(){ observer(); }});
+    deferInitialSave: options.deferInitialSave, isActive:options.isActive, render(request){
+      builder.beforePreviewReplace(request);const outcome={ok:true,replaced:true,text:ids.src.value};
+      builder.previewRendered(outcome);return outcome;
+    }});
   return {ids, storage, sandbox, builder, readers,
     lines(){ return ids.diffbox.children.map(c => c.textContent); },
     diff(){ ids['spec-diff'].click(); return this.lines(); },
     flush(){ const fns = [...timers.values()]; timers.clear(); fns.forEach(fn => fn()); },
     key(key){ for (const {fn} of listeners.get('keydown') || []) fn({key}); },
-    render(){ observer(); }
+    render(){builder.beforePreviewReplace({origin:'manual'});builder.previewRendered({ok:true,replaced:true,text:ids.src.value});}
   };
 }
 
@@ -1399,4 +1402,22 @@ test('a registered panel supplies custom inspectors through shared controls and 
   h.click('undo-builder');assert.equal(JSON.parse(h.elements.src.value).steps[0].panels.reading.value,5);
   h.click('redo-builder');assert.equal(JSON.parse(h.elements.src.value).steps[0].panels.reading.value,9);
   assert.equal(factories,1,'the panel owns one editor instance across rerenders and selections');
+});
+
+
+test('actual builder story callbacks select hidden alternate source indices without preselecting visible playback',()=>{
+  const d={nodes:{a:{},b:{}},rows:[['a','b']],steps:[{id:'done',text:'Done'},{id:'start',text:'Start'},{id:'2',text:'Hidden failure'}],
+    paths:[{id:'happy',steps:['start','done']},{id:'failed',steps:['2']}]};
+  let story,path='happy',index=0;const jumps=[];
+  const sp={pause(){},mode:()=> 'step',path:()=>path,current:()=>({n:index}),sourceIndex:()=>index,
+    selectPath(){throw new Error('Hidden source selection must not require visible playback');},
+    jumpSource(i,p){index=i;if(p)path=p;jumps.push([i,p]);return true;}};
+  const h=importHarness({sections:[{number:1,stepper:sp}]},d,{
+    initWorkbenchStepList(opts){story=opts;return {sync(){},refresh(){}};}
+  });
+  story.selectPath(0,'failed');assert.deepStrictEqual(jumps,[[2,'failed']]);
+  const raw=JSON.parse(h.elements.src.value),entry=h.sandbox.builderStorySteps(h.sandbox.builderStorySections(raw)[0],'','failed')[0];
+  story.navigate(entry);assert.equal(path,'failed');assert.equal(index,2);
+  assert.deepStrictEqual(plain(story.selection()),{section:0,kind:'step',index:2,pathId:'failed'});
+  assert.equal(h.renders,0,'authoring navigation does not publish a source edit');
 });

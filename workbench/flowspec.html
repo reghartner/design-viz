@@ -28660,12 +28660,12 @@ function createBuilderSession(options){
     redoStack.length=0;historyChanged();
   }
   function save(){if(disposed)return;projectOpen=true;persistence.save(text(),baselineText);}
-  function render(){return options.render();}
+  function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
-    to.push(text());options.source.write(from.pop());historyChanged();render();
-    target=null;
-    if(options.afterHistory)options.afterHistory(message);
+    to.push(text());options.source.write(from.pop());historyChanged();target=null;
+    var outcome=render('history');
+    if(options.afterHistory)options.afterHistory(message,outcome);
     save();return true;
   }
   function invalidateProject(){
@@ -28682,8 +28682,8 @@ function createBuilderSession(options){
     options.source.write(value);baselineText=baseline==null?value:baseline;
     projectUndoText=value;initialDraft=null;insertSection=0;
     if(hooks && hooks.beforeRender)hooks.beforeRender();
-    render();
-    if(hooks && hooks.afterRender)hooks.afterRender();
+    var outcome=render('project');
+    if(hooks && hooks.afterRender)hooks.afterRender(outcome);
     save();
     if(hooks && hooks.afterSave)hooks.afterSave();
     return true;
@@ -28704,8 +28704,8 @@ function createBuilderSession(options){
       if(expected && (expected.text!==before || expected.project!==project))return false;
       pushUndo(before);
       if(hooks && hooks.beforePublish)hooks.beforePublish();
-      options.source.write(plan.text);render();save();
-      if(hooks && hooks.afterRender)hooks.afterRender(plan);
+      options.source.write(plan.text);var outcome=render('edit',hooks && hooks.retention);save();
+      if(hooks && hooks.afterRender)hooks.afterRender(plan,outcome);
       return true;
     },
     importText:function(value,hooks){
@@ -28713,8 +28713,8 @@ function createBuilderSession(options){
       pushUndo(text());options.source.write(value);
       if(hooks && hooks.rememberImport)importedText=value;
       if(hooks && hooks.beforeRender)hooks.beforeRender();
-      render();
-      if(hooks && hooks.afterRender)hooks.afterRender();
+      var outcome=render('import');
+      if(hooks && hooks.afterRender)hooks.afterRender(outcome);
       save();return true;
     },
     undo:function(){return historyStep(undoStack,redoStack,'undid the last builder action — board re-rendered');},
@@ -31628,7 +31628,7 @@ var BUILDER_JUMP_TO_FINDING = null;
 
 function initWorkbenchBuilder(opts){
   var view = opts.view, src = opts.src;
-  function render(){ hideDiff(); opts.render(); }
+  function render(request){ hideDiff(); return opts.render(request || {origin:'navigation'}); }
   var guide = document.getElementById('guide');
   var diffbox = document.getElementById('diffbox');
   var diffBtn = document.getElementById('spec-diff');
@@ -31988,10 +31988,7 @@ function initWorkbenchBuilder(opts){
     formError('');
     return session.accept(plan,{
       snapshot:snapshot,
-      beforePublish:function(){
-        if (addToStep) addModeSurvive = true; /* internal render keeps the mode */
-        multiSurvive = true;
-      },
+      retention:{multi:true,addMode:!!addToStep},
       afterRender:function(){
         if (opt && opt.after) opt.after(plan);
         rehighlight();syncBoardToSelectedStep();applyStepMarkers();
@@ -32064,17 +32061,6 @@ function initWorkbenchBuilder(opts){
 
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
-  var multiSurvive = false; /* set by builder-internal renders; a render
-     WITHOUT it (Render button, hand-pasted source) clears the set —
-     coinciding identities in replaced content must never stay selected */
-  /* the flag is consumed by the mutation observer — but a builder render
-     that FAILS validation mutates nothing and would leave it stale, so an
-     explicit user render request invalidates it first (capture phase runs
-     before boot's own Render handler) */
-  (function(){
-    var goBtn = document.getElementById('go');
-    if (goBtn) goBtn.addEventListener('click', function(){ multiSurvive = false; }, true);
-  })();
   function multiIdent(t){
     return t.section + '|' + t.kind + '|' + (t.kind === 'node' ? t.id : t.index);
   }
@@ -32341,7 +32327,6 @@ function initWorkbenchBuilder(opts){
     });
     var outlineTimer;
     src.addEventListener('input', function(){ clearTimeout(outlineTimer); outlineTimer = setTimeout(refreshOutline, 200); });
-    new MutationObserver(refreshOutline).observe(view, {childList: true});
     document.addEventListener('keydown', function(ev){
       if (opts.isActive && !opts.isActive()) return;
       if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || addToStep) return;
@@ -32369,7 +32354,10 @@ function initWorkbenchBuilder(opts){
     path:function(section){var sp=stepperFor(section);return sp && sp.path();},
     selectPath:function(section,id){
       session.target=null; clearMultiSelect(); if(guide) guide.hidden=true;
-      var sp=stepperFor(section); if(sp) sp.selectPath(id);
+      var parsed=parseEditor(),story=!parsed.error && builderStorySections(parsed.raw).find(function(entry){return entry.section===section;});
+      var route=story && diagramPathList(story.diagram).find(function(path){return path.id===id;});
+      var sp=stepperFor(section);
+      if(sp && route && route.indices.length)sp.jumpSource(route.indices[0],id);
       applyRowGrabs(); clearStepMarkers();
     },
     navigate:function(entry){
@@ -32378,7 +32366,7 @@ function initWorkbenchBuilder(opts){
         var tabButton = document.getElementById('tab-' + entry.tab.block + '-' + entry.tab.tab);
         if (tabButton) tabButton.click();
       }
-      if(entry.pathId){var sp=stepperFor(entry.target.section);if(sp) sp.selectPath(entry.pathId,entry.position);}
+      if(entry.pathId){var sp=stepperFor(entry.target.section);if(sp) sp.jumpSource(entry.index,entry.pathId);}
       var el = findTargetEl(entry.target);
       selectTarget(Object.assign({}, entry.target, {el:el}), false, true);
       var loc = jsonLocate(session.text(), entry.path);
@@ -32404,7 +32392,7 @@ function initWorkbenchBuilder(opts){
   }) : null;
 
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
-    view:view,src:src,ctl:opts.ctl,render:render,renderedText:opts.renderedText,pause:pausePreview,
+    view:view,src:src,ctl:opts.ctl,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!addToStep || !!connect;},
     commit:function(section,target,items,id){
       return commitCascade(function(raw){return planSectionLayout(session.text(),raw,section,target,items,id);});
@@ -32447,7 +32435,6 @@ function initWorkbenchBuilder(opts){
 
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
-  var addModeSurvive = false; /* set around this mode's own re-renders */
   function addToStepStatus(){
     if (targetLabel && addToStep)
       targetLabel.textContent = 'ADD TO STEP ' + (addToStep.step + 1) +
@@ -32589,8 +32576,8 @@ function initWorkbenchBuilder(opts){
   /* ---- drag an edge label to set its labelDx/labelDy nudges;
           drag a node onto another to swap, or into a row/slot gap ---- */
   var drag = null, nodeDrag = null, groupDrag = null, suppressClick = false;
-  /* one cancellation path for the node drag: Escape, and every observed
-     re-render (which detaches the dragged elements), both land here */
+  /* one cancellation path for the node drag: Escape, and every controlled
+     replacement (which detaches the dragged elements), both land here */
   function cancelNodeDrag(){
     if (!nodeDrag) return;
     var nd = nodeDrag;
@@ -33190,35 +33177,31 @@ function initWorkbenchBuilder(opts){
     selectTarget(target);
   });
 
-  /* a re-render outside the connect flow (Render button, skin switch)
-     rebuilds the DOM and can renumber sections — a stale armed connect
-     must not wire an edge from the old render. Builder-driven renders
-     clear the state synchronously before this observer runs, so only
-     stale arming is cancelled. */
-  new MutationObserver(function(){
-    if (panelPicker) panelPicker.invalidate();
-    cancelNodeDrag(); /* the dragged elements just got detached */
-    cancelGroupDrag();
-    cancelRowDrag();  /* row handles and the drop line got detached too */
-    hideDiff(); /* the diff panel's jump targets got detached too */
-    if (!multiSurvive && multiSel.length){
-      /* a render the builder did not initiate replaced the DOM */
-      clearMultiSelect();
-      dropMultiUI();
+  /* Controlled preview replacement is explicit; rejected source leaves the board intact. */
+  function beforePreviewReplace(request){
+    var retention=request && request.retention || {};
+    if(panelPicker)panelPicker.invalidate();
+    cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
+    if(drag){drag.lbl.removeAttribute('transform');drag=null;}
+    if(sectionLayoutEditor && sectionLayoutEditor.cancel)sectionLayoutEditor.cancel();
+    hideDiff();
+    if(!retention.multi && multiSel.length){clearMultiSelect();dropMultiUI();}
+    if(connect)cancelConnect('connect cancelled — the page re-rendered');
+    if(addToStep && !retention.addMode)cancelAddToStep('add-to-step ended — the page re-rendered');
+    setSelected(null);
+  }
+  function previewRendered(outcome){
+    hideDiff();
+    if(outlineSearch)refreshOutline();
+    if(!outcome.ok){
+      if(outcome.replaced){clearMultiSelect();clearStepMarkers();if(addToStep)cancelAddToStep(null);}
+      if(stepList)stepList.refresh();
+      return;
     }
-    multiSurvive = false;
-    if (connect) cancelConnect('connect cancelled — the page re-rendered');
-    if (addToStep && !addModeSurvive)
-      cancelAddToStep('add-to-step ended — the page re-rendered');
-    addModeSurvive = false;
-    setTimeout(function(){
-      syncBoardToSelectedStep(); /* a selected step keeps its step view */
-      applyStepMarkers();        /* markers live in the rebuilt DOM */
-      reapplyMultiSel();         /* multi-selection rings live there too */
-      applyRowGrabs();           /* row grab-handles live there too */
-      markInsertTarget();        /* the insert-target frame lives there too */
-    }, 0);
-  }).observe(view, {childList: true});
+    rehighlight();syncBoardToSelectedStep();applyStepMarkers();reapplyMultiSel();
+    applyRowGrabs();markInsertTarget();
+    if(stepList)stepList.refresh();
+  }
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   document.addEventListener('keydown', function(ev){
@@ -33445,6 +33428,7 @@ function initWorkbenchBuilder(opts){
       }else refreshFormSoon();
     },
     loadText:loadText, restoreDraft:restoreDraft, prepareWelcome:prepareWelcome,
+    beforePreviewReplace:beforePreviewReplace,previewRendered:previewRendered,
     isProjectOpen:session.isProjectOpen,
     draft:session.draft,
     draftInfo:function(){
@@ -34220,7 +34204,6 @@ function initWorkbenchStepList(opts){
   opts.src.addEventListener('input', function(){ invalidate(); });
   box.addEventListener('focusin', function(){ if (opts.pause) opts.pause(); });
   box.addEventListener('toggle', function(){ if (box.open) refresh(); });
-  new MutationObserver(refresh).observe(opts.view, {childList:true});
   /* Mode transitions do not replace the page; re-evaluate button availability. */
   document.addEventListener('click', controls);
   document.addEventListener('keydown', function(ev){
@@ -34228,7 +34211,7 @@ function initWorkbenchStepList(opts){
     if (ev.key === 'Escape') setTimeout(sync, 0);
   });
   refresh();
-  return {sync:sync, editPathStep:editPathStep};
+  return {sync:sync,refresh:refresh, editPathStep:editPathStep};
 }
 /* ---- src/workbench/commands/reuse.js ---- */
 /* Reuse changes path references and authored patches, never folded snapshots. */
@@ -34453,7 +34436,7 @@ function initWorkbenchStepReuse(opts){
   });
   return {open:open, refresh:function(){ if (dialog.open && !isCurrent()) invalidate(); }};
 }
-/* ---- src/workspace.workbench.js ---- */
+/* ---- src/workbench/preview.js ---- */
 /* Preview position and layout never enter the spec or undo history. */
 function workbenchPreviewSections(page){
   var sections = [];
@@ -34486,7 +34469,11 @@ function workbenchPreviewSnapshot(page, ctl){
     saved.push(prior);
     if (!stepper) return;
     if (stepper.path) prior.path = stepper.path();
-    var steps = diagramForPath(section.diagram, prior.path).steps || [], step = steps[stepper.current().n];
+    var route=diagramPathList(section.diagram).find(function(p){return p.id===prior.path;}) || diagramPathList(section.diagram)[0];
+    var sourceSteps=section.diagram.steps || [];
+    var steps=route.indices.map(function(i){return sourceSteps[i];});
+    var sourceIndex=stepper.sourceIndex?stepper.sourceIndex():route.indices[stepper.current().n];
+    var step=sourceSteps[sourceIndex];
     var id = step && typeof step.id === 'string' && step.id ? step.id : null;
     var signature = JSON.stringify(step);
     /* No positional fallback: repeated identities must not restore a different beat. */
@@ -34515,31 +34502,88 @@ function restoreWorkbenchPreview(page, ctl, saved){
     if (rec.presentation && prior.focusPanel === rec.presentation.panelId && prior.primaryPanel === section.diagram.primaryPanel)
       rec.presentation.setMode(prior.focusMode);
     if (!stepper || !prior.mode) return;
-    if (prior.path && stepper.selectPath && !stepper.selectPath(prior.path)) return;
     if (prior.mode === 'ambient'){
+      if(prior.path && stepper.selectPath && !stepper.selectPath(prior.path))return;
       if (stepper.mode() !== 'ambient') stepper.enterAmbient();
       return;
     }
     var indices = [];
-    (diagramForPath(section.diagram, prior.path).steps || []).forEach(function(step, i){
+    var route=diagramPathList(section.diagram).find(function(p){return p.id===prior.path;}) || (!section.diagram.paths && diagramPathList(section.diagram)[0]);
+    if(!route)return;
+    route.indices.forEach(function(i){
+      var step=section.diagram.steps[i];
       if (prior.id ? step && step.id === prior.id : JSON.stringify(step) === prior.signature) indices.push(i);
     });
     if (indices.length !== 1) return;
     if (stepper.mode() !== 'step') stepper.enterStep(false);
-    if (stepper.current().n !== indices[0]) stepper.jump(indices[0]);
+    if(stepper.jumpSource){
+      stepper.jumpSource(indices[0],prior.path);
+      stepper.jump(stepper.current().n); /* restoration is settled, including hidden authored beats */
+    }
+    else if(stepper.current().n!==indices[0])stepper.jump(indices[0]);
   });
 }
-function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl){
+function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lifecycle){
   var tabs = activeTabReferences(previousCtl);
   var saved = workbenchPreviewSnapshot(previousPage, previousCtl);
+  if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
   var target = typeof document !== 'undefined' && document.getElementById ? document.getElementById('layout-preview-target') : null;
   var ctl = renderPage(view, page, skin, null, {autoplay:false,layoutTarget:target ? target.value : (typeof window !== 'undefined' && window.location ? new URLSearchParams(window.location.search).get('layout') : 'default')});
-  restoreActiveTabs(ctl, tabs);
-  restoreWorkbenchPreview(page, ctl, saved);
+  try{
+    restoreActiveTabs(ctl, tabs);
+    restoreWorkbenchPreview(page, ctl, saved);
+  }catch(ex){ctl.destroy();throw ex;}
   return ctl;
 }
 
+/* One owner for preview identity and controlled replacement outcomes. The host
+   supplies presentation callbacks; callers never infer a render from DOM mutation. */
+function createWorkbenchPreviewController(opts){
+  var page=null,ctl=null,renderedText=null;
+  function finish(outcome){if(opts.completed)opts.completed(outcome);return outcome;}
+  function replace(next,text,skin,request){
+    var replaced=false,previousPage=page,previousCtl=ctl;
+    try{
+      var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
+        beforeReplace:function(){
+          if(opts.beforeReplace)opts.beforeReplace(request);
+          replaced=true;page=null;ctl=null;renderedText=null;
+        }
+      });
+    }catch(ex){
+      // Invalid source never enters replacement. A renderer failure after teardown
+      // cannot leave the retired controller advertised as a usable preview.
+      if(replaced)opts.view.textContent='';
+      opts.findings({errors:['Render failed: '+ex.message],warnings:[]});
+      return finish({ok:false,replaced:replaced,text:text,reason:'render',error:ex,origin:request.origin});
+    }
+    page=next;ctl=nextCtl;renderedText=text;
+    opts.present(skin);
+    return finish({ok:true,replaced:true,text:text,origin:request.origin});
+  }
+  return {
+    render:function(text,request){
+      request=request || {origin:'manual'};
+      var raw;
+      try{raw=JSON.parse(text);}catch(ex){
+        opts.findings({errors:['JSON parse: '+ex.message],warnings:[]});
+        return finish({ok:false,replaced:false,text:text,reason:'parse',origin:request.origin});
+      }
+      var next=normalize(raw),verdict=validate(next),lint=verdict.errors.length?[]:lintPage(next);
+      opts.findings({errors:verdict.errors,warnings:verdict.warnings.concat(lint)});
+      if(verdict.errors.length)return finish({ok:false,replaced:false,text:text,reason:'validation',origin:request.origin});
+      return replace(next,text,opts.skin(next),request);
+    },
+    repaint:function(skin){
+      if(!page)return {ok:false,replaced:false,text:renderedText,reason:'missing',origin:'skin'};
+      return replace(page,renderedText,skin,{origin:'skin'});
+    },
+    forgetDocument:function(){page=null;},
+    controller:function(){return ctl;},page:function(){return page;},renderedText:function(){return renderedText;}
+  };
+}
+/* ---- src/workspace.workbench.js ---- */
 /* Workspace preferences belong to the browser, never the authored spec. */
 function workspacePrefs(raw){
   var prefs = {editor:440, tool:'inspect'}, value;
@@ -34998,7 +35042,7 @@ function initSectionLayoutEditor(opts){
   document.addEventListener('keydown',function(ev){if(drag&&ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();}},true);
   window.addEventListener('blur',cancel);window.addEventListener('resize',cancel);opts.src.addEventListener('input',cancel);
   var query=new URLSearchParams(window.location.search).get('layout');if(['backstage','confluence'].indexOf(query)>=0)target.value=query;
-  setFrame();return {refresh:refresh};
+  setFrame();return {refresh:refresh,cancel:cancel};
 }
 /* ---- src/canon.workbench.js ---- */
 /* The approved catalog ships beside the editor. The optional company backend
@@ -35523,9 +35567,11 @@ var view = document.getElementById('docview');
 var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
 var activeSkin = null; /* null = follow spec */
-var lastPage = null;
-var lastRenderedText = null;
-var lastCtl = null;  /* renderPage controller of the current render, for tab restore */
+var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,
+  present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
+  beforeReplace:function(request){if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
+  completed:function(outcome){if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);}
+});
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears
    here without touching the skeleton */
@@ -35540,10 +35586,7 @@ var skinBtns = {};
     b.textContent = name.toUpperCase() + (name === DEFAULT_SKIN ? ' (default)' : '');
     b.addEventListener('click', function(){
       activeSkin = name; setSkinButtons(name);
-      if (lastPage){
-        lastCtl = renderWorkbenchPreview(view, lastPage, name, lastPage, lastCtl);
-        applySkinClasses(document.body, view, name);
-      }
+      workbenchPreview.repaint(name);
     });
     holder.appendChild(b);
     skinBtns[name] = b;
@@ -35616,26 +35659,8 @@ function showMsgs(v){
   v.warnings.forEach(function(m){ add('w', 'warn ', m); });
 }
 
-function go(fromText){
-  var raw;
-  msgs.innerHTML = '';
-  try {
-    raw = JSON.parse(src.value);
-  } catch (ex){
-    showMsgs({errors:['JSON parse: ' + ex.message], warnings:[]});
-    return;
-  }
-  var page = normalize(raw);
-  var v = validate(page);
-  var lint = v.errors.length ? [] : lintPage(page);
-  showMsgs({errors: v.errors, warnings: v.warnings.concat(lint)});
-  if (v.errors.length) return;
-  var skin = currentSkin(page);
-  setSkinButtons(skin);
-  lastCtl = renderWorkbenchPreview(view, page, skin, lastPage, lastCtl);
-  lastPage = page;
-  applySkinClasses(document.body, view, skin);
-  lastRenderedText = src.value;
+function go(fromText,request){
+  return workbenchPreview.render(src.value,request || {origin:'manual'});
 }
 
 document.getElementById('go').addEventListener('click', function(){ go(true); });
@@ -35648,16 +35673,16 @@ applySkinClasses(document.body, view, currentSkin(null));
    its definition in the editor; INSERT buttons splice ready-made snippets */
 var workspace = initWorkbenchWorkspace();
 var canonContext, loadingCanon=false;
-var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(){ go(true); }, workspace:workspace,
+var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(request){return go(true,request);}, workspace:workspace,
   catalog:function(){return canonContext && canonContext.catalog;},
   deferInitialSave:true,
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
   beforeProjectLoad:function(){
-    lastPage=null;
+    workbenchPreview.forgetDocument();
     if(canonContext && canonContext.detach && !loadingCanon)canonContext.detach();
   },
-  renderedText: function(){ return lastRenderedText; },
-  ctl: function(){ return lastCtl; }});
+  renderedText:workbenchPreview.renderedText,
+  ctl:workbenchPreview.controller});
 var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,
   workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
 canonContext=initCanonWorkbench({src:src,catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){

@@ -17,6 +17,13 @@ default; changed node sets or default views reset too. Selected-step edits use
 the builder's existing selection tracking. No playback state enters the JSON,
 undo history or saved layout. Standalone published pages retain autoplay.
 
+A failed JSON/validation render leaves the previous preview visible while you
+repair the source. A renderer failure after replacement begins instead reports
+an error and retires that unusable preview; accepted source and Undo history
+remain available. The Steps Path selector can inspect an alternate even when the
+current named view hides every step on that route. Editing and rerendering keep
+that exact authored step without changing the view's selected subset.
+
 Use **Focus workspace** above the skin controls to hide the introduction and
 reference material. On a desktop, the preview scrolls beside a viewport-sized
 editor. **Exit focus** returns to the normal page and its previous scroll

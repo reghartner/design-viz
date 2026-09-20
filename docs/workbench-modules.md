@@ -25,14 +25,18 @@ inspector and I/O dependencies.
 14. `workbench/io-model.js`: pure Mermaid preparation, filenames and HTML injection.
 15. `workbench/io-browser.js`: bound browser resource adapters.
 16. `workbench/io.js`: import/export controls and independent operation lifetimes.
-17. `builder.workbench.js`: composition, outline, gestures and preview coordination. Callers load the validator/panel assembly first.
+17. `builder.workbench.js`: composition, outline, gestures and preview coordination.
+    Callers load the validator/panel assembly first.
 
 The logical `clipboard.workbench.js` bundle loads
 `workbench/commands/clipboard.js` before its existing clipboard transport UI.
 The logical `reuse.workbench.js` bundle similarly loads `commands/reuse.js`
 before its dialog controller. The physical `layout.workbench.js` contains only
 controls and gestures; its pure helpers come from the builder assembly above.
-Browser boot and tests use these same implementations, each declared once.
+The logical `workspace.workbench.js` bundle prepends `workbench/preview.js` to
+the workspace layout/preferences controller. Preview identity and render attempts
+live in that leaf; workspace layout never owns authored source. Browser boot and
+tests use these same implementations, each declared once.
 
 The manifest lists physical files, not nested logical bundles. Portable builds
 expand it into the offline workbench; there is no runtime loader or filesystem
@@ -185,9 +189,10 @@ The source adapter is authoritative. `text()`, `parse()` and `snapshot()` read
 current exact textarea contents, including invalid JSON and handwritten whitespace
 that never passed through a command. `snapshot()` returns
 `{text, raw, error, project, renderedText}`; `raw` and offsets belong to that text.
-`renderedText` is the injected **last successful** preview identity, not a promise
-that calling render succeeded. Invalid rendering does not make a stale board
-fresh. Existing geometry and dialog checks still guard their own render/selection
+`renderedText` is the injected **usable preview** identity, not a promise that
+calling render succeeded. Parse/validation rejection retains the prior successful
+identity; a failed replacement after teardown invalidates it. Rejected source
+does not make a stale board fresh. Existing geometry and dialog checks still guard their own render/selection
 identities; a project counter does not replace independent operation generations.
 
 `target` and `insertSection` hold authored addresses and section ordinals, without
@@ -201,7 +206,7 @@ insertion to section zero and cancels a pending draft save.
 | --- | --- |
 | `accept(plan, hooks)` | Rejects missing/error plans and, when `hooks.snapshot` is supplied, changed exact source or project. Success pushes one Undo snapshot, runs `beforePublish`, writes once, renders once, saves, then runs `afterRender`. Successful unchanged text retains its existing history behavior; there is no universal no-op filter. |
 | `importText(text, hooks)` | Adds one Undo entry while keeping the original baseline. Runs caller-specific before/after-render hooks; only Mermaid requests the imported-text keyboard shortcut marker. File/trace parsing, cancellation and dialogs remain in their I/O controllers. |
-| `undo()` / `redo()` | Captures the current exact adapter text on the opposite stack before writing the historical text, rendering, clearing the authored target, notifying the UI and saving. Intervening invalid handwriting remains reachable. New actions cap Undo at thirty and clear Redo. |
+| `undo()` / `redo()` | Captures the current exact adapter text on the opposite stack before writing the historical text, clearing the authored target, rendering, notifying the UI and saving. Intervening invalid handwriting remains reachable. New actions cap Undo at thirty and clear Redo. |
 | `noteInput()` | Marks the project live immediately, clears the import shortcut and schedules the 800 ms save. Typing adds no builder history and is not parsed, rewritten or rendered by the session. |
 | `replaceProject()` / `restoreDraft()` | Retires the previous project, publishes once, changes the baseline and runs project-specific hooks. If recovery is still pending, the first Undo target is the recovered draft rather than the boot demo. Typing makes the current text win over pending recovery. |
 | `markSaved()` / `save()` | Marks the current exact source as the comparison baseline, or persists the current draft and baseline pair. Saving does not require valid JSON. |
@@ -222,8 +227,64 @@ already-queued cancelled saves inert. `session.destroy()` retires the session an
 its persistence timer, so queued saves and later mutation calls cannot publish.
 This is a session lifetime API. Inspector refreshes and form DOM have their own
 owner below; I/O has a separate owner, while the builder still owns interaction
-listeners, observers and gestures. It does not yet expose a complete editor teardown; each controller must
-retire its own resources.
+listeners and gestures. It does not yet expose a complete editor teardown; each
+controller must retire its own resources.
+
+## Controlled preview outcomes
+
+`createWorkbenchPreviewController()` owns the current normalized page, renderer
+controller and usable rendered-text identity. Its leaf is `workbench/preview.js`;
+it also owns the existing snapshot/restore and `renderWorkbenchPreview()` facades.
+The public controller exposes `render(text, request)`, `repaint(skin)`,
+`forgetDocument()` and the `controller()`, `page()` and `renderedText()` getters.
+Boot's existing `go(fromText, request)` calls this owner and returns its outcome.
+The host injects skin selection/presentation, findings and lifecycle callbacks.
+
+Every render attempt returns `{ok, replaced, text, origin, reason?}`. The text is
+the captured attempt, not an assertion that the current editor has that preview.
+Parse or validation rejection reports `ok:false, replaced:false`, leaving the
+prior renderer and its rendered identity intact. Success reports both true only
+after the new renderer and tab/path/layout restoration finish. A replacement
+exception reports `reason:'render'` and the original error. If teardown began,
+the retired controller/page/rendered identity are cleared and partial board DOM
+is removed; a new controller whose restoration fails is destroyed. A failure
+before teardown leaves the old controller usable. Failed replacement is never
+reported as successful or treated as a fresh preview of the accepted source.
+
+Session operations send explicit origins (`edit`, `history`, `import`, `project`)
+and operation-specific retention. The common planner application retains
+multiselection and an armed ADD TO STEP mode; other ordinary entrypoints keep
+their existing clear/landing policies. History clears its authored target before
+rendering, so synchronous reconciliation cannot briefly navigate an obsolete
+index. Successful source acceptance remains one history action even if rendering
+fails: the source is saved, remains repairable and can be undone. Post-render
+session hooks also receive the outcome: ordinary `afterRender(plan, outcome)`
+keeps its plan argument, while project/import hooks receive the outcome directly.
+The boolean acceptance result remains unchanged.
+
+Boot sends one `beforePreviewReplace(request)` notification immediately before
+teardown and one `previewRendered(outcome)` notification after the attempt.
+Manual Render, skin repaint, layout host preview and session-driven renders use
+that same path. Builder cancels stale gestures/connect, applies explicit retention,
+and refreshes selection/markers, row/layout controls, outline and story index
+directly. There are no controlled-render child-list observers or pending
+`multiSurvive`/`addModeSurvive` flags. A rejected attempt cannot leave retention
+state for some later replacement to consume. Engine `dv:pathrender` still means
+board reconstruction on a route; `dv:pathchange` still means reader navigation.
+Those explicit events keep their distinct selection/mode policies.
+
+The Steps Path selector resolves the route to a **raw registry source index** and
+calls `jumpSource(index, pathId)` directly. A wholly hidden alternate can therefore
+be inspected without requiring a visible playback stop first. Snapshot/restore
+uses unique authored step identity within the route, maps it back to a source
+index after reordering, and restores via `jumpSource` before settling the frame.
+It never substitutes a visible-stop ordinal. Existing ambiguity refusal, tab,
+layout and named-view subset preferences remain intact; authoring does not rewrite
+the view filter or change the viewer's refusal to play an empty visible route.
+
+This slice makes replacement explicit. Interaction state still lives in the
+builder; composed builder/satellite teardown is a separate remaining task. The
+preview renderer, boot, workspace, welcome and Canon have their own lifetimes.
 
 ## Inspector ownership
 
@@ -376,6 +437,10 @@ browser globals. `tests/workbench-io.test.js` loads the real I/O owner and sessi
 with injected browser resources, exercising current and retired reads, clipboard
 rejections, template/body races, directory-write boundaries and cleanup failures.
 Actual builder harnesses retain import mode, one-Undo and keyboard coverage.
+`tests/workbench-preview.test.js` exercises outcomes, notification counts,
+replacement exceptions and session history/persistence after a failed render.
+Builder/story harnesses invoke the explicit lifecycle; playback tests use real
+steppers for hidden-route restoration, source reordering and unchanged view filters.
 
 Run the source-edit and builder tests plus the relevant clipboard, step-reuse,
 layout and panel-reference suites when these boundaries change. Shared workbench

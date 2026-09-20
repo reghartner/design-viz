@@ -20,12 +20,12 @@ function createBuilderSession(options){
     redoStack.length=0;historyChanged();
   }
   function save(){if(disposed)return;projectOpen=true;persistence.save(text(),baselineText);}
-  function render(){return options.render();}
+  function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
-    to.push(text());options.source.write(from.pop());historyChanged();render();
-    target=null;
-    if(options.afterHistory)options.afterHistory(message);
+    to.push(text());options.source.write(from.pop());historyChanged();target=null;
+    var outcome=render('history');
+    if(options.afterHistory)options.afterHistory(message,outcome);
     save();return true;
   }
   function invalidateProject(){
@@ -42,8 +42,8 @@ function createBuilderSession(options){
     options.source.write(value);baselineText=baseline==null?value:baseline;
     projectUndoText=value;initialDraft=null;insertSection=0;
     if(hooks && hooks.beforeRender)hooks.beforeRender();
-    render();
-    if(hooks && hooks.afterRender)hooks.afterRender();
+    var outcome=render('project');
+    if(hooks && hooks.afterRender)hooks.afterRender(outcome);
     save();
     if(hooks && hooks.afterSave)hooks.afterSave();
     return true;
@@ -64,8 +64,8 @@ function createBuilderSession(options){
       if(expected && (expected.text!==before || expected.project!==project))return false;
       pushUndo(before);
       if(hooks && hooks.beforePublish)hooks.beforePublish();
-      options.source.write(plan.text);render();save();
-      if(hooks && hooks.afterRender)hooks.afterRender(plan);
+      options.source.write(plan.text);var outcome=render('edit',hooks && hooks.retention);save();
+      if(hooks && hooks.afterRender)hooks.afterRender(plan,outcome);
       return true;
     },
     importText:function(value,hooks){
@@ -73,8 +73,8 @@ function createBuilderSession(options){
       pushUndo(text());options.source.write(value);
       if(hooks && hooks.rememberImport)importedText=value;
       if(hooks && hooks.beforeRender)hooks.beforeRender();
-      render();
-      if(hooks && hooks.afterRender)hooks.afterRender();
+      var outcome=render('import');
+      if(hooks && hooks.afterRender)hooks.afterRender(outcome);
       save();return true;
     },
     undo:function(){return historyStep(undoStack,redoStack,'undid the last builder action — board re-rendered');},

@@ -28,6 +28,8 @@
   builder. The logical `clipboard.workbench.js` and `reuse.workbench.js`
   bundles load their pure command leaves before their controllers; layout controls use the builder-owned
   layout leaf. Do not include the same leaf again in a satellite bundle.
+  The logical workspace bundle prepends `workbench/preview.js` for preview
+  outcomes and snapshot/restore before workspace layout/preferences.
   Use `readSource()` for UI harnesses; pure tests load only required leaves. Keep
   physical file lists flat and preserve registry-before-builder ordering. Workbench module
   ownership and source-preservation contracts are in `docs/workbench-modules.md`.

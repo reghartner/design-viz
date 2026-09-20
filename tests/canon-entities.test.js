@@ -1,5 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const C=require('../tools/canon/core.cjs');
+const vm=require('node:vm');
 const ref='component:home/recording',apiRef='api:home/recording';
 function diagram(){return {nodes:{hub:{title:'Caller'},cloud:{title:'Recording',binding:{entityRef:ref,api:{entityRef:apiRef}}},db:{title:'Store'}},rows:[['hub','cloud','db']],edges:[{from:'hub',to:'cloud',kind:'https'},{from:'cloud',to:'db',kind:'https'}],steps:[{id:'request',title:'Request',edge:'hub->cloud'},{id:'save',title:'Save',edge:'cloud->db'},{id:'failure',title:'Cannot deliver',failures:{'hub->cloud':'dropped'}}],paths:[{id:'happy',label:'Happy path',steps:['request','save']},{id:'failed',label:'Dropped signal',steps:['request','failure']}]};}
 function spec(id='flow'){
@@ -35,6 +36,50 @@ test('service step links select the correct alternate and include both ends of f
   assert.equal(hash.get('d'),'delivery-2');assert.equal(hash.get('p'),'failed');assert.equal(hash.get('s'),'failure');assert.equal(hash.get('m'),'step');
   assert.equal(new URL(url.searchParams.get('spec')).pathname,'/api/canon/specs/flow');
   assert.equal(section.paths[1].steps[1].position,2);
+});
+
+test('a real entity link passes through shared core and the Backstage frame to a wholly hidden alternate',async()=>{
+  const {buildEntityDiagramIndex,diagramsForEntity}=await import('../tools/canon/entity-diagrams.mjs');
+  const raw=spec(),d=raw.page.blocks[1].tabs[0].sections[0].diagram;
+  d.paths[1].steps=['failure'];
+  d.layouts=[{id:'business',name:'Business',steps:['save'],sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];
+  d.defaultLayout='business';
+  const core=C.viewerRouting(),before=JSON.stringify(raw);
+  const section=diagramsForEntity(buildEntityDiagramIndex([raw],{publicBaseUrl:'https://flows.example.test'}),ref).diagrams[0].sections[0];
+  const alternate=section.paths.find(p=>p.id==='failed');
+  const target=core.parseHash(new URL(alternate.steps[0].url).hash);
+  assert.equal(target.d,'delivery-2');
+  assert.deepEqual(core.diagramLayoutViews(d)[0].steps,['save']);
+  const jumps=[],pathSelections=[],tabSelections=[],messages=[],events={};
+  const stepper={path:()=> 'happy',jumpSource(index,path){jumps.push([index,path]);return true;},
+    selectPath(path){pathSelections.push(path);return false;}};
+  let destroyed=false,scrolled=0;
+  const controller={sections:core.sectionRecords(raw.page).map(record=>({...record,
+      stepper:record.section.diagram?stepper:null,sectionEl:{scrollIntoView(){scrolled++;}}})),
+    tabBlocks:[{select(...args){tabSelections.push(args);}}],steppers:[],destroy(){destroyed=true;}};
+  const view={addEventListener(){},querySelectorAll:()=>[],replaceChildren(){throw new Error('Valid render was removed');}};
+  const error={hidden:true},window={parent:{},addEventListener(type,listener){events[type]=listener;}};
+  const context={window,document:{body:{},getElementById:id=>id==='docview'?view:error,addEventListener(){}},
+    requestAnimationFrame:()=>0,ResizeObserver:class {observe(){}},
+    normalize:core.normalize,validate:C.validateSpec,sectionRecords:core.sectionRecords,
+    resolveSourceStep:core.resolveSourceStep,SKIN_NAMES:['pastel'],DEFAULT_SKIN:'pastel',
+    applySkinClasses(){},FlowCanon:C,renderPage:()=>controller};
+  const port={postMessage:message=>messages.push(message),close(){}};
+  vm.runInNewContext(await fs.readFile(path.join(__dirname,'../apps/backstage/viewer/frame.js'),'utf8'),context);
+  events.message({source:window.parent,ports:[port],data:{type:'flowview:init',spec:raw,
+    target:{section:target.d,path:target.p,step:target.s}}});
+  assert.deepEqual(jumps,[[2,'failed']],'host jumps to the original source index, not the path position or visible stop');
+  assert.deepEqual(pathSelections,[],'a hidden alternate must not be selected before the exact preview');
+  assert.deepEqual(tabSelections,[[0,false,false]]);
+  assert.equal(scrolled,1);
+  assert.ok(messages.some(message=>message.type==='rendered'));
+  assert.equal(messages.some(message=>message.type==='error'||message.type==='navigation-error'),false);
+  port.onmessage({data:{type:'navigate',target:{section:target.d,path:'failed'}}});
+  assert.deepEqual(pathSelections,['failed']);
+  assert.match(messages.at(-1).message,/no visible steps/);
+  assert.equal(destroyed,false);
+  assert.equal(error.hidden,true);
+  assert.equal(JSON.stringify(raw),before,'exact preview preserves the authored view and source');
 });
 
 test('association revisions change after binding removal, and unbound ambient diagrams do not match by title or code',async()=>{

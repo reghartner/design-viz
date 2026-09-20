@@ -36,13 +36,90 @@ function welcomeAgentPrompt(kind, brief, audience, repository){
   ].join('\n');
 }
 
+/* Screens are history entries, not project snapshots. The small visit marker
+   only retires an old Canon attachment; authored text stays in the draft owner. */
+function createWelcomeNavigation(win, initial, changed){
+  var key='flowviewWorkbenchEntry', retiredPrefix='dv-workbench-retired-entry-';
+  var names=['home','paste','new','agent','editor'];
+  function read(state){
+    var value=state && state[key];
+    return value && value.v===1 && names.indexOf(value.screen)>=0 &&
+      typeof value.visit==='string' && value.visit.length>0 && value.visit.length<100 &&
+      Number.isSafeInteger(value.depth) && value.depth>=0 ? value : null;
+  }
+  var current=read(win.history.state), retiredVisits=new Set();
+  if(!current)current={v:1,screen:initial,visit:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),depth:0,canon:!!new URL(win.location.href).searchParams.get('canon')};
+  function wasRetired(route){
+    var retired=!!route.retired || retiredVisits.has(route.visit);
+    try{retired=retired || win.sessionStorage.getItem(retiredPrefix+route.visit)==='1';}catch(ex){}
+    if(retired)retiredVisits.add(route.visit);
+    return retired;
+  }
+  var retired=wasRetired(current);
+  function stateWith(route){
+    var previous=win.history.state, next;
+    if(previous && typeof previous==='object' && !Array.isArray(previous)){
+      next={};Object.keys(previous).forEach(function(name){Object.defineProperty(next,name,{value:previous[name],writable:true,enumerable:true,configurable:true});});
+    }else next=previous==null?{}:{flowviewPreviousState:previous};
+    next[key]=route;return next;
+  }
+  function cleanCanon(){
+    if(!retired || !current.canon)return;
+    var url=new URL(win.location.href);
+    if(!url.searchParams.has('canon') && !url.searchParams.has('review'))return;
+    /* Keep unrelated query bytes (including encoding) and the fragment intact. */
+    var fields=url.search.slice(1).split('&').filter(function(field){
+      var params=new URLSearchParams(field);return !params.has('canon') && !params.has('review');
+    });
+    win.history.replaceState(win.history.state,'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
+  }
+  function write(screen,replace){
+    current={v:1,screen:screen,visit:current.visit,depth:current.depth+(replace?0:1),canon:!!current.canon,retired:retired};
+    win.history[replace?'replaceState':'pushState'](stateWith(current),'');
+    cleanCanon();
+  }
+  function move(screen,replace,focus){
+    if(names.indexOf(screen)<0)return;
+    if(screen!==current.screen || replace)write(screen,!!replace);
+    changed(screen,focus);
+  }
+  function pop(){
+    var next=read(win.history.state);
+    if(next){current=next;retired=wasRetired(next);}
+    else current={v:1,screen:'home',visit:current.visit,depth:0,canon:!!current.canon,retired:retired};
+    /* A visited old entry also carries retirement if session storage is blocked. */
+    if(retired && !current.retired)write(current.screen,true);else cleanCanon();
+    changed(current.screen,true);
+  }
+  write(current.screen,true); // Claim this entry, without adding an initial Back stop.
+  win.addEventListener('popstate',pop);
+  return {
+    screen:function(){return current.screen;},
+    retired:function(){return retired;},
+    go:function(screen){move(screen,false,true);},
+    replace:function(screen,focus){move(screen,true,focus);},
+    back:function(){if(current.depth>0)win.history.back();else move('home',false,true);},
+    localProject:function(){
+      if(!current.canon)return;
+      retired=true;retiredVisits.add(current.visit);
+      try{win.sessionStorage.setItem(retiredPrefix+current.visit,'1');}catch(ex){}
+      write(current.screen,true);
+    }
+  };
+}
+
 function initWorkbenchWelcome(opts){
   var root = document.getElementById('workbench-welcome');
   var editor = document.getElementById('workbench-workspace');
-  if (!root || !editor) return {show:function(){}, enterEditor:function(){}, openWorkspace:function(){}};
+  if (!root || !editor) return {show:function(){}, enterEditor:function(){}, openWorkspace:function(){},localProjectOpened:function(){},canonicalLoaded:function(){}};
   var builder = opts.builder, templates = opts.templates || [];
   var screens = {home:'welcome-home', paste:'welcome-paste-screen', new:'welcome-new-screen', agent:'welcome-agent-screen'};
-  var screen = 'home', operation = 0, manifestStarted = false;
+  var screen = 'home', operation = 0, manifestStarted = false, activeReader=null, navigation;
+  function retireRead(){
+    operation++;
+    if(activeReader && activeReader.readyState===1){try{activeReader.abort();}catch(ex){}}
+    activeReader=null;
+  }
   var resume = document.getElementById('welcome-resume');
   var headerResume = document.getElementById('welcome-header-resume');
   var file = document.getElementById('welcome-file');
@@ -68,7 +145,7 @@ function initWorkbenchWelcome(opts){
       'Saved in this browser' + (date && Number.isFinite(date.getTime()) ? ' · ' + date.toLocaleString() : '') + '.';
   }
   function selectScreen(name, focus){
-    operation++;
+    retireRead();
     screen = name;
     Object.keys(screens).forEach(function(key){ el(screens[key]).hidden = key !== name; });
     error('welcome-file-error', '');
@@ -80,23 +157,31 @@ function initWorkbenchWelcome(opts){
       if (target) target.focus({preventScroll:true});
     }
   }
-  function enterEditor(){
-    operation++;
+  function displayEditor(focus){
+    retireRead();screen='editor';
     root.hidden = true; editor.hidden = false; headerResume.hidden = true;
     document.body.classList.remove('welcome-active');
     window.dispatchEvent(new Event('resize'));
-    window.scrollTo(0, 0);
-    el('workspace-home').focus({preventScroll:true});
+    if(focus!==false){window.scrollTo(0, 0);el('workspace-home').focus({preventScroll:true});}
   }
-  function show(){
+  function displayWelcome(name,focus){
     if (builder.prepareWelcome) builder.prepareWelcome();
     if (opts.workspace && opts.workspace.setExpanded) opts.workspace.setExpanded(false);
     /* Focus mode hides the header and source reference. Exit through its own control. */
     if (document.body.classList.contains('workspace-focus')) el('workspace-focus').click();
     editor.hidden = true; root.hidden = false;
     document.body.classList.add('welcome-active');
-    selectScreen('home');
+    selectScreen(name,focus);
   }
+  function display(screen,focus){
+    if(screen==='editor'){
+      if(builder.isProjectOpen() || (opts.skipWelcome && !navigation.retired()))displayEditor(focus);
+      else if(builder.restoreDraft()){navigation.localProject();displayEditor(focus);}
+      else navigation.replace('home',focus);
+    }else displayWelcome(screen,focus);
+  }
+  function enterEditor(){navigation.go('editor');}
+  function show(){navigation.go('home');}
   function resumeProject(){
     if (builder.isProjectOpen() || builder.restoreDraft()) enterEditor();
     else { updateResume(); error('welcome-file-error', 'This draft is no longer available. Open a file or start a new project.'); }
@@ -109,11 +194,11 @@ function initWorkbenchWelcome(opts){
   el('workspace-home').addEventListener('click', show);
   headerResume.addEventListener('click', resumeProject);
   resume.addEventListener('click', resumeProject);
-  el('welcome-paste').addEventListener('click', function(){ selectScreen('paste'); json.focus(); });
-  el('welcome-new').addEventListener('click', function(){ selectScreen('new'); });
-  ['welcome-agent', 'welcome-new-agent'].forEach(function(id){ el(id).addEventListener('click', function(){ selectScreen('agent'); }); });
-  el('welcome-agent-paste').addEventListener('click', function(){ selectScreen('paste'); json.focus(); });
-  root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ selectScreen('home'); }); });
+  el('welcome-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
+  el('welcome-new').addEventListener('click', function(){ navigation.go('new'); });
+  ['welcome-agent', 'welcome-new-agent'].forEach(function(id){ el(id).addEventListener('click', function(){ navigation.go('agent'); }); });
+  el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
+  root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });
   ['welcome-open', 'welcome-paste-file'].forEach(function(id){ el(id).addEventListener('click', function(){ file.value = ''; file.click(); }); });
   el('welcome-paste-form').addEventListener('submit', function(ev){
     ev.preventDefault();
@@ -124,15 +209,18 @@ function initWorkbenchWelcome(opts){
   file.addEventListener('change', function(){
     var selected = file.files && file.files[0];
     if (!selected) return;
-    var token = ++operation, reader = new FileReader();
+    retireRead();
+    var token = operation, reader = new FileReader();activeReader=reader;
     error('welcome-file-error', '');
     reader.onload = function(){
       if (token !== operation) return;
+      activeReader=null;
       try { builder.loadText(String(reader.result)); enterEditor(); }
       catch (ex){ error('welcome-file-error', 'Could not open “' + selected.name + '”. ' + (ex.message || 'Check the JSON and try again.')); el('welcome-file-error').scrollIntoView({block:'nearest'}); }
     };
     reader.onerror = function(){
       if (token !== operation) return;
+      activeReader=null;
       error('welcome-file-error', 'Could not read “' + selected.name + '”. Choose the file again.');
       el('welcome-file-error').scrollIntoView({block:'nearest'});
     };
@@ -232,7 +320,10 @@ function initWorkbenchWelcome(opts){
     navigator.clipboard.writeText(text).then(function(){ el('welcome-copy-status').textContent = 'Copied. Paste into your agent and attach your sources.'; }, fallback);
   });
   renderTemplates(); updatePrompt();
-  if (opts.skipWelcome) enterEditor();
-  else { editor.hidden = true; root.hidden = false; document.body.classList.add('welcome-active'); selectScreen('home', false); }
-  return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor};
+  navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
+  display(navigation.screen(),false);
+  window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});
+  return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor,
+    localProjectOpened:navigation.localProject,
+    canonicalLoaded:function(){if(navigation.screen()==='editor')displayEditor(false);else updateResume();}};
 }

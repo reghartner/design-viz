@@ -24,12 +24,35 @@ to welcome. **Continue** returns to the current project with its undo history.
 Opening another valid project is one undoable replacement. Welcome navigation
 cancels temporary editor modes and pauses playback.
 
+The browser’s **Back** and **Forward** buttons follow the welcome, template
+picker, agent guidance, Paste JSON, and editor screens. The in-app **Back** button
+uses the same history. Unfinished pasted JSON and agent briefs stay in their forms
+while you navigate. Returning to the editor keeps the latest project, exact source
+text (including unfinished JSON), and its Undo/Redo history; history entries do
+not store older project versions. The initial screen adds no extra Back stop, so
+Back can leave the workbench normally.
+
+Reloading the same tab restores its screen. An editor reload recovers the saved
+local draft when available, or returns safely to welcome; Undo/Redo history and
+unfinished welcome forms are not persisted across reloads. Leaving the editor
+flushes its current draft before the normal autosave delay. Navigating away also
+retires pending file reads, so a late import cannot reopen the editor. This works
+for hosted and downloaded workbenches. Screen routes use small browser history
+metadata, keeping the existing URL, query, fragment and unrelated history state;
+specs, briefs and credentials are not placed in history URLs.
+
 If this browser has a saved draft, welcome offers **Resume** with its title and
 save time. A partially edited draft can still be recovered when its JSON is
 unfinished. Drafts are browser-local; save a JSON file for a portable copy. The
 welcome screen itself does not replace a saved draft. A canonical diagram link
 using `?canon=…` opens directly in the editor. Starting another project detaches
-that review and clears its URL parameters, so reloading offers your local draft.
+that review and clears its URL parameters. Back/Forward through its older screen
+entries keeps the latest local project and removes the retired Canon parameters,
+so reloading recovers the local draft rather than reattaching the old review. A
+small per-visit retirement marker lives in session storage; if storage is blocked,
+visited history entries still carry that metadata. It does not retire unrelated
+future Canon links. A Canon response arriving after you leave the editor may
+finish loading the project, but does not navigate you back into the editor.
 
 ## Build with your own agent
 

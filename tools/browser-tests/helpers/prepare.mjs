@@ -18,7 +18,10 @@ export default async function prepare(){
   try {
     await cp(path.join(repo,'workbench/flowspec.html'),path.join(output,'workbench.html'));
     execFileSync('python3',[fixture('build-editor.py'),repo,path.join(output,'lifetime')],{stdio:'inherit'});
-    for(const directory of [output,path.join(output,'lifetime')])await cp(path.join(repo,'workbench/catalog.json'),path.join(directory,'catalog.json'));
+    for(const directory of [output,path.join(output,'lifetime')]){
+      await cp(path.join(repo,'workbench/catalog.json'),path.join(directory,'catalog.json'));
+      await writeFile(path.join(directory,'starters.json'),'[]');
+    }
     const raw=JSON.parse(await readFile(path.join(repo,'examples/chime-radar/chime-radar.spec.json'),'utf8'));
     function pause(value){if(!value||typeof value!=='object')return;if(value.diagram)value.diagram.autoplay=false;Object.values(value).forEach(pause);}
     pause(raw);

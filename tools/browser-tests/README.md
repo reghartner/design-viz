@@ -29,7 +29,7 @@ existing pure, build and host checks; merge only after this job passes too.
 
 | Case | Production boundary and assertions |
 | --- | --- |
-| Offline standalone | Normal `inject.py` uses the current template, then deletes the input JSON. The only delivered file opens offline and restores a composed tab/section/step/contract-row reference, row focus and local fonts. |
+| Offline standalone | Normal `inject.py` uses the current template, then deletes the input JSON. The only delivered file opens offline and restores a composed tab/section/step/contract-row reference, row focus and local fonts; real fragment navigation after fonts settle verifies exact scroll alignment. |
 | Committed workbench | The actual committed HTML edits an inspector field with exact surrounding bytes and focus; Undo/Redo retains handwritten source; a real pointer swap has one Undo; a wholly hidden alternate remains the exact source step; a held file read cannot replace a newer project. |
 | Builder lifetime | The production named workbench assembly and skeleton receive an appended test-only facade. Destroy retires held graph and captured Home gestures, old controls and public callbacks; two same-DOM remounts each retain one exact Undo. Open picker cleanup and global resource counts return to the still-mounted boot/workspace/Canon/preview baseline. |
 | Native React host | The actual `InlineFlowview` component imports its committed static renderer. Two viewers resist hostile host CSS, retain independent state and exact hidden/numeric navigation, reject stale revisions, remount and release their listeners/timers/observers/fonts. |
@@ -48,6 +48,13 @@ SSO, authorization or CSP acceptance.
 Fixtures fix viewport, locale, timezone and motion. Forge uses normal motion to
 exercise Play/Pause with autoplay disabled; other cases reduce motion. Waits
 observe DOM/source/callback or resource completion rather than elapsed sleeps.
+The offline case observes the initial native row `scrollIntoView({block:
+'start'})` request without changing it. Initial font loading can shift layout;
+after fonts settle, real hash changes select another row and return to the target.
+The precise scroll assertion uses the requested row position clamped to the
+document maximum, with one-pixel rounding tolerance. It does not directly scroll
+from the test or require continued automatic scrolling while fonts load. Both
+initial and settled geometry are attached to the report.
 Pointer tests hover the current node before measuring coordinates after a render.
 No page errors, console errors, failed/HTTP-error requests or outbound requests
 are accepted. External requests are blocked and still fail the audit.

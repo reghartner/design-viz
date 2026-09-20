@@ -98,6 +98,6 @@ path, section-layout and playback regressions, plus shared Node/Python tests.
 Keep temporary source-tree fixtures, portable outputs and host assets current.
 The CJS/ESM backend bundle tests restrict filesystem access to the deployed bundle;
 the root Canon entity suite follows a real entity-index link through the shared
-core and Backstage frame to a hidden alternate's original source step. Plugin
+core and native mount to a hidden alternate's original source step. Plugin
 unit tests stay self-contained so the documented standalone copy can verify
 without the upstream tools or fixtures.

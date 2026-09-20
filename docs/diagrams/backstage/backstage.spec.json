@@ -3,10 +3,10 @@
     "title": "Flowview + Backstage \u2014 ownership, rendering and reviewed canon",
     "contract": "1",
     "generatedFrom": {
-      "url": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+      "url": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
       "label": "Flowview integration docs + implementation",
-      "version": "80ef713c5985",
-      "at": "09-17-2026"
+      "version": "4176f5df9b95",
+      "at": "09-19-2026"
     },
     "protocols": {
       "handoff": {
@@ -30,7 +30,7 @@
         "color": "#fb7185"
       },
       "port": {
-        "label": "Private MessagePort",
+        "label": "Native mount call",
         "color": "#0f8b8d"
       }
     },
@@ -43,7 +43,7 @@
               {
                 "heading": "Who owns what",
                 "accent": "blue",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                 "text": "Backstage supplies service identity and the inline viewer. The company flowview-diagrams repository holds reviewed specs and the service that hosts the read API, standalone viewer and external workbench.",
                 "bullets": [
                   "**Read this as a guided tour:** choose Play or step forward. The page opens paused. Animation shows logical handoffs, not measured latency.",
@@ -62,42 +62,42 @@
                       "sub": "services + APIs",
                       "icon": "cloud",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "editor": {
                       "title": "External workbench",
                       "sub": "hosted by Flowview service",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "git": {
                       "title": "flowview-diagrams",
                       "sub": "specs + backend/config",
                       "icon": "db",
                       "tint": "data",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "scan": {
                       "title": "GitHub Actions",
                       "sub": "source drift scanner",
                       "icon": "gear",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "review": {
                       "title": "Human review",
                       "sub": "behavioral decision",
                       "icon": "shield",
                       "tint": "auth",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "reader": {
                       "title": "Diagrams tab",
                       "sub": "inline bundled renderer",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     }
                   },
                   "rows": [
@@ -219,7 +219,7 @@
                     {
                       "id": "identity",
                       "text": "Backstage supplies fully qualified service/API identities, ownership and endpoint links.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                       "edge": "catalog->editor",
                       "panels": {
                         "stage": {
@@ -230,7 +230,7 @@
                     {
                       "id": "author",
                       "text": "The editor uses those catalog choices; the narrative and its canonical status still require review.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "nodes": [
                         "editor"
                       ],
@@ -243,7 +243,7 @@
                     {
                       "id": "publish",
                       "text": "The company flowview-diagrams repository holds authoritative specs, registry, source pins, traces and backend/deployment configuration.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                       "edge": "editor->git",
                       "panels": {
                         "stage": {
@@ -254,7 +254,7 @@
                     {
                       "id": "scan",
                       "text": "GitHub Actions compares referenced source regions; it never executes watched service code.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "git->scan",
                       "panels": {
                         "stage": {
@@ -265,7 +265,7 @@
                     {
                       "id": "decide",
                       "text": "A report gives the reviewer code differences and every affected diagram/step, without deciding behavioral impact.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "scan->review",
                       "panels": {
                         "stage": {
@@ -276,7 +276,7 @@
                     {
                       "id": "accept",
                       "text": "A maintainer accepts a harmless change, records a regression, or reviews a deliberate spec update.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "review->git",
                       "panels": {
                         "authority": {
@@ -316,7 +316,7 @@
                     {
                       "id": "discover",
                       "text": "Published bindings automatically associate diagrams with service/API pages. Backstage reads the selected spec and renders it inline; editing opens the external workbench.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "git->reader",
                       "panels": {
                         "stage": {
@@ -335,7 +335,7 @@
               {
                 "heading": "Author a service-bound story",
                 "accent": "violet",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                 "text": "Use catalog identity for the actors and reviewed code anchors for the story beats. A proposed HLD stays linked to its design document.",
                 "bullets": [
                   "**Company deployment boundary:** these flows describe the integration contract. Runnable read endpoints live in the development mock; the authenticated company backend and approved-Git provider must still be implemented and deployed.",
@@ -354,42 +354,42 @@
                       "sub": "Components + APIs",
                       "icon": "cloud",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "adapter": {
                       "title": "Catalog adapter",
                       "sub": "server-side credentials",
                       "icon": "server",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "editor": {
                       "title": "Flowview editor",
                       "sub": "service / API pickers",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "proposal": {
                       "title": "Spec proposal",
                       "sub": "base revision attached",
                       "icon": "package",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "reviewer": {
                       "title": "Reviewer",
                       "sub": "identity + repo policy",
                       "icon": "shield",
                       "tint": "auth",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "git": {
                       "title": "Central Git",
                       "sub": "approved spec + registry",
                       "icon": "db",
                       "tint": "data",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     }
                   },
                   "rows": [
@@ -504,7 +504,7 @@
                     {
                       "id": "catalog",
                       "text": "The backend adapter paginates Component/API entities and maps owners, provided APIs, operations and endpoints.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                       "edge": "adapter->catalog",
                       "panels": {
                         "stage": {
@@ -515,7 +515,7 @@
                     {
                       "id": "context",
                       "text": "Authenticated company context seeds the workbench with the catalog, spec and revision token.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                       "edge": "adapter->editor",
                       "panels": {
                         "stage": {
@@ -526,7 +526,7 @@
                     {
                       "id": "bind",
                       "text": "Choose the service, API and operation; attach code references to stable step IDs. Preserve HLD provenance.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "nodes": [
                         "editor"
                       ],
@@ -568,7 +568,7 @@
                     {
                       "id": "propose",
                       "text": "Submit the spec with its base revision. Stale proposals must be rejected instead of overwriting newer work.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                       "edge": "editor->proposal",
                       "panels": {
                         "stage": {
@@ -579,7 +579,7 @@
                     {
                       "id": "review",
                       "text": "The company adapter verifies the real reviewer and applies repository policy; a browser-supplied actor is not authorization.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                       "edge": "proposal->reviewer",
                       "panels": {
                         "stage": {
@@ -590,7 +590,7 @@
                     {
                       "id": "publish",
                       "text": "An approved Git change becomes the published spec. Include it in the registry for source-drift scans.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "edge": "reviewer->git",
                       "panels": {
                         "stage": {
@@ -602,7 +602,7 @@
                 },
                 "contract": {
                   "title": "Code-reference contract",
-                  "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                  "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                   "fields": [
                     {
                       "k": "revision",
@@ -632,7 +632,7 @@
               {
                 "heading": "Discover diagrams from a service",
                 "accent": "cyan",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                 "text": "A service page asks for diagrams bound to its exact entity identity. The backend derives associations from the approved specs this viewer may read.",
                 "bullets": [
                   "**Company boundary:** the plugin and portable toolkit are implemented here. The company agent owns the proper HTTP/auth backend, approved-Git provider and installation; local tests do not establish their deployed state.",
@@ -651,28 +651,28 @@
                       "sub": "Component / API",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "proxy": {
                       "title": "Backstage proxy",
                       "sub": "authenticated GET",
                       "icon": "shield",
                       "tint": "auth",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "api": {
                       "title": "Company API",
                       "sub": "derive associations",
                       "icon": "server",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "repo": {
                       "title": "Published specs",
                       "sub": "viewer-authorized set",
                       "icon": "db",
                       "tint": "data",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     }
                   },
                   "rows": [
@@ -788,7 +788,7 @@
                     {
                       "id": "request",
                       "text": "The entity page reads its identity from Backstage useEntity and queries through the authenticated proxy.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "page->proxy",
                       "panels": {
                         "stage": {
@@ -799,13 +799,13 @@
                     {
                       "id": "forward",
                       "text": "The proxy allows GET requests and keeps its upstream token on the backend. Use identity forwarding for per-user visibility.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "proxy->api"
                     },
                     {
                       "id": "filter",
                       "text": "The company API obtains only published specs the requesting viewer is authorized to read.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "api->repo",
                       "panels": {
                         "stage": {
@@ -816,7 +816,7 @@
                     {
                       "id": "index",
                       "text": "Build associations from explicit service/API bindings. Match full references case-insensitively; namespaces and kinds remain distinct.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "nodes": [
                         "api"
                       ],
@@ -829,7 +829,7 @@
                     {
                       "id": "result",
                       "text": "Return a versioned result with diagram choices, owners, HLD links and matching happy/alternate steps.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "api->proxy",
                       "panels": {
                         "stage": {
@@ -840,13 +840,13 @@
                     {
                       "id": "display",
                       "text": "The Diagrams tab selects an entry and reads its approved revision for inline rendering. An empty association list instead shows an explanation. See Inline viewer for the read and error paths.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "proxy->page"
                     },
                     {
                       "id": "refresh",
                       "text": "While visible, refresh every 60 seconds, on focus and on demand; switching services cancels stale requests.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "nodes": [
                         "page"
                       ],
@@ -859,7 +859,7 @@
                     {
                       "id": "refresh-error",
                       "text": "If refresh fails, keep the last result and display a warning. Do not present an unavailable index as zero diagrams.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "nodes": [
                         "page",
                         "api"
@@ -907,7 +907,7 @@
                 },
                 "contract": {
                   "title": "GET /api/canon/entity-diagrams",
-                  "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                  "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                   "fields": [
                     {
                       "k": "entityRef",
@@ -933,7 +933,7 @@
               {
                 "heading": "Scan source changes in GitHub",
                 "accent": "amber",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                 "text": "A scheduled or manually dispatched workflow compares reviewed anchored source against current default-branch code. The result is evidence, not a behavioral verdict.",
                 "bullets": [
                   "**Cadence:** weekdays at 08:23 America/New_York, including daylight-saving changes. GitHub scheduling can run late. Opt in with `FLOWVIEW_CANON_ENABLED=true` and configure `FLOWVIEW_REGISTRY`.",
@@ -952,42 +952,42 @@
                       "sub": "weekday or dispatch",
                       "icon": "gear",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/.github/workflows/canon-drift.yml"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/.github/workflows/canon-drift.yml"
                     },
                     "runner": {
                       "title": "Trusted runner",
                       "sub": "default branch only",
                       "icon": "shield",
                       "tint": "auth",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "registry": {
                       "title": "Registry + specs",
                       "sub": "reviewed source pins",
                       "icon": "db",
                       "tint": "data",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md"
                     },
                     "sources": {
                       "title": "Source GitHub",
                       "sub": "immutable code blobs",
                       "icon": "cloud",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "compare": {
                       "title": "Anchor comparison",
                       "sub": "source text, not execution",
                       "icon": "gear",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md"
                     },
                     "report": {
                       "title": "Evidence report",
                       "sub": "review PR + artifacts",
                       "icon": "package",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     }
                   },
                   "rows": [
@@ -1112,7 +1112,7 @@
                     {
                       "id": "start",
                       "text": "Schedule or workflow dispatch starts a run against trusted default-branch tooling; never check out a report PR head.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "trigger->runner",
                       "panels": {
                         "status": {
@@ -1131,13 +1131,13 @@
                     {
                       "id": "registry",
                       "text": "Read the checked-in registry, registered specs, code reference pins and prior drift decisions.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/tools/canon/github.mjs",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/tools/canon/github.mjs",
                       "edge": "runner->registry"
                     },
                     {
                       "id": "source",
                       "text": "Read immutable source blobs at the reviewed pin and the current source default-branch revision through the API.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "runner->sources",
                       "panels": {
                         "audit": {
@@ -1153,7 +1153,7 @@
                     {
                       "id": "compare",
                       "text": "Locate each unique literal anchor range and compare its text. Unrelated line movement alone is ignored.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "edge": "sources->compare",
                       "nodes": [
                         "registry"
@@ -1167,7 +1167,7 @@
                     {
                       "id": "changed",
                       "text": "Changed anchored text identifies every affected diagram and step. This still does not establish behavioral impact.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "registry->compare",
                       "panels": {
                         "status": {
@@ -1186,7 +1186,7 @@
                     {
                       "id": "report",
                       "text": "Create or reuse one evidence PR for the changed reference scope, plus Markdown/JSON reports and an Actions summary.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "compare->report",
                       "panels": {
                         "audit": {
@@ -1202,7 +1202,7 @@
                     {
                       "id": "clean",
                       "text": "If anchored content is unchanged, record a clean scan. No behavioral decision or baseline update is needed.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "nodes": [
                         "compare",
                         "report"
@@ -1224,7 +1224,7 @@
                     {
                       "id": "repair",
                       "text": "If source or anchors cannot be resolved, save repair evidence and fail the scan visibly; expected behavior stays unchanged.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "nodes": [
                         "sources",
                         "compare",
@@ -1296,7 +1296,7 @@
               {
                 "heading": "Choose the human disposition",
                 "accent": "violet",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                 "text": "The same evidence can represent a harmless refactor, a regression, or an intended change. Only a human review supplies that interpretation.",
                 "bullets": [
                   "**No impact:** label the report `flowview/no-impact` and close it. A validated decision advances only the exact reviewed source revision and records the audit decision.",
@@ -1315,42 +1315,42 @@
                       "sub": "diff + impacted steps",
                       "icon": "package",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "human": {
                       "title": "Maintainer",
                       "sub": "classify behavioral impact",
                       "icon": "shield",
                       "tint": "auth",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "decision": {
                       "title": "Decision runner",
                       "sub": "verify evidence + actor",
                       "icon": "gear",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/tools/canon/github.mjs"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/tools/canon/github.mjs"
                     },
                     "git": {
                       "title": "Central Git",
                       "sub": "specs + audit state",
                       "icon": "db",
                       "tint": "data",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "ticket": {
                       "title": "Regression issue",
                       "sub": "team follows up",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "proposal": {
                       "title": "Spec update PR",
                       "sub": "intentional new behavior",
                       "icon": "package",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     }
                   },
                   "rows": [
@@ -1460,7 +1460,7 @@
                     {
                       "id": "read",
                       "text": "The maintainer reads the code diff and every affected diagram/step, then determines whether behavior changed.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "report->human",
                       "panels": {
                         "audit": {
@@ -1476,7 +1476,7 @@
                     {
                       "id": "no-impact",
                       "text": "For a harmless change, the maintainer applies flowview/no-impact and closes the report.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "human->decision",
                       "panels": {
                         "audit": {
@@ -1492,7 +1492,7 @@
                     {
                       "id": "validate",
                       "text": "The decision runner verifies the report, live actor permission, exact disposition and current evidence before accepting it.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "nodes": [
                         "decision"
                       ],
@@ -1510,7 +1510,7 @@
                     {
                       "id": "accept",
                       "text": "Commit the exact reviewed source pin and audit decision together. The expected narrative stays unchanged.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "decision->git",
                       "panels": {
                         "outcome": {
@@ -1551,7 +1551,7 @@
                     {
                       "id": "regression",
                       "text": "For a regression, the maintainer links a real team issue, sets flowview/regression and closes the report.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "human->ticket",
                       "panels": {
                         "audit": {
@@ -1567,7 +1567,7 @@
                     {
                       "id": "record-regression",
                       "text": "After validating the regression decision, write its audit state while retaining the expected story and accepted source pin.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "nodes": [
                         "decision",
                         "git"
@@ -1611,7 +1611,7 @@
                     {
                       "id": "intended",
                       "text": "For intended behavior, revise the spec and source pin in an ordinary PR; an agent may assist the author.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "human->proposal",
                       "panels": {
                         "audit": {
@@ -1627,7 +1627,7 @@
                     {
                       "id": "publish",
                       "text": "The reviewed spec update changes the approved story and pin together; the next published snapshot is discoverable.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "proposal->git",
                       "panels": {
                         "outcome": {
@@ -1668,7 +1668,7 @@
                     {
                       "id": "closed",
                       "text": "Closing or merging a report with no disposition leaves the baseline unchanged. A later scan reuses that report.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "nodes": [
                         "report",
                         "git"
@@ -1732,7 +1732,7 @@
               {
                 "heading": "Refuse an unsafe or stale decision",
                 "accent": "red",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                 "text": "A disposition is conditional on the evidence and repository state that were actually reviewed. A refused decision cannot advance canon.",
                 "bullets": [
                   "**Gate inputs:** same-repository closed bot PR, expected branch and evidence marker, live write/maintain/admin actor permission, exactly one disposition, and a ticket for regression.",
@@ -1750,28 +1750,28 @@
                       "sub": "closed / labeled / edited",
                       "icon": "gear",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/.github/workflows/canon-drift.yml"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/.github/workflows/canon-drift.yml"
                     },
                     "gate": {
                       "title": "Decision gates",
                       "sub": "identity + exact evidence",
                       "icon": "shield",
                       "tint": "auth",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/tools/canon/github.mjs"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/tools/canon/github.mjs"
                     },
                     "git": {
                       "title": "Accepted baseline",
                       "sub": "atomic non-forced update",
                       "icon": "db",
                       "tint": "data",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     },
                     "repair": {
                       "title": "Repair + review",
                       "sub": "rescan / fix policy",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md"
                     }
                   },
                   "rows": [
@@ -1866,13 +1866,13 @@
                     {
                       "id": "load",
                       "text": "Load the live closed bot report and the event sender\u2019s current repository permission from GitHub.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/tools/canon/github.mjs",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/tools/canon/github.mjs",
                       "edge": "event->gate"
                     },
                     {
                       "id": "verify",
                       "text": "Validate report provenance, one explicit disposition and matching reviewed evidence. A regression also requires an issue.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "nodes": [
                         "gate"
                       ],
@@ -1898,7 +1898,7 @@
                     {
                       "id": "write",
                       "text": "For no-impact acceptance, if the Git update is permitted, write the reviewed pin and audit atomically without forcing the branch. Regression records audit only and retains the previous pin.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "edge": "gate->git",
                       "panels": {
                         "gates": {
@@ -1944,7 +1944,7 @@
                     {
                       "id": "stale",
                       "text": "If anchored source or report evidence changed, refuse acceptance and require a new scan and review.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/tools/canon/github.mjs",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/tools/canon/github.mjs",
                       "nodes": [
                         "gate",
                         "repair"
@@ -1981,7 +1981,7 @@
                     {
                       "id": "unauthorized",
                       "text": "An unprivileged actor, invalid report or ambiguous disposition is refused; the baseline remains untouched.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "nodes": [
                         "gate"
                       ],
@@ -2009,7 +2009,7 @@
                     {
                       "id": "protected",
                       "text": "If branch policy or a concurrent default-branch update rejects the commit, fail the run and leave canon unchanged.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/github-drift-automation.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/github-drift-automation.md",
                       "nodes": [
                         "gate",
                         "git",
@@ -2092,7 +2092,7 @@
               {
                 "heading": "Compare runtime evidence to canon",
                 "accent": "pink",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                 "text": "Source drift asks whether referenced code changed. Trace comparison asks how one observed execution differs from the approved story. Both feed reviewed proposals.",
                 "bullets": [
                   "**Approve the reference:** paste/export Honeycomb JSON, sanitize it, map exact service/operation selectors, then explicitly review the mapping against the spec revision.",
@@ -2111,42 +2111,42 @@
                       "sub": "exported runtime evidence",
                       "icon": "package",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md"
                     },
                     "mapper": {
                       "title": "Trace mapper",
                       "sub": "selectors + sanitization",
                       "icon": "gear",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md"
                     },
                     "review": {
                       "title": "Reference review",
                       "sub": "approve exact mapping",
                       "icon": "shield",
                       "tint": "auth",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md"
                     },
                     "canon": {
                       "title": "Reviewed story",
                       "sub": "reference + spec revision",
                       "icon": "db",
                       "tint": "data",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md"
                     },
                     "incident": {
                       "title": "Incident compare",
                       "sub": "observed divergence",
                       "icon": "gear",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md"
                     },
                     "overlay": {
                       "title": "Alternate draft",
                       "sub": "independent failure path",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md"
                     }
                   },
                   "rows": [
@@ -2274,7 +2274,7 @@
                     {
                       "id": "import",
                       "text": "Import exported trace JSON and retain only supported operational identity, timing and error attributes.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "edge": "export->mapper",
                       "panels": {
                         "status": {
@@ -2285,7 +2285,7 @@
                     {
                       "id": "map",
                       "text": "Match exact service/operation selectors; ambiguous or missing matches remain visible. Do not guess concurrency from timestamps.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "edge": "mapper->review",
                       "panels": {
                         "status": {
@@ -2296,7 +2296,7 @@
                     {
                       "id": "approve",
                       "text": "Explicitly approve the sanitized reference mapping against the spec revision. Company integration applies real repository review policy.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                       "edge": "review->canon",
                       "panels": {
                         "status": {
@@ -2307,7 +2307,7 @@
                     {
                       "id": "expectation",
                       "text": "Read the approved reference and authored expectations before comparing an incident trace.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "edge": "canon->incident",
                       "panels": {
                         "status": {
@@ -2318,13 +2318,13 @@
                     {
                       "id": "incident",
                       "text": "Supply a new incident trace. Environment mismatches block comparison; missing measurements remain unknown.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "edge": "export->incident"
                     },
                     {
                       "id": "overlay",
                       "text": "Build an isolated alternate at the first differing beat. Preserve only the unchanged prefix and use independent divergent steps.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                       "edge": "incident->overlay",
                       "panels": {
                         "status": {
@@ -2335,7 +2335,7 @@
                     {
                       "id": "propose",
                       "text": "A human or agent may edit the alternate and propose it through normal spec review; comparison alone never changes canon.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/canon.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/canon.md",
                       "edge": "overlay->canon",
                       "panels": {
                         "status": {
@@ -2386,7 +2386,7 @@
               {
                 "heading": "Where the repositories and hosted pages live",
                 "accent": "blue",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md",
                 "text": "Two company repositories, one shared toolkit. Specs and service configuration can stay together in flowview-diagrams; the workbench is hosted by that service and opens outside Backstage.",
                 "bullets": [
                   "**Company Backstage repository:** installs the plugin and configures its authenticated read proxy. Its browser bundle contains the inline renderer.",
@@ -2404,56 +2404,56 @@
                       "sub": "shared toolkit",
                       "icon": "package",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "bsrepo": {
                       "title": "Backstage",
                       "sub": "plugin repo",
                       "icon": "db",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "bsapp": {
                       "title": "Backstage app",
-                      "sub": "parent + proxy",
+                      "sub": "host + proxy",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "frame": {
                       "title": "Local viewer",
                       "sub": "plugin bundle",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "flowrepo": {
                       "title": "Flowview repo",
                       "sub": "specs + backend",
                       "icon": "db",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "service": {
                       "title": "Flowview host",
                       "sub": "HTTP + auth",
                       "icon": "server",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "editor": {
                       "title": "Workbench",
                       "sub": "external editor",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "html": {
                       "title": "Hosted HTML",
                       "sub": "standalone / iframe",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/README.md"
                     }
                   },
                   "rows": [
@@ -2572,7 +2572,7 @@
                           {
                             "id": "3",
                             "cells": {
-                              "field": "Inline frame",
+                              "field": "Native viewer",
                               "value": "Local rendering only"
                             }
                           }
@@ -2584,7 +2584,7 @@
                     {
                       "id": "toolkit",
                       "text": "design-viz supplies reusable, pinned source and build artifacts. Company integrations consume those versions.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "nodes": [
                         "toolkit"
                       ],
@@ -2597,7 +2597,7 @@
                     {
                       "id": "plugin",
                       "text": "The company Backstage repository installs the plugin; its app deployment bundles the inline viewer and configures the normal backend proxy.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "toolkit->bsrepo",
                       "panels": {
                         "stage": {
@@ -2608,7 +2608,7 @@
                     {
                       "id": "central",
                       "text": "flowview-diagrams keeps authoritative specs beside its company backend/configuration, registry, traces and drift automation.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "toolkit->flowrepo",
                       "panels": {
                         "stage": {
@@ -2619,7 +2619,7 @@
                     {
                       "id": "deploy",
                       "text": "The company deploys the Flowview HTTP/auth service from that repository. The exact infrastructure and access rules belong to the company.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "flowrepo->service",
                       "panels": {
                         "stage": {
@@ -2630,7 +2630,7 @@
                     {
                       "id": "editor",
                       "text": "The service hosts the workbench. Edit in workbench opens that page in a separate tab; the builder does not run inside Backstage.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "service->editor",
                       "panels": {
                         "stage": {
@@ -2641,7 +2641,7 @@
                     {
                       "id": "standalone",
                       "text": "The service may host exported HTML for direct reading or temporary Confluence iframes. Updated exports embed fonts, icons, runtime and the spec.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "service->html",
                       "panels": {
                         "stage": {
@@ -2651,8 +2651,8 @@
                     },
                     {
                       "id": "inline",
-                      "text": "Backstage ships its own rendering bundle. The parent reads approved JSON through its proxy and transfers it to a local sandboxed frame.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "text": "Backstage ships trusted renderer code in its app bundle. The host reads approved JSON through its proxy and mounts that inert data inside an owned ShadowRoot.",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "bsapp->frame",
                       "panels": {
                         "stage": {
@@ -2703,13 +2703,13 @@
               {
                 "heading": "Read inside Backstage, follow links, edit elsewhere",
                 "accent": "violet",
-                "source": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
-                "text": "The iframe is a local bundled document. Only the parent plugin reads the approved spec through Backstage. The capture below shows that actual plugin with fictional data.",
+                "source": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
+                "text": "The native viewer is trusted bundled code. Only the host plugin reads the approved spec through Backstage. The capture below shows that actual plugin with fictional data.",
                 "bullets": [
-                  "**No frame egress:** the local frame receives data on a private MessagePort. Fonts, scripts, icons and this screenshot are bundled. connect-src none blocks background fetches.",
-                  "**Links are deliberate navigation:** a service, code or API reference opens a new tab on click. No API operation runs just because a diagram renders. Edit in workbench is a separate parent link.",
+                  "**Inert data, explicit links:** the native renderer receives JSON and has no request transport. Fonts, code, icons and this screenshot are bundled; evidence links open on explicit clicks. Shadow DOM owns styles and DOM; it is not a security sandbox.",
+                  "**Links are deliberate navigation:** a service, code or API reference opens a new tab on click. No API operation runs just because a diagram renders. Edit in workbench is a separate host link.",
                   "**Revision consistency:** the company endpoint returns the requested approved revision or 409. The stale path ends before rendering; refreshing must obtain a new association result.",
-                  "**Host policy:** srcDoc inherits Backstage CSP. Install the generated exact script hash and required style/data-font/image permissions; the plugin guide gives the contract. Company SSO and installed-host acceptance remain company checks."
+                  "**Host policy:** trusted pinned code uses the normal app script policy and required inline-style/data-font/image permissions. No Flowview iframe, script hash or runtime code compilation is required. Company CSP, SSO and installed-host acceptance remain company checks."
                 ],
                 "diagram": {
                   "view": "step",
@@ -2718,46 +2718,46 @@
                   "layoutName": "Viewer walkthrough",
                   "nodes": {
                     "plugin": {
-                      "title": "Plugin parent",
+                      "title": "Plugin host",
                       "sub": "FetchApi",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "proxy": {
                       "title": "Auth proxy",
                       "sub": "server only",
                       "icon": "shield",
                       "tint": "auth",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "api": {
                       "title": "Flowview API",
                       "sub": "approved JSON",
                       "icon": "server",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "frame": {
                       "title": "Local viewer",
-                      "sub": "private port",
+                      "sub": "owned ShadowRoot",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md"
                     },
                     "reference": {
                       "title": "Reference tab",
                       "sub": "code / APIs",
                       "icon": "package",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     },
                     "editor": {
                       "title": "Workbench",
                       "sub": "external editing",
                       "icon": "terminal",
                       "tint": "cmd",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/docs/backstage-integration.md"
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/docs/backstage-integration.md"
                     }
                   },
                   "rows": [
@@ -2866,14 +2866,14 @@
                           {
                             "id": "0",
                             "cells": {
-                              "field": "Parent plugin",
+                              "field": "Plugin host",
                               "value": "Reads JSON with FetchApi"
                             }
                           },
                           {
                             "id": "1",
                             "cells": {
-                              "field": "Local frame",
+                              "field": "Native viewer",
                               "value": "Renders data; no network reads"
                             }
                           },
@@ -2937,7 +2937,7 @@
                     {
                       "id": "select",
                       "text": "Select a diagram from the service list. The parent requests its id and listed revision through Backstage FetchApi.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "plugin->proxy",
                       "panels": {
                         "stage": {
@@ -2947,8 +2947,8 @@
                     },
                     {
                       "id": "forward",
-                      "text": "The backend proxy applies the company authentication contract; tokens and identity handling stay outside the rendering frame.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "text": "The backend proxy applies the company authentication contract; renderer inputs contain inert spec data, never tokens or identity handling.",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "proxy->api",
                       "panels": {
                         "stage": {
@@ -2959,7 +2959,7 @@
                     {
                       "id": "approved",
                       "text": "The read API returns the exact approved revision visible to this viewer.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "api->proxy",
                       "panels": {
                         "stage": {
@@ -2970,7 +2970,7 @@
                     {
                       "id": "received",
                       "text": "The proxy returns JSON to the plugin. Revision and diagram identity remain tied to this selection.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "proxy->plugin",
                       "panels": {
                         "stage": {
@@ -2980,8 +2980,8 @@
                     },
                     {
                       "id": "render",
-                      "text": "The parent transfers data over a private MessagePort. The bundled local viewer renders steps, paths and panels; it does not fetch the spec.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "text": "The host calls the bundled native mount with inert data. Each ShadowRoot owns its steps, paths, panels and resource cleanup; the renderer does not fetch the spec.",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "plugin->frame",
                       "panels": {
                         "stage": {
@@ -2992,7 +2992,7 @@
                     {
                       "id": "inspect",
                       "text": "A deliberate click opens a saved catalog, code or API reference in a separate tab. Rendering alone invokes no service operation.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "frame->reference",
                       "panels": {
                         "stage": {
@@ -3003,7 +3003,7 @@
                     {
                       "id": "edit",
                       "text": "Edit in workbench opens the company-hosted editor in another tab. The Backstage page remains a reader.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "edge": "plugin->editor",
                       "panels": {
                         "stage": {
@@ -3014,7 +3014,7 @@
                     {
                       "id": "stale",
                       "text": "The API returns HTTP 409 because the requested revision is unavailable. This is a received refusal, not a dropped request or an inferred outage.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "nodes": [
                         "api",
                         "proxy"
@@ -3031,7 +3031,7 @@
                     {
                       "id": "refresh",
                       "text": "The parent shows the stale-revision error and asks the reader to refresh diagrams. No newer spec is silently rendered; this path stops before rendering.",
-                      "link": "https://github.com/reghartner/design-viz/blob/80ef713c5985dd603c9512aee55455079db936e6/apps/backstage/README.md",
+                      "link": "https://github.com/reghartner/design-viz/blob/4176f5df9b9507bd38a7f021475ac4de6827f705/apps/backstage/README.md",
                       "nodes": [
                         "plugin"
                       ],

@@ -159,13 +159,13 @@ except refreshed provenance. Old verification above records the previous version
 | hosting / deploy | company deploys its proper HTTP/auth service | repository → hosted service | API, viewer and workbench routes | company-owned implementation boundary |
 | hosting / editor | service hosts external workbench | explicit navigation → authoring page | editor is off Backstage | company handoff |
 | hosting / standalone | service also hosts exported viewer HTML | explicit navigation → viewer | Confluence can iframe self-contained HTML | README embedding section |
-| hosting / inline | Backstage parent passes JSON to local frame | approved spec → rendered document | bundled inline renderer | InlineFlowview.tsx + frame.js |
+| hosting / inline | Backstage host passes JSON to native mount | approved spec → rendered document | bundled inline renderer | InlineFlowview.tsx + src/native/mount.js |
 | inline / select | plugin requests selected diagram + revision | list ready → read pending | parent reads through proxy | api.ts |
-| inline / forward | proxy applies company auth | authorized read → API | credentials stay outside frame | plugin README |
+| inline / forward | proxy applies company auth | authorized read → API | renderer receives inert spec data | plugin README |
 | inline / approved | API returns approved revision | read pending → approved JSON | data received | revision contract |
 | inline / received | proxy returns JSON to plugin | response → parent data | selected spec loaded | FetchApi adapter |
-| inline / render | plugin transfers spec on private port | JSON → local rendering | interactive diagram in Backstage | InlineFlowview.tsx |
-| inline / inspect | viewer opens saved evidence on explicit click | readable diagram → external reference | catalog/code/API docs in new tab | frame.js link handling |
+| inline / render | plugin calls native mount with spec | JSON → local rendering | interactive diagram in Backstage | InlineFlowview.tsx |
+| inline / inspect | viewer opens saved evidence on explicit click | readable diagram → external reference | catalog/code/API docs in new tab | src/native/mount.js link handling |
 | inline / edit | parent opens external workbench | readable diagram → separate authoring page | no embedded builder | FlowviewEntityDiagrams.tsx |
 | inline / stale | API refuses unavailable revision with 409 | same read prefix → stale response | no newer/wrong spec rendered | createSpecLoader guard |
 | inline / refresh | reader refreshes associations | stale revision → retry instruction | stop; later request not assumed successful | error/retry UI |
@@ -182,7 +182,7 @@ spec. It is not a company Backstage screenshot. Caption/alt must say this.
 
 Coverage additions: `page.blocks[0].tabs[6].sections[0]` implements hosting steps; `tabs[7].sections[0]` implements inline read/navigation and the stale-revision branch. The image is `tabs[7].sections[0].diagram.panels[0]`. Overview and discovery summaries now point to these details. All source permalinks use merged revision 80ef713c5985dd603c9512aee55455079db936e6.
 
-## Current verification (September 17)
+## Previous verification (September 17)
 
 - Current source facts and permalinks checked against merged viewer/handoff revision
   `80ef713c5985dd603c9512aee55455079db936e6`; diagram source is reviewed against
@@ -207,3 +207,20 @@ Coverage additions: `page.blocks[0].tabs[6].sections[0]` implements hosting step
 
 - The same raster image also decoded in the actual Backstage plugin under its
   restrictive parent/frame CSP; the rendering frame made zero HTTP requests.
+
+## Native host revision (September 19)
+
+Current guide source links pin native implementation revision
+`4176f5df9b9507bd38a7f021475ac4de6827f705`.
+
+The hosting and inline stories now describe the native package boundary: trusted
+static code mounts inert data in an owned ShadowRoot, using host CSP. Historical
+frame/CSP results above describe the previous release. The existing raster still
+illustrates the actual local plugin UI; it is not a company deployment capture.
+
+Native acceptance used two actual React plugin instances with conflicting host
+styles. It verified skins, exact hidden/numeric source jumps, navigation recovery,
+revision races, independent sizing, unmount/remount and resource cleanup, with no
+page errors or renderer background requests. Prototype checks also exercised SVG
+symbols/motion, Home, keyboard menus, host scrolling, reduced motion and delayed
+font completion after destruction. Company policy acceptance remains separate.

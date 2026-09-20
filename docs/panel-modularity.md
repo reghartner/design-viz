@@ -122,8 +122,10 @@ VM dependency. Its cached `viewerRouting()` facade exposes the shared pure core
 from the validator scope, including navigation; it never initializes the DOM
 renderer. Backstage's standalone compatibility checker contains generated
 feature metadata, not a second handwritten list. Company release and upgrade PR
-boundaries are unchanged. Rebuilding the viewer changes its script hash; refresh
-the host's configured CSP hash when upgrading.
+boundaries are unchanged. Rebuild the native artifact when upgrading Backstage;
+its trusted static code mounts within an owned ShadowRoot. Panel CSS root selectors
+are scoped at build time, and timers/observers use the explicit instance environment.
+See [native ownership](native-viewer.md); no generated script hash is required.
 
 ## Verification and release
 

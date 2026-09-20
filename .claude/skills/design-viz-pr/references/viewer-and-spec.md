@@ -35,6 +35,12 @@
   child durations and preserve concurrency/unknown evidence. Validate malformed
   and incomplete imports as well as the happy fixture.
 
+- Native mounts use the bounded lexical environment in `src/native/environment.js`.
+  New renderer browser APIs need explicit lifetime ownership; preserve composed
+  event targets, shadow focus and scroll ancestors. See `docs/native-viewer.md`.
+  Verify sibling isolation, delayed callbacks after destroy, visible SVG motion,
+  fonts and reduced-motion behavior in real Chrome for affected native changes.
+
 Run the relevant `tests/*.test.js` suites; use the full Node suite for shared
 validator/state/engine changes. Browser-check visible changes with a representative
 starter and the actual failing container/skin where available. A browser claim

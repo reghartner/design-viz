@@ -1,15 +1,33 @@
-import {copyFile, mkdir, writeFile} from 'node:fs/promises';
+import {copyFile, mkdir, writeFile, rm, realpath} from 'node:fs/promises';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 
+async function canonicalPath(value) {
+  let current = path.resolve(value); const suffix = [];
+  for (;;) {
+    try { return path.join(await realpath(current), ...suffix.reverse()); }
+    catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      const parent = path.dirname(current);
+      if (parent === current) throw error;
+      suffix.push(path.basename(current)); current = parent;
+    }
+  }
+}
 export async function vendorFlowview(source, destination) {
+  const sourcePath = await realpath(source);
+  const pluginPath = await canonicalPath(path.join(destination, 'apps/backstage'));
+  if (pluginPath === sourcePath || pluginPath.startsWith(sourcePath + path.sep) || sourcePath.startsWith(pluginPath + path.sep))
+    throw new Error('Vendor into a separate designer checkout.');
   const git = (...args) => execFileSync('git', args, {cwd: source, encoding: 'utf8'}).trim();
   if (git('status', '--porcelain')) throw new Error('Vendor from a clean Flowview checkout so its source pin is accurate.');
   const revision = git('rev-parse', 'HEAD');
   const prefixes = ['template/', 'src/starters/', 'tools/canon/', 'tools/catalog-sync/', 'apps/backstage/', 'deploy/workbench/'];
   // An explicit tracked-file allowlist excludes private/local files and dependencies.
   const files = git('ls-files', '-z').split('\0').filter(name => name === 'workbench/flowspec.html' || prefixes.some(prefix => name.startsWith(prefix)));
+  // The pinned plugin is generator-owned, including deletions on upgrades.
+  await rm(path.join(destination, 'apps/backstage'), {recursive:true, force:true});
   for (const name of files) {
     const target = path.join(destination, name);
     await mkdir(path.dirname(target), {recursive: true});

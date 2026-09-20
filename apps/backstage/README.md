@@ -28,7 +28,7 @@ The guide distinguishes portable implementation from company deployment.
 To try the actual React plugin against fictional data, run `npm ci` and
 `npm run preview:build` in this directory, then start the mock server below and
 open `http://localhost:8766/backstage-preview/index.html`. This local shell runs
-with a restrictive parent CSP including the exact viewer script hash. It is a
+with a host CSP permitting bundled scripts and embedded assets. It is a
 plugin preview, not proof of company authentication or an installed Backstage app.
 
 Run `node apps/backstage-mock/server.mjs` from the repository root and open:
@@ -151,28 +151,42 @@ revision asks the reader to refresh diagrams.
 
 ## Rendering and browser policy
 
-The plugin parent uses Backstage `FetchApi` through the authenticated backend
-proxy to read JSON. It passes that data over a private transferred `MessagePort`
-to a bundled `srcDoc` iframe. The frame never loads a hosted Flowview URL, obtains
-credentials, calls a service API, or fetches fonts/scripts/specs. Its sandbox omits
-`allow-same-origin`; its own CSP includes `connect-src 'none'`. Explicit HTTP(S)
-evidence links open separate tabs. Playback starts paused, pauses when hidden,
-and the frame reports content height to the parent.
+The plugin uses Backstage `FetchApi` through the authenticated backend proxy to
+read revision-pinned JSON, then passes that inert data to `mountNativeViewer`.
+The statically compiled renderer mounts inside a dedicated ShadowRoot. It loads
+no hosted viewer, remote script or stylesheet, and uses no runtime `eval` or
+`Function` compilation. Fonts and SVG symbols ship in the package; authored
+images must be embedded PNG, JPEG or WebP. Evidence links open HTTP(S) destinations
+in a new tab only on an explicit click. The renderer has no request transport.
+Playback starts paused and pauses when hidden or outside the viewport.
 
-**Parent CSP still applies to `srcDoc`.** In the company Backstage backend policy,
-allow the generated exact script hash exported as `viewerScriptCsp` from this
-package (also in `src/generated/viewerDocument.ts`), inline styles, `font-src data:`,
-`img-src data:` and the local frame. Merge these sources with the existing host
-policy; do not replace its other directives or enable blanket inline scripts.
-If the host uses `script-src-elem`, it must also allow the hash. Refresh the hash
-when upgrading the bundled viewer. A blocked script reports a startup error
-after ten seconds. Verify the installed host's CSP, links and SSO separately.
+Shadow DOM provides DOM/style ownership, **not a security sandbox**. This pinned
+package is trusted JavaScript with the host app's permissions. The host loads it
+through its normal bundler and script policy. Merge required inline-style,
+`font-src data:` and `img-src data:` support with the existing host CSP. No
+Flowview iframe permission, exact script hash, or blanket inline-script/eval
+permission is required. The former `viewerScriptCsp` export is removed; remove
+that hash from the host's integration configuration when upgrading. Verify the
+installed company's CSP and SSO separately; local browser checks do not establish
+company acceptance.
 
-`src/generated/viewerDocument.ts` and `FONT-LICENSES.txt` travel with the plugin,
-so company builds do not need this repository's source tree. To update the shared
-runtime here, run `npm run build:viewer`; CI checks freshness with
-`npm run check:viewer`. This snapshot includes the shared engine, validation,
-styles, icons and licensed Latin fonts. No workbench code is included.
+Each mount owns its DOM, IDs, skin, navigation, timers, observers and listeners.
+Its namespaced fonts are shared by live mounts in the same document and released
+after the last mount is destroyed. Sibling viewers keep independent controls,
+focus and path state. No body classes, styles, location hash or host globals are
+patched. Content takes its natural height in the host layout. Stale revisions,
+failed reads and unmounts retire the old instance; a failed navigation leaves a
+valid diagram available for another jump.
+
+`src/generated/nativeViewer.js`, its declarations, compatibility checker and
+`FONT-LICENSES.txt` travel with the plugin. Company builds do not need this
+repository's source tree. Runtime maintainers run `npm run build:viewer` here;
+CI checks freshness with `npm run check:viewer`. The artifact includes the shared
+engine, validation, styles, icons and licensed Latin fonts. Workbench boot code
+is excluded. The reusable `mountNativeViewer(host, spec, options)` export returns
+`navigate`, `pause`, `destroy`, `root` and validation `warnings`; call `destroy()`
+before reusing the dedicated host. See the upstream
+[native renderer guide](../../docs/native-viewer.md) for implementation ownership.
 
 Refresh the repository provider when approved Git changes land, or read its current
 snapshot per request. Cache by published revision and authorization scope if
@@ -199,7 +213,7 @@ approved local decisions; unapproved proposals never appear.
 ## Maintenance
 
 See [module ownership and verification boundaries](ARCHITECTURE.md) before changing
-request lifecycle, selection, or the viewer protocol. The upstream
+request lifecycle, selection, or the native mount boundary. The upstream
 [panel module guide](../../docs/panel-modularity.md) describes the complete
 single-file panel contract, shared lifecycle, authoring hooks and build discovery.
 
@@ -212,8 +226,8 @@ npm run verify
 
 CI typechecks against real Backstage packages and tests rendering, automatic
 refresh/error states, request cancellation, link safety and the authenticated
-proxy client, revision-pinned reads, private frame messages, SVG links and CSP hash
-integrity. Root Node tests cover indexing, alternate links and registry/review
+proxy client, revision-pinned reads, native mount cleanup, exact hidden-step
+navigation, SVG links and static artifact boundaries. Root Node tests cover indexing, alternate links and registry/review
 updates. Company SSO, authorization and mounting the tab in the company's actual
 Backstage app remain the final integration checks.
 

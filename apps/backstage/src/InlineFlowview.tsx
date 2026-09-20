@@ -1,5 +1,4 @@
 import type { AssociatedDiagram, SpecLoader } from './api';
-import { viewerDocument } from './generated/viewerDocument';
 import { FlowviewCompatibility } from './generated/compatibility';
 import { useInlineViewer } from './hooks/useInlineViewer';
 import type { ViewerTarget } from './viewer/protocol';
@@ -16,13 +15,10 @@ export function InlineFlowview({
 }) {
   const {
     state,
-    height,
     renderError,
     rendered,
-    iframe,
-    connect,
+    host,
     retry,
-    attempt,
   } = useInlineViewer(diagram, loadSpec, target);
   const compatibility =
     state.spec === undefined
@@ -69,22 +65,13 @@ export function InlineFlowview({
           {!rendered && !renderError && (
             <p role="status">Starting diagram viewer…</p>
           )}
-          <iframe
-            ref={iframe}
-            key={attempt}
+          <div
+            ref={host}
+            role="region"
+            aria-label={'Flowview: ' + diagram.title}
             title={'Flowview: ' + diagram.title}
-            srcDoc={viewerDocument}
-            onLoad={connect}
-            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-            referrerPolicy="no-referrer"
-            style={{
-              display: 'block',
-              width: '100%',
-              height,
-              border: 0,
-              borderRadius: 8,
-              background: 'transparent',
-            }}
+            data-flowview-native=""
+            style={{ display: 'block', width: '100%', minWidth: 0, borderRadius: 8 }}
           />
         </>
       )}

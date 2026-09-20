@@ -28,12 +28,12 @@ For unattended GitHub scans, use the [automation setup](docs/github-drift-automa
 weekday runs, report-only previews, saved evidence, and human-reviewed drift PRs.
 The [Backstage entity plugin](apps/backstage/README.md) renders related diagrams
 inside service/API pages, with in-place step jumps and external editing. Its
-bundled iframe makes no background network requests; the Backstage parent reads
-specs through the authenticated proxy. The plugin guide includes a local preview.
+native renderer owns a ShadowRoot and makes no background network requests;
+the Backstage host reads specs through the authenticated proxy. The plugin guide includes a local preview.
 
 The [system walkthrough](docs/diagrams/backstage/backstage.html) now includes
 **Deployment** and **Inline viewer** tabs: repository ownership, external editing,
-authenticated reads, private frame messages and stale-revision handling, alongside
+authenticated reads, native mount ownership and stale-revision handling, alongside
 the existing GitHub drift and trace flows. Its embedded screenshot shows the
 actual plugin with local fictional data.
 

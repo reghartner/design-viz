@@ -1,9 +1,11 @@
 'use strict';
 const {readSource} = require('../tools/source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-function context(extra={}){
+function context(extra={}, transport=false){
   const c={URL,TextEncoder,...extra};vm.createContext(c);
-  for(const name of ['canon','validator','engine','builder.workbench','clipboard.workbench'])vm.runInContext(readSource(name+'.js'),c);
+  for(const name of ['canon.js','validator.js','workbench/source-edit.js','workbench/targets.js',
+    'workbench/commands/common.js',transport ? 'clipboard.workbench.js' : 'workbench/commands/clipboard.js'])
+    vm.runInContext(readSource(name),c);
   return c;
 }
 const C=context(),plain=v=>JSON.parse(JSON.stringify(v));
@@ -98,7 +100,7 @@ function harness(clipboard){
   function fire(map,type,target,extra){const ev={target,preventDefault(){this.prevented=true;},stopPropagation(){},...extra};for(const fn of map[type] || [])fn(ev);return ev;}
   for(const id of ['object-clipboard','object-clipboard-text','object-clipboard-feedback','object-clipboard-status','object-clipboard-destination','object-copy','object-duplicate','object-paste','object-clipboard-cancel','object-clipboard-apply','object-clipboard-read'])elements[id]=element(id);
   let raw=fixture(),text=JSON.stringify(raw),targets=[homeTarget('devices')],dest={section:1,index:0},blocked=false;const undo=[];
-  const c=context(),ctl=c.initBuilderClipboard(document,{isActive:()=>active,text:()=>text,selection:()=>targets,destination:()=>({...dest}),destinationLabel:()=> 'Destination Home',blocked:()=>blocked,
+  const c=context({},true),ctl=c.initBuilderClipboard(document,{isActive:()=>active,text:()=>text,selection:()=>targets,destination:()=>({...dest}),destinationLabel:()=> 'Destination Home',blocked:()=>blocked,
     apply(plan){undo.push(text);text=plan.text;return true;}});
   return {elements,document,ctl,undo,set active(v){active=v;},event:(type,extra={})=>fire(events,type,elements['object-copy'],extra),get text(){return text;},set text(v){text=v;},set targets(v){targets=v;},set blocked(v){blocked=v;},selectedText(v){selectedText=v;}};
 }

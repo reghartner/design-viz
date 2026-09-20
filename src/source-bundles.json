@@ -17,6 +17,14 @@
   "builder.workbench.js": [
     "workbench/source-edit.js",
     "workbench/targets.js",
+    "workbench/commands/common.js",
+    "workbench/commands/graph.js",
+    "workbench/commands/document.js",
+    "workbench/commands/narrative.js",
     "builder.workbench.js"
+  ],
+  "clipboard.workbench.js": [
+    "workbench/commands/clipboard.js",
+    "clipboard.workbench.js"
   ]
 }

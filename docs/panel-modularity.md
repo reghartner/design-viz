@@ -105,10 +105,10 @@ Reading raw bundle files directly skips their manifest dependencies.
 Feature metadata and CSS are collected at build time for
 standalone, workbench, Backstage and Forge.
 
-The logical `builder.workbench.js` bundle loads the source-edit and raw-target
-leaves before the generic builder. Use that assembled source for planner and UI
-tests; [workbench modules](workbench-modules.md) describes the leaf-only test
-surface and source-preservation contract.
+The logical `builder.workbench.js` bundle loads source-edit, raw-target and command
+leaves before the generic builder. Use that assembled source for editor and
+cross-family tests; [workbench modules](workbench-modules.md) describes the pure
+command test surface, clipboard bundle and source-preservation contract.
 
 Radar's module keeps geometry and alert state separate: the model computes
 distance and occupancy, while authored `alert` booleans fold through the shared

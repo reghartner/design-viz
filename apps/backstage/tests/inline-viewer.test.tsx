@@ -85,7 +85,7 @@ it('initializes SVG and HTML evidence links without navigating the rendering fra
   vi.stubGlobal('normalize',(v:unknown)=>v);vi.stubGlobal('validate',()=>({errors:[],warnings:[]}));
   vi.stubGlobal('SKIN_NAMES',['pastel']);vi.stubGlobal('applySkinClasses',()=>{});
   vi.stubGlobal('FlowCanon',{http:(v:string)=>v.startsWith('https://')?v:null});
-  vi.stubGlobal('blocksOf',()=>[]);
+  vi.stubGlobal('sectionRecords',()=>[]);
   vi.stubGlobal('renderPage',()=>({sections:[],steppers:[],destroy(){}}));
   const port={postMessage:vi.fn(),onmessage:null,close:vi.fn()};
   window.eval(readFileSync('viewer/frame.js','utf8'));

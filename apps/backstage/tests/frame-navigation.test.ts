@@ -5,7 +5,25 @@ afterEach(() => {
   vi.unstubAllGlobals();
   document.body.replaceChildren();
 });
-function boot(target: unknown) {
+function spec() {
+  return {
+    skin: 'pastel',
+    canon: { version: 1, id: 'recording', kind: 'canonical', owner: 'group:home/team' },
+    sections: [{
+      heading: 'Recording',
+      diagram: {
+        nodes: { cloud: { binding: { entityRef: 'component:home/recording' } } },
+        rows: [['cloud']],
+        steps: ['quiet', 'persist', 'failure'].map(id => ({ id, nodes: ['cloud'] })),
+        paths: [{ id: 'happy', steps: ['quiet', 'persist'] }, { id: 'failed', steps: ['failure'] }],
+        layouts: [{ id: 'business', name: 'Business', steps: ['persist'],
+          sectionLayout: { default: [{ x: 0, y: 0, w: 12, h: 12 }] } }],
+        defaultLayout: 'business',
+      },
+    }],
+  };
+}
+function boot(target: unknown, page = spec()) {
   document.body.innerHTML =
     '<div id="viewer-error" hidden></div><div id="docview"><p>Valid diagram</p></div>';
   const stepper = {
@@ -41,23 +59,20 @@ function boot(target: unknown) {
   vi.stubGlobal('applySkinClasses', () => {});
   vi.stubGlobal('FlowCanon', { http: () => null });
   vi.stubGlobal('renderPage', () => controller);
-  vi.stubGlobal('blocksOf', () => [
-    {
-      type: 'section',
-      sec: {
-        diagram: {
-          steps: [{ id: 'quiet' }, { id: 'persist' }, { id: 'failure' }],
-        },
-      },
-    },
-  ]);
-  vi.stubGlobal('stepIndexOf', (ids: string[], id: string) => ids.indexOf(id));
+  // This copied-plugin unit test supplies the core contract. The repository's
+  // canon-entities suite covers real index -> core -> frame integration.
+  vi.stubGlobal('sectionRecords', () => [{ reference: 'recording', section: page.sections[0] }]);
+  vi.stubGlobal('resolveSourceStep', (_source: unknown, pathId: string, stepRef: string) => {
+    const path = stepper.paths().find(p => p.id === pathId);
+    const indices: Record<string, number> = { quiet: 0, persist: 1, failure: 2 };
+    return path ? { path, sourceIndex: indices[stepRef] ?? -1 } : null;
+  });
   const port = { postMessage: vi.fn(), onmessage: null, close: vi.fn() };
   window.eval(readFileSync('viewer/frame.js', 'utf8'));
   window.dispatchEvent(
     new MessageEvent('message', {
       source: window,
-      data: { type: 'flowview:init', spec: { skin: 'pastel' }, target },
+      data: { type: 'flowview:init', spec: page, target },
       ports: [port as unknown as MessagePort],
     })
   );
@@ -97,3 +112,12 @@ it.each([
     ).toBe(false);
   }
 );
+it('keeps the recoverable refusal for a path-only request with no visible steps', () => {
+  const { stepper, port } = boot({ section: 'recording', path: 'failed' });
+  expect(stepper.selectPath).toHaveBeenCalledWith('failed');
+  expect(stepper.jumpSource).not.toHaveBeenCalled();
+  expect(port.postMessage).toHaveBeenCalledWith({
+    type: 'navigation-error',
+    message: expect.stringContaining('no visible steps'),
+  });
+});

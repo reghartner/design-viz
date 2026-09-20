@@ -2,12 +2,16 @@
   "validator.js": [
     "panels/registry.js",
     "validator.js",
+    "core/navigation.js",
+    "core/document.js",
+    "core/paths.js",
+    "core/section-layout.js",
+    "core/state.js",
     "core/geometry.js",
     "panels/shared.js",
     "panels/types/*.js"
   ],
   "engine.js": [
-    "core/navigation.js",
     "engine.js"
   ]
 }

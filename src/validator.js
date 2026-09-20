@@ -1,4 +1,4 @@
-/* validator.js — constants, helpers, normalize/validate, panel-state folding.
+/* validator.js — shared constants, validation rules and advisory lint.
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
    IIFE. Contains no DOM access, so tests load it under Node via vm. */
 
@@ -44,38 +44,6 @@ function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function isFiniteNum(v){ return typeof v === 'number' && isFinite(v); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function isHex(s){ return typeof s === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(s); }
-function stepKeys(st){
-  if (!st) return [];
-  if (Array.isArray(st.edges)) return st.edges;
-  if (st.edge) return [st.edge];
-  return [];
-}
-var COMM_FAILURE_MODES = ['dropped','blocked'];
-function stepFailures(st){
-  var raw = st && st.failures, out = Object.create(null);
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) Object.keys(raw).forEach(function(key){
-    if (COMM_FAILURE_MODES.indexOf(raw[key]) >= 0) out[key] = raw[key];
-  });
-  return out;
-}
-function stepDeliveredKeys(st){
-  var failures = stepFailures(st);
-  return stepKeys(st).filter(function(key){return !Object.prototype.hasOwnProperty.call(failures,key);});
-}
-function stepNodes(st){
-  return (st && Array.isArray(st.nodes)) ? st.nodes : [];
-}
-function stepPanelPatch(st){
-  if (!st) return null;
-  if (st.panels && typeof st.panels === 'object' && !Array.isArray(st.panels)) return st.panels;
-  if (st.patch && typeof st.patch === 'object' && !Array.isArray(st.patch)) return st.patch;
-  return null;
-}
-function stepTonePatch(st){
-  if (!st || !st.tone || typeof st.tone !== 'object' || Array.isArray(st.tone)) return null;
-  return st.tone;
-}
-
 function resolveProtocols(page){
   var out = {};
   Object.keys(BUILTIN_PROTOCOLS).forEach(function(k){ out[k] = BUILTIN_PROTOCOLS[k]; });
@@ -136,40 +104,6 @@ function bulletRevealWarnings(items, path, stepCount, warnings){
   });
 }
 
-/* Paths reference a shared step registry. Folding always receives just the
-   selected sequence, so another outcome cannot leak state into this one. */
-function diagramPathList(d){
-  var steps = Array.isArray(d.steps) ? d.steps : [], byId = new Map();
-  steps.forEach(function(s,i){ if (s && typeof s.id === 'string') byId.set(s.id,i); });
-  var colors = ['#38bdf8','#fb923c','#c084fc','#f472b6','#4ade80'];
-  var paths = Array.isArray(d.paths) ? d.paths.filter(function(p){
-    return p && typeof p.id === 'string' && p.id && Array.isArray(p.steps) && p.steps.length &&
-      p.steps.every(function(id){ return byId.has(id); });
-  }).map(function(p,i){
-    return {id:p.id, label:p.label || (i ? p.id : 'Happy path'), color:isHex(p.color) ? p.color : colors[i % colors.length],
-      indices:p.steps.map(function(id){ return byId.get(id); })};
-  }) : [];
-  return paths.length ? paths : [{id:'happy',label:'Happy path',color:colors[0],indices:steps.map(function(s,i){return i;})}];
-}
-function diagramForPath(d, id){
-  var paths = diagramPathList(d), path = paths.find(function(p){ return p.id === id; }) || paths[0];
-  return Object.assign({}, d, {steps:path.indices.map(function(i){ return d.steps[i]; }),
-    _sourceIndices:path.indices, _pathId:path.id});
-}
-/* Color a branch starting at its first differing step; every common-prefix
-   beat stays shared. A wholly shared path has start > end. Compare earlier
-   declarations so nested alternatives keep stable rows too. */
-function pathStepRows(paths){
-  return paths.map(function(path,i){
-    var shared = 0;
-    paths.slice(0,i).forEach(function(prior){
-      var n = 0;
-      while (n < path.indices.length && n < prior.indices.length && path.indices[n] === prior.indices[n]) n++;
-      shared = Math.max(shared,n);
-    });
-    return {path:path, start:i ? shared : 0, end:path.indices.length - 1};
-  });
-}
 function validatePaths(d, path, errors){
   if (d.paths == null) return;
   if (!Array.isArray(d.paths) || !d.paths.length){ errors.push(path + '.paths: expected a nonempty array of paths'); return; }
@@ -194,112 +128,6 @@ function validatePaths(d, path, errors){
   });
 }
 
-/* Section composition uses a bounded twelve-column grid. Missing/new panels
-   are appended; collisions push later tiles down instead of hiding content. */
-function sectionLayoutKey(item){
-  if(item && item.panel!=null)return typeof item.panel==='string'?'panel:'+item.panel:'invalid-panel';
-  return item && item.controls!=null ? (item.controls==='steps'?'steps':'invalid-controls') : 'diagram';
-}
-function sectionLayoutTiles(d){
-  var tiles=[{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
-    return {key:'panel:' + p.id,panel:p.id,type:p.type,title:p.title || p.id};
-  }));
-  if(Array.isArray(d.steps) && d.steps.length && d.view!=='ambient-only')tiles.push({key:'steps',controls:'steps',title:'Step controls'});
-  return tiles;
-}
-function sectionLayoutPack(items, priority){
-  var dock=sectionLayoutDock(items);
-  var placed = [], order = items.map(function(it){return Object.assign({},it);});
-  if (priority) order.sort(function(a,b){return (sectionLayoutKey(a) === priority ? -1 : 0) - (sectionLayoutKey(b) === priority ? -1 : 0);});
-  order.forEach(function(it){
-    function overlaps(p){return it.x < p.x+p.w && it.x+it.w > p.x && it.y < p.y+p.h && it.y+it.h > p.y;}
-    var hits;
-    while (!it.hidden && !(dock && it.controls==='steps') && (hits = placed.filter(function(p){return !p.hidden && !(dock && p.controls==='steps') && overlaps(p);})).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
-    placed.push(it);
-  });
-  return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
-}
-/* A docked transport shares its host's geometry. Its saved standalone position
-   is retained for detaching, or used as a fallback if that host is hidden. */
-function sectionLayoutDock(items){
-  var steps=items.find(function(it){return it.controls==='steps';});
-  return steps && typeof steps.attachTo==='string' && items.some(function(it){return sectionLayoutKey(it)===steps.attachTo && !it.hidden && !it.controls;}) ? steps.attachTo : null;
-}
-function sectionLayoutControlsRows(d,items){
-  var steps=(items || []).find(function(it){return it.controls==='steps';});
-  return steps?steps.h:(d.paths || []).length>1?6:4;
-}
-function sectionLayoutPreset(d, target, excludedKeys){
-  var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
-  var tiles=sectionLayoutTiles(d).filter(function(t){return excluded.indexOf(t.key)<0;}), narrow=target==='confluence', items=[];
-  var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
-  var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
-  var controls=tiles.find(function(t){return t.key==='steps';});
-  if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
-  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && panelCapability(t.type,'supporting',true);});
-  ordered.forEach(function(t){
-    var panelLarge=panelCapability(t.type,'large',false), large=t.key==='diagram'||t.key==='steps'||panelLarge||t===main;
-    var w=large?(narrow||!supporting?12:8):(narrow?6:4);
-    var h=t.key==='steps'?((d.paths || []).length>1?6:4):panelLarge?panelCapability(t.type,'height',12):large?12:panelCapability(t.type,'height',6);
-    var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
-      var it={x:x,y:0,w:w,h:h}, hits;
-      while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
-        it.y=Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
-      return it;
-    });
-    candidates.sort(function(a,b){return a.y-b.y||a.x-b.x;});
-    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;if(t.controls)item.controls=t.controls;items.push(item);
-  });
-  return items;
-}
-function diagramLayoutViews(d){
-  var used=Object.create(null), views=[];
-  (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
-    if(!v || typeof v.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v.id) || used[v.id] ||
-      typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
-      !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
-      !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
-  });
-  if(views.length)return views;
-  return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
-    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',sectionLayout:d.sectionLayout,legacy:true}] : [];
-}
-function sectionLayoutDefinition(d, id){
-  var views=diagramLayoutViews(d);
-  return views.find(function(v){return v.id===id;}) || views.find(function(v){return v.id===d.defaultLayout;}) || views[0];
-}
-function sectionViewStepsReachable(d,ids){
-  return diagramPathList(d).some(function(p){return p.indices.some(function(i){return ids.indexOf(d.steps[i].id)>=0;});});
-}
-function sectionLayoutItems(d, target, id){
-  var definition=sectionLayoutDefinition(d,id), layouts = definition && definition.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
-  if (!Array.isArray(saved)) return definition && !definition.legacy ? sectionLayoutPreset(d,target) : null;
-  var items = [], used = Object.create(null);
-  saved.forEach(function(it){
-    if (!it || typeof it !== 'object') return;
-    if(it.controls!=null && (it.controls!=='steps'||it.panel!=null))return;
-    var key = sectionLayoutKey(it);
-    if (used[key] || !tiles.some(function(t){return t.key === key;})) return;
-    if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
-    var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
-    if (it.panel != null) copy.panel=it.panel;
-    if (it.controls==='steps'){
-      copy.controls='steps';
-      if(it.attachTo==='diagram' || tiles.some(function(t){return t.key===it.attachTo && panelCapability(t.type,'attachControls',false);}))copy.attachTo=it.attachTo;
-    }
-    if(it.hidden===true && it.controls==null)copy.hidden=true;
-    used[key]=true;items.push(copy);
-  });
-  var y = items.reduce(function(n,it){return it.hidden?n:Math.max(n,it.y+it.h);},0);
-  tiles.forEach(function(t){
-    if (used[t.key] || t.key==='steps') return; /* Old layouts keep controls attached. */
-    var item={x:0,y:y,w:12,h:t.key==='diagram'?12:panelCapability(t.type,'fallbackHeight',6)};
-    if(t.panel != null)item.panel=t.panel;
-    items.push(item);y+=item.h;
-  });
-  return sectionLayoutPack(items);
-}
 function sectionLayoutProfileWarnings(d, v, path, warnings){
   if(v == null)return;
   if(typeof v!=='object'||Array.isArray(v)){warnings.push(path+'.sectionLayout: expected default/backstage/confluence grid layouts');return;}
@@ -344,18 +172,6 @@ function sectionLayoutWarnings(d, path, warnings){
   if(d.defaultLayout!=null && !(Array.isArray(d.layouts) && diagramLayoutViews(d).some(function(v){return !v.legacy && v.id===d.defaultLayout;})))
     warnings.push(path+'.defaultLayout: name an existing layout ID');
 }
-function normalize(raw){
-  if (!specObject(raw)) return null;
-  if (Object.prototype.hasOwnProperty.call(raw, 'page')) return raw.page;
-  if (Object.prototype.hasOwnProperty.call(raw, 'blocks') || Object.prototype.hasOwnProperty.call(raw, 'sections')) return raw;
-  if (Object.prototype.hasOwnProperty.call(raw, 'nodes') && Object.prototype.hasOwnProperty.call(raw, 'rows')) return {title:'', sections:[{diagram: raw}]};
-  return null;
-}
-
-function specObject(value){
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
 /* Establish only the containers used by dependent traversal. Never repair or
    replace authored values: the editor must retain the exact failing source.
    Optional null diagram fields still mean absent; panel-specific shapes and
@@ -398,26 +214,6 @@ function specStructureErrors(page){
     });
   });
   return errors;
-}
-
-function blocksOf(page){
-  if (!specObject(page)) return [];
-  var raw = page.blocks || page.sections || [];
-  var pfx = page.blocks ? 'blocks' : 'sections';
-  var out = [];
-  (Array.isArray(raw) ? raw : []).forEach(function(b, i){
-    if (b && Array.isArray(b.tabs)){
-      out.push({type:'tabs', path:pfx + '[' + i + ']', tabs:b.tabs.map(function(t, j){
-        return {label:(t && t.label) || ('Tab ' + (j + 1)),
-                highlight:(t && t.highlight != null) ? t.highlight : undefined,
-                sections:(t && Array.isArray(t.sections)) ? t.sections : [],
-                path:pfx + '[' + i + '].tabs[' + j + ']'};
-      })});
-    } else {
-      out.push({type:'section', sec:b, path:pfx + '[' + i + ']'});
-    }
-  });
-  return out;
 }
 
 function validateSection(sec, P, protos, lanes, errors, warnings){
@@ -679,55 +475,6 @@ function validate(page){
     }
   });
   return {errors:errors, warnings:warnings};
-}
-
-/* ---------------- node-tone folding ----------------
-   Like panel patches, node tones are sparse authoring deltas folded into
-   absolute per-step snapshots. Unknown ids/tokens are ignored here (the
-   validator warns); `base` and null delete the carried tone. */
-function foldNodeTones(d){
-  d = d || {};
-  var nodes = d.nodes || {};
-  var steps = Array.isArray(d.steps) ? d.steps : [];
-  var carried = {}, states = [];
-  steps.forEach(function(st){
-    var patch = stepTonePatch(st);
-    if (patch) Object.keys(patch).forEach(function(id){
-      if (!Object.prototype.hasOwnProperty.call(nodes, id)) return;
-      var tone = patch[id];
-      if (tone === null || tone === 'base'){
-        delete carried[id];
-      } else if (TONE_SET.indexOf(tone) >= 0 && tone !== 'base'){
-        carried[id] = tone;
-      }
-    });
-    var snap = {};
-    Object.keys(carried).forEach(function(id){ snap[id] = carried[id]; });
-    states.push(snap);
-  });
-  if (!steps.length) states.push({});
-  return states;
-}
-
-/* ---------------- panel-state folding ----------------
-   Authors emit sparse per-step patches; we fold them into COMPLETE state per
-   step at load time, so any step jump renders from absolute state, never
-   deltas. Rules:
-   - state N = shallow merge of state N-1 and step N's patch for that panel;
-   - a "log" patch key APPENDS (cumulative array of lines);
-   - an "enterOnce" sub-object applies only at its own step (not carried). */
-
-function foldPanelStates(d){
-  var panels = d.panels || [];
-  var steps = d.steps || [];
-  var out = {};
-  panels.forEach(function(panel){
-    if (!panel || !panel.id) return;
-    var descriptor = PanelRegistry.get(panel.type);
-    var fold = descriptor && descriptor.fold || foldCommonPanelStates;
-    out[panel.id] = fold(panel, steps);
-  });
-  return out;
 }
 
 /* ---------------- lint (advisory warnings, never errors) ----------------

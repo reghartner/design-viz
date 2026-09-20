@@ -388,7 +388,7 @@ function panelRemapReferences(panel, kind, mapping, exists) {
   return panel;
 }
 /* ---- src/validator.js ---- */
-/* validator.js — constants, helpers, normalize/validate, panel-state folding.
+/* validator.js — shared constants, validation rules and advisory lint.
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
    IIFE. Contains no DOM access, so tests load it under Node via vm. */
 
@@ -434,38 +434,6 @@ function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function isFiniteNum(v){ return typeof v === 'number' && isFinite(v); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function isHex(s){ return typeof s === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(s); }
-function stepKeys(st){
-  if (!st) return [];
-  if (Array.isArray(st.edges)) return st.edges;
-  if (st.edge) return [st.edge];
-  return [];
-}
-var COMM_FAILURE_MODES = ['dropped','blocked'];
-function stepFailures(st){
-  var raw = st && st.failures, out = Object.create(null);
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) Object.keys(raw).forEach(function(key){
-    if (COMM_FAILURE_MODES.indexOf(raw[key]) >= 0) out[key] = raw[key];
-  });
-  return out;
-}
-function stepDeliveredKeys(st){
-  var failures = stepFailures(st);
-  return stepKeys(st).filter(function(key){return !Object.prototype.hasOwnProperty.call(failures,key);});
-}
-function stepNodes(st){
-  return (st && Array.isArray(st.nodes)) ? st.nodes : [];
-}
-function stepPanelPatch(st){
-  if (!st) return null;
-  if (st.panels && typeof st.panels === 'object' && !Array.isArray(st.panels)) return st.panels;
-  if (st.patch && typeof st.patch === 'object' && !Array.isArray(st.patch)) return st.patch;
-  return null;
-}
-function stepTonePatch(st){
-  if (!st || !st.tone || typeof st.tone !== 'object' || Array.isArray(st.tone)) return null;
-  return st.tone;
-}
-
 function resolveProtocols(page){
   var out = {};
   Object.keys(BUILTIN_PROTOCOLS).forEach(function(k){ out[k] = BUILTIN_PROTOCOLS[k]; });
@@ -526,40 +494,6 @@ function bulletRevealWarnings(items, path, stepCount, warnings){
   });
 }
 
-/* Paths reference a shared step registry. Folding always receives just the
-   selected sequence, so another outcome cannot leak state into this one. */
-function diagramPathList(d){
-  var steps = Array.isArray(d.steps) ? d.steps : [], byId = new Map();
-  steps.forEach(function(s,i){ if (s && typeof s.id === 'string') byId.set(s.id,i); });
-  var colors = ['#38bdf8','#fb923c','#c084fc','#f472b6','#4ade80'];
-  var paths = Array.isArray(d.paths) ? d.paths.filter(function(p){
-    return p && typeof p.id === 'string' && p.id && Array.isArray(p.steps) && p.steps.length &&
-      p.steps.every(function(id){ return byId.has(id); });
-  }).map(function(p,i){
-    return {id:p.id, label:p.label || (i ? p.id : 'Happy path'), color:isHex(p.color) ? p.color : colors[i % colors.length],
-      indices:p.steps.map(function(id){ return byId.get(id); })};
-  }) : [];
-  return paths.length ? paths : [{id:'happy',label:'Happy path',color:colors[0],indices:steps.map(function(s,i){return i;})}];
-}
-function diagramForPath(d, id){
-  var paths = diagramPathList(d), path = paths.find(function(p){ return p.id === id; }) || paths[0];
-  return Object.assign({}, d, {steps:path.indices.map(function(i){ return d.steps[i]; }),
-    _sourceIndices:path.indices, _pathId:path.id});
-}
-/* Color a branch starting at its first differing step; every common-prefix
-   beat stays shared. A wholly shared path has start > end. Compare earlier
-   declarations so nested alternatives keep stable rows too. */
-function pathStepRows(paths){
-  return paths.map(function(path,i){
-    var shared = 0;
-    paths.slice(0,i).forEach(function(prior){
-      var n = 0;
-      while (n < path.indices.length && n < prior.indices.length && path.indices[n] === prior.indices[n]) n++;
-      shared = Math.max(shared,n);
-    });
-    return {path:path, start:i ? shared : 0, end:path.indices.length - 1};
-  });
-}
 function validatePaths(d, path, errors){
   if (d.paths == null) return;
   if (!Array.isArray(d.paths) || !d.paths.length){ errors.push(path + '.paths: expected a nonempty array of paths'); return; }
@@ -584,112 +518,6 @@ function validatePaths(d, path, errors){
   });
 }
 
-/* Section composition uses a bounded twelve-column grid. Missing/new panels
-   are appended; collisions push later tiles down instead of hiding content. */
-function sectionLayoutKey(item){
-  if(item && item.panel!=null)return typeof item.panel==='string'?'panel:'+item.panel:'invalid-panel';
-  return item && item.controls!=null ? (item.controls==='steps'?'steps':'invalid-controls') : 'diagram';
-}
-function sectionLayoutTiles(d){
-  var tiles=[{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
-    return {key:'panel:' + p.id,panel:p.id,type:p.type,title:p.title || p.id};
-  }));
-  if(Array.isArray(d.steps) && d.steps.length && d.view!=='ambient-only')tiles.push({key:'steps',controls:'steps',title:'Step controls'});
-  return tiles;
-}
-function sectionLayoutPack(items, priority){
-  var dock=sectionLayoutDock(items);
-  var placed = [], order = items.map(function(it){return Object.assign({},it);});
-  if (priority) order.sort(function(a,b){return (sectionLayoutKey(a) === priority ? -1 : 0) - (sectionLayoutKey(b) === priority ? -1 : 0);});
-  order.forEach(function(it){
-    function overlaps(p){return it.x < p.x+p.w && it.x+it.w > p.x && it.y < p.y+p.h && it.y+it.h > p.y;}
-    var hits;
-    while (!it.hidden && !(dock && it.controls==='steps') && (hits = placed.filter(function(p){return !p.hidden && !(dock && p.controls==='steps') && overlaps(p);})).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
-    placed.push(it);
-  });
-  return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
-}
-/* A docked transport shares its host's geometry. Its saved standalone position
-   is retained for detaching, or used as a fallback if that host is hidden. */
-function sectionLayoutDock(items){
-  var steps=items.find(function(it){return it.controls==='steps';});
-  return steps && typeof steps.attachTo==='string' && items.some(function(it){return sectionLayoutKey(it)===steps.attachTo && !it.hidden && !it.controls;}) ? steps.attachTo : null;
-}
-function sectionLayoutControlsRows(d,items){
-  var steps=(items || []).find(function(it){return it.controls==='steps';});
-  return steps?steps.h:(d.paths || []).length>1?6:4;
-}
-function sectionLayoutPreset(d, target, excludedKeys){
-  var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
-  var tiles=sectionLayoutTiles(d).filter(function(t){return excluded.indexOf(t.key)<0;}), narrow=target==='confluence', items=[];
-  var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
-  var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
-  var controls=tiles.find(function(t){return t.key==='steps';});
-  if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
-  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && panelCapability(t.type,'supporting',true);});
-  ordered.forEach(function(t){
-    var panelLarge=panelCapability(t.type,'large',false), large=t.key==='diagram'||t.key==='steps'||panelLarge||t===main;
-    var w=large?(narrow||!supporting?12:8):(narrow?6:4);
-    var h=t.key==='steps'?((d.paths || []).length>1?6:4):panelLarge?panelCapability(t.type,'height',12):large?12:panelCapability(t.type,'height',6);
-    var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
-      var it={x:x,y:0,w:w,h:h}, hits;
-      while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
-        it.y=Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
-      return it;
-    });
-    candidates.sort(function(a,b){return a.y-b.y||a.x-b.x;});
-    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;if(t.controls)item.controls=t.controls;items.push(item);
-  });
-  return items;
-}
-function diagramLayoutViews(d){
-  var used=Object.create(null), views=[];
-  (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
-    if(!v || typeof v.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v.id) || used[v.id] ||
-      typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
-      !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
-      !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
-  });
-  if(views.length)return views;
-  return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
-    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',sectionLayout:d.sectionLayout,legacy:true}] : [];
-}
-function sectionLayoutDefinition(d, id){
-  var views=diagramLayoutViews(d);
-  return views.find(function(v){return v.id===id;}) || views.find(function(v){return v.id===d.defaultLayout;}) || views[0];
-}
-function sectionViewStepsReachable(d,ids){
-  return diagramPathList(d).some(function(p){return p.indices.some(function(i){return ids.indexOf(d.steps[i].id)>=0;});});
-}
-function sectionLayoutItems(d, target, id){
-  var definition=sectionLayoutDefinition(d,id), layouts = definition && definition.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
-  if (!Array.isArray(saved)) return definition && !definition.legacy ? sectionLayoutPreset(d,target) : null;
-  var items = [], used = Object.create(null);
-  saved.forEach(function(it){
-    if (!it || typeof it !== 'object') return;
-    if(it.controls!=null && (it.controls!=='steps'||it.panel!=null))return;
-    var key = sectionLayoutKey(it);
-    if (used[key] || !tiles.some(function(t){return t.key === key;})) return;
-    if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
-    var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
-    if (it.panel != null) copy.panel=it.panel;
-    if (it.controls==='steps'){
-      copy.controls='steps';
-      if(it.attachTo==='diagram' || tiles.some(function(t){return t.key===it.attachTo && panelCapability(t.type,'attachControls',false);}))copy.attachTo=it.attachTo;
-    }
-    if(it.hidden===true && it.controls==null)copy.hidden=true;
-    used[key]=true;items.push(copy);
-  });
-  var y = items.reduce(function(n,it){return it.hidden?n:Math.max(n,it.y+it.h);},0);
-  tiles.forEach(function(t){
-    if (used[t.key] || t.key==='steps') return; /* Old layouts keep controls attached. */
-    var item={x:0,y:y,w:12,h:t.key==='diagram'?12:panelCapability(t.type,'fallbackHeight',6)};
-    if(t.panel != null)item.panel=t.panel;
-    items.push(item);y+=item.h;
-  });
-  return sectionLayoutPack(items);
-}
 function sectionLayoutProfileWarnings(d, v, path, warnings){
   if(v == null)return;
   if(typeof v!=='object'||Array.isArray(v)){warnings.push(path+'.sectionLayout: expected default/backstage/confluence grid layouts');return;}
@@ -734,18 +562,6 @@ function sectionLayoutWarnings(d, path, warnings){
   if(d.defaultLayout!=null && !(Array.isArray(d.layouts) && diagramLayoutViews(d).some(function(v){return !v.legacy && v.id===d.defaultLayout;})))
     warnings.push(path+'.defaultLayout: name an existing layout ID');
 }
-function normalize(raw){
-  if (!specObject(raw)) return null;
-  if (Object.prototype.hasOwnProperty.call(raw, 'page')) return raw.page;
-  if (Object.prototype.hasOwnProperty.call(raw, 'blocks') || Object.prototype.hasOwnProperty.call(raw, 'sections')) return raw;
-  if (Object.prototype.hasOwnProperty.call(raw, 'nodes') && Object.prototype.hasOwnProperty.call(raw, 'rows')) return {title:'', sections:[{diagram: raw}]};
-  return null;
-}
-
-function specObject(value){
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
 /* Establish only the containers used by dependent traversal. Never repair or
    replace authored values: the editor must retain the exact failing source.
    Optional null diagram fields still mean absent; panel-specific shapes and
@@ -788,26 +604,6 @@ function specStructureErrors(page){
     });
   });
   return errors;
-}
-
-function blocksOf(page){
-  if (!specObject(page)) return [];
-  var raw = page.blocks || page.sections || [];
-  var pfx = page.blocks ? 'blocks' : 'sections';
-  var out = [];
-  (Array.isArray(raw) ? raw : []).forEach(function(b, i){
-    if (b && Array.isArray(b.tabs)){
-      out.push({type:'tabs', path:pfx + '[' + i + ']', tabs:b.tabs.map(function(t, j){
-        return {label:(t && t.label) || ('Tab ' + (j + 1)),
-                highlight:(t && t.highlight != null) ? t.highlight : undefined,
-                sections:(t && Array.isArray(t.sections)) ? t.sections : [],
-                path:pfx + '[' + i + '].tabs[' + j + ']'};
-      })});
-    } else {
-      out.push({type:'section', sec:b, path:pfx + '[' + i + ']'});
-    }
-  });
-  return out;
 }
 
 function validateSection(sec, P, protos, lanes, errors, warnings){
@@ -1071,55 +867,6 @@ function validate(page){
   return {errors:errors, warnings:warnings};
 }
 
-/* ---------------- node-tone folding ----------------
-   Like panel patches, node tones are sparse authoring deltas folded into
-   absolute per-step snapshots. Unknown ids/tokens are ignored here (the
-   validator warns); `base` and null delete the carried tone. */
-function foldNodeTones(d){
-  d = d || {};
-  var nodes = d.nodes || {};
-  var steps = Array.isArray(d.steps) ? d.steps : [];
-  var carried = {}, states = [];
-  steps.forEach(function(st){
-    var patch = stepTonePatch(st);
-    if (patch) Object.keys(patch).forEach(function(id){
-      if (!Object.prototype.hasOwnProperty.call(nodes, id)) return;
-      var tone = patch[id];
-      if (tone === null || tone === 'base'){
-        delete carried[id];
-      } else if (TONE_SET.indexOf(tone) >= 0 && tone !== 'base'){
-        carried[id] = tone;
-      }
-    });
-    var snap = {};
-    Object.keys(carried).forEach(function(id){ snap[id] = carried[id]; });
-    states.push(snap);
-  });
-  if (!steps.length) states.push({});
-  return states;
-}
-
-/* ---------------- panel-state folding ----------------
-   Authors emit sparse per-step patches; we fold them into COMPLETE state per
-   step at load time, so any step jump renders from absolute state, never
-   deltas. Rules:
-   - state N = shallow merge of state N-1 and step N's patch for that panel;
-   - a "log" patch key APPENDS (cumulative array of lines);
-   - an "enterOnce" sub-object applies only at its own step (not carried). */
-
-function foldPanelStates(d){
-  var panels = d.panels || [];
-  var steps = d.steps || [];
-  var out = {};
-  panels.forEach(function(panel){
-    if (!panel || !panel.id) return;
-    var descriptor = PanelRegistry.get(panel.type);
-    var fold = descriptor && descriptor.fold || foldCommonPanelStates;
-    out[panel.id] = fold(panel, steps);
-  });
-  return out;
-}
-
 /* ---------------- lint (advisory warnings, never errors) ----------------
    Layout-aware heuristics for spec authors who cannot see the render — an
    authoring agent gets these from tools/validate.js before any browser is
@@ -1205,6 +952,523 @@ function lintPage(page){
       warnings.push('page.protocols.' + k + ': declared but no edge uses kind "' + k + '" — remove it or use it');
   });
   return warnings;
+}
+/* ---- src/core/navigation.js ---- */
+/* Pure document references and hash navigation. No viewer initialization;
+   only link-base canonicalization needs the standard URL constructor. */
+
+/* ---------------- deep-link hash (C2/E3, pure core) ---------------- */
+function slugify(s){
+  var out = String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return out || 'tab';
+}
+function sectionSlugify(s){
+  var out = String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!out) out = 'section';
+  /* Purely numeric slugs would be indistinguishable from the accepted legacy
+     rendered-section index, so keep the two namespaces disjoint. */
+  if (/^\d+$/.test(out)) out = 'section-' + out;
+  return out;
+}
+function sectionReferences(headings){
+  var used = {};
+  return (Array.isArray(headings) ? headings : []).map(function(heading, index){
+    /* Heading-less sections retain their rendered index as the canonical
+       fallback. Heading references are unique document-wide. */
+    if (typeof heading !== 'string' || !heading.trim()){
+      var positional = String(index + 1);
+      used[positional] = true;
+      return positional;
+    }
+    var base = sectionSlugify(heading), ref = base, suffix = 2;
+    while (used[ref]) ref = base + '-' + suffix++;
+    used[ref] = true;
+    return ref;
+  });
+}
+function parseHash(h){
+  var kv = {};
+  String(h || '').replace(/^#/, '').split('&').forEach(function(part){
+    var i = part.indexOf('=');
+    if (i > 0){
+      try { kv[decodeURIComponent(part.slice(0, i))] = decodeURIComponent(part.slice(i + 1)); }
+      catch (ex) { /* malformed escape: ignore that pair */ }
+    }
+  });
+  var result = {b: kv.b != null ? kv.b : null,
+          t: kv.t != null ? kv.t : null,
+          d: kv.d != null ? kv.d : null,
+          c: kv.c != null ? kv.c : null,
+          r: kv.r != null ? kv.r : null,
+          s: kv.s != null ? kv.s : null,
+          x: kv.x != null ? kv.x : null,
+          e: kv.e != null ? kv.e : null,
+          m: (kv.m === 'step' || kv.m === 'ambient') ? kv.m : null};
+  if (kv.p != null) result.p = kv.p;
+  return result;
+}
+function encodeSectionRefList(value){
+  return String(value == null ? '' : value).split(',').map(function(ref){
+    return encodeURIComponent(ref);
+  }).join(',');
+}
+function buildHash(st){
+  var parts = [];
+  if (st && st.b != null) parts.push('b=' + encodeURIComponent(st.b));
+  if (st && st.t != null) parts.push('t=' + encodeURIComponent(st.t));
+  if (st && st.d != null) parts.push('d=' + encodeURIComponent(st.d));
+  if (st && st.m) parts.push('m=' + st.m);
+  if (st && st.p != null) parts.push('p=' + encodeURIComponent(st.p));
+  if (st && st.s != null) parts.push('s=' + encodeURIComponent(st.s));
+  if (st && st.c != null) parts.push('c=' + encodeURIComponent(st.c));
+  if (st && st.r != null) parts.push('r=' + encodeURIComponent(st.r));
+  if (st && st.x != null) parts.push('x=' + encodeSectionRefList(st.x));
+  if (st && st.e != null) parts.push('e=' + encodeSectionRefList(st.e));
+  return parts.length ? '#' + parts.join('&') : '';
+}
+function canonicalLinkBase(base){
+  if (typeof base !== 'string' || /[\s"]/.test(base)) return null;
+  try {
+    var parsed = new URL(base);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    var href = parsed.href;
+    /* Keep the serialized value safe to embed in copied text even if URL
+       parsing behavior changes or a non-special URL slips through later. */
+    return /[\s"]/.test(href) ? null : href;
+  } catch (ex) { return null; }
+}
+function isValidLinkBase(base){
+  return canonicalLinkBase(base) !== null;
+}
+function composeLinkURL(base, hash){
+  var params = String(hash || '').replace(/^#/, '');
+  if (!params) return base;
+  var tail = base.charAt(base.length - 1);
+  return base + (tail === '&' || tail === '#' ? '' :
+    (base.indexOf('#') >= 0 ? '&' : '#')) + params;
+}
+function oneBasedIndex(ref, count){
+  if (ref == null || !/^\d+$/.test(String(ref))) return -1;
+  var n = parseInt(String(ref), 10) - 1;
+  return n >= 0 && n < count ? n : -1;
+}
+function tabIndexOf(ref, slugs, count){
+  if (ref == null) return -1;
+  var n = slugs.indexOf(String(ref));
+  return n >= 0 ? n : oneBasedIndex(ref, count);
+}
+function tabReference(slugs, index){
+  var slug = slugs[index];
+  if (slug != null && slugs.indexOf(slug) === index) return slug;
+  var ref = String(index + 1);
+  while (slugs.indexOf(ref) >= 0) ref = '0' + ref;
+  return ref;
+}
+function stepIndexOf(stepIds, ref){
+  if (ref == null) return -1;
+  var str = String(ref);
+  for (var i = 0; i < stepIds.length; i++) if (stepIds[i] === str) return i;
+  return oneBasedIndex(str, stepIds.length);
+}
+function stepReference(stepIds, index){
+  var id = stepIds[index];
+  if (typeof id === 'string' && id && stepIds.indexOf(id) === index &&
+      stepIds.lastIndexOf(id) === index) return id;
+  var ref = String(index + 1);
+  while (stepIds.indexOf(ref) >= 0) ref = '0' + ref;
+  return ref;
+}
+
+/* Resolve a parsed fragment against a DOM-free page manifest. Canonical links
+   use the unique heading-derived section reference for d/c, falling back to a
+   rendered section number only when the section has no heading. Numeric d/c
+   references remain accepted as legacy rendered indices. Direct diagram and
+   contract targets are resolved independently so their state can compose. */
+function resolveHashTarget(st, manifest){
+  st = st || {};
+  manifest = manifest || {};
+  var tabs = Array.isArray(manifest.tabBlocks) ? manifest.tabBlocks : [];
+  var sections = Array.isArray(manifest.sections) ? manifest.sections : [];
+  function sectionAt(ref){
+    if (ref == null) return null;
+    var key = String(ref), i;
+    for (i = 0; i < sections.length; i++)
+      if (sections[i].reference != null && String(sections[i].reference) === key)
+        return sections[i];
+    var n = oneBasedIndex(key, sections.length);
+    if (n < 0) return null;
+    for (i = 0; i < sections.length; i++)
+      if (sections[i].number === n + 1) return sections[i];
+    return null;
+  }
+  function route(sec, out){
+    if (sec && sec.tabBlock != null){
+      out.tabBlock = sec.tabBlock;
+      out.tab = sec.tab;
+    }
+    return out;
+  }
+  function diagram(sec, legacy){
+    if (!sec || !Array.isArray(sec.stepIds)) return {kind:'invalid'};
+    var mode = (st.m === 'step' || st.s != null) ? 'step' :
+               (st.m === 'ambient' ? 'ambient' : null);
+    var step = mode === 'step' ? (st.s != null ? stepIndexOf(sec.stepIds, st.s) : 0) : null;
+    return route(sec, {kind:'diagram', section:sec.number, mode:mode,
+                       step:step, legacy:!!legacy, tabBlock:null, tab:null});
+  }
+
+  var block = null, blockIndex = st.b != null ? oneBasedIndex(st.b, tabs.length) :
+                   (tabs.length ? 0 : -1);
+  if (blockIndex >= 0) block = tabs[blockIndex];
+  var ti = block ? tabIndexOf(st.t, block.slugs || [], block.count || 0) : -1;
+  if (st.t != null && (!block || ti < 0)) return {kind:'invalid'};
+
+  var diagramTarget = null;
+  if (st.d != null){
+    diagramTarget = diagram(sectionAt(st.d), false);
+    if (diagramTarget.kind === 'invalid') return diagramTarget;
+  } else if (st.m === 'step' || st.m === 'ambient' || st.s != null){
+    var legacySec = null;
+    if (block){
+      var activeTab = ti >= 0 ? ti : 0;
+      for (var j = 0; j < sections.length; j++){
+        if (sections[j].tabBlock === block.index && sections[j].tab === activeTab &&
+            Array.isArray(sections[j].stepIds)){ legacySec = sections[j]; break; }
+      }
+    } else {
+      for (var k = 0; k < sections.length; k++){
+        if (Array.isArray(sections[k].stepIds)){ legacySec = sections[k]; break; }
+      }
+    }
+    diagramTarget = diagram(legacySec, true);
+    if (diagramTarget.kind === 'invalid') return diagramTarget;
+  }
+
+  var cardTarget = null;
+  if (st.c != null){
+    var cardSec = sectionAt(st.c);
+    if (!cardSec || !cardSec.hasCard) return {kind:'invalid'};
+    var row = st.r != null ? oneBasedIndex(st.r, cardSec.rowCount || 0) : null;
+    if (row === -1) row = null; /* bad/out-of-range row ref degrades to the card */
+    cardTarget = route(cardSec, {kind:row == null ? 'card' : 'row', section:cardSec.number,
+                                 row:row, tabBlock:null, tab:null});
+  }
+
+  var tabTarget = block && ti >= 0 ? {kind:'tab', tabBlock:block.index, tab:ti} : null;
+  /* The card/row is the most specific scroll and route target, followed by
+     the diagram and then an explicitly addressed tab. The attached targets
+     still all apply even though one supplies the top-level kind. */
+  var primary = cardTarget || diagramTarget || tabTarget || {kind:'page'};
+  var out = {};
+  Object.keys(primary).forEach(function(key){ out[key] = primary[key]; });
+  out.diagram = diagramTarget;
+  out.card = cardTarget;
+  out.explicitTab = tabTarget;
+  return out;
+}
+/* ---- src/core/document.js ---- */
+/* Pure normalization and document identities. Source paths are relative to
+   the normalized page; canonical references come from core/navigation.js. */
+
+function normalize(raw){
+  if (!specObject(raw)) return null;
+  if (Object.prototype.hasOwnProperty.call(raw, 'page')) return raw.page;
+  if (Object.prototype.hasOwnProperty.call(raw, 'blocks') || Object.prototype.hasOwnProperty.call(raw, 'sections')) return raw;
+  if (Object.prototype.hasOwnProperty.call(raw, 'nodes') && Object.prototype.hasOwnProperty.call(raw, 'rows')) return {title:'', sections:[{diagram: raw}]};
+  return null;
+}
+
+function specObject(value){
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function blocksOf(page){
+  if (!specObject(page)) return [];
+  var raw = page.blocks || page.sections || [];
+  var pfx = page.blocks ? 'blocks' : 'sections';
+  var out = [];
+  (Array.isArray(raw) ? raw : []).forEach(function(b, i){
+    if (b && Array.isArray(b.tabs)){
+      out.push({type:'tabs', path:pfx + '[' + i + ']', tabs:b.tabs.map(function(t, j){
+        return {label:(t && t.label) || ('Tab ' + (j + 1)),
+                highlight:(t && t.highlight != null) ? t.highlight : undefined,
+                sections:(t && Array.isArray(t.sections)) ? t.sections : [],
+                path:pfx + '[' + i + '].tabs[' + j + ']'};
+      })});
+    } else {
+      out.push({type:'section', sec:b, path:pfx + '[' + i + ']'});
+    }
+  });
+  return out;
+}
+
+/* Every section counts, including prose and inactive tabs. Keep raw source
+   block indices separate from one-based rendered numbers and tab-block routes.
+   Canon's diagram-only evidence indices and the editor's raw JSON paths are
+   separate contracts; neither is replaced by this viewer traversal. */
+function sectionRecords(page){
+  var out = [], tabBlock = 0;
+  blocksOf(page).forEach(function(block, blockIndex){
+    function add(section, path, tab, tabLabel){
+      out.push({section:section, path:path, blockIndex:blockIndex,
+        number:out.length + 1, tabBlock:tab == null ? null : tabBlock,
+        tab:tab, tabLabel:tabLabel});
+    }
+    if (block.type === 'section') add(block.sec, block.path, null, null);
+    else {
+      tabBlock++;
+      block.tabs.forEach(function(tab, tabIndex){
+        tab.sections.forEach(function(section, index){
+          add(section, tab.path + '.sections[' + index + ']', tabIndex, tab.label);
+        });
+      });
+    }
+  });
+  var references = sectionReferences(out.map(function(record){return record.section && record.section.heading;}));
+  out.forEach(function(record, index){ record.reference = references[index]; });
+  return out;
+}
+/* ---- src/core/paths.js ---- */
+/* Pure step/path projection. Uses shared isHex() and navigation stepIndexOf()
+   at call time; indices always refer to the authored source step registry. */
+
+function stepKeys(st){
+  if (!st) return [];
+  if (Array.isArray(st.edges)) return st.edges;
+  if (st.edge) return [st.edge];
+  return [];
+}
+var COMM_FAILURE_MODES = ['dropped','blocked'];
+function stepFailures(st){
+  var raw = st && st.failures, out = Object.create(null);
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) Object.keys(raw).forEach(function(key){
+    if (COMM_FAILURE_MODES.indexOf(raw[key]) >= 0) out[key] = raw[key];
+  });
+  return out;
+}
+function stepDeliveredKeys(st){
+  var failures = stepFailures(st);
+  return stepKeys(st).filter(function(key){return !Object.prototype.hasOwnProperty.call(failures,key);});
+}
+function stepNodes(st){
+  return (st && Array.isArray(st.nodes)) ? st.nodes : [];
+}
+function stepPanelPatch(st){
+  if (!st) return null;
+  if (st.panels && typeof st.panels === 'object' && !Array.isArray(st.panels)) return st.panels;
+  if (st.patch && typeof st.patch === 'object' && !Array.isArray(st.patch)) return st.patch;
+  return null;
+}
+function stepTonePatch(st){
+  if (!st || !st.tone || typeof st.tone !== 'object' || Array.isArray(st.tone)) return null;
+  return st.tone;
+}
+
+/* Paths reference a shared step registry. Folding always receives just the
+   selected sequence, so another outcome cannot leak state into this one. */
+function diagramPathList(d){
+  var steps = Array.isArray(d.steps) ? d.steps : [], byId = new Map();
+  steps.forEach(function(s,i){ if (s && typeof s.id === 'string') byId.set(s.id,i); });
+  var colors = ['#38bdf8','#fb923c','#c084fc','#f472b6','#4ade80'];
+  var paths = Array.isArray(d.paths) ? d.paths.filter(function(p){
+    return p && typeof p.id === 'string' && p.id && Array.isArray(p.steps) && p.steps.length &&
+      p.steps.every(function(id){ return byId.has(id); });
+  }).map(function(p,i){
+    return {id:p.id, label:p.label || (i ? p.id : 'Happy path'), color:isHex(p.color) ? p.color : colors[i % colors.length],
+      indices:p.steps.map(function(id){ return byId.get(id); })};
+  }) : [];
+  return paths.length ? paths : [{id:'happy',label:'Happy path',color:colors[0],indices:steps.map(function(s,i){return i;})}];
+}
+function diagramForPath(d, id){
+  var paths = diagramPathList(d), path = paths.find(function(p){ return p.id === id; }) || paths[0];
+  return Object.assign({}, d, {steps:path.indices.map(function(i){ return d.steps[i]; }),
+    _sourceIndices:path.indices, _pathId:path.id});
+}
+/* Exact host navigation uses the complete path, never a named view's visible
+   stops. Missing paths return null; missing steps retain the path with -1
+   indices so hosts can keep their existing distinct, recoverable errors. */
+function resolveSourceStep(d, pathId, stepRef){
+  var path = diagramPathList(d).find(function(p){return p.id === pathId;});
+  if (!path) return null;
+  var ids = path.indices.map(function(index){return d.steps[index].id;});
+  var index = stepIndexOf(ids, stepRef);
+  return {path:path, pathIndex:index, sourceIndex:index < 0 ? -1 : path.indices[index]};
+}
+/* Color a branch starting at its first differing step; every common-prefix
+   beat stays shared. A wholly shared path has start > end. Compare earlier
+   declarations so nested alternatives keep stable rows too. */
+function pathStepRows(paths){
+  return paths.map(function(path,i){
+    var shared = 0;
+    paths.slice(0,i).forEach(function(prior){
+      var n = 0;
+      while (n < path.indices.length && n < prior.indices.length && path.indices[n] === prior.indices[n]) n++;
+      shared = Math.max(shared,n);
+    });
+    return {path:path, start:i ? shared : 0, end:path.indices.length - 1};
+  });
+}
+/* ---- src/core/section-layout.js ---- */
+/* Pure section/view layout. Uses diagramPathList() and panelCapability() at
+   call time, after panel definitions have registered; no DOM measurements. */
+
+/* Section composition uses a bounded twelve-column grid. Missing/new panels
+   are appended; collisions push later tiles down instead of hiding content. */
+function sectionLayoutKey(item){
+  if(item && item.panel!=null)return typeof item.panel==='string'?'panel:'+item.panel:'invalid-panel';
+  return item && item.controls!=null ? (item.controls==='steps'?'steps':'invalid-controls') : 'diagram';
+}
+function sectionLayoutTiles(d){
+  var tiles=[{key:'diagram',title:'Data flow'}].concat((Array.isArray(d.panels) ? d.panels : []).filter(function(p){return p && typeof p.id === 'string';}).map(function(p){
+    return {key:'panel:' + p.id,panel:p.id,type:p.type,title:p.title || p.id};
+  }));
+  if(Array.isArray(d.steps) && d.steps.length && d.view!=='ambient-only')tiles.push({key:'steps',controls:'steps',title:'Step controls'});
+  return tiles;
+}
+function sectionLayoutPack(items, priority){
+  var dock=sectionLayoutDock(items);
+  var placed = [], order = items.map(function(it){return Object.assign({},it);});
+  if (priority) order.sort(function(a,b){return (sectionLayoutKey(a) === priority ? -1 : 0) - (sectionLayoutKey(b) === priority ? -1 : 0);});
+  order.forEach(function(it){
+    function overlaps(p){return it.x < p.x+p.w && it.x+it.w > p.x && it.y < p.y+p.h && it.y+it.h > p.y;}
+    var hits;
+    while (!it.hidden && !(dock && it.controls==='steps') && (hits = placed.filter(function(p){return !p.hidden && !(dock && p.controls==='steps') && overlaps(p);})).length) it.y = Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+    placed.push(it);
+  });
+  return items.map(function(it){return placed.find(function(p){return sectionLayoutKey(p) === sectionLayoutKey(it);});});
+}
+/* A docked transport shares its host's geometry. Its saved standalone position
+   is retained for detaching, or used as a fallback if that host is hidden. */
+function sectionLayoutDock(items){
+  var steps=items.find(function(it){return it.controls==='steps';});
+  return steps && typeof steps.attachTo==='string' && items.some(function(it){return sectionLayoutKey(it)===steps.attachTo && !it.hidden && !it.controls;}) ? steps.attachTo : null;
+}
+function sectionLayoutControlsRows(d,items){
+  var steps=(items || []).find(function(it){return it.controls==='steps';});
+  return steps?steps.h:(d.paths || []).length>1?6:4;
+}
+function sectionLayoutPreset(d, target, excludedKeys){
+  var excluded=Array.isArray(excludedKeys)?excludedKeys:[];
+  var tiles=sectionLayoutTiles(d).filter(function(t){return excluded.indexOf(t.key)<0;}), narrow=target==='confluence', items=[];
+  var main=d.primaryPanel && tiles.find(function(t){return t.panel===d.primaryPanel;});
+  var ordered=main ? [main].concat(tiles.filter(function(t){return t!==main;})) : tiles;
+  var controls=tiles.find(function(t){return t.key==='steps';});
+  if(controls){ordered=ordered.filter(function(t){return t!==controls;});ordered.splice(1,0,controls);}
+  var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && panelCapability(t.type,'supporting',true);});
+  ordered.forEach(function(t){
+    var panelLarge=panelCapability(t.type,'large',false), large=t.key==='diagram'||t.key==='steps'||panelLarge||t===main;
+    var w=large?(narrow||!supporting?12:8):(narrow?6:4);
+    var h=t.key==='steps'?((d.paths || []).length>1?6:4):panelLarge?panelCapability(t.type,'height',12):large?12:panelCapability(t.type,'height',6);
+    var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
+      var it={x:x,y:0,w:w,h:h}, hits;
+      while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
+        it.y=Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
+      return it;
+    });
+    candidates.sort(function(a,b){return a.y-b.y||a.x-b.x;});
+    var item=candidates[0];if(t.panel!=null)item.panel=t.panel;if(t.controls)item.controls=t.controls;items.push(item);
+  });
+  return items;
+}
+function diagramLayoutViews(d){
+  var used=Object.create(null), views=[];
+  (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
+    if(!v || typeof v.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v.id) || used[v.id] ||
+      typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
+      !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
+      !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
+  });
+  if(views.length)return views;
+  return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
+    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',sectionLayout:d.sectionLayout,legacy:true}] : [];
+}
+function sectionLayoutDefinition(d, id){
+  var views=diagramLayoutViews(d);
+  return views.find(function(v){return v.id===id;}) || views.find(function(v){return v.id===d.defaultLayout;}) || views[0];
+}
+function sectionViewStepsReachable(d,ids){
+  return diagramPathList(d).some(function(p){return p.indices.some(function(i){return ids.indexOf(d.steps[i].id)>=0;});});
+}
+function sectionLayoutItems(d, target, id){
+  var definition=sectionLayoutDefinition(d,id), layouts = definition && definition.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
+  if (!Array.isArray(saved)) return definition && !definition.legacy ? sectionLayoutPreset(d,target) : null;
+  var items = [], used = Object.create(null);
+  saved.forEach(function(it){
+    if (!it || typeof it !== 'object') return;
+    if(it.controls!=null && (it.controls!=='steps'||it.panel!=null))return;
+    var key = sectionLayoutKey(it);
+    if (used[key] || !tiles.some(function(t){return t.key === key;})) return;
+    if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
+    var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
+    if (it.panel != null) copy.panel=it.panel;
+    if (it.controls==='steps'){
+      copy.controls='steps';
+      if(it.attachTo==='diagram' || tiles.some(function(t){return t.key===it.attachTo && panelCapability(t.type,'attachControls',false);}))copy.attachTo=it.attachTo;
+    }
+    if(it.hidden===true && it.controls==null)copy.hidden=true;
+    used[key]=true;items.push(copy);
+  });
+  var y = items.reduce(function(n,it){return it.hidden?n:Math.max(n,it.y+it.h);},0);
+  tiles.forEach(function(t){
+    if (used[t.key] || t.key==='steps') return; /* Old layouts keep controls attached. */
+    var item={x:0,y:y,w:12,h:t.key==='diagram'?12:panelCapability(t.type,'fallbackHeight',6)};
+    if(t.panel != null)item.panel=t.panel;
+    items.push(item);y+=item.h;
+  });
+  return sectionLayoutPack(items);
+}
+/* ---- src/core/state.js ---- */
+/* Pure path-local state folding. Uses stepTonePatch(), TONE_SET and the
+   registered PanelRegistry/foldCommonPanelStates dispatch at call time. */
+
+/* ---------------- node-tone folding ----------------
+   Like panel patches, node tones are sparse authoring deltas folded into
+   absolute per-step snapshots. Unknown ids/tokens are ignored here (the
+   validator warns); `base` and null delete the carried tone. */
+function foldNodeTones(d){
+  d = d || {};
+  var nodes = d.nodes || {};
+  var steps = Array.isArray(d.steps) ? d.steps : [];
+  var carried = {}, states = [];
+  steps.forEach(function(st){
+    var patch = stepTonePatch(st);
+    if (patch) Object.keys(patch).forEach(function(id){
+      if (!Object.prototype.hasOwnProperty.call(nodes, id)) return;
+      var tone = patch[id];
+      if (tone === null || tone === 'base'){
+        delete carried[id];
+      } else if (TONE_SET.indexOf(tone) >= 0 && tone !== 'base'){
+        carried[id] = tone;
+      }
+    });
+    var snap = {};
+    Object.keys(carried).forEach(function(id){ snap[id] = carried[id]; });
+    states.push(snap);
+  });
+  if (!steps.length) states.push({});
+  return states;
+}
+
+/* ---------------- panel-state folding ----------------
+   Authors emit sparse per-step patches; we fold them into COMPLETE state per
+   step at load time, so any step jump renders from absolute state, never
+   deltas. Rules:
+   - state N = shallow merge of state N-1 and step N's patch for that panel;
+   - a "log" patch key APPENDS (cumulative array of lines);
+   - an "enterOnce" sub-object applies only at its own step (not carried). */
+
+function foldPanelStates(d){
+  var panels = d.panels || [];
+  var steps = d.steps || [];
+  var out = {};
+  panels.forEach(function(panel){
+    if (!panel || !panel.id) return;
+    var descriptor = PanelRegistry.get(panel.type);
+    var fold = descriptor && descriptor.fold || foldCommonPanelStates;
+    out[panel.id] = fold(panel, steps);
+  });
+  return out;
 }
 /* ---- src/core/geometry.js ---- */
 /* Pure diagram layout, routing and collision geometry. The only shared
@@ -14978,222 +15242,10 @@ module.exports.viewerRouting = () => {
   if (!viewerRoutingCache) viewerRoutingCache = createViewerRouting();
   return viewerRoutingCache;
 };
-// Scanners initialize only the evidence/validation code. Pure navigation
-// shares that scope on first use, without initializing the DOM renderer.
+// The facade uses the shared outer pure-core scope, including navigation.
+// Constructing it never initializes the DOM renderer.
 function createViewerRouting(){
-/* ---- src/core/navigation.js ---- */
-/* Pure document references and hash navigation. No viewer initialization;
-   only link-base canonicalization needs the standard URL constructor. */
-
-/* ---------------- deep-link hash (C2/E3, pure core) ---------------- */
-function slugify(s){
-  var out = String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  return out || 'tab';
-}
-function sectionSlugify(s){
-  var out = String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  if (!out) out = 'section';
-  /* Purely numeric slugs would be indistinguishable from the accepted legacy
-     rendered-section index, so keep the two namespaces disjoint. */
-  if (/^\d+$/.test(out)) out = 'section-' + out;
-  return out;
-}
-function sectionReferences(headings){
-  var used = {};
-  return (Array.isArray(headings) ? headings : []).map(function(heading, index){
-    /* Heading-less sections retain their rendered index as the canonical
-       fallback. Heading references are unique document-wide. */
-    if (typeof heading !== 'string' || !heading.trim()){
-      var positional = String(index + 1);
-      used[positional] = true;
-      return positional;
-    }
-    var base = sectionSlugify(heading), ref = base, suffix = 2;
-    while (used[ref]) ref = base + '-' + suffix++;
-    used[ref] = true;
-    return ref;
-  });
-}
-function parseHash(h){
-  var kv = {};
-  String(h || '').replace(/^#/, '').split('&').forEach(function(part){
-    var i = part.indexOf('=');
-    if (i > 0){
-      try { kv[decodeURIComponent(part.slice(0, i))] = decodeURIComponent(part.slice(i + 1)); }
-      catch (ex) { /* malformed escape: ignore that pair */ }
-    }
-  });
-  var result = {b: kv.b != null ? kv.b : null,
-          t: kv.t != null ? kv.t : null,
-          d: kv.d != null ? kv.d : null,
-          c: kv.c != null ? kv.c : null,
-          r: kv.r != null ? kv.r : null,
-          s: kv.s != null ? kv.s : null,
-          x: kv.x != null ? kv.x : null,
-          e: kv.e != null ? kv.e : null,
-          m: (kv.m === 'step' || kv.m === 'ambient') ? kv.m : null};
-  if (kv.p != null) result.p = kv.p;
-  return result;
-}
-function encodeSectionRefList(value){
-  return String(value == null ? '' : value).split(',').map(function(ref){
-    return encodeURIComponent(ref);
-  }).join(',');
-}
-function buildHash(st){
-  var parts = [];
-  if (st && st.b != null) parts.push('b=' + encodeURIComponent(st.b));
-  if (st && st.t != null) parts.push('t=' + encodeURIComponent(st.t));
-  if (st && st.d != null) parts.push('d=' + encodeURIComponent(st.d));
-  if (st && st.m) parts.push('m=' + st.m);
-  if (st && st.p != null) parts.push('p=' + encodeURIComponent(st.p));
-  if (st && st.s != null) parts.push('s=' + encodeURIComponent(st.s));
-  if (st && st.c != null) parts.push('c=' + encodeURIComponent(st.c));
-  if (st && st.r != null) parts.push('r=' + encodeURIComponent(st.r));
-  if (st && st.x != null) parts.push('x=' + encodeSectionRefList(st.x));
-  if (st && st.e != null) parts.push('e=' + encodeSectionRefList(st.e));
-  return parts.length ? '#' + parts.join('&') : '';
-}
-function canonicalLinkBase(base){
-  if (typeof base !== 'string' || /[\s"]/.test(base)) return null;
-  try {
-    var parsed = new URL(base);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-    var href = parsed.href;
-    /* Keep the serialized value safe to embed in copied text even if URL
-       parsing behavior changes or a non-special URL slips through later. */
-    return /[\s"]/.test(href) ? null : href;
-  } catch (ex) { return null; }
-}
-function isValidLinkBase(base){
-  return canonicalLinkBase(base) !== null;
-}
-function composeLinkURL(base, hash){
-  var params = String(hash || '').replace(/^#/, '');
-  if (!params) return base;
-  var tail = base.charAt(base.length - 1);
-  return base + (tail === '&' || tail === '#' ? '' :
-    (base.indexOf('#') >= 0 ? '&' : '#')) + params;
-}
-function oneBasedIndex(ref, count){
-  if (ref == null || !/^\d+$/.test(String(ref))) return -1;
-  var n = parseInt(String(ref), 10) - 1;
-  return n >= 0 && n < count ? n : -1;
-}
-function tabIndexOf(ref, slugs, count){
-  if (ref == null) return -1;
-  var n = slugs.indexOf(String(ref));
-  return n >= 0 ? n : oneBasedIndex(ref, count);
-}
-function tabReference(slugs, index){
-  var slug = slugs[index];
-  if (slug != null && slugs.indexOf(slug) === index) return slug;
-  var ref = String(index + 1);
-  while (slugs.indexOf(ref) >= 0) ref = '0' + ref;
-  return ref;
-}
-function stepIndexOf(stepIds, ref){
-  if (ref == null) return -1;
-  var str = String(ref);
-  for (var i = 0; i < stepIds.length; i++) if (stepIds[i] === str) return i;
-  return oneBasedIndex(str, stepIds.length);
-}
-function stepReference(stepIds, index){
-  var id = stepIds[index];
-  if (typeof id === 'string' && id && stepIds.indexOf(id) === index &&
-      stepIds.lastIndexOf(id) === index) return id;
-  var ref = String(index + 1);
-  while (stepIds.indexOf(ref) >= 0) ref = '0' + ref;
-  return ref;
-}
-
-/* Resolve a parsed fragment against a DOM-free page manifest. Canonical links
-   use the unique heading-derived section reference for d/c, falling back to a
-   rendered section number only when the section has no heading. Numeric d/c
-   references remain accepted as legacy rendered indices. Direct diagram and
-   contract targets are resolved independently so their state can compose. */
-function resolveHashTarget(st, manifest){
-  st = st || {};
-  manifest = manifest || {};
-  var tabs = Array.isArray(manifest.tabBlocks) ? manifest.tabBlocks : [];
-  var sections = Array.isArray(manifest.sections) ? manifest.sections : [];
-  function sectionAt(ref){
-    if (ref == null) return null;
-    var key = String(ref), i;
-    for (i = 0; i < sections.length; i++)
-      if (sections[i].reference != null && String(sections[i].reference) === key)
-        return sections[i];
-    var n = oneBasedIndex(key, sections.length);
-    if (n < 0) return null;
-    for (i = 0; i < sections.length; i++)
-      if (sections[i].number === n + 1) return sections[i];
-    return null;
-  }
-  function route(sec, out){
-    if (sec && sec.tabBlock != null){
-      out.tabBlock = sec.tabBlock;
-      out.tab = sec.tab;
-    }
-    return out;
-  }
-  function diagram(sec, legacy){
-    if (!sec || !Array.isArray(sec.stepIds)) return {kind:'invalid'};
-    var mode = (st.m === 'step' || st.s != null) ? 'step' :
-               (st.m === 'ambient' ? 'ambient' : null);
-    var step = mode === 'step' ? (st.s != null ? stepIndexOf(sec.stepIds, st.s) : 0) : null;
-    return route(sec, {kind:'diagram', section:sec.number, mode:mode,
-                       step:step, legacy:!!legacy, tabBlock:null, tab:null});
-  }
-
-  var block = null, blockIndex = st.b != null ? oneBasedIndex(st.b, tabs.length) :
-                   (tabs.length ? 0 : -1);
-  if (blockIndex >= 0) block = tabs[blockIndex];
-  var ti = block ? tabIndexOf(st.t, block.slugs || [], block.count || 0) : -1;
-  if (st.t != null && (!block || ti < 0)) return {kind:'invalid'};
-
-  var diagramTarget = null;
-  if (st.d != null){
-    diagramTarget = diagram(sectionAt(st.d), false);
-    if (diagramTarget.kind === 'invalid') return diagramTarget;
-  } else if (st.m === 'step' || st.m === 'ambient' || st.s != null){
-    var legacySec = null;
-    if (block){
-      var activeTab = ti >= 0 ? ti : 0;
-      for (var j = 0; j < sections.length; j++){
-        if (sections[j].tabBlock === block.index && sections[j].tab === activeTab &&
-            Array.isArray(sections[j].stepIds)){ legacySec = sections[j]; break; }
-      }
-    } else {
-      for (var k = 0; k < sections.length; k++){
-        if (Array.isArray(sections[k].stepIds)){ legacySec = sections[k]; break; }
-      }
-    }
-    diagramTarget = diagram(legacySec, true);
-    if (diagramTarget.kind === 'invalid') return diagramTarget;
-  }
-
-  var cardTarget = null;
-  if (st.c != null){
-    var cardSec = sectionAt(st.c);
-    if (!cardSec || !cardSec.hasCard) return {kind:'invalid'};
-    var row = st.r != null ? oneBasedIndex(st.r, cardSec.rowCount || 0) : null;
-    if (row === -1) row = null; /* bad/out-of-range row ref degrades to the card */
-    cardTarget = route(cardSec, {kind:row == null ? 'card' : 'row', section:cardSec.number,
-                                 row:row, tabBlock:null, tab:null});
-  }
-
-  var tabTarget = block && ti >= 0 ? {kind:'tab', tabBlock:block.index, tab:ti} : null;
-  /* The card/row is the most specific scroll and route target, followed by
-     the diagram and then an explicitly addressed tab. The attached targets
-     still all apply even though one supplies the top-level kind. */
-  var primary = cardTarget || diagramTarget || tabTarget || {kind:'page'};
-  var out = {};
-  Object.keys(primary).forEach(function(key){ out[key] = primary[key]; });
-  out.diagram = diagramTarget;
-  out.card = cardTarget;
-  out.explicitTab = tabTarget;
-  return out;
-}
-return {blocksOf, sectionReferences, buildHash, diagramPathList,
-  stepKeys, stepFailures, stepReference};
+return {normalize, blocksOf, sectionRecords, sectionReferences, parseHash, buildHash,
+  diagramPathList, diagramForPath, resolveSourceStep, stepKeys, stepFailures, stepReference,
+  diagramLayoutViews, sectionLayoutItems, foldNodeTones, foldPanelStates, layout, lintPage};
 }

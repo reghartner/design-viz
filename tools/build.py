@@ -91,12 +91,12 @@ def canon_runtime() -> str:
         "  if (!viewerRoutingCache) viewerRoutingCache = createViewerRouting();\n"
         "  return viewerRoutingCache;\n"
         "};\n"
-        "// Scanners initialize only the evidence/validation code. Pure navigation\n"
-        "// shares that scope on first use, without initializing the DOM renderer.\n"
+        "// The facade uses the shared outer pure-core scope, including navigation.\n"
+        "// Constructing it never initializes the DOM renderer.\n"
         "function createViewerRouting(){\n"
-        + js_bundle("core/navigation.js")
-        + "\nreturn {blocksOf, sectionReferences, buildHash, diagramPathList,\n"
-        "  stepKeys, stepFailures, stepReference};\n"
+        "return {normalize, blocksOf, sectionRecords, sectionReferences, parseHash, buildHash,\n"
+        "  diagramPathList, diagramForPath, resolveSourceStep, stepKeys, stepFailures, stepReference,\n"
+        "  diagramLayoutViews, sectionLayoutItems, foldNodeTones, foldPanelStates, layout, lintPage};\n"
         "}\n"
     )
 

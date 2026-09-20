@@ -8,6 +8,11 @@
 - Trace changed fields through normalization, validation, state folding and
   rendering. Check old specs that omit new fields, safe text/URL handling and
   round trips. Contract changes need matching authoring guidance and an example.
+- Shared identity/path/layout/state ownership is documented in
+  `docs/shared-core.md`. Use `sectionRecords()` for viewer identities across all
+  sections/tabs; keep Canon's diagram-only indexes and editor raw JSON paths
+  separate. Exact host jumps use `resolveSourceStep()` and `jumpSource()` without
+  selecting a path first, so a view can still preview a wholly hidden alternate.
 - Validation must return findings for malformed JSON container shapes before
   dependent Canon, path, layout or panel traversal. Preserve the authored input
   and existing warning semantics; do not catch unexpected programming errors.

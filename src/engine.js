@@ -1,6 +1,6 @@
 /* engine.js — board renderer, stepper and page renderer.
-   Assembled with core/navigation.js via source-bundles.json; consumes pure
-   geometry from the validator bundle. Render functions need a DOM and are
+   Consumes document, navigation, path, layout, state and geometry helpers
+   from the validator bundle. Render functions need a DOM and are
    only called from the boot files. */
 
 var SVGNS = 'http://www.w3.org/2000/svg';
@@ -2092,14 +2092,7 @@ function renderPage(view, page, skin, backlinks, options){
   }
   var gi = 0;
   var pageBlocks = blocksOf(page);
-  var sectionHeadings = [];
-  pageBlocks.forEach(function(block){
-    if (block.type === 'section') sectionHeadings.push(block.sec && block.sec.heading);
-    else block.tabs.forEach(function(tab){
-      tab.sections.forEach(function(sec){ sectionHeadings.push(sec && sec.heading); });
-    });
-  });
-  var sectionRefs = sectionReferences(sectionHeadings);
+  var records = sectionRecords(page);
   var deferredHides = [];
   var ctl = {view:view, tabBlock:null, tabBlocks:[], sections:[], steppers:[],
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
@@ -2118,9 +2111,9 @@ function renderPage(view, page, skin, backlinks, options){
     ctl.activeTarget = target;
     if (ctl.onChange) ctl.onChange();
   }
-  function addSection(container, sec, tabBlockIndex, tabIndex){
-    var number = gi + 1;
-    var reference = sectionRefs[gi];
+  function addSection(container){
+    var record = records[gi], sec = record.section;
+    var number = record.number, reference = record.reference;
     var built = buildSection(container, sec, gi++, reference, protos, renderSkin, lanes, backlinks,
       function(claimAddressBar){
         if (claimAddressBar !== false) changed({kind:'diagram', section:number});
@@ -2134,7 +2127,7 @@ function renderPage(view, page, skin, backlinks, options){
           if (primary && primary.number === number) changed({kind:'diagram', section:number});
         }
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
-    var rec = {number:number, reference:reference, tabBlock:tabBlockIndex, tab:tabIndex,
+    var rec = {number:number, reference:reference, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                flowDisclosure:built.flowDisclosure, presentation:built.presentation,
                contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
@@ -2144,7 +2137,7 @@ function renderPage(view, page, skin, backlinks, options){
   }
   pageBlocks.forEach(function(block, bi){
     if (block.type === 'section'){
-      addSection(view, block.sec, null, null);
+      addSection(view);
       return;
     }
     /* tabs block */
@@ -2182,7 +2175,7 @@ function renderPage(view, page, skin, backlinks, options){
       panel._steppers = [];
       view.appendChild(panel);
       t.sections.forEach(function(sec){
-        var built = addSection(panel, sec, tabBlockIndex, ti);
+        var built = addSection(panel);
         if (built.stepper) panel._steppers.push(built.stepper);
       });
       panels.push(panel); buttons.push(btn); copyButtons.push(copy); slugs.push(slugify(t.label));

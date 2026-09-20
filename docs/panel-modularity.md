@@ -105,6 +105,11 @@ Reading raw bundle files directly skips their manifest dependencies.
 Feature metadata and CSS are collected at build time for
 standalone, workbench, Backstage and Forge.
 
+The logical `builder.workbench.js` bundle loads the source-edit and raw-target
+leaves before the generic builder. Use that assembled source for planner and UI
+tests; [workbench modules](workbench-modules.md) describes the leaf-only test
+surface and source-preservation contract.
+
 Radar's module keeps geometry and alert state separate: the model computes
 distance and occupancy, while authored `alert` booleans fold through the shared
 state helper. No geometric test sets the alert. The old PIR panel is removed;

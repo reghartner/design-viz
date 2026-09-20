@@ -63,7 +63,7 @@ test('numeric outline controls keep unknown fields, allow defaults, and reject i
 });
 
 test('typed controls save on leaving a field and avoid duplicate undo entries after Enter or change',()=>{
-  const source=fs.readFileSync(path.join(__dirname,'../src/builder.workbench.js'),'utf8');
+  const source=readSource('builder.workbench.js');
   const wire=vm.runInContext('(' + source.slice(source.indexOf('function wireCommit('),source.indexOf('function rowsFieldControl(')).trim() + ')',C);
   const events={},input={value:'300',tagName:'INPUT',addEventListener:(name,fn)=>events[name]=fn};
   const saved=[];wire(input,()=>{if(input.value==='invalid') return false;saved.push(input.value);});

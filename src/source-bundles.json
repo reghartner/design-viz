@@ -13,5 +13,10 @@
   ],
   "engine.js": [
     "engine.js"
+  ],
+  "builder.workbench.js": [
+    "workbench/source-edit.js",
+    "workbench/targets.js",
+    "builder.workbench.js"
   ]
 }

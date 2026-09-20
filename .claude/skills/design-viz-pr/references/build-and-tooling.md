@@ -21,6 +21,11 @@
   bundle after shared helpers; its existing `clamp()` dependency is call-time.
   Validator/lint tooling must use that bundle without loading the DOM engine.
   Preserve algorithm bodies, candidate order and diagnostics during extraction.
+- The logical `builder.workbench.js` bundle loads `workbench/source-edit.js`,
+  `workbench/targets.js`, then the builder. Use `readSource()` for planner/UI test
+  harnesses; pure source/address tests can load only those leaves. Keep physical
+  file lists flat and preserve registry-before-builder ordering. Workbench module
+  ownership and source-preservation contracts are in `docs/workbench-modules.md`.
 - Tool/CLI changes: check actual callers, exit codes, input/output formats,
   escaping, destination safety and reproducibility. Run matching Python/Node
   tests; shared Python helpers may warrant

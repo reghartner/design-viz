@@ -36,8 +36,19 @@
   for replacement DOM before checking Enter caret/scroll, Tab destination and no
   focus steal from outside. Single and multiple forms must share that view
   lifecycle while changed authored target sets start fresh. Source/project/target/path changes must retire stale
-  refreshes. I/O generations and gesture/observer resources still have separate
-  owners; inspector destroy must not be described as complete editor teardown.
+  refreshes. Inspector destroy must not be described as complete editor teardown.
+- `createBuilderIO()` in `src/workbench/io.js` owns file/import/export controls;
+  `io-model.js` is pure preparation and `io-browser.js` binds native resources.
+  Test independent file/trace/export/copy generations with held completions after
+  project replacement, close, fresh input and destroy. Late trace loads and
+  clipboard fallback must not replace current text or take focus. Preserve
+  repairable file-open versus validated `loadText()`, exact invalid-JSON save,
+  import baseline/marker/Undo differences and active-workbench keyboard gates.
+  Export checks freshness before starting writes; already-started authorized
+  writes finish/close safely, failures abort, and stale follow-on files/UI are
+  blocked. Never delete or roll back user files. Check listener, object-URL and
+  failed-request cleanup; dispatched clipboard/download effects are not recallable.
+  I/O destroy is separate from interaction/observer and whole-page teardown.
 - Keep shared Home layout/initial state distinct from per-step overrides. Use
   `docs/homemap-workbench.md` only for those controls. Test the context being
   edited, including non-step selection when affected.

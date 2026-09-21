@@ -55,6 +55,31 @@ const SPEC = {
 };
 const TEXT = JSON.stringify(SPEC, null, 2);
 
+test('service binding seeds only a blank title with one surgical plan', () => {
+  const binding = {entityRef:'component:default/recording',label:'Recording service'};
+  for (const title of [undefined,null,'','  \n ', 'Authored title']){
+    const raw = structuredClone(SPEC), node = raw.page.blocks[0].diagram.nodes.a;
+    if (title === undefined) delete node.title; else node.title = title;
+    const text = JSON.stringify(raw,null,2).replace('"title": "T"','"title"  :  "T"');
+    const before = JSON.stringify(raw);
+    const plan = B.planBindNodeService(text,raw,0,'a',binding);
+    assert.ok(!plan.error,plan.error);
+    const next = JSON.parse(plan.text).page.blocks[0].diagram.nodes.a;
+    assert.deepStrictEqual(next.binding,binding);
+    assert.equal(next.title,title === 'Authored title' ? title : binding.label);
+    assert.ok(plan.text.includes('"title"  :  "T"'),'unrelated source formatting stays intact');
+    assert.equal(JSON.stringify(raw),before,'raw input is immutable');
+    const cleared = B.planBindNodeService(plan.text,JSON.parse(plan.text),0,'a',null);
+    const unbound = JSON.parse(cleared.text).page.blocks[0].diagram.nodes.a;
+    assert.equal(unbound.title,next.title);assert.ok(!('binding' in unbound));
+  }
+  const raw = structuredClone(SPEC);delete raw.page.blocks[0].diagram.nodes.a.title;
+  const noLabel = {entityRef:binding.entityRef};
+  const fallback = B.planBindNodeService(JSON.stringify(raw),raw,0,'a',noLabel);
+  assert.equal(JSON.parse(fallback.text).page.blocks[0].diagram.nodes.a.title,binding.entityRef);
+  assert.ok(B.planBindNodeService(TEXT,SPEC,0,'missing',binding).error);
+});
+
 test('every insert result and every guide entry stays render-ready', () => {
   /* all planner outputs must parse — a splice that corrupts the editor text
      would be worse than no builder at all */

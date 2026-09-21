@@ -25,7 +25,10 @@ New projects receive these choices without contacting Backstage.
 For a manual override, expand **Company repository**, paste a version-1 catalog JSON
 (see `examples/canon/catalog.json`) and choose **Load catalog**. Select a node:
 **Company service**, **Service API**, and **API operation** constrain choices to
-the selected service. Labels and narrative remain authored. Binding JSON is
+the selected service. Choosing a service fills a missing or blank node title from
+its catalog name; an existing title is preserved. The binding and initial title
+are one Undo/Redo action. Changing an API or operation does not rename the node.
+Narrative remains authored. Binding JSON is
 editable without a catalog. A hosted repository can initialize the controls
 through the same-origin `/api/canon/context` adapter when no bundled catalog is
 configured. Manual imports take precedence over either automatic source.

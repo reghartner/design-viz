@@ -1,6 +1,21 @@
 /* Pure graph identity, reference cascades and insert templates. Uses common
    commands, raw targets, source edits and registry-owned panel rewrites. */
 
+function planBindNodeService(text, raw, sectionIdx, nodeId, binding){
+  var got = builderDiagram(text, raw, sectionIdx);
+  if (got.error) return got;
+  var node = got.d.nodes && got.d.nodes[nodeId];
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return {error: 'node not found'};
+  var fields = [['binding', binding ? JSON.stringify(binding) : null]];
+  /* Read the current raw title, not the inspector's earlier snapshot. Binding
+     and its initial display name are one edit; API changes use field edits. */
+  if (binding && (node.title == null || (typeof node.title === 'string' && !node.title.trim()))){
+    var title = typeof binding.label === 'string' && binding.label.trim() ? binding.label : binding.entityRef;
+    fields.push(['title', JSON.stringify(title)]);
+  }
+  return planSetFields(text, raw, got.path.concat(['nodes', nodeId]), fields);
+}
+
 function planAddNode(text, raw, sectionIdx, preset){
   /* preset (optional): {icon, tint, title} from NODE_PRESETS — the id stem
      follows the icon so the spec reads well (db1, antenna1, ...) */

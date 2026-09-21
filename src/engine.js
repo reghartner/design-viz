@@ -282,7 +282,9 @@ function wireNodeReferences(host,svg,diagram,prefix){
   if(!svg || typeof svg.querySelectorAll!=='function')return null;
   var triggers=svg.querySelectorAll('.nrefs-trigger');if(!triggers.length)return null;
   var pop=document.createElement('div');pop.className='nbackpop node-link-menu';pop.id=prefix+'-node-links';
-  pop.setAttribute('role','dialog');pop.setAttribute('popover','auto');pop.hidden=true;host.appendChild(pop);
+  /* contextmenu can fire before pointerup. Auto popovers treat that release
+     outside the new menu as light-dismiss; our listeners own dismissal. */
+  pop.setAttribute('role','dialog');pop.setAttribute('popover','manual');pop.hidden=true;host.appendChild(pop);
   var active=null,open=false,destroyed=false,scrollAtOpen=[];
   function inside(target){return pop.contains(target) || !!(active && active.contains(target));}
   function close(focus){

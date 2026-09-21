@@ -220,6 +220,9 @@ Preview dimensions simulate the content area; verify the actual installed host.
 ## Node reference menus
 
 Right-click a diagram node, or tap its **…** button, to open its saved links.
+Release the mouse button, then choose a link; holding or dragging is unnecessary.
+Click outside, use the close button, or press Escape to dismiss the menu. Scrolling
+or resizing also dismisses it so it does not stay anchored to an old position.
 The button is keyboard focusable: Enter, Space, or Shift+F10 opens it; arrows
 move among links and Escape closes it and returns focus. Ordinary node clicks
 still select the node in the workbench. Nodes without available links retain

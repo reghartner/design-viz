@@ -1,4 +1,21 @@
 import {test,expect,trackResources,resources} from '../helpers/test.mjs';
+test('native node menus survive right-button release and dismiss across viewer boundaries',async({page,server})=>{
+  await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);
+  await page.evaluate(()=>{__host.left(true);__host.right(true);});
+  const alpha=page.locator('#alpha'),beta=page.locator('#beta');
+  const menu=scope=>scope.getByRole('dialog',{name:'Links for Recording'});
+  await alpha.locator('[data-dv-node="service"]').click({button:'right'});
+  await expect(menu(alpha)).toBeVisible();
+  await expect.poll(()=>menu(alpha).evaluate(el=>el.matches(':popover-open'))).toBe(true);
+  await expect(menu(alpha).getByRole('link')).toBeFocused();
+  await beta.locator('[data-dv-node="service"]').click({button:'right'});
+  await expect(menu(alpha)).toBeHidden();await expect(menu(beta)).toBeVisible();
+  await expect.poll(()=>menu(beta).evaluate(el=>el.matches(':popover-open'))).toBe(true);
+  await page.locator('#host-sentinel').click();await expect(menu(beta)).toBeHidden();
+  await beta.locator('.nrefs-trigger').click();await expect(menu(beta)).toBeVisible();
+  await page.keyboard.press('Escape');await expect(menu(beta)).toBeHidden();
+  await expect(beta.locator('.nrefs-trigger')).toBeFocused();
+});
 test('actual React native viewers isolate styles/navigation and retire stale revisions and resources',async({page,server})=>{
   await page.setViewportSize({width:1920,height:1400});await page.addInitScript(trackResources);
   await page.goto(server.origin+'/native/index.html#host-route');await page.waitForFunction(()=>!!window.__host);

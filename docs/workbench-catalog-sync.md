@@ -154,7 +154,10 @@ updating HTML/assets from a newer Flowview release.
 The workbench requests `catalog.json` relative to its own page, so it also works
 under a hosting path prefix. The loaded catalog populates **Company service**,
 **Service API**, and **API operation** in node inspectors. Existing specs are never
-rewritten by a catalog refresh. A removed service can remain in an older spec’s
+rewritten by a catalog refresh. Selecting a service fills its catalog name into a
+missing or blank node title, preserving any existing name. Undo restores both the
+binding and title together. API/operation changes do not rename the node.
+A removed service can remain in an older spec’s
 binding until an author explicitly updates it.
 
 Manual **Company repository → Load catalog** overrides the bundled snapshot for

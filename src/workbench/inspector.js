@@ -320,7 +320,11 @@ function protocolKinds(page){
         catch(ex){formError(ex.message);return false;}
       }
       var picker=selectControl(registry.services.map(function(s){return s.entityRef;}),bound.entityRef,function(ref){
-        var ok=set(ref); if(ok) refreshFormSoon(); return ok;
+        try {
+          var binding=ref ? FlowCanon.binding(registry,ref) : null, t=session.target;
+          var ok=commitCascade(function(raw){return planBindNodeService(session.text(),raw,t.section,t.id,binding);});
+          if(ok) refreshFormSoon(); return ok;
+        }catch(ex){formError(ex.message);return false;}
       },true);
       Array.prototype.forEach.call(picker.options,function(option){var s=registry.services.find(function(s){return s.entityRef===option.value;});if(s) option.textContent=s.title+' · '+s.entityRef;});
       rows.push(frow('Company service',picker));

@@ -46,6 +46,8 @@ Bound nodes expose saved Backstage/API/source/code destinations through
 right-click and a keyboard/touch **…** button. Preserve `binding` URLs and
 immutable `codeRefs`; do not invent destinations from node titles. Code from
 steps involving the node is labeled **Related step code**, not node ownership.
+The workbench service picker seeds a missing or blank node title from the catalog
+name in the same Undo action as the binding; existing titles remain authored.
 See the node-reference menu section in `docs/backstage-integration.md`.
 For approved reference traces and incident alternates, use
 `cookbook/canonical-incidents.md` and `tools/canon/trace-cli.mjs`. Bind exact

@@ -1,9 +1,10 @@
-import type { DiscoveryApi, FetchApi } from '@backstage/frontend-plugin-api';
+import type { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
 
 import type { DiagramLoader, SpecLoader } from './types';
 import { parseEntityDiagrams } from './validation';
 
-export const SPEC_MAX_BYTES = 2 * 1024 * 1024;
+import { SPEC_MAX_BYTES } from './constants';
+export { SPEC_MAX_BYTES } from './constants';
 
 export function createSpecLoader(
   discovery: DiscoveryApi,

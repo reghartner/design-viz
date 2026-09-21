@@ -7,16 +7,20 @@ export function normalizeEntityRef(value){
   if(!C.entityRef(value))throw new Error('Use a full entity reference: kind:namespace/name.');
   return value.toLowerCase();
 }
-export function buildEntityDiagramIndex(specs,{publicBaseUrl=''}={}){
+export function buildEntityDiagramIndex(specs,{publicBaseUrl='',diagramUrls}={}){
   if(publicBaseUrl && (!C.http(publicBaseUrl) || new URL(publicBaseUrl).search || new URL(publicBaseUrl).hash))throw new Error('Configure an HTTP(S) public base URL without credentials, query or fragment.');
+  if(diagramUrls!==undefined && typeof diagramUrls!=='function')throw new Error('diagramUrls must be a function returning viewerUrl and editUrl.');
   const base=(C.http(publicBaseUrl) || '').replace(/\/$/,''),routing=C.viewerRouting(),entities=new Map(),ids=new Set();
   for(const spec of specs){
     const errors=C.validateSpec(spec).errors;if(errors.length)throw new Error(errors.join('\n'));
     const page=C.pageOf(spec),canon=page.canon;
     if(!canon || ids.has(canon.id))throw new Error('Indexed diagrams require unique page.canon IDs.');ids.add(canon.id);
     const revision=digest(spec),specUrl=base+'/api/canon/specs/'+encodeURIComponent(canon.id);
-    const viewerUrl=base+'/template/flowview.html?spec='+encodeURIComponent(specUrl)+'&v='+revision+'&layout=backstage';
-    const editUrl=base+'/workbench/flowspec.html?canon='+encodeURIComponent(canon.id)+'&layout=backstage';
+    const links=diagramUrls?.({id:canon.id,revision,spec});
+    if(diagramUrls && (!links || !C.http(links.viewerUrl) || new URL(links.viewerUrl).hash || !C.http(links.editUrl)))
+      throw new Error('diagramUrls must return HTTP(S) viewerUrl and editUrl without credentials; viewerUrl cannot contain a fragment.');
+    const viewerUrl=links?C.http(links.viewerUrl):base+'/template/flowview.html?spec='+encodeURIComponent(specUrl)+'&v='+revision+'&layout=backstage';
+    const editUrl=links?C.http(links.editUrl):base+'/workbench/flowspec.html?canon='+encodeURIComponent(canon.id)+'&layout=backstage';
     // Includes prose-only sections and every tab, exactly as the viewer counts
     // and names them. Duplicate/numeric headings use its canonical references.
     routing.sectionRecords(page).forEach(({section,reference,number})=>{

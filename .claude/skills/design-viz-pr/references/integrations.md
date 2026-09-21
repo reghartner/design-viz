@@ -28,8 +28,17 @@ changing a host API rather than inferring it from the mock.
   spec data. Read `docs/native-viewer.md` for ShadowRoot/event/font ownership.
   Verify two mounts, revision races, hidden alternate jumps and cleanup; do not
   restore an iframe, remote code, runtime compilation or a frame CSP hash. Native
-  style isolation is not a security sandbox. Run the copied-plugin check as well
-  as package verification; portable tests must not import upstream source files.
+  style isolation is not a security sandbox. The public root is React-only and
+  loader-injectable; `/reference-proxy` and `/new-frontend` are optional adapters,
+  while `/backend` bundles association indexing. Keep Backstage imports and peers
+  out of the root consumer graph. Run `npm run build --prefix apps/backstage` and
+  `node tools/verify-backstage-package.mjs`: install the actual tarball, bundle
+  downstream declarations and execute backend bundles without upstream files.
+  Consumers must need no source edits, `allowJs`, lint exclusions or install builds.
+  Export/type/loader changes follow the public package SemVer contract. Update
+  package lock, README and company handoff with the changed API; preserve the
+  single company fork and GitHub-sourced specs. A build never authorizes registry
+  publication. CI uploads a tarball; company credentials and release remain local.
 
 The required `tools/browser-tests` suite exercises the actual native React
 component and a copied normal Forge resource using a pinned downloaded Chromium.

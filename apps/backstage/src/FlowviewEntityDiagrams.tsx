@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { DiagramLoader, SpecLoader } from './api';
+import type { DiagramLoader, SpecLoader } from './api/types';
 import { InlineFlowview, type ViewerTarget } from './InlineFlowview';
 import { EvidenceLink } from './components/EvidenceLink';
 import { useEntityDiagrams } from './hooks/useEntityDiagrams';

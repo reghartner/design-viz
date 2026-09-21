@@ -33,7 +33,10 @@ releases and builds the nginx editor image from the same versioned source.
 **`backstage-diagrams` hosts the static workbench and no APIs.** The Backstage
 plugin pulls diagram specs from this repository in **GitHub**. The separate
 Backstage app repository owns the plugin installation, GitHub access and app
-deployment. There is no Flowview diagrams service between Backstage and GitHub.
+deployment. `apps/backstage` in the same fork builds the versioned
+`@flowview/backstage-plugin` package. The company registry distributes its built
+artifact; it is not another source repository. There is no Flowview diagrams
+service between Backstage and GitHub.
 Backstage pins and upgrades its Flowview dependency through its own PR/release
 cycle. [Spec/runtime compatibility](runtime-compatibility.md) lets a newer spec
 explain which features need an upgrade. The company Backstage integration owns
@@ -42,7 +45,7 @@ GitHub authentication and reader access; the static nginx site supplies neither.
 Host the generated `template/flowview.html`, `workbench/flowspec.html`, and portal
 assets behind company authentication. Install the [Flowview entity plugin](../apps/backstage/README.md)
 for a **Diagrams** tab on Component and API pages, or mount the mock portal as a
-development preview. `tools/canon/entity-diagrams.mjs` derives associations from
+development preview. The package's `/backend` entry derives associations from
 `nodes.*.binding.entityRef` and explicit API bindings across every section/tab.
 The tab renders canonical flows and HLD designs inline with jumps to relevant happy
 and alternate steps, and refreshes automatically. Editing stays external. The
@@ -55,12 +58,14 @@ manually maintained list is needed.
 ### GitHub source integration status
 
 The company GitHub loader is an integration responsibility, not something proven
-by the public toolkit's existing mock. `apps/backstage/src/EntityFlowviewContent.tsx`
-currently wires the reference proxy loaders from `src/api/client.ts`.
-For the company source, wire GitHub-backed `loadDiagrams` and `loadSpec` functions
-into `FlowviewEntityDiagrams`; their contracts are in `src/api/types.ts` relative
-to `apps/backstage/`. Reuse the association and validation helpers without
-deploying `apps/backstage-mock/server.mjs` as a company service.
+by the public toolkit's existing mock. Install `@flowview/backstage-plugin` and
+import `FlowviewEntityDiagrams`, `DiagramLoader`, `SpecLoader`,
+`parseEntityDiagrams` and `SPEC_MAX_BYTES` from the package root. Wire company
+GitHub loaders into that component. Root imports are independent of Backstage
+frontend registration and the proxy; the optional `/reference-proxy` and
+`/new-frontend` entries provide the reference transport. Reuse `/backend`
+association helpers without vendoring `tools/canon` or deploying the mock server.
+See the [package API and loader example](../apps/backstage/README.md#company-github-loaders).
 
 Keep the association index and selected spec on a consistent Git snapshot.
 Preserve compatibility declarations and distinguish a failed GitHub read from
@@ -72,12 +77,18 @@ rendering and drift against fictional data, not the company's GitHub source path
 
 ### Backend production packaging
 
-`tools/canon/core.cjs` imports the committed `generated-runtime.cjs` through a
-static CommonJS dependency. It contains the shared catalog, validation and pure
-core code, exposed through a cached viewer-routing facade. Backend bundlers can include it without copying `src/` into
-the image, and it never uses `fs.readFileSync` or `vm` to load renderer source.
-Keep the generated module when vendoring `tools/canon/`; existing import paths
-and the `validateSpec()` / `viewerRouting()` API stay the same.
+Install the same package version in the Backstage backend workspace and import
+`buildEntityDiagramIndex` and `diagramsForEntity` from
+`@flowview/backstage-plugin/backend`. Pass only the approved specs the requesting
+reader may access. Supply `diagramUrls` for your company's hosted viewer/editor
+links; its callback receives `{id, revision, spec}`. Omitting it retains the
+reference adapter's `publicBaseUrl`/`/api/canon` URL convention.
+
+The entry is prebuilt for ESM and CommonJS and includes the shared static
+validation/routing runtime. It performs no GitHub requests and has no runtime
+`fs`/`vm`/`__dirname` source loading. Neither `tools/canon` nor `src/` needs to be
+copied into the app or image. The source implementation still uses
+`tools/canon/core.cjs` and its generated static dependency inside this fork.
 
 The entity index and native mount use the shared `sectionRecords()` identities
 and `resolveSourceStep()` lookup described in [shared core](shared-core.md).
@@ -90,13 +101,17 @@ sources change, and commit the output. CI checks freshness and runs standalone
 CommonJS and ESM backend bundles with filesystem access restricted to the bundle
 directory. Those tests exercise validation and service links into happy/alternate
 steps. Consumers of the committed runtime do not need Python or the source tree
-at runtime.
+at runtime. The packed-consumer check also installs the actual release, bundles
+its declarations, renders with injected loaders, and runs its backend bundle
+without the source checkout.
 
 If these data-only helpers are used in the Backstage backend, build its actual
 image and smoke-test the GitHub loading/indexing path from that image. A development
 `backstage-cli package start` run alone does not verify production packaging. If
-the host externalizes a Flowview workspace package instead of bundling its code,
-include that package and `generated-runtime.cjs` in the production dependencies.
+the host externalizes the package instead of bundling its code, include the
+installed package and its prebuilt `dist` in production dependencies. Follow the
+[release checklist](../apps/backstage/README.md#release-and-public-api-policy);
+company registry publishing and installed-image acceptance happen in your environment.
 
 ### Reference mock API (not a company deployment requirement)
 

@@ -1,4 +1,4 @@
-import type { AssociatedDiagram, SpecLoader } from './api';
+import type { AssociatedDiagram, SpecLoader } from './api/types';
 import { FlowviewCompatibility } from './generated/compatibility';
 import { useInlineViewer } from './hooks/useInlineViewer';
 import type { ViewerTarget } from './viewer/protocol';

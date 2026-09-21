@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "Packed consumer recording",
+    "contract": "1",
+    "canon": {
+      "version": 1,
+      "id": "consumer-recording",
+      "kind": "canonical",
+      "owner": "group:default/consumer"
+    },
+    "sections": [{
+      "heading": "Recording",
+      "diagram": {
+        "view": "step",
+        "autoplay": false,
+        "nodes": {
+          "cloud": {
+            "title": "Recording service",
+            "icon": "cloud",
+            "binding": { "entityRef": "component:default/recording" }
+          }
+        },
+        "rows": [["cloud"]],
+        "steps": [
+          { "id": "save", "text": "Recording saved", "nodes": ["cloud"] },
+          { "id": "failure", "text": "Recording unavailable", "nodes": ["cloud"] }
+        ],
+        "paths": [
+          { "id": "happy", "label": "Saved", "steps": ["save"] },
+          { "id": "failed", "label": "Unavailable", "steps": ["failure"] }
+        ]
+      }
+    }]
+  }
+}

@@ -9,9 +9,16 @@ Flowview engine/plugin source remains in the public Flowview repository.
 running `node scripts/vendor-flowview.mjs PATH_TO_CLEAN_FLOWVIEW_CHECKOUT` and
 reviewing the resulting PR. The service catalog is preserved by runtime upgrades.
 
-The real Backstage host is in the mock repository. It copies `apps/backstage`
-from this checkout, reads approved specs through the authenticated proxy, and
-links to the external workbench. See the mock README for setup and browser tests.
+The real Backstage host is in the mock repository. Its installer builds and packs
+`apps/backstage` from this checkout and installs the compiled tarball as
+`@flowview/backstage-plugin`. The `/new-frontend` adapter reads approved specs
+through the reference authenticated proxy and links to the external workbench.
+No source tree is copied into the host. See the mock README for setup, local
+lockfile refresh and browser tests.
+
+This generated repository is fictional rehearsal scaffolding. A company builds
+and publishes the package from its existing Flowview fork, which also owns its
+diagrams and static workbench; it does not need an additional package-source repo.
 
 ## Catalog and source workflows
 

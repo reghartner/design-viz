@@ -5,14 +5,14 @@ engine, editor and specs, and hosts the static workbench with no APIs. The
 Backstage plugin pulls diagram specs from that GitHub repository; the Backstage
 app separately pins and ships its renderer dependency.
 
-**Current reference transport:** this source package's `EntityFlowviewContent`
-still wires the proxy-based loaders in `src/api/client.ts`. The company agent
-supplies GitHub-backed `loadDiagrams` and `loadSpec` functions for
-`FlowviewEntityDiagrams` (contracts in `src/api/types.ts`). The mock and existing
+**Public package:** `@flowview/backstage-plugin` exports the React rendering core
+and its stable loader contracts. The company agent supplies GitHub-backed
+`loadDiagrams` and `loadSpec` functions for `FlowviewEntityDiagrams`. The optional
+`/reference-proxy` adapter wires the mock/proxy transport. The mock and existing
 local screenshots test native rendering through the reference adapter, not
 the company GitHub loader. See the [company source handoff](../../docs/backstage-integration.md#github-source-integration-status).
 
-This source workspace plugin adds a **Diagrams** tab to Component and API entity
+This package supplies a **Diagrams** tab to Component and API entity
 pages. It discovers published diagrams from explicit spec bindings; no per-service
 list, catalog annotation, or manual Backstage link maintenance is required.
 
@@ -54,54 +54,103 @@ Backstage frontend integration; the company agent connects its GitHub source.
 
 ## Install in the company Backstage app
 
-Copy this directory into your Backstage workspace as `plugins/flowview`, or bring
-it into that workspace through your normal internal package process. Keep
-`tools/canon/entity-diagrams.mjs` and its dependencies with the Backstage-side
-indexing code if reused, including the committed `tools/canon/generated-runtime.cjs`. Its static
-import makes the shared runtime available to production bundlers without a
-runtime `src/` directory; see [backend production packaging](../../docs/backstage-integration.md#backend-production-packaging)
-for the company image acceptance check. Align the Backstage dependency versions
-with the host app's release;
-this package is typechecked against the versions pinned in `package-lock.json`.
-It is private source code, not a published npm package.
+Install a released version from your company registry in the existing Backstage
+frontend workspace:
 
-Add `@flowview/backstage-plugin` as a dependency of the frontend app workspace.
-For a Yarn workspace, its package dependency can use `"workspace:^"`.
-
-For the new frontend system, include the default plugin in the app's features:
-
-```tsx
-import flowviewPlugin from '@flowview/backstage-plugin';
-
-const app = createApp({
-  features: [/* your existing features, */ flowviewPlugin],
-});
+```sh
+yarn workspace app add @flowview/backstage-plugin@1.0.0
 ```
 
-This registers the default tab using the reference proxy loaders. Wire the
-company GitHub loaders before using it for the company deployment. It includes
-entities that currently have zero diagrams. Keep the empty tab: it explains how
-a service becomes associated instead of suggesting that the integration is absent.
+The company fork `backstage-diagrams` owns the package source in `apps/backstage`,
+the workbench, and the diagram specs. It publishes the package to the approved
+registry; publishing does not require another source repository. The existing
+Backstage app repository pins and upgrades that dependency through its own PR.
+Configure the `@flowview` registry/authentication in your normal package-manager
+configuration. This repository's build does not publish to any registry.
 
-For an app that still defines `EntityLayout` routes explicitly, use the named
-component on the service/API entity page:
+The package ships prebuilt JavaScript and bundled declarations. Consumers do not
+compile or lint Flowview source, enable `allowJs`, or edit files in the installed
+package. Both ESM and CommonJS entry points have matching declaration exports.
+
+| Import | Public surface |
+| --- | --- |
+| `@flowview/backstage-plugin` | `FlowviewEntityDiagrams`, wire/load types, `ViewerTarget`, `parseEntityDiagrams`, `SPEC_MAX_BYTES`, native mount/types and `FlowviewCompatibility` |
+| `@flowview/backstage-plugin/reference-proxy` | Optional `EntityFlowviewContent`, `createDiagramLoader`, `createSpecLoader` |
+| `@flowview/backstage-plugin/new-frontend` | Optional default/named `flowviewPlugin` registering the reference-proxy tab |
+| `@flowview/backstage-plugin/backend` | `buildEntityDiagramIndex`, `diagramsForEntity` and index/options types |
+
+The root import has no Backstage dependency or proxy transport. React is the
+required frontend peer. Backstage peers are optional; install the peers needed by
+the adapter you choose and align them with the host's Backstage release. Only the
+`/new-frontend` entry requires the new frontend registration API. Its default
+plugin deliberately uses the reference proxy, so the company GitHub integration
+should register its own entity content using the core component.
+
+### Company GitHub loaders
+
+Register a component such as this on your company entity page:
 
 ```tsx
-import {EntityFlowviewContent} from '@flowview/backstage-plugin';
+import {useEntity} from '@backstage/plugin-catalog-react';
+import {stringifyEntityRef} from '@backstage/catalog-model';
+import {
+  FlowviewEntityDiagrams, parseEntityDiagrams, SPEC_MAX_BYTES,
+  type DiagramLoader, type SpecLoader,
+} from '@flowview/backstage-plugin';
+import {githubSource} from './companyGitHubSource'; // Company-owned authenticated adapter.
 
-<EntityLayout.Route path="/diagrams" title="Diagrams">
-  <EntityFlowviewContent />
-</EntityLayout.Route>
+const loadDiagrams: DiagramLoader = async (entityRef, signal) =>
+  parseEntityDiagrams(await githubSource.associations(entityRef, signal), entityRef);
+
+const loadSpec: SpecLoader = async (diagram, signal) => {
+  const {text, revision} = await githubSource.approvedSpec(diagram.id, signal);
+  if (revision !== diagram.revision) throw new Error('Diagram changed; refresh diagrams.');
+  if (new TextEncoder().encode(text).length > SPEC_MAX_BYTES)
+    throw new Error('Diagram exceeds the 2 MiB viewer limit.');
+  const spec = JSON.parse(text);
+  if (spec?.page?.canon?.id !== diagram.id) throw new Error('Unexpected diagram.');
+  return spec;
+};
+
+export function CompanyDiagrams() {
+  const {entity} = useEntity();
+  return <FlowviewEntityDiagrams
+    entityRef={stringifyEntityRef(entity).toLowerCase()}
+    loadDiagrams={loadDiagrams} loadSpec={loadSpec} refreshMs={60000}
+  />;
+}
 ```
 
-The component gets the entity from Backstage's `useEntity`; it does not guess
-identity from display names. Its current reference wiring uses `FetchApi` and discovers the proxy base on
-each request. The optional frontend `flowview.proxyPath` defaults to `/flowview`.
-`config.d.ts` declares that path's frontend visibility; it contains no credentials.
+`companyGitHubSource` is your integration, not a shipped client. Keep loader
+identities stable, forward each `AbortSignal`, and resolve list and spec from the
+same approved snapshot. A diagram's `revision` is the spec digest from the index,
+not necessarily a Git commit SHA; the company adapter maps it to its pinned Git
+snapshot and verifies that digest. Fail a missing/unauthorized/stale read instead
+of returning an empty list or a different revision. The renderer accepts inert
+JSON and performs its own spec validation; it never obtains GitHub credentials.
+
+In the new frontend system, return `<CompanyDiagrams />` from your
+`EntityContentBlueprint` loader and register that extension with your existing
+app. A route-based host can mount the same component in its entity route. Neither
+requires modifications inside the package. Keep an empty Diagrams tab visible so
+users can discover how to associate a service.
 
 ## Reference proxy adapter
 
-The following configuration documents the existing API-based reference adapter
+Import the optional reference wiring independently:
+
+```tsx
+import {EntityFlowviewContent} from '@flowview/backstage-plugin/reference-proxy';
+// Or register the complete reference tab in a new-frontend app:
+import flowviewPlugin from '@flowview/backstage-plugin/new-frontend';
+```
+
+`EntityFlowviewContent` gets the entity from `useEntity` and discovery/fetch/config
+from Backstage's core plugin API. It discovers the proxy URL on each request.
+The optional frontend `flowview.proxyPath` defaults to `/flowview`; `config.d.ts`
+declares its frontend visibility and contains no credentials.
+
+The following configuration documents the API-based reference adapter
 and local rehearsal. It is not the GitHub-backed company architecture, and does
 not require `backstage-diagrams` to host a read API. For deployments deliberately
 using this adapter, configure a read-only Backstage proxy route:
@@ -134,7 +183,7 @@ After obtaining the published specs the requesting viewer can read:
 
 ```js
 import {buildEntityDiagramIndex, diagramsForEntity}
-  from './tools/canon/entity-diagrams.mjs';
+  from '@flowview/backstage-plugin/backend';
 
 const index = buildEntityDiagramIndex(authorizedPublishedSpecs, {
   publicBaseUrl: 'https://flowview.internal.example',
@@ -154,7 +203,7 @@ Each entry has `id`, `title`, `kind`, `owner`, `revision`, `viewerUrl`, `editUrl
 optional `designDocument`, and `sections`. Sections contain matched `nodes`,
 a `url`, and paths with numbered, linked steps. Empty results are HTTP 200 with
 an empty array; an invalid/unavailable index must be an error, not an empty list.
-`src/api.ts` contains the frontend contract and response checks.
+The root package exports the wire-contract types and `parseEntityDiagrams`.
 
 The spec route must apply the same per-viewer authorization as the association
 list. Return the requested approved revision, or HTTP 409 when it is no longer
@@ -163,6 +212,34 @@ the listed revision. The response is the original JSON spec with matching
 `page.canon.id`, at most 2 MiB UTF-8. Selection changes cancel pending reads and
 remove the old viewer. Read/render failures show an explicit retry; a stale
 revision asks the reader to refresh diagrams.
+
+## Indexing specs fetched from GitHub
+
+Install the same package version in your existing Backstage backend workspace and
+import only `/backend`. Supply the approved specs that the requesting reader can
+access; the module performs no source-control requests or authentication. It
+contains the statically bundled validation/routing runtime and needs no `tools/`,
+`src/`, `fs`, `vm`, or runtime source lookup in the deployed image.
+
+```ts
+import {buildEntityDiagramIndex, diagramsForEntity}
+  from '@flowview/backstage-plugin/backend';
+
+const index = buildEntityDiagramIndex(authorizedSpecs, {
+  diagramUrls: ({id, revision}) => ({
+    viewerUrl: `https://designs.example.test/approved/${id}.html?v=${revision}`,
+    editUrl: 'https://designs.example.test/workbench/flowspec.html',
+  }),
+});
+const result = diagramsForEntity(index, 'component:default/recording-service');
+```
+
+Use your actual hosted viewer/editor routes. `diagramUrls` configures links only;
+it does not fetch or publish those pages. Viewer URLs must be HTTP(S), have no
+credentials or fragment, and receive generated section/path/step fragments from
+the shared router. Edit URLs must be credential-free HTTP(S). Without this option,
+`publicBaseUrl` retains the reference adapter's `/api/canon` link convention.
+Cache the index by both approved snapshot and authorization scope.
 
 ## Rendering and browser policy
 
@@ -193,8 +270,8 @@ patched. Content takes its natural height in the host layout. Stale revisions,
 failed reads and unmounts retire the old instance; a failed navigation leaves a
 valid diagram available for another jump.
 
-`src/generated/nativeViewer.js`, its declarations, compatibility checker and
-`FONT-LICENSES.txt` travel with the plugin. Company builds do not need this
+The generated native viewer and compatibility checker are compiled into `dist`;
+bundled declarations, `LICENSE` and `FONT-LICENSES.txt` travel with the package. Company builds do not need this
 repository's source tree. Runtime maintainers run `npm run build:viewer` here;
 CI checks freshness with `npm run check:viewer`. The artifact includes the shared
 engine, validation, styles, icons and licensed Latin fonts selected by the shared
@@ -239,6 +316,8 @@ single-file panel contract, shared lifecycle, authoring hooks and build discover
 ```sh
 npm ci --no-fund --no-audit
 npm run verify
+npm run build
+node ../../tools/verify-backstage-package.mjs --skip-build
 ```
 
 CI typechecks against real Backstage packages and tests rendering, automatic
@@ -247,6 +326,33 @@ proxy client, revision-pinned reads, native mount cleanup, exact hidden-step
 navigation, SVG links and static artifact boundaries. Root Node tests cover indexing, alternate links and registry/review
 updates. Company SSO, authorization and mounting the tab in the company's actual
 Backstage app remain the final integration checks.
+
+## Release and public API policy
+
+Package version 1.0.0 establishes the stable import paths and the loader, wire,
+native-viewer and backend contracts documented above. Removing/renaming an export,
+changing a loader signature, or requiring new wire fields needs a major version.
+Additive optional fields/exports use a minor version; compatible fixes use a patch.
+The bundled renderer's `FlowviewCompatibility.version` and spec feature metadata
+remain distinct from package SemVer: check them to explain renderer upgrades.
+
+From a clean reviewed company-fork checkout:
+
+```sh
+npm ci --prefix apps/backstage --no-fund --no-audit
+npm run verify --prefix apps/backstage
+npm run build --prefix apps/backstage
+node tools/verify-backstage-package.mjs --skip-build
+npm pack ./apps/backstage
+# Publish the resulting, reviewed .tgz to your configured company registry:
+# npm publish ./flowview-backstage-plugin-1.0.0.tgz --registry https://REGISTRY
+```
+
+For an explicit package path, run `npm pack ./apps/backstage` from the repository
+root. CI uploads the built tarball as `backstage-plugin-package`; it does not
+publish it. Test the installed company backend image and host CSP/SSO before the
+company app release. Upgrade the package version through a normal dependency PR;
+new specs can be read from GitHub independently.
 
 References: [entity-content extensions](https://backstage.io/docs/frontend-system/building-plugins/#plugin-specific-extensions),
 [authenticated proxy configuration](https://backstage.io/docs/plugins/proxying/).

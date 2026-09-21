@@ -1,7 +1,8 @@
 # Backstage plugin maintenance
 
-This package is a read-only host adapter. It discovers associated diagrams and
-loads revision-pinned JSON through Backstage's authenticated proxy. The external
+The root package is a React rendering library with injected association/spec
+loaders. The optional reference adapter reads revision-pinned JSON through
+Backstage's authenticated proxy; company loaders read approved GitHub specs. The external
 workbench owns editing; the bundled Flowview runtime owns rendering.
 
 ## Handwritten modules
@@ -9,7 +10,9 @@ workbench owns editing; the bundled Flowview runtime owns rendering.
 | Responsibility | Location |
 | --- | --- |
 | Backstage registration and entity/config adapters | `src/plugin.tsx`, `src/EntityFlowviewContent.tsx` |
-| Public API facade, preserved for consumers | `src/api.ts` |
+| Stable root exports and optional adapter entries | `src/index.ts`, `src/reference-proxy.ts`, `src/new-frontend.ts` |
+| Bundled backend indexing boundary | `src/backend.ts`, `../../tools/canon/entity-diagrams.mjs` |
+| Package JS/declaration bundles | `build.mjs`, `package.json` exports |
 | Wire contracts, response validation, proxy clients | `src/api/` |
 | Association refresh, request cancellation, stale results | `src/hooks/useEntityDiagrams.ts` |
 | Spec loading, native mount, pause and cleanup | `src/hooks/useInlineViewer.ts` |
@@ -46,14 +49,14 @@ adapter owns CSS scoping, namespaced fonts and instance mount/environment code.
 The named `compatibility` entrypoint supplies the checker and its panel metadata.
 Source order, exports and font profiles are described in the upstream
 [build guide](../../docs/build-entrypoints.md). Company
-copies use these artifacts without reading the upstream `src/` tree. Changes to
+releases compile these artifacts into `dist` without reading the upstream `src/` tree. Changes to
 shared source or native ownership require `npm run build:viewer` upstream.
 ShadowRoot isolation and the host script/style/font/image policy are documented
 in the README; there is no frame channel or generated script hash.
 
 ## Verification boundaries
 
-`npm run verify` works with only this package and its installed dependencies. It
+`npm run verify` runs from the company fork with installed development dependencies. It
 covers strict types, API validation, refresh/cancellation, selection by revision,
 native lifecycle, recoverable exact navigation, inert/unsafe assets and static
 artifact boundaries. Root tests cover real entity-index → shared core → native
@@ -64,14 +67,19 @@ From the upstream repository, also run:
 ```sh
 npm run check:viewer --prefix apps/backstage
 node --test tests/canon-bundle.test.mjs
-node tools/verify-backstage-copy.mjs
+npm run build --prefix apps/backstage
+node tools/verify-backstage-package.mjs --skip-build
 ```
 
 The backend test uses the plugin's installed esbuild dependency and Node 24 to
 check CJS/ESM bundles with filesystem access restricted to their output directory.
-It belongs upstream because the Canon backend and its fixtures are not part of
-this frontend package. The copy check installs only the plugin in a temporary
-directory and runs the documented verification there.
+The packed-consumer check installs a real tarball into an isolated temporary
+consumer with no Backstage packages. It checks public exports, custom-loader
+rendering, backend bundles and downstream declaration bundling without `allowJs`.
+The distributed package contains built JS, flattened declarations and licenses,
+not source to lint or an install-time build. Optional adapter entry points retain
+external Backstage peers; the core graph must never import them. Keep exported
+wire, loader and native/backend types stable under package SemVer.
 
 CI does not boot the entire Backstage app. The public rehearsal's documented
 installed-host browser check is an additional integration gate; company SSO,

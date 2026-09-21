@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DiagramLoader, EntityDiagrams } from '../api';
+import type { DiagramLoader, EntityDiagrams } from '../api/types';
 
 interface LookupState {
   ref: string;

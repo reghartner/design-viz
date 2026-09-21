@@ -1265,8 +1265,9 @@ body.workspace-focus .workwrap{max-width:none;}
 .guide li code{font:600 11px 'IBM Plex Mono',monospace; background:var(--codebg); color:var(--codeink); padding:0 4px; border-radius:4px;}
 .guide .gtokens{margin-top:6px; font:500 11px 'IBM Plex Mono',monospace;}
 /* inspector: per-element edit form written through to the spec JSON */
-.iform{margin-top:8px; display:grid; gap:5px;}
-.frow{display:flex; align-items:center; gap:8px;}
+/* Long catalog options must not set the minimum width of the whole form. */
+.iform{margin-top:8px; display:grid; grid-template-columns:minmax(0,1fr); min-width:0; gap:5px;}
+.frow{display:flex; min-width:0; align-items:center; gap:8px;}
 .flab{flex:0 0 88px; font:600 11px 'IBM Plex Mono',monospace; color:var(--sub); text-align:right;}
 .fctl{flex:1; min-width:0; background:var(--codebg); color:var(--codeink); border:1px solid var(--line);
   border-radius:6px; font:12px/1.4 'IBM Plex Mono',monospace; padding:4px 8px; box-sizing:border-box;}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AssociatedDiagram, SpecLoader } from '../api';
+import type { AssociatedDiagram, SpecLoader } from '../api/types';
 import { FlowviewCompatibility } from '../generated/compatibility';
 import { mountNativeViewer, type NativeViewer } from '../generated/nativeViewer';
 import type { ViewerTarget } from '../viewer/protocol';

@@ -7,8 +7,9 @@ All service code, catalogs and API definitions are fictional. Node 24 is require
 
 The public package creator has already installed the small catalog dependencies,
 seeded the workbench through an authenticated HTTP GET, generated local test
-credentials, and copied the real Flowview plugin from the designer checkout.
-Install the larger Backstage workspace, then start all four services:
+credentials, and recorded the designer checkout as the package source. Install
+builds and packs `@flowview/backstage-plugin` there, then installs the tarball into
+the larger Backstage workspace. Start all four services afterward:
 
 ```sh
 node scripts/install-backstage.mjs
@@ -24,10 +25,24 @@ Stop the launcher with Ctrl-C to stop its child services.
 After fresh clones, run `npm ci` here and
 `npm ci --prefix tools/catalog-sync --ignore-scripts` in the designer repository,
 then `node scripts/setup-sandbox.mjs ../__DESIGNER_NAME__` here before installing
-Backstage. Setup copies the designer's actual native plugin and configures the
-local host's bundled-script and embedded-font/image/style CSP. No iframe or
-Flowview script hash is required. Setup replaces its generated plugin copy; make
-plugin changes in the designer runtime source. Repeat setup after a reviewed runtime upgrade.
+Backstage. Setup records the designer source path and configures the local host's
+bundled-script and embedded-font/image/style CSP. No iframe or Flowview script
+hash is required. It preserves existing credentials and installs no dependencies.
+
+The installer uses the designer's local npm build tooling and the sandbox's local
+Yarn release; no global tooling is installed. Flowview is a compiled tarball
+dependency, with no copy under `plugins/flowview`. The app imports the optional
+`@flowview/backstage-plugin/new-frontend` entry, which still uses the reference
+proxy/read API transport. Company GitHub loading needs separate acceptance.
+
+The fixture lockfile pins host dependencies before a local tarball exists. The
+installer stages a SHA-256-named archive in ignored `sandbox/backstage/.local/`,
+updates the app's `file:` dependency and runs `yarn install --no-immutable` to
+refresh its resolution. Repeat the installer after a reviewed designer runtime
+upgrade; repeat setup only when the source checkout moves. Review the app manifest
+and lockfile diff. A new digest prevents stale package reuse even at the same
+version. Keep the archive for later immutable installs; after a fresh clone,
+rebuild through this installer. Do not commit local archives or credentials.
 
 ## Verify
 

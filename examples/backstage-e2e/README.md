@@ -56,14 +56,29 @@ The creator:
    GET using the production importer. Three services and three APIs seed the editor.
 4. Authors a happy/timeout diagram from those identities and pins its code anchors
    to the new source commit. These are fresh pins, not copied demo SHAs.
-5. Generates ignored local credentials/CSP configuration and creates separate
-   refactor and timeout experiment branches. Source `main` remains healthy.
+5. Records the designer package source and generates ignored local credentials/CSP
+   configuration, then creates separate refactor and timeout experiment branches.
+   Source `main` remains healthy. Creation does not install the Backstage host.
 
 The real Backstage host is the official create-app 0.9.2 scaffold with a committed
-lockfile and selected plugins. It ingests the mock repository's catalog/OpenAPI
-files through real processors, copies the designer's actual Flowview plugin, and
-renders approved specs through an authenticated proxy. This is development Guest
+host dependency lockfile and selected plugins. It ingests the mock repository's
+catalog/OpenAPI files through real processors. The install script builds and packs
+`@flowview/backstage-plugin` from the designer, then installs that tarball in the
+app. Its `/new-frontend` entry renders approved specs through the reference
+authenticated proxy. This is development Guest
 auth with fictional data; company SSO and production hosting are separate work.
+No plugin source is copied into the host. The separate generated designer exists
+for this fictional rehearsal; the company publishes from its existing Flowview
+fork and does not need an additional source repository.
+
+The fixture lockfile pins the host dependencies before the local package exists.
+`install-backstage.mjs` names the tarball by its SHA-256 digest, updates the app
+manifest, and deliberately runs Yarn with `--no-immutable` to resolve that local
+archive. Repeat the installer after a reviewed runtime change. Review the app
+manifest and lockfile diff; changed package bytes get a new file locator even at
+the same version. Tarballs stay under ignored `sandbox/backstage/.local/`.
+Keep the staged archive when running a later `yarn install --immutable`; a fresh
+clone needs setup and the installer to rebuild its local package first.
 
 ## 2. Verify locally
 
@@ -174,8 +189,8 @@ Backstage scaffold/lockfile, portable setup, sample authoring logic, tests and
 workflow templates. The runtime is copied from the checked-out public commit.
 No complete live repository history or private run artifacts are copied.
 
-Generated credentials, deploy private keys, installed dependencies, screenshots,
-local configuration and run evidence are ignored. Do not force-add them. The
+Generated credentials, deploy private keys, packed tarballs, installed dependencies,
+screenshots, local configuration and run evidence are ignored. Do not force-add them. The
 Backstage scaffold retains its Apache-2.0 license; Flowview carries its own license.
 The mock is a tested subset of the real Catalog API, not a full implementation.
 For company deployment, replace the fixture with a reachable Backstage backend

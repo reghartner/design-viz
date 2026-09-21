@@ -38,6 +38,30 @@ test('service step links select the correct alternate and include both ends of f
   assert.equal(section.paths[1].steps[1].position,2);
 });
 
+test('caller-supplied links keep indexing independent of proxy transport and retain exact step navigation',async()=>{
+  const {buildEntityDiagramIndex,diagramsForEntity}=await import('../tools/canon/entity-diagrams.mjs');
+  const raw=spec(),before=JSON.stringify(raw),calls=[];
+  const diagramUrls=({id,revision,spec:input})=>{
+    calls.push({id,revision});assert.equal(input,raw);
+    return {viewerUrl:'https://designs.example.test/approved/'+id+'.html?revision='+revision,
+      editUrl:'https://designs.example.test/workbench/flowspec.html'};
+  };
+  const result=diagramsForEntity(buildEntityDiagramIndex([raw],{diagramUrls}),ref),entry=result.diagrams[0];
+  assert.deepEqual(calls,[{id:'flow',revision:entry.revision}]);
+  assert.equal(entry.editUrl,'https://designs.example.test/workbench/flowspec.html');
+  assert.equal(entry.viewerUrl,'https://designs.example.test/approved/flow.html?revision='+entry.revision);
+  const link=new URL(entry.sections[0].paths[1].steps[1].url),hash=new URLSearchParams(link.hash.slice(1));
+  assert.equal(link.pathname,'/approved/flow.html');assert.equal(link.searchParams.get('revision'),entry.revision);
+  assert.equal(hash.get('d'),'delivery-2');assert.equal(hash.get('p'),'failed');assert.equal(hash.get('s'),'failure');
+  assert.doesNotMatch(JSON.stringify(result),/api\/canon/);assert.equal(JSON.stringify(raw),before);
+  for(const links of [null,{}, {viewerUrl:'javascript:alert(1)',editUrl:entry.editUrl},
+    {viewerUrl:entry.viewerUrl+'#incorrect-section',editUrl:entry.editUrl},
+    {viewerUrl:entry.viewerUrl,editUrl:'https://token@example.test/editor'}]){
+    assert.throws(()=>buildEntityDiagramIndex([raw],{diagramUrls:()=>links}),/diagramUrls/);
+  }
+  assert.throws(()=>buildEntityDiagramIndex([raw],{diagramUrls:'wrong'}),/diagramUrls/);
+});
+
 test('a real entity link passes through shared core and the native mount to a wholly hidden alternate',async()=>{
   const {buildEntityDiagramIndex,diagramsForEntity}=await import('../tools/canon/entity-diagrams.mjs');
   const raw=spec(),d=raw.page.blocks[1].tabs[0].sections[0].diagram;

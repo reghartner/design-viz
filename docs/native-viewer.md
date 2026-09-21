@@ -107,7 +107,8 @@ engine edits, `python3 tools/build.py`, and the relevant Python build tests. The
 npm run build:viewer --prefix apps/backstage
 npm run verify --prefix apps/backstage
 npm run check:viewer --prefix apps/backstage
-node tools/verify-backstage-copy.mjs
+npm run build --prefix apps/backstage
+node tools/verify-backstage-package.mjs --skip-build
 node --test tests/canon-bundle.test.mjs
 npm run verify --prefix apps/confluence
 node --test examples/backstage-e2e/tests/*.test.mjs

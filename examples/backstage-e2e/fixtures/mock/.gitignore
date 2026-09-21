@@ -2,4 +2,3 @@ node_modules/
 .local/
 *.local.yaml
 .DS_Store
-sandbox/backstage/plugins/flowview/

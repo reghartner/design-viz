@@ -9,6 +9,8 @@ import {
   writeFile,
   mkdir,
   symlink,
+  access,
+  realpath,
 } from 'node:fs/promises';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -311,15 +313,25 @@ test(
             'check-ignore',
             '.local/secrets.json',
             'sandbox/backstage/app-config.local.yaml',
-            'sandbox/backstage/plugins/flowview/package.json',
+            'sandbox/backstage/.local/flowview-backstage-plugin-test.tgz',
+            '.local/designer.json',
           ],
           mock
         )
       ).stdout
         .trim()
         .split('\n').length,
-      3
+      4
     );
+    const setupSource = JSON.parse(await readFile(path.join(mock, '.local/designer.json'), 'utf8'));
+    assert.equal(setupSource.source, await realpath(designer));
+    await assert.rejects(access(path.join(mock, 'sandbox/backstage/plugins/flowview')), {code: 'ENOENT'});
+    await assert.rejects(access(path.join(mock, 'sandbox/backstage/node_modules')), {code: 'ENOENT'});
+    assert.equal(await readFile(path.join(designer, 'LICENSE'), 'utf8'), await readFile(path.join(root, 'LICENSE'), 'utf8'));
+    const app = JSON.parse(await readFile(path.join(mock, 'sandbox/backstage/packages/app/package.json'), 'utf8'));
+    assert.equal(app.dependencies['@flowview/backstage-plugin'], 'file:../../.local/flowview-backstage-plugin.tgz');
+    assert.match(await readFile(path.join(mock, 'sandbox/backstage/packages/app/src/App.tsx'), 'utf8'), /@flowview\/backstage-plugin\/new-frontend/);
+    assert.doesNotMatch(await readFile(path.join(mock, 'sandbox/backstage/yarn.lock'), 'utf8'), /@flowview\/backstage-plugin@workspace:/);
     const workflows =
       (await readFile(
         path.join(designer, '.github/workflows/catalog-sync.yml'),

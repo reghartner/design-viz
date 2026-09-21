@@ -12,3 +12,4 @@ node_modules/
 /.local/
 /apps/confluence/static/
 /apps/confluence/preview/
+/apps/backstage/release/

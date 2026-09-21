@@ -63,6 +63,9 @@ keeps a 320-pixel live preview on the right. It also enters Focus workspace.
 does not render the preview again or change the selected step, path or view.
 Wide home-step inspectors place the map beside its device, person and signal
 controls. Narrow inspectors stack them.
+Inspector fields stay within the editor column even when service/API choices
+or field values are long. Use **Expand editor** when you want more space to read
+and edit those values.
 
 Preview panels move below the diagram when its section has 1000 pixels or
 less of usable width. This follows the space left by the editor and section

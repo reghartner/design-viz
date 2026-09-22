@@ -49,13 +49,9 @@
           "rows": [
             [
               "sensor",
-              "intake"
-            ],
-            [
+              "intake",
               "monitor",
-              "dispatch"
-            ],
-            [
+              "dispatch",
               "unit"
             ]
           ],

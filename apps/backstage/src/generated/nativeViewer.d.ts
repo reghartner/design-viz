@@ -10,7 +10,12 @@ export interface DetailViewState {
 export interface DetailNavigation {
   section: string;
   rootState?: DetailViewState;
-  frames: Array<{node: string | null; expanded: string[]; state: DetailViewState}>;
+  frames: Array<{
+    node: string | null;
+    /** @deprecated Inline expansion was removed. Ignored on restore; emitted empty. */
+    expanded: string[];
+    state: DetailViewState;
+  }>;
 }
 export interface DetailReference {spec: string; revision?: string; section?: string}
 export interface NativeViewerTarget {

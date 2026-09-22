@@ -39,7 +39,6 @@ function sanitizedGroupParents(groups, ignored){
 
 /* ---------------- layout + geometry (per diagram) ---------------- */
 function layout(spec){
-  if (spec._detailGeometry && spec._detailGeometry.owner === DETAIL_GEOMETRY_OWNER) return spec._detailGeometry.layout;
   var pos = {}, rowsMeta = [];
   var lanes = spec.routing === 'lanes' && laneRoutingSupported(spec);
   var laneCounts = {};

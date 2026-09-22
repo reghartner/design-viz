@@ -119,7 +119,7 @@ var BUILDER_GUIDES = {
       ['tint', 'chip color (default cmd)'],
       ['group', 'containment-boundary id — members get a dashed box'],
       ['link', 'permalink URL — clickable ↗ on the card corner'],
-      ['detail', 'inner flow: choose a section and focus, expand or link; map boundary nodes and parent step IDs as needed']
+      ['detail', 'inner flow: choose a section for a focused drilldown with an overview map; map parent beats or link an external destination in Domain detail']
     ],
     tokens: 'icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone house camera doorbell lock bulb car · tints: cmd auth data mqtt dev'
   },

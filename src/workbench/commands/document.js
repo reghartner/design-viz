@@ -372,9 +372,8 @@ function planExtractNodeDetail(text,raw,sectionIdx,ids,title){
     }
     child.steps.push(inner);
   });
-  var detail={section:sectionId,mode:'focus'},ports={};
-  if(ingress.size)ports.in=Array.from(ingress)[0];if(egress.size)ports.out=Array.from(egress)[0];
-  if(Object.keys(ports).length)detail.ports=ports;if(Object.keys(stepMap).length)detail.stepMap=stepMap;
+  var detail={section:sectionId,mode:'focus'};
+  if(Object.keys(stepMap).length)detail.stepMap=stepMap;
   d.nodes[domainId]={title:typeof title==='string' && title.trim() || 'New domain',icon:'package',tint:'cmd',detail:detail};
   var group=child.nodes[ids[0]].group;
   if(group && ids.every(function(id){return child.nodes[id].group===group;}))d.nodes[domainId].group=group;

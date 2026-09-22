@@ -143,7 +143,7 @@ function planSetNodeDetail(text,raw,sectionIdx,nodeId,detail){
   if(!path || !specValueAt(raw,path))return {error:'node not found — reselect and try again'};
   if(detail!=null){
     if(!detail || typeof detail!=='object' || Array.isArray(detail))return {error:'Detail must be a JSON object.'};
-    if(['focus','expand','link'].indexOf(detail.mode)<0)return {error:'Choose a detail mode: focus, expand or link.'};
+    if(['focus','link'].indexOf(detail.mode)<0)return {error:'Choose focus for a drilldown or link for an external destination. Inline expansion is no longer supported.'};
     if(!detail.section && !detail.spec && !detail.url)return {error:'Choose a local section or enter an external detail target.'};
     if(detail.spec || !detail.section){
       if(detail.mode!=='link')return {error:'External details use link mode.'};
@@ -153,7 +153,7 @@ function planSetNodeDetail(text,raw,sectionIdx,nodeId,detail){
     }else{
       var records=builderDetailRecords(raw),index=builderDetailIndex(records,detail);
       if(index<0)return {error:'That detail section does not exist.'};
-      detail=builderClone(detail);detail.section=records[index].reference;
+      detail=builderClone(detail);detail.section=records[index].reference;detail.mode='focus';
     }
     if(detail.url!=null && !isValidLinkBase(detail.url))return {error:'Detail URL must be an absolute http or https URL.'};
   }

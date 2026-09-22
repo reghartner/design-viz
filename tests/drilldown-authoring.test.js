@@ -17,7 +17,7 @@ function fixture(){
 }
 const parent=raw=>raw.page.blocks[0].diagram;
 const child=raw=>raw.page.blocks[1].tabs[0].sections[0].diagram;
-function detail(){return {section:'inside',mode:'expand',path:'happy',step:'accept',ports:{in:'entry',out:'exit'},stepMap:{request:{step:'accept',path:'happy'},done:{step:'finish'}}};}
+function detail(){return {section:'inside',mode:'focus',path:'happy',step:'accept',ports:{in:'entry',out:'exit'},stepMap:{request:{step:'accept',path:'happy'},done:{step:'finish'}}};}
 function linked(){const raw=fixture();parent(raw).nodes.domain.detail=detail();return raw;}
 function run(name,raw,...args){const before=JSON.stringify(raw),plan=B[name](JSON.stringify(raw,null,2),raw,...args);assert.equal(plan.error,undefined);assert.equal(JSON.stringify(raw),before,'planner must not mutate input');return {plan,raw:JSON.parse(plan.text)};}
 function validDetails(raw){const errors=[];B.validateDetails(B.normalize(raw),errors,[]);assert.deepEqual(errors,[]);}
@@ -59,7 +59,7 @@ test('local picker plan saves ports and step mapping together and canonicalizes 
 test('detail assignment rejects invalid child refs, boundary ports, mappings and unsafe external URLs without partial text',()=>{
   const raw=fixture(),text=JSON.stringify(raw);
   const bad=[{section:'gone',mode:'focus'},{...detail(),ports:{in:'gone'}},{...detail(),stepMap:{missing:{step:'accept'}}},
-    {...detail(),stepMap:{request:{step:'gone'}}},{...detail(),stepMap:[]},{...detail(),ports:{}},
+    {...detail(),stepMap:{request:{step:'gone'}}},{...detail(),stepMap:[]},{...detail(),mode:'expand'},
     {url:'javascript:alert(1)',mode:'link'},{spec:'approved',mode:'link'},{url:'https://example.com',mode:'expand'}];
   for(const value of bad){const plan=B.planSetNodeDetail(text,raw,0,'domain',value);assert.ok(plan.error,JSON.stringify(value));assert.equal(plan.text,undefined);}
   assert.equal(JSON.stringify(raw),text);
@@ -71,8 +71,14 @@ test('approved spec and standalone URL details preserve external identities',()=
   const next=run('planSetNodeDetail',first.raw,0,'domain',{url:'https://example.com/flow#d=inside',mode:'link'});
   assert.deepEqual(parent(next.raw).nodes.domain.detail,{url:'https://example.com/flow#d=inside',mode:'link'});validDetails(next.raw);
 });
+test('local link authoring canonicalizes to focus without mutating its input',()=>{
+  const value={section:'inside',mode:'link'};
+  const next=run('planSetNodeDetail',fixture(),0,'domain',value).raw;
+  assert.deepEqual(parent(next).nodes.domain.detail,{section:'inside',mode:'focus'});
+  assert.equal(value.mode,'link');validDetails(next);
+});
 
-test('node rename cascades incoming local ports; deletion returns an affected expansion to focus',()=>{
+test('node rename and deletion maintain legacy incoming port references',()=>{
   const raw=linked(),renamed=run('planRenameNode',raw,1,'entry','inbox').raw;
   assert.equal(parent(renamed).nodes.domain.detail.ports.in,'inbox');validDetails(renamed);
   const removed=run('planDeleteNode',renamed,1,'inbox').raw;
@@ -194,10 +200,10 @@ function ui(){
 test('node inspector stages a complete local detail and applies it with one Undo',()=>{
   const h=ui(),initial=h.text;h.inspector.render();
   h.field('Local section').value='inside';h.field('Local section').fire('change');
-  h.field('Open mode').value='expand';h.field('Boundary input node').value='entry';h.field('Boundary output node').value='exit';
+  assert.equal(h.field('Open mode'),undefined);assert.equal(h.field('Boundary input node'),undefined);assert.equal(h.field('Boundary output node'),undefined);
   h.field('Parent → child steps JSON').value='{"request":{"step":"accept"}}';
   assert.equal(h.text,initial,'draft controls must not publish half a detail');h.button('Apply detail').fire('click');
-  assert.deepEqual(parent(JSON.parse(h.text)).nodes.domain.detail,{section:'inside',mode:'expand',ports:{in:'entry',out:'exit'},stepMap:{request:{step:'accept'}}});
+  assert.deepEqual(parent(JSON.parse(h.text)).nodes.domain.detail,{section:'inside',mode:'focus',stepMap:{request:{step:'accept'}}});
   assert.equal(h.renders,1);h.session.undo();assert.equal(h.text,initial);
 });
 
@@ -237,7 +243,7 @@ function extractionFixture(){
   }},{heading:'Unrelated',text:'Keep this exact section.'}]}};
 }
 
-test('extraction preserves node identities and timeline evidence, reconnects ports, and is one reversible source plan',()=>{
+test('extraction preserves identities and timeline evidence, creates focus without ports, and is reversible',()=>{
   const raw=extractionFixture(),text=JSON.stringify(raw,null,3).replace('"title": "Keep formatting"','"title"   : "Keep formatting"'),before=JSON.stringify(raw);
   const plan=B.planExtractNodeDetail(text,raw,0,['a','b'],'Orders');assert.equal(plan.error,undefined);assert.equal(JSON.stringify(raw),before);
   const next=JSON.parse(plan.text),outer=next.page.sections[0].diagram,inner=next.page.sections[2].diagram,domain=outer.nodes[plan.id];
@@ -245,7 +251,7 @@ test('extraction preserves node identities and timeline evidence, reconnects por
   assert.deepEqual(outer.rows,[['outside','domain1'],['end','idle']]);assert.deepEqual(inner.rows,[[['a','b']]]);
   assert.deepEqual(outer.edges.map(edge=>[edge.from,edge.to]),[['outside','domain1'],['domain1','end'],['outside','idle']]);
   assert.deepEqual(inner.edges,[raw.page.sections[0].diagram.edges[1]]);assert.deepEqual(inner.groups,raw.page.sections[0].diagram.groups);
-  assert.deepEqual(domain.detail.ports,{in:'a',out:'b'});assert.equal(next.page.sections[2].detailOnly,true);
+  assert.equal(domain.detail.ports,undefined);assert.equal(next.page.sections[2].detailOnly,true);
   assert.equal(domain.group,'inner');
   assert.deepEqual(outer.steps[1].nodes,['idle','domain1']);assert.equal(outer.steps[1].edge,'outside->idle');
   assert.deepEqual(outer.steps[1].tone,{idle:'warn'});assert.deepEqual(inner.steps[1].tone,{b:'ok'});

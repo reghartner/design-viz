@@ -3,7 +3,7 @@
 Start with the [doorbell domain example](../src/starters/domain-drilldown.json).
 Open it with **Open file** in the workbench. The initial view follows Doorbell
 → Connectivity → Recording → Apps / Notify. Connectivity opens a focused
-detail, Recording expands its implementation in context, and Cloud handoff
+detail, Recording opens its own focused flow, and Cloud handoff
 inside Connectivity opens a second level containing a mailbox and uplink.
 
 The example is a fictional design, not telemetry or a product specification.
@@ -28,7 +28,7 @@ inside each parent that references it.
 In the workbench, create the child as a section and author its diagram as
 usual. In the section inspector, set **Stable section ID** and **Detail only**.
 Select the parent node, open **Domain detail**, choose **Local section**, and
-set the target, open mode, optional entry path/step, and boundary nodes. Enter
+set the target and optional entry path/step. Enter
 per-parent-step targets in the mapping JSON field, then choose **Apply detail**.
 **Remove detail** removes the node's reference; the child section remains
 available for other nodes. Approved spec and URL destinations are also offered
@@ -43,7 +43,7 @@ To extract an existing flow, Shift-click at least two nodes in the same
 section and choose **Create domain from selected nodes**. The selected nodes
 and internal edges move into a new detail-only section with their IDs intact.
 A new domain card replaces them in the overview; incoming and outgoing edges
-reconnect to its boundary nodes. Affected parent steps activate the domain and
+reconnect to that domain card. Affected parent steps activate the domain and
 map to child step copies, preserving internal failures, tones, packets, and
 code references. The whole extraction is one **Undo** action.
 
@@ -66,8 +66,7 @@ Attach `detail` to the parent node:
     "section": "connectivity",
     "mode": "focus",
     "path": "happy",
-    "step": "accept",
-    "ports": {"in": "eventin", "out": "eventout"}
+    "step": "accept"
   }
 }
 ```
@@ -100,25 +99,25 @@ This is a node fragment. Its target section is an ordinary section such as:
 }
 ```
 
-## Choose the reader action
+## Use focused drilldowns
 
-| Mode | Purpose |
-|---|---|
-| `focus` | Open the child flow as the reader's current level. Breadcrumbs return to its parent and preserve the parent's reading position. |
-| `expand` | Show a child's internals within the parent diagram, using the declared boundary ports for surrounding edges. Collapse returns to the domain card. |
-| `link` | Navigate to a local target section, an approved external spec, or an ordinary URL. |
-
-Use the explicit detail controls on a node. Keep the domain title descriptive
-and let its action communicate that it opens detail. A normal node `link` still
-represents a source-document permalink; `detail` represents the reader's next
-level of explanation. Avoid cyclic detail references.
-
-Focus is useful when the child needs its own panels and alternate timelines.
-Expansion is useful when the question is how neighboring domains connect to
-the child's entry and exit. Expansion retains the overview's steps and panels;
-use **Explore** in its expanded controls to enter the child's own timeline and
-panels at the mapped beat. Child details can themselves contain detail nodes;
+Author local domain details with `mode: "focus"` (also the viewer default).
+Each domain opens as its own reading level, with its own panels, alternate
+paths and step timeline. Breadcrumbs return to an ancestor while preserving
+its reading position. Child details can themselves contain detail nodes;
 the example's Connectivity → Cloud handoff → mailbox makes this concrete.
+
+**Inline expansion has been removed. Do not author `mode: "expand"` or
+`detail.ports`.** Older specs using `expand` open as focused drilldowns with
+a validation warning; their JSON is not automatically rewritten. If copying
+an older seed, change its detail modes to `focus` and omit expansion ports.
+External approved specs or ordinary URLs retain their separate `link` mode.
+Legacy local `link` references also open focused details with a warning;
+saving a local detail through the workbench writes `focus`.
+
+Use the explicit detail control on a node. Keep domain titles descriptive.
+A normal node `link` remains a source-document permalink; `detail` represents
+the reader's next level of explanation. Avoid cyclic detail references.
 
 Focused details also show a compact **Overview** map beside the heading. It
 shows the larger diagram with the entered domain highlighted and a **You are
@@ -144,8 +143,7 @@ parent steps:
     "handoff": {"path": "happy", "step": "queued"},
     "online": {"path": "happy", "step": "released"},
     "offline": {"path": "link-lost", "step": "lost"}
-  },
-  "ports": {"in": "eventin", "out": "eventout"}
+  }
 }
 ```
 
@@ -176,18 +174,12 @@ contradict the parent's story. The example provides this correspondence:
 | Doorbell / `storage-failed` | Recording / `storage-rejected` / `rejected` | Received HTTP error; no clip-ready |
 | Doorbell / `push-failed` | Apps / `push-lost` / `lost` | Clip exists; phone has no notification |
 
-## Make expansion boundaries explicit
+## Explain handoffs inside the child
 
-`ports.in` and `ports.out` name **child node IDs**. They do not name parent
-nodes, edge IDs, or port objects. The renderer reroutes a parent edge entering
-the domain card to the child's `in` node, and an outgoing parent edge from the
-child's `out` node. Internal edges retain their own authored meaning.
-
-Label boundary nodes in the child itself: “Event in · from Doorbell” and
-“Event out · to Recording” remain understandable in both focus and expansion.
-Choose actual child entry/exit nodes. One declared input and output are shared
-by all entering and leaving parent edges; this does not encode a separate
-mapping for every edge or expose typed message contracts automatically.
+Label entry and exit nodes in the child itself: “Event in · from Doorbell”
+and “Event out · to Recording” explain how it fits into the larger story.
+The parent diagram stays intact while the child is open. Focused drilldowns
+do not reconnect parent edges to internal nodes, so no `detail.ports` are needed.
 
 An outer edge often represents a coarser handoff than the internal edges. In
 the example, the dropped MQTT send lives inside Cloud handoff, while the
@@ -256,17 +248,15 @@ that supports this capability. No spec-version switch enables drilldowns in
 an old export.
 
 Walk the normal and failure paths, opening each mapped detail at the relevant
-beat. Return through breadcrumbs and check the parent position; expand and
-collapse Recording and check both outer handoffs. Open nested Cloud handoff at
+beat. Return through breadcrumbs and the overview map, and check the parent
+position. Open Recording and inspect its child timeline. Open nested Cloud handoff at
 Connectivity's failed beat and inspect the **held mailbox**, not just its
 caption. Switch from a notified ending to every failed ending and verify no
 success notification leaks across paths. Check the intended embed width, and
 test external loading in the actual host that provides its loader.
 
-Expanded domains initially use **Readable** size; the mouse scroll arrows and slider
-keep large internal flows accessible. **Fit width** remains available. Expanding
-nested components inside an already expanded domain requires opening that domain
-with **Explore** first. Focused drilldown can continue through multiple levels.
+Focused drilldowns can continue through multiple levels. The usual **Readable**
+and **Fit width** controls remain available within each flow.
 
 Standalone links include the drill trail and step positions and support browser
 Back/Forward. Native hosts can save `onDetailNavigate` state and pass it back as
@@ -274,3 +264,7 @@ Back/Forward. Native hosts can save `onDetailNavigate` state and pass it back as
 External restoration goes through the same approved-spec loader and cancels on
 navigation or destruction. Stable section IDs retain unambiguous old heading links;
 IDs that would redirect an old link to another section are rejected.
+
+Legacy navigation snapshots may include `expanded` arrays. These are ignored;
+restoration keeps the containing flow and restores any ordinary focused trail.
+New snapshots emit empty arrays for existing host type compatibility.

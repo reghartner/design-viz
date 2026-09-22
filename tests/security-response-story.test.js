@@ -23,13 +23,25 @@ test('security response teaching seed validates without warnings and preserves i
 test('verification, assignment, travel and arrival remain separate authored events', () => {
   const states = folded('confirmed');
   assert.deepEqual(plain(states.monitor.map(s => s.status)),
-    ['armed', 'alarm', 'reviewing', 'verified', 'verified', 'verified', 'verified']);
+    ['armed', 'alarm', 'reviewing', 'reviewing', 'verified', 'verified', 'verified', 'verified', 'verified']);
   assert.deepEqual(plain(states.response.map(s => s.status)),
-    ['idle', 'idle', 'idle', 'requested', 'assigned', 'enroute', 'onscene']);
-  assert.equal(states.response[3].patrol.status, 'available');
-  assert.equal(states.response[4].patrol.status, 'assigned');
+    ['idle', 'idle', 'idle', 'idle', 'requested', 'assigned', 'enroute', 'enroute', 'onscene']);
+  assert.equal(states.response[4].patrol.status, 'available');
+  assert.equal(states.response[5].patrol.status, 'assigned');
   assert.equal(states.response.at(-1).patrol.status, 'onscene');
   assert.equal(states.response.at(-1).backup.status, 'available');
+});
+
+test('operator evidence and responder movement are explicit separate story beats', () => {
+  const states = folded('confirmed');
+  assert.equal(states.monitor[1].video, 'closed');
+  assert.equal(states.monitor[2].video, 'opening');
+  assert.equal(states.monitor[2].scenePlayback, 'waiting');
+  assert.equal(states.monitor[3].video, 'reviewing');
+  assert.equal(states.monitor[3].scenePlayback, 'playing');
+  assert.deepEqual(plain(states.response.slice(5).map(s => s.patrol.progress)), [0,35,78,100]);
+  assert.equal(folded('false-alarm').monitor.at(-1).video, 'closed');
+  assert.equal(folded('dispatch-unavailable').response.at(-1).patrol.progress, undefined);
 });
 
 test('false-alarm and unavailable handoffs cannot inherit a previous responder assignment', () => {

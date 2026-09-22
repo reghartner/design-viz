@@ -485,6 +485,15 @@ perspectives" of one timeline). Types:
   `mark`, `cells`. Empty objects also reset an item; wholly invalid patches
   warn and are ignored. Mixed valid/invalid properties install the sanitized
   complete item. Only the first 12 declared sensor entries are considered.
+  The operator desk displays the same stock clips as `screen`. Set declaration
+  `scene` to a Camera Screen scene token and optional `videoLabel` to the feed
+  name. New step fields: `video` (`closed|opening|reviewing|unavailable`),
+  `scene` (optional clip override), `scenePlayback` (`waiting|playing`), and
+  `videoReason` text for an unavailable feed. These fields carry independently
+  and support `enterOnce`. Explicitly open/review the footage; an alarm or a
+  verified assessment alone never opens a video. A `waiting` clip shows the
+  empty scene before its event, matching Camera Screen behavior. The video
+  is an embedded illustrative animation; no camera connection is opened.
   No alarm, verification or dispatch decision is inferred from sensor geometry,
   status or a Home map. See [security and response recipe](../cookbook/security-response.md).
 - `dispatch` — emergency response request, assignment and arrival status.
@@ -506,6 +515,19 @@ perspectives" of one timeline). Types:
   wholly invalid patches warn and are ignored, while mixed valid/invalid
   properties install the sanitized complete item. Only the first 8 declared
   responder entries are considered. ETA is authored text, never a live countdown.
+  The neighborhood scene visualizes each responder using its declared kind:
+  police car, fire engine, ambulance or security vehicle. Patch per-responder
+  `progress` (number 0–100) for an illustrative route position and `lights`
+  (`on|off`) for its beacon. These are part of the same WHOLE-item replacement;
+  retain its `status` when changing progress. Available/assigned units stay at
+  the station, `enroute` uses the supplied position (default 45), and `onscene`
+  parks at the house. Unknown, released and unavailable units are not placed
+  on the route. Beacons default on for enroute/onscene; `lights: "off"` disables
+  them. Parked units never flash.
+  The vehicle never advances to arrival just because animation time passed.
+  Progress is a drawing position, not a real distance, location or ETA estimate.
+  Optional top-level `timeOfDay` is `day|dusk|night` (default dusk). Reduced
+  motion and print show the authored position without motion or flashing.
   Request status and responder status are independent: the panel does not
   infer assignment, arrival or resolution. Missing data is unknown. Pair
   `blocked` with a failed edge only when non-delivery is established. No actual

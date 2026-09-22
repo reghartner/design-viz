@@ -8,7 +8,7 @@
         "id": "security-response",
         "heading": "One event. Three possible outcomes.",
         "accent": "cyan",
-        "text": "A fictional home-security workflow. Compare a confirmed incident, an authorized entry and a failed dispatch handoff. Sensor evidence, the operator decision and responder progress are authored separately. Switch to At the property for the home or Service flow for backend handoffs.",
+        "text": "A fictional home-security story with a monitoring operator, shared camera clips and a response vehicle. Watch the operator open the footage, then follow an assigned unit to the house. False alarms and failed handoffs never send a vehicle.",
         "diagram": {
           "view": "step",
           "autoplay": false,
@@ -167,7 +167,7 @@
               "id": "monitor",
               "type": "security",
               "title": "Security monitoring",
-              "site": "Cedar House \u00b7 demo property",
+              "site": "Cedar House · demo property",
               "sensors": [
                 {
                   "id": "door",
@@ -190,7 +190,7 @@
               ],
               "initial": {
                 "status": "armed",
-                "operator": "Morgan \u00b7 monitoring",
+                "operator": "Morgan · monitoring",
                 "incident": "No open incident",
                 "assessment": "unverified",
                 "detail": "Armed away. Waiting for a reported event.",
@@ -208,14 +208,18 @@
                   "health": "online",
                   "alarm": "clear",
                   "detail": "No reported motion"
-                }
-              }
+                },
+                "video": "closed",
+                "scenePlayback": "waiting"
+              },
+              "scene": "person-through-door",
+              "videoLabel": "Front door · incident clip"
             },
             {
               "id": "response",
               "type": "dispatch",
               "title": "Emergency dispatch",
-              "agency": "Cedar response desk \u00b7 illustrative",
+              "agency": "Cedar response desk · illustrative",
               "responders": [
                 {
                   "id": "patrol",
@@ -234,8 +238,8 @@
                 "status": "idle",
                 "priority": "routine",
                 "incident": "No request",
-                "location": "Cedar House \u00b7 front entry",
-                "dispatcher": "Avery \u00b7 response desk",
+                "location": "Cedar House · front entry",
+                "dispatcher": "Avery · response desk",
                 "detail": "A sensor alarm alone does not assign a responder.",
                 "patrol": {
                   "status": "available",
@@ -246,7 +250,8 @@
                   "status": "available",
                   "eta": "",
                   "detail": "Not assigned"
-                }
+                },
+                "timeOfDay": "dusk"
               }
             }
           ],
@@ -281,7 +286,7 @@
                 },
                 "monitor": {
                   "status": "alarm",
-                  "incident": "INC-204 \u00b7 front entry",
+                  "incident": "INC-204 · front entry",
                   "assessment": "unverified",
                   "detail": "Door open while armed away. Review required.",
                   "door": {
@@ -294,7 +299,7 @@
             },
             {
               "id": "review",
-              "text": "Morgan acknowledges the alarm and reviews camera evidence. The monitoring decision is still pending.",
+              "text": "Morgan acknowledges the alarm and pulls up the front-door clip at the monitoring desk. The footage is still loading.",
               "nodes": [
                 "monitor"
               ],
@@ -307,7 +312,23 @@
                     "health": "online",
                     "alarm": "acknowledged",
                     "detail": "Operator is assessing the event"
-                  }
+                  },
+                  "video": "opening",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "clip-review",
+              "text": "The clip opens on the operator’s monitor. Morgan watches the person cross the doorway before making an assessment.",
+              "nodes": [
+                "monitor"
+              ],
+              "panels": {
+                "monitor": {
+                  "video": "reviewing",
+                  "scenePlayback": "playing",
+                  "detail": "Reviewing the front-door footage; no dispatch request has been made."
                 }
               }
             },
@@ -322,7 +343,7 @@
                 "monitor": {
                   "status": "verified",
                   "assessment": "verified",
-                  "detail": "Intrusion confirmed by the operator in this authored scenario.",
+                  "detail": "Operator confirms the incident after reviewing the clip.",
                   "motion": {
                     "health": "online",
                     "alarm": "triggered",
@@ -332,7 +353,7 @@
                 "response": {
                   "status": "requested",
                   "priority": "urgent",
-                  "incident": "INC-204 \u00b7 confirmed intrusion",
+                  "incident": "INC-204 · confirmed intrusion",
                   "detail": "Request received. Awaiting dispatcher assignment."
                 },
                 "home": {
@@ -357,15 +378,17 @@
                   "detail": "P-12 accepts the assignment.",
                   "patrol": {
                     "status": "assigned",
-                    "eta": "6 min \u00b7 example",
-                    "detail": "Assignment accepted"
+                    "eta": "6 min · example",
+                    "detail": "Assignment accepted",
+                    "progress": 0,
+                    "lights": "off"
                   }
                 }
               }
             },
             {
               "id": "enroute",
-              "text": "P-12 reports en route. The arrival estimate is an authored example, not a live clock or routing calculation.",
+              "text": "P-12 departs the response station and drives through the neighborhood. The illustrated position and ETA are authored examples.",
               "nodes": [
                 "unit"
               ],
@@ -375,15 +398,36 @@
                   "detail": "Unit reports travel has begun.",
                   "patrol": {
                     "status": "enroute",
-                    "eta": "3 min \u00b7 example",
-                    "detail": "Travelling to the front entry"
+                    "eta": "3 min · example",
+                    "detail": "Travelling to the front entry",
+                    "progress": 35,
+                    "lights": "on"
+                  }
+                }
+              }
+            },
+            {
+              "id": "approaching",
+              "text": "P-12 turns onto the home’s street. The vehicle moves closer, but arrival has not yet been reported.",
+              "nodes": [
+                "unit"
+              ],
+              "panels": {
+                "response": {
+                  "detail": "P-12 reports approaching Cedar House.",
+                  "patrol": {
+                    "status": "enroute",
+                    "progress": 78,
+                    "lights": "on",
+                    "eta": "1 min · example",
+                    "detail": "On the home’s street"
                   }
                 }
               }
             },
             {
               "id": "onscene",
-              "text": "P-12 reports arrival. The incident remains verified; an arrival report does not imply that the incident is resolved.",
+              "text": "P-12 reports arrival and parks outside Cedar House. The vehicle stops at the house; the incident has not yet been resolved.",
               "nodes": [
                 "unit"
               ],
@@ -397,7 +441,9 @@
                   "patrol": {
                     "status": "onscene",
                     "eta": "Arrived",
-                    "detail": "At the front entry"
+                    "detail": "At the front entry",
+                    "progress": 100,
+                    "lights": "on"
                   }
                 },
                 "home": {
@@ -419,12 +465,13 @@
                 "monitor": {
                   "status": "cleared",
                   "assessment": "false-alarm",
-                  "detail": "Resident confirms an authorized arrival.",
+                  "detail": "Resident confirms an authorized arrival. Operator closes the clip.",
                   "door": {
                     "health": "online",
                     "alarm": "clear",
                     "detail": "Authorized entry confirmed"
-                  }
+                  },
+                  "video": "closed"
                 },
                 "home": {
                   "door": "closed",
@@ -456,7 +503,7 @@
                 "response": {
                   "status": "blocked",
                   "priority": "urgent",
-                  "incident": "INC-204 \u00b7 handoff failed",
+                  "incident": "INC-204 · handoff failed",
                   "detail": "Request not delivered. No responder acknowledgement or ETA."
                 }
               }
@@ -471,9 +518,11 @@
                 "armed",
                 "detected",
                 "review",
+                "clip-review",
                 "verified",
                 "assigned",
                 "enroute",
+                "approaching",
                 "onscene"
               ]
             },
@@ -485,6 +534,7 @@
                 "armed",
                 "detected",
                 "review",
+                "clip-review",
                 "false-alarm"
               ]
             },
@@ -496,6 +546,7 @@
                 "armed",
                 "detected",
                 "review",
+                "clip-review",
                 "dispatch-blocked"
               ]
             }
@@ -511,12 +562,12 @@
                     "x": 0,
                     "y": 0,
                     "w": 6,
-                    "h": 20
+                    "h": 24
                   },
                   {
                     "controls": "steps",
                     "x": 0,
-                    "y": 14,
+                    "y": 18,
                     "w": 6,
                     "h": 6,
                     "attachTo": "panel:monitor"
@@ -526,7 +577,7 @@
                     "x": 6,
                     "y": 0,
                     "w": 6,
-                    "h": 20
+                    "h": 24
                   },
                   {
                     "panel": "home",
@@ -556,14 +607,14 @@
                     "x": 0,
                     "y": 0,
                     "w": 4,
-                    "h": 18,
+                    "h": 24,
                     "hidden": false
                   },
                   {
                     "x": 0,
                     "y": 0,
                     "w": 4,
-                    "h": 18,
+                    "h": 28,
                     "hidden": true
                   },
                   {
@@ -571,19 +622,19 @@
                     "x": 4,
                     "y": 0,
                     "w": 4,
-                    "h": 18
+                    "h": 24
                   },
                   {
                     "panel": "response",
                     "x": 8,
                     "y": 0,
                     "w": 4,
-                    "h": 18
+                    "h": 24
                   },
                   {
                     "controls": "steps",
                     "x": 0,
-                    "y": 12,
+                    "y": 18,
                     "w": 4,
                     "h": 6,
                     "attachTo": "panel:home"
@@ -623,14 +674,14 @@
                     "x": 0,
                     "y": 14,
                     "w": 6,
-                    "h": 16
+                    "h": 22
                   },
                   {
                     "panel": "response",
                     "x": 6,
                     "y": 14,
                     "w": 6,
-                    "h": 16
+                    "h": 22
                   }
                 ]
               }

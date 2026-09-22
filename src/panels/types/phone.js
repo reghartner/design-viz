@@ -38,12 +38,22 @@ function phoneBrandWarnings(panel, path, warnings) {
 }
 
 /* Phone patches are operations, validated for both initial and steps. */
-function phonePatchWarnings(obj, path, warnings) {
+function phonePatchWarnings(obj, path, warnings, allowOnce) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
   Object.keys(obj).forEach(function (k) {
-    if (['clock', 'notify', 'clear'].indexOf(k) < 0)
-      warnings.push(path + '.' + k + ': not a phone field — ignored (valid: clock, notify, clear)');
+    if (['clock', 'notify', 'clear', 'audio'].indexOf(k) < 0 && !(allowOnce && k === 'enterOnce'))
+      warnings.push(path + '.' + k + ': not a phone field — ignored (valid: clock, notify, clear, audio' + (allowOnce ? ', enterOnce' : '') + ')');
   });
+  if (Object.prototype.hasOwnProperty.call(obj, 'audio'))
+    FlowAudio.clean(obj.audio, path + '.audio', warnings);
+  if (allowOnce && Object.prototype.hasOwnProperty.call(obj, 'enterOnce')) {
+    if (!phoneBrandIsPlainObject(obj.enterOnce))
+      warnings.push(path + '.enterOnce: expected {audio} — ignored');
+    else Object.keys(obj.enterOnce).forEach(function (key) {
+      if (key === 'audio') FlowAudio.clean(obj.enterOnce.audio, path + '.enterOnce.audio', warnings);
+      else warnings.push(path + '.enterOnce.' + key + ': only audio supports a phone enterOnce override — ignored');
+    });
+  }
   if (Object.prototype.hasOwnProperty.call(obj, 'clock') && typeof obj.clock !== 'string')
     warnings.push(path + '.clock: must be a string — ignored');
   if (Object.prototype.hasOwnProperty.call(obj, 'clear') && obj.clear !== true)
@@ -79,6 +89,7 @@ function foldPhoneStates(panel, steps) {
   steps = Array.isArray(steps) ? steps : [];
   var clock = '',
     notifications = [],
+    audio,
     states = [];
   function validNotification(n) {
     return n && typeof n === 'object' && !Array.isArray(n) && typeof n.app === 'string' && !!n.app;
@@ -93,6 +104,10 @@ function foldPhoneStates(panel, steps) {
   function apply(patch) {
     patch = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
     if (typeof patch.clock === 'string') clock = patch.clock;
+    if (Object.prototype.hasOwnProperty.call(patch, 'audio')) {
+      var nextAudio = FlowAudio.clean(patch.audio);
+      if (nextAudio !== undefined) audio = nextAudio;
+    }
     if (patch.clear === true) notifications = [];
     if (!Object.prototype.hasOwnProperty.call(patch, 'notify')) return 0;
     var raw = Array.isArray(patch.notify) ? patch.notify : [patch.notify];
@@ -100,22 +115,27 @@ function foldPhoneStates(panel, steps) {
     if (pushed.length) notifications = pushed.concat(notifications);
     return pushed.length;
   }
-  apply(panel.initial);
-  steps.forEach(function (st) {
-    var all = stepPanelPatch(st) || {};
-    var added = apply(all[panel.id]);
-    states.push({
+  function snapshot(added, once) {
+    var result = {
       clock: clock,
       notifications: notifications.map(cleanNotification),
       _phoneAdded: added,
-    });
+    };
+    var transientAudio = phoneBrandIsPlainObject(once) && Object.prototype.hasOwnProperty.call(once, 'audio')
+      ? FlowAudio.clean(once.audio) : undefined;
+    var currentAudio = transientAudio === undefined ? audio : transientAudio;
+    /* Sanitize anew so snapshots never share mutable authored objects. Absent
+       audio keeps the legacy snapshot shape; null explicitly clears a card. */
+    if (currentAudio !== undefined) result.audio = FlowAudio.clean(currentAudio);
+    return result;
+  }
+  apply(panel.initial);
+  steps.forEach(function (st) {
+    var all = stepPanelPatch(st) || {};
+    var patch = all[panel.id], added = apply(patch);
+    states.push(snapshot(added, patch && patch.enterOnce));
   });
-  if (!steps.length)
-    states.push({
-      clock: clock,
-      notifications: notifications.map(cleanNotification),
-      _phoneAdded: 0,
-    });
+  if (!steps.length) states.push(snapshot(0));
   return states;
 }
 
@@ -125,7 +145,7 @@ PanelRegistry.extend('phone', {
     phonePatchWarnings(p.initial, PP + '.initial', warnings);
   },
   validatePatch: function (patch, path, panel, warnings, context) {
-    phonePatchWarnings(patch, path, warnings);
+    phonePatchWarnings(patch, path, warnings, true);
   },
   fold: foldPhoneStates,
 });
@@ -180,7 +200,7 @@ function phoneModel(panelOrState, stepsOrState, currentStep) {
       };
     })
     .filter(Boolean);
-  return {
+  var model = {
     clock: typeof state.clock === 'string' ? state.clock : '',
     notifications: notifications,
     cards: notifications.slice(0, 3),
@@ -189,11 +209,63 @@ function phoneModel(panelOrState, stepsOrState, currentStep) {
     overflow: Math.max(0, notifications.length - 3),
     added: typeof state._phoneAdded === 'number' ? Math.max(0, Math.round(state._phoneAdded)) : 0,
   };
+  if (Object.prototype.hasOwnProperty.call(state, 'audio')) {
+    var audio = FlowAudio.clean(state.audio);
+    if (audio !== undefined) model.audio = audio;
+  }
+  return model;
+}
+
+/* A phone's microphone captures the homeowner; its speaker plays the remote
+   visitor. Direction is derived only from authored audio facts, never a
+   notification or a camera/monitor state elsewhere on the diagram. */
+function phoneAudioModel(audio) {
+  if (audio == null) return null;
+  var clean = FlowAudio.clean(audio);
+  if (clean == null) return null;
+  var m = FlowAudio.model(clean), capturing = FlowAudio.isCapturing(clean), emitting = FlowAudio.isEmitting(clean);
+  var direction = capturing && emitting ? 'You ↔ visitor'
+    : capturing ? 'You → visitor'
+    : emitting ? (m.output === 'speech' ? 'Visitor → you' : 'Audio → you')
+    : m.connection === 'connecting' ? 'Connecting call'
+    : m.connection === 'ended' ? 'Call ended'
+    : m.connection === 'interrupted' ? 'Connection interrupted' : 'No audio flowing';
+  var microphone = {idle:'Mic idle',listening:'Mic listening',capturing:'You are speaking',muted:'Mic muted',unavailable:'Mic unavailable'}[m.microphone];
+  var speaker = m.output === 'silent' ? 'Speaker silent'
+    : m.playback === 'queued' ? 'Audio queued'
+    : m.playback === 'suppressed' ? 'Audio suppressed'
+    : m.playback === 'failed' ? 'Speaker unavailable'
+    : m.playback === 'stopped' ? 'Audio stopped'
+    : {speech:'Visitor speaking',recorded:'Recorded message',chime:'Chime playing',siren:'Siren playing'}[m.output];
+  var detection = {none:'',sound:'Sound detected','smoke-alarm':'Smoke alarm heard','co-alarm':'CO alarm heard','glass-break':'Glass-break sound detected'}[m.detection];
+  return {audio:m, direction:direction, microphone:microphone, speaker:speaker,
+    capturing:capturing, emitting:emitting, detection:detection,
+    description:'Audio ' + m.connection + '. ' + direction + '. ' + microphone + '. ' + speaker +
+      (m.source ? '. ' + m.source : '') + (m.text ? '. ' + m.text : '') + (detection ? '. ' + detection : '') + (m.reason ? '. ' + m.reason : '')};
+}
+
+function phoneAudioHTML(model) {
+  if (!model) return '';
+  var a = model.audio;
+  var mic = '<span class="phonecallicon' + (a.microphone === 'muted' || a.microphone === 'unavailable' ? ' is-muted' : '') + '">' + FlowAudio.icon('microphone') + '</span>';
+  var speaker = '<span class="phonecallicon' + (!model.emitting ? ' is-muted' : '') + '">' + FlowAudio.icon('speaker') + '</span>';
+  return '<div class="phonecall phonecall-' + a.connection + '">' +
+    '<div class="phonecallhead"><span>Live audio</span><span class="phonecallconnection"><i aria-hidden="true"></i>' + esc(a.connection) + '</span></div>' +
+    '<div class="phonecalldirection">' + esc(model.direction) + '</div>' +
+    '<div class="phonecallchannels"><div class="phonecallchannel' + (model.capturing ? ' is-active' : '') + '">' + mic +
+    '<span>' + esc(model.microphone) + '</span></div><div class="phonecallchannel' + (model.emitting ? ' is-active' : '') + '">' + speaker +
+    '<span>' + esc(model.speaker) + '</span></div></div>' +
+    (a.source ? '<div class="phonecallsource" title="' + esc(a.source) + '">' + esc(a.source) + '</div>' : '') +
+    (a.text ? '<div class="phonecallcaption" title="' + esc(a.text) + '">“' + esc(a.text) + '”</div>' : '') +
+    (model.detection ? '<div class="phonecalldetection">' + esc(model.detection) + '</div>' : '') +
+    (a.reason ? '<div class="phonecallreason" title="' + esc(a.reason) + '">' + esc(a.reason) + '</div>' : '') +
+    '</div>';
 }
 
 function phonePanelHTML(panel, state, fresh) {
   panel = panel || {};
   var m = phoneModel(panel, state);
+  var call = phoneAudioModel(m.audio);
   var brand = phoneBrand(panel);
   var styles = [];
   if (brand) {
@@ -205,8 +277,9 @@ function phonePanelHTML(panel, state, fresh) {
     ? 'Phone with ' + m.count + ' unread notification' + (m.count === 1 ? '' : 's')
     : 'Phone with no notifications';
   if (brand && brand.app) label = brand.app + ' phone' + label.slice(5);
+  if (call) label += '. ' + call.description;
   var h =
-    '<div class="phoneframe"' +
+    '<div class="phoneframe' + (call ? ' phonehasaudio' : '') + '"' +
     (styles.length ? ' style="' + styles.join(';') + '"' : '') +
     ' role="img" aria-label="' +
     esc(label) +
@@ -227,6 +300,7 @@ function phonePanelHTML(panel, state, fresh) {
       '</div>';
   if (m.count) h += '<span class="phonebadge" aria-hidden="true">' + m.badge + '</span>';
   h += '<div class="phonecards">';
+  h += phoneAudioHTML(call);
   if (!m.cards.length) {
     h += '<div class="phoneempty">no notifications</div>';
   } else {
@@ -342,6 +416,29 @@ PanelRegistry.extend('phone', {
 .phoneoverflow{text-align:center;font-size:8px;font-weight:700;letter-spacing:.04em;}
 .phoneempty{margin:auto;text-align:center;font-size:8px;letter-spacing:.05em;text-transform:uppercase;opacity:.58;}
 .phonehome{position:absolute;bottom:8px;left:50%;width:42px;height:3px;transform:translateX(-50%);border-radius:999px;}
+.phonecall{--pcacc:var(--phacc, #4956C9);--pcgood:#276D58;--pcwarn:#95601D;box-sizing:border-box;flex:none;padding:9px 8px;
+  border:1px solid color-mix(in srgb,var(--pcacc) 38%,transparent);border-radius:12px;
+  background:color-mix(in srgb,var(--pcacc) 7%,transparent);font:500 8px/1.35 'IBM Plex Sans',sans-serif;}
+.phonecallhead{display:flex;align-items:center;justify-content:space-between;gap:4px;font:600 6.5px/1.4 'IBM Plex Mono',monospace;}
+.phonecallhead>span:first-child{text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+.phonecallconnection{display:flex;align-items:center;gap:3px;min-width:0;text-transform:capitalize;opacity:.8;}
+.phonecallconnection i{flex:none;width:4px;height:4px;border-radius:50%;background:currentColor;}
+.phonecall-connected .phonecallconnection{color:var(--pcgood);opacity:1;}
+.phonecall-interrupted .phonecallconnection,.phonecall-connecting .phonecallconnection{color:var(--pcwarn);opacity:1;}
+.phonecalldirection{margin:8px 0;font-size:11px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;}
+.phonecallchannels{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px;}
+.phonecallchannel{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;min-width:0;padding:7px 2px 5px;
+  border:1px solid color-mix(in srgb,currentColor 12%,transparent);border-radius:7px;text-align:center;font-size:7.5px;line-height:1.2;}
+.phonecallchannel svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.phonecallicon{position:relative;display:block;height:17px;}.phonecallicon.is-muted:after{content:'';position:absolute;top:8px;left:-1px;width:21px;height:1.5px;background:currentColor;transform:rotate(45deg);}
+.phonecallchannel.is-active{color:var(--pcacc);border-color:color-mix(in srgb,var(--pcacc) 45%,transparent);background:color-mix(in srgb,var(--pcacc) 10%,transparent);}
+.phonecallsource{margin-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:7px;font-weight:600;opacity:.68;}
+.phonecallcaption,.phonecallreason{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow-wrap:anywhere;margin-top:6px;}
+.phonecallcaption{font-size:9px;line-height:1.35;}.phonecallreason{font-size:8px;opacity:.72;}
+.phonecalldetection{margin-top:6px;font-size:8px;font-weight:600;color:var(--pcwarn);}
+.phonehasaudio .phoneempty{padding:9px 0;font-size:7px;}
+.sk-aurora .phonecall{--pcacc:var(--phacc, #8AE8FF);--pcgood:#8FDEC0;--pcwarn:#F2C078;}
+.sk-daylight .phonecall{--pcacc:var(--phacc, #4956C9);}
 .sk-aurora .phoneframe{color:var(--phfg, #D9E4F2);background:var(--phbg, #09111E);border-color:#718099;box-shadow:inset 0 0 0 2px #16233A;}
 .sk-aurora .phonespeaker,.sk-aurora .phonehome{background:#718099;}
 .sk-aurora .phonesignal i{background:#C7D3E3;}
@@ -367,6 +464,7 @@ PanelRegistry.extend('phone', {
       order: 1207,
       css: String.raw`@media (prefers-reduced-motion: reduce){
   .phonecard.fresh{animation:none !important;}
+  .phonecall,.phonecall *{animation:none !important;transition:none !important;}
 }`,
     },
     {
@@ -392,6 +490,8 @@ PanelRegistry.extend('phone', {
 }
 @media print{
   .phonecard.fresh{animation:none !important;}
+  .phonecall{color:#222222 !important;background:#FFFFFF !important;border-color:#777777 !important;}
+  .phonecallconnection,.phonecallchannel.is-active,.phonecalldetection{color:#333333 !important;}
 }`,
     },
     {
@@ -424,7 +524,9 @@ body.sk-editorial .sk-daylight .phonetext{color:var(--ed-muted);}
 body.sk-editorial .sk-aurora .phonebadge,
 body.sk-editorial .sk-daylight .phonebadge{color:#FFFDF8;background:var(--phacc, var(--ed-accent-deep));}
 body.sk-editorial .sk-aurora .phonelogo,
-body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, var(--ed-accent-deep));}`,
+body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, var(--ed-accent-deep));}
+body.sk-editorial .phonecall{--pcacc:var(--phacc, var(--ed-accent));--pcgood:#276D58;--pcwarn:#95601D;border-radius:2px;}
+body.sk-editorial .phonecallchannel{border-radius:2px;}`,
     },
     {
       order: 1663,
@@ -475,6 +577,9 @@ body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, 
 @media screen {
   body.sk-terminal .sk-aurora .phonelogo,
   body.sk-terminal .sk-daylight .phonelogo{color:var(--tm-ground);background:var(--phacc, var(--tm-alert));}
+  body.sk-terminal .phonecall{--pcacc:var(--phacc, var(--tm-good));--pcgood:var(--tm-good);--pcwarn:var(--tm-alert);border-radius:0;}
+  body.sk-terminal .phonecallchannel{border-radius:0;}
+  body.sk-terminal .phonecall,body.sk-terminal .phonecall *{font-family:'IBM Plex Mono',monospace;}
 }`,
     },
     {
@@ -526,6 +631,7 @@ body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, 
 @media screen {
   body.sk-pastel .sk-aurora .phonelogo,
   body.sk-pastel .sk-daylight .phonelogo{color:#FFFFFF;background:var(--phacc, #D36370);}
+  body.sk-pastel .phonecall{--pcacc:var(--phacc, #5263B9);--pcgood:#276D58;--pcwarn:#95601D;}
 }`,
     },
     {
@@ -577,6 +683,8 @@ body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, 
 @media screen {
   body.sk-blueprint .sk-aurora .phonelogo,
   body.sk-blueprint .sk-daylight .phonelogo{color:#052956;background:var(--phacc, #FFD166);}
+  body.sk-blueprint .phonecall{--pcacc:var(--phacc, #58E7FF);--pcgood:#8FDEC0;--pcwarn:#FFD166;border-radius:0;}
+  body.sk-blueprint .phonecallchannel{border-radius:0;}
 }`,
     },
   ],
@@ -598,13 +706,14 @@ PanelRegistry.extend('phone', {
       ['clock', 'text'],
       ['notify', 'jsonAny'],
       ['clear', 'bool', { trueOnly: true }],
+      ['audio', 'objf', FlowAudio.fields],
     ],
     picker: {
       order: 24,
-      name: 'Phone notifications',
+      name: 'Phone notifications & audio',
       category: 'Devices & interfaces',
       tagline: 'The user-facing moment',
-      description: 'Show notifications stacking on a phone as events reach the user.',
+      description: 'Show notifications stacking on a phone and optional live audio with the visitor.',
     },
     origin: function (p, key, snapshot, context) {
       var assignment = context.assignment,
@@ -621,6 +730,11 @@ PanelRegistry.extend('phone', {
           },
           false
         );
+      if (key === 'audio') {
+        var once = context.currentPatch && context.currentPatch.enterOnce;
+        return assignment(key, function (value) { return FlowAudio.clean(value) !== undefined; },
+          phoneBrandIsPlainObject(once) && own(once, 'audio') && FlowAudio.clean(once.audio) !== undefined);
+      }
       return { kind: 'engine', label: 'Engine · presentation metadata', inputs: [] };
     },
     example: function (sample, context) {

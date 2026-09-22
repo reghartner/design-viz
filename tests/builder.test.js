@@ -290,7 +290,7 @@ test('findingLocation selects the exact field and falls back to the nearest pare
 
 test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and nonempty enums', () => {
   assert.deepStrictEqual(Object.keys(B.PANEL_PATCH_FIELDS).sort(), [...V.PANEL_TYPES].sort());
-  const kinds = new Set(['text', 'num', 'bool', 'enum', 'clock', 'json', 'jsonArr', 'jsonAny']);
+  const kinds = new Set(['text', 'num', 'bool', 'enum', 'clock', 'json', 'jsonArr', 'jsonAny', 'objf']);
   for (const fields of Object.values(B.PANEL_PATCH_FIELDS)){
     for (const [key, kind, extra] of fields){
       assert.ok(typeof key === 'string' && key.length);
@@ -299,13 +299,13 @@ test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and none
     }
   }
   const expected = {
-    state: ['state'], leds: [], gauge: ['value'], log: ['log'], screen: ['mode', 'scenePlayback', 'banner', 'reason'],
+    state: ['state'], leds: [], gauge: ['value'], log: ['log'], screen: ['mode', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight'],
     waterfall: ['reveal', 'highlight', 'total'], orbit: ['state', 'via'],
     zoneframe: ['zones', 'subject', 'verdict'], xray: ['layers', 'hop'],
     queue: ['state', 'label', 'from', 'to', 'reason'],
     thermo: ['value', 'label'], battery: ['charge', 'trend', 'source', 'cold', 'note', 'label'],
     buffer: ['cells', 'mark', 'head', 'note', 'label'], radar: ['subject', 'threshold', 'alert', 'status', 'banner'],
-    signal: [], tiles: [], inflight: ['start', 'end', 'mark'], phone: ['clock', 'notify', 'clear'],
+    signal: [], tiles: [], inflight: ['start', 'end', 'mark'], phone: ['clock', 'notify', 'clear', 'audio'],
     timeline: ['now', 'events', 'miss']
   };
   for (const [type, keys] of Object.entries(expected))

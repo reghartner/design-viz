@@ -10523,7 +10523,12 @@ function validateDetails(page, errors, warnings){
       }
       if(detail.ports!=null){
         if(!specObject(detail.ports))errors.push(where+'.ports: expected {in, out}');
-        else ['in','out'].forEach(function(k){if(detail.ports[k]!=null && (!child || !Object.prototype.hasOwnProperty.call(child.nodes,detail.ports[k])))errors.push(where+'.ports.'+k+': unknown child node');});
+        else ['in','out'].forEach(function(k){
+          var port=detail.ports[k];if(port==null)return;
+          if(!child || !Object.prototype.hasOwnProperty.call(child.nodes,port))errors.push(where+'.ports.'+k+': unknown child node');
+          else if(!(child.rows || []).some(function(row){return row.some(function(slot){return (Array.isArray(slot)?slot:[slot]).indexOf(port)>=0;});}) && !(child.floats || []).some(function(f){return f.id===port;}))
+            errors.push(where+'.ports.'+k+': child node must be placed in rows or floats');
+        });
       }
       if(detail.mode==='expand' && child){
         ['in','out'].forEach(function(k){
@@ -10548,6 +10553,7 @@ function expandDetailDiagram(page, source, expanded){
     var child=target.section.diagram, ports=detail.ports || {};
     if((source.edges || []).some(function(e){return e.to===id && !ports.in || e.from===id && !ports.out;}))throw new Error('Define input and output boundary nodes before expanding '+(n.title || id)+'.');
     var keys=Object.create(null), group=unique('__detail_'+id,groups), childLayout=layout(child);
+    if(['in','out'].some(function(k){return ports[k]!=null && !Object.prototype.hasOwnProperty.call(childLayout.pos,ports[k]);}))throw new Error('Input and output boundary nodes must be placed before expanding '+(n.title || id)+'.');
     Object.keys(child.nodes).forEach(function(k){keys[k]=unique('__detail_'+id+'_'+k,nodes);nodes[keys[k]]=Object.assign({},child.nodes[k],{group:group});});
     groups[group]={title:n.title || id,icon:n.icon || 'gear'};
     domains[id]={keys:keys,child:child,layout:childLayout,group:group,ports:ports};

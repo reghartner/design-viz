@@ -27,6 +27,15 @@ test('expansion reconnects boundary edges, projects failures, preserves source a
  for(const [id,pos] of Object.entries(L.pos))if(!id.startsWith('__detail_recording'))assert.ok(pos.cx+pos.w/2<=group.x || pos.cx-pos.w/2>=group.x+group.w || pos.cy+pos.h/2<=group.y || pos.cy-pos.h/2>=group.y+group.h,id+' overlaps expanded group');
  const path=B.diagramForPath(expanded);assert.equal(B.layout(path),L,'path projection retains derived geometry identity');
 });
+test('expansion rejects boundary nodes that are defined but have no placement',()=>{
+ const p=copy().page,d=p.sections[0].diagram,detail=d.nodes.recording.detail;
+ const child=B.detailTarget(p,detail).section.diagram;
+ child.nodes.unplaced={title:'Unused boundary'};detail.ports.in='unplaced';
+ assert.match(B.validate(p).errors.join('\n'),/ports.in: child node must be placed/);
+ const before=JSON.stringify(p);
+ assert.throws(()=>B.expandDetailDiagram(p,d,['recording']),/boundary nodes must be placed/);
+ assert.equal(JSON.stringify(p),before);
+});
 test('drill navigation hash preserves opaque state and source-derived step mapping',()=>{
  const q=JSON.stringify({section:'doorbell-domains',frames:[{node:'connectivity',expanded:[],state:{path:'link-lost',step:'held'}}]});
  assert.equal(B.parseHash(B.buildHash({d:'doorbell-domains',q})).q,q);

@@ -464,6 +464,52 @@ perspectives" of one timeline). Types:
   captures: base64 adds about one third to file size, and the existing 128 KiB
   Confluence snapshot limit applies to the entire spec. Hosted HTML has no such
   snapshot limit. Label mocked interfaces and provide actual capture provenance.
+- `security` — security monitoring with independently authored sensor health,
+  alarms and operator assessment. Declare `site` text and 1–12 `sensors`:
+  `{"id":"monitor","type":"security","title":"Security monitoring",
+  "site":"Demo home","sensors":[{"id":"entry","label":"Front door",
+  "kind":"door","zone":"Entry"}],"initial":{"status":"armed",
+  "assessment":"unverified","entry":{"health":"online","alarm":"clear"}}}`.
+  Sensor kinds are `door|motion|camera|smoke|water|lock|sensor`. Patch top-level
+  `status` (`unknown|disarmed|armed|alarm|reviewing|verified|cleared|offline`),
+  `assessment` (`unverified|reviewing|verified|false-alarm`), and plain-text
+  `operator`, `incident`, `detail`, `note`. Patch each declared sensor by ID:
+  `{"entry":{"health":"online","alarm":"triggered","detail":"Opened while armed"}}`.
+  Health is `unknown|online|degraded|offline`; alarm is
+  `unknown|clear|triggered|acknowledged`. A sensor object replaces the WHOLE
+  previous item; omitted subfields reset to unknown/empty. Omit the sensor ID
+  to carry it forward, or use null to reset it. `enterOnce` overrides only the
+  current step. IDs start with a letter and contain only letters, digits,
+  underscores or hyphens. Keep them unique and distinct from top-level state
+  fields and the reserved `constructor`, `prototype`, `enterOnce`, `log`,
+  `mark`, `cells`. Empty objects also reset an item; wholly invalid patches
+  warn and are ignored. Mixed valid/invalid properties install the sanitized
+  complete item. Only the first 12 declared sensor entries are considered.
+  No alarm, verification or dispatch decision is inferred from sensor geometry,
+  status or a Home map. See [security and response recipe](../cookbook/security-response.md).
+- `dispatch` — emergency response request, assignment and arrival status.
+  Declare `agency` text and 1–8 `responders`:
+  `{"id":"response","type":"dispatch","title":"Emergency dispatch",
+  "agency":"Demo response desk","responders":[{"id":"patrol","label":"Patrol",
+  "kind":"police","callsign":"P-12"}],"initial":{"status":"idle",
+  "priority":"routine","patrol":{"status":"available"}}}`.
+  Responder kinds are `police|fire|medical|security`. Patch top-level `status`
+  (`unknown|idle|requested|assigned|enroute|onscene|resolved|cancelled|blocked`),
+  `priority` (`routine|urgent|critical`), and plain-text `incident`, `location`,
+  `dispatcher`, `detail`, `note`. Patch each responder by ID:
+  `{"patrol":{"status":"enroute","eta":"3 min · illustrative","detail":"Unit report"}}`.
+  Responder status is `unknown|available|assigned|enroute|onscene|released|unavailable`.
+  Each responder object replaces the WHOLE previous item. Omitted subfields
+  reset to unknown/empty; null resets the item; an omitted responder ID carries
+  forward. `enterOnce` is current-step only. IDs follow the security panel's
+  letter-led ID and reserved-name rules. Empty objects also reset an item;
+  wholly invalid patches warn and are ignored, while mixed valid/invalid
+  properties install the sanitized complete item. Only the first 8 declared
+  responder entries are considered. ETA is authored text, never a live countdown.
+  Request status and responder status are independent: the panel does not
+  infer assignment, arrival or resolution. Missing data is unknown. Pair
+  `blocked` with a failed edge only when non-delivery is established. No actual
+  emergency service is contacted. See [security and response recipe](../cookbook/security-response.md).
 - `state` — a state-machine readout plus a chip rail:
   `{"id":"hp","type":"state","title":"...","states":["OFF","BOOT","RUN"],
   "colors":{"RUN":"#38E1FF"},"initial":{"state":"OFF"}}`. Patched via

@@ -1,0 +1,644 @@
+{
+  "page": {
+    "title": "From alarm to response",
+    "contract": "1",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "security-response",
+        "heading": "One event. Three possible outcomes.",
+        "accent": "cyan",
+        "text": "A fictional home-security workflow. Compare a confirmed incident, an authorized entry and a failed dispatch handoff. Sensor evidence, the operator decision and responder progress are authored separately. Switch to At the property for the home or Service flow for backend handoffs.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "primaryPanel": "home",
+          "defaultLayout": "response-room",
+          "nodes": {
+            "sensor": {
+              "title": "Home devices",
+              "sub": "report an event",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "intake": {
+              "title": "Event intake",
+              "sub": "deliver the report",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "monitor": {
+              "title": "Monitoring",
+              "sub": "assess the incident",
+              "icon": "terminal",
+              "tint": "data"
+            },
+            "dispatch": {
+              "title": "Dispatch desk",
+              "sub": "assign a response",
+              "icon": "phone",
+              "tint": "cmd"
+            },
+            "unit": {
+              "title": "Responders",
+              "sub": "report progress",
+              "icon": "phone",
+              "tint": "dev"
+            }
+          },
+          "rows": [
+            [
+              "sensor",
+              "intake",
+              "monitor",
+              "dispatch",
+              "unit"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "sensor",
+              "to": "intake",
+              "kind": "https",
+              "label": "event"
+            },
+            {
+              "from": "intake",
+              "to": "monitor",
+              "kind": "https",
+              "label": "alert"
+            },
+            {
+              "from": "monitor",
+              "to": "dispatch",
+              "kind": "https",
+              "label": "case"
+            },
+            {
+              "from": "dispatch",
+              "to": "unit",
+              "kind": "https",
+              "label": "assign"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "At the property",
+              "outline": {
+                "w": 300,
+                "h": 164
+              },
+              "rooms": [
+                {
+                  "label": "PORCH",
+                  "x": 10,
+                  "y": 8,
+                  "w": 65,
+                  "h": 164
+                },
+                {
+                  "label": "ENTRY",
+                  "x": 75,
+                  "y": 8,
+                  "w": 75,
+                  "h": 164
+                },
+                {
+                  "label": "LIVING ROOM",
+                  "x": 150,
+                  "y": 8,
+                  "w": 160,
+                  "h": 164
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Porch cam",
+                  "x": 40,
+                  "y": 42,
+                  "facing": 70,
+                  "spread": 60,
+                  "range": 72
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "label": "Front door",
+                  "x": 102,
+                  "y": 90
+                },
+                {
+                  "id": "hub",
+                  "kind": "hub",
+                  "label": "Home hub",
+                  "x": 205,
+                  "y": 58
+                },
+                {
+                  "id": "motion",
+                  "kind": "sensor",
+                  "label": "Motion",
+                  "icon": "gear",
+                  "x": 262,
+                  "y": 130
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "person",
+                  "label": "Person",
+                  "x": 38,
+                  "y": 130
+                }
+              ],
+              "initial": {
+                "cam": "scan",
+                "door": "closed",
+                "hub": "idle",
+                "motion": "ok",
+                "person": null
+              }
+            },
+            {
+              "id": "monitor",
+              "type": "security",
+              "title": "Security monitoring",
+              "site": "Cedar House \u00b7 demo property",
+              "sensors": [
+                {
+                  "id": "door",
+                  "label": "Front entry",
+                  "kind": "door",
+                  "zone": "Entry"
+                },
+                {
+                  "id": "camera",
+                  "label": "Doorbell camera",
+                  "kind": "camera",
+                  "zone": "Porch"
+                },
+                {
+                  "id": "motion",
+                  "label": "Hall motion",
+                  "kind": "motion",
+                  "zone": "Hall"
+                }
+              ],
+              "initial": {
+                "status": "armed",
+                "operator": "Morgan \u00b7 monitoring",
+                "incident": "No open incident",
+                "assessment": "unverified",
+                "detail": "Armed away. Waiting for a reported event.",
+                "door": {
+                  "health": "online",
+                  "alarm": "clear",
+                  "detail": "Closed"
+                },
+                "camera": {
+                  "health": "online",
+                  "alarm": "clear",
+                  "detail": "Monitoring the porch"
+                },
+                "motion": {
+                  "health": "online",
+                  "alarm": "clear",
+                  "detail": "No reported motion"
+                }
+              }
+            },
+            {
+              "id": "response",
+              "type": "dispatch",
+              "title": "Emergency dispatch",
+              "agency": "Cedar response desk \u00b7 illustrative",
+              "responders": [
+                {
+                  "id": "patrol",
+                  "label": "Patrol team",
+                  "kind": "police",
+                  "callsign": "P-12"
+                },
+                {
+                  "id": "backup",
+                  "label": "Property security",
+                  "kind": "security",
+                  "callsign": "S-04"
+                }
+              ],
+              "initial": {
+                "status": "idle",
+                "priority": "routine",
+                "incident": "No request",
+                "location": "Cedar House \u00b7 front entry",
+                "dispatcher": "Avery \u00b7 response desk",
+                "detail": "A sensor alarm alone does not assign a responder.",
+                "patrol": {
+                  "status": "available",
+                  "eta": "",
+                  "detail": "Not assigned"
+                },
+                "backup": {
+                  "status": "available",
+                  "eta": "",
+                  "detail": "Not assigned"
+                }
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "armed",
+              "text": "The home is armed away. Sensors report healthy; there is no incident and no response request.",
+              "nodes": [
+                "sensor"
+              ],
+              "panels": {}
+            },
+            {
+              "id": "detected",
+              "text": "The front door reports an opening. The event reaches monitoring; recording starts, but the cause is unverified.",
+              "edges": [
+                "sensor->intake",
+                "intake->monitor"
+              ],
+              "tone": {
+                "monitor": "warn"
+              },
+              "panels": {
+                "home": {
+                  "door": "open",
+                  "cam": "rec",
+                  "hub": "tx",
+                  "person": {
+                    "x": 94,
+                    "y": 126
+                  }
+                },
+                "monitor": {
+                  "status": "alarm",
+                  "incident": "INC-204 \u00b7 front entry",
+                  "assessment": "unverified",
+                  "detail": "Door open while armed away. Review required.",
+                  "door": {
+                    "health": "online",
+                    "alarm": "triggered",
+                    "detail": "Open while armed away"
+                  }
+                }
+              }
+            },
+            {
+              "id": "review",
+              "text": "Morgan acknowledges the alarm and reviews camera evidence. The monitoring decision is still pending.",
+              "nodes": [
+                "monitor"
+              ],
+              "panels": {
+                "monitor": {
+                  "status": "reviewing",
+                  "assessment": "reviewing",
+                  "detail": "Reviewing the entry event and contacting the resident.",
+                  "door": {
+                    "health": "online",
+                    "alarm": "acknowledged",
+                    "detail": "Operator is assessing the event"
+                  }
+                }
+              }
+            },
+            {
+              "id": "verified",
+              "text": "In this fictional scenario, the operator confirms an intrusion and sends a response request. The response desk has not assigned a unit yet.",
+              "edge": "monitor->dispatch",
+              "tone": {
+                "monitor": "alert"
+              },
+              "panels": {
+                "monitor": {
+                  "status": "verified",
+                  "assessment": "verified",
+                  "detail": "Intrusion confirmed by the operator in this authored scenario.",
+                  "motion": {
+                    "health": "online",
+                    "alarm": "triggered",
+                    "detail": "Movement inside the hall"
+                  }
+                },
+                "response": {
+                  "status": "requested",
+                  "priority": "urgent",
+                  "incident": "INC-204 \u00b7 confirmed intrusion",
+                  "detail": "Request received. Awaiting dispatcher assignment."
+                },
+                "home": {
+                  "person": {
+                    "x": 174,
+                    "y": 122
+                  },
+                  "motion": "alert"
+                }
+              }
+            },
+            {
+              "id": "assigned",
+              "text": "Avery assigns P-12. The property security team remains available; assignment does not mean either team has arrived.",
+              "edge": "dispatch->unit",
+              "tone": {
+                "dispatch": "ok"
+              },
+              "panels": {
+                "response": {
+                  "status": "assigned",
+                  "detail": "P-12 accepts the assignment.",
+                  "patrol": {
+                    "status": "assigned",
+                    "eta": "6 min \u00b7 example",
+                    "detail": "Assignment accepted"
+                  }
+                }
+              }
+            },
+            {
+              "id": "enroute",
+              "text": "P-12 reports en route. The arrival estimate is an authored example, not a live clock or routing calculation.",
+              "nodes": [
+                "unit"
+              ],
+              "panels": {
+                "response": {
+                  "status": "enroute",
+                  "detail": "Unit reports travel has begun.",
+                  "patrol": {
+                    "status": "enroute",
+                    "eta": "3 min \u00b7 example",
+                    "detail": "Travelling to the front entry"
+                  }
+                }
+              }
+            },
+            {
+              "id": "onscene",
+              "text": "P-12 reports arrival. The incident remains verified; an arrival report does not imply that the incident is resolved.",
+              "nodes": [
+                "unit"
+              ],
+              "tone": {
+                "unit": "ok"
+              },
+              "panels": {
+                "response": {
+                  "status": "onscene",
+                  "detail": "P-12 reports on scene. Resolution has not been reported.",
+                  "patrol": {
+                    "status": "onscene",
+                    "eta": "Arrived",
+                    "detail": "At the front entry"
+                  }
+                },
+                "home": {
+                  "cam": "scan",
+                  "hub": "idle"
+                }
+              }
+            },
+            {
+              "id": "false-alarm",
+              "text": "The resident confirms an authorized entry. Morgan clears the incident; no response request is sent and no unit is assigned.",
+              "nodes": [
+                "monitor"
+              ],
+              "tone": {
+                "monitor": "ok"
+              },
+              "panels": {
+                "monitor": {
+                  "status": "cleared",
+                  "assessment": "false-alarm",
+                  "detail": "Resident confirms an authorized arrival.",
+                  "door": {
+                    "health": "online",
+                    "alarm": "clear",
+                    "detail": "Authorized entry confirmed"
+                  }
+                },
+                "home": {
+                  "door": "closed",
+                  "cam": "scan",
+                  "person": null
+                },
+                "response": {
+                  "status": "idle",
+                  "detail": "No dispatch requested. Monitoring closed the false alarm."
+                }
+              }
+            },
+            {
+              "id": "dispatch-blocked",
+              "text": "The operator confirms the incident, but the response request cannot be delivered. No unit is assigned; the monitoring team must follow its separate escalation process.",
+              "failures": {
+                "monitor->dispatch": "dropped"
+              },
+              "tone": {
+                "monitor": "alert",
+                "dispatch": "warn"
+              },
+              "panels": {
+                "monitor": {
+                  "status": "verified",
+                  "assessment": "verified",
+                  "detail": "Incident confirmed; dispatch delivery failed."
+                },
+                "response": {
+                  "status": "blocked",
+                  "priority": "urgent",
+                  "incident": "INC-204 \u00b7 handoff failed",
+                  "detail": "Request not delivered. No responder acknowledgement or ETA."
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "confirmed",
+              "label": "Confirmed incident",
+              "color": "#5262c6",
+              "steps": [
+                "armed",
+                "detected",
+                "review",
+                "verified",
+                "assigned",
+                "enroute",
+                "onscene"
+              ]
+            },
+            {
+              "id": "false-alarm",
+              "label": "False alarm",
+              "color": "#1c8b79",
+              "steps": [
+                "armed",
+                "detected",
+                "review",
+                "false-alarm"
+              ]
+            },
+            {
+              "id": "dispatch-unavailable",
+              "label": "Dispatch unavailable",
+              "color": "#be6b23",
+              "steps": [
+                "armed",
+                "detected",
+                "review",
+                "dispatch-blocked"
+              ]
+            }
+          ],
+          "layouts": [
+            {
+              "id": "response-room",
+              "name": "Response room",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "monitor",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 14,
+                    "w": 6,
+                    "h": 6,
+                    "attachTo": "panel:monitor"
+                  },
+                  {
+                    "panel": "response",
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20
+                  },
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 4,
+                    "h": 16,
+                    "hidden": true
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 4,
+                    "h": 16,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "property",
+              "name": "At the property",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 4,
+                    "h": 18,
+                    "hidden": false
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 4,
+                    "h": 18,
+                    "hidden": true
+                  },
+                  {
+                    "panel": "monitor",
+                    "x": 4,
+                    "y": 0,
+                    "w": 4,
+                    "h": 18
+                  },
+                  {
+                    "panel": "response",
+                    "x": 8,
+                    "y": 0,
+                    "w": 4,
+                    "h": 18
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 12,
+                    "w": 4,
+                    "h": 6,
+                    "attachTo": "panel:home"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "service-flow",
+              "name": "Service flow",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 14
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 8,
+                    "w": 12,
+                    "h": 6,
+                    "attachTo": "diagram"
+                  },
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 4,
+                    "h": 18,
+                    "hidden": true
+                  },
+                  {
+                    "panel": "monitor",
+                    "x": 0,
+                    "y": 14,
+                    "w": 6,
+                    "h": 16
+                  },
+                  {
+                    "panel": "response",
+                    "x": 6,
+                    "y": 14,
+                    "w": 6,
+                    "h": 16
+                  }
+                ]
+              }
+            }
+          ],
+          "routing": "lanes"
+        }
+      }
+    ]
+  }
+}

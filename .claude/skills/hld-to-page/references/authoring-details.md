@@ -42,6 +42,9 @@ to explicit child paths and steps, and label the child nodes referenced by
 run a simulation or derive the parent outcome. External specs use approved
 host identities and an injected loader, never renderer-side URL fetching.
 Stamp the `flow.drilldown` capability with the compatibility tool.
+Focused drilldowns automatically display an ancestor overview map highlighting
+the entered domain. Use clear domain titles for its location trail; do not add
+a duplicate panel or copy of the overview to simulate this context map.
 
 Step views now open paused unless `diagram.autoplay` is strictly `true`.
 For an automatically playing story use `view:"step", autoplay:true`; do not

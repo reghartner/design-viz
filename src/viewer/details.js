@@ -51,11 +51,18 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   }
   function back(index,silent){
     cancel();if(!session)return;
+    var departed=session.stack.slice(index+1).find(function(item){return item.via;});
+    var returnNode=departed && departed.via;
     while(session.stack.length>index+1)retire(session.stack.pop());
     var frame=current();frame.rec.sectionEl.hidden=false;
     if(frame.rec.stepper)frame.rec.stepper.onShow();
     if(index===0 && !frame.expanded.length){session=null;}
-    if(!silent){changed(true);var button=frame.rec.sectionEl.querySelector('[data-dv-detail]');if(button)button.focus();}
+    if(!silent){
+      changed(true);
+      var buttons=Array.from(frame.rec.sectionEl.querySelectorAll('[data-dv-detail],[data-detail-return]'));
+      var button=buttons.find(function(el){return (el.getAttribute('data-dv-detail') || el.getAttribute('data-detail-return'))===returnNode;}) || buttons[0];
+      if(button)button.focus();
+    }
   }
   function breadcrumb(frame){
     var nav=document.createElement('nav');nav.className='detail-breadcrumb';nav.setAttribute('aria-label','Diagram drill-down');
@@ -72,6 +79,21 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     }
     frame.rec.sectionEl.prepend(nav);
     if(frame.originStep){var context=document.createElement('p');context.className='detail-context';context.textContent='Details for '+frame.originStep;nav.after(context);}
+    var levels=[];
+    session.stack.forEach(function(parent,i){
+      var child=session.stack[i+1];if(!child || !child.via)return;
+      var diagram=parent.section.diagram;
+      if(!Object.prototype.hasOwnProperty.call(diagram.nodes,child.via))diagram=(parent.projected || parent.section).diagram;
+      var node=diagram.nodes[child.via];if(!node)return;
+      levels.push({diagram:diagram,node:child.via,label:node.title || child.via,title:parent.section.heading || parent.section.id || 'Overview',index:i});
+    });
+    if(levels.length){
+      var header=document.createElement('div');header.className='detail-head';
+      var intro=document.createElement('div');intro.className='detail-head-intro';header.appendChild(intro);
+      var el=frame.rec.sectionEl;el.prepend(header);
+      Array.from(el.children).forEach(function(child){if(child.matches('.detail-breadcrumb,.detail-context,.sec-eyebrow,.sec-heading-row,.sec-prose,.sec-teaser'))intro.appendChild(child);});
+      header.appendChild(buildDetailOverview(levels,function(index){back(index);}));
+    }
   }
   function stepState(frame){
     var sp=frame.rec.stepper,presentation=frame.rec.presentation;
@@ -138,7 +160,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     frame.expanded.forEach(function(id){var node=frame.section.diagram.nodes[id];
       var button=document.createElement('button');button.type='button';button.textContent='Collapse '+(node.title || id);
       button.addEventListener('click',function(){expand(frame,id);});controls.appendChild(button);
-      var explore=document.createElement('button');explore.type='button';explore.textContent='Explore '+(node.title || id);explore.addEventListener('click',function(){open(frame,id,'focus');});controls.appendChild(explore);
+      var explore=document.createElement('button');explore.type='button';explore.setAttribute('data-detail-return',id);explore.textContent='Explore '+(node.title || id);explore.addEventListener('click',function(){open(frame,id,'focus');});controls.appendChild(explore);
     });
     var text=document.createElement('span');text.textContent='Overview steps · internal components expanded';controls.appendChild(text);
     frame.rec.sectionEl.prepend(controls);

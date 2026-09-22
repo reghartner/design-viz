@@ -9,6 +9,7 @@ const active=page=>page.locator('[data-dv-detail-preview]:visible');
 async function flow(page){
   const initial=root(page);await initial.locator('[data-dv-detail="connectivity"]').click();
   await expect(initial).toBeHidden();await expect(active(page).locator('.detail-breadcrumb')).toContainText('Connectivity');
+  await expect(active(page).locator('.detail-overview .detail-map-node.is-current')).toHaveAttribute('data-detail-map-node','connectivity');
   await expect(active(page).locator('.sec-eyebrow')).toHaveText('Detail flow');
   const cloud=active(page).locator('[data-dv-detail]');await expect(cloud).toHaveCount(1);await cloud.focus();await cloud.press('Enter');
   await expect(active(page).locator('.detail-breadcrumb')).toContainText('Cloud handoff');
@@ -38,6 +39,7 @@ test('standalone details support native Back/Forward and shareable reloadable de
  await page.goBack();await expect(root(page)).toBeVisible();await expect(active(page)).toHaveCount(0);
  await page.goForward();await expect(active(page).locator('.detail-breadcrumb')).toContainText('Connectivity');
  await page.reload();await expect(active(page).locator('.detail-breadcrumb')).toContainText('Connectivity');
+ await expect(active(page).locator('.detail-overview .detail-map-node.is-current')).toHaveAttribute('data-detail-map-node','connectivity');
  await active(page).locator('.detail-breadcrumb button').first().click();await flow(page);
 });
 test('Forge single-section macro keeps the detail definitions available without showing them as extra sections',async({page,server})=>{
@@ -60,6 +62,7 @@ test('native mounts restore external pinned details, isolate roots, and retire l
  const host=page.locator('#a'),other=page.locator('#b');
  await page.evaluate(()=>__viewer.navigate({section:'doorbell-domains',step:'dispatch'}));
  await host.locator('[data-dv-detail="apps"]').click();await expect(host.getByRole('navigation',{name:'Diagram drill-down'})).toContainText('Approved remote flow');
+ await expect(host.locator('.detail-overview .detail-map-node.is-current')).toHaveAttribute('data-detail-map-node','apps');
  expect(await page.evaluate(()=>__detailRequests[0].r)).toEqual({spec:'approved-apps',revision:'commit-123',section:'remote'});
  await expect(other.locator('[data-dv-detail-preview]')).toHaveCount(0);
  expect(await page.evaluate(()=>__detailState.rootState.step)).toBe('dispatch');
@@ -71,6 +74,34 @@ test('native mounts restore external pinned details, isolate roots, and retire l
  await page.evaluate(()=>{__viewer.destroy();__resolve(__external);});await expect(host).toBeEmpty();
  expect(await page.evaluate(()=>__detailRequests.at(-1).signal.aborted)).toBe(true);
  await page.evaluate(()=>__other.destroy());
+});
+test('overview maps preserve context at each depth and return with keyboard without changing source',async({page,server})=>{
+ await page.goto(server.origin+'/workbench.html');await paste(page,source);
+ const initial=root(page);await initial.locator('.schip[data-step-source="1"]').first().click();
+ const caption=await initial.locator('.stepline').innerText();
+ await initial.locator('[data-dv-detail="connectivity"]').click();
+ await active(page).locator('[data-dv-detail="handoff"]').click();
+ const overview=active(page).locator('.detail-overview');
+ await expect(overview.locator('.detail-overview-depth')).toHaveText('Level 2');
+ await expect(overview.locator('.detail-overview-location')).toContainText('Connectivity › Cloud handoff');
+ await expect(overview.locator('.detail-map-node.is-current')).toHaveAttribute('data-detail-map-node','connectivity');
+ await expect(overview.locator('[data-dv-node],[data-dv-detail],[id]')).toHaveCount(0);
+ const mapBox=await overview.boundingBox(),sectionBox=await active(page).boundingBox(),boardBox=await active(page).locator('.board').boundingBox();
+ expect(mapBox.x+mapBox.width).toBeLessThanOrEqual(sectionBox.x+sectionBox.width);
+ expect(mapBox.y+mapBox.height).toBeLessThanOrEqual(boardBox.y);
+ await overview.getByRole('combobox',{name:'Overview ancestor'}).selectOption('1');
+ await expect(overview.locator('.detail-map-node.is-current')).toHaveAttribute('data-detail-map-node','handoff');
+ await overview.locator('summary').click();await expect(overview.locator('.detail-overview-map')).toBeHidden();
+ await overview.locator('summary').click();await overview.locator('.detail-overview-map').focus();await overview.locator('.detail-overview-map').press('Enter');
+ await expect(active(page).locator('.sec-h')).toContainText('Connectivity');
+ await expect(active(page).locator('.detail-overview-depth')).toHaveText('Level 1');
+ await active(page).locator('.detail-overview-return').click();
+ await expect(initial).toBeVisible();await expect(active(page)).toHaveCount(0);
+ await expect(initial.locator('.stepline')).toHaveText(caption,{useInnerText:true});await expect(page.locator('#src')).toHaveValue(source);
+ await initial.locator('[data-dv-detail="apps"]').focus();await initial.locator('[data-dv-detail="apps"]').press('Enter');
+ await active(page).locator('.detail-overview-return').focus();await active(page).locator('.detail-overview-return').press('Enter');
+ await expect(initial.locator('[data-dv-detail="apps"]')).toBeFocused();
+ await expect(page.locator('#src')).toHaveValue(source);
 });
 test('the node inspector creates a detail section in one Undo action and configures an existing reference',async({page,server})=>{
  const spec={page:{title:'Author a domain',sections:[{heading:'Overview',diagram:{nodes:{a:{title:'Client'},b:{title:'Service'}},rows:[['a','b']],edges:[{from:'a',to:'b'}]}}]}};

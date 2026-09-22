@@ -3683,6 +3683,29 @@ body.sk-daylight .docview,body.sk-pastel .docview,body.sk-editorial .docview{--t
 .detail-breadcrumb button[aria-current]{font-weight:700;opacity:1;cursor:default;border-color:transparent}
 .detail-context,.detail-notice,.detail-expanded-controls span{font-size:12px;line-height:1.5;opacity:.85}
 .detail-notice:empty{display:none}
-.doc-sec:has(>.detail-breadcrumb){animation:detail-enter .2s ease-out}
+.detail-head{display:flex;align-items:flex-start;flex-wrap:wrap;gap:20px;margin-bottom:20px}
+.detail-head-intro{flex:1 1 420px;min-width:0}
+.detail-overview{--detail-map-bg:#101a2c;color:var(--dtext);flex:0 1 340px;min-width:0;max-width:100%;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);border-radius:14px;background:color-mix(in srgb,var(--acc) 6%,var(--detail-map-bg));box-shadow:0 5px 18px #0000000a;animation:detail-map-enter .22s ease-out}
+.sk-daylight .detail-overview,.sk-pastel .detail-overview,.sk-editorial .detail-overview{--detail-map-bg:#fff}
+.detail-overview summary{cursor:pointer;padding:10px 12px;font-size:12px;font-weight:700;letter-spacing:.04em}
+.detail-overview-depth{float:right;font-size:10px;font-weight:500;opacity:.7}
+.detail-overview-body{padding:0 12px 12px;min-width:0}
+.detail-overview-location{margin:0 0 8px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.detail-overview-level{display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:8px}
+.detail-overview-level select{min-width:0;flex:1;width:0;font:inherit;color:inherit;background:transparent;border:1px solid color-mix(in srgb,var(--acc) 30%,transparent);border-radius:5px;padding:4px}
+.detail-overview-map{display:block;width:100%;padding:8px;border:0;border-radius:8px;background:color-mix(in srgb,var(--acc) 4%,transparent);cursor:zoom-out;color:inherit}
+.detail-overview-map svg{display:block;width:100%;height:auto;min-height:76px;max-height:150px;overflow:visible}
+.detail-map-group{fill:color-mix(in srgb,var(--acc) 3%,transparent);stroke:currentColor;stroke-opacity:.18;vector-effect:non-scaling-stroke}
+.detail-map-edge{fill:none;stroke:currentColor;stroke-opacity:.35;stroke-width:1.25;vector-effect:non-scaling-stroke}
+.detail-map-node rect{fill:var(--detail-map-bg);stroke:currentColor;stroke-opacity:.3;stroke-width:1;vector-effect:non-scaling-stroke}
+.detail-map-node text{fill:currentColor;font:600 26px sans-serif}
+.detail-map-node.is-current rect{fill:color-mix(in srgb,var(--acc) 24%,var(--detail-map-bg));stroke:var(--acc);stroke-opacity:1;stroke-width:1.5}
+.detail-map-highlight{fill:color-mix(in srgb,var(--acc) 10%,transparent);stroke:var(--acc);stroke-width:2;vector-effect:non-scaling-stroke}
+.detail-overview-caption{margin:6px 0 8px;font-size:10px;line-height:1.4;opacity:.75;overflow-wrap:anywhere}
+.detail-overview-return{width:100%;font:inherit;font-size:11px;font-weight:600;color:inherit;background:transparent;border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);border-radius:7px;padding:6px;cursor:pointer}
+.detail-overview-map:hover,.detail-overview-return:hover{background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.detail-overview :focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+.doc-sec:has(>.detail-breadcrumb),.doc-sec:has(>.detail-head){animation:detail-enter .2s ease-out}
+@keyframes detail-map-enter{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 @keyframes detail-enter{from{opacity:.2;transform:scale(.985)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.doc-sec:has(>.detail-breadcrumb){animation:none}}
+@media(prefers-reduced-motion:reduce){.doc-sec:has(>.detail-breadcrumb),.doc-sec:has(>.detail-head),.detail-overview{animation:none}}

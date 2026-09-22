@@ -9,12 +9,33 @@ var SCENE_NAMES = [
   'static-noise',
 ];
 var SCREEN_MODES = ['off', 'boot', 'active', 'live', 'rec', 'save', 'unavailable'];
+var SCREEN_SPOTLIGHTS = ['off', 'on', 'flash'];
+/* Preserve the legacy screen snapshot contract while sanitizing the independent
+   audio/light channels before they enter carried state. */
+function screenCleanState(raw, once) {
+  if (!panelObject(raw)) return {};
+  var out = Object.assign({}, raw);
+  if (panelOwn(raw, 'audio')) {
+    var audio = FlowAudio.clean(raw.audio);
+    if (audio === undefined) delete out.audio;
+    else out.audio = audio;
+  }
+  if (panelOwn(raw, 'spotlight') && SCREEN_SPOTLIGHTS.indexOf(raw.spotlight) < 0) delete out.spotlight;
+  if (panelOwn(raw, 'enterOnce')) {
+    if (once && panelObject(raw.enterOnce)) out.enterOnce = screenCleanState(raw.enterOnce, false);
+    else delete out.enterOnce;
+  }
+  return out;
+}
 function screenPatchWarnings(state, path, warnings) {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return;
   if (state.mode != null && SCREEN_MODES.indexOf(state.mode) < 0)
     warnings.push(path + '.mode: unknown camera mode — using off');
   if (state.reason != null && typeof state.reason !== 'string')
     warnings.push(path + '.reason: expected text or null — using the default explanation');
+  if (panelOwn(state, 'audio')) FlowAudio.clean(state.audio, path + '.audio', warnings);
+  if (panelOwn(state, 'spotlight') && SCREEN_SPOTLIGHTS.indexOf(state.spotlight) < 0)
+    warnings.push(path + '.spotlight: expected off|on|flash — ignored');
   if (
     Object.prototype.hasOwnProperty.call(state, 'scenePlayback') &&
     ['waiting', 'playing'].indexOf(state.scenePlayback) < 0
@@ -28,6 +49,7 @@ function screenPatchWarnings(state, path, warnings) {
 }
 
 PanelRegistry.extend('screen', {
+  fold: function (panel, steps) { return foldSanitizedPanelStates(panel, steps, screenCleanState); },
   validateDeclaration: function (p, PP, warnings, errors, d) {
     if (p.scene && SCENE_NAMES.indexOf(p.scene) < 0)
       warnings.push(
@@ -291,6 +313,31 @@ var SCENES = {
 
 /* Shared by embedded monitoring consoles. The caller still owns its panel
    lifecycle; this factory owns camera artwork, overlays and clip-preserving patches. */
+function screenDeviceOverlay(audio, spotlight) {
+  var light = SCREEN_SPOTLIGHTS.indexOf(spotlight) >= 0 && spotlight !== 'off';
+  var sound = FlowAudio.render(audio);
+  if (!sound && !light) return '';
+  return '<svg class="ovl screen-devices" viewBox="0 0 320 180" aria-hidden="true">' +
+    (light ? '<g class="screen-spotlight screen-spotlight-' + spotlight + '"><path d="M263 55L101 180H320V122Z" fill="#FFE5A3" opacity=".24"/><path d="M263 55L203 180H320V126Z" fill="#FFF6D6" opacity=".14"/><ellipse cx="250" cy="170" rx="67" ry="12" fill="#FFE5A3" opacity=".2"/></g>' : '') +
+    '<g class="screen-camera-device" transform="translate(260 40)"><rect x="-17" y="-12" width="34" height="25" rx="9" fill="#163046" stroke="#A3CCD6" stroke-width="1.2"/>' +
+    '<circle cx="-5" cy="-1" r="6" fill="#081927" stroke="#65B8C5" stroke-width="2"/><circle cx="-6" cy="-2" r="2" fill="#92D9E2"/>' +
+    '<path d="M6-5H11M6-1H11M6 3H11" stroke="#C7E4DF" stroke-width="1.6" stroke-linecap="round"/>' +
+    (light ? '<rect x="-8" y="12" width="16" height="3" rx="1.5" fill="#FFE5A3"/>' : '') +
+    FlowAudio.effect(audio) + '</g></svg>';
+}
+function screenAudioHTML(audio) {
+  var strip = FlowAudio.render(audio, {label:'Camera audio'});
+  if (!strip) return '';
+  var speaking = FlowAudio.isEmitting(audio), hearing = FlowAudio.isCapturing(audio), model = FlowAudio.model(audio);
+  var action = speaking && hearing ? 'Camera speaker and microphone active' :
+    speaking ? {speech:'Camera speaking to visitor',recorded:'Camera playing recorded message',chime:'Camera sounding a chime',siren:'Camera sounding a siren'}[model.output] :
+    hearing ? 'Camera hearing visitor or nearby sound' :
+    model.microphone === 'muted' ? 'Camera microphone muted' :
+    model.microphone === 'unavailable' ? 'Camera microphone unavailable' :
+    model.playback === 'failed' ? 'Camera speaker playback failed' :
+    model.microphone === 'listening' ? 'Camera microphone listening' : 'Camera audio';
+  return '<div class="screen-audio-direction">' + action + '</div>' + strip;
+}
 function screenFramePresentation(host, panel, state) {
   var h = '';
   var mode = String(state.mode || 'off');
@@ -323,25 +370,29 @@ function screenFramePresentation(host, panel, state) {
           : 'Video is temporarily unavailable.'
       ) +
       '</span></div>';
+  scrOvl += screenDeviceOverlay(state.audio, state.spotlight);
+  var audioHTML = screenAudioHTML(state.audio);
+  if (SCREEN_SPOTLIGHTS.indexOf(state.spotlight) >= 0 && state.spotlight !== 'off')
+    scrOvl += '<span class="ovl screen-light-label">Spotlight ' + (state.spotlight === 'flash' ? 'flashing' : 'on') + '</span>';
   h += '<div class="' + scrClass + '">';
   if (mode === 'boot') h += SCENES['static-noise'];
   else if (mode === 'active' || mode === 'live' || mode === 'rec' || mode === 'save')
     h += SCENES[sceneName];
-  h += scrOvl + '</div>';
+  h += scrOvl + '</div><div class="screen-audio-slot">' + audioHTML + '</div>';
   return {
     html: h,
     patch: function () {
       /* screen surgical path: consecutive modes that both show the SAME scene
      (active / live / rec / save) swap only the mode class and the overlay chips,
      keeping the scene subtree — the walker's animation state survives.
-     Any other transition (off/boot involved, or a first render) rebuilds. */
+     A stable off/boot/unavailable frame can patch audio too; entering or
+     leaving one of those modes rebuilds its video content. */
       var surgical = false;
       var SCENE_SHOWING = { active: true, live: true, rec: true, save: true };
       if (
         host._lastHTML != null &&
         sceneName === host._scrScene &&
-        SCENE_SHOWING[mode] &&
-        SCENE_SHOWING[host._scrMode]
+        ((SCENE_SHOWING[mode] && SCENE_SHOWING[host._scrMode]) || mode === host._scrMode)
       ) {
         var scrBox = host.querySelector('.screenbox');
         if (scrBox) {
@@ -353,11 +404,17 @@ function screenFramePresentation(host, panel, state) {
               oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
             if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
           }
+          if (audioHTML !== host._scrAudio) {
+            var audioSlot = host.querySelector('.screen-audio-slot');
+            if (audioSlot) audioSlot.innerHTML = audioHTML;
+            else surgical = false;
+          }
         }
       }
       host._scrMode = mode;
       host._scrScene = sceneName;
       host._scrOverlay = scrOvl;
+      host._scrAudio = audioHTML;
       return surgical;
     },
   };
@@ -375,6 +432,19 @@ PanelRegistry.extend('screen', {
 
 PanelRegistry.extend('screen', {
   styles: [
+    {
+      order: 490,
+      css: String.raw`.screen-devices{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.screen-camera-device{color:#B9FFF0;filter:drop-shadow(0 2px 4px #09192788);}
+.screen-spotlight-flash{animation:screen-spotlight-flash 2.6s ease-in-out infinite;}
+.screen-audio-slot:empty{display:none;}.screen-audio-slot{margin-top:7px;min-width:0;}
+.screen-audio-direction{margin:0 2px 5px;color:var(--dtext);font:500 10px/1.4 'IBM Plex Sans',sans-serif;}
+.screen-light-label{position:absolute;right:8px;bottom:8px;padding:3px 6px;border:1px solid #FFE5A355;border-radius:5px;background:#183046D9;color:#FFF0CA;font:500 9px/1.4 'IBM Plex Sans',sans-serif;}
+@keyframes screen-spotlight-flash{0%,34%,100%{opacity:1;}50%,82%{opacity:.16;}}
+@media(prefers-reduced-motion:reduce){.screen-devices *{animation:none!important;}.screen-spotlight-flash{opacity:.8;}}
+@media print{.screen-devices *{animation:none!important;}.screen-audio-slot{break-inside:avoid;}.screen-devices{print-color-adjust:exact;}}
+`,
+    },
     {
       order: 478,
       css: String.raw`.screenbox{position:relative; border-radius:8px; overflow:hidden; aspect-ratio:16/9; background:#05080B;}
@@ -635,14 +705,19 @@ PanelRegistry.extend('screen', {
       ['scenePlayback', 'enum', ['waiting', 'playing']],
       ['banner', 'text'],
       ['reason', 'text'],
+      ['audio', 'objf', FlowAudio.fields],
+      ['spotlight', 'enum', SCREEN_SPOTLIGHTS],
     ],
+    origin: function (panel, key, snapshot, context) {
+      return panelSanitizedOrigin(key, context, function (raw) { return screenCleanState(raw, false); });
+    },
     picker: {
       order: 15,
       name: 'Camera view',
       category: 'Places & sensing',
       tagline: 'What the camera sees',
       description:
-        'Show a camera scene moving through live view, recording, saving, and other modes.',
+        'Show camera video, two-way talk, recorded warnings, sound detection and an independent spotlight.',
     },
     example: function (sample, context) {
       var panel = sample.panel,
@@ -692,7 +767,7 @@ PanelRegistry.extend('screen', {
           var sceneNote = document.createElement('p');
           sceneNote.className = 'home-note';
           sceneNote.textContent =
-            'Active means on without livestreaming or recording. Unavailable hides the scene and shows the reason (for example, protective shutdown). Mode, reason and scene event carry independently; the reason is visible only in Unavailable mode.';
+            'Active means on without livestreaming or recording. Audio and spotlight carry independently of video. Camera output is heard by the visitor; microphone capturing means the camera hears the visitor. Each audio object replaces the prior audio state; null clears it. Audio is visual only. Unavailable hides video and shows its reason.';
           body.appendChild(sceneNote);
         },
         patchLabel: function (key) {

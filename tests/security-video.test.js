@@ -24,9 +24,9 @@ function host() {
   }
   Object.defineProperty(result,'innerHTML',{get(){return markup;},set(value){
     markup = value;result.writes++;
-    elements = Object.fromEntries(['.secmon','.secmon-stage','.secmon-hero-slot','.secmon-facts','.secmon-note','.secmon-feed-label','.secmon-review-caption strong','.secmon-review-clip','.secmon-sensor-details'].map(k=>[k,element()]));
+    elements = Object.fromEntries(['.secmon','.secmon-stage','.secmon-hero-slot','.secmon-facts','.secmon-note','.secmon-audio-slot','.secmon-feed-label','.secmon-review-caption strong','.secmon-review-clip','.secmon-sensor-details'].map(k=>[k,element()]));
     elements['.secmon-sensor-details'].open = false;
-    const video = {...element(),writes:0,querySelector(s){return s === '.screenbox' ? this.box : null;}};
+    const video = {...element(),writes:0,audioSlot:element(),querySelector(s){return s === '.screenbox' ? this.box : s === '.screen-audio-slot' ? this.audioSlot : null;}};
     Object.defineProperty(video,'innerHTML',{get(){return this.html;},set(h){
       this.writes++;this.html=h;
       this.box = {clip:{},className:'',querySelectorAll(){return [];},insertAdjacentHTML(){}};
@@ -136,7 +136,11 @@ test('clip DOM survives assessments, sensor facts, notes and playback toggles', 
     {video:'reviewing',scenePlayback:'playing',assessment:'reviewing'},
     {video:'reviewing',scenePlayback:'playing',status:'verified',operator:'Jordan',note:'Reviewed evidence',frontDoor:{alarm:'acknowledged'}},
     {video:'reviewing',scenePlayback:'waiting',assessment:'false-alarm'},
-    {video:'reviewing',scenePlayback:'playing',assessment:'verified'}
+    {video:'reviewing',scenePlayback:'playing',assessment:'verified'},
+    {video:'reviewing',audio:{microphone:'capturing',text:'Please identify yourself'},spotlight:'on'},
+    {video:'reviewing',audio:{output:'speech',text:'I live here'},spotlight:'flash'},
+    {video:'reviewing',audio:{microphone:'muted',output:'speech',playback:'failed',reason:'Headset disconnected'}},
+    {video:'reviewing',audio:null,spotlight:'off'}
   ]) {
     render(h,p,state);
     assert.equal(h.writes,1,'outer operator scene is stable');

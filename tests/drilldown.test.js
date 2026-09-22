@@ -36,6 +36,13 @@ test('expansion rejects boundary nodes that are defined but have no placement',(
  assert.throws(()=>B.expandDetailDiagram(p,d,['recording']),/boundary nodes must be placed/);
  assert.equal(JSON.stringify(p),before);
 });
+test('detail boundary validation reports malformed child placements without throwing',()=>{
+ for(const mutate of [d=>d.rows={bad:true},d=>d.rows=[null],d=>d.floats={bad:true},d=>delete d.nodes]){
+  const p={sections:[{id:'parent',diagram:{nodes:{domain:{detail:{section:'child',mode:'expand',ports:{in:'a'}}}},rows:[['domain']]}},{id:'child',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+  mutate(p.sections[1].diagram);
+  assert.ok(B.validate(p).errors.length);
+ }
+});
 test('drill navigation hash preserves opaque state and source-derived step mapping',()=>{
  const q=JSON.stringify({section:'doorbell-domains',frames:[{node:'connectivity',expanded:[],state:{path:'link-lost',step:'held'}}]});
  assert.equal(B.parseHash(B.buildHash({d:'doorbell-domains',q})).q,q);

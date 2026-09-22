@@ -9200,8 +9200,8 @@ function validateDetails(page, errors, warnings){
         if(!specObject(detail.ports))errors.push(where+'.ports: expected {in, out}');
         else ['in','out'].forEach(function(k){
           var port=detail.ports[k];if(port==null)return;
-          if(!child || !Object.prototype.hasOwnProperty.call(child.nodes,port))errors.push(where+'.ports.'+k+': unknown child node');
-          else if(!(child.rows || []).some(function(row){return row.some(function(slot){return (Array.isArray(slot)?slot:[slot]).indexOf(port)>=0;});}) && !(child.floats || []).some(function(f){return f.id===port;}))
+          if(!child || !Object.prototype.hasOwnProperty.call(child.nodes || {},port))errors.push(where+'.ports.'+k+': unknown child node');
+          else if(!(Array.isArray(child.rows)?child.rows:[]).some(function(row){return Array.isArray(row) && row.some(function(slot){return (Array.isArray(slot)?slot:[slot]).indexOf(port)>=0;});}) && !(Array.isArray(child.floats)?child.floats:[]).some(function(f){return f && f.id===port;}))
             errors.push(where+'.ports.'+k+': child node must be placed in rows or floats');
         });
       }

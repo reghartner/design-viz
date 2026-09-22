@@ -119,13 +119,14 @@ Use the explicit detail control on a node. Keep domain titles descriptive.
 A normal node `link` remains a source-document permalink; `detail` represents
 the reader's next level of explanation. Avoid cyclic detail references.
 
-Focused details also show a compact **Overview** map beside the heading. It
+Focused details also show a compact **Context map** beside the heading. It
 shows the larger diagram with the entered domain highlighted and a **You are
 here** trail. At deeper levels, **Map of** selects an ancestor diagram; the
 top-level overview is shown initially. Click the map or **Back to overview**
 to return to that ancestor with its reading position intact. Collapse the map
-using its Overview heading. This is automatic viewer context, not an authored
-panel, and it does not reduce the width of the main diagram or change the spec.
+using its **Context map** heading. The return control names the selected ancestor,
+and breadcrumb labels keep section subtitles in their hover titles. This is
+automatic viewer context, not an authored panel, and it does not reduce the width of the main diagram or change the spec.
 
 ## Map a parent beat to a child beat
 

@@ -118,7 +118,8 @@ var BUILDER_GUIDES = {
       ['icon', 'icon on the chip (see tokens below; default gear)'],
       ['tint', 'chip color (default cmd)'],
       ['group', 'containment-boundary id — members get a dashed box'],
-      ['link', 'permalink URL — clickable ↗ on the card corner']
+      ['link', 'permalink URL — clickable ↗ on the card corner'],
+      ['detail', 'inner flow: choose a section and focus, expand or link; map boundary nodes and parent step IDs as needed']
     ],
     tokens: 'icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone house camera doorbell lock bulb car · tints: cmd auth data mqtt dev'
   },
@@ -138,6 +139,7 @@ var BUILDER_GUIDES = {
     title: 'Step — one numbered narrative beat',
     how: 'Edit the selected JSON, then click Render. The same steps array drives the ambient packet schedule, the numbered coins, and the click-through.',
     fields: [
+      ['id', 'stable step identity used by paths and detail mappings; renaming updates those references'],
       ['edge', '"from->to" — the hop this step fires (or edges: [..] for hops that fire together)'],
       ['failures', 'edge outcomes: {"from->to":"dropped"}; use dropped for lost in transit or blocked for never sent'],
       ['text', 'caption shown in the step bar'],
@@ -201,6 +203,8 @@ var BUILDER_GUIDES = {
     how: 'Edit the selected JSON, then click Render. Everything inside is optional; a section is prose, an optional contract card, and an optional diagram.',
     fields: [
       ['heading', 'section heading'],
+      ['id', 'optional stable identity for links and node details; renaming updates local detail references'],
+      ['detailOnly', 'hide this section until its detail is opened; it remains editable in the workbench'],
       ['accent', 'green blue violet amber pink cyan red slate, or "#RRGGBB"'],
       ['source', 'permalink URL — "source ↗" chip beside the heading'],
       ['text', 'paragraph or list of paragraphs above the diagram'],

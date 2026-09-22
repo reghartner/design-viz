@@ -12,10 +12,48 @@ function planDeleteStep(text, raw, sectionIdx, stepIdx){
     if (got.d.paths.some(function(p){return p.steps.length === 1 && p.steps[0] === id;}))
       return {error:'This is the only step in a path. Remove that path or add another step first.'};
   }
-  return builderRewrite(text, raw, got.path, function(d){
+  var plan=builderRewrite(text, raw, got.path, function(d){
     d.steps.splice(stepIdx,1);
     (d.paths || []).forEach(function(p){p.steps=p.steps.filter(function(ref){return ref!==id;});});
     (d.layouts || []).forEach(function(v){if(Array.isArray(v.steps))v.steps=v.steps.filter(function(ref){return ref!==id;});});
+  });
+  return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
+    if(target===sectionIdx && detail.step===id)delete detail.step;
+    if(detail.stepMap){
+      Object.keys(detail.stepMap).forEach(function(parentId){
+        if(owner===sectionIdx && parentId===id || target===sectionIdx && detail.stepMap[parentId] && detail.stepMap[parentId].step===id)
+          delete detail.stepMap[parentId];
+      });
+      if(!Object.keys(detail.stepMap).length)delete detail.stepMap;
+    }
+  });
+}
+
+function planRenameStep(text,raw,sectionIdx,stepIdx,newId){
+  var got=builderDiagram(text,raw,sectionIdx);
+  if(got.error)return got;
+  var step=got.d.steps && got.d.steps[stepIdx],oldId=step && step.id;
+  if(!step)return {error:'step not found — reselect and try again'};
+  if(typeof newId!=='string' || !/^[a-zA-Z][\w.-]*$/.test(newId))return {error:'Step IDs start with a letter and use letters, digits, _, . or -.'};
+  if((got.d.steps || []).some(function(st,i){return i!==stepIdx && st.id===newId;}))return {error:'That step ID is already in use.'};
+  var plan=builderRewrite(text,raw,got.path,function(d){
+    d.steps[stepIdx].id=newId;
+    if(!oldId)return;
+    (d.paths || []).forEach(function(path){path.steps=path.steps.map(function(id){return id===oldId?newId:id;});});
+    (d.layouts || []).forEach(function(view){if(view.steps)view.steps=view.steps.map(function(id){return id===oldId?newId:id;});});
+  });
+  if(!oldId)return plan;
+  return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
+    if(target===sectionIdx && detail.step===oldId)detail.step=newId;
+    if(!detail.stepMap)return;
+    if(owner===sectionIdx && Object.prototype.hasOwnProperty.call(detail.stepMap,oldId)){
+      var mappings=Object.create(null);
+      Object.keys(detail.stepMap).forEach(function(id){mappings[id===oldId?newId:id]=detail.stepMap[id];});
+      detail.stepMap=mappings;
+    }
+    if(target===sectionIdx)Object.keys(detail.stepMap).forEach(function(id){
+      if(detail.stepMap[id] && detail.stepMap[id].step===oldId)detail.stepMap[id].step=newId;
+    });
   });
 }
 
@@ -109,7 +147,7 @@ function planPathStepEdit(text,raw,section,pathId,index,action,metadata){
   var got = builderDiagram(text,raw,section);
   if (got.error) return got;
   var resultIndex=index, resultPath=pathId;
-  return builderNarrativeResult(text,raw,got.path,function(d,result){
+  var plan=builderNarrativeResult(text,raw,got.path,function(d,result){
     var steps=d.steps || [], taken=Object.create(null);
     steps.forEach(function(s){if(s && s.id) taken[s.id]=true;});
     function newId(stem){var id=builderUniqueKey(taken,stem);taken[id]=true;return id;}
@@ -150,6 +188,15 @@ function planPathStepEdit(text,raw,section,pathId,index,action,metadata){
       resultIndex=steps.findIndex(function(s){return s.id===d.paths[0].steps[0];});
     } else return {error:'Unknown path edit.'};
     result.index=resultIndex;result.pathId=resultPath;
+  });
+  if(action!=='remove')return plan;
+  return builderDetailCascade(plan,section,function(detail,owner,target){
+    if(target!==section)return;
+    if(detail.path===pathId){delete detail.path;delete detail.step;}
+    if(detail.stepMap){
+      Object.keys(detail.stepMap).forEach(function(id){if(detail.stepMap[id] && detail.stepMap[id].path===pathId)delete detail.stepMap[id];});
+      if(!Object.keys(detail.stepMap).length)delete detail.stepMap;
+    }
   });
 }
 

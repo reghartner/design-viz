@@ -6,7 +6,7 @@ function mountNativeSpec(environment, spec, options){
   var skin=resolveSkin('',options.skin || page.skin), view=document.createElement('div');
   environment.body.appendChild(view);applySkinClasses(environment.body,view,skin);
   var records=sectionRecords(page), controller=renderPage(view,page,skin,options.backlinks || {},
-    {autoplay:false,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false});
+    {autoplay:false,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false,loadDetail:options.loadDetail,onDetailNavigate:options.onDetailNavigate});
   function protectLinks(){
     view.querySelectorAll('a[href]').forEach(function(link){
       var url=FlowCanon.http(link.getAttribute('href'));
@@ -33,8 +33,10 @@ function mountNativeSpec(environment, spec, options){
     resources:environment.resources,
     navigate:function(target){
       if(environment.disposed)throw new Error('This viewer has been destroyed.');
-      var section=controller.sections.find(function(s){return s.reference===target.section;});
+      var destination=records.find(function(r){return r.reference===target.section;}) || records.find(function(r){return r.aliases && r.aliases.indexOf(target.section)>=0;});
+      var section=destination && controller.sections.find(function(s){return s.reference===destination.reference;});
       if(!section)throw new Error('This section is no longer in the published diagram. Refresh diagrams.');
+      if(controller.details)controller.details.showSection(section.reference);
       if(section.tabBlock!=null)controller.tabBlocks[section.tabBlock-1].select(section.tab,false,false);
       var sp=section.stepper;
       if(sp && (target.path || target.step)){
@@ -46,10 +48,11 @@ function mountNativeSpec(environment, spec, options){
           if(!sp.jumpSource(resolved.sourceIndex,resolved.path.id))throw new Error('This step is unavailable in this diagram.');
         }else if(!sp.selectPath(resolved.path.id))throw new Error('This path has no visible steps in the current view. Select a view that includes it.');
       }
+      if(target.drilldown && controller.details)controller.details.restore(target.drilldown);
       if(options.scrollIntoView!==false)section.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
       changed();
     },
-    pause:function(){if(!environment.disposed)controller.steppers.forEach(function(s){s.stepper.pause();});},
+    pause:function(){if(controller.details)controller.details.pause();if(!environment.disposed)controller.steppers.forEach(function(s){s.stepper.pause();});},
     destroy:function(){if(environment.disposed)return;try{controller.destroy();}finally{environment.destroy();}}
   };
 }

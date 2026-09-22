@@ -49,6 +49,7 @@ function parseHash(h){
           e: kv.e != null ? kv.e : null,
           m: (kv.m === 'step' || kv.m === 'ambient') ? kv.m : null};
   if (kv.p != null) result.p = kv.p;
+  if (kv.q != null) result.q = kv.q;
   return result;
 }
 function encodeSectionRefList(value){
@@ -64,6 +65,7 @@ function buildHash(st){
   if (st && st.m) parts.push('m=' + st.m);
   if (st && st.p != null) parts.push('p=' + encodeURIComponent(st.p));
   if (st && st.s != null) parts.push('s=' + encodeURIComponent(st.s));
+  if (st && st.q != null) parts.push('q=' + encodeURIComponent(st.q));
   if (st && st.c != null) parts.push('c=' + encodeURIComponent(st.c));
   if (st && st.r != null) parts.push('r=' + encodeURIComponent(st.r));
   if (st && st.x != null) parts.push('x=' + encodeSectionRefList(st.x));
@@ -139,6 +141,7 @@ function resolveHashTarget(st, manifest){
     for (i = 0; i < sections.length; i++)
       if (sections[i].reference != null && String(sections[i].reference) === key)
         return sections[i];
+    for(i=0;i<sections.length;i++)if(sections[i].aliases && sections[i].aliases.indexOf(key)>=0)return sections[i];
     var n = oneBasedIndex(key, sections.length);
     if (n < 0) return null;
     for (i = 0; i < sections.length; i++)
@@ -153,9 +156,10 @@ function resolveHashTarget(st, manifest){
     return out;
   }
   function diagram(sec, legacy){
-    if (!sec || !Array.isArray(sec.stepIds)) return {kind:'invalid'};
+    if (!sec || (!Array.isArray(sec.stepIds) && !sec.hasDiagram)) return {kind:'invalid'};
     var mode = (st.m === 'step' || st.s != null) ? 'step' :
                (st.m === 'ambient' ? 'ambient' : null);
+    if(!Array.isArray(sec.stepIds))mode=null;
     var step = mode === 'step' ? (st.s != null ? stepIndexOf(sec.stepIds, st.s) : 0) : null;
     return route(sec, {kind:'diagram', section:sec.number, mode:mode,
                        step:step, legacy:!!legacy, tabBlock:null, tab:null});

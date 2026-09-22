@@ -1,9 +1,29 @@
+export interface DetailViewState {
+  path?: string;
+  step?: string;
+  mode?: string;
+  size?: string;
+  focus?: string;
+  layout?: string;
+  diagramVisible?: boolean;
+}
+export interface DetailNavigation {
+  section: string;
+  rootState?: DetailViewState;
+  frames: Array<{node: string | null; expanded: string[]; state: DetailViewState}>;
+}
+export interface DetailReference {spec: string; revision?: string; section?: string}
 export interface NativeViewerTarget {
   section: string;
+  drilldown?: DetailNavigation;
   path?: string;
   step?: string;
 }
 export interface NativeViewerOptions {
+  /** Consumer-owned approved-spec transport. Renderer never fetches remote URLs. */
+  loadDetail?: (reference: DetailReference, signal: AbortSignal) => Promise<unknown>;
+  /** Host may store this state in its own router; Flowview does not change host history. */
+  onDetailNavigate?: (state: DetailNavigation | null) => void;
   skin?: string;
   layoutTarget?: 'backstage' | 'confluence' | 'default';
   scrollIntoView?: boolean;

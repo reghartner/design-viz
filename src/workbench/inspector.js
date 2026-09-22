@@ -368,7 +368,97 @@ function nodeForm(val, ctx){
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
       frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); }))
-    ].concat(catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
+    ].concat([detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
+  }
+
+function detailControls(val,ctx){
+    var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
+    fold.className='node-detail-editor';fold.open=!!val.detail;summary.textContent='Domain detail';fold.appendChild(summary);
+    var note=document.createElement('p');note.className='fnote';
+    note.textContent='Open an ordinary section as this node’s inner flow, or link to an approved spec. Apply saves these fields together.';
+    fold.appendChild(note);
+    var body=document.createElement('div');fold.appendChild(body);
+    var draft=val.detail?builderClone(val.detail):{mode:'focus'};
+    var type=draft.spec?'Approved spec':draft.url && !draft.section?'URL':'Local section';
+    var collect=function(){return draft;};
+    function input(value,placeholder,area){
+      var control=document.createElement(area?'textarea':'input');control.className='fctl';
+      if(!area)control.type='text';control.value=value==null?'':String(value);
+      if(placeholder)control.placeholder=placeholder;
+      return control;
+    }
+    function picker(options,value,empty){return selectControl(options,value,function(){return true;},empty);}
+    function draw(){
+      body.innerHTML='';
+      var kind=picker(['Local section','Approved spec','URL'],type,false);
+      body.appendChild(frow('Detail target',kind));
+      listen(kind,'change',function(){
+        try{draft=collect();}catch(ex){kind.value=type;formError('Step mapping must be valid JSON before changing target type.');return;}
+        type=kind.value;draw();assignControlKeys();
+      });
+      var section,mode,path,step,inPort,outPort,map,spec,revision,url;
+      if(type==='Local section'){
+        var records=builderDetailRecords(parseEditor().raw).filter(function(record){return record.section && record.section.diagram;});
+        var current=records.find(function(record){return record.reference===String(draft.section);}) ||
+          records.find(function(record){return record.aliases.indexOf(String(draft.section))>=0 || String(record.number)===String(draft.section);});
+        section=picker(records.map(function(record){return record.reference;}),current?current.reference:draft.section,true);
+        Array.prototype.forEach.call(section.options || [],function(option){
+          var record=records.find(function(rec){return rec.reference===option.value;});
+          if(record)option.textContent=(record.section.heading || 'Section '+record.number)+' · '+record.reference+(record.section.detailOnly?' (detail only)':'');
+        });
+        body.appendChild(frow('Local section',section));
+        listen(section,'change',function(){draft={section:section.value,mode:mode.value};draw();assignControlKeys();});
+        mode=picker(['focus','expand','link'],draft.mode || 'focus',false);
+        body.appendChild(frow('Open mode',mode));
+        var help=document.createElement('p');help.className='fnote';
+        help.textContent='Focus opens a drilldown with a return trail. Expand shows the inner flow beside the parent. Link navigates to the section.';
+        body.appendChild(help);
+        var chosen=records.find(function(record){return record.reference===section.value;}),d=chosen && chosen.section.diagram || {};
+        path=picker((d.paths || []).map(function(p){return p.id;}),draft.path,true);
+        step=picker((d.steps || []).filter(function(s){return typeof s.id==='string' && s.id;}).map(function(s){return s.id;}),draft.step,true);
+        body.appendChild(frow('Initial child path',path));body.appendChild(frow('Initial child step',step));
+        var ports=Object.keys(d.nodes || {});
+        inPort=picker(ports,draft.ports && draft.ports.in,true);outPort=picker(ports,draft.ports && draft.ports.out,true);
+        body.appendChild(frow('Boundary input node',inPort));body.appendChild(frow('Boundary output node',outPort));
+        map=input(draft.stepMap?JSON.stringify(draft.stepMap,null,2):'', '{"parent-step": {"step": "child-step", "path": "child-path"}}',true);
+        body.appendChild(frow('Parent → child steps JSON',map));
+        var ids=(ctx.diagram.steps || []).filter(function(s){return s.id;}).map(function(s){return s.id;});
+        var mappingHelp=document.createElement('p');mappingHelp.className='fnote';
+        mappingHelp.textContent=ids.length?'Parent step IDs: '+ids.join(', ')+'. Map only the steps that should choose a child position.':'Give parent steps IDs in the step inspector to map them to child steps.';
+        body.appendChild(mappingHelp);
+      }else{
+        if(type==='Approved spec'){
+          spec=input(draft.spec,'approved-spec-id');revision=input(draft.revision,'optional pinned revision');section=input(draft.section,'child-section-id');
+          body.appendChild(frow('Approved spec ID',spec));body.appendChild(frow('Revision (optional)',revision));body.appendChild(frow('External section',section));
+        }
+        url=input(draft.url,'https://…');body.appendChild(frow(type==='Approved spec'?'Fallback URL (optional)':'Detail URL',url));
+        var externalHelp=document.createElement('p');externalHelp.className='fnote';
+        externalHelp.textContent='External details use link mode. The host resolves approved spec IDs; the URL is the fallback when available.';
+        body.appendChild(externalHelp);
+      }
+      collect=function(){
+        var detail={mode:type==='Local section'?mode.value:'link'};
+        function put(key,control){if(control && control.value.trim())detail[key]=control.value.trim();}
+        put('section',section);
+        if(type==='Local section'){
+          put('path',path);put('step',step);
+          if(inPort.value || outPort.value){detail.ports={};if(inPort.value)detail.ports.in=inPort.value;if(outPort.value)detail.ports.out=outPort.value;}
+          if(map.value.trim())detail.stepMap=JSON.parse(map.value);
+        }else {put('spec',spec);put('revision',revision);put('url',url);}
+        return detail;
+      };
+      body.appendChild(actionButton('Apply detail',function(){
+        var detail;
+        try{detail=collect();}catch(ex){formError('Step mapping must be valid JSON.');return;}
+        var ok=commitCascade(function(raw){return planSetNodeDetail(session.text(),raw,target.section,target.id,detail);});
+        if(ok)refreshFormSoon();
+      }));
+      if(val.detail)body.appendChild(actionButton('Remove detail',function(){
+        var ok=commitCascade(function(raw){return planSetNodeDetail(session.text(),raw,target.section,target.id,null);});
+        if(ok)refreshFormSoon();
+      }));
+    }
+    draw();return fold;
   }
 
 function edgeForm(val, ctx){
@@ -432,6 +522,10 @@ function stepForm(val, ctx){
       };
     }
     var rows = [
+      frow('Step ID',textControl(val.id,function(v){
+        if(v==null){formError('Use a stable step ID to support paths and detail mappings.');return false;}
+        return commitCascade(function(raw){return planRenameStep(session.text(),raw,t.section,t.index,v);});
+      },{placeholder:'optional stable-step-id'})),
       frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
     ];
     var evidence=document.createElement('details');
@@ -1115,8 +1209,12 @@ function panelForm(val, ctx){
 
 function sectionForm(val, ctx){
     ensureAccentDatalist();
+    var target=session.target;
+    function identity(key,value){return commitCascade(function(raw){return planSetSectionIdentity(session.text(),raw,target.section,key,value);});}
     return [
-      frow('heading', textControl(val.heading, function(v){ return commitSimple('heading', v == null ? null : JSON.stringify(v)); })),
+      frow('heading', textControl(val.heading, function(v){ return identity('heading',v); })),
+      frow('Stable section ID',textControl(val.id,function(v){return identity('id',v);},{placeholder:'optional stable-section-id'})),
+      frow('Detail only',checkboxControl(val.detailOnly,function(on){return commitSimple('detailOnly',on?'true':null);})),
       frow('accent', textControl(val.accent, function(v){ return commitSimple('accent', v == null ? null : JSON.stringify(v)); },
         {list: accentListId, placeholder: 'token or #hex'})),
       frow('source', textControl(val.source, function(v){ return commitSimple('source', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
@@ -1259,6 +1357,17 @@ function renderMultiInspector(multiSel){
       acts.appendChild(actionButton('clear delta', function(){ return applyBulkField('delta', null); }));
     }
     if (kind === 'node'){
+      acts.appendChild(actionButton('Create domain from selected nodes',function(){
+        if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
+          formError('Choose nodes from a single section to create a domain.');return;
+        }
+        commitGroup(function(raw){return planExtractNodeDetail(session.text(),raw,multiSel[0].section,multiSel.map(function(t){return t.id;}));},
+          {after:function(plan){
+            if(opts.selection.clear)opts.selection.clear();
+            session.target={kind:'node',section:plan.section,id:plan.id};session.insertSection=plan.section;
+            rehighlight();renderInspector();
+          }});
+      }));
       acts.appendChild(actionButton('stack together', function(){
         var secs = {};
         multiSel.forEach(function(t){ secs[t.section] = true; });
@@ -1369,6 +1478,13 @@ function renderInspector(){
         if(t.kind === 'panel')acts.appendChild(actionButton('Duplicate panel',function(){clipboard().duplicate([t]);}));
       }
       if (t.kind === 'node'){
+        if(!val.detail)acts.appendChild(actionButton('Create detail flow',function(){
+          commitCascade(function(raw){return planCreateNodeDetail(session.text(),raw,t.section,t.id);},
+            {after:function(plan){
+              session.target={section:plan.index,kind:'section'};session.insertSection=plan.index;
+              rehighlight();renderInspector();
+            }});
+        }));
         acts.appendChild(actionButton('duplicate', function(){
           commitCascade(function(raw){ return planDuplicateNode(session.text(), raw, t.section, t.id); },
             {after: function(plan){

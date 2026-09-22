@@ -8,11 +8,13 @@
     "core/section-layout.js",
     "core/state.js",
     "core/geometry.js",
+    "core/details.js",
     "panels/shared.js",
     "panels/types/*.js"
   ],
   "engine.js": [
-    "engine.js"
+    "engine.js",
+    "viewer/details.js"
   ],
   "builder.workbench.js": [
     "workbench/source-edit.js",

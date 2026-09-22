@@ -90,7 +90,7 @@ for (const format of ['cjs', 'esm'])
         );
         assert.equal(hash.get('p'), 'failed');
         assert.equal(hash.get('s'), 'failed-upload');
-        assert.equal(hash.get('d'), 'doorbell-press-to-resident-notification');
+        assert.equal(hash.get('d'), 'doorbell-flow');
       } finally {
         await rm(deployed, { recursive: true, force: true });
       }

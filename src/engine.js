@@ -665,6 +665,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
            '<g class="nbackref" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Other pages containing ' + esc(nodeTitle) + '">' +
            '<circle cx="' + backlinkX + '" cy="14" r="9" fill="transparent"/>' +
            '<text x="' + backlinkX + '" y="18" text-anchor="middle">&#8599;</text></g>' : '') +
+         (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + (n.detail.mode === 'expand' ? 'Expand ' : 'Explore ') + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (p.h-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (p.h-9) + '" text-anchor="middle">⊞</text></g>' : '') +
          (n.delta === true ? '<polygon class="dvdelta" points="-3,-4 8,-4 2.5,-13" aria-hidden="true"/>' : '') +
          '</g>';
   });
@@ -2132,6 +2133,7 @@ function renderPage(view, page, skin, backlinks, options){
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
   ctl.destroy = function(){
     ctl.destroyed = true;
+    if(ctl.details)ctl.details.destroy();
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
     ctl.sections.forEach(function(rec){
       if (rec.boardSize) rec.boardSize.destroy();
@@ -2161,7 +2163,7 @@ function renderPage(view, page, skin, backlinks, options){
           if (primary && primary.number === number) changed({kind:'diagram', section:number});
         }
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
-    var rec = {number:number, reference:reference, tabBlock:record.tabBlock, tab:record.tab,
+    var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                flowDisclosure:built.flowDisclosure, presentation:built.presentation,
                contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
@@ -2216,6 +2218,7 @@ function renderPage(view, page, skin, backlinks, options){
     });
     var tabCtl = null;
     function select(idx, focus, activate){
+      if(ctl.details)ctl.details.pause();
       activeIdx = idx;
       buttons.forEach(function(b, i){
         b.setAttribute('aria-selected', i === idx ? 'true' : 'false');
@@ -2255,7 +2258,7 @@ function renderPage(view, page, skin, backlinks, options){
       return {index:tb.index, count:tb.count, slugs:tb.slugs.slice()};
     }),
     sections:ctl.sections.map(function(sec){
-      return {number:sec.number, reference:sec.reference, tabBlock:sec.tabBlock, tab:sec.tab,
+      return {number:sec.number, reference:sec.reference, aliases:sec.aliases, hasDiagram:sec.hasDiagram, tabBlock:sec.tabBlock, tab:sec.tab,
               stepIds:sec.stepper ? sec.stepper.ids() : null,
               hasCard:!!sec.contractCard, rowCount:sec.contractRows.length};
     })
@@ -2272,6 +2275,8 @@ function renderPage(view, page, skin, backlinks, options){
     if (initialDirect && initialDirect.stepper.mode() === 'step')
       ctl.activeTarget = {kind:'diagram', section:initialDirect.number};
   }
+  if(records.some(function(r){return r.section.detailOnly || Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.detail;});}))
+    ctl.details=wireDetailFlows(ctl,page,skin,backlinks,options);
   return ctl;
 }
 
@@ -2477,6 +2482,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     var key = String(ref), i;
     for (i = 0; i < ctl.sections.length; i++)
       if (String(ctl.sections[i].reference) === key) return ctl.sections[i];
+    for(i=0;i<ctl.sections.length;i++)if(ctl.sections[i].aliases && ctl.sections[i].aliases.indexOf(key)>=0)return ctl.sections[i];
     var index = oneBasedIndex(key, ctl.sections.length);
     if (index < 0) return null;
     return section(index + 1);
@@ -2497,6 +2503,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     }
   }
   function activeStepper(){
+    if(ctl.details && ctl.details.activeStepper())return ctl.details.activeStepper();
     var active = fragmentState.diagramSection != null ? section(fragmentState.diagramSection) :
                  (ctl.activeTarget && ctl.activeTarget.section ? section(ctl.activeTarget.section) : null);
     if (active && active.stepper) return active.stepper;
@@ -2554,8 +2561,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     }
     if (state.diagramSection != null){
       var diagramSec = section(state.diagramSection);
+      if(diagramSec)st.d=String(diagramSec.reference);
       if (diagramSec && diagramSec.stepper){
-        st.d = String(diagramSec.reference);
         st.m = diagramSec.stepper.mode();
         if (diagramSec.stepper.paths && diagramSec.stepper.paths().length > 1) st.p = diagramSec.stepper.path();
         if (st.m === 'step'){
@@ -2571,6 +2578,7 @@ function wireDeepLinks(ctl, win, preservedHash){
         if (state.row != null) st.r = String(state.row + 1);
       }
     }
+    if(ctl.details && ctl.details.snapshot())st.q=JSON.stringify(ctl.details.snapshot());
     return buildHash(addCollapseDeviations(st));
   }
   function currentHash(){ return stateHash(fragmentState); }
@@ -2594,7 +2602,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();
     try {
-      win.history.replaceState(null, '',
+      win.history[ctl.detailHistoryPush ? 'pushState' : 'replaceState'](null, '',
         withPreserved(h) || win.location.pathname + win.location.search);
       /* Fragments may contain heading slugs derived from a company document.
          Do not disclose them to an arbitrary embedder: mirroring stays off
@@ -2604,6 +2612,7 @@ function wireDeepLinks(ctl, win, preservedHash){
       if (mirrorSource && typeof mirrorSource.postMessage === 'function')
         mirrorSource.postMessage({type:'dv_fragment', fragment:h.replace(/^#/, '')}, mirrorOrigin);
     } catch (ex) { /* sandboxed viewers may refuse; deep links just stay off */ }
+    ctl.detailHistoryPush=false;
   }
   function clearRowTarget(){
     var rows = ctl.view.querySelectorAll('.ctrow.dv-hash-target');
@@ -2616,6 +2625,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     var st = parseHash(win.location.hash);
     var target = resolveHashTarget(st, ctl.manifest);
     suppress = true;
+    if(ctl.details)ctl.details.close(true);
     clearRowTarget();
     /* Collapse affects document height, so restore it before routing and,
        critically, before the resolved target is scrolled into view. */
@@ -2625,13 +2635,14 @@ function wireDeepLinks(ctl, win, preservedHash){
     var diagramTarget = target.diagram;
     if (diagramTarget){
       var diagramSec = section(diagramTarget.section), sp = diagramSec && diagramSec.stepper;
+      if(ctl.details && diagramSec)ctl.details.showSection(diagramSec.reference);
       if (sp && sp.selectPath) sp.selectPath(st.p || sp.paths()[0].id);
       if (sp && diagramTarget.mode === 'step'){
         sp.enterStep(false);
         var pathStep = sp.stepIndexOf(st.s);
         if (pathStep >= 0) sp.jump(pathStep);
       } else if (sp && diagramTarget.mode === 'ambient') sp.enterAmbient();
-      targetEl = sp && (sp.scrollTargetEl || sp.sectionEl);
+      targetEl = sp ? (sp.scrollTargetEl || sp.sectionEl) : diagramSec && diagramSec.sectionEl;
     }
     var cardTarget = target.card;
     if (cardTarget){
@@ -2663,6 +2674,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     else if (target.kind === 'tab')
       ctl.activeTarget = {kind:'tab', tabBlock:target.tabBlock, tab:target.tab};
     else ctl.activeTarget = {kind:'page'};
+    if(ctl.details && st.q){try{ctl.details.restore(JSON.parse(st.q));}catch(_) {/* stale drill target leaves its valid ancestor visible */}}
+    ctl.detailHistoryPush=false;
     if (targetEl && typeof targetEl.scrollIntoView === 'function'){
       targetEl.scrollIntoView({block: 'start', behavior: 'instant'});
     }
@@ -2714,6 +2727,7 @@ function wireDeepLinks(ctl, win, preservedHash){
       bindCopy(button, function(){ return tabHash(tb, i); });
     });
   });
+  ctl.bindDetailCopy=function(button){bindCopy(button,currentHash);};
   ctl.onChange = write;
   ctl.activeStepper = activeStepper;
   win.addEventListener('hashchange', apply);

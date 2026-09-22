@@ -97,6 +97,7 @@ One accent-colored bounding box on the page:
 
 ```json
 {
+  "id": "delivery-flow",
   "heading": "Section heading",
   "accent": "green",
   "source": "https://docs.example.com/hld#anchor",
@@ -107,6 +108,11 @@ One accent-colored bounding box on the page:
 }
 ```
 
+- `id` — optional stable section identifier, unique across the whole document.
+  Use `/^[a-zA-Z][\w.-]*$/` (ASCII letter first; then letters, digits,
+  underscores, periods, or hyphens). Required when a node references this
+  section as a detail. Preserve it when headings change; navigation uses the
+  explicit ID before the legacy heading-derived reference.
 - `heading` — optional but recommended.
 - `accent` — optional. One of: `green blue violet amber pink cyan red slate`,
   or a `#RRGGBB` hex. Omitted accents cycle green → blue → violet → amber.
@@ -125,6 +131,10 @@ One accent-colored bounding box on the page:
   default, and copy links preserve that presentation choice.
 - `contract` — optional message-contract card (next subsection).
 - `diagram` — optional. A section may be prose-only, but usually carries one.
+- `detailOnly` — optional boolean. `true` hides the section from the initial
+  reader view until opened as a detail. The section remains ordinary authored
+  content with its own diagram, steps, paths and panels. See
+  [domain drilldowns](../docs/drilldowns.md).
 
 **Inline markup** (in `text`, `bullets`, and a contract card's `note`): a small,
 safe subset, escaped first so it can never inject HTML.
@@ -280,6 +290,24 @@ with no `title` shows its id:
   `data` = stores, `mqtt` = brokers, `dev` = end devices.
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
+- `detail` — optional domain-detail destination. An internal reference has
+  `{section:"stable-section-id", mode:"focus"|"expand"|"link", path?, step?,
+  stepMap?, ports?}`. Its target is an ordinary section with an explicit `id`.
+  `path` and `step` are child IDs used for the default entry;
+  `stepMap:{parentStepId:{step:childStepId,path?:childPathId}}` selects another
+  entry at a particular parent beat. `ports:{in:childNodeId,out:childNodeId}`
+  routes incoming/outgoing parent edges through those child boundary nodes
+  during expansion. Focus preserves the parent reading position for return
+  through breadcrumbs. A mapping selects an authored state; it does not run
+  the child or derive the parent's outcome.
+  External details use `{spec:"approved-spec-id", revision?:"content-revision",
+  section:"stable-section-id", url?:"https://fallback.example", mode:"link"}`;
+  plain URL details use `{url:"https://docs.example.com",mode:"link"}`.
+  A host injects the approved external loader; the renderer does not fetch
+  external specs itself. Backstage requires a pinned content revision. See
+  [domain drilldowns](../docs/drilldowns.md) for modes, mapping, boundaries,
+  loader integration, and the complete doorbell seed. This contract-1 feature
+  requires the `flow.drilldown` renderer capability.
 - `group` — optional containment-boundary membership (see "groups").
 
 ### groups — containment boundaries
@@ -1212,7 +1240,8 @@ You do not author these, but they shape what ids are worth writing:
   - A composed example is
     `#t=overview&d=delivery-flow&m=step&s=ack&c=delivery-flow&r=2&x=background&e=appendix`.
 
-  A `<section-ref>` is the section heading lowercased, with each run of
+  A `<section-ref>` uses the section's explicit stable `id` when present.
+  Otherwise it is the section heading lowercased, with each run of
   characters other than ASCII `a`–`z` and `0`–`9` replaced by `-` and
   leading/trailing hyphens removed. References are unique across the whole
   rendered document; collisions receive document-order suffixes (`flow`,
@@ -1229,7 +1258,8 @@ You do not author these, but they shape what ids are worth writing:
   first stepped diagram on a tabless page or in the selected tab of the first
   tab block. Step ids may still fall back to 1-based step numbers. Thus an old
   `#d=4&m=step&s=ota.3` link remains valid, while newly emitted links use the
-  heading slug. Write `steps[n].id` values people can say out loud.
+  explicit section ID or heading slug. Write `steps[n].id` values people can
+  say out loud.
 - **Presenter mode.** A PRESENT button goes fullscreen; arrow keys step,
   space plays/pauses, digits 1–9 switch tabs, Esc exits.
 - **Adjacent-file specs.** An http(s)-served template page still holding the

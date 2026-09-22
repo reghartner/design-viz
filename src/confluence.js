@@ -41,7 +41,10 @@ function confluenceDisplayPage(page, config){
   if (config.section !== 'all'){
     var selected = confluenceSections(display).find(function(s){return s.id === config.section;});
     if (!selected) throw new Error('The selected section no longer exists.');
-    display.blocks = [selected.section]; delete display.sections;
+    var hasDetails=sectionRecords(display).some(function(r){return Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.detail;});});
+    // Keep the source manifest intact for local detail references; only the
+    // selected entry section is initially visible in this macro.
+    display.blocks = hasDetails ? sectionRecords(display).map(function(r){return Object.assign({},r.section,{detailOnly:r.section!==selected.section});}) : [selected.section]; delete display.sections;
   }
   confluenceSections(display).forEach(function(s){
     var d = s.section.diagram;

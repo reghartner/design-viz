@@ -82,6 +82,36 @@ test('native mounts restore external pinned details, isolate roots, and retire l
  expect(await page.evaluate(()=>__detailRequests.at(-1).signal.aborted)).toBe(true);
  await page.evaluate(()=>__other.destroy());
 });
+test('native nested context maps stay usable at embedded widths across every skin',async({page,server})=>{
+ await writeFile(path.join(server.root,'detail-map-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'detail-map-native.html'),'<div id="host" style="width:640px"></div><script type="module">import {mountNativeViewer} from "./detail-map-native.js"; window.mountDetail=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/detail-map-native.html');await page.waitForFunction(()=>!!window.mountDetail);
+ const host=page.locator('#host');
+ for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
+  await page.evaluate(({raw,skin})=>{if(window.__viewer)__viewer.destroy();window.__viewer=mountDetail(document.querySelector('#host'),raw,{skin});},{raw:JSON.parse(source),skin});
+  await host.locator('[data-dv-detail="connectivity"]').click();
+  await active(page).locator('[data-dv-detail="handoff"]').click();
+  const overview=active(page).locator('.detail-overview');
+  await expect(overview).toBeVisible();await expect(overview.locator('.detail-overview-location')).toContainText('Connectivity › Cloud handoff');
+  await expect(overview.locator('[data-dv-node],[data-dv-detail],[id]')).toHaveCount(0);
+  await expect(active(page)).toHaveCSS('animation-name','none');
+  for(const width of [640,360]){
+   await host.evaluate((el,w)=>el.style.width=w+'px',width);
+   const mapBox=await overview.boundingBox(),sectionBox=await active(page).boundingBox(),boardBox=await active(page).locator('.board').boundingBox();
+   expect(mapBox.x+mapBox.width).toBeLessThanOrEqual(sectionBox.x+sectionBox.width);
+   expect(mapBox.y+mapBox.height).toBeLessThanOrEqual(boardBox.y);
+   expect(await active(page).evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  }
+  await host.evaluate(el=>el.style.width='640px');
+  await overview.getByRole('combobox',{name:'Overview ancestor'}).selectOption('1');
+  await expect(overview.locator('.detail-map-node.is-current')).toHaveAttribute('data-detail-map-node','handoff');
+  await overview.locator('.detail-overview-return').focus();await overview.locator('.detail-overview-return').press('Enter');
+  await expect(active(page).locator('[data-dv-detail="handoff"]')).toBeFocused();
+  await active(page).locator('.detail-breadcrumb button').first().click();
+  await expect(host.locator('[data-dv-detail="connectivity"]')).toBeFocused();
+ }
+ await page.evaluate(()=>__viewer.destroy());
+});
 test('overview maps preserve context at each depth and return with keyboard without changing source',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
  const initial=root(page);await initial.locator('.schip[data-step-source="1"]').first().click();

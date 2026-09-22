@@ -289,7 +289,9 @@ var SCENES = {
     '<path d="M0 160H109V162H0Z" fill="#5DBECC"/><path d="M176 160H320V162H176Z" fill="#CD78B4"/></g></svg>',
 };
 
-PanelViews.register('screen', function (host, panel, state, skin, states, stepIdx, animate) {
+/* Shared by embedded monitoring consoles. The caller still owns its panel
+   lifecycle; this factory owns camera artwork, overlays and clip-preserving patches. */
+function screenFramePresentation(host, panel, state) {
   var h = '';
   var mode = String(state.mode || 'off');
   if (SCREEN_MODES.indexOf(mode) < 0) mode = 'off';
@@ -359,7 +361,8 @@ PanelViews.register('screen', function (host, panel, state, skin, states, stepId
       return surgical;
     },
   };
-});
+}
+PanelViews.register('screen', screenFramePresentation);
 
 PanelRegistry.extend('screen', {
   order: 4,
@@ -584,15 +587,7 @@ PanelRegistry.extend('screen', {
 });
 
 /* screen authoring contract; merged into this panel definition by the bundle. */
-var SCENE_TOKENS = [
-  'person-at-door-night',
-  'person-through-door',
-  'doorbell-run-away',
-  'doorbell-runners',
-  'package-drop',
-  'kitchen-fire',
-  'static-noise',
-];
+var SCENE_TOKENS = SCENE_NAMES;
 
 /* A local preview never patches camera mode or advances the story. Replay
    replaces only this SVG, so it cannot reset the diagram's animation. */

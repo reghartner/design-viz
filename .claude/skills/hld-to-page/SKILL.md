@@ -81,6 +81,9 @@ plan concise; it is a reviewable artifact, not a reasoning transcript.
   Keep detection, operator verification, dispatch acceptance, assignment and
   arrival separate. Missing evidence stays unknown; these panels never infer
   an alarm decision, responder availability or a live arrival estimate.
+  Stage the operator opening/reviewing a shared camera clip and the vehicle's
+  authored journey when those actions help explain the story; use the recipe's
+  video and route controls rather than replacing these moments with status text.
 
 Use existing authorization to proceed with sensible presentation choices.
 Ask before changing the requested story or source, not for routine layout

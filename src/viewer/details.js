@@ -6,7 +6,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   var frames=new Map(), liveRoots=new Map();
   ctl.sections.forEach(function(rec){
     var record=detailSection(page,rec.reference);
-    var frame={rec:rec,section:record.section,page:page,expanded:[],root:rec,original:true};
+    var frame={rec:rec,section:record.section,page:page,root:rec,original:true};
     frames.set(rec.sectionEl,frame);liveRoots.set(rec.reference,frame);
     if(record.section.detailOnly && !options.authoring){rec.sectionEl.hidden=true;if(rec.stepper){rec.stepper.pause();rec.stepper.onHide();}}
   });
@@ -56,11 +56,11 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     while(session.stack.length>index+1)retire(session.stack.pop());
     var frame=current();frame.rec.sectionEl.hidden=false;
     if(frame.rec.stepper)frame.rec.stepper.onShow();
-    if(index===0 && !frame.expanded.length){session=null;}
+    if(index===0){session=null;}
     if(!silent){
       changed(true);
-      var buttons=Array.from(frame.rec.sectionEl.querySelectorAll('[data-dv-detail],[data-detail-return]'));
-      var button=buttons.find(function(el){return (el.getAttribute('data-dv-detail') || el.getAttribute('data-detail-return'))===returnNode;}) || buttons[0];
+      var buttons=Array.from(frame.rec.sectionEl.querySelectorAll('[data-dv-detail]'));
+      var button=buttons.find(function(el){return el.getAttribute('data-dv-detail')===returnNode;}) || buttons[0];
       if(button)button.focus();
     }
   }
@@ -68,7 +68,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     var nav=document.createElement('nav');nav.className='detail-breadcrumb';nav.setAttribute('aria-label','Diagram drill-down');
     session.stack.forEach(function(item,i){
       if(i){var arrow=document.createElement('span');arrow.textContent='›';arrow.setAttribute('aria-hidden','true');nav.appendChild(arrow);}
-      var button=document.createElement('button');button.type='button';button.textContent=item.expansionRoot ? 'Expanded view' : item.section.heading || item.section.id || 'Overview';
+      var button=document.createElement('button');button.type='button';button.textContent=item.section.heading || item.section.id || 'Overview';
       if(item===frame){button.setAttribute('aria-current','page');button.disabled=true;}
       else button.addEventListener('click',function(){back(i);});
       nav.appendChild(button);
@@ -83,7 +83,6 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     session.stack.forEach(function(parent,i){
       var child=session.stack[i+1];if(!child || !child.via)return;
       var diagram=parent.section.diagram;
-      if(!Object.prototype.hasOwnProperty.call(diagram.nodes,child.via))diagram=(parent.projected || parent.section).diagram;
       var node=diagram.nodes[child.via];if(!node)return;
       levels.push({diagram:diagram,node:child.via,label:node.title || child.via,title:parent.section.heading || parent.section.id || 'Overview',index:i});
     });
@@ -123,21 +122,20 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
       sp.enterStep(false);
     }
   }
-  function build(section, childPage, root, expanded){
-    var projected=Object.assign({},section,{diagram:expandDetailDiagram(childPage,section.diagram,expanded || [])});
+  function build(section, childPage, root){
     var host=document.createElement('div');
     root.rec.sectionEl.parentNode.insertBefore(host,root.rec.sectionEl.nextSibling);
     var built;
-    try{built=buildSection(host,projected,serial++,'detail-'+serial,resolveProtocols(childPage),skinBase(skin),resolveLanes(childPage),backlinks,
+    try{built=buildSection(host,section,serial++,'detail-'+serial,resolveProtocols(childPage),skinBase(skin),resolveLanes(childPage),backlinks,
       function(){changed(false);},null,Object.assign({},options,{autoplay:false}));}
     catch(error){host.remove();throw error;}
     var el=built.sectionEl;host.replaceWith(el);
     el.setAttribute('data-dv-detail-preview','');
-    var eyebrow=el.querySelector('.sec-eyebrow');if(eyebrow)eyebrow.textContent=expanded && expanded.length?'Expanded domain':'Detail flow';
+    var eyebrow=el.querySelector('.sec-eyebrow');if(eyebrow)eyebrow.textContent='Detail flow';
     el.querySelectorAll('.embedcopy').forEach(function(b){b.remove();});
     if(ctl.bindDetailCopy && built.stepper)ctl.bindDetailCopy(built.stepper.copyButton);
     if(root.rec.sectionEl.classList.contains('dv-embed-target'))el.classList.add('dv-embed-target');
-    var frame={rec:built,section:section,page:childPage,expanded:expanded || [],root:root.rec,projected:projected};frames.set(el,frame);
+    var frame={rec:built,section:section,page:childPage,root:root.rec};frames.set(el,frame);
     return frame;
   }
   function begin(frame){
@@ -147,48 +145,19 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   function openLocal(frame,id,detail,childPage,childSection,target){
     if(session && session.stack.length>=DETAIL_MAX_DEPTH)throw new Error('Maximum drill-down depth reached. Use the breadcrumb to return.');
     begin(frame);pause(frame);
-    var next=build(childSection,childPage,session.root,[]);
+    var next=build(childSection,childPage,session.root);
     try{applyStep(next,target);}catch(error){retire(next);throw error;}
     next.via=id;next.external=detail.spec?{spec:detail.spec,revision:detail.revision,section:detail.section}:null;
     next.originStep=frame.rec.stepper && frame.rec.stepper.mode()==='step' ? 'step '+(frame.rec.stepper.current().n+1)+' · '+(frame.section.heading || 'overview'):null;
     frame.rec.sectionEl.hidden=true;session.stack.push(next);breadcrumb(next);changed(true);
     var heading=next.rec.sectionEl.querySelector('.detail-breadcrumb button');if(heading)heading.focus();
   }
-  function expansionControls(frame){
-    if(!frame.expanded.length)return;
-    var controls=document.createElement('div');controls.className='detail-expanded-controls';
-    frame.expanded.forEach(function(id){var node=frame.section.diagram.nodes[id];
-      var button=document.createElement('button');button.type='button';button.textContent='Collapse '+(node.title || id);
-      button.addEventListener('click',function(){expand(frame,id);});controls.appendChild(button);
-      var explore=document.createElement('button');explore.type='button';explore.setAttribute('data-detail-return',id);explore.textContent='Explore '+(node.title || id);explore.addEventListener('click',function(){open(frame,id,'focus');});controls.appendChild(explore);
-    });
-    var text=document.createElement('span');text.textContent='Overview steps · internal components expanded';controls.appendChild(text);
-    frame.rec.sectionEl.prepend(controls);
-  }
-  function expand(frame,id){
-    if(!restoring)cancel();begin(frame);pause(frame);
-    var ids=frame.expanded.slice(), index=ids.indexOf(id);if(index<0)ids.push(id);else ids.splice(index,1);
-    var state=stepState(frame);if(!frame.expanded.length)state.size='readable';
-    var next=build(frame.section,frame.page,session.root,ids);
-    next.via=frame.via;next.external=frame.external;next.originStep=frame.originStep;
-    try{applyStep(next,state);}catch(error){retire(next);throw error;}
-    var at=session.stack.indexOf(frame);
-    // The original root stays mounted as the exact return destination.
-    if(frame.original){frame.rec.sectionEl.hidden=true;session.stack.push(next);next.expansionRoot=true;}
-    else{next.expansionRoot=frame.expansionRoot;session.stack[at]=next;retire(frame);}
-    if(next.expansionRoot && !ids.length){retire(next);session.stack.pop();back(0);return;}
-    breadcrumb(next);expansionControls(next);changed(true);
-  }
-  function open(frame,id,override){
-    var node=(frame.projected || frame.section).diagram.nodes[id] || frame.section.diagram.nodes[id], detail=node && node.detail;
+  function open(frame,id){
+    var node=frame.section.diagram.nodes[id], detail=node && node.detail;
     if(!detail)return;
     cancel();
-    var mode=override || detail.mode || 'focus',target=detailStepTarget(detail,frame.rec.stepper);
+    var target=detailStepTarget(detail,frame.rec.stepper);
     try{
-      if(mode==='expand'){
-        if(!Object.prototype.hasOwnProperty.call(frame.section.diagram.nodes,id)){notice(frame,'Explore the containing domain before expanding its nested components.');return;}
-        expand(frame,id);return;
-      }
       var local=detailTarget(frame.page,detail);
       if(local){openLocal(frame,id,detail,frame.page,local.section,target);return;}
       if(detail.spec && typeof options.loadDetail==='function'){
@@ -218,7 +187,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   function snapshot(){
     if(restoreValue)return restoreValue;
     if(!session)return null;
-    return {section:session.root.rec.reference,rootState:stepState(session.root),frames:session.stack.slice(1).map(function(f){return {node:f.via || null,expanded:f.expanded.slice(),state:stepState(f)};})};
+    return {section:session.root.rec.reference,rootState:stepState(session.root),frames:session.stack.slice(1).map(function(f){return {node:f.via || null,expanded:[],state:stepState(f)};})};
   }
   async function restore(value){
     close(true);if(!value)return;
@@ -233,7 +202,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
         var saved=value.frames[i],frame=current() || root;
         if(!specObject(saved))break;
         if(saved.node){
-          var node=(frame.projected || frame.section).diagram.nodes[saved.node] || frame.section.diagram.nodes[saved.node],detail=node && node.detail,target=detailTarget(frame.page,detail),childPage=frame.page;
+          var node=frame.section.diagram.nodes[saved.node],detail=node && node.detail,target=detailTarget(frame.page,detail),childPage=frame.page;
           if(!target && detail && detail.spec && typeof options.loadDetail==='function'){
             pending=new AbortController();var signal=pending.signal;notice(frame,'Loading detail diagram…');
             var raw=await options.loadDetail({spec:detail.spec,revision:detail.revision,section:detail.section},signal);
@@ -250,7 +219,8 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
           restoring=false;
         }
         restoring=true;
-        (Array.isArray(saved.expanded)?saved.expanded:[]).forEach(function(id){var f=current() || root;if(f.section.diagram.nodes[id])expand(f,id);});
+        // Legacy expansion arrays are ignored; retain the containing flow and
+        // continue restoring ordinary focused frames without rewriting source.
         if(current())applyStep(current(),saved.state);
         restoring=false;
       }

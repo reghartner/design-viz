@@ -92,7 +92,7 @@ Do not copy its latency, topology, notification, or outcome without evidence.
 | Needed behavior | Read |
 |---|---|
 | Shared happy/failure paths | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
-| Domain overview with focused/expanded internals, nested flows, or mapped child steps | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md`; use ordinary sections with stable IDs and `node.detail` |
+| Domain overview with focused internals, nested flows, or mapped child steps | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md`; use ordinary sections with stable IDs and `node.detail.mode:"focus"`; never inline expansion |
 | Confirmed dropped or prevented communication | `docs/failed-communications.md` |
 | Physical home, outside grounds, doors | `cookbook/home-story.md` or `cookbook/outdoor-home.md` |
 | Sensing geometry, motion events, range or room presence | `cookbook/motion-detection.md` or `cookbook/radar-range.md`; use Radar with explicit `alert` transitions |

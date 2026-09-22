@@ -291,21 +291,22 @@ with no `title` shows its id:
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
 - `detail` — optional domain-detail destination. An internal reference has
-  `{section:"stable-section-id", mode:"focus"|"expand"|"link", path?, step?,
-  stepMap?, ports?}`. Its target is an ordinary section with an explicit `id`.
+  `{section:"stable-section-id", mode:"focus", path?, step?, stepMap?}`. Its
+  target is an ordinary section with an explicit `id`.
   `path` and `step` are child IDs used for the default entry;
   `stepMap:{parentStepId:{step:childStepId,path?:childPathId}}` selects another
-  entry at a particular parent beat. `ports:{in:childNodeId,out:childNodeId}`
-  routes incoming/outgoing parent edges through those child boundary nodes
-  during expansion. Focus preserves the parent reading position for return
-  through breadcrumbs. A mapping selects an authored state; it does not run
+  entry at a particular parent beat. Focus preserves the parent reading position
+  for return through breadcrumbs and displays an ancestor overview map. Inline
+  expansion is removed: do not author `mode:"expand"` or `detail.ports`. Legacy
+  `expand` references open in focus mode with a warning. A mapping selects an
+  authored state; it does not run
   the child or derive the parent's outcome.
   External details use `{spec:"approved-spec-id", revision?:"content-revision",
   section:"stable-section-id", url?:"https://fallback.example", mode:"link"}`;
   plain URL details use `{url:"https://docs.example.com",mode:"link"}`.
   A host injects the approved external loader; the renderer does not fetch
   external specs itself. Backstage requires a pinned content revision. See
-  [domain drilldowns](../docs/drilldowns.md) for modes, mapping, boundaries,
+  [domain drilldowns](../docs/drilldowns.md) for focused navigation, mapping, handoffs,
   loader integration, and the complete doorbell seed. This contract-1 feature
   requires the `flow.drilldown` renderer capability.
 - `group` — optional containment-boundary membership (see "groups").

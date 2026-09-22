@@ -12,7 +12,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 |---|---|
 | Confluence-ready JSON or an exported file for the Forge viewer | `docs/confluence.md`; company deployment agents also read `docs/confluence-integration.md` |
 | Happy and failure outcomes on the SAME diagram; aligned alternate timelines | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
-| Domain cards that open or expand internals; a child flow matching the current outcome | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md`; stable section IDs, `detailOnly`, `node.detail`, explicit `stepMap` and child boundary nodes |
+| Domain cards that open focused internals; a child flow matching the current outcome | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md`; stable section IDs, `detailOnly`, `node.detail`, explicit `stepMap` and `mode:"focus"` |
 | A send that never arrives, or a communication that is never sent | `docs/failed-communications.md` (also demonstrated in the alternate-path recipe) |
 | Copy/share steps across paths, continue a happy ending, or detach a shared step | `docs/workbench-step-reuse.md` |
 | Copy/paste Home elements, panels, nodes or sections between diagrams | `docs/workbench-clipboard.md`; copies are independent, with fresh IDs where scopes overlap |
@@ -37,8 +37,10 @@ adding a made-up version or zoom field to its spec cannot update its engine.
 For domain drilldowns, author child flows as ordinary sections and attach
 `detail` to the parent node. Preserve section IDs when headings change; use
 `detailOnly:true` to hide details from the initial reader view. Map failures
-to explicit child paths and steps, and label the child nodes referenced by
-`ports.in` / `ports.out`. A mapping selects a reading position; it does not
+to explicit child paths and steps. Author only `mode:"focus"` for local details.
+Inline expansion is removed: never emit `mode:"expand"` or `detail.ports`.
+When reusing an older seed, replace its expansion modes with `focus` and omit
+ports. A mapping selects a reading position; it does not
 run a simulation or derive the parent outcome. External specs use approved
 host identities and an injected loader, never renderer-side URL fetching.
 Stamp the `flow.drilldown` capability with the compatibility tool.

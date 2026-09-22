@@ -15,14 +15,13 @@ async function flow(page){
   await expect(active(page).locator('.detail-breadcrumb')).toContainText('Cloud handoff');
   await active(page).locator('.detail-breadcrumb button').first().click();await expect(initial).toBeVisible();
   await initial.locator('[data-dv-detail="recording"]').click();
-  await expect(active(page).getByRole('button',{name:'Collapse Recording',exact:true})).toBeVisible();
-  await expect(active(page).locator('[data-dv-node="recording"]')).toHaveCount(0);
-  await expect(active(page).locator('[data-dv-node^="__detail_recording_"]')).not.toHaveCount(0);
-  await active(page).getByRole('button',{name:'Explore Recording',exact:true}).click();
+  await expect(active(page).locator('.sec-h')).toContainText('Recording');
   await expect(active(page).locator('.sec-eyebrow')).toHaveText('Detail flow');
+  await expect(active(page).locator('.detail-expanded-controls,[data-dv-node^="__detail_"]')).toHaveCount(0);
+  await expect(active(page).locator('.detail-overview .detail-map-node.is-current')).toHaveAttribute('data-detail-map-node','recording');
   await active(page).locator('.detail-breadcrumb button').first().click();await expect(initial).toBeVisible();
 }
-test('workbench drilldowns and expansion preserve authored source and restore the original controls',async({page,server})=>{
+test('workbench drilldowns and legacy expansion references preserve authored source and restore the original controls',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
  const initial=root(page);await initial.locator('.schip[data-step-source="1"]').first().click();
  const caption=await initial.locator('.stepline').innerText();await flow(page);
@@ -70,6 +69,14 @@ test('native mounts restore external pinned details, isolate roots, and retire l
  await expect(host.getByRole('navigation',{name:'Diagram drill-down'})).toContainText('Approved remote flow');expect(await page.evaluate(()=>__detailRequests.length)).toBe(2);
  await page.evaluate(()=>{__viewer.navigate({section:'connectivity'});});await expect(host.locator('#section-connectivity')).toBeVisible();
  await page.evaluate(()=>{__viewer.navigate({section:'doorbell-domains'});});await expect(host.locator('#section-connectivity')).toBeHidden();
+ await page.evaluate(()=>__viewer.navigate({section:'doorbell-domains',drilldown:{section:'doorbell-domains',rootState:{path:'happy',step:'dispatch'},frames:[{node:null,expanded:['recording'],state:{}}]}}));
+ await expect(host.locator('#section-doorbell-domains')).toBeVisible();await expect(host.locator('[data-dv-detail-preview]')).toHaveCount(0);
+ await page.evaluate(()=>__viewer.navigate({section:'doorbell-domains',drilldown:{section:'doorbell-domains',rootState:{path:'happy',step:'dispatch'},frames:[{node:null,expanded:['recording'],state:{}},{node:'recording',expanded:[],state:{}}]}}));
+ await expect(host.locator('[data-dv-detail-preview]:visible .sec-h')).toContainText('Recording');
+ await expect(host.locator('.detail-expanded-controls')).toHaveCount(0);
+ await host.locator('[data-dv-detail-preview]:visible .schip').first().click();
+ expect(await page.evaluate(()=>__detailState.frames.map(f=>({node:f.node,expanded:f.expanded})))).toEqual([{node:'recording',expanded:[]}]);
+ await page.evaluate(()=>__viewer.navigate({section:'doorbell-domains'}));
  await page.evaluate(()=>window.__delay=true);await host.locator('[data-dv-detail="apps"]').click();await expect(host.locator('.detail-notice')).toContainText('Loading');
  await page.evaluate(()=>{__viewer.destroy();__resolve(__external);});await expect(host).toBeEmpty();
  expect(await page.evaluate(()=>__detailRequests.at(-1).signal.aborted)).toBe(true);
@@ -109,8 +116,10 @@ test('the node inspector creates a detail section in one Undo action and configu
  await page.locator('[data-dv-node="b"]').click();await page.getByRole('button',{name:'Create detail flow',exact:true}).click();
  let result=JSON.parse(await page.locator('#src').inputValue());expect(result.page.sections).toHaveLength(2);expect(result.page.sections[0].diagram.nodes.b.detail).toEqual({section:'b-detail',mode:'focus'});
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);await page.locator('#redo-builder').click();
- await page.locator('[data-dv-node="b"]').click();await page.locator('#guide').getByRole('combobox',{name:'Open mode',exact:true}).selectOption('expand');
- const child=Object.keys(result.page.sections[1].diagram.nodes)[0];await page.locator('#guide').getByRole('combobox',{name:'Boundary input node',exact:true}).selectOption(child);
+ await page.locator('[data-dv-node="b"]').click();
+ await expect(page.locator('#guide').getByRole('combobox',{name:'Open mode',exact:true})).toHaveCount(0);
+ await expect(page.locator('#guide').getByRole('combobox',{name:'Boundary input node',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Apply detail',exact:true}).click();result=JSON.parse(await page.locator('#src').inputValue());
- expect(result.page.sections[0].diagram.nodes.b.detail.mode).toBe('expand');await page.locator('[data-dv-detail="b"]').click();await expect(active(page).getByRole('button',{name:'Collapse Service',exact:true})).toBeVisible();
+ expect(result.page.sections[0].diagram.nodes.b.detail).toEqual({section:'b-detail',mode:'focus'});
+ await page.locator('[data-dv-detail="b"]').click();await expect(active(page).locator('.sec-eyebrow')).toHaveText('Detail flow');
 });

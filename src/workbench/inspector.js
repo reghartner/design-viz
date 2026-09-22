@@ -396,7 +396,7 @@ function detailControls(val,ctx){
         try{draft=collect();}catch(ex){kind.value=type;formError('Step mapping must be valid JSON before changing target type.');return;}
         type=kind.value;draw();assignControlKeys();
       });
-      var section,mode,path,step,inPort,outPort,map,spec,revision,url;
+      var section,path,step,map,spec,revision,url;
       if(type==='Local section'){
         var records=builderDetailRecords(parseEditor().raw).filter(function(record){return record.section && record.section.diagram;});
         var current=records.find(function(record){return record.reference===String(draft.section);}) ||
@@ -407,19 +407,14 @@ function detailControls(val,ctx){
           if(record)option.textContent=(record.section.heading || 'Section '+record.number)+' · '+record.reference+(record.section.detailOnly?' (detail only)':'');
         });
         body.appendChild(frow('Local section',section));
-        listen(section,'change',function(){draft={section:section.value,mode:mode.value};draw();assignControlKeys();});
-        mode=picker(['focus','expand','link'],draft.mode || 'focus',false);
-        body.appendChild(frow('Open mode',mode));
+        listen(section,'change',function(){draft={section:section.value,mode:'focus'};draw();assignControlKeys();});
         var help=document.createElement('p');help.className='fnote';
-        help.textContent='Focus opens a drilldown with a return trail. Expand shows the inner flow beside the parent. Link navigates to the section.';
+        help.textContent='Opens a focused drilldown with an overview map and a return trail.';
         body.appendChild(help);
         var chosen=records.find(function(record){return record.reference===section.value;}),d=chosen && chosen.section.diagram || {};
         path=picker((d.paths || []).map(function(p){return p.id;}),draft.path,true);
         step=picker((d.steps || []).filter(function(s){return typeof s.id==='string' && s.id;}).map(function(s){return s.id;}),draft.step,true);
         body.appendChild(frow('Initial child path',path));body.appendChild(frow('Initial child step',step));
-        var ports=Object.keys(d.nodes || {});
-        inPort=picker(ports,draft.ports && draft.ports.in,true);outPort=picker(ports,draft.ports && draft.ports.out,true);
-        body.appendChild(frow('Boundary input node',inPort));body.appendChild(frow('Boundary output node',outPort));
         map=input(draft.stepMap?JSON.stringify(draft.stepMap,null,2):'', '{"parent-step": {"step": "child-step", "path": "child-path"}}',true);
         body.appendChild(frow('Parent → child steps JSON',map));
         var ids=(ctx.diagram.steps || []).filter(function(s){return s.id;}).map(function(s){return s.id;});
@@ -437,12 +432,11 @@ function detailControls(val,ctx){
         body.appendChild(externalHelp);
       }
       collect=function(){
-        var detail={mode:type==='Local section'?mode.value:'link'};
+        var detail={mode:type==='Local section'?'focus':'link'};
         function put(key,control){if(control && control.value.trim())detail[key]=control.value.trim();}
         put('section',section);
         if(type==='Local section'){
           put('path',path);put('step',step);
-          if(inPort.value || outPort.value){detail.ports={};if(inPort.value)detail.ports.in=inPort.value;if(outPort.value)detail.ports.out=outPort.value;}
           if(map.value.trim())detail.stepMap=JSON.parse(map.value);
         }else {put('spec',spec);put('revision',revision);put('url',url);}
         return detail;

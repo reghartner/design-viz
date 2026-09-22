@@ -97,11 +97,14 @@ test('Canon traversal tolerates malformed tabs and null trace-match panels befor
   assert.deepEqual(validateBoth(raw).errors, ['sections[0].diagram.panels[0]: must be an object']);
 });
 
-test('valid starters retain zero findings and input values in all supported envelopes', () => {
+test('valid starters retain input values and only the known legacy expansion warning', () => {
   const directory = path.join(__dirname, '../src/starters');
   for (const file of fs.readdirSync(directory).filter(file => file.endsWith('.json'))) {
     const raw = JSON.parse(fs.readFileSync(path.join(directory, file), 'utf8'));
-    assert.deepEqual(validateBoth(raw), {errors: [], warnings: []}, file);
+    const warnings = file === 'domain-drilldown.json'
+      ? ['sections[0].diagram.nodes.recording.detail.mode: inline expansion was removed; opens as a focused drilldown. Use focus for new diagrams.']
+      : [];
+    assert.deepEqual(validateBoth(raw), {errors: [], warnings}, file);
   }
   const d = diagram(), section = {diagram: d}, page = {sections: [section]};
   assert.equal(source.normalize({page}), page);

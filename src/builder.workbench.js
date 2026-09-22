@@ -474,7 +474,7 @@ function initWorkbenchBuilder(opts){
     surface:{reveal:revealInspector,hideDiff:hideDiff,
       show:function(keepTool){if(opts.workspace && !keepTool)opts.workspace.showTool('inspect');},
       retire:function(){if(secInspect)secInspect.hidden=true;}},
-    selection:{select:selectTarget,range:selectRange,rehighlight:rehighlight,
+    selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
     preview:{stepper:stepperFor,targetElement:findTargetEl},
     clipboard:{current:function(){return objectClipboard;},selectHome:homeClipboardSelect,

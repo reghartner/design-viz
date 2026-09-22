@@ -459,6 +459,7 @@ function validate(page){
         '" — this engine implements contract ' + CONTRACT_VERSION +
         '; rendering proceeds but re-check the spec against the current authoring contract');
   }
+  validateDetails(page, errors, warnings);
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);
   blocks.forEach(function(b){

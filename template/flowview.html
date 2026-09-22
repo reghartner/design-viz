@@ -6967,6 +6967,20 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
 }
 /* Host-independent compatibility notice; text is supplied through textContent. */
 .docview .flowview-compatibility{padding:14px 18px;margin:0 0 18px;border:1px solid #b7791f;border-radius:8px;background:#fff5d6;color:#59400a;font:14px/1.5 sans-serif;}
+
+/* Domain detail navigation belongs to the shared viewer, including native hosts. */
+.detail-trigger{cursor:pointer;color:var(--acc,#7c83e8)}
+.detail-trigger rect{fill:color-mix(in srgb,var(--acc,#7c83e8) 14%,var(--bg,#fff));stroke:var(--acc,#7c83e8);stroke-width:1}
+.detail-trigger text{fill:currentColor;font:700 17px sans-serif;pointer-events:none}
+.detail-trigger:hover rect,.detail-trigger:focus rect{fill:color-mix(in srgb,var(--acc,#7c83e8) 30%,var(--bg,#fff));stroke-width:2}
+.detail-breadcrumb,.detail-expanded-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;max-width:100%}
+.detail-breadcrumb button,.detail-expanded-controls button{font:inherit;font-size:13px;padding:7px 12px;border-radius:9px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent);color:inherit;cursor:pointer}
+.detail-breadcrumb button[aria-current]{font-weight:700;opacity:1;cursor:default;border-color:transparent}
+.detail-context,.detail-notice,.detail-expanded-controls span{font-size:12px;line-height:1.5;opacity:.85}
+.detail-notice:empty{display:none}
+.doc-sec:has(>.detail-breadcrumb){animation:detail-enter .2s ease-out}
+@keyframes detail-enter{from{opacity:.2;transform:scale(.985)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.doc-sec:has(>.detail-breadcrumb){animation:none}}
 </style>
 
 <svg aria-hidden="true" style="position:absolute; width:0; height:0; overflow:hidden">
@@ -7056,7 +7070,7 @@ var FlowviewCompatibility = (function(){
   var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Camera app panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"}};
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
-  var extraLabels={ 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
+  var extraLabels={ 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
@@ -7088,6 +7102,7 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){if(p && typeof p.type==='string')used['panel.'+p.type]=true;});
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
@@ -7102,9 +7117,10 @@ var FlowviewCompatibility = (function(){
     var blocks=page.blocks || page.sections;
     (Array.isArray(blocks)?blocks:[]).forEach(function(b){
       if(!object(b))return;
+      if(b.id!=null || b.detailOnly)used['flow.drilldown']=true;
       diagram(b.diagram);
       (Array.isArray(b.tabs)?b.tabs:[]).forEach(function(t){
-        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){diagram(s && s.diagram);});
+        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);});
       });
     });
     return Object.keys(used).sort();
@@ -7893,6 +7909,7 @@ function validate(page){
         '" — this engine implements contract ' + CONTRACT_VERSION +
         '; rendering proceeds but re-check the spec against the current authoring contract');
   }
+  validateDetails(page, errors, warnings);
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);
   blocks.forEach(function(b){
@@ -8049,6 +8066,7 @@ function parseHash(h){
           e: kv.e != null ? kv.e : null,
           m: (kv.m === 'step' || kv.m === 'ambient') ? kv.m : null};
   if (kv.p != null) result.p = kv.p;
+  if (kv.q != null) result.q = kv.q;
   return result;
 }
 function encodeSectionRefList(value){
@@ -8064,6 +8082,7 @@ function buildHash(st){
   if (st && st.m) parts.push('m=' + st.m);
   if (st && st.p != null) parts.push('p=' + encodeURIComponent(st.p));
   if (st && st.s != null) parts.push('s=' + encodeURIComponent(st.s));
+  if (st && st.q != null) parts.push('q=' + encodeURIComponent(st.q));
   if (st && st.c != null) parts.push('c=' + encodeURIComponent(st.c));
   if (st && st.r != null) parts.push('r=' + encodeURIComponent(st.r));
   if (st && st.x != null) parts.push('x=' + encodeSectionRefList(st.x));
@@ -8139,6 +8158,7 @@ function resolveHashTarget(st, manifest){
     for (i = 0; i < sections.length; i++)
       if (sections[i].reference != null && String(sections[i].reference) === key)
         return sections[i];
+    for(i=0;i<sections.length;i++)if(sections[i].aliases && sections[i].aliases.indexOf(key)>=0)return sections[i];
     var n = oneBasedIndex(key, sections.length);
     if (n < 0) return null;
     for (i = 0; i < sections.length; i++)
@@ -8153,9 +8173,10 @@ function resolveHashTarget(st, manifest){
     return out;
   }
   function diagram(sec, legacy){
-    if (!sec || !Array.isArray(sec.stepIds)) return {kind:'invalid'};
+    if (!sec || (!Array.isArray(sec.stepIds) && !sec.hasDiagram)) return {kind:'invalid'};
     var mode = (st.m === 'step' || st.s != null) ? 'step' :
                (st.m === 'ambient' ? 'ambient' : null);
+    if(!Array.isArray(sec.stepIds))mode=null;
     var step = mode === 'step' ? (st.s != null ? stepIndexOf(sec.stepIds, st.s) : 0) : null;
     return route(sec, {kind:'diagram', section:sec.number, mode:mode,
                        step:step, legacy:!!legacy, tabBlock:null, tab:null});
@@ -8269,7 +8290,11 @@ function sectionRecords(page){
     }
   });
   var references = sectionReferences(out.map(function(record){return record.section && record.section.heading;}));
-  out.forEach(function(record, index){ record.reference = references[index]; });
+  out.forEach(function(record, index){
+    var id=record.section && record.section.id;
+    record.reference=typeof id==='string' && id.trim() ? id : references[index];
+    if(record.reference!==references[index])record.aliases=[references[index]];
+  });
   return out;
 }
 /* ---- src/core/paths.js ---- */
@@ -8556,6 +8581,7 @@ function sanitizedGroupParents(groups, ignored){
 
 /* ---------------- layout + geometry (per diagram) ---------------- */
 function layout(spec){
+  if (spec._detailGeometry && spec._detailGeometry.owner === DETAIL_GEOMETRY_OWNER) return spec._detailGeometry.layout;
   var pos = {}, rowsMeta = [];
   var lanes = spec.routing === 'lanes' && laneRoutingSupported(spec);
   var laneCounts = {};
@@ -9111,6 +9137,143 @@ function resolveLabelCollisions(labels, obstacles){
     out.push({dx: best.dx, dy: best.dy});
   });
   return out;
+}
+/* ---- src/core/details.js ---- */
+/* Detail definitions remain ordinary sections. These pure helpers are shared by
+   authoring, portable validation and all viewers; resolving never performs I/O. */
+var DETAIL_GEOMETRY_OWNER = {};
+var DETAIL_MAX_DEPTH = 12;
+function detailSection(page, reference){
+  var records=sectionRecords(page);
+  return records.find(function(r){return r.reference===reference;}) || records.find(function(r){return r.aliases && r.aliases.indexOf(reference)>=0;}) || records[oneBasedIndex(reference,records.length)] || null;
+}
+function detailTarget(page, detail){
+  return specObject(detail) && !detail.spec && detail.section ? detailSection(page, detail.section) : null;
+}
+function detailURL(value){
+  if (typeof value !== 'string') return null;
+  try { var u = new URL(value); return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u.href : null; }
+  catch (_) { return null; }
+}
+function detailStepTarget(detail, stepper){
+  var id = stepper && stepper.current().id;
+  var mapped = id && detail.stepMap && Object.prototype.hasOwnProperty.call(detail.stepMap,id) ? detail.stepMap[id] : null;
+  return Object.assign({}, {path:detail.path,step:detail.step}, specObject(mapped) ? mapped : {});
+}
+function validateDetails(page, errors, warnings){
+  var records = sectionRecords(page), seen = Object.create(null);
+  records.forEach(function(r){
+    (r.aliases || []).forEach(function(alias){if(records.some(function(other){return other!==r && other.reference===alias;}))errors.push(r.path+'.id: section ID conflicts with a legacy heading reference '+alias);});
+    var s=r.section, at=r.path;
+    if(s.id != null && (typeof s.id !== 'string' || !/^[a-zA-Z][\w.-]*$/.test(s.id))) errors.push(at+'.id: use a stable identifier beginning with a letter');
+    if(seen[r.reference]) errors.push(at+'.id: duplicate or ambiguous section reference '+r.reference);
+    seen[r.reference]=true;
+    if(s.detailOnly != null && typeof s.detailOnly !== 'boolean') errors.push(at+'.detailOnly: expected a boolean');
+    Object.keys(s.diagram && s.diagram.nodes || {}).forEach(function(id){
+      var detail=s.diagram.nodes[id].detail, where=at+'.diagram.nodes.'+id+'.detail';
+      if(detail == null)return;
+      if(!specObject(detail)){errors.push(where+': expected an object');return;}
+      if(detail.mode != null && ['focus','expand','link'].indexOf(detail.mode)<0) errors.push(where+'.mode: expected focus, expand or link');
+      ['section','spec','revision','path','step'].forEach(function(k){if(detail[k]!=null && (typeof detail[k]!=='string' || !detail[k].trim()))errors.push(where+'.'+k+': expected a nonempty string');});
+      if(detail.url != null && !detailURL(detail.url))errors.push(where+'.url: expected an HTTP(S) URL without credentials');
+      if(!detail.section && !detail.spec && !detail.url)errors.push(where+': choose a detail section, approved spec or URL');
+      if((detail.spec || !detail.section) && detail.mode && detail.mode!=='link')errors.push(where+'.mode: external details use link');
+      var target=detailTarget(page,detail), child=target && target.section.diagram;
+      if(detail.section && !detail.spec && !child)errors.push(where+'.section: missing detail diagram '+detail.section);
+      function checkTarget(t,label){
+        if(!specObject(t)){errors.push(label+': expected {step, path?}');return;}
+        if(child){
+          var path=t.path || detail.path || diagramPathList(child)[0].id;
+          var resolved=resolveSourceStep(child,path,t.step);
+          if(!resolved || (t.step!=null && resolved.sourceIndex<0))errors.push(label+': unknown child step or path');
+        }
+      }
+      if(child && (detail.path || detail.step))checkTarget(detail,where);
+      if(detail.stepMap!=null){
+        if(!specObject(detail.stepMap))errors.push(where+'.stepMap: expected a map of parent step IDs to child targets');
+        else Object.keys(detail.stepMap).forEach(function(key){
+          if(!(s.diagram.steps || []).some(function(st){return st.id===key;}))errors.push(where+'.stepMap.'+key+': unknown parent step ID');
+          checkTarget(detail.stepMap[key],where+'.stepMap.'+key);
+        });
+      }
+      if(detail.ports!=null){
+        if(!specObject(detail.ports))errors.push(where+'.ports: expected {in, out}');
+        else ['in','out'].forEach(function(k){
+          var port=detail.ports[k];if(port==null)return;
+          if(!child || !Object.prototype.hasOwnProperty.call(child.nodes || {},port))errors.push(where+'.ports.'+k+': unknown child node');
+          else if(!(Array.isArray(child.rows)?child.rows:[]).some(function(row){return Array.isArray(row) && row.some(function(slot){return (Array.isArray(slot)?slot:[slot]).indexOf(port)>=0;});}) && !(Array.isArray(child.floats)?child.floats:[]).some(function(f){return f && f.id===port;}))
+            errors.push(where+'.ports.'+k+': child node must be placed in rows or floats');
+        });
+      }
+      if(detail.mode==='expand' && child){
+        ['in','out'].forEach(function(k){
+          if((s.diagram.edges || []).some(function(e){return e[k==='in'?'to':'from']===id;}) && !(detail.ports && detail.ports[k]))
+            errors.push(where+'.ports.'+k+': required to reconnect domain edges when expanding');
+        });
+      }
+    });
+  });
+}
+
+/* Expanded topology is a disposable projection. Authored IDs and step registry
+   never change. Child layouts keep their geometry inside wider compound slots. */
+function expandDetailDiagram(page, source, expanded){
+  if(!expanded || !expanded.length)return source;
+  var d=Object.assign({},source), nodes=Object.assign(Object.create(null),source.nodes), groups=Object.assign(Object.create(null),source.groups || {});
+  var domains=Object.create(null), internalEdges=[], pos=Object.create(null), groupBoxes=Object.create(null), rows=[], y=60, widest=1180;
+  function unique(prefix, map){var key=prefix;while(Object.prototype.hasOwnProperty.call(map,key))key+='_';return key;}
+  expanded.forEach(function(id){
+    var n=source.nodes[id], detail=n && n.detail, target=detailTarget(page,detail);
+    if(!target || !target.section.diagram)return;
+    var child=target.section.diagram, ports=detail.ports || {};
+    if((source.edges || []).some(function(e){return e.to===id && !ports.in || e.from===id && !ports.out;}))throw new Error('Define input and output boundary nodes before expanding '+(n.title || id)+'.');
+    var keys=Object.create(null), group=unique('__detail_'+id,groups), childLayout=layout(child);
+    if(['in','out'].some(function(k){return ports[k]!=null && !Object.prototype.hasOwnProperty.call(childLayout.pos,ports[k]);}))throw new Error('Input and output boundary nodes must be placed before expanding '+(n.title || id)+'.');
+    Object.keys(child.nodes).forEach(function(k){keys[k]=unique('__detail_'+id+'_'+k,nodes);nodes[keys[k]]=Object.assign({},child.nodes[k],{group:group});});
+    groups[group]={title:n.title || id,icon:n.icon || 'gear'};
+    domains[id]={keys:keys,child:child,layout:childLayout,group:group,ports:ports};
+    delete nodes[id];
+    (child.edges || []).forEach(function(e){internalEdges.push(Object.assign({},e,{from:keys[e.from],to:keys[e.to]}));});
+  });
+  function endpoint(id,direction){return domains[id] ? domains[id].keys[domains[id].ports[direction]] : id;}
+  function edgeKey(key){var pair=String(key).split('->');return pair.length===2?endpoint(pair[0],'out')+'->'+endpoint(pair[1],'in'):key;}
+  function nodeKeys(id){return domains[id]?Object.values(domains[id].keys):[id];}
+  function projectStep(step){
+    var s=Object.assign({},step);
+    if(s.edge)s.edge=edgeKey(s.edge);if(s.edges)s.edges=s.edges.map(edgeKey);
+    if(s.nodes)s.nodes=s.nodes.flatMap(nodeKeys);
+    if(s.tone){s.tone=Object.create(null);Object.keys(step.tone).forEach(function(k){nodeKeys(k).forEach(function(id){s.tone[id]=step.tone[k];});});}
+    if(s.failures){s.failures=Object.create(null);Object.keys(step.failures).forEach(function(k){s.failures[edgeKey(k)]=step.failures[k];});}
+    if(s.packets)s.packets=s.packets.map(function(p){return Object.assign({},p,{edge:edgeKey(p.edge)});});
+    if(s.conditions)s.conditions=s.conditions.flatMap(function(c){return c.nodeId?nodeKeys(c.nodeId).map(function(id){return Object.assign({},c,{nodeId:id});}):[c];});
+    return s;
+  }
+  var sourceRows=(source.rows || []).map(function(row){return row.map(function(slot){return Array.isArray(slot)?slot:[slot];});});
+  (source.floats || []).forEach(function(f){if(f.side==='above')sourceRows.unshift([[f.id]]);else sourceRows.push([[f.id]]);});
+  sourceRows.forEach(function(slots,ri){
+    var measures=slots.map(function(ids){var h=0,w=190;ids.forEach(function(id){var item=domains[id];w=Math.max(w,item?item.layout.vb.w+48:190);h+=(item?item.layout.vb.h+56:70)+32;});return {w:w,h:h,ids:ids};});
+    var width=measures.reduce(function(n,m){return n+m.w+90;},0)+40, height=Math.max.apply(null,measures.map(function(m){return m.h;}));
+    widest=Math.max(widest,width);var x=40, rowIds=[];
+    measures.forEach(function(m,fi){var localY=y+(height-m.h)/2;
+      m.ids.forEach(function(id){var item=domains[id];
+        if(item){var vb=item.layout.vb, dx=x+24-vb.x,dy=localY+38-vb.y;
+          Object.keys(item.layout.pos).forEach(function(k){var p=item.layout.pos[k],key=item.keys[k];pos[key]=Object.assign({},p,{cx:p.cx+dx,cy:p.cy+dy,row:ri,flow:fi,stack:true});rowIds.push(key);});
+          groupBoxes[item.group]={x:x,y:localY,w:m.w,h:vb.h+56,nestLevel:0};localY+=vb.h+88;
+        }else if(nodes[id]){pos[id]={cx:x+m.w/2,cy:localY+35,w:170,h:CARD_H,row:ri,flow:fi,stack:false};rowIds.push(id);localY+=102;}
+      });x+=m.w+90;
+    });
+    rows.push({top:y,center:y+height/2,height:height,slots:rowIds,k:rowIds.length});y+=height+120;
+  });
+  // Retain authored domain boundaries around their remaining visible members.
+  Object.keys(source.groups || {}).forEach(function(g){var members=Object.keys(source.nodes).filter(function(k){return source.nodes[k].group===g;}).flatMap(nodeKeys).map(function(k){return pos[k];}).filter(Boolean);if(!members.length)return;
+    var left=Math.min.apply(null,members.map(function(p){return p.cx-p.w/2;}))-20,top=Math.min.apply(null,members.map(function(p){return p.cy-p.h/2;}))-40;
+    groupBoxes[g]={x:left,y:top,w:Math.max.apply(null,members.map(function(p){return p.cx+p.w/2;}))-left+20,h:Math.max.apply(null,members.map(function(p){return p.cy+p.h/2;}))-top+20,nestLevel:0};
+  });
+  d.nodes=nodes;d.groups=groups;d.rows=rows.map(function(r){return r.slots;});d.floats=[];delete d.routing;
+  d.edges=(source.edges || []).map(function(e){return Object.assign({},e,{from:endpoint(e.from,'out'),to:endpoint(e.to,'in')});}).concat(internalEdges);
+  d.steps=(source.steps || []).map(projectStep);
+  d._detailGeometry={owner:DETAIL_GEOMETRY_OWNER,layout:{pos:pos,rows:rows,groups:groupBoxes,H:y,vb:{x:0,y:0,w:widest,h:y}}};
+  return d;
 }
 /* ---- src/panels/shared.js ---- */
 /* Pure panel utilities shared by declarations, folds and render models. */
@@ -22952,6 +23115,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
            '<g class="nbackref" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" data-dv-node-id="' + esc(id) + '" aria-label="Other pages containing ' + esc(nodeTitle) + '">' +
            '<circle cx="' + backlinkX + '" cy="14" r="9" fill="transparent"/>' +
            '<text x="' + backlinkX + '" y="18" text-anchor="middle">&#8599;</text></g>' : '') +
+         (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + (n.detail.mode === 'expand' ? 'Expand ' : 'Explore ') + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (p.h-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (p.h-9) + '" text-anchor="middle">⊞</text></g>' : '') +
          (n.delta === true ? '<polygon class="dvdelta" points="-3,-4 8,-4 2.5,-13" aria-hidden="true"/>' : '') +
          '</g>';
   });
@@ -24419,6 +24583,7 @@ function renderPage(view, page, skin, backlinks, options){
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
   ctl.destroy = function(){
     ctl.destroyed = true;
+    if(ctl.details)ctl.details.destroy();
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
     ctl.sections.forEach(function(rec){
       if (rec.boardSize) rec.boardSize.destroy();
@@ -24448,7 +24613,7 @@ function renderPage(view, page, skin, backlinks, options){
           if (primary && primary.number === number) changed({kind:'diagram', section:number});
         }
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
-    var rec = {number:number, reference:reference, tabBlock:record.tabBlock, tab:record.tab,
+    var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                flowDisclosure:built.flowDisclosure, presentation:built.presentation,
                contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
@@ -24503,6 +24668,7 @@ function renderPage(view, page, skin, backlinks, options){
     });
     var tabCtl = null;
     function select(idx, focus, activate){
+      if(ctl.details)ctl.details.pause();
       activeIdx = idx;
       buttons.forEach(function(b, i){
         b.setAttribute('aria-selected', i === idx ? 'true' : 'false');
@@ -24542,7 +24708,7 @@ function renderPage(view, page, skin, backlinks, options){
       return {index:tb.index, count:tb.count, slugs:tb.slugs.slice()};
     }),
     sections:ctl.sections.map(function(sec){
-      return {number:sec.number, reference:sec.reference, tabBlock:sec.tabBlock, tab:sec.tab,
+      return {number:sec.number, reference:sec.reference, aliases:sec.aliases, hasDiagram:sec.hasDiagram, tabBlock:sec.tabBlock, tab:sec.tab,
               stepIds:sec.stepper ? sec.stepper.ids() : null,
               hasCard:!!sec.contractCard, rowCount:sec.contractRows.length};
     })
@@ -24559,6 +24725,8 @@ function renderPage(view, page, skin, backlinks, options){
     if (initialDirect && initialDirect.stepper.mode() === 'step')
       ctl.activeTarget = {kind:'diagram', section:initialDirect.number};
   }
+  if(records.some(function(r){return r.section.detailOnly || Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.detail;});}))
+    ctl.details=wireDetailFlows(ctl,page,skin,backlinks,options);
   return ctl;
 }
 
@@ -24764,6 +24932,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     var key = String(ref), i;
     for (i = 0; i < ctl.sections.length; i++)
       if (String(ctl.sections[i].reference) === key) return ctl.sections[i];
+    for(i=0;i<ctl.sections.length;i++)if(ctl.sections[i].aliases && ctl.sections[i].aliases.indexOf(key)>=0)return ctl.sections[i];
     var index = oneBasedIndex(key, ctl.sections.length);
     if (index < 0) return null;
     return section(index + 1);
@@ -24784,6 +24953,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     }
   }
   function activeStepper(){
+    if(ctl.details && ctl.details.activeStepper())return ctl.details.activeStepper();
     var active = fragmentState.diagramSection != null ? section(fragmentState.diagramSection) :
                  (ctl.activeTarget && ctl.activeTarget.section ? section(ctl.activeTarget.section) : null);
     if (active && active.stepper) return active.stepper;
@@ -24841,8 +25011,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     }
     if (state.diagramSection != null){
       var diagramSec = section(state.diagramSection);
+      if(diagramSec)st.d=String(diagramSec.reference);
       if (diagramSec && diagramSec.stepper){
-        st.d = String(diagramSec.reference);
         st.m = diagramSec.stepper.mode();
         if (diagramSec.stepper.paths && diagramSec.stepper.paths().length > 1) st.p = diagramSec.stepper.path();
         if (st.m === 'step'){
@@ -24858,6 +25028,7 @@ function wireDeepLinks(ctl, win, preservedHash){
         if (state.row != null) st.r = String(state.row + 1);
       }
     }
+    if(ctl.details && ctl.details.snapshot())st.q=JSON.stringify(ctl.details.snapshot());
     return buildHash(addCollapseDeviations(st));
   }
   function currentHash(){ return stateHash(fragmentState); }
@@ -24881,7 +25052,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();
     try {
-      win.history.replaceState(null, '',
+      win.history[ctl.detailHistoryPush ? 'pushState' : 'replaceState'](null, '',
         withPreserved(h) || win.location.pathname + win.location.search);
       /* Fragments may contain heading slugs derived from a company document.
          Do not disclose them to an arbitrary embedder: mirroring stays off
@@ -24891,6 +25062,7 @@ function wireDeepLinks(ctl, win, preservedHash){
       if (mirrorSource && typeof mirrorSource.postMessage === 'function')
         mirrorSource.postMessage({type:'dv_fragment', fragment:h.replace(/^#/, '')}, mirrorOrigin);
     } catch (ex) { /* sandboxed viewers may refuse; deep links just stay off */ }
+    ctl.detailHistoryPush=false;
   }
   function clearRowTarget(){
     var rows = ctl.view.querySelectorAll('.ctrow.dv-hash-target');
@@ -24903,6 +25075,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     var st = parseHash(win.location.hash);
     var target = resolveHashTarget(st, ctl.manifest);
     suppress = true;
+    if(ctl.details)ctl.details.close(true);
     clearRowTarget();
     /* Collapse affects document height, so restore it before routing and,
        critically, before the resolved target is scrolled into view. */
@@ -24912,13 +25085,14 @@ function wireDeepLinks(ctl, win, preservedHash){
     var diagramTarget = target.diagram;
     if (diagramTarget){
       var diagramSec = section(diagramTarget.section), sp = diagramSec && diagramSec.stepper;
+      if(ctl.details && diagramSec)ctl.details.showSection(diagramSec.reference);
       if (sp && sp.selectPath) sp.selectPath(st.p || sp.paths()[0].id);
       if (sp && diagramTarget.mode === 'step'){
         sp.enterStep(false);
         var pathStep = sp.stepIndexOf(st.s);
         if (pathStep >= 0) sp.jump(pathStep);
       } else if (sp && diagramTarget.mode === 'ambient') sp.enterAmbient();
-      targetEl = sp && (sp.scrollTargetEl || sp.sectionEl);
+      targetEl = sp ? (sp.scrollTargetEl || sp.sectionEl) : diagramSec && diagramSec.sectionEl;
     }
     var cardTarget = target.card;
     if (cardTarget){
@@ -24950,6 +25124,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     else if (target.kind === 'tab')
       ctl.activeTarget = {kind:'tab', tabBlock:target.tabBlock, tab:target.tab};
     else ctl.activeTarget = {kind:'page'};
+    if(ctl.details && st.q){try{ctl.details.restore(JSON.parse(st.q));}catch(_) {/* stale drill target leaves its valid ancestor visible */}}
+    ctl.detailHistoryPush=false;
     if (targetEl && typeof targetEl.scrollIntoView === 'function'){
       targetEl.scrollIntoView({block: 'start', behavior: 'instant'});
     }
@@ -25001,6 +25177,7 @@ function wireDeepLinks(ctl, win, preservedHash){
       bindCopy(button, function(){ return tabHash(tb, i); });
     });
   });
+  ctl.bindDetailCopy=function(button){bindCopy(button,currentHash);};
   ctl.onChange = write;
   ctl.activeStepper = activeStepper;
   win.addEventListener('hashchange', apply);
@@ -25055,6 +25232,254 @@ function wirePresenter(ctl, view, win){
       exit();
     }
   });
+}
+/* ---- src/viewer/details.js ---- */
+/* Instance-owned drill-down navigation. No transport or host routing is assumed.
+   Frames retain their DOM so Back restores the exact layout, scroll and panels. */
+function wireDetailFlows(ctl, page, skin, backlinks, options){
+  options=options || {};
+  var session=null, serial=100000, disposed=false, pending=null, generation=0, restoring=false, restoreValue=null;
+  var frames=new Map(), liveRoots=new Map();
+  ctl.sections.forEach(function(rec){
+    var record=detailSection(page,rec.reference);
+    var frame={rec:rec,section:record.section,page:page,expanded:[],root:rec,original:true};
+    frames.set(rec.sectionEl,frame);liveRoots.set(rec.reference,frame);
+    if(record.section.detailOnly && !options.authoring){rec.sectionEl.hidden=true;if(rec.stepper){rec.stepper.pause();rec.stepper.onHide();}}
+  });
+  function current(){return session && session.stack[session.stack.length-1];}
+  function retire(frame){
+    frames.delete(frame.rec.sectionEl);
+    if(frame.original)return;
+    if(frame.rec.stepper)frame.rec.stepper.destroy();
+    if(frame.rec.boardSize)frame.rec.boardSize.destroy();
+    if(frame.rec.presentation)frame.rec.presentation.destroy();
+    if(frame.rec.destroy)frame.rec.destroy();
+    frame.rec.sectionEl.remove();
+  }
+  function pause(frame){if(frame && frame.rec.stepper)frame.rec.stepper.pause();}
+  function notice(frame,message){
+    var box=frame.rec.sectionEl.querySelector(':scope > .detail-notice');
+    if(!box){box=document.createElement('p');box.className='detail-notice';box.setAttribute('role','status');frame.rec.sectionEl.prepend(box);}
+    box.textContent=message;
+  }
+  function cancel(){
+    generation++;restoreValue=null;
+    if(pending){pending.abort();frames.forEach(function(frame){var status=frame.rec.sectionEl.querySelector(':scope > .detail-notice');if(status && status.textContent==='Loading detail diagram…')status.textContent='';});}
+    pending=null;
+  }
+  function changed(navigation){
+    if(disposed || restoring)return;
+    ctl.detailHistoryPush=!!navigation;
+    if(session)ctl.activeTarget={kind:'diagram',section:session.root.rec.number};
+    if(ctl.onChange)ctl.onChange();
+    if(options.onDetailNavigate)options.onDetailNavigate(snapshot());
+  }
+  function restoreOriginal(frame){
+    frame.rec.sectionEl.hidden=!!(frame.section.detailOnly && !options.authoring);
+    if(frame.rec.stepper && !frame.rec.sectionEl.hidden)frame.rec.stepper.onShow();
+  }
+  function close(silent){
+    cancel();if(!session)return;
+    var root=session.root;
+    while(session.stack.length>1)retire(session.stack.pop());
+    restoreOriginal(root);session=null;
+    if(!silent)changed(true);
+  }
+  function back(index,silent){
+    cancel();if(!session)return;
+    while(session.stack.length>index+1)retire(session.stack.pop());
+    var frame=current();frame.rec.sectionEl.hidden=false;
+    if(frame.rec.stepper)frame.rec.stepper.onShow();
+    if(index===0 && !frame.expanded.length){session=null;}
+    if(!silent){changed(true);var button=frame.rec.sectionEl.querySelector('[data-dv-detail]');if(button)button.focus();}
+  }
+  function breadcrumb(frame){
+    var nav=document.createElement('nav');nav.className='detail-breadcrumb';nav.setAttribute('aria-label','Diagram drill-down');
+    session.stack.forEach(function(item,i){
+      if(i){var arrow=document.createElement('span');arrow.textContent='›';arrow.setAttribute('aria-hidden','true');nav.appendChild(arrow);}
+      var button=document.createElement('button');button.type='button';button.textContent=item.expansionRoot ? 'Expanded view' : item.section.heading || item.section.id || 'Overview';
+      if(item===frame){button.setAttribute('aria-current','page');button.disabled=true;}
+      else button.addEventListener('click',function(){back(i);});
+      nav.appendChild(button);
+    });
+    if(options.authoring && frame.page===page){
+      var edit=document.createElement('button');edit.type='button';edit.textContent='Edit detail section';
+      edit.addEventListener('click',function(){var ref=sectionRecords(page).find(function(r){return r.section===frame.section;});if(!ref)return;close(true);var original=liveRoots.get(ref.reference);if(original){original.rec.sectionEl.hidden=false;original.rec.sectionEl.scrollIntoView({block:'start'});}});nav.appendChild(edit);
+    }
+    frame.rec.sectionEl.prepend(nav);
+    if(frame.originStep){var context=document.createElement('p');context.className='detail-context';context.textContent='Details for '+frame.originStep;nav.after(context);}
+  }
+  function stepState(frame){
+    var sp=frame.rec.stepper,presentation=frame.rec.presentation;
+    var state=sp?{path:sp.path(),step:sp.current().id || String(sp.current().n+1),mode:sp.mode()}:{};
+    if(frame.rec.boardSize)state.size=frame.rec.boardSize.mode();
+    if(presentation){state.focus=presentation.mode();if(presentation.layoutId)state.layout=presentation.layoutId();if(presentation.diagramVisible)state.diagramVisible=presentation.diagramVisible();}
+    return state;
+  }
+  function applyStep(frame,target){
+    var presentation=frame.rec.presentation;
+    if(target && presentation){
+      if(target.layout && presentation.setLayout)presentation.setLayout(target.layout);
+      if(target.focus)presentation.setMode(target.focus);
+      if(typeof target.diagramVisible==='boolean' && presentation.setDiagramVisible)presentation.setDiagramVisible(target.diagramVisible);
+    }
+    if(target && target.size && frame.rec.boardSize)frame.rec.boardSize.setMode(target.size);
+    var sp=frame.rec.stepper;if(!sp)return;
+    sp.pause();
+    if(target && target.mode==='ambient'){sp.enterAmbient();return;}
+    var path=target && target.path || diagramPathList(frame.section.diagram)[0].id;
+    if(target && target.step){
+      var resolved=resolveSourceStep(frame.section.diagram,path,target.step);
+      if(!resolved || resolved.sourceIndex<0)throw new Error('The requested detail step or path is unavailable.');
+      if(!sp.jumpSource(resolved.sourceIndex,path))throw new Error('The requested detail step is unavailable in this view.');
+    }else if(target && target.path){
+      if(!sp.selectPath(path))throw new Error('The requested detail path is unavailable in this view.');
+      sp.enterStep(false);
+    }
+  }
+  function build(section, childPage, root, expanded){
+    var projected=Object.assign({},section,{diagram:expandDetailDiagram(childPage,section.diagram,expanded || [])});
+    var host=document.createElement('div');
+    root.rec.sectionEl.parentNode.insertBefore(host,root.rec.sectionEl.nextSibling);
+    var built;
+    try{built=buildSection(host,projected,serial++,'detail-'+serial,resolveProtocols(childPage),skinBase(skin),resolveLanes(childPage),backlinks,
+      function(){changed(false);},null,Object.assign({},options,{autoplay:false}));}
+    catch(error){host.remove();throw error;}
+    var el=built.sectionEl;host.replaceWith(el);
+    el.setAttribute('data-dv-detail-preview','');
+    var eyebrow=el.querySelector('.sec-eyebrow');if(eyebrow)eyebrow.textContent=expanded && expanded.length?'Expanded domain':'Detail flow';
+    el.querySelectorAll('.embedcopy').forEach(function(b){b.remove();});
+    if(ctl.bindDetailCopy && built.stepper)ctl.bindDetailCopy(built.stepper.copyButton);
+    if(root.rec.sectionEl.classList.contains('dv-embed-target'))el.classList.add('dv-embed-target');
+    var frame={rec:built,section:section,page:childPage,expanded:expanded || [],root:root.rec,projected:projected};frames.set(el,frame);
+    return frame;
+  }
+  function begin(frame){
+    if(session && session.stack.indexOf(frame)>=0)return;
+    if(!restoring)close(true);session={root:frame,stack:[frame]};
+  }
+  function openLocal(frame,id,detail,childPage,childSection,target){
+    if(session && session.stack.length>=DETAIL_MAX_DEPTH)throw new Error('Maximum drill-down depth reached. Use the breadcrumb to return.');
+    begin(frame);pause(frame);
+    var next=build(childSection,childPage,session.root,[]);
+    try{applyStep(next,target);}catch(error){retire(next);throw error;}
+    next.via=id;next.external=detail.spec?{spec:detail.spec,revision:detail.revision,section:detail.section}:null;
+    next.originStep=frame.rec.stepper && frame.rec.stepper.mode()==='step' ? 'step '+(frame.rec.stepper.current().n+1)+' · '+(frame.section.heading || 'overview'):null;
+    frame.rec.sectionEl.hidden=true;session.stack.push(next);breadcrumb(next);changed(true);
+    var heading=next.rec.sectionEl.querySelector('.detail-breadcrumb button');if(heading)heading.focus();
+  }
+  function expansionControls(frame){
+    if(!frame.expanded.length)return;
+    var controls=document.createElement('div');controls.className='detail-expanded-controls';
+    frame.expanded.forEach(function(id){var node=frame.section.diagram.nodes[id];
+      var button=document.createElement('button');button.type='button';button.textContent='Collapse '+(node.title || id);
+      button.addEventListener('click',function(){expand(frame,id);});controls.appendChild(button);
+      var explore=document.createElement('button');explore.type='button';explore.textContent='Explore '+(node.title || id);explore.addEventListener('click',function(){open(frame,id,'focus');});controls.appendChild(explore);
+    });
+    var text=document.createElement('span');text.textContent='Overview steps · internal components expanded';controls.appendChild(text);
+    frame.rec.sectionEl.prepend(controls);
+  }
+  function expand(frame,id){
+    if(!restoring)cancel();begin(frame);pause(frame);
+    var ids=frame.expanded.slice(), index=ids.indexOf(id);if(index<0)ids.push(id);else ids.splice(index,1);
+    var state=stepState(frame);if(!frame.expanded.length)state.size='readable';
+    var next=build(frame.section,frame.page,session.root,ids);
+    next.via=frame.via;next.external=frame.external;next.originStep=frame.originStep;
+    try{applyStep(next,state);}catch(error){retire(next);throw error;}
+    var at=session.stack.indexOf(frame);
+    // The original root stays mounted as the exact return destination.
+    if(frame.original){frame.rec.sectionEl.hidden=true;session.stack.push(next);next.expansionRoot=true;}
+    else{next.expansionRoot=frame.expansionRoot;session.stack[at]=next;retire(frame);}
+    if(next.expansionRoot && !ids.length){retire(next);session.stack.pop();back(0);return;}
+    breadcrumb(next);expansionControls(next);changed(true);
+  }
+  function open(frame,id,override){
+    var node=(frame.projected || frame.section).diagram.nodes[id] || frame.section.diagram.nodes[id], detail=node && node.detail;
+    if(!detail)return;
+    cancel();
+    var mode=override || detail.mode || 'focus',target=detailStepTarget(detail,frame.rec.stepper);
+    try{
+      if(mode==='expand'){
+        if(!Object.prototype.hasOwnProperty.call(frame.section.diagram.nodes,id)){notice(frame,'Explore the containing domain before expanding its nested components.');return;}
+        expand(frame,id);return;
+      }
+      var local=detailTarget(frame.page,detail);
+      if(local){openLocal(frame,id,detail,frame.page,local.section,target);return;}
+      if(detail.spec && typeof options.loadDetail==='function'){
+        cancel();pause(frame);pending=new AbortController();var signal=pending.signal,request=++generation;
+        notice(frame,'Loading detail diagram…');
+        Promise.resolve().then(function(){return options.loadDetail({spec:detail.spec,revision:detail.revision,section:detail.section},signal);}).then(function(raw){
+          if(disposed || signal.aborted || request!==generation)return;
+          var child=normalize(raw),findings=validate(child);if(findings.errors.length)throw new Error(findings.errors.join('\n'));
+          var section=detail.section?detailSection(child,detail.section):sectionRecords(child).find(function(r){return r.section.diagram;});
+          if(!section || !section.section.diagram)throw new Error('The detail section is unavailable in this revision.');
+          notice(frame,'');openLocal(frame,id,detail,child,section.section,target);
+        }).catch(function(error){if(!disposed && !signal.aborted && request===generation)notice(frame,error.message || 'Unable to load detail diagram.');});
+      }else if(detailURL(detail.url)){
+        var a=document.createElement('a');a.href=detailURL(detail.url);a.target='_blank';a.rel='noopener noreferrer';a.textContent='Open detail diagram ↗';
+        frame.rec.sectionEl.appendChild(a);a.click();a.remove();
+      }else notice(frame,'This detail requires an approved-spec loader from the host. Add a fallback URL to open it separately.');
+    }catch(error){notice(frame,error.message);}
+  }
+  function gesture(event){
+    var trigger=event.target.closest && event.target.closest('[data-dv-detail]');
+    if(!trigger || !ctl.view.contains(trigger))return;
+    if(event.type==='keydown' && event.key!=='Enter' && event.key!==' ')return;
+    var frame=frames.get(trigger.closest('.doc-sec'));if(!frame)return;
+    event.preventDefault();event.stopPropagation();open(frame,trigger.getAttribute('data-dv-detail'));
+  }
+  ctl.view.addEventListener('click',gesture,true);ctl.view.addEventListener('keydown',gesture,true);
+  function snapshot(){
+    if(restoreValue)return restoreValue;
+    if(!session)return null;
+    return {section:session.root.rec.reference,rootState:stepState(session.root),frames:session.stack.slice(1).map(function(f){return {node:f.via || null,expanded:f.expanded.slice(),state:stepState(f)};})};
+  }
+  async function restore(value){
+    close(true);if(!value)return;
+    if(!specObject(value) || !Array.isArray(value.frames) || value.frames.length>=DETAIL_MAX_DEPTH)return;
+    var source=detailSection(page,value.section),root=source && liveRoots.get(source.reference);if(!root)return;
+    restoreValue=Object.assign({},value,{section:root.rec.reference});
+    var request=++generation;
+    try{
+      restoring=true;applyStep(root,value.rootState);restoring=false;
+      for(var i=0;i<value.frames.length;i++){
+        if(disposed || request!==generation)return;
+        var saved=value.frames[i],frame=current() || root;
+        if(!specObject(saved))break;
+        if(saved.node){
+          var node=(frame.projected || frame.section).diagram.nodes[saved.node] || frame.section.diagram.nodes[saved.node],detail=node && node.detail,target=detailTarget(frame.page,detail),childPage=frame.page;
+          if(!target && detail && detail.spec && typeof options.loadDetail==='function'){
+            pending=new AbortController();var signal=pending.signal;notice(frame,'Loading detail diagram…');
+            var raw=await options.loadDetail({spec:detail.spec,revision:detail.revision,section:detail.section},signal);
+            if(disposed || signal.aborted || request!==generation)return;
+            childPage=normalize(raw);var findings=validate(childPage);if(findings.errors.length)throw new Error(findings.errors.join('\n'));
+            target=detail.section?detailSection(childPage,detail.section):sectionRecords(childPage).find(function(r){return r.section.diagram;});notice(frame,'');pending=null;
+          }
+          if(!target || !target.section.diagram)throw new Error('The saved detail flow is unavailable in this revision.');
+          restoring=true;
+          // begin() closes an unrelated session; establish the root without
+          // cancelling this in-flight restoration's generation.
+          if(!session)session={root:root,stack:[root]};
+          openLocal(frame,saved.node,detail,childPage,target.section,saved.state);
+          restoring=false;
+        }
+        restoring=true;
+        (Array.isArray(saved.expanded)?saved.expanded:[]).forEach(function(id){var f=current() || root;if(f.section.diagram.nodes[id])expand(f,id);});
+        if(current())applyStep(current(),saved.state);
+        restoring=false;
+      }
+    }catch(error){if(!disposed && request===generation)notice(current() || root,error.message || 'Unable to restore the detail flow.');}
+    finally{restoring=false;if(request===generation){restoreValue=null;if(ctl.onChange)ctl.onChange();}}
+  }
+  function cancelInteraction(){if(pending){cancel();changed(false);}}
+  ctl.view.addEventListener('pointerdown',cancelInteraction,true);
+
+  return {snapshot:snapshot,restore:restore,close:close,
+    showSection:function(reference){close(true);liveRoots.forEach(function(f){restoreOriginal(f);});var frame=liveRoots.get(reference);if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
+    activeStepper:function(){return current() && current().rec.stepper;},
+    pause:function(){if(session)session.stack.forEach(pause);},
+    destroy:function(){disposed=true;close(true);ctl.view.removeEventListener('click',gesture,true);ctl.view.removeEventListener('keydown',gesture,true);ctl.view.removeEventListener('pointerdown',cancelInteraction,true);}
+  };
 }
 /* ---- src/boot.flowview.js ---- */
 /* boot.flowview.js — boots the standalone render target. The embedded JSON

@@ -300,7 +300,7 @@ function planRenameNode(text, raw, sectionIdx, oldId, newId){
   if (newId === oldId) return {error: 'same id'};
   if (Object.prototype.hasOwnProperty.call(got.d.nodes, newId))
     return {error: 'id "' + newId + '" is already taken'};
-  return builderRewrite(text, raw, got.path, function(d){
+  var plan=builderRewrite(text, raw, got.path, function(d){
     /* null-prototype map: a plain {} would route an id like "__proto__"
        through the prototype setter and silently drop the node */
     var nodes = Object.create(null);
@@ -330,6 +330,11 @@ function planRenameNode(text, raw, sectionIdx, oldId, newId){
         st.nodes = st.nodes.map(function(n){ return n === oldId ? newId : n; });
     });
     renamedKeys.forEach(function(pair){ builderRetargetStepKeys(d.steps, pair[0], pair[1]); });
+  });
+  return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
+    if(target===sectionIdx && detail.ports)Object.keys(detail.ports).forEach(function(port){
+      if(detail.ports[port]===oldId)detail.ports[port]=newId;
+    });
   });
 }
 
@@ -371,7 +376,7 @@ function planDeleteNode(text, raw, sectionIdx, id){
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
-  return builderRewrite(text, raw, got.path, function(d){
+  var plan=builderRewrite(text, raw, got.path, function(d){
     delete d.nodes[id];
     var panelNodes=Object.create(null);panelNodes[id]=null;
     (d.panels || []).forEach(function(p){panelRemapReferences(p,'nodes',panelNodes);});
@@ -405,6 +410,13 @@ function planDeleteNode(text, raw, sectionIdx, id){
         if (!st.nodes.length) delete st.nodes;
       }
     });
+  });
+  return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
+    if(target!==sectionIdx || !detail.ports)return;
+    Object.keys(detail.ports).forEach(function(port){
+      if(detail.ports[port]===id){delete detail.ports[port];if(detail.mode==='expand')detail.mode='focus';}
+    });
+    if(!Object.keys(detail.ports).length)delete detail.ports;
   });
 }
 

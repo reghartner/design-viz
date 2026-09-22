@@ -88,6 +88,83 @@ function planSetFields(text, raw, targetPath, pairs){
   }
   return {text: out};
 }
+
+/* Detail declarations stay on ordinary nodes/sections. Walk raw paths for
+   source edits and use the shared viewer records for reference identity. */
+function builderDetailRecords(raw){
+  var records=sectionRecords(normalize(raw)),paths=specSectionPaths(raw);
+  return records.map(function(record,i){
+    return {section:record.section,reference:record.reference,aliases:record.aliases || [],
+      number:record.number,path:paths[i].section,diagram:paths[i].diagram};
+  });
+}
+function builderDetailIndex(records,detail){
+  if (!detail || detail.spec || detail.section==null) return -1;
+  var key=String(detail.section),index=records.findIndex(function(record){return record.reference===key;});
+  if(index<0)index=records.findIndex(function(record){return record.aliases.indexOf(key)>=0;});
+  if(index<0 && /^\d+$/.test(key)) index=Number(key)-1;
+  return index>=0 && index<records.length?index:-1;
+}
+function builderEditDetails(text,raw,edit){
+  var out=text,records=builderDetailRecords(raw),error=null;
+  records.forEach(function(record,owner){
+    var diagram=specValueAt(raw,record.diagram);
+    Object.keys(diagram && diagram.nodes || {}).forEach(function(id){
+      if(error)return;
+      var detail=diagram.nodes[id] && diagram.nodes[id].detail;
+      if(!detail || typeof detail!=='object' || Array.isArray(detail))return;
+      var next=builderClone(detail),target=builderDetailIndex(records,detail);
+      var result=edit(next,owner,target,id);
+      if(result && result.error){error=result;return;}
+      if(result===null)next=null;
+      if(JSON.stringify(next)===JSON.stringify(detail))return;
+      var changed=jsonSetField(out,record.diagram.concat(['nodes',id]),'detail',next==null?null:JSON.stringify(next,null,2));
+      if(!changed){error={error:'could not update a detail reference'};return;}
+      out=changed.text;
+    });
+  });
+  return error || {text:out};
+}
+function builderDetailCascade(plan,sectionIdx,edit){
+  if(plan.error)return plan;
+  var updated=builderEditDetails(plan.text,JSON.parse(plan.text),function(detail,owner,target,id){
+    return edit(detail,owner,target,id);
+  });
+  if(updated.error)return updated;
+  if(updated.text===plan.text)return plan;
+  plan.text=updated.text;
+  var record=specSectionPaths(JSON.parse(plan.text))[sectionIdx];
+  var range=record && jsonLocate(plan.text,record.diagram);
+  if(range){plan.start=range.start;plan.end=range.end;}
+  return plan;
+}
+function planSetNodeDetail(text,raw,sectionIdx,nodeId,detail){
+  var path=builderTargetPath(raw,{kind:'node',section:sectionIdx,id:nodeId});
+  if(!path || !specValueAt(raw,path))return {error:'node not found — reselect and try again'};
+  if(detail!=null){
+    if(!detail || typeof detail!=='object' || Array.isArray(detail))return {error:'Detail must be a JSON object.'};
+    if(['focus','expand','link'].indexOf(detail.mode)<0)return {error:'Choose a detail mode: focus, expand or link.'};
+    if(!detail.section && !detail.spec && !detail.url)return {error:'Choose a local section or enter an external detail target.'};
+    if(detail.spec || !detail.section){
+      if(detail.mode!=='link')return {error:'External details use link mode.'};
+      if(detail.spec && (typeof detail.spec!=='string' || !detail.spec.trim() || typeof detail.section!=='string' || !detail.section.trim()))
+        return {error:'An approved spec detail needs a spec ID and section reference.'};
+      if(!detail.spec && !detail.url)return {error:'Choose a local section or enter a URL.'};
+    }else{
+      var records=builderDetailRecords(raw),index=builderDetailIndex(records,detail);
+      if(index<0)return {error:'That detail section does not exist.'};
+      detail=builderClone(detail);detail.section=records[index].reference;
+    }
+    if(detail.url!=null && !isValidLinkBase(detail.url))return {error:'Detail URL must be an absolute http or https URL.'};
+  }
+  var plan=planSetField(text,raw,path,'detail',detail==null?null:JSON.stringify(detail,null,2));
+  if(plan.error)return plan;
+  if(typeof validateDetails==='function'){
+    var errors=[];validateDetails(normalize(JSON.parse(plan.text)),errors,[]);
+    if(errors.length)return {error:errors.join('\n')};
+  }
+  return plan;
+}
 function planDeleteListItem(text, raw, containerPath, index){
   /* Remove one entry from a plain list (bullets, text paragraphs,
      contract fields). */

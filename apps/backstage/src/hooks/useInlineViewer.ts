@@ -42,6 +42,10 @@ export function useInlineViewer(
     let viewer: NativeViewer;
     try {
       viewer = mountNativeViewer(host.current, state.spec, {
+        loadDetail: (reference, signal) => {
+          if (!reference.revision) return Promise.reject(new Error('External detail diagrams require a pinned revision.'));
+          return loadSpec({ id: reference.spec, revision: reference.revision }, signal);
+        },
         onWarning: message => { if (active) setRenderError(message); },
       });
     } catch (error) {

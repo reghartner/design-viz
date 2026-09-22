@@ -1,0 +1,1182 @@
+{
+  "page": {
+    "title": "Doorbell domains · from event to notification",
+    "contract": "1",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "doorbell-domains",
+        "heading": "From the doorstep to the resident",
+        "accent": "cyan",
+        "text": [
+          "A fictional doorbell design, organized by domain. Follow an event from Doorbell through Connectivity and Recording to Apps / Notify. Open a domain to see its handoffs; use Recording to expand its internals in context. Each orange or purple path is an authored outcome, with no automatic retry or recovery."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "sub": "capture an event",
+              "icon": "chip",
+              "tint": "dev"
+            },
+            "connectivity": {
+              "title": "Connectivity",
+              "sub": "deliver the event",
+              "icon": "antenna",
+              "tint": "mqtt",
+              "detail": {
+                "section": "connectivity",
+                "mode": "focus",
+                "path": "happy",
+                "step": "accept",
+                "ports": {
+                  "in": "eventin",
+                  "out": "eventout"
+                },
+                "stepMap": {
+                  "capture": {
+                    "step": "accept",
+                    "path": "happy"
+                  },
+                  "handoff": {
+                    "step": "queued",
+                    "path": "happy"
+                  },
+                  "online": {
+                    "step": "released",
+                    "path": "happy"
+                  },
+                  "offline": {
+                    "step": "lost",
+                    "path": "link-lost"
+                  }
+                }
+              }
+            },
+            "recording": {
+              "title": "Recording",
+              "sub": "store + index clip",
+              "icon": "db",
+              "tint": "data",
+              "detail": {
+                "section": "recording",
+                "mode": "expand",
+                "path": "happy",
+                "step": "accept",
+                "ports": {
+                  "in": "eventin",
+                  "out": "eventout"
+                },
+                "stepMap": {
+                  "record": {
+                    "step": "accept",
+                    "path": "happy"
+                  },
+                  "saved": {
+                    "step": "publish",
+                    "path": "happy"
+                  },
+                  "storage-failed": {
+                    "step": "rejected",
+                    "path": "storage-rejected"
+                  }
+                }
+              }
+            },
+            "apps": {
+              "title": "Apps / Notify",
+              "sub": "reach the resident",
+              "icon": "phone",
+              "tint": "cmd",
+              "detail": {
+                "section": "apps-notifications",
+                "mode": "focus",
+                "path": "happy",
+                "step": "accept",
+                "ports": {
+                  "in": "eventin",
+                  "out": "resident"
+                },
+                "stepMap": {
+                  "dispatch": {
+                    "step": "accept",
+                    "path": "happy"
+                  },
+                  "notify": {
+                    "step": "deliver",
+                    "path": "happy"
+                  },
+                  "push-failed": {
+                    "step": "lost",
+                    "path": "push-lost"
+                  }
+                }
+              }
+            }
+          },
+          "rows": [
+            [
+              "doorbell",
+              "connectivity",
+              "recording",
+              "apps"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "doorbell",
+              "to": "connectivity",
+              "kind": "int",
+              "label": "event"
+            },
+            {
+              "from": "connectivity",
+              "to": "recording",
+              "kind": "int",
+              "label": "accepted"
+            },
+            {
+              "from": "recording",
+              "to": "apps",
+              "kind": "int",
+              "label": "clip ready"
+            }
+          ],
+          "panels": [
+            {
+              "id": "journey",
+              "type": "state",
+              "title": "Event journey",
+              "states": [
+                "WAITING",
+                "CAPTURED",
+                "QUEUED",
+                "CLOUD ACCEPTED",
+                "CLIP PENDING",
+                "CLIP READY",
+                "PUSH PENDING",
+                "NOTIFIED",
+                "HELD ON DEVICE",
+                "STORAGE REJECTED",
+                "PUSH LOST"
+              ],
+              "initial": {
+                "state": "WAITING"
+              }
+            },
+            {
+              "id": "resident",
+              "type": "phone",
+              "title": "Resident notification"
+            }
+          ],
+          "steps": [
+            {
+              "id": "capture",
+              "text": "A visitor presses the doorbell. The device creates an event and retains its clip locally.",
+              "nodes": [
+                "doorbell"
+              ],
+              "panels": {
+                "journey": {
+                  "state": "CAPTURED"
+                }
+              }
+            },
+            {
+              "id": "handoff",
+              "text": "Doorbell hands the event to Connectivity. Its local mailbox owns delivery until the cloud accepts it.",
+              "edge": "doorbell->connectivity",
+              "panels": {
+                "journey": {
+                  "state": "QUEUED"
+                }
+              }
+            },
+            {
+              "id": "online",
+              "text": "Connectivity confirms cloud acceptance. Open it to inspect the mailbox and uplink.",
+              "nodes": [
+                "connectivity"
+              ],
+              "tone": {
+                "connectivity": "ok"
+              },
+              "panels": {
+                "journey": {
+                  "state": "CLOUD ACCEPTED"
+                }
+              }
+            },
+            {
+              "id": "record",
+              "text": "Recording receives the accepted event and begins storing the retained clip.",
+              "edge": "connectivity->recording",
+              "panels": {
+                "journey": {
+                  "state": "CLIP PENDING"
+                }
+              }
+            },
+            {
+              "id": "saved",
+              "text": "The clip is stored and indexed before Recording publishes clip-ready. Expand Recording for the storage boundary.",
+              "nodes": [
+                "recording"
+              ],
+              "tone": {
+                "recording": "ok"
+              },
+              "panels": {
+                "journey": {
+                  "state": "CLIP READY"
+                }
+              }
+            },
+            {
+              "id": "dispatch",
+              "text": "Apps receives clip-ready and prepares the resident notification.",
+              "edge": "recording->apps",
+              "panels": {
+                "journey": {
+                  "state": "PUSH PENDING"
+                }
+              }
+            },
+            {
+              "id": "notify",
+              "text": "The push reaches the resident. This happy path ends with a saved clip and one notification.",
+              "nodes": [
+                "apps"
+              ],
+              "tone": {
+                "apps": "ok"
+              },
+              "panels": {
+                "journey": {
+                  "state": "NOTIFIED"
+                },
+                "resident": {
+                  "notify": {
+                    "app": "Doorbell",
+                    "title": "Someone is at the door",
+                    "text": "Your front-door clip is ready."
+                  }
+                }
+              }
+            },
+            {
+              "id": "offline",
+              "text": "The uplink drops inside Connectivity. The mailbox retains the event, and no accepted event is sent to Recording. Open Connectivity to locate the failed send.",
+              "nodes": [
+                "connectivity"
+              ],
+              "failures": {
+                "connectivity->recording": "blocked"
+              },
+              "tone": {
+                "connectivity": "warn",
+                "recording": "dim",
+                "apps": "dim"
+              },
+              "panels": {
+                "journey": {
+                  "state": "HELD ON DEVICE"
+                }
+              }
+            },
+            {
+              "id": "storage-failed",
+              "text": "Object storage returns a rejection. Recording keeps the local clip available, emits no clip-ready event, and stops this path before notification.",
+              "nodes": [
+                "recording"
+              ],
+              "failures": {
+                "recording->apps": "blocked"
+              },
+              "tone": {
+                "recording": "alert",
+                "apps": "dim"
+              },
+              "panels": {
+                "journey": {
+                  "state": "STORAGE REJECTED"
+                }
+              }
+            },
+            {
+              "id": "push-failed",
+              "text": "The push is dropped inside Apps / Notify. The indexed clip remains available, but the resident receives no notification in this path.",
+              "nodes": [
+                "apps"
+              ],
+              "tone": {
+                "apps": "warn"
+              },
+              "panels": {
+                "journey": {
+                  "state": "PUSH LOST"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Clip + notification",
+              "color": "#38bdf8",
+              "steps": [
+                "capture",
+                "handoff",
+                "online",
+                "record",
+                "saved",
+                "dispatch",
+                "notify"
+              ]
+            },
+            {
+              "id": "link-lost",
+              "label": "Uplink lost",
+              "color": "#fb923c",
+              "steps": [
+                "capture",
+                "handoff",
+                "offline"
+              ]
+            },
+            {
+              "id": "storage-rejected",
+              "label": "Storage rejected",
+              "color": "#a78bfa",
+              "steps": [
+                "capture",
+                "handoff",
+                "online",
+                "record",
+                "storage-failed"
+              ]
+            },
+            {
+              "id": "push-lost",
+              "label": "Push lost",
+              "color": "#f472b6",
+              "steps": [
+                "capture",
+                "handoff",
+                "online",
+                "record",
+                "saved",
+                "dispatch",
+                "push-failed"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "connectivity",
+        "heading": "Connectivity · accepted event boundary",
+        "accent": "cyan",
+        "text": [
+          "Input: a doorbell event with a locally retained clip. Output: an event accepted by the cloud. The handoff node contains another detail flow: open it to see the mailbox and the exact send that fails. The held event has no authored recovery in this example."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "eventin": {
+              "title": "Event in",
+              "sub": "from Doorbell",
+              "icon": "chip",
+              "tint": "dev"
+            },
+            "ingress": {
+              "title": "Event ingress",
+              "sub": "validate + accept",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "handoff": {
+              "title": "Cloud handoff",
+              "sub": "mailbox + uplink",
+              "icon": "antenna",
+              "tint": "mqtt",
+              "detail": {
+                "section": "delivery-mailbox",
+                "mode": "focus",
+                "path": "happy",
+                "step": "enqueue",
+                "ports": {
+                  "in": "eventin",
+                  "out": "eventout"
+                },
+                "stepMap": {
+                  "accept": {
+                    "step": "enqueue",
+                    "path": "happy"
+                  },
+                  "queued": {
+                    "step": "hold",
+                    "path": "happy"
+                  },
+                  "released": {
+                    "step": "delivered",
+                    "path": "happy"
+                  },
+                  "lost": {
+                    "step": "lost",
+                    "path": "link-lost"
+                  }
+                }
+              }
+            },
+            "eventout": {
+              "title": "Event out",
+              "sub": "to Recording",
+              "icon": "server",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "eventin",
+              "ingress",
+              "handoff",
+              "eventout"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "eventin",
+              "to": "ingress",
+              "kind": "int",
+              "label": "event"
+            },
+            {
+              "from": "ingress",
+              "to": "handoff",
+              "kind": "int",
+              "label": "queue"
+            },
+            {
+              "from": "handoff",
+              "to": "eventout",
+              "kind": "int",
+              "label": "accepted"
+            }
+          ],
+          "panels": [
+            {
+              "id": "status",
+              "type": "state",
+              "title": "Delivery guarantee",
+              "states": [
+                "WAITING",
+                "ACCEPTED LOCALLY",
+                "QUEUED",
+                "CLOUD ACCEPTED",
+                "RETAINED LOCALLY"
+              ],
+              "initial": {
+                "state": "WAITING"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "accept",
+              "text": "The domain accepts the device event. Local acceptance does not prove cloud delivery.",
+              "edge": "eventin->ingress",
+              "panels": {
+                "status": {
+                  "state": "ACCEPTED LOCALLY"
+                }
+              }
+            },
+            {
+              "id": "queued",
+              "text": "The event enters the cloud handoff mailbox. Open Cloud handoff to inspect its queue state.",
+              "edge": "ingress->handoff",
+              "panels": {
+                "status": {
+                  "state": "QUEUED"
+                }
+              }
+            },
+            {
+              "id": "released",
+              "text": "Cloud acceptance releases the event to Recording and removes it from the local mailbox.",
+              "edge": "handoff->eventout",
+              "tone": {
+                "handoff": "ok",
+                "eventout": "ok"
+              },
+              "panels": {
+                "status": {
+                  "state": "CLOUD ACCEPTED"
+                }
+              }
+            },
+            {
+              "id": "lost",
+              "text": "The MQTT uplink send drops inside Cloud handoff. The event stays in the mailbox; nothing crosses the output boundary.",
+              "nodes": [
+                "handoff"
+              ],
+              "failures": {
+                "handoff->eventout": "blocked"
+              },
+              "tone": {
+                "handoff": "warn",
+                "eventout": "dim"
+              },
+              "panels": {
+                "status": {
+                  "state": "RETAINED LOCALLY"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Cloud accepted",
+              "color": "#38bdf8",
+              "steps": [
+                "accept",
+                "queued",
+                "released"
+              ]
+            },
+            {
+              "id": "link-lost",
+              "label": "Retained on device",
+              "color": "#fb923c",
+              "steps": [
+                "accept",
+                "queued",
+                "lost"
+              ]
+            }
+          ]
+        },
+        "detailOnly": true
+      },
+      {
+        "id": "delivery-mailbox",
+        "heading": "Cloud handoff · mailbox and uplink",
+        "accent": "blue",
+        "text": [
+          "This nested Connectivity detail separates enqueue, waiting, send, and acceptance. Queue state is authored at each beat. A known dropped MQTT send leaves the envelope held on the device; it does not imply a retry has occurred."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "eventin": {
+              "title": "Event in",
+              "sub": "from Event ingress",
+              "icon": "package",
+              "tint": "dev"
+            },
+            "mailbox": {
+              "title": "Mailbox",
+              "sub": "retained envelope",
+              "icon": "db",
+              "tint": "data"
+            },
+            "uplink": {
+              "title": "MQTT client",
+              "sub": "device uplink",
+              "icon": "antenna",
+              "tint": "mqtt"
+            },
+            "eventout": {
+              "title": "Event out",
+              "sub": "cloud accepted",
+              "icon": "cloud",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "eventin",
+              "mailbox",
+              "uplink",
+              "eventout"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "eventin",
+              "to": "mailbox",
+              "kind": "int",
+              "label": "enqueue"
+            },
+            {
+              "from": "mailbox",
+              "to": "uplink",
+              "kind": "int",
+              "label": "send"
+            },
+            {
+              "from": "uplink",
+              "to": "eventout",
+              "kind": "mqtt",
+              "label": "publish"
+            }
+          ],
+          "panels": [
+            {
+              "id": "pending",
+              "type": "queue",
+              "title": "Device event mailbox",
+              "initial": {
+                "state": "empty"
+              }
+            },
+            {
+              "id": "delivery",
+              "type": "state",
+              "title": "Acceptance",
+              "states": [
+                "WAITING",
+                "QUEUED",
+                "WAITING FOR LINK",
+                "SENDING",
+                "ACCEPTED",
+                "RETAINED"
+              ],
+              "initial": {
+                "state": "WAITING"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "enqueue",
+              "text": "The event is stored in the mailbox before the uplink is used.",
+              "edge": "eventin->mailbox",
+              "panels": {
+                "pending": {
+                  "state": "enqueue",
+                  "label": "DOORBELL event",
+                  "from": "Doorbell event ingress",
+                  "to": "Cloud event boundary"
+                },
+                "delivery": {
+                  "state": "QUEUED"
+                }
+              }
+            },
+            {
+              "id": "hold",
+              "text": "The event waits in the mailbox while the client prepares the connection.",
+              "nodes": [
+                "mailbox"
+              ],
+              "panels": {
+                "pending": {
+                  "state": "held",
+                  "reason": "Waiting for the MQTT uplink"
+                },
+                "delivery": {
+                  "state": "WAITING FOR LINK"
+                }
+              }
+            },
+            {
+              "id": "send",
+              "text": "The client takes a send attempt. The retained envelope remains until cloud acceptance.",
+              "edge": "mailbox->uplink",
+              "panels": {
+                "pending": {
+                  "reason": "Waiting for cloud acceptance"
+                },
+                "delivery": {
+                  "state": "SENDING"
+                }
+              }
+            },
+            {
+              "id": "delivered",
+              "text": "The publish is accepted by the cloud. The event leaves the mailbox and crosses Connectivity’s output boundary.",
+              "edge": "uplink->eventout",
+              "tone": {
+                "eventout": "ok"
+              },
+              "panels": {
+                "pending": {
+                  "state": "dequeue"
+                },
+                "delivery": {
+                  "state": "ACCEPTED"
+                }
+              }
+            },
+            {
+              "id": "lost",
+              "text": "The MQTT publish is attempted but drops before cloud delivery. The event remains held, with no retry shown.",
+              "nodes": [
+                "uplink"
+              ],
+              "failures": {
+                "uplink->eventout": "dropped"
+              },
+              "tone": {
+                "uplink": "warn",
+                "eventout": "dim"
+              },
+              "panels": {
+                "pending": {
+                  "state": "held",
+                  "reason": "Uplink dropped; retained on device"
+                },
+                "delivery": {
+                  "state": "RETAINED"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Accepted",
+              "color": "#38bdf8",
+              "steps": [
+                "enqueue",
+                "hold",
+                "send",
+                "delivered"
+              ]
+            },
+            {
+              "id": "link-lost",
+              "label": "Uplink lost",
+              "color": "#fb923c",
+              "steps": [
+                "enqueue",
+                "hold",
+                "send",
+                "lost"
+              ]
+            }
+          ]
+        },
+        "detailOnly": true
+      },
+      {
+        "id": "recording",
+        "heading": "Recording · durable clip before publication",
+        "accent": "violet",
+        "text": [
+          "Input: a cloud-accepted event. Output: clip-ready after storage and indexing. The storage-rejected branch receives an HTTP error response, so that response is an ordinary edge. Only the unpublished clip-ready handoff is marked blocked."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "eventin": {
+              "title": "Event in",
+              "sub": "from Connectivity",
+              "icon": "antenna",
+              "tint": "mqtt"
+            },
+            "writer": {
+              "title": "Clip writer",
+              "sub": "fetch retained clip",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "objects": {
+              "title": "Object store",
+              "sub": "durable clip",
+              "icon": "db",
+              "tint": "data"
+            },
+            "catalog": {
+              "title": "Clip catalog",
+              "sub": "index playable clip",
+              "icon": "db",
+              "tint": "data"
+            },
+            "eventout": {
+              "title": "Clip-ready out",
+              "sub": "to Apps / Notify",
+              "icon": "package",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "eventin",
+              "writer",
+              "objects"
+            ],
+            [
+              "catalog",
+              "eventout"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "eventin",
+              "to": "writer",
+              "kind": "int",
+              "label": "event"
+            },
+            {
+              "from": "writer",
+              "to": "objects",
+              "kind": "https",
+              "label": "PUT"
+            },
+            {
+              "from": "objects",
+              "to": "writer",
+              "kind": "https",
+              "label": "status",
+              "ret": true
+            },
+            {
+              "from": "objects",
+              "to": "catalog",
+              "kind": "int",
+              "label": "index"
+            },
+            {
+              "from": "catalog",
+              "to": "eventout",
+              "kind": "int",
+              "label": "ready"
+            }
+          ],
+          "panels": [
+            {
+              "id": "clip",
+              "type": "state",
+              "title": "Cloud recording",
+              "states": [
+                "NOT STARTED",
+                "WRITING",
+                "STORED",
+                "INDEXED",
+                "READY",
+                "REJECTED"
+              ],
+              "initial": {
+                "state": "NOT STARTED"
+              }
+            },
+            {
+              "id": "local",
+              "type": "state",
+              "title": "Device clip",
+              "states": [
+                "RETAINED"
+              ],
+              "initial": {
+                "state": "RETAINED"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "accept",
+              "text": "Recording accepts the event. The source clip is still retained on the doorbell.",
+              "edge": "eventin->writer",
+              "panels": {
+                "clip": {
+                  "state": "WRITING"
+                },
+                "local": {
+                  "state": "RETAINED"
+                }
+              }
+            },
+            {
+              "id": "write",
+              "text": "Clip writer submits the retained media to object storage.",
+              "edge": "writer->objects"
+            },
+            {
+              "id": "stored",
+              "text": "Storage confirms the object is durable.",
+              "nodes": [
+                "objects"
+              ],
+              "tone": {
+                "objects": "ok"
+              },
+              "panels": {
+                "clip": {
+                  "state": "STORED"
+                }
+              }
+            },
+            {
+              "id": "indexed",
+              "text": "The clip catalog indexes the durable object so the app can resolve it.",
+              "edge": "objects->catalog",
+              "panels": {
+                "clip": {
+                  "state": "INDEXED"
+                }
+              }
+            },
+            {
+              "id": "publish",
+              "text": "Recording publishes clip-ready only after the catalog entry exists.",
+              "edge": "catalog->eventout",
+              "tone": {
+                "eventout": "ok"
+              },
+              "panels": {
+                "clip": {
+                  "state": "READY"
+                }
+              }
+            },
+            {
+              "id": "rejected",
+              "text": "Storage returns HTTP 503 to the writer. No catalog entry or clip-ready event is created; the retained device clip remains available.",
+              "edge": "objects->writer",
+              "failures": {
+                "catalog->eventout": "blocked"
+              },
+              "tone": {
+                "writer": "alert",
+                "objects": "warn",
+                "catalog": "dim",
+                "eventout": "dim"
+              },
+              "panels": {
+                "clip": {
+                  "state": "REJECTED"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Stored + indexed",
+              "color": "#38bdf8",
+              "steps": [
+                "accept",
+                "write",
+                "stored",
+                "indexed",
+                "publish"
+              ]
+            },
+            {
+              "id": "storage-rejected",
+              "label": "Storage rejected",
+              "color": "#a78bfa",
+              "steps": [
+                "accept",
+                "write",
+                "rejected"
+              ]
+            }
+          ]
+        },
+        "detailOnly": true
+      },
+      {
+        "id": "apps-notifications",
+        "heading": "Apps · notify after the clip is ready",
+        "accent": "pink",
+        "text": [
+          "Input: clip-ready from Recording. The example assumes the resident has enabled doorbell alerts. The happy path delivers one notification; the alternate is a known dropped push. Neither path changes whether the recorded clip exists."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "eventin": {
+              "title": "Clip-ready in",
+              "sub": "from Recording",
+              "icon": "package",
+              "tint": "data"
+            },
+            "policy": {
+              "title": "Alert policy",
+              "sub": "doorbell alerts on",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "push": {
+              "title": "Push delivery",
+              "sub": "resident device",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "resident": {
+              "title": "Resident",
+              "sub": "notification surface",
+              "icon": "phone",
+              "tint": "dev"
+            }
+          },
+          "rows": [
+            [
+              "eventin",
+              "policy",
+              "push",
+              "resident"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "eventin",
+              "to": "policy",
+              "kind": "int",
+              "label": "ready"
+            },
+            {
+              "from": "policy",
+              "to": "push",
+              "kind": "https",
+              "label": "request"
+            },
+            {
+              "from": "push",
+              "to": "resident",
+              "kind": "push",
+              "label": "notify"
+            }
+          ],
+          "panels": [
+            {
+              "id": "status",
+              "type": "state",
+              "title": "Notification",
+              "states": [
+                "WAITING",
+                "CLIP READY",
+                "PUSH REQUESTED",
+                "DELIVERED",
+                "LOST"
+              ],
+              "initial": {
+                "state": "WAITING"
+              }
+            },
+            {
+              "id": "phone",
+              "type": "phone",
+              "title": "Resident phone"
+            }
+          ],
+          "steps": [
+            {
+              "id": "accept",
+              "text": "The app domain receives clip-ready. A stored clip exists before it evaluates the alert preference.",
+              "edge": "eventin->policy",
+              "panels": {
+                "status": {
+                  "state": "CLIP READY"
+                }
+              }
+            },
+            {
+              "id": "request",
+              "text": "The enabled preference permits a push request for the front-door event.",
+              "edge": "policy->push",
+              "panels": {
+                "status": {
+                  "state": "PUSH REQUESTED"
+                }
+              }
+            },
+            {
+              "id": "deliver",
+              "text": "The push reaches the resident’s phone with a link to the saved clip.",
+              "edge": "push->resident",
+              "tone": {
+                "resident": "ok"
+              },
+              "panels": {
+                "status": {
+                  "state": "DELIVERED"
+                },
+                "phone": {
+                  "notify": {
+                    "app": "Doorbell",
+                    "title": "Someone is at the door",
+                    "text": "Your front-door clip is ready."
+                  }
+                }
+              }
+            },
+            {
+              "id": "lost",
+              "text": "The push send is known to drop before reaching the phone. No notification appears; the recorded clip remains available in the app.",
+              "nodes": [
+                "push"
+              ],
+              "failures": {
+                "push->resident": "dropped"
+              },
+              "tone": {
+                "push": "warn",
+                "resident": "dim"
+              },
+              "panels": {
+                "status": {
+                  "state": "LOST"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Resident notified",
+              "color": "#38bdf8",
+              "steps": [
+                "accept",
+                "request",
+                "deliver"
+              ]
+            },
+            {
+              "id": "push-lost",
+              "label": "Push lost",
+              "color": "#f472b6",
+              "steps": [
+                "accept",
+                "request",
+                "lost"
+              ]
+            }
+          ]
+        },
+        "detailOnly": true
+      }
+    ],
+    "protocols": {
+      "push": {
+        "label": "Push delivery",
+        "color": "#EC4899"
+      }
+    },
+    "flowview": {
+      "authoredWith": "0.1.0",
+      "minVersion": "0.1.0",
+      "features": [
+        "flow.alternates",
+        "flow.drilldown",
+        "flow.failures",
+        "panel.phone",
+        "panel.queue",
+        "panel.state"
+      ]
+    }
+  }
+}

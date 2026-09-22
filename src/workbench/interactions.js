@@ -15,6 +15,7 @@ function createBuilderInteractions(opts){
   function commitCascade(plan,options){return inspector.transact(plan,options);}
   function panelEditorForCard(card){return inspector.panelForCard(card);}
   function panelEditorForTarget(target){return inspector.panelForTarget(target);}
+  function inDetailPreview(el){return !!(el && el.closest && el.closest('[data-dv-detail-preview]'));}
   var selectedEl=null,clipboardHomeTarget=null;
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
@@ -274,6 +275,7 @@ function createBuilderInteractions(opts){
   /* ================= selection ================= */
 
   function targetFromEvent(ev){
+    if(inDetailPreview(ev.target))return null;
     /* Map editing follows the same manual transport/path selection as the
        preview. Play/Pause are excluded so selecting an inspector cannot
        immediately stop a user-started animation. */
@@ -392,12 +394,14 @@ function createBuilderInteractions(opts){
 
   life.listen(view,'dv:pathrender',applyRowGrabs);
   life.listen(view,'click',function(ev){
+    if(inDetailPreview(ev.target))return;
     if(!ev.target.closest('[data-view-layout]') || !session.target || session.target.kind!=='step')return;
     var section=ev.target.closest('.doc-sec'),index=section && Number(section.getAttribute('data-dv-section'));
     var player=section && stepperFor(index);
     if(player && session.target.section===index){session.target={kind:'step',section:index,index:player.sourceIndex(),pathId:player.path()};renderInspector();applyStepMarkers();}
   });
   life.listen(view,'dv:pathchange',function(ev){
+    if(inDetailPreview(ev.target))return;
     var followStep = session.target && session.target.kind === 'step';
     session.target=null;clearMultiSelect();if(guide) guide.hidden=true;
     if(addToStep) cancelAddToStep(null);if(connect) cancelConnect(null);
@@ -431,7 +435,7 @@ function createBuilderInteractions(opts){
        step, re-render from outside the mode, or leave the page state
        behind the mode's back are paused — capture phase, so the
        engine's own listeners never fire */
-    if (!addToStep) return;
+    if (!addToStep || inDetailPreview(ev.target)) return;
     var el = ev.target.closest && ev.target.closest(ADD_MODE_BLOCKED);
     if (!el) return;
     ev.stopPropagation();
@@ -702,6 +706,7 @@ function createBuilderInteractions(opts){
   }
   function applyPanelEditorControls(){
     Array.prototype.forEach.call(view.querySelectorAll('[data-dv-panel]'),function(card){
+      if(inDetailPreview(card))return;
       var editor=panelEditorForCard(card);
       if(editor.decoratePreview) editor.decoratePreview(card);
     });
@@ -717,6 +722,7 @@ function createBuilderInteractions(opts){
     var secList = view.querySelectorAll('.doc-sec[data-dv-section]');
     for (var s = 0; s < secList.length; s++){
       var secEl = secList[s];
+      if(inDetailPreview(secEl))continue;
       var old = secEl.querySelectorAll('g.dv-rowgrab');
       for (var o = 0; o < old.length; o++) old[o].parentNode.removeChild(old[o]);
       var anyNode = secEl.querySelector('g.node[data-dv-node]');
@@ -922,6 +928,7 @@ function createBuilderInteractions(opts){
     gd.line.setAttribute('y1', String(y1)); gd.line.setAttribute('y2', String(y2));
   }
   life.listen(view,'mousedown', function(ev){
+    if(inDetailPreview(ev.target))return;
     if (ev.button !== 0 || connect) return;
     if (!ev.target.closest) return;
     if (targetFromEvent(ev)) pausePreview();
@@ -1133,6 +1140,7 @@ function createBuilderInteractions(opts){
   });
 
   life.listen(view,'click', function(ev){
+    if(inDetailPreview(ev.target))return;
     if (suppressClick){ suppressClick = false; return; }
     var target = targetFromEvent(ev);
     if (target) pausePreview();
@@ -1156,6 +1164,7 @@ function createBuilderInteractions(opts){
 
   /* ---- keyboard: Esc clears/cancels, Delete removes the selection ---- */
   life.listen(document,'keydown', function(ev){
+    if(inDetailPreview(ev.target) || inDetailPreview(document.activeElement))return;
     if (opts.isActive && !opts.isActive()) return;
     if(document.querySelector('#object-clipboard[open], #panel-picker[open]'))return;
     if (ev.key === 'Escape'){

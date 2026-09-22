@@ -56,6 +56,10 @@ function sectionRecords(page){
     }
   });
   var references = sectionReferences(out.map(function(record){return record.section && record.section.heading;}));
-  out.forEach(function(record, index){ record.reference = references[index]; });
+  out.forEach(function(record, index){
+    var id=record.section && record.section.id;
+    record.reference=typeof id==='string' && id.trim() ? id : references[index];
+    if(record.reference!==references[index])record.aliases=[references[index]];
+  });
   return out;
 }

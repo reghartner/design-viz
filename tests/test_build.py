@@ -76,7 +76,7 @@ class BuildTests(unittest.TestCase):
         self.assertIsNotNone(match)
         templates = json.loads(match.group(1))
         metadata = runpy.run_path(str(BUILD))["WORKBENCH_TEMPLATES"]
-        self.assertEqual(len(templates), 8)
+        self.assertEqual(len(templates), 9)
         for entry, info in zip(templates, metadata):
             expected = json.loads((ROOT / "src" / info["source"]).read_text())
             if "title" in info:

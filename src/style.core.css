@@ -3672,3 +3672,17 @@ body.sk-daylight .docview,body.sk-pastel .docview,body.sk-editorial .docview{--t
 }
 /* Host-independent compatibility notice; text is supplied through textContent. */
 .docview .flowview-compatibility{padding:14px 18px;margin:0 0 18px;border:1px solid #b7791f;border-radius:8px;background:#fff5d6;color:#59400a;font:14px/1.5 sans-serif;}
+
+/* Domain detail navigation belongs to the shared viewer, including native hosts. */
+.detail-trigger{cursor:pointer;color:var(--acc,#7c83e8)}
+.detail-trigger rect{fill:color-mix(in srgb,var(--acc,#7c83e8) 14%,var(--bg,#fff));stroke:var(--acc,#7c83e8);stroke-width:1}
+.detail-trigger text{fill:currentColor;font:700 17px sans-serif;pointer-events:none}
+.detail-trigger:hover rect,.detail-trigger:focus rect{fill:color-mix(in srgb,var(--acc,#7c83e8) 30%,var(--bg,#fff));stroke-width:2}
+.detail-breadcrumb,.detail-expanded-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;max-width:100%}
+.detail-breadcrumb button,.detail-expanded-controls button{font:inherit;font-size:13px;padding:7px 12px;border-radius:9px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent);color:inherit;cursor:pointer}
+.detail-breadcrumb button[aria-current]{font-weight:700;opacity:1;cursor:default;border-color:transparent}
+.detail-context,.detail-notice,.detail-expanded-controls span{font-size:12px;line-height:1.5;opacity:.85}
+.detail-notice:empty{display:none}
+.doc-sec:has(>.detail-breadcrumb){animation:detail-enter .2s ease-out}
+@keyframes detail-enter{from{opacity:.2;transform:scale(.985)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.doc-sec:has(>.detail-breadcrumb){animation:none}}

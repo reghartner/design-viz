@@ -120,6 +120,14 @@ use **Explore** in its expanded controls to enter the child's own timeline and
 panels at the mapped beat. Child details can themselves contain detail nodes;
 the example's Connectivity → Cloud handoff → mailbox makes this concrete.
 
+Focused details also show a compact **Overview** map beside the heading. It
+shows the larger diagram with the entered domain highlighted and a **You are
+here** trail. At deeper levels, **Map of** selects an ancestor diagram; the
+top-level overview is shown initially. Click the map or **Back to overview**
+to return to that ancestor with its reading position intact. Collapse the map
+using its Overview heading. This is automatic viewer context, not an authored
+panel, and it does not reduce the width of the main diagram or change the spec.
+
 ## Map a parent beat to a child beat
 
 `path` and `step` select the default child entry. Use child path and step IDs,

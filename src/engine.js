@@ -1830,11 +1830,42 @@ function createBoardSizeControl(board, legend, label){
     ['fit', 'Fit width', 'Show the whole diagram at the available width'],
     ['readable', 'Readable', 'Keep labels at their designed size; scroll sideways to explore']];
   var buttons = {}, mode = 'auto', wasScrollable = null, destroyed = false;
+  var pan = document.createElement('div'); pan.className = 'board-pan'; pan.hidden = true;
+  pan.setAttribute('role', 'group'); pan.setAttribute('aria-label', 'Horizontal diagram scroll');
+  var panLabel = document.createElement('span'); panLabel.textContent = 'Scroll'; pan.appendChild(panLabel);
+  function panButton(direction, text){
+    var button = document.createElement('button'); button.className = 'mbtn board-pan-button'; button.type = 'button';
+    button.textContent = text; button.title = 'Scroll diagram ' + (direction < 0 ? 'left' : 'right');
+    button.setAttribute('aria-label', button.title);
+    button.addEventListener('click', function(){ panTo(board.scrollLeft + direction * board.clientWidth * .75); });
+    return button;
+  }
+  var left = panButton(-1, '←'), right = panButton(1, '→');
+  var position = document.createElement('input'); position.type = 'range'; position.className = 'board-pan-position';
+  position.min = '0'; position.max = '100'; position.step = '.1'; position.value = '0';
+  position.setAttribute('aria-label', 'Horizontal diagram position'); position.title = 'Drag to scroll horizontally';
+  pan.appendChild(left); pan.appendChild(position); pan.appendChild(right);
+  function maxScroll(){ return Math.max(0, board.scrollWidth - board.clientWidth); }
+  function syncPan(){
+    if (destroyed) return;
+    var max = maxScroll(), offset = Math.max(0, Math.min(max, board.scrollLeft));
+    var percent = max > 1 ? offset / max * 100 : 0;
+    position.value = String(percent);
+    position.setAttribute('aria-valuetext', Math.round(percent) + '% from left');
+    left.disabled = offset <= 1; right.disabled = offset >= max - 1;
+  }
+  function panTo(offset){
+    if (destroyed || !Number.isFinite(offset)) return;
+    board.scrollLeft = Math.max(0, Math.min(maxScroll(), offset)); syncPan();
+  }
+  position.addEventListener('input', function(){ panTo(Number(position.value) / 100 * maxScroll()); });
+  board.addEventListener('scroll', syncPan, {passive:true});
   function syncOverflow(){
     if (destroyed || !board.clientWidth) return;
     var scrollable = board.scrollWidth > board.clientWidth + 1;
     if (scrollable && !wasScrollable) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
     board.classList.toggle('board-overflow', scrollable);
+    pan.hidden = !scrollable; syncPan();
     wasScrollable = scrollable;
   }
   function setMode(value){
@@ -1851,8 +1882,7 @@ function createBoardSizeControl(board, legend, label){
     button.textContent = choice[1]; button.title = choice[2]; buttons[choice[0]] = button;
     button.addEventListener('click', function(){ setMode(choice[0]); }); group.appendChild(button);
   });
-  var hint = document.createElement('span'); hint.className = 'board-scroll-hint';
-  hint.textContent = 'Scroll sideways to explore'; group.appendChild(hint);
+  group.appendChild(pan);
   legend.appendChild(group);
   board.tabIndex = 0; board.setAttribute('role', 'region');
   board.setAttribute('aria-label', (label || 'Flow') + ' diagram; scroll horizontally to explore');
@@ -1860,7 +1890,7 @@ function createBoardSizeControl(board, legend, label){
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer) observer.observe(board);
   return {mode:function(){ return mode; }, setMode:setMode,
-    destroy:function(){ destroyed = true; if (observer) observer.disconnect(); }};
+    destroy:function(){ destroyed = true; board.removeEventListener('scroll', syncPan); if (observer) observer.disconnect(); }};
 }
 
 function appendCanonLinks(host,links){

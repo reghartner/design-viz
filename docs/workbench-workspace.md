@@ -90,7 +90,10 @@ supports it. This is a browser layout, not an operating-system fullscreen mode.
 All row diagrams have their own **Auto / Fit width / Readable** controls,
 including default curved edges, explicit `routing:"curves"`, and lane routing.
 Auto uses full-size labels on narrow diagram columns with horizontal scrolling;
-Fit width shows the whole graph. Tab to the diagram region to pan with arrow
+Fit width shows the whole graph. When a diagram overflows, **Scroll** buttons and
+a draggable slider appear beneath its view choices. Click the arrows or drag/click
+the slider to pan with a regular mouse; trackpad and native scrolling stay in sync.
+Tab to the slider for keyboard positioning, or to the diagram region to pan with arrow
 keys. Phone gutters and larger view buttons leave more room for the content.
 The choice belongs to each diagram and follows the same unique-section match
 as preview playback, even for diagrams without steps. It survives normal

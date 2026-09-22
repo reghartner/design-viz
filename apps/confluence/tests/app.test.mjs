@@ -318,13 +318,22 @@ test('all row routing modes expose sizing without changing the drawing or requir
     const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
     const board=view.querySelector('.board'),svg=board.querySelector('.boardcanvas>svg'),drawing=svg.outerHTML;
     const group=board.querySelector('[aria-label="Diagram size"]');assert.ok(group,'controls available for '+(routing || 'default')+' routing');
-    const buttons=[...group.querySelectorAll('button')];assert.deepEqual(buttons.map(b=>b.textContent),['Auto','Fit width','Readable']);
+    const buttons=[...group.querySelectorAll('button[aria-pressed]')];assert.deepEqual(buttons.map(b=>b.textContent),['Auto','Fit width','Readable']);
     assert.ok(board.classList.contains('board-size-auto'));
     for(const [i,mode] of [[2,'readable'],[1,'fit'],[0,'auto']]){
       buttons[i].click();assert.ok(board.classList.contains('board-size-'+mode));
       assert.deepEqual(buttons.map(b=>b.getAttribute('aria-pressed')),buttons.map((_,n)=>String(n===i)));
       assert.equal(board.querySelector('.boardcanvas>svg'),svg);assert.equal(svg.outerHTML,drawing,'sizing does not rebuild or reroute the drawing');
     }
+    const pan=group.querySelector('[aria-label="Horizontal diagram scroll"]');assert.ok(pan);assert.equal(pan.hidden,true);
+    // jsdom has no layout; supply an overflowing viewport to exercise the
+    // shipped Forge controls without treating scroll arrows as size modes.
+    Object.defineProperties(board,{clientWidth:{value:500},scrollWidth:{value:1180}});
+    buttons[2].click();assert.equal(pan.hidden,false);assert.equal(board.scrollLeft,340);
+    const position=pan.querySelector('input[type="range"]');position.value='100';position.dispatchEvent(new s.win.Event('input'));
+    assert.equal(board.scrollLeft,680);assert.equal(pan.querySelector('[aria-label="Scroll diagram right"]').disabled,true);
+    pan.querySelector('[aria-label="Scroll diagram left"]').click();assert.equal(board.scrollLeft,305);
+    assert.equal(svg.outerHTML,drawing,'scrolling never rewrites the drawing');
     assert.equal(s.calls.submits.length,0,'viewing choices never save macro configuration');
   }
 });

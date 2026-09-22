@@ -147,8 +147,11 @@ most 640 pixels wide; on wider columns it fits. Readable always keeps that
 minimum width, while Fit width shows the whole graph at the available width.
 These are viewing controls, not changes to the imported spec or row layout.
 
-Scroll sideways inside a readable board, or Tab to its named diagram region
-and use the arrow keys. The legend and view controls stay in sight while you
+For a regular mouse, use the **Scroll** arrows or drag/click the position slider
+below the view choices. They appear only when the board overflows, including in
+Auto mode on narrow columns, and stay synchronized with native scrolling.
+You can also Tab to the slider or named diagram region and use the arrow keys.
+The legend and view controls stay in sight while you
 pan. A newly overflowing board starts horizontally centered; later resizes
 and tab visits preserve an existing pan. In the workbench, a uniquely matched
 section retains its view choice through normal edits and skin changes. A

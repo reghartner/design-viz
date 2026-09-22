@@ -14,7 +14,8 @@ function element(){
     contains:name=>classes.has(name)},
     appendChild(child){ this.children.push(child); },
     setAttribute(name, value){ this.attrs[name] = value; },
-    addEventListener(name, fn){ this.events[name] = fn; }};
+    addEventListener(name, fn){ this.events[name] = fn; },
+    removeEventListener(name, fn){ if(this.events[name]===fn) delete this.events[name]; }};
 }
 function harness(width=320, scrollWidth=1180){
   const observers = [];
@@ -27,9 +28,37 @@ function harness(width=320, scrollWidth=1180){
   const board = element(), legend = element();
   Object.assign(board,{clientWidth:width,scrollWidth,scrollLeft:0});
   const ctl = context.createBoardSizeControl(board, legend, 'Checkout');
+  const pan = legend.children[0].children.find(el=>el.className==='board-pan');
   return {context,board,legend,ctl,observer:observers[0],
+    pan,left:pan.children[1],position:pan.children[2],right:pan.children[3],
     buttons:legend.children[0].children.filter(el=>el.events.click)};
 }
+
+test('mouse arrows and position slider pan within bounds and follow native scroll',()=>{
+  const h=harness();
+  assert.equal(h.pan.hidden,false);assert.equal(Number(h.position.value),50);
+  h.left.events.click();assert.equal(h.board.scrollLeft,190);
+  h.left.events.click();assert.equal(h.board.scrollLeft,0);assert.equal(h.left.disabled,true);
+  h.position.value='100';h.position.events.input();
+  assert.equal(h.board.scrollLeft,860);assert.equal(h.right.disabled,true);
+  h.right.events.click();assert.equal(h.board.scrollLeft,860);
+  h.board.scrollLeft=215;h.board.events.scroll();
+  assert.equal(Number(h.position.value),25);assert.equal(h.position.attrs['aria-valuetext'],'25% from left');
+  h.board.clientWidth=750;h.observer.fn();
+  assert.equal(Number(h.position.value),50);assert.equal(h.left.disabled,false);assert.equal(h.right.disabled,false);
+});
+
+test('mouse controls disappear without overflow and retire captured callbacks on destruction',()=>{
+  const h=harness(1180,1180);
+  assert.equal(h.pan.hidden,true);
+  h.board.clientWidth=320;h.observer.fn();assert.equal(h.pan.hidden,false);
+  const scroll=h.board.events.scroll,previous=h.board.scrollLeft;
+  h.ctl.destroy();assert.equal(h.board.events.scroll,undefined);
+  h.position.value='100';h.position.events.input();h.left.events.click();scroll();
+  assert.equal(h.board.scrollLeft,previous);assert.equal(h.position.value,'100');
+  const fit=harness();fit.board.scrollWidth=320;fit.board.scrollLeft=0;fit.ctl.setMode('fit');
+  assert.equal(fit.pan.hidden,true);
+});
 
 test('diagram sizing exposes mutually exclusive native controls without accepting unknown modes',()=>{
   const h=harness();

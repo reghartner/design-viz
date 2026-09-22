@@ -1818,8 +1818,16 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .board.board-size-fit .boardcanvas svg,.board.board-size-auto .boardcanvas svg{min-width:0;}
 .board-size{display:flex;flex-wrap:wrap;align-items:center;gap:5px;flex-basis:100%;font:11px 'IBM Plex Mono',monospace;color:var(--dtext);}
 .board-size>span:first-child{margin-right:3px;}
-.board-scroll-hint{display:none;flex-basis:100%;font-size:10px;color:var(--dfaint);}
-.board-overflow .board-scroll-hint{display:block;}
+.board-pan{display:flex;flex-basis:100%;align-items:center;gap:8px;min-width:0;}
+.board-pan[hidden]{display:none;}
+.board-pan-position{flex:1;min-width:0;width:0;height:24px;margin:0;appearance:none;background:transparent;cursor:ew-resize;}
+.board-pan-position::-webkit-slider-runnable-track{height:6px;border-radius:8px;background:color-mix(in srgb,var(--dtext) 20%,transparent);}
+.board-pan-position::-moz-range-track{height:6px;border-radius:8px;background:color-mix(in srgb,var(--dtext) 20%,transparent);}
+.board-pan-position::-webkit-slider-thumb{appearance:none;width:16px;height:16px;margin-top:-5px;border:0;border-radius:50%;background:var(--acc);box-shadow:0 1px 3px #0003;}
+.board-pan-position::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:var(--acc);box-shadow:0 1px 3px #0003;}
+.board-pan-position:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px;}
+.board-pan-button{flex:none;min-width:32px;}
+.board-pan-button:disabled{opacity:.4;cursor:default;}
 .board:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
 @media screen{
   @container(max-width:640px){
@@ -25433,11 +25441,42 @@ function createBoardSizeControl(board, legend, label){
     ['fit', 'Fit width', 'Show the whole diagram at the available width'],
     ['readable', 'Readable', 'Keep labels at their designed size; scroll sideways to explore']];
   var buttons = {}, mode = 'auto', wasScrollable = null, destroyed = false;
+  var pan = document.createElement('div'); pan.className = 'board-pan'; pan.hidden = true;
+  pan.setAttribute('role', 'group'); pan.setAttribute('aria-label', 'Horizontal diagram scroll');
+  var panLabel = document.createElement('span'); panLabel.textContent = 'Scroll'; pan.appendChild(panLabel);
+  function panButton(direction, text){
+    var button = document.createElement('button'); button.className = 'mbtn board-pan-button'; button.type = 'button';
+    button.textContent = text; button.title = 'Scroll diagram ' + (direction < 0 ? 'left' : 'right');
+    button.setAttribute('aria-label', button.title);
+    button.addEventListener('click', function(){ panTo(board.scrollLeft + direction * board.clientWidth * .75); });
+    return button;
+  }
+  var left = panButton(-1, '←'), right = panButton(1, '→');
+  var position = document.createElement('input'); position.type = 'range'; position.className = 'board-pan-position';
+  position.min = '0'; position.max = '100'; position.step = '.1'; position.value = '0';
+  position.setAttribute('aria-label', 'Horizontal diagram position'); position.title = 'Drag to scroll horizontally';
+  pan.appendChild(left); pan.appendChild(position); pan.appendChild(right);
+  function maxScroll(){ return Math.max(0, board.scrollWidth - board.clientWidth); }
+  function syncPan(){
+    if (destroyed) return;
+    var max = maxScroll(), offset = Math.max(0, Math.min(max, board.scrollLeft));
+    var percent = max > 1 ? offset / max * 100 : 0;
+    position.value = String(percent);
+    position.setAttribute('aria-valuetext', Math.round(percent) + '% from left');
+    left.disabled = offset <= 1; right.disabled = offset >= max - 1;
+  }
+  function panTo(offset){
+    if (destroyed || !Number.isFinite(offset)) return;
+    board.scrollLeft = Math.max(0, Math.min(maxScroll(), offset)); syncPan();
+  }
+  position.addEventListener('input', function(){ panTo(Number(position.value) / 100 * maxScroll()); });
+  board.addEventListener('scroll', syncPan, {passive:true});
   function syncOverflow(){
     if (destroyed || !board.clientWidth) return;
     var scrollable = board.scrollWidth > board.clientWidth + 1;
     if (scrollable && !wasScrollable) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
     board.classList.toggle('board-overflow', scrollable);
+    pan.hidden = !scrollable; syncPan();
     wasScrollable = scrollable;
   }
   function setMode(value){
@@ -25454,8 +25493,7 @@ function createBoardSizeControl(board, legend, label){
     button.textContent = choice[1]; button.title = choice[2]; buttons[choice[0]] = button;
     button.addEventListener('click', function(){ setMode(choice[0]); }); group.appendChild(button);
   });
-  var hint = document.createElement('span'); hint.className = 'board-scroll-hint';
-  hint.textContent = 'Scroll sideways to explore'; group.appendChild(hint);
+  group.appendChild(pan);
   legend.appendChild(group);
   board.tabIndex = 0; board.setAttribute('role', 'region');
   board.setAttribute('aria-label', (label || 'Flow') + ' diagram; scroll horizontally to explore');
@@ -25463,7 +25501,7 @@ function createBoardSizeControl(board, legend, label){
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer) observer.observe(board);
   return {mode:function(){ return mode; }, setMode:setMode,
-    destroy:function(){ destroyed = true; if (observer) observer.disconnect(); }};
+    destroy:function(){ destroyed = true; board.removeEventListener('scroll', syncPan); if (observer) observer.disconnect(); }};
 }
 
 function appendCanonLinks(host,links){

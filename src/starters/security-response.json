@@ -60,25 +60,25 @@
               "from": "sensor",
               "to": "intake",
               "kind": "https",
-              "label": "sensor event"
+              "label": "event"
             },
             {
               "from": "intake",
               "to": "monitor",
               "kind": "https",
-              "label": "incident report"
+              "label": "alert"
             },
             {
               "from": "monitor",
               "to": "dispatch",
               "kind": "https",
-              "label": "response request"
+              "label": "case"
             },
             {
               "from": "dispatch",
               "to": "unit",
               "kind": "https",
-              "label": "assignment"
+              "label": "assign"
             }
           ],
           "panels": [

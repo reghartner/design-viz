@@ -67,6 +67,68 @@ function panelCollectionWarnings(p, path, warnings, key, max, validateItem) {
     });
   }
 }
+
+/* Declared operational rows use safe, letter-led IDs because their state is
+   edited as top-level object fields. These helpers keep monitoring/dispatch
+   snapshots typed while leaving their domain rules in each panel module. */
+function panelOperationalItems(panel, key, max, fields) {
+  return panelCollectionItems(panel, key, max).filter(function (item) {
+    return /^[A-Za-z][A-Za-z0-9_-]*$/.test(item.id) &&
+      ['constructor', 'prototype', 'enterOnce', 'log', 'mark', 'cells'].indexOf(item.id) < 0 &&
+      !Object.prototype.hasOwnProperty.call(fields, item.id);
+  });
+}
+function panelOperationalSnapshot(raw, fields, items, itemFields, path, warnings, allowOnce) {
+  var out = Object.create(null);
+  function warn(at, message) { if (warnings) warnings.push(at + ': ' + message); }
+  function field(value, kind, at) {
+    var valid = kind === 'text' ? typeof value === 'string' : kind.indexOf(value) >= 0;
+    if (!valid) warn(at, 'expected ' + (kind === 'text' ? 'text' : kind.join('|')) + ' — ignored');
+    return valid;
+  }
+  if (raw == null) return out;
+  if (!panelObject(raw)) { warn(path, 'expected a state object — ignored'); return out; }
+  Object.keys(raw).forEach(function (key) {
+    var value = raw[key], at = path + '.' + key;
+    if (allowOnce && key === 'enterOnce') {
+      if (!panelObject(value)) warn(at, 'expected a state object — ignored');
+      else out.enterOnce = panelOperationalSnapshot(value, fields, items, itemFields, at, warnings, false);
+    } else if (Object.prototype.hasOwnProperty.call(fields, key)) {
+      if (field(value, fields[key], at)) out[key] = value;
+    } else if (items.some(function (item) { return item.id === key; })) {
+      if (value === null) { out[key] = null; return; }
+      if (!panelObject(value)) { warn(at, 'expected an item object or null — ignored'); return; }
+      var item = Object.create(null), keys = Object.keys(value);
+      keys.forEach(function (property) {
+        if (!Object.prototype.hasOwnProperty.call(itemFields, property))
+          warn(at + '.' + property, 'unknown item property — ignored');
+        else if (field(value[property], itemFields[property], at + '.' + property))
+          item[property] = value[property];
+      });
+      /* An explicit empty object resets the item. An entirely invalid patch
+         leaves the previous item intact instead of accidentally clearing it. */
+      if (!keys.length || Object.keys(item).length) out[key] = item;
+    } else warn(at, 'unknown field or declared item ID — ignored');
+  });
+  return out;
+}
+function foldSanitizedPanelStates(panel, steps, sanitize) {
+  var initial = sanitize(panel.initial, false);
+  var cleanSteps = steps.map(function (step) {
+    var source = stepPanelPatch(step), patches = Object.create(null);
+    patches[panel.id] = sanitize(source && panelOwn(source, panel.id) ? source[panel.id] : null, true);
+    return {panels: patches};
+  });
+  return foldCommonPanelStates({id: panel.id, initial: initial}, cleanSteps);
+}
+function panelSanitizedOrigin(key, context, sanitize) {
+  var once = context.currentPatch && context.currentPatch.enterOnce;
+  return context.assignment(key, function (value) {
+    var patch = Object.create(null);
+    patch[key] = value;
+    return panelOwn(sanitize(patch), key);
+  }, panelOwn(sanitize(once), key));
+}
 /* Sparse snapshots carry shallow fields, append histories and isolate one-step
    overrides. Range paints retain the original generic compatibility behavior. */
 function foldCommonPanelStates(panel, steps, options) {

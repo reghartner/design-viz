@@ -76,6 +76,11 @@ plan concise; it is a reviewable artifact, not a reasoning transcript.
 - For a physical story, plan meaningful motion as well as text: subject movement,
   door state, camera/event timing, device activity and delivery signals where
   supported. Richness means coordinated evidence across views, not more panels.
+- For security and emergency-response stories, use the `security` and `dispatch`
+  panels with [the response recipe](../../../cookbook/security-response.md).
+  Keep detection, operator verification, dispatch acceptance, assignment and
+  arrival separate. Missing evidence stays unknown; these panels never infer
+  an alarm decision, responder availability or a live arrival estimate.
 
 Use existing authorization to proceed with sensible presentation choices.
 Ask before changing the requested story or source, not for routine layout

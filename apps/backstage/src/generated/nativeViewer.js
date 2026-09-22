@@ -1427,7 +1427,8 @@ flowview-root.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .sk-aurora .stepmode .coin.lit circle{stroke:#8AE8FF;}
 .sk-daylight .stepmode .node.lit .card{stroke:#4956C9;}
 .sk-daylight .stepmode .coin.lit circle{fill:#2F3AA0;}
-.termbar{position:relative; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+/* Wrapped captions grow downward without recentering the controls beside them. */
+.termbar{position:relative; padding:10px 14px; display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap;
   border-radius:0 0 12px 12px; border:1px solid color-mix(in srgb, var(--acc) 30%, transparent); border-top:0;}
 .sk-aurora .termbar{background:#0B1220; border-top:1px dashed #25364F;}
 .termbar[hidden]{display:none;}

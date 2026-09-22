@@ -13,6 +13,8 @@ a twelve-column grid. Overlapping tiles move down to remain visible. Click
 retain their existing separate editing controls. Drag **Step controls** to put
 play/pause, alternate-path chips, step buttons, and the caption beside the Home
 map or elsewhere in the section. They move as one live group.
+When the caption sits beside the controls, the control groups stay aligned to
+the top as text wraps onto more lines. Narrow layouts still put the caption below.
 
 **Step controls** can be **Attached to Data flow**, **Attached to** a Home map,
 or **Detached**. Attached controls share their host's outline and move/resize

@@ -48,7 +48,7 @@ test('workbench edits monitoring per step and discovers both panels in the visua
   await page.locator('#steps-list [data-step-index="1"]').click();
   await page.locator('#editor-tab-inspect').click();
   const patch=page.locator('#guide .patchedit').filter({has:page.locator('summary').filter({hasText:/^monitor ·/})});
-  await patch.locator('summary').first().click();
+  if (await patch.getAttribute('open') === null) await patch.locator('summary').first().click();
   await patch.getByLabel('status',{exact:true}).selectOption('reviewing');
   await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.steps[1].panels.monitor.status).toBe('reviewing');
   await page.locator('#undo-builder').click();
@@ -56,7 +56,7 @@ test('workbench edits monitoring per step and discovers both panels in the visua
   await page.locator('#editor-tab-steps').click();
   await page.locator('#steps-list [data-step-index="1"]').click();
   await page.locator('#editor-tab-inspect').click();
-  await patch.locator('summary').first().click();
+  if (await patch.getAttribute('open') === null) await patch.locator('summary').first().click();
   await patch.getByLabel('video',{exact:true}).selectOption('reviewing');
   await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.steps[1].panels.monitor.video).toBe('reviewing');
   await page.locator('#undo-builder').click();

@@ -521,7 +521,9 @@ perspectives" of one timeline). Types:
   (`on|off`) for its beacon. These are part of the same WHOLE-item replacement;
   retain its `status` when changing progress. Available/assigned units stay at
   the station, `enroute` uses the supplied position (default 45), and `onscene`
-  parks at the house. Unknown/unavailable units are not placed on the route.
+  parks at the house. Unknown, released and unavailable units are not placed
+  on the route. Beacons default on for enroute/onscene; `lights: "off"` disables
+  them. Parked units never flash.
   The vehicle never advances to arrival just because animation time passed.
   Progress is a drawing position, not a real distance, location or ETA estimate.
   Optional top-level `timeOfDay` is `day|dusk|night` (default dusk). Reduced

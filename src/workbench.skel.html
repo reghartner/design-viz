@@ -114,6 +114,11 @@
     <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
     <details class="specbox" id="spec-editor" open>
       <summary><span>Editor</span><button class="bbtn" type="button" id="workspace-expand" aria-pressed="false">⤢ Expand editor</button></summary>
+      <div class="editor-add">
+        <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
+        <label class="editor-add-destination" for="diagram-add-target">Into <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
+        <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
+      </div>
       <div class="editor-tabs" role="tablist" aria-label="Editor tools">
         <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true">Inspect</button>
         <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1">Steps</button>
@@ -122,26 +127,13 @@
       <div class="draftbar" id="draftbar" hidden></div>
       <div class="editor-utilities">
       <details class="ssec" id="sec-insert">
-        <summary>insert &amp; import</summary>
+        <summary>import</summary>
         <div class="buildrow">
-          <span class="bgroup" role="group" aria-label="add diagram elements">
-            <button class="bbtn" id="add-node">+ node</button>
-            <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
-            <button class="bbtn" id="add-step">+ step</button>
-            <button class="bbtn" id="add-panel" aria-haspopup="dialog" aria-controls="panel-picker">+ panel</button>
-          </span>
-          <span class="bgroup" role="group" aria-label="add page structure">
-            <button class="bbtn" id="add-section">+ section</button>
-            <button class="bbtn" id="add-tabs" title="a tabbed block: two tabs, one starter section each">+ tabs</button>
-          </span>
           <span class="bgroup" role="group" aria-label="load and import">
             <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
             <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
           </span>
-          <button class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button>
-          <span class="btarget" id="btarget"></span>
         </div>
-        <div class="palette" id="palette" hidden></div>
         <div class="importbox" id="importbox" hidden>
           <textarea class="fctl" id="import-mermaid-text" rows="8" spellcheck="false" aria-label="Mermaid sequence diagram" placeholder="paste a sequenceDiagram or markdown mermaid fence"></textarea>
           <button class="bbtn" id="import-mermaid-convert">convert</button>
@@ -266,6 +258,24 @@
       </div>
     </details>
   </div>
+
+  <dialog id="diagram-add-menu" class="diagram-add-menu" aria-labelledby="diagram-add-title" aria-describedby="diagram-add-destination">
+    <div class="diagram-add-header"><div><h2 id="diagram-add-title">Add to diagram</h2><p id="diagram-add-destination"></p></div><button type="button" class="bbtn" id="diagram-add-close" aria-label="Close add to diagram">✕</button></div>
+    <div class="diagram-add-choices" role="group" aria-label="What to add">
+      <button type="button" data-add-kind="node" aria-pressed="true"><span class="diagram-add-symbol" aria-hidden="true">▣</span><span><b>Node</b><small>A service, device or actor</small></span></button>
+      <button type="button" data-add-kind="edge" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">→</span><span><b>Connection</b><small>A message between nodes</small></span></button>
+      <button type="button" data-add-kind="step" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">≡</span><span><b>Step</b><small>The next moment in the story</small></span></button>
+      <button type="button" data-add-kind="panel" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">▤</span><span><b>Panel</b><small>Browse the visual panel library</small></span></button>
+    </div>
+    <div class="diagram-add-options"><label id="diagram-add-preset-label" for="diagram-add-preset">Node preset<select id="diagram-add-preset" class="fctl"></select></label><p id="diagram-add-help"></p><p id="diagram-add-error" role="status" hidden></p></div>
+    <div class="diagram-add-footer">
+      <details class="diagram-add-structure"><summary>Page structure</summary><button type="button" class="bbtn" id="add-section">Add section</button><button type="button" class="bbtn" id="add-tabs">Add tabs</button></details>
+      <button type="button" class="editor-add-button" id="add-node" data-add-action="node">Add node</button>
+      <button type="button" class="editor-add-button" id="add-edge" data-add-action="edge" hidden>Choose source and target</button>
+      <button type="button" class="editor-add-button" id="add-step" data-add-action="step" hidden>Add step</button>
+      <button type="button" class="editor-add-button" id="add-panel" data-add-action="panel" aria-haspopup="dialog" aria-controls="panel-picker" hidden>Browse panels</button>
+    </div>
+  </dialog>
 
   <div class="wrap">
   <section class="schema">

@@ -40,6 +40,7 @@
     "workbench/io-browser.js",
     "workbench/io.js",
     "workbench/interactions.js",
+    "workbench/add-menu.js",
     "builder.workbench.js"
   ],
   "clipboard.workbench.js": [

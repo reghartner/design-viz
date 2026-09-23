@@ -29,7 +29,8 @@ inspector, I/O, interaction and lifetime dependencies.
 16. `workbench/io-browser.js`: bound browser resource adapters.
 17. `workbench/io.js`: import/export controls and independent operation lifetimes.
 18. `workbench/interactions.js`: selection, board markers, modes and graph gestures.
-19. `builder.workbench.js`: composition, outline, source focus, insertion and preview coordination.
+19. `workbench/add-menu.js`: destination selector and modal insertion chooser; commands and history stay in their existing owners.
+20. `builder.workbench.js`: composition, outline, source focus, insertion and preview coordination.
     Callers load the validator/panel assembly first.
 
 The logical `clipboard.workbench.js` bundle loads
@@ -317,7 +318,7 @@ outer session transaction remain unchanged.
 
 `initWorkbenchBuilder()` now returns an idempotent `destroy()`. It composes the
 interaction, section-layout, step-list/reuse, panel-picker, clipboard, inspector,
-I/O and session lifetimes, plus its own source/history/insertion/outline/palette
+I/O and session lifetimes, plus its own source/history/insertion/outline/Add chooser
 controls. It clears `BUILDER_JUMP_TO_FINDING` only if the installed callback still
 belongs to this mount. Old public mutation/render callbacks and retained controls
 cannot publish after destroy. Remounting the same editor DOM installs one live
@@ -330,7 +331,7 @@ state store. `listen()` normalizes listener capture/duplicates, returns a remove
 and guards retained callbacks; `delay()`/`cancelDelay()` guard queued callbacks;
 `own()` registers explicit cleanup. `destroy()` first retires the owner, removes
 listeners and cancels timers, then runs all registered cleanup functions. Each
-inspector form, step/reuse row list, picker card/filter list and outline/palette/
+inspector form, step/reuse row list, picker card/filter list and outline/Add chooser/
 diff rebuild replaces its child scope. Section-layout controls retain only the
 current section DOM and field scopes. Normal rerendering therefore releases
 old control listeners rather than retaining every previous form until unmount.
@@ -412,7 +413,7 @@ step indices.
 `createBuilderIO()` owns the existing file open/save, HTML export, Mermaid,
 trace importer and manual Confluence handoff controls. Its host injects the live
 session, source element, document and bound browser adapters, plus small hooks for
-project replacement, messages, saved-baseline UI, palette closure, active-workbench
+project replacement, messages, saved-baseline UI, Add chooser closure, active-workbench
 keyboard policy and before/after-import selection. It does not receive the
 builder's closure or duplicate session history. The returned API is
 `retireProject()` and `destroy()`; builder teardown calls the latter.

@@ -115,7 +115,7 @@ The workbench's **document outline** (⌘/Ctrl K) searches sections, hidden tabs
 nodes, groups, edges, panels, and steps and opens the matching inspector.
 See the [ranked feature roadmap](docs/feature-roadmap.md) for the next additions.
 
-The [visual panel library](docs/workbench-panel-picker.md) opens from **+ panel**:
+The [visual panel library](docs/workbench-panel-picker.md) opens from **Add to diagram → Panel → Browse panels**:
 browse actual panel previews, select a type, and confirm with **Add panel**.
 
 [Repository catalog sync](docs/workbench-catalog-sync.md) reads company catalog/API
@@ -375,14 +375,14 @@ references; steps legally survive as captions). Steps get **↑ earlier / ↓
 later** reorder buttons. Every builder action pushes an **undo** snapshot
 (the always-visible `undo` button below the editor, 30 deep). Selection maps the last
 render onto the current editor text — re-render after hand-reordering
-edits to keep the two aligned. The INSERT buttons splice a ready-made node,
-step, panel, or section into the spec and re-render; inserts target the
-section you last clicked. **+ node and + panel open a picker**: one preset
-per icon type (Console, API, Auth, Store, Broker, Sensor, …, each with its
-usual tint) and one working starter per registered panel widget type (every
-template validates with zero errors and zero warnings). **+ edge draws by
-clicking**: press it, click the source node, click the target node (Esc
-cancels; a duplicate `from->to` pair is refused). **Dragging an edge label** commits the movement as
+edits to keep the two aligned. **Add to diagram**, above the editor tabs, adds nodes, connections, steps and
+panels. The **Into** selector beneath it chooses the destination section, including
+sections inside tabs; clicking a section in the preview updates it too. Choose
+**Node** for icon presets (Console, API, Auth, Store, Broker, Sensor, …), or **Panel**
+for the visual panel library. Each addition uses an explicit button and is one
+Undo. **Connection** asks you to click a source and target in the chosen section
+(Esc cancels; duplicate `from->to` pairs are refused). **Step** appends to its
+selected timeline. **Page structure** inside the chooser adds sections or tabs. **Dragging an edge label** commits the movement as
 `labelDx`/`labelDy` nudges — the hand-tuning chore for crowded corridors —
 while a plain click still selects. Prose is selectable too: paragraphs,
 bullets, and contract-card rows each open their own edit form with delete;

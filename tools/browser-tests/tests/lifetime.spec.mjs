@@ -29,7 +29,7 @@ test('builder destruction retires captured gestures and old controls across same
       expect(await held.evaluate(e=>e.hasPointerCapture(1))).toBe(false);await held.dispose();
       await expect(src).toHaveValue(source);
     }else{
-      if(!await page.locator('#add-panel').isVisible())await page.locator('#sec-insert > summary').click();
+      await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();
       await page.locator('#add-panel').click();await page.locator('#panel-picker-grid .pwidget').first().waitFor();
       await page.evaluate(()=>__editorTest.builder.destroy());await expect(page.locator('#panel-picker')).toBeHidden();
     }

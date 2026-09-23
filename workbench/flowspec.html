@@ -1192,8 +1192,8 @@ body.workspace-focus .workwrap{max-width:none;}
 .specbox[open]>summary>span::before{content:"▾ ";}
 .specbox>summary::-webkit-details-marker{display:none;}
 .specbox[open] > summary{border-bottom:1px solid var(--line);}
-/* collapsible editor sections: insert / inspector / JSON source */
-/* class display rules (flex on .draftbar/.palette and the section rows
+/* collapsible editor sections: import / inspector / JSON source */
+/* class display rules (flex on .draftbar and the section rows
    above) would otherwise beat the hidden attribute's UA display:none */
 .specbox [hidden]{display:none !important;}
 .ssec > summary{cursor:pointer; padding:7px 14px; font:600 11px 'IBM Plex Mono',monospace;
@@ -1216,6 +1216,59 @@ body.workspace-focus .workwrap{max-width:none;}
   padding:5px 10px; border-radius:7px; cursor:pointer;}
 .bbtn:hover{color:var(--ink); border-color:var(--accent);}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+/* One persistent insertion entry point above the editor tools. */
+.editor-add{flex:none;min-width:0;padding:12px 14px;border-bottom:1px solid var(--line);}
+.editor-add-button{display:flex;align-items:center;justify-content:center;gap:9px;box-sizing:border-box;
+  min-height:46px;padding:11px 18px;border:1px solid var(--accent);border-radius:10px;
+  background:var(--accent);color:var(--accent-ink);font:600 14px/1.4 'Sora',sans-serif;cursor:pointer;}
+.editor-add > .editor-add-button{width:100%;}
+.editor-add-button:hover:not(:disabled){box-shadow:0 3px 12px var(--selglow);filter:brightness(1.06);}
+.editor-add-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+.editor-add-button:disabled{opacity:.5;cursor:default;}
+.editor-add-chevron{margin-left:auto;font-size:18px;line-height:1;}
+.editor-add-destination{display:flex;align-items:center;gap:8px;min-width:0;margin-top:10px;
+  color:var(--sub);font:600 11px/1.4 'IBM Plex Mono',monospace;}
+.editor-add-destination select{flex:1;min-width:0;max-width:100%;min-height:32px;padding:5px 8px;
+  border:1px solid var(--line);border-radius:7px;background:var(--codebg);color:var(--ink);
+  font:inherit;text-overflow:ellipsis;cursor:pointer;}
+.editor-add-destination select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.editor-add-status{display:none;gap:8px;margin-top:10px;padding:8px;border:1px solid var(--line);border-radius:8px;}
+.editor-add-status.dv-addmode,.editor-add-status.dv-connectmode{display:flex;}
+.editor-add-status .btarget{margin:0;min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;line-height:1.5;}
+.diagram-add-menu{box-sizing:border-box;width:min(680px,calc(100vw - 32px));max-height:calc(100dvh - 48px);
+  padding:28px;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--ink);
+  box-shadow:0 24px 80px #101b3540;overflow:auto;}
+.diagram-add-menu::backdrop{background:#111b3659;backdrop-filter:blur(4px);}
+.diagram-add-menu [hidden]{display:none!important;}
+.diagram-add-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px;}
+.diagram-add-header h2{margin:0;font:700 24px/1.3 'Sora',sans-serif;letter-spacing:-.025em;}
+.diagram-add-header p{margin:7px 0 0;color:var(--sub);font:500 12px/1.5 'IBM Plex Mono',monospace;overflow-wrap:anywhere;}
+.diagram-add-header .bbtn{flex:none;min-width:36px;min-height:36px;border-radius:50%;font-size:15px;}
+.diagram-add-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.diagram-add-choices button{display:flex;align-items:center;gap:14px;min-width:0;min-height:108px;padding:18px;
+  border:1px solid var(--line);border-radius:13px;background:var(--codebg);color:var(--ink);text-align:left;cursor:pointer;}
+.diagram-add-choices button:hover{border-color:var(--accent);}
+.diagram-add-choices button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--selglow);}
+.diagram-add-choices button:focus-visible,.diagram-add-structure summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+.diagram-add-symbol{display:grid;place-items:center;flex:0 0 40px;height:40px;border-radius:11px;
+  background:var(--card);color:var(--accent);font:500 27px/1 'IBM Plex Mono',monospace;}
+.diagram-add-choices b{display:block;font:600 15px/1.4 'Sora',sans-serif;}
+.diagram-add-choices small{display:block;margin-top:5px;color:var(--sub);font:12px/1.5 'Sora',sans-serif;}
+.diagram-add-options{margin:22px 0;}
+.diagram-add-options label{display:flex;align-items:center;gap:16px;font:600 12px/1.5 'Sora',sans-serif;}
+.diagram-add-options select{min-height:40px;}
+.diagram-add-options p{margin:12px 0 0;color:var(--sub);font:12px/1.6 'Sora',sans-serif;}
+#diagram-add-error{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--codebg);color:var(--ink);}
+.diagram-add-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:20px;border-top:1px solid var(--line);}
+.diagram-add-structure{color:var(--sub);font:12px/1.5 'Sora',sans-serif;}
+.diagram-add-structure summary{padding:7px 0;cursor:pointer;}
+.diagram-add-structure .bbtn{min-height:34px;margin:4px 4px 0 0;}
+@media(max-width:600px){
+  .diagram-add-menu{padding:20px;max-height:calc(100dvh - 24px);}
+  .diagram-add-choices{gap:8px;}
+  .diagram-add-choices button{align-items:flex-start;flex-direction:column;gap:10px;padding:12px;}
+  .diagram-add-footer{align-items:stretch;flex-direction:column-reverse;gap:10px;}
+}
 .extraction-preview{min-width:0;}
 .extraction-preview h3{margin:0 0 8px;font:600 17px/1.35 'Sora',sans-serif;}
 .extraction-intro{margin:0 0 16px;font-size:13px;line-height:1.55;color:var(--sub);}
@@ -1256,14 +1309,6 @@ body.workspace-focus .workwrap{max-width:none;}
 /* draft-recovery offer */
 .draftbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px;
   border-bottom:1px solid var(--line); font:500 12px 'IBM Plex Mono',monospace; color:#B0771A;}
-/* insert palette: node presets / panel widget types */
-.palette{display:flex; flex-wrap:wrap; gap:6px; padding:8px 14px; border-bottom:1px solid var(--line);
-  max-height:180px; overflow-y:auto;}
-.pbtn{display:inline-flex; align-items:center; gap:6px; background:var(--codebg); border:1px solid var(--line);
-  color:var(--codeink); font:600 11px 'IBM Plex Mono',monospace; padding:5px 9px; border-radius:7px; cursor:pointer;}
-.pbtn:hover{border-color:var(--accent); color:var(--ink);}
-.pbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
-.pbtn svg{width:14px; height:14px;}
 .guide, .diffbox{border-bottom:1px solid var(--line); padding:10px 14px; font-size:12.5px; line-height:1.5; color:var(--sub);
   max-height:340px; overflow-y:auto;}
 .guide b{color:var(--ink); font-size:13px;}
@@ -8313,6 +8358,11 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
     <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
     <details class="specbox" id="spec-editor" open>
       <summary><span>Editor</span><button class="bbtn" type="button" id="workspace-expand" aria-pressed="false">⤢ Expand editor</button></summary>
+      <div class="editor-add">
+        <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
+        <label class="editor-add-destination" for="diagram-add-target">Into <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
+        <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
+      </div>
       <div class="editor-tabs" role="tablist" aria-label="Editor tools">
         <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true">Inspect</button>
         <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1">Steps</button>
@@ -8321,26 +8371,13 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       <div class="draftbar" id="draftbar" hidden></div>
       <div class="editor-utilities">
       <details class="ssec" id="sec-insert">
-        <summary>insert &amp; import</summary>
+        <summary>import</summary>
         <div class="buildrow">
-          <span class="bgroup" role="group" aria-label="add diagram elements">
-            <button class="bbtn" id="add-node">+ node</button>
-            <button class="bbtn" id="add-edge" title="click a source node, then a target node (Esc cancels)">+ edge</button>
-            <button class="bbtn" id="add-step">+ step</button>
-            <button class="bbtn" id="add-panel" aria-haspopup="dialog" aria-controls="panel-picker">+ panel</button>
-          </span>
-          <span class="bgroup" role="group" aria-label="add page structure">
-            <button class="bbtn" id="add-section">+ section</button>
-            <button class="bbtn" id="add-tabs" title="a tabbed block: two tabs, one starter section each">+ tabs</button>
-          </span>
           <span class="bgroup" role="group" aria-label="load and import">
             <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
             <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
           </span>
-          <button class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button>
-          <span class="btarget" id="btarget"></span>
         </div>
-        <div class="palette" id="palette" hidden></div>
         <div class="importbox" id="importbox" hidden>
           <textarea class="fctl" id="import-mermaid-text" rows="8" spellcheck="false" aria-label="Mermaid sequence diagram" placeholder="paste a sequenceDiagram or markdown mermaid fence"></textarea>
           <button class="bbtn" id="import-mermaid-convert">convert</button>
@@ -8465,6 +8502,24 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       </div>
     </details>
   </div>
+
+  <dialog id="diagram-add-menu" class="diagram-add-menu" aria-labelledby="diagram-add-title" aria-describedby="diagram-add-destination">
+    <div class="diagram-add-header"><div><h2 id="diagram-add-title">Add to diagram</h2><p id="diagram-add-destination"></p></div><button type="button" class="bbtn" id="diagram-add-close" aria-label="Close add to diagram">✕</button></div>
+    <div class="diagram-add-choices" role="group" aria-label="What to add">
+      <button type="button" data-add-kind="node" aria-pressed="true"><span class="diagram-add-symbol" aria-hidden="true">▣</span><span><b>Node</b><small>A service, device or actor</small></span></button>
+      <button type="button" data-add-kind="edge" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">→</span><span><b>Connection</b><small>A message between nodes</small></span></button>
+      <button type="button" data-add-kind="step" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">≡</span><span><b>Step</b><small>The next moment in the story</small></span></button>
+      <button type="button" data-add-kind="panel" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">▤</span><span><b>Panel</b><small>Browse the visual panel library</small></span></button>
+    </div>
+    <div class="diagram-add-options"><label id="diagram-add-preset-label" for="diagram-add-preset">Node preset<select id="diagram-add-preset" class="fctl"></select></label><p id="diagram-add-help"></p><p id="diagram-add-error" role="status" hidden></p></div>
+    <div class="diagram-add-footer">
+      <details class="diagram-add-structure"><summary>Page structure</summary><button type="button" class="bbtn" id="add-section">Add section</button><button type="button" class="bbtn" id="add-tabs">Add tabs</button></details>
+      <button type="button" class="editor-add-button" id="add-node" data-add-action="node">Add node</button>
+      <button type="button" class="editor-add-button" id="add-edge" data-add-action="edge" hidden>Choose source and target</button>
+      <button type="button" class="editor-add-button" id="add-step" data-add-action="step" hidden>Add step</button>
+      <button type="button" class="editor-add-button" id="add-panel" data-add-action="panel" aria-haspopup="dialog" aria-controls="panel-picker" hidden>Browse panels</button>
+    </div>
+  </dialog>
 
   <div class="wrap">
   <section class="schema">
@@ -33872,7 +33927,7 @@ function createBuilderIO(opts){
     function closeTrace(){cancelTraceRead();invalidateTrace();clearListeners('trace-results');traceBox.hidden=true;traceBtn.setAttribute('aria-expanded','false');traceBtn.focus();}
     listen(traceBtn,'click',function(){
       if(!traceBox.hidden){closeTrace();return;}
-      traceBox.hidden=false;traceBtn.setAttribute('aria-expanded','true');opts.closePalette();traceText.focus();
+      traceBox.hidden=false;traceBtn.setAttribute('aria-expanded','true');opts.closeInsertMenu();traceText.focus();
     });
     listen(document.getElementById('trace-cancel'),'click',closeTrace);
     listen(traceBox,'keydown',function(ev){ if (ev.key === 'Escape'){ ev.stopPropagation(); closeTrace(); } });
@@ -34337,6 +34392,7 @@ function createBuilderInteractions(opts){
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
   function addToStepStatus(){
+    opts.refreshInsertion();
     if (targetLabel && addToStep)
       targetLabel.textContent = 'ADD TO STEP ' + (addToStep.step + 1) +
         ': click edges, nodes, panels to toggle';
@@ -34349,7 +34405,7 @@ function createBuilderInteractions(opts){
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .path-chip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
-    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
+    '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, ' +
     '#import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
@@ -34367,7 +34423,7 @@ function createBuilderInteractions(opts){
   life.listen(document,'click', addModeBlocker, true);
   life.listen(document,'keydown', function(ev){
     if (opts.isActive && !opts.isActive()) return;
-    if(document.querySelector('#object-clipboard[open], #panel-picker[open]'))return;
+    if(document.querySelector('#object-clipboard[open], #panel-picker[open], #diagram-add-menu[open]'))return;
     /* the tab bar switches tabs on Arrow/Home/End — pause that too
        while the mode is armed (capture phase beats the engine's
        tab-bar listener) */
@@ -34430,20 +34486,23 @@ function createBuilderInteractions(opts){
   var connect = null; /* null | {stage:1} | {stage:2, section, fromId} */
   function connectStatus(text){
     if (targetLabel) targetLabel.textContent = text;
+    if (buildRow) buildRow.classList.add('dv-connectmode');
+    opts.refreshInsertion();
   }
   function cancelConnect(message){
     connect = null;
+    if (buildRow) buildRow.classList.remove('dv-connectmode');
     var parsed = parseEditor();
     updateTargetLabel(parsed.error ? null : parsed.raw);
     if (message) inspectorMessage(message);
   }
-  function startConnect(){
+  function startConnect(section){
     if (addToStep) cancelAddToStep(null);
     if (connect){ cancelConnect('connect cancelled'); return; }
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
     if (!specSectionPaths(parsed.raw).length){ inspectorMessage('no sections found in the editor text'); return; }
-    connect = {stage: 1};
+    connect = {stage: 1,section:typeof section==='number'?section:undefined};
     connectStatus('connect: click the SOURCE node (Esc cancels)');
   }
   function handleConnectClick(target){
@@ -34452,6 +34511,9 @@ function createBuilderInteractions(opts){
       return;
     }
     if (connect.stage === 1){
+      if(typeof connect.section==='number' && target.section!==connect.section){
+        connectStatus('connect: choose a SOURCE node in section '+(connect.section+1)+' (Esc cancels)');return;
+      }
       connect = {stage: 2, section: target.section, fromId: target.id};
       setSelected(target.el);
       connectStatus('connect: ' + target.id + ' → click the TARGET node');
@@ -35087,7 +35149,7 @@ function createBuilderInteractions(opts){
   life.listen(document,'keydown', function(ev){
     if(inDetailPreview(ev.target) || inDetailPreview(document.activeElement))return;
     if (opts.isActive && !opts.isActive()) return;
-    if(document.querySelector('#object-clipboard[open], #panel-picker[open]'))return;
+    if(document.querySelector('#object-clipboard[open], #panel-picker[open], #diagram-add-menu[open]'))return;
     if (ev.key === 'Escape'){
       if(ev.defaultPrevented)return; /* an owned importer consumed Escape */
       if (rowDrag){ cancelRowDrag(); return; }
@@ -35179,6 +35241,84 @@ function createBuilderInteractions(opts){
       Array.prototype.forEach.call(view.querySelectorAll('.dv-inserttarget'),function(el){el.classList.remove('dv-inserttarget');});
     }
   };
+}
+/* ---- src/workbench/add-menu.js ---- */
+/* Editor-only insertion entry point. Commands, source transactions and the
+   panel library keep their existing owners; this owns destination and modal UI. */
+function initDiagramAddMenu(opts){
+  var doc=opts.document,dialog=doc.getElementById('diagram-add-menu'),button=doc.getElementById('diagram-add');
+  if(!dialog || !button)return null;
+  var life=createWorkbenchLifetime(),target=doc.getElementById('diagram-add-target');
+  var preset=doc.getElementById('diagram-add-preset'),presetLabel=doc.getElementById('diagram-add-preset-label');
+  var error=doc.getElementById('diagram-add-error'),help=doc.getElementById('diagram-add-help');
+  var choices=Array.from(dialog.querySelectorAll('[data-add-kind]')),actions=Array.from(dialog.querySelectorAll('[data-add-action]'));
+  var structure=[doc.getElementById('add-section'),doc.getElementById('add-tabs')];
+  var kind='node',snapshot=null,invalid=false,optionsKey='';
+  var copy={node:'Choose a preset, then edit the node in the inspector.',
+    edge:'Choose a source node, then a target node in this section. Escape cancels.',
+    step:'Append a step to the selected timeline in this section.',
+    panel:'Browse large previews, then explicitly add a panel from the library.'};
+  NODE_PRESETS.forEach(function(item,index){var option=doc.createElement('option');option.value=String(index);option.textContent=item.title;preset.appendChild(option);});
+  function showError(message){error.textContent=message || '';error.hidden=!message;}
+  function same(current){return snapshot && !current.error && current.text===snapshot.text && current.section===snapshot.section;}
+  function paint(current){
+    choices.forEach(function(choice){choice.setAttribute('aria-pressed',String(choice.getAttribute('data-add-kind')===kind));});
+    actions.forEach(function(action){action.hidden=action.getAttribute('data-add-action')!==kind;action.disabled=invalid || !!current.error || !current.diagram;});
+    structure.forEach(function(action){action.disabled=invalid || !!current.error;});
+    presetLabel.hidden=kind!=='node';help.textContent=copy[kind];
+    showError(invalid ? 'The source or destination changed. Close this dialog and open it again before adding.' :
+      current.error || (!current.diagram ? 'Choose a section with a diagram, or add a new section below.' : ''));
+  }
+  function refresh(){
+    var current=opts.context(),entries=current.sections || [];
+    var key=JSON.stringify(entries.map(function(entry){return [entry.section,entry.label];}));
+    if(key!==optionsKey){
+      optionsKey=key;target.replaceChildren();
+      entries.forEach(function(entry){var option=doc.createElement('option');option.value=String(entry.section);option.textContent=entry.label;target.appendChild(option);});
+    }
+    target.value=String(current.section);target.disabled=!!current.error || !entries.length;
+    button.disabled=!!current.locked;
+    if(dialog.open){if(!same(current))invalid=true;paint(current);}
+  }
+  function close(focus){
+    if(dialog.open)dialog.close();
+    snapshot=null;invalid=false;button.setAttribute('aria-expanded','false');
+    if(focus!==false && button.isConnected)button.focus({preventScroll:true});
+  }
+  function open(){
+    var current=opts.context();
+    if(current.locked)return;
+    if(opts.pause)opts.pause();
+    snapshot=current;invalid=false;kind='node';preset.value='0';
+    doc.getElementById('diagram-add-destination').textContent=current.label || 'Page';
+    dialog.querySelector('.diagram-add-structure').open=false;
+    paint(current);dialog.showModal();button.setAttribute('aria-expanded','true');
+    choices[0].focus({preventScroll:true});
+  }
+  function confirm(run,pageStructure){
+    if(!dialog.open)return false;
+    var current=opts.context();
+    if(invalid || !same(current) || (!pageStructure && !current.diagram)){invalid=!same(current);paint(current);return false;}
+    close();run();return true;
+  }
+  function invalidate(){if(dialog.open){invalid=true;paint(opts.context());}}
+  life.listen(button,'click',open);
+  life.listen(target,'change',function(){
+    var current=opts.context(),index=Number(target.value);
+    if(!current.error && (current.sections || []).some(function(entry){return entry.section===index;}))opts.chooseSection(index);
+    refresh();
+  });
+  choices.forEach(function(choice){life.listen(choice,'click',function(){kind=choice.getAttribute('data-add-kind');paint(opts.context());});});
+  life.listen(doc.getElementById('diagram-add-close'),'click',function(){close();});
+  life.listen(dialog,'cancel',function(event){event.preventDefault();close();});
+  life.listen(dialog,'close',function(){if(!dialog.open){snapshot=null;button.setAttribute('aria-expanded','false');}});
+  life.listen(dialog,'keydown',function(event){event.stopPropagation();if(event.key==='Escape'){event.preventDefault();close();}});
+  life.listen(dialog,'click',function(event){event.stopPropagation();});
+  life.listen(opts.src,'input',refresh);
+  refresh();
+  return {refresh:life.guard(refresh),invalidate:life.guard(invalidate),close:life.guard(close),confirm:life.guard(confirm),
+    preset:function(){return NODE_PRESETS[Number(preset.value)] || NODE_PRESETS[0];},
+    destroy:function(){if(!life.alive())return;life.destroy();close(false);preset.replaceChildren();target.replaceChildren();}};
 }
 /* ---- src/builder.workbench.js ---- */
 /* Workbench composition, outline/diff and interaction/preview coordination.
@@ -35581,8 +35721,8 @@ var BUILDER_JUMP_TO_FINDING = null;
 /* ---------------- DOM wiring (workbench only) ---------------- */
 
 function initWorkbenchBuilder(opts){
-  var life=createWorkbenchLifetime(),outlineLife=createWorkbenchLifetime(),diffLife=createWorkbenchLifetime(),paletteLife=createWorkbenchLifetime();
-  life.own(function(){outlineLife.destroy();});life.own(function(){diffLife.destroy();});life.own(function(){paletteLife.destroy();});
+  var life=createWorkbenchLifetime(),outlineLife=createWorkbenchLifetime(),diffLife=createWorkbenchLifetime();
+  life.own(function(){outlineLife.destroy();});life.own(function(){diffLife.destroy();});
   var view = opts.view, src = opts.src;
   function render(request){ hideDiff(); return opts.render(request || {origin:'navigation'}); }
   var guide = document.getElementById('guide');
@@ -35672,11 +35812,11 @@ function initWorkbenchBuilder(opts){
   interactions=createBuilderInteractions({document:document,window:window,view:view,src:src,session:session,
     inspector:inspector,guide:guide,targetLabel:targetLabel,addModeExit:addModeExit,
     apply:applyPlan,selectRange:selectRange,ctl:opts.ctl,workspace:opts.workspace,isActive:opts.isActive,renderedText:opts.renderedText,
-    refreshInsertion:function(){if(panelPicker)panelPicker.refresh();},
+    refreshInsertion:function(){if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();},
     syncStory:function(){if(stepList)stepList.sync();},refreshLayout:function(){if(sectionLayoutEditor)sectionLayoutEditor.refresh();},
     dismissOverlay:function(){
       if(diffbox && !diffbox.hidden){hideDiff();diffBtn.focus();return true;}
-      if(palette && !palette.hidden){closePalette();return true;}return false;
+      return false;
     }
   });
   function setSelected(){if(interactions)return interactions.setSelected.apply(null,arguments); }
@@ -35786,14 +35926,15 @@ function initWorkbenchBuilder(opts){
   })();
   session.saveInitial();
 
+  function closeInsertMenu(){if(addMenu)addMenu.close(false);}
   var io=createBuilderIO({
     document:document,sourceElement:src,session:session,browser:createBuilderBrowserIO(document,window),
-    replaceProject:replaceProject,message:inspectorMessage,saved:hideDiff,closePalette:closePalette,
+    replaceProject:replaceProject,message:inspectorMessage,saved:hideDiff,closeInsertMenu:closeInsertMenu,
     isActive:opts.isActive,canUndoImport:function(){return !interactions.adding();},
     beforeImport:function(kind){
       setSelected(null);session.target=null;session.insertSection=0;
       if(interactions.connecting())cancelConnect(null);
-      if(kind==='mermaid')closePalette();else clearMultiSelect();
+      if(kind==='mermaid')closeInsertMenu();else clearMultiSelect();
       clearStepMarkers();if(guide)guide.hidden=true;
       if(kind==='trace')retireInspector();
     },
@@ -35808,7 +35949,7 @@ function initWorkbenchBuilder(opts){
   if (diffBtn && diffbox) life.listen(diffBtn,'click', function(){
     if (interactions.adding()) return;
     if (!diffbox.hidden){ hideDiff(); return; }
-    closePalette();
+    closeInsertMenu();
     if (guide) guide.hidden = true;
     diffLife.destroy();diffLife=createWorkbenchLifetime();
     diffbox.innerHTML = '';
@@ -36031,12 +36172,14 @@ function initWorkbenchBuilder(opts){
   /* Controlled preview replacement is explicit; rejected source leaves the board intact. */
   function beforePreviewReplace(request){
     if(panelPicker)panelPicker.invalidate();
+    if(addMenu)addMenu.invalidate();
     interactions.beforeReplace(request);
     if(sectionLayoutEditor && sectionLayoutEditor.beforeReplace)sectionLayoutEditor.beforeReplace();
     hideDiff();
   }
   function previewRendered(outcome){
     hideDiff();
+    if(addMenu)addMenu.refresh();
     if(outlineSearch)refreshOutline();
     if(!outcome.ok){
       if(outcome.replaced){clearMultiSelect();clearStepMarkers();if(interactions.adding())cancelAddToStep(null);}
@@ -36049,6 +36192,8 @@ function initWorkbenchBuilder(opts){
   }
 
   /* ================= insert buttons ================= */
+
+  function confirmAddition(run,pageStructure){if(addMenu)return addMenu.confirm(run,pageStructure);run();}
 
   function runInsert(kind, planFn){
     var parsed = parseEditor();
@@ -36075,17 +36220,18 @@ function initWorkbenchBuilder(opts){
   Object.keys(addButtons).forEach(function(id){
     var btn = document.getElementById(id);
     if (btn) life.listen(btn,'click', function(){
-      runInsert(addButtons[id][0], addButtons[id][1]);
+      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-section');
     });
   });
   /* + edge draws by clicking source then target (Esc cancels) */
   var edgeBtn = document.getElementById('add-edge');
-  if (edgeBtn) life.listen(edgeBtn,'click', startConnect);
+  if (edgeBtn) life.listen(edgeBtn,'click', function(){confirmAddition(function(){startConnect(session.insertSection);});});
   /* + tabs appends a whole tabs container and lands on its first tab —
      tab targets address by block/tab, so runInsert's section identity
      does not fit */
   var tabsBtn = document.getElementById('add-tabs');
   if (tabsBtn) life.listen(tabsBtn,'click', function(){
+    confirmAddition(function(){
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
     var plan = planAddTabs(session.text(), parsed.raw);
@@ -36095,6 +36241,7 @@ function initWorkbenchBuilder(opts){
     var el = findTargetEl({kind: 'tab', block: plan.block, tab: 0});
     selectTarget({kind: 'tab', block: plan.block, tab: 0, el: el}, false);
     selectRange(plan);
+    },true);
   });
 
   /* Whole-project imports are undoable even when the source has focus. */
@@ -36109,49 +36256,12 @@ function initWorkbenchBuilder(opts){
     doUndo();
   });
 
-  /* ---- node presets and the visual panel library ---- */
-  var palette = document.getElementById('palette');
-  function closePalette(){
-    paletteLife.destroy();paletteLife=createWorkbenchLifetime();
-    if (palette && !palette.hidden){ palette.hidden = true; palette.innerHTML = ''; }
-  }
-  function paletteButton(iconToken, labelText, run){
-    var b = document.createElement('button');
-    b.type = 'button'; b.className = 'pbtn';
-    if (iconToken){
-      /* iconToken comes from our own preset table, never from the spec */
-      var ns = 'http://www.w3.org/2000/svg';
-      var svg = document.createElementNS(ns, 'svg');
-      svg.setAttribute('viewBox', '0 0 16 16');
-      svg.setAttribute('aria-hidden', 'true');
-      var use = document.createElementNS(ns, 'use');
-      use.setAttribute('href', '#i-' + iconToken);
-      svg.appendChild(use);
-      b.appendChild(svg);
-    }
-    b.appendChild(document.createTextNode(labelText));
-    paletteLife.listen(b,'click', function(){ closePalette(); run(); });
-    return b;
-  }
-  function openPalette(kind){
-    hideDiff();
-    if (kind === 'panel'){ closePalette(); if (panelPicker) panelPicker.open(); return; }
-    if (!palette) return;
-    if (!palette.hidden && palette.getAttribute('data-kind') === kind){ closePalette(); return; }
-    closePalette();
-    palette.setAttribute('data-kind', kind);
-    palette.innerHTML = '';
-    if (kind === 'node'){
-      NODE_PRESETS.forEach(function(pr){
-        palette.appendChild(paletteButton(pr.icon, pr.title, function(){
-          runInsert('node', function(text, raw, si){ return planAddNode(text, raw, si, pr); });
-        }));
-      });
-    }
-    palette.hidden = false;
-  }
+  /* Node presets and the panel library share the persistent Add entry point. */
   var nodeBtn = document.getElementById('add-node');
-  if (nodeBtn) life.listen(nodeBtn,'click', function(){ openPalette('node'); });
+  if (nodeBtn) life.listen(nodeBtn,'click',function(){
+    var preset=addMenu ? addMenu.preset() : NODE_PRESETS[0];
+    confirmAddition(function(){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});});
+  });
   var panelPicker = typeof initPanelPicker === 'function' ? initPanelPicker({
     src:src, pause:pausePreview, error:inspectorMessage,
     context:function(){
@@ -36167,10 +36277,28 @@ function initWorkbenchBuilder(opts){
     insert:function(type){runInsert('panel',function(text,raw,si){return planAddPanel(text,raw,si,type);});}
   }) : null;
   var panelBtn = document.getElementById('add-panel');
-  if (panelBtn) life.listen(panelBtn,'click', function(){ openPalette('panel'); });
-  life.listen(document,'click', function(ev){
-    if (palette && !palette.hidden &&
-        !(ev.target.closest && ev.target.closest('#palette, #add-node, #add-panel'))) closePalette();
+  if (panelBtn) life.listen(panelBtn,'click',function(){confirmAddition(function(){if(panelPicker)panelPicker.open();});});
+  var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,
+    context:function(){
+      var parsed=parseEditor(),locked=!!interactions.adding() || !!interactions.connecting();
+      var error=locked ? 'Finish adding to the step or connecting nodes first (Done or Esc).' : parsed.error;
+      if(!error){var findings=validate(normalize(parsed.raw));if(findings.errors.length)error='Fix the diagram’s validation errors before adding.';}
+      var sections=parsed.error ? [] : specSectionPaths(parsed.raw).map(function(rec,index){
+        return {section:index,label:builderInsertTargetText(parsed.raw,index).replace(/^into /,'')};
+      });
+      var rec=parsed.error ? null : specSectionPaths(parsed.raw)[session.insertSection];
+      return {text:session.text(),raw:parsed.raw,section:session.insertSection,sections:sections,
+        label:rec ? builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'') : '',
+        diagram:rec && specValueAt(parsed.raw,rec.diagram),error:error,locked:locked};
+    },
+    chooseSection:function(index){
+      var parsed=parseEditor();if(parsed.error || interactions.adding() || interactions.connecting())return;
+      var rec=specSectionPaths(parsed.raw)[index];if(!rec)return;
+      var tool=opts.workspace && opts.workspace.tool(),ti=rec.section.indexOf('tabs');
+      if(ti>=0){var tab=document.getElementById('tab-'+rec.section[ti-1]+'-'+rec.section[ti+1]);if(tab)tab.click();}
+      clearMultiSelect();selectTarget({kind:'section',section:index,el:findTargetEl({kind:'section',section:index})},false,true);
+      if(tool)opts.workspace.showTool(tool);
+    }
   });
 
   var jumpToFinding = life.guard(function(message, rawPath){
@@ -36192,7 +36320,7 @@ function initWorkbenchBuilder(opts){
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();
     pausePreview();
     interactions.retire();
-    closePalette(); if (panelPicker) panelPicker.close(); hideDiff(); clearMultiSelect(); clearStepMarkers();
+    if(addMenu)addMenu.close(false); if (panelPicker) panelPicker.close(); hideDiff(); clearMultiSelect(); clearStepMarkers();
     setSelected(null); retireInspector();
   }
   function projectHooks(){return {
@@ -36228,8 +36356,9 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(stepList)stepList.destroy();});
   life.own(function(){if(sectionLayoutEditor)sectionLayoutEditor.destroy();});
   life.own(function(){if(panelPicker)panelPicker.destroy();});
+  life.own(function(){if(addMenu)addMenu.destroy();});
   life.own(function(){interactions.destroy();});
-  life.own(function(){closePalette();hideDiff();if(guide)guide.hidden=true;});
+  life.own(function(){hideDiff();if(guide)guide.hidden=true;});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },

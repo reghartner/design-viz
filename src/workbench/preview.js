@@ -104,6 +104,25 @@ function createWorkbenchPreviewController(opts){
   var page=null,ctl=null,renderedText=null;
   function finish(outcome){if(opts.completed)opts.completed(outcome);return outcome;}
   function replace(next,text,skin,request){
+    /* Rebuilding panels can force layout while the document is only partially
+       mounted. Browsers then clamp/anchor the page (or Focus workspace scroller)
+       to that temporary height. Restore after all synchronous reconciliation,
+       before paint; no deferred scroll may override the user's next gesture. */
+    var scroll=[];
+    if(page && request.origin!=='project' && request.origin!=='import'){
+      for(var el=opts.view;el;el=el.parentElement){
+        if(typeof el.scrollTop==='number')scroll.push({el:el,x:el.scrollLeft,y:el.scrollTop});
+      }
+    }
+    try{return rebuild(next,text,skin,request);}
+    finally{
+      scroll.forEach(function(saved){
+        if(saved.el.isConnected===false)return;
+        saved.el.scrollLeft=saved.x;saved.el.scrollTop=saved.y;
+      });
+    }
+  }
+  function rebuild(next,text,skin,request){
     var replaced=false,previousPage=page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{

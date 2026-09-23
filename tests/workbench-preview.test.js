@@ -63,3 +63,25 @@ test('preview restore failure destroys the newly created controller instead of p
   assert.throws(()=>c.renderWorkbenchPreview({}, {},'pastel',null,{destroy(){retired++;}},{beforeReplace(){before++;}}),/restore failed/);
   assert.equal(before,1);assert.equal(retired,1);assert.equal(nextRetired,1);
 });
+test('existing preview replacements restore scroll ancestors; project/import navigation does not inherit them',()=>{
+  const h=harness(),p=h.preview,root={scrollTop:1500,scrollLeft:20},pane={scrollTop:600,scrollLeft:100,parentElement:root};
+  h.view.parentElement=pane;
+  p.render(SOURCE);
+  const render=h.c.renderWorkbenchPreview;
+  h.c.renderWorkbenchPreview=(...args)=>{
+    pane.scrollTop=0;pane.scrollLeft=0;root.scrollTop=0;root.scrollLeft=0;
+    return render(...args);
+  };
+  for(const origin of ['edit','history','manual','layout-preview']){
+    p.render(SOURCE,{origin});
+    assert.equal(pane.scrollTop,600);assert.equal(pane.scrollLeft,100);
+    assert.equal(root.scrollTop,1500);assert.equal(root.scrollLeft,20);
+  }
+  p.repaint('daylight');assert.equal(pane.scrollTop,600);assert.equal(root.scrollTop,1500);
+  for(const origin of ['project','import']){
+    pane.scrollTop=600;root.scrollTop=1500;
+    p.render(SOURCE,{origin});assert.equal(pane.scrollTop,0);assert.equal(root.scrollTop,0);
+  }
+  pane.scrollTop=600;root.scrollTop=1500;p.forgetDocument();
+  p.render(SOURCE);assert.equal(pane.scrollTop,0);assert.equal(root.scrollTop,0);
+});

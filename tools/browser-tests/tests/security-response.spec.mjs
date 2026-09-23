@@ -61,7 +61,7 @@ test('workbench edits monitoring per step and discovers both panels in the visua
   await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.steps[1].panels.monitor.video).toBe('reviewing');
   await page.locator('#undo-builder').click();
   await expect(page.locator('#src')).toHaveValue(source);
-  await page.locator('#sec-insert > summary').click();
+  await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();
   await page.locator('#add-panel').click();
   for (const type of ['security','dispatch']) {
     await page.locator('.panel-picker-card[data-panel-type="'+type+'"]').click();

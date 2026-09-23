@@ -416,6 +416,7 @@ function createBuilderInteractions(opts){
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
   function addToStepStatus(){
+    opts.refreshInsertion();
     if (targetLabel && addToStep)
       targetLabel.textContent = 'ADD TO STEP ' + (addToStep.step + 1) +
         ': click edges, nodes, panels to toggle';
@@ -428,7 +429,7 @@ function createBuilderInteractions(opts){
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .path-chip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
-    '#add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #palette .pbtn, ' +
+    '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, ' +
     '#import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
@@ -446,7 +447,7 @@ function createBuilderInteractions(opts){
   life.listen(document,'click', addModeBlocker, true);
   life.listen(document,'keydown', function(ev){
     if (opts.isActive && !opts.isActive()) return;
-    if(document.querySelector('#object-clipboard[open], #panel-picker[open]'))return;
+    if(document.querySelector('#object-clipboard[open], #panel-picker[open], #diagram-add-menu[open]'))return;
     /* the tab bar switches tabs on Arrow/Home/End — pause that too
        while the mode is armed (capture phase beats the engine's
        tab-bar listener) */
@@ -509,20 +510,23 @@ function createBuilderInteractions(opts){
   var connect = null; /* null | {stage:1} | {stage:2, section, fromId} */
   function connectStatus(text){
     if (targetLabel) targetLabel.textContent = text;
+    if (buildRow) buildRow.classList.add('dv-connectmode');
+    opts.refreshInsertion();
   }
   function cancelConnect(message){
     connect = null;
+    if (buildRow) buildRow.classList.remove('dv-connectmode');
     var parsed = parseEditor();
     updateTargetLabel(parsed.error ? null : parsed.raw);
     if (message) inspectorMessage(message);
   }
-  function startConnect(){
+  function startConnect(section){
     if (addToStep) cancelAddToStep(null);
     if (connect){ cancelConnect('connect cancelled'); return; }
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
     if (!specSectionPaths(parsed.raw).length){ inspectorMessage('no sections found in the editor text'); return; }
-    connect = {stage: 1};
+    connect = {stage: 1,section:typeof section==='number'?section:undefined};
     connectStatus('connect: click the SOURCE node (Esc cancels)');
   }
   function handleConnectClick(target){
@@ -531,6 +535,9 @@ function createBuilderInteractions(opts){
       return;
     }
     if (connect.stage === 1){
+      if(typeof connect.section==='number' && target.section!==connect.section){
+        connectStatus('connect: choose a SOURCE node in section '+(connect.section+1)+' (Esc cancels)');return;
+      }
       connect = {stage: 2, section: target.section, fromId: target.id};
       setSelected(target.el);
       connectStatus('connect: ' + target.id + ' → click the TARGET node');
@@ -1166,7 +1173,7 @@ function createBuilderInteractions(opts){
   life.listen(document,'keydown', function(ev){
     if(inDetailPreview(ev.target) || inDetailPreview(document.activeElement))return;
     if (opts.isActive && !opts.isActive()) return;
-    if(document.querySelector('#object-clipboard[open], #panel-picker[open]'))return;
+    if(document.querySelector('#object-clipboard[open], #panel-picker[open], #diagram-add-menu[open]'))return;
     if (ev.key === 'Escape'){
       if(ev.defaultPrevented)return; /* an owned importer consumed Escape */
       if (rowDrag){ cancelRowDrag(); return; }

@@ -1,13 +1,14 @@
 # Choose a panel visually
 
-Open **Insert & import → + panel** to browse the panel library. Every supported
+Open **Add to diagram → Panel → Browse panels** to browse the panel library. Every supported
 panel type has a thumbnail drawn by the same renderer as the diagram. Search by
 name or purpose, or choose a category to narrow the gallery.
 
 Select a card to see a larger preview and a short explanation of when to use it.
 The gallery scrolls independently of the selected panel. **Add panel** inserts
 that selection into the section named in the footer, then opens its inspector.
-Click a section in the diagram before opening the picker to change the destination.
+Choose the **Into** section beneath **Add to diagram**, or click a section in the
+preview before opening the picker to change the destination.
 
 The previews use illustrative values. The added panel starts from its existing,
 simple editable template; sample notifications, measurements, or events are not
@@ -17,7 +18,7 @@ default Pastel skin. Thumbnails fit the complete sample; selecting a card shows
 a larger version.
 
 Selecting, searching, and changing categories do not edit the source. Cancel,
-the close button, and Escape dismiss the picker and return focus to **+ panel**.
+the close button, and Escape dismiss the picker and return focus to **Add to diagram**.
 A single Undo removes the addition; Redo restores it. Keyboard focus stays inside
 the dialog, and underlying editor shortcuts do not edit the diagram while it is open.
 

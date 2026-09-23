@@ -63,7 +63,7 @@ function harness(adapters={},options={}){
   const session=C.createBuilderSession({source:{read:()=>elements.src.value,write:text=>{elements.src.value=text;}},persistence,
     render(){renderCount++;},invalidateProject(){io?.retireProject();}});
   io=C.createBuilderIO({document:doc,sourceElement:elements.src,session,browser,replaceProject:text=>session.replaceProject(text),
-    message:message=>messages.push(message),saved:()=>saved.push(true),closePalette(){},canUndoImport:()=>true,beforeImport(){},afterImport(){},...options});
+    message:message=>messages.push(message),saved:()=>saved.push(true),closeInsertMenu(){},canUndoImport:()=>true,beforeImport(){},afterImport(){},...options});
   return {io,session,doc,e:elements,browser,blobs,messages,downloads,revoked,readers,requests,timers,saved,all,
     get renders(){return renderCount;},get text(){return elements.src.value;},
     click:id=>elements[id].click(),type(id,value){elements[id].value=value;elements[id].fire('input');},

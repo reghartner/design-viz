@@ -35,6 +35,19 @@ reference material. On a desktop, the preview scrolls beside a viewport-sized
 editor. **Exit focus** returns to the normal page and its previous scroll
 position. Focus mode lasts only until you exit or reload.
 
+**Add to diagram** stays at the top of the editor, above all three tools. The
+**Into** selector names the destination section, including its tab when applicable.
+Selecting a section in the preview updates this selector; choosing a destination
+here opens its tab and selects that section without switching editor tools.
+
+Choose **Node**, **Connection**, **Step**, or **Panel**, then use the explicit
+button to continue. Nodes offer presets; connections ask you to click a source and
+target in the chosen section; steps append to that section's selected timeline;
+panels open the visual library. **Page structure** inside the chooser adds a
+section or tab block. Each addition is one Undo. Escape closes the chooser and
+returns focus to **Add to diagram**. If the source or destination changes while it
+is open, reopen it before adding.
+
 The editor has three tools, with one visible at a time:
 
 - **Inspect** edits the selected element. Selecting something in the preview
@@ -48,7 +61,7 @@ The editor has three tools, with one visible at a time:
 
 Tab into the tool bar, then use Left/Right or Home/End to switch tools. Changing
 tools retains the existing forms and source textarea, including uncommitted
-source text and its selection. **Insert & import** and **Document outline**
+source text and its selection. **Import** and **Document outline**
 remain collapsible above the active tool. Undo/redo and file actions stay
 visible below it. Selecting a tool or a preview element closes those utilities
 to make room; an active import or diff can still be closed using its own controls.

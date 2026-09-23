@@ -389,7 +389,7 @@ function createBuilderIO(opts){
     function closeTrace(){cancelTraceRead();invalidateTrace();clearListeners('trace-results');traceBox.hidden=true;traceBtn.setAttribute('aria-expanded','false');traceBtn.focus();}
     listen(traceBtn,'click',function(){
       if(!traceBox.hidden){closeTrace();return;}
-      traceBox.hidden=false;traceBtn.setAttribute('aria-expanded','true');opts.closePalette();traceText.focus();
+      traceBox.hidden=false;traceBtn.setAttribute('aria-expanded','true');opts.closeInsertMenu();traceText.focus();
     });
     listen(document.getElementById('trace-cancel'),'click',closeTrace);
     listen(traceBox,'keydown',function(ev){ if (ev.key === 'Escape'){ ev.stopPropagation(); closeTrace(); } });

@@ -109,7 +109,7 @@ function harness(d=fixture()){
   // Enable timer logic but keep geometry/animation irrelevant to the test.
   c.RM=false;
   const board=()=>({svg:el(),nodeEls:{},edgeIds:{}}),term={};
-  ['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep','playbackStatus'].forEach(k=>term[k]=el());
+  ['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep','playbackStatus','sharedStatus'].forEach(k=>term[k]=el());
   term.bar.appendChild(el()).appendChild(term.stepN);
   folded=c.foldPanelStates(c.diagramForPath(d));
   const sp=c.attachStepper(el(),el(),term,d,'test',board(),{},
@@ -163,7 +163,7 @@ test('an alternate diverging at four occupies the same columns and keeps its row
   assert.equal(happy.children[0].textContent,'Happy path');assert.equal(drop.children[0].textContent,'Dropped signal');
   assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4,5]);
   assert.deepEqual(drop.children.slice(1).map(b=>b.style.gridColumn),happy.children.slice(1).map(b=>b.style.gridColumn));
-  assert.deepEqual(drop.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,false,false]);
+  assert.deepEqual(drop.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,false,true]);
   assert.equal(drop.children[1].style['--path-color'],d.paths[0].color);
   assert.match(drop.children[1].getAttribute('aria-label'),/shared with Happy path/);
   assert.equal(matrix.style['--path-step-count'],5);
@@ -188,13 +188,13 @@ test('shared shadows end with their own path and use the correct ancestor for ne
     {id:'separate',steps:['drop']});
   const h=harness(d),rows=h.term.chips.children[0].children,drop=rows[1],nested=rows[2],separate=rows[3];
   assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4],'no ghost after the failure ending');
-  assert.deepEqual(nested.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,true,false]);
+  assert.deepEqual(nested.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,true,true]);
   assert.equal(nested.children[1].style['--path-color'],d.paths[0].color);
-  assert.equal(separate.children.length,2);assert.equal(separate.children[1].className,'schip');
+  assert.equal(separate.children.length,2);assert.match(separate.children[1].className,/shared-step-shadow/);assert.match(separate.children[1].className,/shared-downstream-step/);
   d.paths.push({id:'nested-again',steps:['one','two','three','drop','five','four']});
   const deep=harness(d).term.chips.children[0].children[4];
   assert.equal(deep.children[4].style['--path-color'],d.paths[1].color);
-  assert.match(deep.children[4].getAttribute('aria-label'),/shared with Dropped signal/);
+  assert.match(deep.children[4].getAttribute('aria-label'),/shared step; also in Dropped signal \(step 4\)/);
 });
 
 test('the first colored alternate selects and edits its own caption and panel patch',()=>{
@@ -267,4 +267,44 @@ test('Radar alarms carry until explicitly cleared and stay isolated between path
   assert.equal(edited.steps[1].panels.radar.alert,true,'editing an alternate preserves the main step');
   const clear=c.planStepSetPanelPatch(edit.text,edited,0,4,'radar','{"alert":false}');
   assert.equal(c.foldPanelStates(c.diagramForPath(JSON.parse(clear.text),'quiet')).radar[1].alert,false);
+});
+
+
+test('sharing tracks source identity across different positions without confusing independent copies',()=>{
+  const c=load(),d=fixture();
+  d.steps.push({...d.steps[4],id:'five-copy'});
+  d.paths=[{id:'base',steps:['one','four','five']},{id:'alt',steps:['drop','two','three','five']},
+    {id:'copy',steps:['five-copy']},{id:'return',steps:['two','one','five']}];
+  const before=JSON.stringify(d),paths=c.diagramPathList(d),sharing=c.pathStepSharing(paths);
+  assert.equal(sharing.get(4).owner.id,'base');assert.equal(sharing.get(4).downstream,true);
+  assert.deepEqual(plain(sharing.get(4).occurrences.map(o=>[o.path.id,o.position])),[['base',2],['alt',3],['return',2]]);
+  assert.equal(sharing.get(0).downstream,true,'source index zero is a valid shared occurrence');
+  assert.equal(sharing.get(6).downstream,false,'a separate copy is not shared');
+  assert.equal(sharing.get(6).occurrences.length,1);assert.equal(JSON.stringify(d),before);
+  const prefix=c.pathStepSharing(c.diagramPathList(fixture()));
+  assert.deepEqual([0,1,2].map(i=>prefix.get(i).downstream),[false,false,false]);
+});
+
+test('rejoined circles keep path-specific state, explain peer positions, and survive filtered views',()=>{
+  const d=fixture();
+  d.paths[0].steps=['one','four','five'];d.paths[1].steps=['two','three','drop','five'];
+  const h=harness(d),matrix=h.term.chips.children[0],happy=matrix.children[0],alt=matrix.children[1];
+  const base=happy.children[3],shared=alt.children[4];
+  assert.match(base.className,/shared-downstream-step/);assert.doesNotMatch(base.className,/shared-step-shadow/);
+  assert.match(shared.className,/shared-step-shadow/);assert.equal(shared.children[0].className,'shared-step-link');
+  assert.match(base.title,/Dropped signal \(step 4\)/);assert.match(shared.title,/Happy path \(step 3\)/);
+  shared.fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.sourceIndex(),4);assert.equal(h.paints.at(-1).state,'lost');
+  assert.equal(h.term.sharedStatus.hidden,false);assert.match(h.term.sharedStatus.textContent,/Happy path \(step 3\)/);
+  base.fire('click');assert.equal(h.paints.at(-1).state,'applied');assert.equal(h.sp.path(),'happy');
+  happy.children[1].fire('click');assert.equal(h.term.sharedStatus.hidden,true);assert.equal(h.term.sharedStatus.textContent,'');
+  h.sp.setVisibleSteps(['one','five']);
+  const filtered=h.term.chips.children[0].children,filteredAlt=filtered[1].children[1];
+  assert.equal(filteredAlt.textContent,1);assert.match(filteredAlt.className,/shared-downstream-step/);
+  assert.match(filteredAlt.title,/Happy path \(step 2\)/);
+  filteredAlt.fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.paints.at(-1).state,'lost');
+  assert.match(h.term.sharedStatus.textContent,/Happy path \(step 2\)/);
+  assert.equal(h.term.chips.children[1].className,'path-sharing-key');
+  h.sp.setVisibleSteps(['five']);
+  assert.ok(h.term.chips.children[0].children.every(row=>row.children[1].className.includes('shared-downstream-step')),
+    'hiding both inputs must not turn convergence into an ordinary prefix');
 });

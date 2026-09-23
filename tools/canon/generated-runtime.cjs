@@ -1414,6 +1414,29 @@ function pathStepRows(paths){
     return {path:path, start:i ? shared : 0, end:path.indices.length - 1};
   });
 }
+
+/* Sharing is source identity, not a column match. Cache pairwise prefixes so
+   recognizing a shared suffix never rebuilds or joins the paths' state. */
+function pathStepSharing(paths){
+  var byStep=new Map(),prefixes=new Map();
+  function prefix(a,b){
+    var peers=prefixes.get(a);if(!peers){peers=new Map();prefixes.set(a,peers);}
+    if(!peers.has(b)){
+      var n=0;while(n<a.indices.length && n<b.indices.length && a.indices[n]===b.indices[n])n++;
+      peers.set(b,n);
+    }
+    return peers.get(b);
+  }
+  paths.forEach(function(path){
+    path.indices.forEach(function(sourceIndex,position){
+      var shared=byStep.get(sourceIndex);
+      if(!shared){shared={sourceIndex:sourceIndex,owner:path,occurrences:[],downstream:false};byStep.set(sourceIndex,shared);}
+      else if(position>=prefix(shared.owner,path))shared.downstream=true;
+      shared.occurrences.push({path:path,position:position});
+    });
+  });
+  return byStep;
+}
 /* ---- src/core/section-layout.js ---- */
 /* Pure section/view layout. Uses diagramPathList() and panelCapability() at
    call time, after panel definitions have registered; no DOM measurements. */

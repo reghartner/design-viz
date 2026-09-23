@@ -64,8 +64,10 @@ plan concise; it is a reviewable artifact, not a reasoning transcript.
   duration must not imply an unsupported execution order or measured latency.
 - For the same topology, prefer happy and alternate outcomes in `diagram.paths`.
   Reuse IDs only for identical shared content. The **first differing beat gets
-  its own ID**. Share only the unchanged prefix; later shared endings require
-  compatible meaning on every incoming path. Retries use distinct IDs.
+  its own ID**. Reuse downstream IDs after translation or a rejoin only when
+  their captions and patches have compatible meaning on every incoming path.
+  Shared suffixes gain linked-circle cues automatically; see `docs/alternate-paths.md`.
+  Identical-looking copies are not shared. Retries use distinct IDs.
 - Each path starts from panel initial state and folds its own sparse patches.
   Specify honest endings, including early termination. Never inherit another
   outcome's notification, recovery, or success to make an ending feel complete.

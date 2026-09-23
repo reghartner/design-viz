@@ -1351,9 +1351,12 @@ Below the transport controls, each path has a colored chip on the left and
 a row of steps on the right. Step numbers align in shared columns. The
 primary row shows all its steps. An alternate shows its earlier shared beats
 as shadows at 35% opacity, using each beat's earlier path color. Its full-strength
-steps begin immediately after the longest common prefix with an earlier path,
-at the first differing step, and end at its own last step; space after the
-ending stays blank. Every beat in the common prefix is shared, including its
+unique steps begin at the first differing step after the common prefix. Later
+reused IDs also become shared shadows, regardless of their position on other
+paths. Linked-circle badges on all occurrences identify shared downstream
+processing; tooltips and the selected caption name the other paths and their
+visible step numbers. Per-path ordering and ending stay unchanged; space after
+the ending stays blank. Every beat in the common prefix is shared, including its
 last beat. A path ending inside that prefix has only shared shadows.
 Shared shadows are clickable and become fully opaque when current or keyboard
 focused. No shared prefix means column 1. Clicking a path chip always selects

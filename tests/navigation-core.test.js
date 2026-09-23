@@ -101,3 +101,17 @@ test('static backend routing initializes without evaluating the DOM renderer or 
   assert.equal(routing.stepReference(stepIds, 1), '02');
   assert.deepEqual(plain(backend.validateSpec({nodes: {a: {}}, rows: [['a']]})), {errors: [], warnings: []});
 });
+
+test('view selectors round trip without conflating host profiles, playback or paths',()=>{
+  const core=withoutDOM();vm.runInContext(readSource('core/navigation.js'),core);
+  const hash=core.buildHash({d:'front-door',v:'home-story',m:'step',p:'offline',s:'held'});
+  assert.equal(hash,'#d=front-door&v=home-story&m=step&p=offline&s=held');
+  assert.equal(core.parseHash(hash).v,'home-story');
+  assert.equal(core.parseHash('#d=front-door&v=%E0%A4%A').v,undefined);
+  assert.equal(core.parseHash('#d=front-door&layout=confluence').v,undefined);
+  assert.equal(core.parseHash(core.buildHash({v:'not a view & <id>'})).v,'not a view & <id>');
+  const manifest={sections:[{number:1,reference:'prose'},
+    {number:2,reference:'home',hasDiagram:true,stepIds:null}]};
+  const target=core.resolveHashTarget(core.parseHash('#v=home'),manifest);
+  assert.equal(target.diagram.section,2);assert.equal(target.diagram.mode,null);
+});

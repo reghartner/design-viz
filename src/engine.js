@@ -1551,6 +1551,9 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
   });
   setMode(initial);
   return {panelId:panel.id, mode:function(){return mode;}, setMode:setMode,
+    viewId:function(){return mode==='panel'?'home':'flow';},
+    defaultView:function(){return initial==='panel'?'home':'flow';},
+    setView:function(id){if(id!=='home' && id!=='flow')return false;setMode(id==='home'?'panel':'flow');return true;},
     destroy:function(){destroyed = true;}};
 }
 
@@ -1577,6 +1580,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   if(!items)return null;
   var dock=sectionLayoutDock(items),separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
   var named=definition && !definition.legacy;
+  var defaultView=named?layoutId:'layout';
   var group=layout.viewChoicesHost;
   if(!group){
     var toolbar=document.createElement('div');toolbar.className='diagram-views';
@@ -1694,6 +1698,14 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
     layoutId:function(){return layoutId;},setLayout:setLayout,
+    viewId:function(){return active?(named?layoutId:'layout'):'flow';},
+    defaultView:function(){return defaultView;},
+    setView:function(id){
+      if(named){if(!views.some(function(v){return v.id===id;}))return false;setLayout(id);return true;}
+      if(id==='layout' || id==='home'){setMode('layout');return true;}
+      if(id==='flow'){setMode('flow');return true;}
+      return false;
+    },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
     destroy:function(){if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
@@ -1989,14 +2001,19 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var hasDelta = diagramHasDelta(d);
   var btnDelta = null, bar = null;
   function addFocusControl(){
-    if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
-      d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', function(host){
-        if (result.stepper) result.stepper.scrollTargetEl = host;
-      });
-    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,function(host){
+    var ready=false;
+    function presentationChanged(host){
       if(result.stepper)result.stepper.scrollTargetEl=host;
-    },result.stepper);
+      if(!ready)return;
+      box.setAttribute('data-view-id',result.presentation.viewId());
+      if(onChange)onChange();
+    }
+    if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
+      d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged);
+    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper);
     if(composition)result.presentation=composition;
+    ready=true;
+    box.setAttribute('data-view-id',result.presentation?result.presentation.viewId():'flow');
   }
   if (hasDelta){
     btnDelta = document.createElement('button');
@@ -2564,6 +2581,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     if (state.diagramSection != null){
       var diagramSec = section(state.diagramSection);
       if(diagramSec)st.d=String(diagramSec.reference);
+      if(diagramSec && diagramSec.presentation && diagramSec.presentation.viewId)st.v=diagramSec.presentation.viewId();
       if (diagramSec && diagramSec.stepper){
         st.m = diagramSec.stepper.mode();
         if (diagramSec.stepper.paths && diagramSec.stepper.paths().length > 1) st.p = diagramSec.stepper.path();
@@ -2638,6 +2656,12 @@ function wireDeepLinks(ctl, win, preservedHash){
     if (diagramTarget){
       var diagramSec = section(diagramTarget.section), sp = diagramSec && diagramSec.stepper;
       if(ctl.details && diagramSec)ctl.details.showSection(diagramSec.reference);
+      // Restore the view before its path/step: selecting a view installs its
+      // visible-stop filter. Stale IDs (and old links without v) use the default.
+      var presentation=diagramSec && diagramSec.presentation;
+      if(presentation && presentation.setView){
+        if(st.v == null || !presentation.setView(st.v))presentation.setView(presentation.defaultView());
+      }
       if (sp && sp.selectPath) sp.selectPath(st.p || sp.paths()[0].id);
       if (sp && diagramTarget.mode === 'step'){
         sp.enterStep(false);
@@ -2701,7 +2725,9 @@ function wireDeepLinks(ctl, win, preservedHash){
     var embedBtn = sec.sectionEl && sec.sectionEl.querySelector ?
       sec.sectionEl.querySelector('.embedcopy') : null;
     if (embedBtn) bindCopyControl(win, embedBtn, function(){
-      return win.location.href.split('#')[0] + '#embed=' + encodeURIComponent(String(sec.reference));
+      var view=sec.presentation && sec.presentation.viewId && sec.presentation.viewId();
+      return win.location.href.split('#')[0] + '#embed=' + encodeURIComponent(String(sec.reference))+
+        (view?'&v='+encodeURIComponent(view):'');
     });
   });
   var initial = ctl.activeTarget || {kind:'page'};

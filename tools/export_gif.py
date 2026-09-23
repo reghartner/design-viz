@@ -4,12 +4,13 @@
 Usage:
   python3 tools/export_gif.py <built-page.html> [--section <n>]
       [--width 1280] [--delay-ms 1600] [--margin 16] [--scale 2]
-      [--skin <name>] [--dim-alpha <0..1>]
+      [--skin <name>] [--dim-alpha <0..1>] [--view <layout-id|home|flow|layout>]
       [--out <path.gif | directory>] [--chrome <path>]
 
 Output lands HERE by default: beside the page, named after it — with the
 section reference appended when --section picked one, so exporting several
-sections never overwrites. --out takes an exact .gif path, or a directory
+sections never overwrites. --view also appends its ID to the derived name.
+--out takes an exact .gif path, or a directory
 (existing, or marked by a trailing slash) to receive the derived name.
 
 Chrome/Chromium captures one PNG for every canonical heading-slug step deep
@@ -28,6 +29,14 @@ prose, and everything after the diagram stay out of frame; a diagram taller
 than the viewport is captured in full. Pillow is used when available; a
 bundled PNG reader, fixed-palette quantizer, and simple GIF LZW stream keep
 the command functional on a bare Python 3 installation.
+
+--view selects a saved layout ID, or home/flow/layout on diagrams without
+named layouts. Each frame retains that view. Only its visible steps are
+captured, in path order; shared steps appear once on their first path, while
+alternate-only steps retain their own path state. Hidden steps still contribute
+their accumulated state. Omit --view to keep the page's authored default and
+the historical step-registry capture order. Rebuild older HTML before using
+--view: capture checks that the requested view and step actually became active.
 """
 
 from __future__ import annotations
@@ -78,6 +87,14 @@ class PageSection:
 
 
 @dataclass(frozen=True)
+class ViewTarget:
+    reference: str
+    canonical_id: str
+    layout_id: str | None = None
+    step_ids: tuple[Any, ...] | None = None
+
+
+@dataclass(frozen=True)
 class StepTarget:
     section_number: int
     heading: str
@@ -86,6 +103,8 @@ class StepTarget:
     fragments: tuple[str, ...]
     forced_positional_refs: bool
     section_reference: str
+    view: ViewTarget | None = None
+    source_indices: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -132,6 +151,8 @@ def build_step_fragment(
     section: Any | None = None,
     diagram_number: int | None = None,
     diagram_reference: Any | None = None,
+    view: str | None = None,
+    path: str | None = None,
 ) -> str:
     """Build a renderer step fragment, preserving the legacy call shape.
 
@@ -158,7 +179,11 @@ def build_step_fragment(
         if str(diagram_reference) == "":
             raise ValueError("diagram reference must not be empty")
         parts.append("d=" + quote(str(diagram_reference), safe="-._~"))
+    if view is not None:
+        parts.append("v=" + quote(view, safe="-._~"))
     parts.append("m=step")
+    if path is not None:
+        parts.append("p=" + quote(path, safe="-._~"))
     parts.append("s=" + quote(str(step), safe="-._~"))
     return "#" + "&".join(parts)
 
@@ -168,6 +193,8 @@ def build_step_fragments(
     section: Any | None = None,
     diagram_number: int | None = None,
     diagram_reference: Any | None = None,
+    view: str | None = None,
+    path: str | None = None,
 ) -> StepFragmentPlan:
     """Build one distinct, correctly resolving fragment for every step.
 
@@ -199,7 +226,7 @@ def build_step_fragments(
             references = [reference.zfill(width) for reference in references]
 
     fragments = tuple(build_step_fragment(reference, section, diagram_number,
-                                           diagram_reference)
+                                           diagram_reference, view, path)
                       for reference in references)
     if len(set(fragments)) != len(fragments):
         raise ValueError("could not build a distinct fragment for every diagram step")
@@ -250,7 +277,9 @@ def _sections(page: dict[str, Any]) -> list[PageSection]:
         section.section.get("heading") for section in result)
     return [PageSection(
         section.number, section.section, section.block_index, section.tab_index,
-        section.tab_label, references[index])
+        section.tab_label,
+        section.section["id"] if isinstance(section.section.get("id"), str)
+        and section.section["id"].strip() else references[index])
         for index, section in enumerate(result)]
 
 
@@ -280,7 +309,95 @@ def _addressable_targets(
     return targets
 
 
-def choose_target(spec: Any, section_number: int | None = None) -> StepTarget:
+def _choose_view(diagram: dict[str, Any], reference: str) -> ViewTarget:
+    """Mirror diagramLayoutViews; IDs win over the legacy view aliases."""
+    named: dict[str, dict[str, Any]] = {}
+    for layout in diagram.get("layouts", []) if isinstance(diagram.get("layouts"), list) else []:
+        if not isinstance(layout, dict):
+            continue
+        key, name, compositions = layout.get("id"), layout.get("name"), layout.get("sectionLayout")
+        if (not isinstance(key, str) or not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{0,63}", key)
+                or key in named or not isinstance(name, str) or not 0 < len(name.strip()) <= 40
+                or not isinstance(compositions, dict)
+                or not any(isinstance(compositions.get(k), list)
+                           for k in ("default", "backstage", "confluence"))):
+            continue
+        named[key] = layout
+    if named:
+        if reference in named:
+            steps = named[reference].get("steps")
+            return ViewTarget(reference, reference, reference,
+                              tuple(steps) if isinstance(steps, list) else None)
+        available = list(named)
+    else:
+        # The capture URL has no host-profile query: a legacy composition is
+        # available only if its default profile can actually render.
+        composition = diagram.get("sectionLayout")
+        has_layout = isinstance(composition, dict) and isinstance(composition.get("default"), list)
+        panels = diagram.get("panels") if isinstance(diagram.get("panels"), list) else []
+        has_home = any(isinstance(p, dict) and isinstance(p.get("id"), str) and p["id"]
+                       and (p["id"] == diagram.get("primaryPanel") or p.get("type") == "homemap")
+                       for p in panels)
+        available = (["layout", "home"] if has_layout else ["home"] if has_home else []) + ["flow"]
+        if reference in available:
+            canonical = "layout" if has_layout and reference in ("home", "layout") else reference
+            return ViewTarget(reference, canonical, "default" if canonical == "layout" else None)
+    raise ValueError(f"--view {reference!r} is not available in this section (available: {', '.join(available)})")
+
+
+def _diagram_paths(diagram: dict[str, Any]) -> list[tuple[str, list[int]]]:
+    """Mirror diagramPathList with source indices, including its safe fallback."""
+    steps = diagram["steps"]
+    by_id = {s["id"]: i for i, s in enumerate(steps)
+             if isinstance(s, dict) and isinstance(s.get("id"), str)}
+    paths: list[tuple[str, list[int]]] = []
+    raw_paths = diagram.get("paths")
+    for path in raw_paths if isinstance(raw_paths, list) else []:
+        if (isinstance(path, dict) and isinstance(path.get("id"), str) and path["id"]
+                and isinstance(path.get("steps"), list) and path["steps"]
+                and all(isinstance(key, str) and key in by_id for key in path["steps"])):
+            paths.append((path["id"], [by_id[key] for key in path["steps"]]))
+    return paths or [("happy", list(range(len(steps))))]
+
+
+def _target_in_view(target: StepTarget, diagram: dict[str, Any], reference: str) -> StepTarget:
+    view = _choose_view(diagram, reference)
+    paths = _diagram_paths(diagram)
+    allowed = view.step_ids
+    # The renderer drops an empty/unreachable filter rather than leaving every
+    # path without a stop. Compare values instead of hashing malformed JSON IDs.
+    if allowed is not None and not any(
+        isinstance(diagram["steps"][i], dict) and diagram["steps"][i].get("id") in allowed
+        for _, indices in paths for i in indices
+    ):
+        allowed = None
+    refs: list[str] = []
+    fragments: list[str] = []
+    source_indices: list[int] = []
+    forced = False
+    for path_id, indices in paths:
+        # Form references BEFORE filtering: numeric fallbacks address the full
+        # path, never a view's renumbered visible chips.
+        plan = build_step_fragments(
+            [diagram["steps"][i] for i in indices],
+            diagram_reference=target.section_reference, view=reference,
+            path=path_id if len(paths) > 1 or diagram.get("paths") else None)
+        forced = forced or plan.forced_positional_refs
+        for path_index, source_index in enumerate(indices):
+            step = diagram["steps"][source_index]
+            if source_index in source_indices or (allowed is not None and (
+                    not isinstance(step, dict) or step.get("id") not in allowed)):
+                continue
+            source_indices.append(source_index)
+            refs.append(plan.references[path_index])
+            fragments.append(plan.fragments[path_index])
+    return StepTarget(target.section_number, target.heading, target.tab_selector,
+                      tuple(refs), tuple(fragments), forced, target.section_reference,
+                      view, tuple(source_indices))
+
+
+def choose_target(spec: Any, section_number: int | None = None,
+                  view: str | None = None) -> StepTarget:
     page = _page_of(spec)
     if not page:
         raise ValueError("embedded flowspec does not contain a renderable page")
@@ -289,7 +406,7 @@ def choose_target(spec: Any, section_number: int | None = None) -> StepTarget:
     if section_number is None:
         if not targets:
             raise ValueError("page has no deep-link-addressable diagram with steps")
-        return min(targets, key=lambda target: target.section_number)
+        section_number = min(targets, key=lambda target: target.section_number).section_number
     selected = next((section for section in all_sections
                      if section.number == section_number), None)
     if selected is None:
@@ -301,7 +418,7 @@ def choose_target(spec: Any, section_number: int | None = None) -> StepTarget:
                    if target.section_number == section_number), None)
     if target is None:
         raise ValueError(f"section {section_number} is not addressable")
-    return target
+    return _target_in_view(target, selected.section["diagram"], view) if view is not None else target
 
 
 def read_embedded_spec(page_path: pathlib.Path) -> Any:
@@ -467,6 +584,39 @@ def ground_expression(section_reference: str) -> str:
     ) % json.dumps(str(section_reference))
 
 
+def view_expression(section_reference: str, view: ViewTarget,
+                    source_index: int | None = None) -> str:
+    """Verify navigation applied; never silently export an older page's default."""
+    return """(function(){
+      var section=document.getElementById('section-' + %s), expected=%s,
+          layoutId=%s, sourceIndex=%s;
+      if(!section)return 'target section was not found';
+      var actual=section.getAttribute('data-view-id');
+      if(actual===null)return 'this HTML does not support view links; rebuild it from current src/';
+      if(actual!==expected)return 'requested view was not activated (active: ' + actual + ')';
+      function visible(el){return !!el && el.getBoundingClientRect().width>0 && el.getBoundingClientRect().height>0;}
+      if(layoutId!==null){
+        var grid=section.querySelector('.section-layout-grid');
+        if(!visible(grid) || grid.getAttribute('data-layout-id')!==layoutId)
+          return 'requested layout is not visible';
+      }else{
+        var grid=section.querySelector('.boardgrid');
+        if(!visible(grid))return 'requested view is not visible';
+        if(expected==='home' && !grid.classList.contains('panel-first'))
+          return 'Home view is not active';
+        if(expected==='flow' && grid.classList.contains('panel-first'))
+          return 'Data flow view is not active';
+      }
+      if(sourceIndex!==null){
+        var chip=section.querySelector('.schip[aria-current="true"]');
+        if(!chip || chip.getAttribute('data-step-source')!==String(sourceIndex))
+          return 'requested step was not activated (it may be hidden or belong to another path)';
+      }
+      return true;
+    })()""" % (json.dumps(section_reference), json.dumps(view.canonical_id),
+               json.dumps(view.layout_id), json.dumps(source_index))
+
+
 def capture_frames(
     page_path: pathlib.Path,
     fragments: Iterable[str],
@@ -478,6 +628,8 @@ def capture_frames(
     scale: int = 1,
     skin: str | None = None,
     dim_alpha: float | None = None,
+    view: ViewTarget | None = None,
+    source_indices: Iterable[int] | None = None,
 ) -> list[pathlib.Path]:
     """Capture one PNG per deep-link fragment.
 
@@ -489,7 +641,14 @@ def capture_frames(
     image is ``scale`` times larger in each direction). ``skin`` switches the
     page to that theme before measuring or capturing anything; ``dim_alpha``
     overrides the step-mode non-highlighted opacity (the page's --dv-dim
-    variable) with one uniform value."""
+    variable) with one uniform value. ``view`` verifies the requested view
+    applied; ``source_indices`` additionally verifies each frame's actual step."""
+    fragments = tuple(fragments)
+    expected_indices = tuple(source_indices) if source_indices is not None else ()
+    if view is not None and section_reference is None:
+        raise ValueError("view capture requires a section reference")
+    if expected_indices and len(expected_indices) != len(fragments):
+        raise ValueError("source step count must match capture fragment count")
     height = max(1, round(width * 9 / 16))
     screenshots: list[pathlib.Path] = []
     base_url = page_path.resolve().as_uri()
@@ -593,6 +752,17 @@ def capture_frames(
                         ),
                         "awaitPromise": True,
                     })
+                    if view is not None:
+                        result = devtools.command("Runtime.evaluate", {
+                            "expression": view_expression(
+                                str(section_reference), view,
+                                expected_indices[index] if expected_indices else None),
+                            "returnByValue": True,
+                        })
+                        value = result.get("result", {}).get("value")
+                        if value is not True:
+                            raise RuntimeError(
+                                f"--view {view.reference}: {value or 'the page rejected view navigation'}")
                     capture_params: dict[str, Any] = {
                         "format": "png",
                         "fromSurface": True,
@@ -1136,15 +1306,19 @@ def resolve_out_path(
     out_arg: str | None,
     page_path: pathlib.Path,
     section_reference: str | None,
+    view_reference: str | None = None,
 ) -> pathlib.Path:
     """Where the GIF lands. Default: beside the page, named after it — with
     the section reference appended when --section chose one, so exporting
-    several sections of one page never overwrites. --out may be an existing
+    several sections of one page never overwrites. An explicit view adds its ID
+    too. --out may be an existing
     directory (or end with a path separator): the derived name lands inside
     it. Otherwise --out names the exact .gif file."""
     default_name = page_path.stem
     if section_reference is not None:
         default_name += "-" + str(section_reference).replace("/", "-")
+    if view_reference is not None:
+        default_name += "-view-" + str(view_reference).replace("/", "-")
     default_name += ".gif"
     if out_arg is None:
         return page_path.parent / default_name
@@ -1159,6 +1333,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("built_page", metavar="built-page.html")
     parser.add_argument("--section", type=int,
                         help="1-based rendered section number (default: first step-through)")
+    parser.add_argument("--view", metavar="layout-id",
+                        help="saved layout ID, or home/flow/layout without named layouts; "
+                             "capture only that view's visible steps (requires rebuilt HTML)")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--delay-ms", type=int, default=1600)
     parser.add_argument("--margin", type=int, default=16,
@@ -1206,11 +1383,12 @@ def main(argv: list[str] | None = None) -> int:
                 "Chrome/Chromium was not found. Install Google Chrome or Chromium, then "
                 "pass --chrome <path> or set the CHROME environment variable.")
         spec = read_embedded_spec(page_path)
-        target = choose_target(spec, args.section)
+        target = choose_target(spec, args.section, args.view)
         fragments = target.fragments
         out_path = resolve_out_path(
             args.out, page_path,
-            str(target.section_reference) if args.section is not None else None)
+            str(target.section_reference) if args.section is not None else None,
+            target.view.canonical_id if target.view is not None else None)
         if out_path.suffix.lower() != ".gif":
             raise ValueError("--out must name a .gif file or an existing directory")
         if out_path.resolve() == page_path.resolve():
@@ -1221,7 +1399,8 @@ def main(argv: list[str] | None = None) -> int:
                 page_path, fragments, chrome, args.width, pathlib.Path(temp),
                 section_reference=str(target.section_reference),
                 margin=args.margin, scale=args.scale,
-                skin=args.skin, dim_alpha=args.dim_alpha)
+                skin=args.skin, dim_alpha=args.dim_alpha,
+                view=target.view, source_indices=target.source_indices)
             encoder, width, height = write_animated_gif(
                 screenshots, out_path, args.delay_ms)
         reference_note = (
@@ -1232,7 +1411,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"EXPORT_GIF OK: {out_path} ({len(fragments)} frames, {width}x{height}, "
             f"{args.delay_ms} ms, {encoder} encoder; section {target.section_number}: "
-            f"{target.heading} [d={target.section_reference}]{reference_note})")
+            f"{target.heading} [d={target.section_reference}]"
+            f"{'; view ' + args.view if args.view is not None else ''}{reference_note})")
         return 0
     except (OSError, ValueError, RuntimeError, zlib.error) as exc:
         print(f"EXPORT_GIF FAIL: {exc}", file=sys.stderr)

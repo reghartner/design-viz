@@ -123,6 +123,54 @@ Arrange section, Optimize, or the first duplication converts an older
 Reader view switches do not write JSON or create undo entries. The workbench
 retains the active named view across edits and skin/host preview changes.
 
+## Link to or capture a particular view
+
+Use the view's stable `layouts[].id`, not its display name, in the HTML fragment:
+
+```text
+page.html#d=front-door&v=home-story
+page.html#d=front-door&v=service-flow&m=step&p=offline&s=offline
+page.html?layout=confluence#d=front-door&v=home-story
+page.html#embed=front-door&v=service-flow
+```
+
+`d` is the section ID (or its heading-derived reference). `v` selects its view;
+`m`, `p` and `s` still select playback mode, path and step. The `layout` query
+parameter selects a host profile within that view, such as Confluence or
+Backstage. It does not select a view. `embed` hides the surrounding page and
+can target its view even when the section has no steps.
+
+Changing a view updates the page URL. The step's **Copy link** and the
+section's **Copy embed link** retain the selected view. Reload and browser
+Back/Forward between links restore it. A missing or unknown view ID uses the
+authored default. The view is applied before the step, so a hidden stop advances
+to the next included stop, or the final included stop if there is no next;
+an excluded path uses an available path. Earlier state still folds normally.
+
+For older specs without named views, `v=home` selects the Home/panel focus and
+`v=flow` selects Data flow. A legacy single `sectionLayout` accepts `v=layout`
+(or `v=home`, canonicalized to `layout`) and `v=flow`. A plain diagram has only
+`flow`. Named IDs take precedence: a named view with ID `home` is that view,
+not a request for a legacy Home presentation.
+
+The GIF exporter uses the same IDs:
+
+```sh
+python3 tools/export_gif.py page.html --section 1 --view home-story --out home.gif
+python3 tools/export_gif.py page.html --section 1 --view service-flow --out services.gif
+```
+
+An explicit view exports its visible stops, visiting paths in authored order;
+shared stops are captured once, on their first containing path. Each frame
+still folds that path's earlier state. Hidden steps and paths without visible
+stops do not produce frames. Without `--view`, the existing default-view export
+behavior remains. Invalid view IDs fail with the available choices. Rebuild old
+HTML first: the exporter rejects a page that cannot confirm the requested view,
+rather than capturing its default silently. See [GIF options](../README.md#exporting-a-gif).
+
+These link selectors require a newly generated standalone HTML page. They do
+not change the Backstage plugin's public navigation API.
+
 ## Steps shown in each view
 
 Under **Arrange section**, expand **Steps shown in this view** and check the

@@ -69,7 +69,8 @@ function createBuilderInteractions(opts){
               t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
               t.kind === 'bullet' ? '[data-dv-bullet="' + t.index + '"]' :
               t.kind === 'para' ? '[data-dv-para="' + t.index + '"]' :
-              t.kind === 'crow' ? '[data-dv-crow="' + t.index + '"]' :
+              t.kind === 'contract' ? '[data-dv-contract="'+cssQuote(t.card==null?'legacy':t.card)+'"]' :
+              t.kind === 'crow' ? '[data-dv-contract="'+cssQuote(t.card==null?'legacy':t.card)+'"] [data-dv-crow="' + t.index + '"]' :
                                   '[data-dv-panel="' + t.index + '"]';
     try { return secEl.querySelector(sel); } catch (ex){ return null; }
   }
@@ -184,7 +185,7 @@ function createBuilderInteractions(opts){
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
   function multiIdent(t){
-    return t.section + '|' + t.kind + '|' + (t.kind === 'node' ? t.id : t.index);
+    return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + (t.kind === 'node' ? t.id : t.index);
   }
   function clearMultiSelect(){
     multiSel.forEach(function(t){ if (t.el && t.el.classList) t.el.classList.remove('dv-sel'); });
@@ -237,7 +238,7 @@ function createBuilderInteractions(opts){
       var seedEl = findTargetEl(prev);
       if (seedEl){
         multiSel.push({section: prev.section, kind: prev.kind,
-                       id: prev.id, index: prev.index, el: seedEl});
+                       id: prev.id, index: prev.index, card:prev.card, el: seedEl});
         seedEl.classList.add('dv-sel');
       }
     }
@@ -248,7 +249,7 @@ function createBuilderInteractions(opts){
       if (gone.el && gone.el.classList) gone.el.classList.remove('dv-sel');
     } else {
       multiSel.push({section: target.section, kind: target.kind,
-                     id: target.id, index: target.index, el: target.el});
+                     id: target.id, index: target.index, card:target.card, el: target.el});
       if (target.el && target.el.classList) target.el.classList.add('dv-sel');
     }
     if (!multiSel.length){ dropMultiUI(); return; }
@@ -257,7 +258,7 @@ function createBuilderInteractions(opts){
       var only = multiSel[0];
       clearMultiSelect();
       selectTarget({section: only.section, kind: only.kind, id: only.id,
-                    index: only.index, el: only.el}, false);
+                    index: only.index, card:only.card, el: only.el}, false);
       return;
     }
     if (opts.workspace) opts.workspace.showTool('inspect', {closeUtilities:true});
@@ -335,7 +336,7 @@ function createBuilderInteractions(opts){
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
     var gi = parseInt(secEl.getAttribute('data-dv-section'), 10);
     if (isNaN(gi)) return null;
-    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-para], [data-dv-crow]');
+    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-para], [data-dv-crow], [data-dv-contract]');
     if (el && secEl.contains(el)){
       if (el.hasAttribute('data-dv-node'))
         return {section: gi, kind: 'node', id: el.getAttribute('data-dv-node'), el: el};
@@ -348,7 +349,8 @@ function createBuilderInteractions(opts){
       if (el.hasAttribute('data-dv-para'))
         return {section: gi, kind: 'para', index: parseInt(el.getAttribute('data-dv-para'), 10), el: el};
       if (el.hasAttribute('data-dv-crow'))
-        return {section: gi, kind: 'crow', index: parseInt(el.getAttribute('data-dv-crow'), 10), el: el};
+        return {section: gi, kind: 'crow', card:el.closest('[data-dv-contract]').getAttribute('data-dv-contract'), index: parseInt(el.getAttribute('data-dv-crow'), 10), el: el};
+      if(el.hasAttribute('data-dv-contract'))return {section:gi,kind:'contract',card:el.getAttribute('data-dv-contract'),el:el};
       /* halo and label clicks resolve to the same edge — highlight the
          visible edge path (the halo has no selected style of its own) */
       var edgeIdx = parseInt(el.getAttribute('data-dv-edge'), 10);
@@ -368,7 +370,7 @@ function createBuilderInteractions(opts){
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     session.target = {section: target.section, kind: target.kind,
-                     id: target.id, index: target.index,
+                     id: target.id, index: target.index, card:target.card,
                      block: target.block, tab: target.tab};
     if (target.kind !== 'tab') session.insertSection = target.section;
     var parsed = parseEditor();
@@ -429,7 +431,7 @@ function createBuilderInteractions(opts){
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .path-chip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
-    '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, ' +
+    '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #add-contract, ' +
     '#import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown

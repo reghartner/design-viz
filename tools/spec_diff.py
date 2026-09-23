@@ -30,10 +30,12 @@ class SectionRef:
     heading: str
     section: dict[str, Any]
     path: str
+    contract_index: int | None = None
 
     @property
     def contract(self) -> dict[str, Any] | None:
-        value = self.section.get("contract")
+        value = (self.section.get("contract") if self.contract_index is None
+                 else self.section["contracts"][self.contract_index])
         return value if isinstance(value, dict) else None
 
     @property
@@ -126,6 +128,26 @@ def iter_sections(spec: Any) -> Iterable[SectionRef]:
             )
 
 
+def iter_contracts(sections: Iterable[SectionRef]) -> Iterable[SectionRef]:
+    """Enumerate each actual card, retaining its source object for annotation."""
+    for ref in sections:
+        if ref.contract is not None:
+            yield ref
+        blocks = ref.section.get("contracts")
+        if isinstance(blocks, list):
+            for index, block in enumerate(blocks):
+                if isinstance(block, dict):
+                    yield SectionRef(ref.ordinal, ref.heading, ref.section,
+                                     f"{ref.path}.contracts[{index}]", index)
+
+
+def _contract_identity(ref: SectionRef) -> tuple[str, str, str]:
+    block_id = (ref.contract or {}).get("id")
+    if isinstance(block_id, str) and block_id:
+        return ref.heading, "id", block_id
+    return ref.heading, "title", _title(ref)
+
+
 def _title(ref: SectionRef) -> str:
     contract = ref.contract or {}
     title = contract.get("title")
@@ -185,7 +207,7 @@ def _pair_contract_refs(
     old_refs: list[SectionRef],
     new_refs: list[SectionRef],
 ) -> tuple[list[tuple[SectionRef, SectionRef]], list[SectionRef], list[SectionRef]]:
-    """Pair cards only within a full identity (heading + card title).
+    """Pair cards by heading plus stable card ID (or title without an ID).
 
     Duplicate cards cannot use document order as their primary discriminator:
     reordering them would make unrelated rows look changed. Within one
@@ -197,11 +219,11 @@ def _pair_contract_refs(
     overlap, so a fully-rewritten card diffs as one card (removed + added
     rows) instead of a removed card plus an added card.
     """
-    groups: dict[tuple[str, str], tuple[list[int], list[int]]] = {}
+    groups: dict[tuple[str, str, str], tuple[list[int], list[int]]] = {}
     for index, ref in enumerate(old_refs):
-        groups.setdefault((ref.heading, _title(ref)), ([], []))[0].append(index)
+        groups.setdefault(_contract_identity(ref), ([], []))[0].append(index)
     for index, ref in enumerate(new_refs):
-        groups.setdefault((ref.heading, _title(ref)), ([], []))[1].append(index)
+        groups.setdefault(_contract_identity(ref), ([], []))[1].append(index)
 
     def shared(oi: int, ni: int) -> int:
         return len(set(_field_map(old_refs[oi].contract)) &
@@ -373,8 +395,8 @@ def compare_specs(old_spec: Any, new_spec: Any) -> SpecDiff:
     old_sections = list(iter_sections(old_spec))
     new_sections = list(iter_sections(new_spec))
 
-    old_contracts = [ref for ref in old_sections if ref.contract is not None]
-    new_contracts = [ref for ref in new_sections if ref.contract is not None]
+    old_contracts = list(iter_contracts(old_sections))
+    new_contracts = list(iter_contracts(new_sections))
     pairs, old_only, new_only = _pair_contract_refs(old_contracts, new_contracts)
 
     for old, new in pairs:
@@ -504,8 +526,8 @@ def _annotate_pair(old: SectionRef, new: SectionRef) -> None:
 def annotate_spec(old_spec: Any, new_spec: Any) -> Any:
     """Deep-copy new_spec and apply added/changed/removed row deltas."""
     annotated = copy.deepcopy(new_spec)
-    old_contracts = [ref for ref in iter_sections(old_spec) if ref.contract is not None]
-    new_contracts = [ref for ref in iter_sections(annotated) if ref.contract is not None]
+    old_contracts = list(iter_contracts(iter_sections(old_spec)))
+    new_contracts = list(iter_contracts(iter_sections(annotated)))
     pairs, _old_only, new_only = _pair_contract_refs(old_contracts, new_contracts)
     for old, new in pairs:
         _annotate_pair(old, new)

@@ -226,12 +226,12 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     warnings.push(P + '.source: must be a URL string — source chip skipped');
   if (Object.prototype.hasOwnProperty.call(sec, 'collapsed') && typeof sec.collapsed !== 'boolean')
     warnings.push(P + '.collapsed: must be a boolean — using the expanded default');
-  if (sec.contract != null){
-    var CP = P + '.contract';
-    if (typeof sec.contract !== 'object' || Array.isArray(sec.contract)){
+  function checkContract(ct,CP){
+    if (!ct || typeof ct !== 'object' || Array.isArray(ct)){
       warnings.push(CP + ': must be an object {title?, source?, fields:[...], note?} — card skipped');
     } else {
-      var ct = sec.contract;
+      if(ct.span!=null && [4,6,8,12].indexOf(ct.span)<0)warnings.push(CP+'.span: use 4 (third), 6 (half), 8 (two-thirds), or 12 (full) — using full width');
+      if(ct.id!=null && (typeof ct.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(ct.id) || ct.id==='legacy'))warnings.push(CP+'.id: use a stable ID beginning with a letter; "legacy" is reserved');
       if (ct.source && typeof ct.source !== 'string')
         warnings.push(CP + '.source: must be a URL string — source chip skipped');
       if (!Array.isArray(ct.fields) || !ct.fields.length){
@@ -251,8 +251,21 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       });
     }
   }
-  if (!sec.diagram && !sec.text && !sec.bullets && !sec.heading && !sec.contract)
-    warnings.push(P + ': empty section — add heading, text, bullets, contract, or diagram');
+  if(sec.contract!=null)checkContract(sec.contract,P+'.contract');
+  if(sec.contracts!=null){
+    if(!Array.isArray(sec.contracts))warnings.push(P+'.contracts: must be an array of contract blocks — blocks skipped');
+    else sec.contracts.forEach(function(ct,i){checkContract(ct,P+'.contracts['+i+']');});
+  }
+  var contractIds=Object.create(null);
+  sectionContracts(sec).forEach(function(rec){
+    var id=rec.value.id;
+    if(typeof id==='string' && id){
+      if(contractIds[id])warnings.push(P+'.contracts: duplicate contract id "'+id+'" — links use positions instead');
+      contractIds[id]=true;
+    }
+  });
+  if (!sec.diagram && !sec.text && !sec.bullets && !sec.heading && !sectionContracts(sec).length)
+    warnings.push(P + ': empty section — add heading, text, bullets, contracts, or diagram');
   var d = sec.diagram;
   if (!d) return;
   var DP = P + '.diagram';

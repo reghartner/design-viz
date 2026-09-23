@@ -129,3 +129,6 @@ Auto. See [trace viewing](trace-import.md) for sizing and pan behavior.
 For saved panel/diagram placement within a section, use
 [section arrangements and host previews](section-layouts.md). These layouts are
 spec content and have their own per-section reset, separate from editor sizing.
+
+Contract blocks have their own width and editing controls: see
+[adding, sizing and arranging contract blocks](contract-blocks.md).

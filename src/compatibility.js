@@ -10,7 +10,7 @@ var FlowviewCompatibility = (function(){
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
-    'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
+    'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
@@ -74,15 +74,16 @@ var FlowviewCompatibility = (function(){
         if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;
       }
     }
+    function contracts(s){if(object(s) && (Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null))used['content.contracts']=true;}
     if(!object(page))return [];
     if(page.nodes && page.rows)diagram(page);
     var blocks=page.blocks || page.sections;
     (Array.isArray(blocks)?blocks:[]).forEach(function(b){
       if(!object(b))return;
       if(b.id!=null || b.detailOnly)used['flow.drilldown']=true;
-      diagram(b.diagram);
+      diagram(b.diagram);contracts(b);
       (Array.isArray(b.tabs)?b.tabs:[]).forEach(function(t){
-        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);});
+        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);contracts(s);});
       });
     });
     return Object.keys(used).sort();

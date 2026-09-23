@@ -36,6 +36,9 @@ function builderOutline(raw, query){
         entries.push({label: label, context: context, target: target, path: path, tab: tab});
     }
     add('section', sec.heading || 'Section ' + (section + 1));
+    sectionContracts(sec).forEach(function(rec){
+      add('contract',rec.value.title || 'On the wire',{card:rec.key});
+    });
     Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || id) + ' · ' + id, {id: id}); });
     Object.keys(d.groups || {}).forEach(function(id){ add('group', ((d.groups[id] || {}).title || id) + ' · ' + id, {id: id}); });
     (Array.isArray(d.edges) ? d.edges : []).forEach(function(e, index){
@@ -336,6 +339,7 @@ function diffSpecs(oldObj, newObj){
       if (i < as.length) allFields(as[i], step, dp.concat(['steps', i]), label + ': step ' + (i + 1));
     });
     compareList(a.panels, b.panels, dp.concat(['panels']), function(p){ return p.id; }, label + ': panel', ['id']);
+    compareList(prev.value.contracts,ref.value.contracts,path.concat(['contracts']),function(c){return c.id || c.title || 'Contract';},label+': contract block',['id']);
     compareList(object(prev.value.contract).fields, object(ref.value.contract).fields,
       path.concat(['contract', 'fields']), function(f){ return f.k; }, label + ': contract field', ['k']);
   });
@@ -884,20 +888,21 @@ function initWorkbenchBuilder(opts){
     if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
     if (plan.kind === 'section') session.insertSection = plan.index;
     var identity = {section: plan.kind === 'section' ? plan.index : session.insertSection,
-                    kind: plan.kind, id: plan.id, index: plan.index};
+                    kind: plan.kind, id: plan.id, index: plan.index, card:plan.card};
     var el = findTargetEl(identity);
     selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
-                  index: identity.index, el: el}, false);
+                  index: identity.index, card:identity.card, el: el}, false);
     selectRange(plan);
   }
   var addButtons = {
     'add-step': ['step', planAddStep],
-    'add-section': ['section', planAddSection]
+    'add-section': ['section', planAddSection],
+    'add-contract': ['contract',planAddContract]
   };
   Object.keys(addButtons).forEach(function(id){
     var btn = document.getElementById(id);
     if (btn) life.listen(btn,'click', function(){
-      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-section');
+      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-section' || id==='add-contract');
     });
   });
   /* + edge draws by clicking source then target (Esc cancels) */

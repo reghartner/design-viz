@@ -1405,7 +1405,10 @@ textarea.fctl{resize:vertical; min-height:44px;}
 /* builder: selection highlight on the rendered page (svg + widget cards) */
 .docview .grp, .docview .node, .docview .edge, .docview .halo, .docview .coin,
 .docview .pwidget, .docview .sec-text[data-dv-para],
-.docview .sec-bullets li[data-dv-bullet], .docview .ctrow{cursor:pointer;}
+.docview .sec-bullets li[data-dv-bullet], .docview .ctrow, .docview .cttitle{cursor:pointer;}
+.docview .ctcard.dv-sel{outline:2px dashed var(--accent);outline-offset:2px;}
+.contract-manager{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.contract-manager button{text-align:left;white-space:normal;overflow-wrap:anywhere;}
 .docview text.lbl{cursor:grab;}
 /* drag nudges labelDx/labelDy; click selects */
 /* the selection ring animates its dashes — nothing else on the page moves
@@ -3110,7 +3113,16 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .sk-daylight .qreason{color:#8A8474;}
 
 /* message-contract card: "on the wire" field table under a section's prose */
-.ctcard{margin:10px 0 8px; border-radius:10px; padding:10px 12px 11px;}
+.contract-region{container-type:inline-size; margin:10px 0 8px; min-width:0;}
+.contract-grid{display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:12px; align-items:start;}
+.ctcard{margin:10px 0 8px; border-radius:10px; padding:10px 12px 11px; min-width:0;}
+.contract-grid>.ctcard{margin:0; grid-column:span var(--contract-span,12); overflow-wrap:anywhere;}
+.contract-grid .cttable{table-layout:fixed;}
+.contract-grid .ctk{width:24%; white-space:normal; overflow-wrap:anywhere;}
+.contract-grid .ctv{width:26%; white-space:normal; overflow-wrap:anywhere;}
+.cttitle>span{min-width:0; overflow-wrap:anywhere;}
+@container (max-width:720px){.contract-grid>.ctcard{grid-column:1/-1;}}
+@media print{.ctcard{break-inside:avoid;}}
 .sk-aurora .ctcard{background:#0B1220; border:1px solid #25364F;}
 .sk-daylight .ctcard{background:#FFFFFF; border:1px solid #E0DCD1;}
 .cttitle{display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -8532,7 +8544,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
     </div>
     <div class="diagram-add-options"><label id="diagram-add-preset-label" for="diagram-add-preset">Node preset<select id="diagram-add-preset" class="fctl"></select></label><p id="diagram-add-help"></p><p id="diagram-add-error" role="status" hidden></p></div>
     <div class="diagram-add-footer">
-      <details class="diagram-add-structure"><summary>Page structure</summary><button type="button" class="bbtn" id="add-section">Add section</button><button type="button" class="bbtn" id="add-tabs">Add tabs</button></details>
+      <details class="diagram-add-structure"><summary>Contracts &amp; page structure</summary><button type="button" class="bbtn" id="add-contract">Add contract block</button><button type="button" class="bbtn" id="add-section">Add section</button><button type="button" class="bbtn" id="add-tabs">Add tabs</button></details>
       <button type="button" class="editor-add-button" id="add-node" data-add-action="node">Add node</button>
       <button type="button" class="editor-add-button" id="add-edge" data-add-action="edge" hidden>Choose source and target</button>
       <button type="button" class="editor-add-button" id="add-step" data-add-action="step" hidden>Add step</button>
@@ -8713,7 +8725,7 @@ var FlowviewCompatibility = (function(){
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
-    'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
+    'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
@@ -8777,15 +8789,16 @@ var FlowviewCompatibility = (function(){
         if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;
       }
     }
+    function contracts(s){if(object(s) && (Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null))used['content.contracts']=true;}
     if(!object(page))return [];
     if(page.nodes && page.rows)diagram(page);
     var blocks=page.blocks || page.sections;
     (Array.isArray(blocks)?blocks:[]).forEach(function(b){
       if(!object(b))return;
       if(b.id!=null || b.detailOnly)used['flow.drilldown']=true;
-      diagram(b.diagram);
+      diagram(b.diagram);contracts(b);
       (Array.isArray(b.tabs)?b.tabs:[]).forEach(function(t){
-        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);});
+        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);contracts(s);});
       });
     });
     return Object.keys(used).sort();
@@ -9341,12 +9354,12 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     warnings.push(P + '.source: must be a URL string — source chip skipped');
   if (Object.prototype.hasOwnProperty.call(sec, 'collapsed') && typeof sec.collapsed !== 'boolean')
     warnings.push(P + '.collapsed: must be a boolean — using the expanded default');
-  if (sec.contract != null){
-    var CP = P + '.contract';
-    if (typeof sec.contract !== 'object' || Array.isArray(sec.contract)){
+  function checkContract(ct,CP){
+    if (!ct || typeof ct !== 'object' || Array.isArray(ct)){
       warnings.push(CP + ': must be an object {title?, source?, fields:[...], note?} — card skipped');
     } else {
-      var ct = sec.contract;
+      if(ct.span!=null && [4,6,8,12].indexOf(ct.span)<0)warnings.push(CP+'.span: use 4 (third), 6 (half), 8 (two-thirds), or 12 (full) — using full width');
+      if(ct.id!=null && (typeof ct.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(ct.id) || ct.id==='legacy'))warnings.push(CP+'.id: use a stable ID beginning with a letter; "legacy" is reserved');
       if (ct.source && typeof ct.source !== 'string')
         warnings.push(CP + '.source: must be a URL string — source chip skipped');
       if (!Array.isArray(ct.fields) || !ct.fields.length){
@@ -9366,8 +9379,21 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       });
     }
   }
-  if (!sec.diagram && !sec.text && !sec.bullets && !sec.heading && !sec.contract)
-    warnings.push(P + ': empty section — add heading, text, bullets, contract, or diagram');
+  if(sec.contract!=null)checkContract(sec.contract,P+'.contract');
+  if(sec.contracts!=null){
+    if(!Array.isArray(sec.contracts))warnings.push(P+'.contracts: must be an array of contract blocks — blocks skipped');
+    else sec.contracts.forEach(function(ct,i){checkContract(ct,P+'.contracts['+i+']');});
+  }
+  var contractIds=Object.create(null);
+  sectionContracts(sec).forEach(function(rec){
+    var id=rec.value.id;
+    if(typeof id==='string' && id){
+      if(contractIds[id])warnings.push(P+'.contracts: duplicate contract id "'+id+'" — links use positions instead');
+      contractIds[id]=true;
+    }
+  });
+  if (!sec.diagram && !sec.text && !sec.bullets && !sec.heading && !sectionContracts(sec).length)
+    warnings.push(P + ': empty section — add heading, text, bullets, contracts, or diagram');
   var d = sec.diagram;
   if (!d) return;
   var DP = P + '.diagram';
@@ -9731,6 +9757,7 @@ function parseHash(h){
           x: kv.x != null ? kv.x : null,
           e: kv.e != null ? kv.e : null,
           m: (kv.m === 'step' || kv.m === 'ambient') ? kv.m : null};
+  if (kv.ct != null) result.ct=kv.ct;
   if (kv.p != null) result.p = kv.p;
   if (kv.v != null) result.v = kv.v;
   if (kv.q != null) result.q = kv.q;
@@ -9752,6 +9779,7 @@ function buildHash(st){
   if (st && st.s != null) parts.push('s=' + encodeURIComponent(st.s));
   if (st && st.q != null) parts.push('q=' + encodeURIComponent(st.q));
   if (st && st.c != null) parts.push('c=' + encodeURIComponent(st.c));
+  if (st && st.ct != null) parts.push('ct=' + encodeURIComponent(st.ct));
   if (st && st.r != null) parts.push('r=' + encodeURIComponent(st.r));
   if (st && st.x != null) parts.push('x=' + encodeSectionRefList(st.x));
   if (st && st.e != null) parts.push('e=' + encodeSectionRefList(st.e));
@@ -9881,10 +9909,17 @@ function resolveHashTarget(st, manifest){
   if (st.c != null){
     var cardSec = sectionAt(st.c);
     if (!cardSec || !cardSec.hasCard) return {kind:'invalid'};
-    var row = st.r != null ? oneBasedIndex(st.r, cardSec.rowCount || 0) : null;
+    var cards=cardSec.cards || [],cardIndex=0;
+    if(st.ct!=null){
+      cardIndex=cards.findIndex(function(card){return card.reference===String(st.ct);});
+      if(cardIndex<0)return {kind:'invalid'};
+    }
+    var rowCount=cards[cardIndex]?cards[cardIndex].rowCount:cardSec.rowCount;
+    var row = st.r != null ? oneBasedIndex(st.r, rowCount || 0) : null;
     if (row === -1) row = null; /* bad/out-of-range row ref degrades to the card */
     cardTarget = route(cardSec, {kind:row == null ? 'card' : 'row', section:cardSec.number,
                                  row:row, tabBlock:null, tab:null});
+    if(st.ct!=null)cardTarget.cardIndex=cardIndex;
   }
 
   var tabTarget = block && ti >= 0 ? {kind:'tab', tabBlock:block.index, tab:ti} : null;
@@ -9965,6 +10000,31 @@ function sectionRecords(page){
   });
   return out;
 }
+/* ---- src/core/contracts.js ---- */
+/* Contract block identities are shared by validation, rendering and authoring.
+   Keep legacy contract first when both forms are present; never rewrite it just
+   to append a new block. Raw indexes survive malformed skipped entries. */
+function sectionContracts(section){
+  var out=[];
+  function add(value,path,key){
+    if(!value || typeof value!=='object' || Array.isArray(value))return;
+    out.push({value:value,path:path,key:key});
+  }
+  if(section){
+    add(section.contract,['contract'],'legacy');
+    (Array.isArray(section.contracts)?section.contracts:[]).forEach(function(value,index){
+      add(value,['contracts',index],String(index));
+    });
+  }
+  var ids=Object.create(null);
+  out.forEach(function(rec){if(typeof rec.value.id==='string')ids[rec.value.id]=(ids[rec.value.id] || 0)+1;});
+  out.forEach(function(rec){
+    var id=rec.value.id;
+    rec.reference=rec.key==='legacy'?'legacy':typeof id==='string' && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(id) && id!=='legacy' && ids[id]===1?id:String(Number(rec.key)+1);
+  });
+  return out;
+}
+function contractColumnSpan(value){return [4,6,8,12].indexOf(value)>=0?value:12;}
 /* ---- src/core/paths.js ---- */
 /* Pure step/path projection. Uses shared isHex() and navigation stepIndexOf()
    at call time; indices always refer to the authored source step registry. */
@@ -25173,6 +25233,56 @@ function proseMarkup(value){
   }
   return html+inlineMarkup(source.slice(position));
 }
+/* ---- src/viewer/contracts.js ---- */
+/* Message contracts share one card renderer in every host. */
+function contractCardHTML(contract, sectionReference, record){
+  if (!contract || typeof contract !== 'object' || Array.isArray(contract)) return '';
+  var addressed = (typeof sectionReference === 'number' && sectionReference > 0) ||
+                  (typeof sectionReference === 'string' && sectionReference.length > 0);
+  var sectionAddress = addressed ? esc(String(sectionReference)) : '';
+  if(record && record.key!=='legacy')sectionAddress+='-block-'+esc(record.reference);
+  var key=record?record.key:'legacy';
+  var h = '<div class="ctcard" data-dv-contract="'+esc(key)+'" data-contract-ref="'+esc(record?record.reference:'legacy')+'" style="--contract-span:'+contractColumnSpan(contract.span)+'"' + (addressed ? ' id="contract-' + sectionAddress + '"' : '') + '>';
+  var src = (contract.source && typeof contract.source === 'string') ?
+    ' <a class="srcchip" href="' + esc(contract.source) + '" target="_blank" rel="noopener">source &#8599;</a>' : '';
+  if (contract.title || src || addressed){
+    h += '<div class="cttitle"><span>' + esc(contract.title || 'On the wire') + src + '</span>';
+    if (addressed) h += '<button type="button" class="copychip contractcopy" title="Copy link" aria-label="Copy link to this contract card">' + COPY_ICON + '</button>';
+    h += '</div>';
+  }
+  var rows = Array.isArray(contract.fields) ? contract.fields : [];
+  var body = '', renderedRow = 0;
+  rows.forEach(function(f, fi){
+    if (!f || typeof f !== 'object' || !f.k) return;
+    renderedRow++;
+    var link = (f.link && typeof f.link === 'string') ?
+      ' <a class="ctlink" href="' + esc(f.link) + '" target="_blank" rel="noopener" aria-label="Source for ' +
+      esc(f.k) + '">&#8599;</a>' : '';
+    var delta = ['added','removed','changed'].indexOf(f.delta) >= 0 ? f.delta : null;
+    var badge = delta ? ' <span class="ctdelta" aria-label="' + delta + ' field">' + delta + '</span>' : '';
+    body += '<tr class="ctrow' + (f.hot === true ? ' hot' : '') +
+            (delta ? ' delta-' + delta : '') + '"' +
+            ' data-dv-crow="' + fi + '"' + /* spec index — malformed rows are skipped, so the rendered position can lag it */
+            (addressed ? ' id="contract-' + sectionAddress + '-row-' + renderedRow +
+             '" tabindex="-1" aria-label="Contract field ' + esc(f.k) + '"' : '') +
+            fragmentAttrs(f) + '>' +
+            '<td class="ctk"><span class="ctkey">' + esc(f.k) + link + '</span>' + badge + '</td>' +
+            '<td class="ctv">' + (f.v != null ? esc(f.v) : '') + '</td>' +
+            '<td class="ctg">' + (f.g != null ? proseMarkup(f.g) : '') + '</td></tr>';
+  });
+  if (body) h += '<table class="cttable">' + body + '</table>';
+  if (contract.note) h += '<div class="ctnote">' + proseMarkup(contract.note) + '</div>';
+  h += '</div>';
+  return h;
+}
+
+function contractBlocksHTML(section,reference){
+  var records=sectionContracts(section);
+  if(!records.length)return '';
+  return '<div class="contract-region"><div class="contract-grid">'+records.map(function(rec){
+    return contractCardHTML(rec.value,reference,rec);
+  }).join('')+'</div></div>';
+}
 /* ---- src/engine.js ---- */
 /* engine.js — board renderer, stepper and page renderer.
    Consumes document, navigation, path, layout, state and geometry helpers
@@ -26128,44 +26238,6 @@ var COPY_FAIL_ICON = '<svg class="copyglyph" viewBox="0 0 16 16" width="13" heig
    shows just this section's diagram (for iframes / direct links) */
 var EMBED_ICON = '<svg class="copyglyph" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.6"/><path d="M5.4 8h5.2M8.6 6l2 2-2 2"/></svg>';
 
-function contractCardHTML(contract, sectionReference){
-  if (!contract || typeof contract !== 'object' || Array.isArray(contract)) return '';
-  var addressed = (typeof sectionReference === 'number' && sectionReference > 0) ||
-                  (typeof sectionReference === 'string' && sectionReference.length > 0);
-  var sectionAddress = addressed ? esc(String(sectionReference)) : '';
-  var h = '<div class="ctcard"' + (addressed ? ' id="contract-' + sectionAddress + '"' : '') + '>';
-  var src = (contract.source && typeof contract.source === 'string') ?
-    ' <a class="srcchip" href="' + esc(contract.source) + '" target="_blank" rel="noopener">source &#8599;</a>' : '';
-  if (contract.title || src || addressed){
-    h += '<div class="cttitle"><span>' + esc(contract.title || 'On the wire') + src + '</span>';
-    if (addressed) h += '<button type="button" class="copychip contractcopy" title="Copy link" aria-label="Copy link to this contract card">' + COPY_ICON + '</button>';
-    h += '</div>';
-  }
-  var rows = Array.isArray(contract.fields) ? contract.fields : [];
-  var body = '', renderedRow = 0;
-  rows.forEach(function(f, fi){
-    if (!f || typeof f !== 'object' || !f.k) return;
-    renderedRow++;
-    var link = (f.link && typeof f.link === 'string') ?
-      ' <a class="ctlink" href="' + esc(f.link) + '" target="_blank" rel="noopener" aria-label="Source for ' +
-      esc(f.k) + '">&#8599;</a>' : '';
-    var delta = ['added','removed','changed'].indexOf(f.delta) >= 0 ? f.delta : null;
-    var badge = delta ? ' <span class="ctdelta" aria-label="' + delta + ' field">' + delta + '</span>' : '';
-    body += '<tr class="ctrow' + (f.hot === true ? ' hot' : '') +
-            (delta ? ' delta-' + delta : '') + '"' +
-            ' data-dv-crow="' + fi + '"' + /* spec index — malformed rows are skipped, so the rendered position can lag it */
-            (addressed ? ' id="contract-' + sectionAddress + '-row-' + renderedRow +
-             '" tabindex="-1" aria-label="Contract field ' + esc(f.k) + '"' : '') +
-            fragmentAttrs(f) + '>' +
-            '<td class="ctk"><span class="ctkey">' + esc(f.k) + link + '</span>' + badge + '</td>' +
-            '<td class="ctv">' + (f.v != null ? esc(f.v) : '') + '</td>' +
-            '<td class="ctg">' + (f.g != null ? proseMarkup(f.g) : '') + '</td></tr>';
-  });
-  if (body) h += '<table class="cttable">' + body + '</table>';
-  if (contract.note) h += '<div class="ctnote">' + proseMarkup(contract.note) + '</div>';
-  h += '</div>';
-  return h;
-}
 
 
 /* ---------------- software state panels ---------------- */
@@ -27089,7 +27161,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.style.setProperty('--acc', acc);
   var intro = sectionIntroHTML(sec, gi, sectionReference);
   var inner = intro.html;
-  inner += contractCardHTML(sec.contract, sectionReference);
+  inner += contractBlocksHTML(sec, sectionReference);
   box.innerHTML = inner;
   container.appendChild(box);
   var prose = intro.hasProse ? createProseController(
@@ -27099,6 +27171,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     box.querySelector('.sec-teaser')) : null;
   var result = {sectionEl:box, stepper:null, boardSize:null,
                 prose:prose,
+                contractCards:Array.prototype.slice.call(box.querySelectorAll('.ctcard')),
                 contractCard:box.querySelector('.ctcard'),
                 contractRows:Array.prototype.slice.call(box.querySelectorAll('.ctrow'))};
   if (!sec.diagram) return result;
@@ -27353,7 +27426,7 @@ function renderPage(view, page, skin, backlinks, options){
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                flowDisclosure:built.flowDisclosure, presentation:built.presentation,
-               contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
+               contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);
     return built;
@@ -27447,7 +27520,8 @@ function renderPage(view, page, skin, backlinks, options){
     sections:ctl.sections.map(function(sec){
       return {number:sec.number, reference:sec.reference, aliases:sec.aliases, hasDiagram:sec.hasDiagram, tabBlock:sec.tabBlock, tab:sec.tab,
               stepIds:sec.stepper ? sec.stepper.ids() : null,
-              hasCard:!!sec.contractCard, rowCount:sec.contractRows.length};
+              hasCard:!!sec.contractCard, rowCount:sec.contractCard?sec.contractCard.querySelectorAll('.ctrow').length:0,
+              cards:sec.contractCards.map(function(card){return {reference:card.getAttribute('data-contract-ref'),rowCount:card.querySelectorAll('.ctrow').length};})};
     })
   };
   if (ctl.tabBlocks.length){
@@ -27735,7 +27809,7 @@ function wireDeepLinks(ctl, win, preservedHash){
   function cloneState(state){
     return {tabBlock:state.tabBlock, tab:state.tab,
             diagramSection:state.diagramSection,
-            cardSection:state.cardSection, row:state.row};
+            cardSection:state.cardSection, cardIndex:state.cardIndex, row:state.row};
   }
   function stateHash(state){
     var st = {};
@@ -27763,6 +27837,8 @@ function wireDeepLinks(ctl, win, preservedHash){
       var cardSec = section(state.cardSection);
       if (cardSec && cardSec.contractCard){
         st.c = String(cardSec.reference);
+        var card=cardSec.contractCards && cardSec.contractCards[state.cardIndex || 0];
+        if(card && card.getAttribute('data-contract-ref')!=='legacy')st.ct=card.getAttribute('data-contract-ref');
         if (state.row != null) st.r = String(state.row + 1);
       }
     }
@@ -27841,9 +27917,11 @@ function wireDeepLinks(ctl, win, preservedHash){
     var cardTarget = target.card;
     if (cardTarget){
       var cardSec = section(cardTarget.section);
-      targetEl = cardSec && cardSec.contractCard;
-      if (cardTarget.kind === 'row' && cardSec && cardSec.contractRows[cardTarget.row]){
-        var row = cardSec.contractRows[cardTarget.row];
+      var selectedCard=cardSec && (cardSec.contractCards ? cardSec.contractCards[cardTarget.cardIndex || 0] : cardSec.contractCard);
+      var selectedRows=selectedCard?Array.prototype.slice.call(selectedCard.querySelectorAll('.ctrow')):[];
+      targetEl = selectedCard;
+      if (cardTarget.kind === 'row' && selectedRows[cardTarget.row]){
+        var row = selectedRows[cardTarget.row];
         row.classList.add('dv-hash-target');
         targetEl = row;
         if (typeof row.focus === 'function'){
@@ -27859,6 +27937,7 @@ function wireDeepLinks(ctl, win, preservedHash){
       tab:target.explicitTab ? target.explicitTab.tab : null,
       diagramSection:diagramTarget ? diagramTarget.section : null,
       cardSection:cardTarget ? cardTarget.section : null,
+      cardIndex:cardTarget ? cardTarget.cardIndex : null,
       row:cardTarget && cardTarget.kind === 'row' ? cardTarget.row : null
     };
     if (cardTarget)
@@ -27910,13 +27989,14 @@ function wireDeepLinks(ctl, win, preservedHash){
       state.diagramSection = sec.number;
       return stateHash(state);
     });
-    if (sec.contractCard) bindCopy(sec.contractCard.querySelector('.contractcopy'),
+    (sec.contractCards || (sec.contractCard?[sec.contractCard]:[])).forEach(function(card,index){bindCopy(card.querySelector('.contractcopy'),
       function(){
         var state = cloneState(fragmentState);
         state.cardSection = sec.number;
+        state.cardIndex = index;
         state.row = null;
         return stateHash(state);
-      });
+      });});
   });
   ctl.tabBlocks.forEach(function(tb){
     tb.copyButtons.forEach(function(button, i){
@@ -28955,7 +29035,10 @@ function builderTargetPath(raw, target){
     if (sec && typeof sec.text === 'string') return rec.section.concat(['text']);
     return rec.section.concat(['text', target.index]);
   }
-  if (target.kind === 'crow') return rec.section.concat(['contract', 'fields', target.index]);
+  if (target.kind === 'contract' || target.kind === 'crow'){
+    var card=target.card==null || target.card==='legacy'?['contract']:['contracts',Number(target.card)];
+    return rec.section.concat(card,target.kind==='crow'?['fields',target.index]:[]);
+  }
   return null;
 }
 
@@ -29185,7 +29268,11 @@ function builderDeletePlan(text, raw, t){
     if (sec && typeof sec.text === 'string') return planSetField(text, raw, rec.section, 'text', null);
     return planDeleteListItem(text, raw, rec.section.concat(['text']), t.index);
   }
-  if (t.kind === 'crow') return planDeleteListItem(text, raw, rec.section.concat(['contract', 'fields']), t.index);
+  if (t.kind === 'crow') return planDeleteListItem(text, raw, builderTargetPath(raw,t).slice(0,-1), t.index);
+  if (t.kind === 'contract'){
+    var cp=builderTargetPath(raw,t);
+    return jsonRemoveMember(text,cp.slice(0,-1),cp[cp.length-1]) || {error:'contract block not found'};
+  }
   return planDeleteSection(text, raw, t.section);
 }
 
@@ -30053,6 +30140,46 @@ function planCreateNodeDetail(text,raw,sectionIdx,nodeId){
   var index=specSectionPaths(raw).length,newPath=specSectionPaths(JSON.parse(assigned.text))[index].section;
   var range=jsonLocate(assigned.text,newPath);
   return {text:assigned.text,start:range.start,end:range.end,kind:'section',index:index,sectionId:id};
+}
+/* ---- src/workbench/commands/contracts.js ---- */
+/* Contract-block authoring; raw addresses preserve page wrappers and tabs. */
+function planAddContract(text,raw,section,copy){
+  var rec=specSectionPaths(raw)[section],sec=rec && specValueAt(raw,rec.section);
+  if(!rec || !rec.section.length || !sec)return {error:'Choose a page section for the contract block.'};
+  if(sec.contracts!=null && !Array.isArray(sec.contracts))return {error:'Fix contracts to be an array before adding a block.'};
+  var taken=Object.create(null);
+  sectionContracts(sec).forEach(function(c){if(c.value.id)taken[c.value.id]=true;});
+  var value=copy?builderClone(copy):{title:'New contract',span:12,fields:[{k:'event',v:'button_press',g:'What this field means.'}]};
+  value.id=builderUniqueKey(taken,copy && copy.id?copy.id+'-copy':'contract');
+  if(copy)value.title=(value.title || 'Contract')+' (copy)';
+  var plan=Array.isArray(sec.contracts)?jsonInsertMember(text,rec.section.concat(['contracts']),null,JSON.stringify(value,null,2)):
+    planSetField(text,raw,rec.section,'contracts',JSON.stringify([value],null,2));
+  if(!plan || plan.error)return plan || {error:'Could not insert the contract block.'};
+  plan.card=String((sec.contracts || []).length);plan.kind='contract';return plan;
+}
+function planMoveContract(text,raw,target,delta){
+  var rec=specSectionPaths(raw)[target.section],sec=rec && specValueAt(raw,rec.section);
+  if(!sec)return {error:'Contract section not found.'};
+  var entries=sectionContracts(sec),key=target.card==null?'legacy':String(target.card);
+  var index=entries.findIndex(function(c){return c.key===key;}),next=index+delta;
+  if(index<0 || next<0 || next>=entries.length)return {error:'Contract is already at that end.'};
+  if(sec.contract!=null && (!sec.contract || typeof sec.contract!=='object' || Array.isArray(sec.contract)) ||
+      sec.contracts!=null && (!Array.isArray(sec.contracts) || sec.contracts.some(function(c){return !c || typeof c!=='object' || Array.isArray(c);})))
+    return {error:'Fix malformed contract blocks before reordering.'};
+  var blocks=entries.map(function(c){return builderClone(c.value);}),moved=blocks.splice(index,1)[0];blocks.splice(next,0,moved);
+  var plan=planSetFields(text,raw,rec.section,[['contract',null],['contracts',JSON.stringify(blocks,null,2)]]);
+  if(!plan.error)plan.card=String(next);return plan;
+}
+function planAddContractField(text,raw,target){
+  var path=builderTargetPath(raw,Object.assign({},target,{kind:'contract'})),value=path && specValueAt(raw,path);
+  if(!value)return {error:'Contract block not found.'};
+  if(value.fields!=null && !Array.isArray(value.fields))return {error:'Fix fields to be an array before adding a field.'};
+  var taken=Object.create(null);(value.fields || []).forEach(function(f){if(f && f.k)taken[f.k]=true;});
+  var field={k:builderUniqueKey(taken,'field'),v:'',g:''};
+  var plan=Array.isArray(value.fields)?jsonInsertMember(text,path.concat(['fields']),null,JSON.stringify(field,null,2)):
+    planSetField(text,raw,path,'fields',JSON.stringify([field],null,2));
+  if(!plan || plan.error)return plan || {error:'Could not add the field.'};
+  plan.index=(value.fields || []).length;return plan;
 }
 /* ---- src/workbench/commands/extraction.js ---- */
 /* Independent extraction is a graph edit, not a timeline split. The parent
@@ -31425,6 +31552,11 @@ function builderPositionLine(raw, target){
     }
     return 'step ' + (target.index + 1) + ' of ' + d.steps.length;
   }
+  if(target.kind==='contract'){
+    var cr=specSectionPaths(raw)[target.section],blocks=cr?sectionContracts(specValueAt(raw,cr.section)):[];
+    var index=blocks.findIndex(function(c){return c.key===(target.card==null?'legacy':String(target.card));});
+    return index<0?null:'block '+(index+1)+' of '+blocks.length;
+  }
   if (target.kind === 'section'){
     var n = specSectionPaths(raw).length;
     if (typeof target.section !== 'number' || target.section < 0 || target.section >= n) return null;
@@ -31586,6 +31718,11 @@ var BUILDER_GUIDES = {
       ['text', 'plain prose; `code` spans render in monospace']
     ]
   },
+  contract: {
+    title:'Contract block — size and content',
+    how:'Choose half width for two blocks side by side, or full width to stack. Blocks fill in source order and stack automatically in narrow embeds. Click a field row to edit it.',
+    fields:[['title','block heading'],['span','4 = third, 6 = half, 8 = two-thirds, 12 = full (default)'],['id','optional stable ID for links'],['source','source permalink'],['note','prose below the fields; supports code spans and fenced code'],['fields','k/v/g rows, each with optional step reveal timing']]
+  },
   crow: {
     title: 'Contract field — one "on the wire" row',
     how: 'Edit the row and Render. Rows without a k key are skipped by the renderer.',
@@ -31610,7 +31747,7 @@ var BUILDER_GUIDES = {
   },
   section: {
     title: 'Section — one accent-colored box',
-    how: 'Edit the selected JSON, then click Render. Everything inside is optional; a section is prose, an optional contract card, and an optional diagram.',
+    how: 'Edit the selected JSON, then click Render. Everything inside is optional; a section is prose, optional contract blocks, and an optional diagram.',
     fields: [
       ['heading', 'section heading'],
       ['id', 'optional stable identity for links and node details; renaming updates local detail references'],
@@ -31619,7 +31756,7 @@ var BUILDER_GUIDES = {
       ['source', 'permalink URL — "source ↗" chip beside the heading'],
       ['text', 'paragraph or list of paragraphs above the diagram'],
       ['bullets', 'bullet list; entries may reveal/hide per step'],
-      ['contract', '"on the wire" message-contract card'],
+      ['contract / contracts', 'legacy single card or an ordered array of sized contract blocks'],
       ['diagram', 'the board: nodes, rows, edges, panels, steps']
     ]
   }
@@ -31710,11 +31847,11 @@ function createBuilderInspector(opts){
   function clipboard(){return disposed?null:opts.clipboard.current();}
   function targetIdentity(){
     var t=session.target;
-    return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.block,t.tab,t.pathId]):null;
+    return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.card,t.block,t.tab,t.pathId]):null;
   }
   function multiIdentity(targets){
     return JSON.stringify([session.snapshot().project,targets.map(function(t){
-      return JSON.stringify([t.kind,t.section,t.id,t.index,t.block,t.tab,t.pathId]);
+      return JSON.stringify([t.kind,t.section,t.id,t.index,t.card,t.block,t.tab,t.pathId]);
     }).sort()]);
   }
   function beginForm(identity){
@@ -32923,12 +33060,47 @@ function panelForm(val, ctx){
     return rows.concat(panelSetupRows(val));
   }
 
+function selectContract(section,card,kind,index){
+    var t={section:section,kind:kind || 'contract',card:card,index:index};
+    selectTarget(Object.assign(t,{el:findTargetEl(t)}),false);
+  }
+function addContract(section,copy){
+    return commitCascade(function(raw){return planAddContract(session.text(),raw,section,copy);},
+      {after:function(plan){selectContract(section,plan.card);}});
+  }
+function contractManager(section,val){
+    var list=document.createElement('div');list.className='contract-manager';
+    sectionContracts(val).forEach(function(rec){
+      var width={4:'⅓',6:'½',8:'⅔',12:'full'}[contractColumnSpan(rec.value.span)];
+      list.appendChild(actionButton((rec.value.title || 'On the wire')+' · '+width+' width',function(){selectContract(section,rec.key);}));
+    });
+    list.appendChild(actionButton('+ Add contract block',function(){addContract(section);}));
+    return list;
+  }
+function contractForm(val,ctx){
+    var t=session.target,widths={'Full width':12,'Half width':6,'Third width':4,'Two-thirds width':8};
+    var selected=Object.keys(widths).find(function(label){return widths[label]===contractColumnSpan(val.span);});
+    var widthControl=selectControl(Object.keys(widths),selected,function(v){return commitSimple('span',String(widths[v]));});
+    widthControl.setAttribute('aria-label','Contract block width');
+    return [
+      frow('title',textControl(val.title,function(v){return commitSimple('title',v==null?null:JSON.stringify(v));})),
+      frow('Width',widthControl),
+      frow('source',textControl(val.source,function(v){return commitSimple('source',v==null?null:JSON.stringify(v));},{placeholder:'permalink URL'})),
+      frow('note',textControl(val.note,function(v){return commitSimple('note',v==null?null:JSON.stringify(v));},{textarea:true})),
+      frowBlock('Fields',actionButton('+ Add field',function(){
+        commitCascade(function(raw){return planAddContractField(session.text(),raw,t);},
+          {after:function(plan){selectContract(t.section,t.card,'crow',plan.index);}});
+      })),
+      frowBlock('Section',actionButton('All contract blocks',function(){selectTarget({kind:'section',section:t.section,el:findTargetEl({kind:'section',section:t.section})},false);}))
+    ];
+  }
 function sectionForm(val, ctx){
     ensureAccentDatalist();
     var target=session.target;
     function identity(key,value){return commitCascade(function(raw){return planSetSectionIdentity(session.text(),raw,target.section,key,value);});}
     return [
       frow('heading', textControl(val.heading, function(v){ return identity('heading',v); })),
+      frowBlock('Contract blocks',contractManager(target.section,val)),
       frow('Stable section ID',textControl(val.id,function(v){return identity('id',v);},{placeholder:'optional stable-section-id'})),
       frow('Detail only',checkboxControl(val.detailOnly,function(on){return commitSimple('detailOnly',on?'true':null);})),
       frow('accent', textControl(val.accent, function(v){ return commitSimple('accent', v == null ? null : JSON.stringify(v)); },
@@ -32963,7 +33135,9 @@ function paraForm(val, ctx){
   }
 
 function crowForm(val, ctx){
+    var target=session.target;
     return [
+      frowBlock('Block',actionButton('Edit contract block',function(){selectContract(target.section,target.card);})),
       frow('k', textControl(val.k, function(v){
         if (v == null){ formError('a contract row needs k — the field name'); return false; }
         return commitSimple('k', JSON.stringify(v));
@@ -33294,6 +33468,7 @@ function renderInspector(){
         t.kind === 'bullet' ? bulletForm(val, ctx) :
         t.kind === 'para' ? paraForm(val, ctx) :
         t.kind === 'crow' ? crowForm(val, ctx) :
+        t.kind === 'contract' ? contractForm(val,ctx) :
         t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);
       rows.forEach(function(r){ form.appendChild(r); });
       guide.appendChild(form);
@@ -33320,6 +33495,17 @@ function renderInspector(){
               renderInspector();
             }});
         }));
+      }
+      if(t.kind==='contract'){
+        acts.appendChild(actionButton('Duplicate block',function(){addContract(t.section,val);}));
+        var contracts=sectionContracts(specValueAt(parsed.raw,rec.section)),ci=contracts.findIndex(function(c){return c.key===(t.card==null?'legacy':String(t.card));});
+        [-1,1].forEach(function(delta){
+          var move=actionButton(delta<0?'↑ Move earlier':'↓ Move later',function(){
+            commitCascade(function(raw){return planMoveContract(session.text(),raw,t,delta);},
+              {after:function(plan){selectContract(t.section,plan.card);}});
+          });
+          move.disabled=ci+delta<0 || ci+delta>=contracts.length;acts.appendChild(move);
+        });
       }
       if (t.kind === 'section'){
         acts.appendChild(actionButton('duplicate', function(){
@@ -33398,7 +33584,7 @@ function renderInspector(){
         }));
       }
       if (!armedHere)
-        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : 'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
+        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       guide.appendChild(acts);
     }
 
@@ -34117,7 +34303,8 @@ function createBuilderInteractions(opts){
               t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
               t.kind === 'bullet' ? '[data-dv-bullet="' + t.index + '"]' :
               t.kind === 'para' ? '[data-dv-para="' + t.index + '"]' :
-              t.kind === 'crow' ? '[data-dv-crow="' + t.index + '"]' :
+              t.kind === 'contract' ? '[data-dv-contract="'+cssQuote(t.card==null?'legacy':t.card)+'"]' :
+              t.kind === 'crow' ? '[data-dv-contract="'+cssQuote(t.card==null?'legacy':t.card)+'"] [data-dv-crow="' + t.index + '"]' :
                                   '[data-dv-panel="' + t.index + '"]';
     try { return secEl.querySelector(sel); } catch (ex){ return null; }
   }
@@ -34232,7 +34419,7 @@ function createBuilderInteractions(opts){
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
   function multiIdent(t){
-    return t.section + '|' + t.kind + '|' + (t.kind === 'node' ? t.id : t.index);
+    return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + (t.kind === 'node' ? t.id : t.index);
   }
   function clearMultiSelect(){
     multiSel.forEach(function(t){ if (t.el && t.el.classList) t.el.classList.remove('dv-sel'); });
@@ -34285,7 +34472,7 @@ function createBuilderInteractions(opts){
       var seedEl = findTargetEl(prev);
       if (seedEl){
         multiSel.push({section: prev.section, kind: prev.kind,
-                       id: prev.id, index: prev.index, el: seedEl});
+                       id: prev.id, index: prev.index, card:prev.card, el: seedEl});
         seedEl.classList.add('dv-sel');
       }
     }
@@ -34296,7 +34483,7 @@ function createBuilderInteractions(opts){
       if (gone.el && gone.el.classList) gone.el.classList.remove('dv-sel');
     } else {
       multiSel.push({section: target.section, kind: target.kind,
-                     id: target.id, index: target.index, el: target.el});
+                     id: target.id, index: target.index, card:target.card, el: target.el});
       if (target.el && target.el.classList) target.el.classList.add('dv-sel');
     }
     if (!multiSel.length){ dropMultiUI(); return; }
@@ -34305,7 +34492,7 @@ function createBuilderInteractions(opts){
       var only = multiSel[0];
       clearMultiSelect();
       selectTarget({section: only.section, kind: only.kind, id: only.id,
-                    index: only.index, el: only.el}, false);
+                    index: only.index, card:only.card, el: only.el}, false);
       return;
     }
     if (opts.workspace) opts.workspace.showTool('inspect', {closeUtilities:true});
@@ -34383,7 +34570,7 @@ function createBuilderInteractions(opts){
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
     var gi = parseInt(secEl.getAttribute('data-dv-section'), 10);
     if (isNaN(gi)) return null;
-    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-para], [data-dv-crow]');
+    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-para], [data-dv-crow], [data-dv-contract]');
     if (el && secEl.contains(el)){
       if (el.hasAttribute('data-dv-node'))
         return {section: gi, kind: 'node', id: el.getAttribute('data-dv-node'), el: el};
@@ -34396,7 +34583,8 @@ function createBuilderInteractions(opts){
       if (el.hasAttribute('data-dv-para'))
         return {section: gi, kind: 'para', index: parseInt(el.getAttribute('data-dv-para'), 10), el: el};
       if (el.hasAttribute('data-dv-crow'))
-        return {section: gi, kind: 'crow', index: parseInt(el.getAttribute('data-dv-crow'), 10), el: el};
+        return {section: gi, kind: 'crow', card:el.closest('[data-dv-contract]').getAttribute('data-dv-contract'), index: parseInt(el.getAttribute('data-dv-crow'), 10), el: el};
+      if(el.hasAttribute('data-dv-contract'))return {section:gi,kind:'contract',card:el.getAttribute('data-dv-contract'),el:el};
       /* halo and label clicks resolve to the same edge — highlight the
          visible edge path (the halo has no selected style of its own) */
       var edgeIdx = parseInt(el.getAttribute('data-dv-edge'), 10);
@@ -34416,7 +34604,7 @@ function createBuilderInteractions(opts){
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     session.target = {section: target.section, kind: target.kind,
-                     id: target.id, index: target.index,
+                     id: target.id, index: target.index, card:target.card,
                      block: target.block, tab: target.tab};
     if (target.kind !== 'tab') session.insertSection = target.section;
     var parsed = parseEditor();
@@ -34477,7 +34665,7 @@ function createBuilderInteractions(opts){
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .path-chip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
-    '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, ' +
+    '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-section, #add-tabs, #add-contract, ' +
     '#import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown
@@ -35324,7 +35512,7 @@ function initDiagramAddMenu(opts){
   var preset=doc.getElementById('diagram-add-preset'),presetLabel=doc.getElementById('diagram-add-preset-label');
   var error=doc.getElementById('diagram-add-error'),help=doc.getElementById('diagram-add-help');
   var choices=Array.from(dialog.querySelectorAll('[data-add-kind]')),actions=Array.from(dialog.querySelectorAll('[data-add-action]'));
-  var structure=[doc.getElementById('add-section'),doc.getElementById('add-tabs')];
+  var structure=[doc.getElementById('add-section'),doc.getElementById('add-tabs'),doc.getElementById('add-contract')];
   var kind='node',snapshot=null,invalid=false,optionsKey='';
   var copy={node:'Choose a preset, then edit the node in the inspector.',
     edge:'Choose a source node, then a target node in this section. Escape cancels.',
@@ -35431,6 +35619,9 @@ function builderOutline(raw, query){
         entries.push({label: label, context: context, target: target, path: path, tab: tab});
     }
     add('section', sec.heading || 'Section ' + (section + 1));
+    sectionContracts(sec).forEach(function(rec){
+      add('contract',rec.value.title || 'On the wire',{card:rec.key});
+    });
     Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || id) + ' · ' + id, {id: id}); });
     Object.keys(d.groups || {}).forEach(function(id){ add('group', ((d.groups[id] || {}).title || id) + ' · ' + id, {id: id}); });
     (Array.isArray(d.edges) ? d.edges : []).forEach(function(e, index){
@@ -35731,6 +35922,7 @@ function diffSpecs(oldObj, newObj){
       if (i < as.length) allFields(as[i], step, dp.concat(['steps', i]), label + ': step ' + (i + 1));
     });
     compareList(a.panels, b.panels, dp.concat(['panels']), function(p){ return p.id; }, label + ': panel', ['id']);
+    compareList(prev.value.contracts,ref.value.contracts,path.concat(['contracts']),function(c){return c.id || c.title || 'Contract';},label+': contract block',['id']);
     compareList(object(prev.value.contract).fields, object(ref.value.contract).fields,
       path.concat(['contract', 'fields']), function(f){ return f.k; }, label + ': contract field', ['k']);
   });
@@ -36279,20 +36471,21 @@ function initWorkbenchBuilder(opts){
     if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
     if (plan.kind === 'section') session.insertSection = plan.index;
     var identity = {section: plan.kind === 'section' ? plan.index : session.insertSection,
-                    kind: plan.kind, id: plan.id, index: plan.index};
+                    kind: plan.kind, id: plan.id, index: plan.index, card:plan.card};
     var el = findTargetEl(identity);
     selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
-                  index: identity.index, el: el}, false);
+                  index: identity.index, card:identity.card, el: el}, false);
     selectRange(plan);
   }
   var addButtons = {
     'add-step': ['step', planAddStep],
-    'add-section': ['section', planAddSection]
+    'add-section': ['section', planAddSection],
+    'add-contract': ['contract',planAddContract]
   };
   Object.keys(addButtons).forEach(function(id){
     var btn = document.getElementById(id);
     if (btn) life.listen(btn,'click', function(){
-      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-section');
+      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-section' || id==='add-contract');
     });
   });
   /* + edge draws by clicking source then target (Esc cancels) */

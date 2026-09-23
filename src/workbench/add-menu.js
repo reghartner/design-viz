@@ -7,7 +7,7 @@ function initDiagramAddMenu(opts){
   var preset=doc.getElementById('diagram-add-preset'),presetLabel=doc.getElementById('diagram-add-preset-label');
   var error=doc.getElementById('diagram-add-error'),help=doc.getElementById('diagram-add-help');
   var choices=Array.from(dialog.querySelectorAll('[data-add-kind]')),actions=Array.from(dialog.querySelectorAll('[data-add-action]'));
-  var structure=[doc.getElementById('add-section'),doc.getElementById('add-tabs')];
+  var structure=[doc.getElementById('add-section'),doc.getElementById('add-tabs'),doc.getElementById('add-contract')];
   var kind='node',snapshot=null,invalid=false,optionsKey='';
   var copy={node:'Choose a preset, then edit the node in the inspector.',
     edge:'Choose a source node, then a target node in this section. Escape cancels.',

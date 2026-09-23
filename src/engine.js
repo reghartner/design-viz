@@ -952,44 +952,6 @@ var COPY_FAIL_ICON = '<svg class="copyglyph" viewBox="0 0 16 16" width="13" heig
    shows just this section's diagram (for iframes / direct links) */
 var EMBED_ICON = '<svg class="copyglyph" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.6"/><path d="M5.4 8h5.2M8.6 6l2 2-2 2"/></svg>';
 
-function contractCardHTML(contract, sectionReference){
-  if (!contract || typeof contract !== 'object' || Array.isArray(contract)) return '';
-  var addressed = (typeof sectionReference === 'number' && sectionReference > 0) ||
-                  (typeof sectionReference === 'string' && sectionReference.length > 0);
-  var sectionAddress = addressed ? esc(String(sectionReference)) : '';
-  var h = '<div class="ctcard"' + (addressed ? ' id="contract-' + sectionAddress + '"' : '') + '>';
-  var src = (contract.source && typeof contract.source === 'string') ?
-    ' <a class="srcchip" href="' + esc(contract.source) + '" target="_blank" rel="noopener">source &#8599;</a>' : '';
-  if (contract.title || src || addressed){
-    h += '<div class="cttitle"><span>' + esc(contract.title || 'On the wire') + src + '</span>';
-    if (addressed) h += '<button type="button" class="copychip contractcopy" title="Copy link" aria-label="Copy link to this contract card">' + COPY_ICON + '</button>';
-    h += '</div>';
-  }
-  var rows = Array.isArray(contract.fields) ? contract.fields : [];
-  var body = '', renderedRow = 0;
-  rows.forEach(function(f, fi){
-    if (!f || typeof f !== 'object' || !f.k) return;
-    renderedRow++;
-    var link = (f.link && typeof f.link === 'string') ?
-      ' <a class="ctlink" href="' + esc(f.link) + '" target="_blank" rel="noopener" aria-label="Source for ' +
-      esc(f.k) + '">&#8599;</a>' : '';
-    var delta = ['added','removed','changed'].indexOf(f.delta) >= 0 ? f.delta : null;
-    var badge = delta ? ' <span class="ctdelta" aria-label="' + delta + ' field">' + delta + '</span>' : '';
-    body += '<tr class="ctrow' + (f.hot === true ? ' hot' : '') +
-            (delta ? ' delta-' + delta : '') + '"' +
-            ' data-dv-crow="' + fi + '"' + /* spec index — malformed rows are skipped, so the rendered position can lag it */
-            (addressed ? ' id="contract-' + sectionAddress + '-row-' + renderedRow +
-             '" tabindex="-1" aria-label="Contract field ' + esc(f.k) + '"' : '') +
-            fragmentAttrs(f) + '>' +
-            '<td class="ctk"><span class="ctkey">' + esc(f.k) + link + '</span>' + badge + '</td>' +
-            '<td class="ctv">' + (f.v != null ? esc(f.v) : '') + '</td>' +
-            '<td class="ctg">' + (f.g != null ? proseMarkup(f.g) : '') + '</td></tr>';
-  });
-  if (body) h += '<table class="cttable">' + body + '</table>';
-  if (contract.note) h += '<div class="ctnote">' + proseMarkup(contract.note) + '</div>';
-  h += '</div>';
-  return h;
-}
 
 
 /* ---------------- software state panels ---------------- */
@@ -1913,7 +1875,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.style.setProperty('--acc', acc);
   var intro = sectionIntroHTML(sec, gi, sectionReference);
   var inner = intro.html;
-  inner += contractCardHTML(sec.contract, sectionReference);
+  inner += contractBlocksHTML(sec, sectionReference);
   box.innerHTML = inner;
   container.appendChild(box);
   var prose = intro.hasProse ? createProseController(
@@ -1923,6 +1885,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     box.querySelector('.sec-teaser')) : null;
   var result = {sectionEl:box, stepper:null, boardSize:null,
                 prose:prose,
+                contractCards:Array.prototype.slice.call(box.querySelectorAll('.ctcard')),
                 contractCard:box.querySelector('.ctcard'),
                 contractRows:Array.prototype.slice.call(box.querySelectorAll('.ctrow'))};
   if (!sec.diagram) return result;
@@ -2177,7 +2140,7 @@ function renderPage(view, page, skin, backlinks, options){
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                flowDisclosure:built.flowDisclosure, presentation:built.presentation,
-               contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
+               contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);
     return built;
@@ -2271,7 +2234,8 @@ function renderPage(view, page, skin, backlinks, options){
     sections:ctl.sections.map(function(sec){
       return {number:sec.number, reference:sec.reference, aliases:sec.aliases, hasDiagram:sec.hasDiagram, tabBlock:sec.tabBlock, tab:sec.tab,
               stepIds:sec.stepper ? sec.stepper.ids() : null,
-              hasCard:!!sec.contractCard, rowCount:sec.contractRows.length};
+              hasCard:!!sec.contractCard, rowCount:sec.contractCard?sec.contractCard.querySelectorAll('.ctrow').length:0,
+              cards:sec.contractCards.map(function(card){return {reference:card.getAttribute('data-contract-ref'),rowCount:card.querySelectorAll('.ctrow').length};})};
     })
   };
   if (ctl.tabBlocks.length){
@@ -2559,7 +2523,7 @@ function wireDeepLinks(ctl, win, preservedHash){
   function cloneState(state){
     return {tabBlock:state.tabBlock, tab:state.tab,
             diagramSection:state.diagramSection,
-            cardSection:state.cardSection, row:state.row};
+            cardSection:state.cardSection, cardIndex:state.cardIndex, row:state.row};
   }
   function stateHash(state){
     var st = {};
@@ -2587,6 +2551,8 @@ function wireDeepLinks(ctl, win, preservedHash){
       var cardSec = section(state.cardSection);
       if (cardSec && cardSec.contractCard){
         st.c = String(cardSec.reference);
+        var card=cardSec.contractCards && cardSec.contractCards[state.cardIndex || 0];
+        if(card && card.getAttribute('data-contract-ref')!=='legacy')st.ct=card.getAttribute('data-contract-ref');
         if (state.row != null) st.r = String(state.row + 1);
       }
     }
@@ -2665,9 +2631,11 @@ function wireDeepLinks(ctl, win, preservedHash){
     var cardTarget = target.card;
     if (cardTarget){
       var cardSec = section(cardTarget.section);
-      targetEl = cardSec && cardSec.contractCard;
-      if (cardTarget.kind === 'row' && cardSec && cardSec.contractRows[cardTarget.row]){
-        var row = cardSec.contractRows[cardTarget.row];
+      var selectedCard=cardSec && (cardSec.contractCards ? cardSec.contractCards[cardTarget.cardIndex || 0] : cardSec.contractCard);
+      var selectedRows=selectedCard?Array.prototype.slice.call(selectedCard.querySelectorAll('.ctrow')):[];
+      targetEl = selectedCard;
+      if (cardTarget.kind === 'row' && selectedRows[cardTarget.row]){
+        var row = selectedRows[cardTarget.row];
         row.classList.add('dv-hash-target');
         targetEl = row;
         if (typeof row.focus === 'function'){
@@ -2683,6 +2651,7 @@ function wireDeepLinks(ctl, win, preservedHash){
       tab:target.explicitTab ? target.explicitTab.tab : null,
       diagramSection:diagramTarget ? diagramTarget.section : null,
       cardSection:cardTarget ? cardTarget.section : null,
+      cardIndex:cardTarget ? cardTarget.cardIndex : null,
       row:cardTarget && cardTarget.kind === 'row' ? cardTarget.row : null
     };
     if (cardTarget)
@@ -2734,13 +2703,14 @@ function wireDeepLinks(ctl, win, preservedHash){
       state.diagramSection = sec.number;
       return stateHash(state);
     });
-    if (sec.contractCard) bindCopy(sec.contractCard.querySelector('.contractcopy'),
+    (sec.contractCards || (sec.contractCard?[sec.contractCard]:[])).forEach(function(card,index){bindCopy(card.querySelector('.contractcopy'),
       function(){
         var state = cloneState(fragmentState);
         state.cardSection = sec.number;
+        state.cardIndex = index;
         state.row = null;
         return stateHash(state);
-      });
+      });});
   });
   ctl.tabBlocks.forEach(function(tb){
     tb.copyButtons.forEach(function(button, i){

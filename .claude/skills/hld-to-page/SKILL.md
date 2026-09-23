@@ -69,6 +69,9 @@ plan concise; it is a reviewable artifact, not a reasoning transcript.
 - Each path starts from panel initial state and folds its own sparse patches.
   Specify honest endings, including early termination. Never inherit another
   outcome's notification, recovery, or success to make an ending feel complete.
+- For multiple message contracts in one section, follow `docs/contract-blocks.md`
+  (relative to VIZ): use `contracts` with stable IDs and `span:6` for two across
+  or `span:12` to stack; keep their field rows and evidence independent.
 - Pick panels for the question they answer. Home shows physical events; screens
   show camera experience; state/table/log/check panels explain software effects.
   Measurements and computed widgets require supported inputs. Do not invent

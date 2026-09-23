@@ -42,7 +42,8 @@ def load_sections(text):
                 break
         return lines[start:end]
 
-    card = "\n".join(section(CARD_HEAD)).rstrip()
+    card = "\n".join(section(CARD_HEAD) + [""] +
+                     section("### Multiple contract blocks and widths")).rstrip()
 
     panel_lines = section(PANELS_HEAD)
     blocks, intro, tail, cur_type, cur = {}, [], [], None, []

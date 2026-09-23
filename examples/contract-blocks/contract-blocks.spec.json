@@ -1,0 +1,128 @@
+{
+  "page": {
+    "title": "Doorbell event \u2014 contracts at the boundary",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "doorbell-contracts",
+        "heading": "Request, acknowledgment and failure",
+        "text": "Illustrative payloads for a doorbell button press. Compare the request and response side by side; keep the failure rules below them. These are synthetic examples, not a vendor API.",
+        "contracts": [
+          {
+            "id": "request",
+            "title": "Doorbell \u2192 ingestion",
+            "span": 6,
+            "fields": [
+              {
+                "k": "event_id",
+                "v": "evt-123",
+                "g": "Stable key; retries keep the same value."
+              },
+              {
+                "k": "device_id",
+                "v": "doorbell-front",
+                "g": "Identifies the source device."
+              },
+              {
+                "k": "event_type",
+                "v": "button_press",
+                "g": "The physical event, independent of later recording."
+              }
+            ],
+            "note": "Authenticate the device before accepting this payload."
+          },
+          {
+            "id": "response",
+            "title": "Ingestion \u2192 doorbell",
+            "span": 6,
+            "fields": [
+              {
+                "k": "event_id",
+                "v": "evt-123",
+                "g": "Correlates with the request."
+              },
+              {
+                "k": "status",
+                "v": "accepted",
+                "g": "Durably queued; downstream work may still fail."
+              },
+              {
+                "k": "recording_id",
+                "v": "rec-456",
+                "g": "Reference for subsequent status lookups."
+              }
+            ],
+            "note": "An acknowledgment is **not** proof that recording has completed."
+          },
+          {
+            "id": "unavailable",
+            "title": "When ingestion is unavailable",
+            "span": 12,
+            "fields": [
+              {
+                "k": "status",
+                "v": "503",
+                "g": "Service cannot accept new work."
+              },
+              {
+                "k": "error",
+                "v": "ingestion_unavailable",
+                "g": "Explicit failure; do not display recording success."
+              },
+              {
+                "k": "retry_after_ms",
+                "v": "2000",
+                "g": "Illustrative retry delay. Preserve `event_id` to deduplicate."
+              }
+            ],
+            "note": "Failure example:\n```json\n{ \"event_id\": \"evt-123\", \"error\": \"ingestion_unavailable\" }\n```"
+          }
+        ],
+        "diagram": {
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "icon": "camera"
+            },
+            "ingestion": {
+              "title": "Event ingestion",
+              "icon": "cloud"
+            }
+          },
+          "rows": [
+            [
+              "doorbell",
+              "ingestion"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "doorbell",
+              "to": "ingestion",
+              "label": "Button press"
+            },
+            {
+              "from": "ingestion",
+              "to": "doorbell",
+              "label": "Accepted"
+            }
+          ],
+          "steps": [
+            {
+              "id": "press",
+              "edge": "doorbell->ingestion",
+              "text": "Send the button press with a stable `event_id`."
+            },
+            {
+              "id": "ack",
+              "edge": "ingestion->doorbell",
+              "text": "Acknowledge durable acceptance. Recording completion is a separate outcome."
+            }
+          ],
+          "view": "step",
+          "autoplay": false
+        }
+      }
+    ]
+  }
+}

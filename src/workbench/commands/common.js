@@ -198,7 +198,11 @@ function builderDeletePlan(text, raw, t){
     if (sec && typeof sec.text === 'string') return planSetField(text, raw, rec.section, 'text', null);
     return planDeleteListItem(text, raw, rec.section.concat(['text']), t.index);
   }
-  if (t.kind === 'crow') return planDeleteListItem(text, raw, rec.section.concat(['contract', 'fields']), t.index);
+  if (t.kind === 'crow') return planDeleteListItem(text, raw, builderTargetPath(raw,t).slice(0,-1), t.index);
+  if (t.kind === 'contract'){
+    var cp=builderTargetPath(raw,t);
+    return jsonRemoveMember(text,cp.slice(0,-1),cp[cp.length-1]) || {error:'contract block not found'};
+  }
   return planDeleteSection(text, raw, t.section);
 }
 

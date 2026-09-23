@@ -13,7 +13,7 @@ var FlowviewCompatibility = (function(){
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
-    'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
+    'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
@@ -77,15 +77,16 @@ var FlowviewCompatibility = (function(){
         if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;
       }
     }
+    function contracts(s){if(object(s) && (Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null))used['content.contracts']=true;}
     if(!object(page))return [];
     if(page.nodes && page.rows)diagram(page);
     var blocks=page.blocks || page.sections;
     (Array.isArray(blocks)?blocks:[]).forEach(function(b){
       if(!object(b))return;
       if(b.id!=null || b.detailOnly)used['flow.drilldown']=true;
-      diagram(b.diagram);
+      diagram(b.diagram);contracts(b);
       (Array.isArray(b.tabs)?b.tabs:[]).forEach(function(t){
-        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);});
+        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);contracts(s);});
       });
     });
     return Object.keys(used).sort();
@@ -641,12 +642,12 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     warnings.push(P + '.source: must be a URL string — source chip skipped');
   if (Object.prototype.hasOwnProperty.call(sec, 'collapsed') && typeof sec.collapsed !== 'boolean')
     warnings.push(P + '.collapsed: must be a boolean — using the expanded default');
-  if (sec.contract != null){
-    var CP = P + '.contract';
-    if (typeof sec.contract !== 'object' || Array.isArray(sec.contract)){
+  function checkContract(ct,CP){
+    if (!ct || typeof ct !== 'object' || Array.isArray(ct)){
       warnings.push(CP + ': must be an object {title?, source?, fields:[...], note?} — card skipped');
     } else {
-      var ct = sec.contract;
+      if(ct.span!=null && [4,6,8,12].indexOf(ct.span)<0)warnings.push(CP+'.span: use 4 (third), 6 (half), 8 (two-thirds), or 12 (full) — using full width');
+      if(ct.id!=null && (typeof ct.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(ct.id) || ct.id==='legacy'))warnings.push(CP+'.id: use a stable ID beginning with a letter; "legacy" is reserved');
       if (ct.source && typeof ct.source !== 'string')
         warnings.push(CP + '.source: must be a URL string — source chip skipped');
       if (!Array.isArray(ct.fields) || !ct.fields.length){
@@ -666,8 +667,21 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       });
     }
   }
-  if (!sec.diagram && !sec.text && !sec.bullets && !sec.heading && !sec.contract)
-    warnings.push(P + ': empty section — add heading, text, bullets, contract, or diagram');
+  if(sec.contract!=null)checkContract(sec.contract,P+'.contract');
+  if(sec.contracts!=null){
+    if(!Array.isArray(sec.contracts))warnings.push(P+'.contracts: must be an array of contract blocks — blocks skipped');
+    else sec.contracts.forEach(function(ct,i){checkContract(ct,P+'.contracts['+i+']');});
+  }
+  var contractIds=Object.create(null);
+  sectionContracts(sec).forEach(function(rec){
+    var id=rec.value.id;
+    if(typeof id==='string' && id){
+      if(contractIds[id])warnings.push(P+'.contracts: duplicate contract id "'+id+'" — links use positions instead');
+      contractIds[id]=true;
+    }
+  });
+  if (!sec.diagram && !sec.text && !sec.bullets && !sec.heading && !sectionContracts(sec).length)
+    warnings.push(P + ': empty section — add heading, text, bullets, contracts, or diagram');
   var d = sec.diagram;
   if (!d) return;
   var DP = P + '.diagram';
@@ -1031,6 +1045,7 @@ function parseHash(h){
           x: kv.x != null ? kv.x : null,
           e: kv.e != null ? kv.e : null,
           m: (kv.m === 'step' || kv.m === 'ambient') ? kv.m : null};
+  if (kv.ct != null) result.ct=kv.ct;
   if (kv.p != null) result.p = kv.p;
   if (kv.v != null) result.v = kv.v;
   if (kv.q != null) result.q = kv.q;
@@ -1052,6 +1067,7 @@ function buildHash(st){
   if (st && st.s != null) parts.push('s=' + encodeURIComponent(st.s));
   if (st && st.q != null) parts.push('q=' + encodeURIComponent(st.q));
   if (st && st.c != null) parts.push('c=' + encodeURIComponent(st.c));
+  if (st && st.ct != null) parts.push('ct=' + encodeURIComponent(st.ct));
   if (st && st.r != null) parts.push('r=' + encodeURIComponent(st.r));
   if (st && st.x != null) parts.push('x=' + encodeSectionRefList(st.x));
   if (st && st.e != null) parts.push('e=' + encodeSectionRefList(st.e));
@@ -1181,10 +1197,17 @@ function resolveHashTarget(st, manifest){
   if (st.c != null){
     var cardSec = sectionAt(st.c);
     if (!cardSec || !cardSec.hasCard) return {kind:'invalid'};
-    var row = st.r != null ? oneBasedIndex(st.r, cardSec.rowCount || 0) : null;
+    var cards=cardSec.cards || [],cardIndex=0;
+    if(st.ct!=null){
+      cardIndex=cards.findIndex(function(card){return card.reference===String(st.ct);});
+      if(cardIndex<0)return {kind:'invalid'};
+    }
+    var rowCount=cards[cardIndex]?cards[cardIndex].rowCount:cardSec.rowCount;
+    var row = st.r != null ? oneBasedIndex(st.r, rowCount || 0) : null;
     if (row === -1) row = null; /* bad/out-of-range row ref degrades to the card */
     cardTarget = route(cardSec, {kind:row == null ? 'card' : 'row', section:cardSec.number,
                                  row:row, tabBlock:null, tab:null});
+    if(st.ct!=null)cardTarget.cardIndex=cardIndex;
   }
 
   var tabTarget = block && ti >= 0 ? {kind:'tab', tabBlock:block.index, tab:ti} : null;
@@ -1265,6 +1288,31 @@ function sectionRecords(page){
   });
   return out;
 }
+/* ---- src/core/contracts.js ---- */
+/* Contract block identities are shared by validation, rendering and authoring.
+   Keep legacy contract first when both forms are present; never rewrite it just
+   to append a new block. Raw indexes survive malformed skipped entries. */
+function sectionContracts(section){
+  var out=[];
+  function add(value,path,key){
+    if(!value || typeof value!=='object' || Array.isArray(value))return;
+    out.push({value:value,path:path,key:key});
+  }
+  if(section){
+    add(section.contract,['contract'],'legacy');
+    (Array.isArray(section.contracts)?section.contracts:[]).forEach(function(value,index){
+      add(value,['contracts',index],String(index));
+    });
+  }
+  var ids=Object.create(null);
+  out.forEach(function(rec){if(typeof rec.value.id==='string')ids[rec.value.id]=(ids[rec.value.id] || 0)+1;});
+  out.forEach(function(rec){
+    var id=rec.value.id;
+    rec.reference=rec.key==='legacy'?'legacy':typeof id==='string' && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(id) && id!=='legacy' && ids[id]===1?id:String(Number(rec.key)+1);
+  });
+  return out;
+}
+function contractColumnSpan(value){return [4,6,8,12].indexOf(value)>=0?value:12;}
 /* ---- src/core/paths.js ---- */
 /* Pure step/path projection. Uses shared isHex() and navigation stepIndexOf()
    at call time; indices always refer to the authored source step registry. */

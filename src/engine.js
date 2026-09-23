@@ -899,19 +899,6 @@ function pointInPoly(x, y, points){
   }
   return inside;
 }
-/* Whole-home geometry is bounded before any value reaches SVG. */
-/* Specs remain in the 320×180 authoring frame. The taller display spreads
-   positions vertically, while device/person glyphs and labels keep their shape. */
-function inlineMarkup(s){
-  var e = esc(s);
-  e = e.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(m, label, url){
-    return '<a class="ilink" href="' + url + '" target="_blank" rel="noopener">' + label + '</a>';
-  });
-  e = e.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');       /* bold before italic */
-  e = e.replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*/g, '$1<em>$2</em>'); /* remaining single stars */
-  e = e.replace(/`([^`]+)`/g, '<code>$1</code>');
-  return e;
-}
 
 /* Page-level document provenance. Kept as a pure string builder so the URL
    safety and separator rules stay independently testable without a DOM. */
@@ -942,11 +929,11 @@ function bulletsHTML(items, markTop){
   items.forEach(function(b, i){
     var mark = markTop ? ' data-dv-bullet="' + i + '"' : '';
     if (b && typeof b === 'object' && !Array.isArray(b)){
-      h += '<li' + mark + fragmentAttrs(b) + '>' + inlineMarkup(b.text != null ? String(b.text) : '');
+      h += '<li' + mark + fragmentAttrs(b) + '>' + proseMarkup(b.text != null ? String(b.text) : '');
       if (Array.isArray(b.sub) && b.sub.length) h += bulletsHTML(b.sub);
       h += '</li>';
     } else {
-      h += '<li' + mark + '>' + inlineMarkup(String(b)) + '</li>';
+      h += '<li' + mark + '>' + proseMarkup(String(b)) + '</li>';
     }
   });
   return h + '</ul>';
@@ -996,10 +983,10 @@ function contractCardHTML(contract, sectionReference){
             fragmentAttrs(f) + '>' +
             '<td class="ctk"><span class="ctkey">' + esc(f.k) + link + '</span>' + badge + '</td>' +
             '<td class="ctv">' + (f.v != null ? esc(f.v) : '') + '</td>' +
-            '<td class="ctg">' + (f.g != null ? esc(f.g) : '') + '</td></tr>';
+            '<td class="ctg">' + (f.g != null ? proseMarkup(f.g) : '') + '</td></tr>';
   });
   if (body) h += '<table class="cttable">' + body + '</table>';
-  if (contract.note) h += '<div class="ctnote">' + inlineMarkup(contract.note) + '</div>';
+  if (contract.note) h += '<div class="ctnote">' + proseMarkup(contract.note) + '</div>';
   h += '</div>';
   return h;
 }
@@ -1213,7 +1200,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       termbar.lanePill.style.color = lm.color;
       termbar.lanePill.style.borderColor = lm.color;
     }
-    stepText.textContent = s.text;
+    stepText.innerHTML = proseMarkup(s.text);
     if(termbar.evidenceLinks && typeof FlowCanon!=='undefined'){
       var stepLinks=FlowCanon.links(s);termbar.evidenceLinks.innerHTML='';
       appendCanonLinks(termbar.evidenceLinks,stepLinks);termbar.evidenceLinks.hidden=!stepLinks.length;
@@ -1755,7 +1742,7 @@ function sectionIntroHTML(sec, gi, sectionReference){
       (defaultCollapsed ? ' hidden' : '') + '>';
     var texts = typeof sec.text === 'string' ? [sec.text] :
                 (Array.isArray(sec.text) ? sec.text : []);
-    texts.forEach(function(t, ti){ h += '<p class="sec-text" data-dv-para="' + ti + '">' + inlineMarkup(t) + '</p>'; });
+    texts.forEach(function(t, ti){ h += '<div class="sec-text" data-dv-para="' + ti + '">' + proseMarkup(t) + '</div>'; });
     if (Array.isArray(sec.bullets) && sec.bullets.length) h += bulletsHTML(sec.bullets, true);
     h += '</div>';
     /* collapsed sections show one clamped line of the prose instead of
@@ -2057,7 +2044,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var chips = document.createElement('div'); chips.className = 'schips';
   if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
   var line = document.createElement('div'); line.className = 'stepline';
-  var stepN = document.createElement('b'); var stepText = document.createElement('span');
+  var stepN = document.createElement('b'); var stepText = document.createElement('div');stepText.className='step-text';
   var failureStatus = document.createElement('span'); failureStatus.className = 'comm-status'; failureStatus.hidden = true;
   failureStatus.setAttribute('aria-label','Communication failures');
   var lanePill = document.createElement('span');
@@ -2097,8 +2084,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     (diagram.steps || []).forEach(function(st){
       if(printFilter && printFilter.indexOf(st.id)<0)return;
       var li = document.createElement('li');
-      li.textContent = (st && st.lane ? '[' + st.lane + '] ' : '') + ((st && st.text) || '') +
-        (Object.keys(stepFailures(st)).length ? ' [' + communicationFailureText(diagram,stepFailures(st)) + ']' : '');
+      li.innerHTML = esc(st && st.lane ? '[' + st.lane + '] ' : '') + proseMarkup(st && st.text) +
+        esc(Object.keys(stepFailures(st)).length ? ' [' + communicationFailureText(diagram,stepFailures(st)) + ']' : '');
       ol.appendChild(li);
     });
   }
@@ -2797,6 +2784,7 @@ function wirePresenter(ctl, view, win){
   });
   doc.addEventListener('keydown', function(ev){
     if (!presenting()) return;
+    if (ev.key !== 'Escape' && ev.target && ev.target.closest && ev.target.closest('.prose-code')) return;
     var sp = ctl.activeStepper ? ctl.activeStepper() : null;
     if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft'){
       if (!sp) return;

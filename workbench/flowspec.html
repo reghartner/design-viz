@@ -1429,7 +1429,7 @@ g.coin.dv-sel circle{stroke:var(--accent); stroke-width:3.5; stroke-dasharray:7 
 }
 .pwidget.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
 section.doc-sec.dv-sel{outline:2px dashed var(--accent); outline-offset:3px; box-shadow:0 0 0 5px var(--selglow);}
-p.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; border-radius:4px; box-shadow:0 0 0 4px var(--selglow);}
+.sec-text.dv-sel, .sec-bullets li.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; border-radius:4px; box-shadow:0 0 0 4px var(--selglow);}
 tr.ctrow.dv-sel{outline:2px dashed var(--accent); outline-offset:-1px;}
 .tabbtn.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
 .schip.dv-sel{outline:2px dashed var(--accent); outline-offset:2px; box-shadow:0 0 0 4px var(--selglow);}
@@ -2025,6 +2025,25 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .steplink{color:#4956C9;}
 .steplink:hover{text-decoration:underline;}
 /* inline prose links (markdown [label](url) in text/bullets/notes) */
+.sec-text code,.sec-bullets code,.ctg code,.ctnote code,.step-text code,.printsteps code{
+  font:500 .93em/1.5 'IBM Plex Mono',monospace;overflow-wrap:anywhere;
+  padding:.08em .3em;border:1px solid color-mix(in srgb,currentColor 16%,transparent);
+  border-radius:4px;background:color-mix(in srgb,currentColor 6%,transparent);}
+.prose-code{box-sizing:border-box;max-width:100%;min-width:0;margin:10px 0;padding:12px 14px;
+  border:1px solid color-mix(in srgb,currentColor 20%,transparent);border-radius:9px;
+  background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;
+  overflow:auto;white-space:pre;tab-size:2;font:500 12px/1.6 'IBM Plex Mono',monospace;}
+.prose-code>.prose-block-code{display:block;padding:0;border:0;border-radius:0;background:transparent;
+  color:inherit;font:inherit;white-space:pre;overflow-wrap:normal;word-break:normal;}
+.prose-code:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
+/* Shrink text tracks around long code lines; only the code block scrolls. */
+.sec-text,.sec-bullets li,.ctnote,.stepline{min-width:0;overflow-wrap:anywhere;}
+.cttable:has(.prose-code){table-layout:fixed;}
+.cttable:has(.prose-code) .ctk{width:20%;white-space:normal;overflow-wrap:anywhere;}
+.cttable:has(.prose-code) .ctv{width:25%;white-space:normal;overflow-wrap:anywhere;}
+.cttable:has(.prose-code) .ctg{overflow-wrap:anywhere;}
+.step-text{display:inline;}
+@media print{.prose-code,.prose-code>.prose-block-code{white-space:pre-wrap;overflow-wrap:anywhere;overflow:visible;}}
 .ilink{text-decoration:underline; text-underline-offset:2px;}
 .sk-aurora .ilink{color:#63D9F5;}
 .sk-aurora .ilink:hover{color:#B5F0FF;}
@@ -3653,8 +3672,8 @@ body.sk-editorial .sec-text{
 }
 body.sk-editorial .sec-text strong,
 body.sk-editorial .sec-bullets strong{color:var(--ed-ink); font-weight:650;}
-body.sk-editorial .sec-text code,
-body.sk-editorial .sec-bullets code{
+body.sk-editorial .sec-text code:not(.prose-block-code),
+body.sk-editorial .sec-bullets code:not(.prose-block-code){
   padding:.08em .34em;
   border:1px solid var(--ed-rule);
   border-radius:2px;
@@ -25089,6 +25108,50 @@ PanelRegistry.extend('zoneframe', {
     },
   },
 });
+/* ---- src/viewer/prose.js ---- */
+/* Safe prose formatting only. Graph labels and panel values remain literal.
+   Parse the source, never generated HTML: code and link URLs are opaque. */
+function inlineMarkup(value, links){
+  var source=String(value == null ? '' : value),html='',position=0,match;
+  var tokens=/(`+)|\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*|\*(?![\s*])([^*\n]+?)\*(?!\*)/g;
+  while((match=tokens.exec(source))){
+    html+=esc(source.slice(position,match.index));
+    if(match[1]){
+      var end=/`+/g,close=null,run;end.lastIndex=tokens.lastIndex;
+      while((run=end.exec(source))){if(run[0].length===match[1].length){close=run;break;}}
+      if(close){
+        html+='<code>'+esc(source.slice(tokens.lastIndex,close.index).replace(/\r\n?|\n/g,' '))+'</code>';
+        tokens.lastIndex=close.index+close[0].length;
+      }else html+=esc(match[0]);
+    }else if(match[2]){
+      html+=links===false ? esc(match[0]) : '<a class="ilink" href="'+esc(match[3])+'" target="_blank" rel="noopener">'+inlineMarkup(match[2],false)+'</a>';
+    }else if(match[4]) html+='<strong>'+inlineMarkup(match[4],links)+'</strong>';
+    else if(match.index && source[match.index-1]==='*')html+=esc(match[0]);
+    else html+='<em>'+inlineMarkup(match[5],links)+'</em>';
+    position=tokens.lastIndex;
+  }
+  return html+esc(source.slice(position));
+}
+
+/* Backtick fences occupy their own lines, optionally with a language label.
+   A longer fence can quote shorter fences. An unfinished fence extends to EOF,
+   so editing a snippet never exposes its contents as prose/HTML. */
+function proseMarkup(value){
+  var source=String(value == null ? '' : value).replace(/\r\n?/g,'\n');
+  var fences=/^ {0,3}(`{3,})([^`\n]*)$/gm,position=0,html='',match;
+  while((match=fences.exec(source))){
+    html+=inlineMarkup(source.slice(position,match.index));
+    var start=fences.lastIndex+(source[fences.lastIndex]==='\n'?1:0);
+    var closing=new RegExp('^ {0,3}`{'+match[1].length+',}[ \\t]*$','gm');closing.lastIndex=start;
+    var end=closing.exec(source),language=match[2].trim().split(/\s+/)[0];
+    if(!/^[\w.+#-]+$/.test(language))language='';
+    html+='<pre class="prose-code" tabindex="0" aria-label="Code block'+(language?' ('+esc(language)+')':'')+'"'+
+      (language?' data-language="'+esc(language)+'"':'')+'><code class="prose-block-code">'+esc(source.slice(start,end?end.index:source.length))+'</code></pre>';
+    position=end?closing.lastIndex:source.length;
+    fences.lastIndex=position;
+  }
+  return html+inlineMarkup(source.slice(position));
+}
 /* ---- src/engine.js ---- */
 /* engine.js — board renderer, stepper and page renderer.
    Consumes document, navigation, path, layout, state and geometry helpers
@@ -25991,19 +26054,6 @@ function pointInPoly(x, y, points){
   }
   return inside;
 }
-/* Whole-home geometry is bounded before any value reaches SVG. */
-/* Specs remain in the 320×180 authoring frame. The taller display spreads
-   positions vertically, while device/person glyphs and labels keep their shape. */
-function inlineMarkup(s){
-  var e = esc(s);
-  e = e.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(m, label, url){
-    return '<a class="ilink" href="' + url + '" target="_blank" rel="noopener">' + label + '</a>';
-  });
-  e = e.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');       /* bold before italic */
-  e = e.replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*/g, '$1<em>$2</em>'); /* remaining single stars */
-  e = e.replace(/`([^`]+)`/g, '<code>$1</code>');
-  return e;
-}
 
 /* Page-level document provenance. Kept as a pure string builder so the URL
    safety and separator rules stay independently testable without a DOM. */
@@ -26034,11 +26084,11 @@ function bulletsHTML(items, markTop){
   items.forEach(function(b, i){
     var mark = markTop ? ' data-dv-bullet="' + i + '"' : '';
     if (b && typeof b === 'object' && !Array.isArray(b)){
-      h += '<li' + mark + fragmentAttrs(b) + '>' + inlineMarkup(b.text != null ? String(b.text) : '');
+      h += '<li' + mark + fragmentAttrs(b) + '>' + proseMarkup(b.text != null ? String(b.text) : '');
       if (Array.isArray(b.sub) && b.sub.length) h += bulletsHTML(b.sub);
       h += '</li>';
     } else {
-      h += '<li' + mark + '>' + inlineMarkup(String(b)) + '</li>';
+      h += '<li' + mark + '>' + proseMarkup(String(b)) + '</li>';
     }
   });
   return h + '</ul>';
@@ -26088,10 +26138,10 @@ function contractCardHTML(contract, sectionReference){
             fragmentAttrs(f) + '>' +
             '<td class="ctk"><span class="ctkey">' + esc(f.k) + link + '</span>' + badge + '</td>' +
             '<td class="ctv">' + (f.v != null ? esc(f.v) : '') + '</td>' +
-            '<td class="ctg">' + (f.g != null ? esc(f.g) : '') + '</td></tr>';
+            '<td class="ctg">' + (f.g != null ? proseMarkup(f.g) : '') + '</td></tr>';
   });
   if (body) h += '<table class="cttable">' + body + '</table>';
-  if (contract.note) h += '<div class="ctnote">' + inlineMarkup(contract.note) + '</div>';
+  if (contract.note) h += '<div class="ctnote">' + proseMarkup(contract.note) + '</div>';
   h += '</div>';
   return h;
 }
@@ -26305,7 +26355,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       termbar.lanePill.style.color = lm.color;
       termbar.lanePill.style.borderColor = lm.color;
     }
-    stepText.textContent = s.text;
+    stepText.innerHTML = proseMarkup(s.text);
     if(termbar.evidenceLinks && typeof FlowCanon!=='undefined'){
       var stepLinks=FlowCanon.links(s);termbar.evidenceLinks.innerHTML='';
       appendCanonLinks(termbar.evidenceLinks,stepLinks);termbar.evidenceLinks.hidden=!stepLinks.length;
@@ -26847,7 +26897,7 @@ function sectionIntroHTML(sec, gi, sectionReference){
       (defaultCollapsed ? ' hidden' : '') + '>';
     var texts = typeof sec.text === 'string' ? [sec.text] :
                 (Array.isArray(sec.text) ? sec.text : []);
-    texts.forEach(function(t, ti){ h += '<p class="sec-text" data-dv-para="' + ti + '">' + inlineMarkup(t) + '</p>'; });
+    texts.forEach(function(t, ti){ h += '<div class="sec-text" data-dv-para="' + ti + '">' + proseMarkup(t) + '</div>'; });
     if (Array.isArray(sec.bullets) && sec.bullets.length) h += bulletsHTML(sec.bullets, true);
     h += '</div>';
     /* collapsed sections show one clamped line of the prose instead of
@@ -27149,7 +27199,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var chips = document.createElement('div'); chips.className = 'schips';
   if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
   var line = document.createElement('div'); line.className = 'stepline';
-  var stepN = document.createElement('b'); var stepText = document.createElement('span');
+  var stepN = document.createElement('b'); var stepText = document.createElement('div');stepText.className='step-text';
   var failureStatus = document.createElement('span'); failureStatus.className = 'comm-status'; failureStatus.hidden = true;
   failureStatus.setAttribute('aria-label','Communication failures');
   var lanePill = document.createElement('span');
@@ -27189,8 +27239,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     (diagram.steps || []).forEach(function(st){
       if(printFilter && printFilter.indexOf(st.id)<0)return;
       var li = document.createElement('li');
-      li.textContent = (st && st.lane ? '[' + st.lane + '] ' : '') + ((st && st.text) || '') +
-        (Object.keys(stepFailures(st)).length ? ' [' + communicationFailureText(diagram,stepFailures(st)) + ']' : '');
+      li.innerHTML = esc(st && st.lane ? '[' + st.lane + '] ' : '') + proseMarkup(st && st.text) +
+        esc(Object.keys(stepFailures(st)).length ? ' [' + communicationFailureText(diagram,stepFailures(st)) + ']' : '');
       ol.appendChild(li);
     });
   }
@@ -27889,6 +27939,7 @@ function wirePresenter(ctl, view, win){
   });
   doc.addEventListener('keydown', function(ev){
     if (!presenting()) return;
+    if (ev.key !== 'Escape' && ev.target && ev.target.closest && ev.target.closest('.prose-code')) return;
     var sp = ctl.activeStepper ? ctl.activeStepper() : null;
     if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft'){
       if (!sp) return;
@@ -32897,7 +32948,7 @@ function crowForm(val, ctx){
         return commitSimple('k', JSON.stringify(v));
       }, {required: 'a contract row needs k — the field name'})),
       frow('v', textControl(val.v, function(v){ return commitSimple('v', v == null ? null : JSON.stringify(v)); })),
-      frow('g', textControl(val.g, function(v){ return commitSimple('g', v == null ? null : JSON.stringify(v)); })),
+      frow('g', textControl(val.g, function(v){ return commitSimple('g', v == null ? null : JSON.stringify(v)); }, {textarea:true})),
       frow('hot', checkboxControl(val.hot, function(on){ return commitSimple('hot', on ? 'true' : null); })),
       frow('delta', selectControl(['added', 'removed', 'changed'], val.delta, function(v){
         return commitSimple('delta', v == null ? null : JSON.stringify(v));
@@ -38548,6 +38599,9 @@ var CONTRACT = [
   '}',
   '',
   'Rules:',
+  '- Section text, bullets, step captions and contract notes/glosses support',
+  '  `inline code` and triple-backtick fenced code blocks. Code stays literal.',
+  '  Use actual newlines in text fields, \\n in JSON. Keep node/panel labels plain.',
   '- ONE diagram spec always yields BOTH flavors: the ambient animated view and',
   '  the guided step click-through. steps drives the numbered coins, the ambient',
   '  packet schedule, and the click-through playback (lit hops + caption from',

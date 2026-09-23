@@ -30,6 +30,12 @@ remain available. The Steps Path selector can inspect an alternate even when the
 current named view hides every step on that route. Editing and rerendering keep
 that exact authored step without changing the view's selected subset.
 
+Prose and step-text fields support backticks for inline code and triple-backtick
+fences for multiline code blocks. Enter real newlines in the text field; JSON
+source uses `\n`. Code remains literal, preserves indentation, and scrolls within
+its block. Node/edge labels and panel values remain plain text. See
+[prose markup](../contract/authoring-contract.md#section-object) for syntax and examples.
+
 Use **Focus workspace** above the skin controls to hide the introduction and
 reference material. On a desktop, the preview scrolls beside a viewport-sized
 editor. **Exit focus** returns to the normal page and its previous scroll

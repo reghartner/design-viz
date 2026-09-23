@@ -14,6 +14,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Happy and failure outcomes on the SAME diagram; aligned alternate timelines | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
 | Domain cards that open focused internals; a child flow matching the current outcome | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md`; stable section IDs, `detailOnly`, `node.detail`, explicit `stepMap` and `mode:"focus"` |
 | A send that never arrives, or a communication that is never sent | `docs/failed-communications.md` (also demonstrated in the alternate-path recipe) |
+| Inline backticks or fenced code in descriptions, bullets, notes or step captions | `contract/authoring-contract.md` → Prose markup; labels inside nodes and panels stay plain |
 | Copy/share steps across paths, continue a happy ending, or detach a shared step | `docs/workbench-step-reuse.md` |
 | Copy/paste Home elements, panels, nodes or sections between diagrams | `docs/workbench-clipboard.md`; copies are independent, with fresh IDs where scopes overlap |
 | Open a step view paused or playing; clarify Play / Pause state | `contract/authoring-contract.md` → `view` and `autoplay` |

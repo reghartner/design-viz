@@ -6,7 +6,10 @@ once in the logical `validator.js` bundle. The backend-only public facade lives
 in `core/backend.js`, included by the named `backend` entrypoint. Navigation and
 document helpers share the same outer scope;
 a document helper can call `sectionReferences()` in both browser and backend builds.
-The logical `engine.js` bundle adds the DOM renderer and player only.
+The logical `engine.js` bundle adds the DOM renderer, player and viewer-only
+helpers. `viewer/prose.js` owns safe inline/code-block formatting; it uses the
+shared `esc()` helper and is intentionally separate from SVG labels and panel
+values. Prose wrappers allow block elements while retaining workbench addresses.
 
 Use `readSource('validator.js')` from `tools/source-loader.cjs` in Node tools and VM
 tests. Add `readSource('engine.js')` only when rendering or playback is needed.

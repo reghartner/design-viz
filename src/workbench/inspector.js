@@ -1280,7 +1280,7 @@ function crowForm(val, ctx){
         return commitSimple('k', JSON.stringify(v));
       }, {required: 'a contract row needs k — the field name'})),
       frow('v', textControl(val.v, function(v){ return commitSimple('v', v == null ? null : JSON.stringify(v)); })),
-      frow('g', textControl(val.g, function(v){ return commitSimple('g', v == null ? null : JSON.stringify(v)); })),
+      frow('g', textControl(val.g, function(v){ return commitSimple('g', v == null ? null : JSON.stringify(v)); }, {textarea:true})),
       frow('hot', checkboxControl(val.hot, function(on){ return commitSimple('hot', on ? 'true' : null); })),
       frow('delta', selectControl(['added', 'removed', 'changed'], val.delta, function(v){
         return commitSimple('delta', v == null ? null : JSON.stringify(v));

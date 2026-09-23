@@ -268,6 +268,25 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .steplink{color:#4956C9;}
 .steplink:hover{text-decoration:underline;}
 /* inline prose links (markdown [label](url) in text/bullets/notes) */
+.sec-text code,.sec-bullets code,.ctg code,.ctnote code,.step-text code,.printsteps code{
+  font:500 .93em/1.5 'IBM Plex Mono',monospace;overflow-wrap:anywhere;
+  padding:.08em .3em;border:1px solid color-mix(in srgb,currentColor 16%,transparent);
+  border-radius:4px;background:color-mix(in srgb,currentColor 6%,transparent);}
+.prose-code{box-sizing:border-box;max-width:100%;min-width:0;margin:10px 0;padding:12px 14px;
+  border:1px solid color-mix(in srgb,currentColor 20%,transparent);border-radius:9px;
+  background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;
+  overflow:auto;white-space:pre;tab-size:2;font:500 12px/1.6 'IBM Plex Mono',monospace;}
+.prose-code>.prose-block-code{display:block;padding:0;border:0;border-radius:0;background:transparent;
+  color:inherit;font:inherit;white-space:pre;overflow-wrap:normal;word-break:normal;}
+.prose-code:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
+/* Shrink text tracks around long code lines; only the code block scrolls. */
+.sec-text,.sec-bullets li,.ctnote,.stepline{min-width:0;overflow-wrap:anywhere;}
+.cttable:has(.prose-code){table-layout:fixed;}
+.cttable:has(.prose-code) .ctk{width:20%;white-space:normal;overflow-wrap:anywhere;}
+.cttable:has(.prose-code) .ctv{width:25%;white-space:normal;overflow-wrap:anywhere;}
+.cttable:has(.prose-code) .ctg{overflow-wrap:anywhere;}
+.step-text{display:inline;}
+@media print{.prose-code,.prose-code>.prose-block-code{white-space:pre-wrap;overflow-wrap:anywhere;overflow:visible;}}
 .ilink{text-decoration:underline; text-underline-offset:2px;}
 .sk-aurora .ilink{color:#63D9F5;}
 .sk-aurora .ilink:hover{color:#B5F0FF;}
@@ -926,8 +945,8 @@ body.sk-editorial .sec-text{
 }
 body.sk-editorial .sec-text strong,
 body.sk-editorial .sec-bullets strong{color:var(--ed-ink); font-weight:650;}
-body.sk-editorial .sec-text code,
-body.sk-editorial .sec-bullets code{
+body.sk-editorial .sec-text code:not(.prose-block-code),
+body.sk-editorial .sec-bullets code:not(.prose-block-code){
   padding:.08em .34em;
   border:1px solid var(--ed-rule);
   border-radius:2px;

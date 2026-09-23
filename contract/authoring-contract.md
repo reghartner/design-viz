@@ -119,11 +119,11 @@ One accent-colored bounding box on the page:
 - `source` — optional permalink to the design-doc section this content came
   from. Renders as a small "source ↗" chip beside the heading (new tab).
 - `text` — optional. A string or an array of paragraph strings. Shown above
-  the diagram. Supports inline markup (see below).
+  the diagram. Supports prose markup and fenced code blocks (see below).
 - `bullets` — optional array of bullet items. Each item is either a **string**,
   or an object `{"text": "...", "sub": [ ...items ], "revealAt": 1,
   "hideAt": 3}` whose `sub` list renders as an indented child list. Nesting
-  may recurse. Items support inline markup. Reveal fields are optional; see
+  may recurse. Items support prose markup and fenced code blocks. Reveal fields are optional; see
   "fragment-level reveals" below.
 - `collapsed` — optional boolean. `true` starts this section's text and bullets
   collapsed; the heading, source chip, contract card, and diagram stay visible.
@@ -136,12 +136,33 @@ One accent-colored bounding box on the page:
   content with its own diagram, steps, paths and panels. See
   [domain drilldowns](../docs/drilldowns.md).
 
-**Inline markup** (in `text`, `bullets`, and a contract card's `note`): a small,
-safe subset, escaped first so it can never inject HTML.
+**Prose markup** (in section `text`, `bullets`, step `text`, and a contract
+card's `note` or field gloss `g`): a small, safe subset. Authored HTML is always
+escaped. Node/edge labels, headings, panel values, and contract keys/values stay
+literal; do not add Markdown to those labels.
 - `**bold**` → bold, `*italic*` → italic, `` `code` `` → monospace.
   Italics use `*`, not `_`, so `snake_case` identifiers are left alone.
 - `[label](https://url)` → an underlined link (new tab). Only `http`/`https`
   URLs become links; anything else renders as literal text.
+- Code spans are literal: Markdown, HTML, and links inside backticks are not
+  interpreted. Double backticks can enclose a single backtick.
+- Triple backticks on their own lines enclose a code block. An optional language
+  tag such as `json` is accepted; no syntax highlighting or external assets are
+  loaded. Indentation and line breaks are preserved, and long lines scroll
+  horizontally within the block. A closing fence has at least as many backticks
+  as its opener. An unfinished fence runs to the end of the text.
+
+For example, a section paragraph or step caption can use this JSON string:
+
+```json
+"text": "Send `eventId` to the service.\n```json\n{\n  \"eventId\": \"evt-123\",\n  \"type\": \"button_press\"\n}\n```\nThen acknowledge the request."
+```
+
+In a workbench text field, enter actual newlines; in JSON source, encode them
+as `\n`. Keep snippets short in step captions so the controls and diagram remain
+easy to scan. Longer examples belong in section prose. Formatting is also used
+by the printed step list and native embedded viewers. Existing generated HTML
+must be rebuilt to gain this support; no spec flag is required.
 
 **Bulleting style — match the source document.** A design doc (HLD) usually
 carries its argument as layered bullets, not prose paragraphs. Reproduce that
@@ -1222,8 +1243,9 @@ An ordered array walking the flow. Each step:
 - `panels` — optional sparse panel patches for this step (see "panels"):
   `{"panels": {"hp": {"state": "BOOT"}, "cam": {"mode": "live"}}}`.
 - `lane` — optional lane tag (declare colors in `page.lanes`).
-- `text` — one-line caption for the step (shown during click-through
-  playback). Required in practice.
+- `text` — caption for the step (shown during click-through playback).
+  Supports the prose markup and fenced code blocks described above. Prefer a
+  short explanation and only a small snippet. Required in practice.
 - `id` — optional stable step id, e.g. `"ota.3"`. Shown subtly on the caption
   line and addressable in deep links (`#d=ota-rollout&m=step&s=ota.3`), so meeting
   feedback can name a step unambiguously. Keep ids unique within a diagram.

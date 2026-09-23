@@ -70,8 +70,10 @@ content carries its link; content out of scope under the admissible
 reasons takes its permalink with it. "No natural element" is never a
 reason to drop a link. Mirror the HLD's formatting where it has any
 (nested bullets via `sub`, the same bolded terms, `*italic*` emphasis,
-`` `code` `` identifiers — only section text/bullets and contract `note`
-render markup; step text and labels are plain). Plain-prose sources get the
+`` `code` `` identifiers and fenced code where useful — section text/bullets,
+step text, contract `note` and field gloss `g` render markup. Code contents stay
+literal; node/edge labels, headings and panel values stay plain). Keep code in
+step captions short; longer snippets belong in section prose. Plain-prose sources get the
 contract's own bulleting style, declared in your report as yours. When a source HTTP(S) URL is supplied, use `page.generatedFrom` with that URL,
 its actual title/version, and the current clock for `at` (`MM-DD-YYYY hh:mm`).
 Do not guess a GitHub URL from a local path or invent a timestamp. Local-only

@@ -15,6 +15,7 @@
     "panels/types/*.js"
   ],
   "engine.js": [
+    "viewer/prose.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",

@@ -270,3 +270,77 @@ test('legacy steps without IDs retain their identities and receive no synthesize
   assert.deepEqual(result.parent.steps.map(step=>step.text),d.steps.map(step=>step.text));
   noInheritedStory(childOf(result));
 });
+
+test('bare diagram extraction wraps the overview in a page and Undo restores the exact shorthand source',()=>{
+  const raw={nodes:{outside:{title:'Outside'},accept:{title:'Accept'},store:{title:'Store'}},rows:[['outside','accept','store']],edges:[{from:'outside',to:'accept'},{from:'accept',to:'store'}],steps:[{id:'save',edge:'accept->store',text:'Save'}]},
+    text=' \n'+JSON.stringify(raw,null,4)+'\n',result=extract(raw,['accept','store'],{mode:'local',title:'Orders'},text);
+  assert.ok(result.next.page);assert.equal(B.specSectionPaths(result.next).length,2);
+  assert.deepEqual(result.parent.steps.map(step=>step.id),['save']);noInheritedStory(childOf(result));
+  const h=sessionFor(text);assert.equal(h.session.accept(result.plan),true);assert.equal(h.session.undo(),true);assert.equal(h.text,text);
+});
+
+test('extracting all nodes works when the source has no timeline or edges',()=>{
+  for(const mode of ['local','external']){
+    const raw={page:{sections:[{id:'overview',diagram:{nodes:{accept:{title:'Accept'},store:{title:'Store'}},rows:[['accept','store']]}}]}};
+    const result=extract(raw,['accept','store'],{mode,handoff:mode==='external'?{spec:'empty-story'}:undefined});
+    assert.deepEqual(Object.keys(result.parent.nodes),[result.plan.id]);assert.deepEqual(flatRows(result.parent),[result.plan.id]);
+    assert.equal((result.parent.edges || []).length,0);assert.equal((result.parent.steps || []).length,0);
+    assert.equal(result.plan.report.internalEdges,0);assert.deepEqual(plain(result.plan.report.affectedSteps),[]);
+    const child=mode==='local'?childOf(result):diagram(plain(result.plan.childSpec));
+    assert.deepEqual(Object.keys(child.nodes).sort(),['accept','store']);assert.equal(child.edges.length,0);noInheritedStory(child);
+  }
+});
+
+test('unrelated singleton stacks preserve their authored row shape',()=>{
+  const raw=fixture(),d=diagram(raw);d.rows=[[['client']],[['accept'],'store'],[['audit']]];valid(raw);
+  const result=extract(raw);assert.deepEqual(result.parent.rows[0],[['client']]);assert.deepEqual(result.parent.rows.at(-1),[['audit']]);
+});
+
+test('exported dependency closure can return to the original parent without losing its timeline or looping forever',()=>{
+  const raw=nestedFixture(),nested=raw.page.blocks[1].tabs[0].sections[1];
+  nested.diagram.nodes.done.detail={section:'overview',mode:'focus',step:'request',path:'success',ports:{in:'accept'},stepMap:{start:{step:'persist'}}};valid(raw);
+  const {plan,next}=extract(raw,['accept','store'],{mode:'external',handoff:{spec:'orders'}}),exported=plain(plan.childSpec);valid(exported);
+  const root=diagram(exported),nestedCopy=B.detailTarget(exported.page,root.nodes.accept.detail).section;
+  const originalParentCopy=B.detailTarget(exported.page,nestedCopy.diagram.nodes.done.detail).section;
+  assert.equal(B.specSectionPaths(exported).length,4,'each original dependency is copied once even through a cycle');
+  assert.deepEqual(originalParentCopy.diagram.steps,diagram(raw).steps);
+  assert.deepEqual(originalParentCopy.diagram.paths,diagram(raw).paths);
+  assert.equal(nestedCopy.diagram.nodes.done.detail.ports.in,'accept','export resolves against the original parent snapshot');
+  assert.equal(B.detailTarget(exported.page,originalParentCopy.diagram.nodes.accept.detail).section.id,nestedCopy.id);
+  assert.deepEqual(originalParentCopy.diagram.nodes.accept.detail.stepMap,diagram(raw).nodes.accept.detail.stepMap);
+  assert.equal(diagram(next,2).nodes.done.detail.ports.in,plan.id,'live parent references resolve against the extracted overview');
+});
+
+test('heading aliases resolve to their original targets before exported IDs are assigned',()=>{
+  const raw=nestedFixture();diagram(raw).nodes.accept.detail.section='nested-processing';
+  raw.page.blocks[1].tabs[0].sections[1].diagram.nodes.inner.detail.section='leaf-detail';valid(raw);
+  const {plan}=extract(raw,['accept','store'],{mode:'external',handoff:{spec:'orders'}}),exported=plain(plan.childSpec);
+  const nested=B.detailTarget(exported.page,diagram(exported).nodes.accept.detail).section;
+  assert.equal(nested.heading,'Nested processing');
+  assert.equal(B.detailTarget(exported.page,nested.diagram.nodes.inner.detail).section.heading,'Leaf detail');
+});
+
+test('an explicit dependency1 destination ID cannot capture a nested section that originally used the same ID',()=>{
+  const raw=nestedFixture();raw.page.blocks[1].tabs[0].sections[1].id='dependency1';
+  diagram(raw).nodes.accept.detail.section='dependency1';valid(raw);
+  const {plan}=extract(raw,['accept','store'],{mode:'external',handoff:{spec:'orders',section:'dependency1'}}),exported=plain(plan.childSpec);
+  assert.equal(section(exported,0).id,'dependency1');
+  const target=B.detailTarget(exported.page,diagram(exported).nodes.accept.detail).section;
+  assert.equal(target.heading,'Nested processing');assert.notEqual(target.id,'dependency1');
+  assert.equal(B.detailTarget(exported.page,target.diagram.nodes.inner.detail).section.heading,'Leaf detail');
+});
+
+test('generated dependency IDs avoid aliases belonging to a different exported dependency',()=>{
+  const raw=nestedFixture();raw.page.blocks[1].tabs[0].sections[2].heading='Dependency1';valid(raw);
+  const {plan}=extract(raw,['accept','store'],{mode:'external',handoff:{spec:'orders'}}),exported=plain(plan.childSpec);valid(exported);
+  const nested=B.detailTarget(exported.page,diagram(exported).nodes.accept.detail).section;
+  assert.equal(nested.heading,'Nested processing');
+  assert.equal(B.detailTarget(exported.page,nested.diagram.nodes.inner.detail).section.heading,'Dependency1');
+});
+
+test('generated dependency IDs avoid the exported root heading alias',()=>{
+  const raw=nestedFixture();valid(raw);
+  const {plan}=extract(raw,['accept','store'],{mode:'external',title:'Dependency1',handoff:{spec:'orders'}}),exported=plain(plan.childSpec);valid(exported);
+  assert.equal(section(exported,0).heading,'Dependency1');
+  assert.equal(B.detailTarget(exported.page,diagram(exported).nodes.accept.detail).section.heading,'Nested processing');
+});

@@ -728,7 +728,12 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     if (e.label){
       var lx = mid.x + (e.labelDx || 0), ly = mid.y - (stepN ? 16 : 9) + (e.labelDy || 0);
       var anchor = 'middle';
-      if (wrap){ anchor = 'end'; lx = mid.x - 18 + (e.labelDx || 0); ly = mid.y - 4 + (e.labelDy || 0); }
+      if (wrap){
+        var wrapsRight = L.pos[e.from].row % 2 === 0;
+        anchor = wrapsRight ? 'end' : 'start';
+        lx = mid.x + (wrapsRight ? -18 : 18) + (e.labelDx || 0);
+        ly = mid.y - 4 + (e.labelDy || 0);
+      }
       var lt = document.createElementNS(SVGNS, 'text');
       lt.setAttribute('class', 'lbl' + (e.delta === true ? ' dvd' : '')); lt.setAttribute('x', lx); lt.setAttribute('y', ly);
       lt.setAttribute('text-anchor', anchor);

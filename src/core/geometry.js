@@ -3,7 +3,9 @@
    Loaded once by the logical validator bundle before panel definitions. */
 
 var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
-var LEFT_X = 110, RIGHT_X = 885;
+/* Reserve equal card gutters; a fixed right column left a node-sized blank
+   strip when Auto or Fit width scaled the entire canvas. */
+var LEFT_X = 110, RIGHT_X = W - LEFT_X;
 
 /* Shared, pure parent-link tolerance for layout, validation and the inspector.
    Inspect all chains before dropping cyclic links so declaration order cannot
@@ -437,12 +439,16 @@ function edgePath(e, L, adj){
 
   if (isWrap(e, L)){
     var side = a.row % 2 === 0 ? 1 : -1;
-    var xO = (side > 0 ? W - 58 : 58) + avX;
+    var xO = (side > 0 ? W - 12 : 12) + avX;
     var s1x = a.cx + side * a.w/2, t1x = b.cx + side * b.w/2;
+    /* Full-width columns leave a narrow outside gutter. Bound the curve's
+       handles there instead of projecting them 115px beyond the canvas. */
+    var sControl = side > 0 ? Math.min(s1x + 115, xO) : Math.max(s1x - 115, xO);
+    var tControl = side > 0 ? Math.min(t1x + 115, xO) : Math.max(t1x - 115, xO);
     var mid = (a.cy + b.cy) / 2;
     return 'M ' + s1x + ' ' + a.cy +
-           ' C ' + (s1x + side*115) + ' ' + a.cy + ' ' + xO + ' ' + (a.cy + 55) + ' ' + xO + ' ' + mid +
-           ' C ' + xO + ' ' + (b.cy - 55) + ' ' + (t1x + side*115) + ' ' + b.cy + ' ' + t1x + ' ' + b.cy;
+           ' C ' + sControl + ' ' + a.cy + ' ' + xO + ' ' + (a.cy + 55) + ' ' + xO + ' ' + mid +
+           ' C ' + xO + ' ' + (b.cy - 55) + ' ' + tControl + ' ' + b.cy + ' ' + t1x + ' ' + b.cy;
   }
 
   if (a.row === b.row){

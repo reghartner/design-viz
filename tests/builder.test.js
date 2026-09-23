@@ -700,9 +700,10 @@ test('generated workbench validates imported skeletons and retains expected auth
   const page = sandbox.normalize(sandbox.mermaidToSpec(hld));
   assert.deepStrictEqual(plain(sandbox.validate(page)), {errors: [], warnings: []});
   const lint = sandbox.lintPage(page);
-  assert.strictEqual(lint.filter(w => w.includes('longer than its edge can carry')).length, 2);
+  // Full-width rows give the shorter imported labels enough space.
+  assert.strictEqual(lint.filter(w => w.includes('longer than its edge can carry')).length, 1);
   assert.strictEqual(lint.filter(w => w.includes('shares first edge')).length, 2);
-  assert.strictEqual(lint.length, 4);
+  assert.strictEqual(lint.length, 3);
   const simple = sandbox.normalize(sandbox.mermaidToSpec(MERMAID_SEQ));
   assert.deepStrictEqual(plain(sandbox.validate(simple)), {errors: [], warnings: []});
 });

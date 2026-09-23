@@ -12,7 +12,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const fixtures = ['tests/fixtures/lint-crowded.json', 'examples/doorbell-atlas/atlas.spec.json',
   'src/starters/complex-trace.json', 'src/starters/whole-home-outdoors.json'];
 const lintFindings = [
-  'blocks[0].diagram.edges[0].label: "this label is extremely l…" (~425px) is longer than its edge can carry (~44px) — shorten it, or the auto-layout will push it far off the line',
+  'blocks[0].diagram.edges[0].label: "this label is extremely l…" (~425px) is longer than its edge can carry (~90px) — shorten it, or the auto-layout will push it far off the line',
   'blocks[0].diagram: 5 edges cross the corridor between rows 1 and 2 — expect crowding; consider fewer return edges or a second section',
   'blocks[0].diagram.steps[1]: shares first edge "a->g" with steps[0] — both step coins land on the same midpoint; reorder the edges list of one step',
   'page.protocols.unusedproto: declared but no edge uses kind "unusedproto" — remove it or use it',
@@ -31,20 +31,55 @@ function geometry(core, diagram) {
   return plain({layout, adjust, paths: edges.map((edge, index) => core.edgePath(edge, layout, adjust[index]))});
 }
 
-test('the geometry leaf needs only clamp and preserves classic placement and parent-cycle handling', () => {
+test('the geometry leaf needs only clamp and centers row placement across the canvas', () => {
   const validator = withoutDOM();
   vm.runInContext(readSource('validator.js'), validator);
   const leaf = withoutDOM({clamp: validator.clamp});
   vm.runInContext(readSource('core/geometry.js'), leaf);
   const d = {nodes: {a: {}, b: {}, c: {}}, rows: [['a', 'b'], ['c']], edges: [{from: 'a', to: 'b'}]};
   const result = geometry(leaf, d);
-  assert.deepEqual(Object.values(result.layout.pos).map(node => [node.cx, node.cy]), [[110, 69], [885, 69], [497.5, 263]]);
+  assert.deepEqual(Object.values(result.layout.pos).map(node => [node.cx, node.cy]), [[110, 69], [1070, 69], [590, 263]]);
   assert.deepEqual(result.layout.vb, {x: 0, y: 0, w: 1180, h: 330});
-  assert.deepEqual(result.paths, ['M 185 69 L 810 69']);
+  assert.deepEqual(result.paths, ['M 185 69 L 995 69']);
   const warnings = [], groups = {a: {parent: 'b'}, b: {parent: 'a'}, child: {parent: 'a'}};
   assert.deepEqual(plain(leaf.sanitizedGroupParents(groups, (id, message) => warnings.push(id + ': ' + message))), {child: 'a'});
   assert.deepEqual(warnings, ['a: parent chain loops — parent ignored', 'b: parent chain loops — parent ignored']);
   assert.deepEqual(groups, {a: {parent: 'b'}, b: {parent: 'a'}, child: {parent: 'a'}});
+});
+
+test('rows use both sides equally for curves, lanes, stacks and single-node rows', () => {
+  const core = withoutDOM();
+  vm.runInContext(readSource('validator.js'), core);
+  for (const routing of [undefined, 'lanes']) for (const count of [2, 3, 4, 5]) {
+    const ids = Array.from({length: count}, (_, i) => 'n' + i);
+    const d = {routing, nodes: Object.fromEntries([...ids, 'single'].map(id => [id, {}])),
+      rows: [ids, ['single']], edges: []};
+    const L = core.layout(d), a = L.pos[ids[0]], b = L.pos[ids[count - 1]];
+    const left = a.cx - a.w / 2 - L.vb.x, right = L.vb.x + L.vb.w - b.cx - b.w / 2;
+    assert.equal(left, right, routing + ': balanced margins');
+    assert.ok(right < a.w / 2, 'no spare node-sized gutter');
+    assert.equal(L.pos.single.cx, L.vb.x + L.vb.w / 2);
+  }
+  const d = {nodes: {a: {}, b: {}, c: {}, d: {}}, rows: [[['a', 'b'], ['c', 'd']]]};
+  const L = core.layout(d);
+  assert.equal(L.pos.a.cx - L.pos.a.w / 2, L.vb.w - L.pos.c.cx - L.pos.c.w / 2);
+});
+
+test('curved row wraps stay inside the canvas after rows use the full width', () => {
+  const core = withoutDOM();
+  vm.runInContext(readSource('validator.js'), core);
+  for (const rows of [[['a', 'b'], ['c']], [['a'], ['b', 'c']], [['a', 'b'], ['c'], ['d', 'e']]]) {
+    const d = {nodes: Object.fromEntries(rows.flat().map(id => [id, {}])), rows};
+    const L = core.layout(d);
+    for (let r = 1; r < rows.length; r++) {
+      const edge = {from: rows[r - 1].at(-1), to: rows[r][0]};
+      const points = core.samplePathD(core.edgePath(edge, L));
+      assert.ok(points.every(p => p.x >= L.vb.x && p.x <= L.vb.x + L.vb.w), JSON.stringify(edge));
+      const node = L.pos[edge.from], first = points[1];
+      assert.ok(r % 2 ? first.x > node.cx + node.w / 2 : first.x < node.cx - node.w / 2,
+        'wrap must leave outward from its node');
+    }
+  }
 });
 
 test('headless validator and standalone geometry match viewer layouts, routes and avoidance without mutating specs', () => {

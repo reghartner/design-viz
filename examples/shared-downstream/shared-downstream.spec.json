@@ -1,0 +1,240 @@
+{
+  "page": {
+    "title": "Different inputs, shared processing",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "shared-downstream",
+        "heading": "Button press or motion \u2192 one downstream pipeline",
+        "text": "Select either input. The linked circles identify the same downstream steps, even though they have different step numbers. Alternate occurrences are shadows until selected.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "button": {
+              "title": "Button event",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "motion": {
+              "title": "Motion event",
+              "icon": "antenna",
+              "tint": "dev"
+            },
+            "button-adapter": {
+              "title": "Button translator",
+              "icon": "chip",
+              "tint": "cmd"
+            },
+            "motion-adapter": {
+              "title": "Motion translator",
+              "icon": "chip",
+              "tint": "cmd"
+            },
+            "processor": {
+              "title": "Event processor",
+              "icon": "cloud",
+              "tint": "data"
+            },
+            "storage": {
+              "title": "Event storage",
+              "icon": "db",
+              "tint": "data"
+            },
+            "resident": {
+              "title": "Resident app",
+              "icon": "phone",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "button",
+              "motion"
+            ],
+            [
+              "motion-adapter",
+              "button-adapter"
+            ],
+            [
+              "processor",
+              "storage"
+            ],
+            [
+              "resident"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "button",
+              "to": "button-adapter",
+              "label": "Button pressed"
+            },
+            {
+              "from": "motion",
+              "to": "motion-adapter",
+              "label": "Confirmed motion"
+            },
+            {
+              "from": "button-adapter",
+              "to": "processor",
+              "label": "Normalized event"
+            },
+            {
+              "from": "motion-adapter",
+              "to": "processor",
+              "label": "Normalized event"
+            },
+            {
+              "from": "processor",
+              "to": "storage",
+              "label": "Persist event"
+            },
+            {
+              "from": "processor",
+              "to": "resident",
+              "label": "Notify resident"
+            }
+          ],
+          "panels": [
+            {
+              "id": "origin",
+              "type": "state",
+              "title": "Event origin (carried forward)",
+              "states": [
+                "Waiting",
+                "Button",
+                "Motion"
+              ],
+              "initial": {
+                "state": "Waiting"
+              },
+              "colors": {
+                "Button": "#0284c7",
+                "Motion": "#f97316"
+              }
+            },
+            {
+              "id": "work",
+              "type": "log",
+              "title": "Shared downstream processing"
+            }
+          ],
+          "steps": [
+            {
+              "id": "press",
+              "text": "A visitor presses the doorbell. This input belongs to the button path.",
+              "edge": "button->button-adapter",
+              "panels": {
+                "origin": {
+                  "state": "Button"
+                }
+              }
+            },
+            {
+              "id": "translate-press",
+              "text": "Translate the button payload into a normalized event.",
+              "edge": "button-adapter->processor"
+            },
+            {
+              "id": "detect",
+              "text": "The camera detects motion. This input belongs to the motion path.",
+              "nodes": [
+                "motion"
+              ],
+              "panels": {
+                "origin": {
+                  "state": "Motion"
+                }
+              }
+            },
+            {
+              "id": "debounce",
+              "text": "Confirm motion before emitting the event. The extra stop makes this path one step longer.",
+              "edge": "motion->motion-adapter"
+            },
+            {
+              "id": "translate-motion",
+              "text": "Translate the motion payload into the same normalized event shape.",
+              "edge": "motion-adapter->processor"
+            },
+            {
+              "id": "process",
+              "text": "The same processor handles either normalized event. The original event source stays on the selected path.",
+              "nodes": [
+                "processor"
+              ],
+              "color": "#0d9488",
+              "panels": {
+                "work": {
+                  "log": [
+                    {
+                      "text": "Process normalized event"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "persist",
+              "text": "Write the event using the same downstream operation on both paths.",
+              "edge": "processor->storage",
+              "color": "#0d9488",
+              "panels": {
+                "work": {
+                  "log": [
+                    {
+                      "text": "Persist event"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "notify",
+              "text": "Notify the resident. Shared processing does not replace the event origin with the other path\u2019s state.",
+              "edge": "processor->resident",
+              "color": "#0d9488",
+              "panels": {
+                "work": {
+                  "log": [
+                    {
+                      "text": "Notify resident"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "button",
+              "label": "Button press",
+              "color": "#0284c7",
+              "steps": [
+                "press",
+                "translate-press",
+                "process",
+                "persist",
+                "notify"
+              ]
+            },
+            {
+              "id": "motion",
+              "label": "Motion detected",
+              "color": "#f97316",
+              "steps": [
+                "detect",
+                "debounce",
+                "translate-motion",
+                "process",
+                "persist",
+                "notify"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

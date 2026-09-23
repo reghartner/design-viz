@@ -3807,3 +3807,15 @@ body.sk-daylight .docview,body.sk-pastel .docview,body.sk-editorial .docview{--t
 .schip.step-colored[aria-current="true"]{box-shadow:0 0 0 2px var(--dbg,#fff),0 0 0 4px var(--dink,#24324b)!important;}
 .coin.step-colored circle{fill:var(--step-color)!important;stroke:var(--step-ink)!important;}
 .coin.step-colored text{fill:var(--step-ink)!important;}
+
+/* Rejoined/shared suffixes keep their link cue even when the current circle
+   is fully lit. Bottom placement leaves delta triangles unobstructed. */
+.schip.shared-downstream-step{position:relative;overflow:visible;}
+.shared-step-link{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:var(--dbg,#fff);color:var(--dink,#24324b);border:1px solid currentColor;pointer-events:none;}
+.shared-step-link .copyglyph{width:11px;height:11px;}
+.path-sharing-key{display:flex;align-items:center;gap:6px;margin-top:9px;color:var(--dtext);font:500 10px/1.5 'IBM Plex Mono',monospace;}
+.path-sharing-key .copyglyph{flex:none;}
+.step-shared-note{margin-left:6px;font:500 10px/1.5 'IBM Plex Mono',monospace;color:var(--dtext);border-left:2px solid var(--acc);padding-left:7px;}
+.step-shared-note[hidden]{display:none;}
+
+.path-matrix:has(.shared-step-link){padding:0 5px 5px 0;}

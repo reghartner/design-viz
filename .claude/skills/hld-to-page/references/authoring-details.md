@@ -16,7 +16,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | A send that never arrives, or a communication that is never sent | `docs/failed-communications.md` (also demonstrated in the alternate-path recipe) |
 | Multiple message contracts, request/response tables side by side or stacked | `docs/contract-blocks.md`; use `section.contracts`, stable block IDs and widths 4/6/8/12 |
 | Inline backticks or fenced code in descriptions, bullets, notes or step captions | `contract/authoring-contract.md` → Prose markup; labels inside nodes and panels stay plain |
-| Copy/share steps across paths, continue a happy ending, or detach a shared step | `docs/workbench-step-reuse.md` |
+| Copy/share steps across paths, converge after translation, continue an ending, or detach a shared step | `docs/workbench-step-reuse.md`; `docs/alternate-paths.md` for linked downstream steps (reuse IDs, not copies) |
 | Copy/paste Home elements, panels, nodes or sections between diagrams | `docs/workbench-clipboard.md`; copies are independent, with fresh IDs where scopes overlap |
 | Open a step view paused or playing; clarify Play / Pause state | `contract/authoring-contract.md` → `view` and `autoplay` |
 | A large home map, live Home / Data flow switching, or per-step placement | `cookbook/home-story.md`, `docs/homemap-workbench.md` |

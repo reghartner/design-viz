@@ -58,6 +58,29 @@ The effective-state inspector folds the selected path, with source links back
 to the shared registry. Reveal/hide thresholds are positions within the selected
 path; review them after reordering.
 
+## Two inputs, one downstream process
+
+Use distinct IDs for each input and its translation. Then reference the same
+shared processing IDs in both paths:
+
+```json
+[
+  {"id":"button", "label":"Button press", "steps":["press", "translate-press", "process", "persist", "notify"]},
+  {"id":"motion", "label":"Motion event", "steps":["detect", "debounce", "translate-motion", "process", "persist", "notify"]}
+]
+```
+
+Here `process` is step 3 on Button press and step 4 on Motion event. Both show a
+link badge; the Motion occurrence is a shared shadow. Playback remains on Motion
+when you click its shared step. This is a shared operation, not a merge of runtime
+state: path-specific values still carry into it independently. Do not reuse a
+success/recovery step if its meaning is false on another incoming path.
+
+In **Reuse steps…**, choose **Use shared steps** (not the default **Copy and
+customize**) to reference existing downstream IDs. Existing specs already using
+shared IDs gain the visual cues when rebuilt; there is no new schema field.
+See the [two-input example](../examples/shared-downstream/shared-downstream.spec.json).
+
 ## Authoring shape
 
 `diagram.paths` is optional. It contains named sequences of IDs from
@@ -99,8 +122,15 @@ displays its full sequence; all rows stay visible and keep the same columns
 when selecting a path. A path diverging at 3 and ending at 5 displays shared
 shadows at 1–2, then colored steps 3–5 beneath those same numbers on the
 primary row. On narrow screens the rows scroll together.
-A later shared step is allowed, but its state
-still comes from that path's complete preceding sequence. This models authored
+Later steps that reuse the same IDs also render as shared shadows on subsequent
+rows, even at different step numbers. Linked-circle badges identify shared
+downstream processing on every participating row, including the first. The
+selected caption and tooltips name the other paths and their visible step
+numbers. The badge remains when the selected shadow becomes fully opaque.
+Classification uses the full authored paths, so hiding earlier stops in a view
+does not turn a downstream join into a shared prefix. Numbers still follow each
+path's own order; the renderer does not move or insert stops to line up a join.
+Its state still comes from that path's complete preceding sequence. This models authored
 outcomes, not executable conditions or a simulation of failure probabilities.
 A step may set `color:"#RRGGBB"` to override its numbered markers without
 creating a branch. This travels with its shared body, retains shadow opacity,

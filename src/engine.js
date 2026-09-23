@@ -1003,6 +1003,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   var destroyed = false;
   var hidden = false, resumeOnShow = false;
   var source = d, paths = diagramPathList(source), selectedPath = paths[0];
+  var sharingByStep=pathStepSharing(paths);
   var visibleStepIds=null,editingStep=null;
   function viewPath(path){
     return Object.assign({},path,{indices:path.indices.filter(function(index){return index===editingStep || !visibleStepIds || visibleStepIds.indexOf(source.steps[index].id)>=0;})});
@@ -1046,22 +1047,34 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var text=coin.querySelector('text');if(text && position>=0)text.textContent=String(position+1);
     });
   }
+  function sharedPeers(shared,path){
+    return shared.occurrences.filter(function(o){return o.path.id!==path.id;}).map(function(o){
+      var at=viewPath(o.path).indices.indexOf(shared.sourceIndex);
+      return o.path.label+(at>=0?' (step '+(at+1)+')':' (hidden in this view)');
+    }).join(', ');
+  }
   function paintChips(){
     paintStepCoins();
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
     chipButtons = []; pathButtons = [];
-    function appendStep(parent,path,idx,rowNumber,sharedWith){
+    function appendStep(parent,path,idx,rowNumber,sharedWith,sharing){
       var step = source.steps[path.indices[idx]], b = document.createElement('button');
       var fullPath=paths.find(function(p){return p.id===path.id;}),fullIndex=fullPath.indices.indexOf(path.indices[idx]);
-      b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '') + (sharedWith ? ' shared-step-shadow' : '');
+      var downstream=sharing && sharing.downstream;
+      b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '') + (sharedWith ? ' shared-step-shadow' : '') + (downstream ? ' shared-downstream-step' : '');
       applyStepCircleColor(b,step);
       b.textContent = idx + 1;
       b.setAttribute('data-step-source',path.indices[idx]);
       b.setAttribute('aria-label','Go to step ' + (idx + 1) + (paths.length > 1 ? ' on ' + path.label : '') +
-        (sharedWith ? ', shared with ' + sharedWith.label : ''));
+        (downstream ? ', shared step; also in '+sharedPeers(sharing,path) : sharedWith ? ', shared with ' + sharedWith.label : ''));
       if (sharedWith){
         b.title = 'Shared with ' + sharedWith.label;
         b.style.setProperty('--path-color',sharedWith.color);
+      }
+      if(downstream){
+        b.title='Shared step — also in '+sharedPeers(sharing,path);
+        var link=document.createElement('span');link.className='shared-step-link';link.setAttribute('aria-hidden','true');
+        link.innerHTML=COPY_ICON;b.appendChild(link);
       }
       if (paths.length > 1){
         b.setAttribute('data-step-path',path.id);
@@ -1102,16 +1115,18 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       });
       line.appendChild(choice); pathButtons.push({button:choice,path:path,row:line});
       for (var i = 0; i <= row.end; i++){
-        /* Copy only real shared beats. Nested forks inherit each beat's
-           earliest matching path color, including another alternate. */
-        var sharedWith = i < row.start ? shownPaths.slice(0,rowNumber).find(function(prior){
-          return prior.indices[i] === path.indices[i];
-        }) : null;
-        appendStep(line,path,i,rowNumber,sharedWith);
+        var sharing=sharingByStep.get(path.indices[i]);
+        var sharedWith=sharing && sharing.owner.id!==path.id ? sharing.owner : null;
+        appendStep(line,path,i,rowNumber,sharedWith,sharing);
       }
       matrix.appendChild(line);
     });
     chipsBox.appendChild(matrix);
+    if(shownPaths.some(function(p){return p.indices.some(function(i){return sharingByStep.get(i).downstream;});})){
+      var key=document.createElement('div');key.className='path-sharing-key';
+      key.innerHTML=COPY_ICON;
+      var label=document.createElement('span');label.textContent='Linked circles share downstream processing';key.appendChild(label);chipsBox.appendChild(key);
+    }
   }
   function syncPathControls(){
     pathButtons.forEach(function(choice){
@@ -1175,6 +1190,11 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       termbar.lanePill.style.borderColor = lm.color;
     }
     stepText.innerHTML = proseMarkup(s.text);
+    if(termbar.sharedStatus){
+      var sharing=sharingByStep.get(selectedPath.indices[cur]);
+      termbar.sharedStatus.hidden=!(sharing && sharing.downstream);
+      termbar.sharedStatus.textContent=sharing && sharing.downstream?'Shared step · also in '+sharedPeers(sharing,selectedPath):'';
+    }
     if(termbar.evidenceLinks && typeof FlowCanon!=='undefined'){
       var stepLinks=FlowCanon.links(s);termbar.evidenceLinks.innerHTML='';
       appendCanonLinks(termbar.evidenceLinks,stepLinks);termbar.evidenceLinks.hidden=!stepLinks.length;
@@ -2020,6 +2040,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
   var line = document.createElement('div'); line.className = 'stepline';
   var stepN = document.createElement('b'); var stepText = document.createElement('div');stepText.className='step-text';
+  var sharedStatus=document.createElement('span');sharedStatus.className='step-shared-note';sharedStatus.hidden=true;
   var failureStatus = document.createElement('span'); failureStatus.className = 'comm-status'; failureStatus.hidden = true;
   failureStatus.setAttribute('aria-label','Communication failures');
   var lanePill = document.createElement('span');
@@ -2035,7 +2056,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   copyStep.innerHTML = COPY_ICON; copyStep.title = 'Copy link';
   copyStep.setAttribute('aria-label', 'Copy link to this diagram step');
   line.appendChild(stepN); line.appendChild(lanePill); line.appendChild(stepText);
-  line.appendChild(failureStatus);
+  line.appendChild(failureStatus);line.appendChild(sharedStatus);
   line.appendChild(stepIdEl); line.appendChild(srcA); line.appendChild(copyStep);
   line.appendChild(evidenceLinks);
   var runtimeStatus=document.createElement('span');runtimeStatus.className='runtime-status';runtimeStatus.hidden=true;runtimeStatus.setAttribute('aria-label','Runtime evidence');line.appendChild(runtimeStatus);
@@ -2068,7 +2089,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   box.appendChild(ol);
 
   var stepper = attachStepper(box, boardDiv, {
-    bar:bar, chips:chips, stepN:stepN, stepText:stepText, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
+    bar:bar, chips:chips, stepN:stepN, stepText:stepText, sharedStatus:sharedStatus, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {viewSteps:function(ids){printFilter=ids;printSteps(printDiagram);},renderPath:function(next){
     printSteps(next);

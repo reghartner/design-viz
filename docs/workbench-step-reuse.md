@@ -11,7 +11,10 @@ Selections remain checked when searching or paging.
 its own complete authored content: caption, hops, node focus, tones, failures,
 panel patches, links and any additional fields. Editing a copy leaves the
 source steps unchanged. **Use shared steps** adds references to the original
-steps instead; subsequent edits affect every path referencing them.
+steps instead; subsequent edits affect every path referencing them. Shared
+downstream occurrences show link badges in the viewer, with shadows on later
+rows, even when the same step has a different number on each path. Separate
+copies do not get these cues; identical captions alone do not establish sharing.
 
 Choose where the selection goes:
 

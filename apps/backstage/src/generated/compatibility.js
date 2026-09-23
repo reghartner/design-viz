@@ -13,7 +13,8 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops' };
+    'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
+    'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -44,7 +45,28 @@ var FlowviewCompatibility = (function(){
     function diagram(d){
       if(!object(d))return;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
-      (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){if(p && typeof p.type==='string')used['panel.'+p.type]=true;});
+      (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
+        if(!p || typeof p.type!=='string')return;
+        used['panel.'+p.type]=true;
+        if(['homemap','screen','security','phone'].indexOf(p.type)<0)return;
+        function endpoint(value){
+          if(!object(value))return;
+          if(object(value.audio) && Object.keys(value.audio).length)used['media.audio']=true;
+          if(value.spotlight && value.spotlight!=='off')used['media.spotlight']=true;
+        }
+        function patch(value){
+          if(!object(value))return;
+          if(p.type==='homemap'){
+            (Array.isArray(p.devices)?p.devices:[]).concat(Array.isArray(p.subjects)?p.subjects:[])
+              .forEach(function(item){if(item && Object.prototype.hasOwnProperty.call(value,item.id))endpoint(value[item.id]);});
+          }else{endpoint(value);endpoint(value.enterOnce);}
+        }
+        patch(p.initial);
+        (Array.isArray(d.steps)?d.steps:[]).forEach(function(s){
+          var patches=s && (object(s.panels)?s.panels:s.patch);
+          if(object(patches) && Object.prototype.hasOwnProperty.call(patches,p.id))patch(patches[p.id]);
+        });
+      });
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
       if(d.sectionLayout)used['layout.arranged']=true;

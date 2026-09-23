@@ -82,3 +82,23 @@ test('CLI stamps to stdout without changing input and exits nonzero for incompat
     assert.equal(checked.status,1);assert.equal(JSON.parse(checked.stdout).status,'partial');
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('audio and spotlight features are stamped across endpoint panels, Home subjects and transient patches',()=>{
+  const raw={page:{sections:[{diagram:{nodes:{cam:{}},rows:[['cam']],panels:[
+    {id:'home',type:'homemap',devices:[{id:'cam'}],subjects:[{id:'visitor'}]},
+    {id:'phone',type:'phone'}, {id:'camera',type:'screen'}, {id:'monitor',type:'security'}],steps:[
+    {panels:{home:{visitor:{x:20,y:30,audio:{output:'speech'}},cam:{spotlight:'on'}}}},
+    {patch:{phone:{enterOnce:{audio:{microphone:'muted'}}}}}
+  ]}}]}};
+  const stamped=C.stamp(raw);
+  assert.ok(stamped.page.flowview.features.includes('media.audio'));
+  assert.ok(stamped.page.flowview.features.includes('media.spotlight'));
+  const older={...C.features};delete older['media.audio'];delete older['media.spotlight'];
+  assert.deepEqual(plain(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures),['media.audio','media.spotlight']);
+  const d=raw.page.sections[0].diagram;
+  d.steps=[];d.panels[2].initial={audio:{output:'recorded'}};
+  assert.ok(C.detect(raw).includes('media.audio'));
+  d.panels[2].initial={};d.steps=[{panels:{monitor:{enterOnce:{audio:{output:'speech'},spotlight:'flash'}}}}];
+  assert.ok(C.detect(raw).includes('media.spotlight'));
+  d.steps=[];assert.ok(!C.detect(raw).includes('media.audio'));
+});

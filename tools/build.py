@@ -29,6 +29,7 @@ WORKBENCH_TEMPLATES = [
     {"name": "One story, two perspectives", "desc": "Connect the engineering detail to a visitor’s experience. Same steps, two ways to understand.", "category": "business", "categories": ["engineering", "devices"], "tag": "Engineering + business", "art": "perspectives", "source": "../docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json"},
     {"name": "A connected home", "desc": "Tell a story across rooms, devices, and people—including an internet outage.", "category": "devices", "tag": "Physical interactions", "art": "home", "source": "starters/homemap-story.json"},
     {"name": "From alarm to response", "desc": "Follow security monitoring and emergency dispatch through a confirmed incident, a false alarm, or a failed handoff.", "category": "devices", "categories": ["business", "engineering"], "tag": "Monitoring & dispatch", "art": "home", "source": "starters/security-response.json"},
+    {"name": "Sound at the door", "desc": "See conversations, chimes, recorded replies, sirens and sound detection—including audio failures while video keeps working.", "category": "devices", "categories": ["business", "engineering"], "tag": "Audio & intervention", "art": "home", "source": "starters/audio-story.json"},
     {"name": "Behind the app", "desc": "See where each camera-app value comes from, and what changes when telemetry fails.", "category": "devices", "tag": "App & backend", "art": "phone", "source": "starters/device-app-sources.json"},
 ]
 

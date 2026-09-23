@@ -14,7 +14,8 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops' };
+    'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
+    'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -45,7 +46,28 @@ var FlowviewCompatibility = (function(){
     function diagram(d){
       if(!object(d))return;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
-      (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){if(p && typeof p.type==='string')used['panel.'+p.type]=true;});
+      (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
+        if(!p || typeof p.type!=='string')return;
+        used['panel.'+p.type]=true;
+        if(['homemap','screen','security','phone'].indexOf(p.type)<0)return;
+        function endpoint(value){
+          if(!object(value))return;
+          if(object(value.audio) && Object.keys(value.audio).length)used['media.audio']=true;
+          if(value.spotlight && value.spotlight!=='off')used['media.spotlight']=true;
+        }
+        function patch(value){
+          if(!object(value))return;
+          if(p.type==='homemap'){
+            (Array.isArray(p.devices)?p.devices:[]).concat(Array.isArray(p.subjects)?p.subjects:[])
+              .forEach(function(item){if(item && Object.prototype.hasOwnProperty.call(value,item.id))endpoint(value[item.id]);});
+          }else{endpoint(value);endpoint(value.enterOnce);}
+        }
+        patch(p.initial);
+        (Array.isArray(d.steps)?d.steps:[]).forEach(function(s){
+          var patches=s && (object(s.panels)?s.panels:s.patch);
+          if(object(patches) && Object.prototype.hasOwnProperty.call(patches,p.id))patch(patches[p.id]);
+        });
+      });
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
       if(d.sectionLayout)used['layout.arranged']=true;
@@ -394,7 +416,7 @@ function panelRemapReferences(panel, kind, mapping, exists) {
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
    IIFE. Contains no DOM access, so tests load it under Node via vm. */
 
-var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car'];
+var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car','speaker'];
 var TINT_SET = ['cmd','auth','data','mqtt','dev'];
 /* Per-step node state is semantic narrative state, never an authored color.
    `base` is the explicit clearing token; null clears too. */
@@ -2703,6 +2725,99 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     },
   };
 }
+/* ---- src/panels/audio.js ---- */
+/* Shared, silent audio storytelling. Each panel owns an endpoint; these facts
+   never open a microphone, play media, infer an alarm, or contact a service. */
+var FlowAudio = (function () {
+  var choices = {
+    connection: ['idle', 'connecting', 'connected', 'interrupted', 'ended'],
+    microphone: ['idle', 'listening', 'capturing', 'muted', 'unavailable'],
+    output: ['silent', 'speech', 'recorded', 'chime', 'siren'],
+    playback: ['playing', 'queued', 'suppressed', 'failed', 'stopped'],
+    detection: ['none', 'sound', 'smoke-alarm', 'co-alarm', 'glass-break'],
+  };
+  var textFields = ['text', 'source', 'reason'];
+  var fields = Object.keys(choices).map(function (key) { return [key, 'enum', choices[key]]; })
+    .concat(textFields.map(function (key) { return [key, 'text']; }));
+  function own(object, key) { return Object.prototype.hasOwnProperty.call(object, key); }
+  function escape(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c];
+    });
+  }
+  function clean(raw, path, warnings) {
+    if (raw === undefined || raw === null) return raw;
+    function warn(message) { if (warnings) warnings.push((path || 'audio') + message); }
+    if (!panelObject(raw)) { warn(': expected an audio object or null — ignored'); return undefined; }
+    var result = Object.create(null), keys = Object.keys(raw);
+    keys.forEach(function (key) {
+      var value = raw[key];
+      if (own(choices, key)) {
+        if (choices[key].indexOf(value) >= 0) result[key] = value;
+        else warn('.' + key + ': expected ' + choices[key].join('|') + ' — ignored');
+      } else if (textFields.indexOf(key) >= 0) {
+        if (typeof value === 'string') result[key] = value;
+        else warn('.' + key + ': expected text — ignored');
+      } else warn('.' + key + ': not an audio field — ignored');
+    });
+    return !keys.length || Object.keys(result).length ? result : undefined;
+  }
+  function model(raw) {
+    var value = clean(raw) || {};
+    return {
+      connection: value.connection || 'idle', microphone: value.microphone || 'idle',
+      output: value.output || 'silent',
+      playback: value.playback || (value.output && value.output !== 'silent' ? 'playing' : 'stopped'),
+      detection: value.detection || 'none', text: value.text || '', source: value.source || '', reason: value.reason || '',
+    };
+  }
+  function isEmitting(raw) { var a = model(raw); return a.output !== 'silent' && a.playback === 'playing'; }
+  function isCapturing(raw) { return model(raw).microphone === 'capturing'; }
+  function icon(kind) {
+    var paths = {
+      microphone: '<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3M9 21h6"/>',
+      speaker: '<path d="M3 9h4l5-4v14l-5-4H3ZM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+      recorded: '<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/>',
+      chime: '<path d="M6 16h12l-2-3V9a4 4 0 0 0-8 0v4ZM10 20h4M12 3v2"/>',
+      siren: '<path d="M5 19h14v3H5ZM7 19v-7a5 5 0 0 1 10 0v7M12 1v3M2 6l3 2m17-2-3 2M1 13h3m16 0h3"/>',
+      detection: '<path d="M9 19c0-4 7-4 7-10a5 5 0 0 0-10 0m4 1a2 2 0 0 1 4 0c0 3-5 3-5 6M8 21h3M3 5 1 3m19 4 3-1"/>',
+    };
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[own(paths, kind) ? kind : 'speaker'] + '</svg>';
+  }
+  var outputs = {silent:'Silent', speech:'Live speech', recorded:'Recorded message', chime:'Chime', siren:'Siren'};
+  var microphones = {idle:'Mic idle', listening:'Listening', capturing:'Capturing sound', muted:'Mic muted', unavailable:'Mic unavailable'};
+  var detections = {none:'', sound:'Sound detected', 'smoke-alarm':'Smoke alarm heard', 'co-alarm':'CO alarm heard', 'glass-break':'Glass-break sound detected'};
+  function effect(raw) {
+    var a = model(raw), emitting = isEmitting(a), capturing = isCapturing(a), h = '';
+    if (emitting) {
+      if (a.output === 'chime') h = '<g class="fva-note"><path d="M21-12v17m0-17 10-3V2"/><ellipse cx="17" cy="6" rx="4" ry="3"/><ellipse cx="27" cy="3" rx="4" ry="3"/></g>';
+      else if (a.output === 'siren') h = '<path class="fva-outwave" d="m18-12 6 4-4 8 6 8-8 5"/><path class="fva-outwave" d="m29-19 8 6-5 13 6 12-9 8"/>';
+      else h = '<path class="fva-outwave" d="M18-8q7 8 0 16"/><path class="fva-outwave" d="M25-14q12 14 0 28"/><path class="fva-outwave" d="M32-20q17 20 0 40"/>';
+      h = '<g class="fva-emission fva-sound-' + a.output + '" data-sound="' + a.output + '">' + h + '</g>';
+    }
+    if (capturing) h += '<g class="fva-capture"><path d="m-34-9 9 9-9 9m12-16 7 7-7 7"/></g>';
+    if (a.detection !== 'none') h += '<g class="fva-detection"><circle cx="0" cy="-28" r="7"/><path d="M0-32v5m0 3h.01"/></g>';
+    return h ? '<g class="fva-effects" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + h + '</g>' : '';
+  }
+  function render(raw, options) {
+    var cleanValue = clean(raw);
+    if (!cleanValue || !Object.keys(cleanValue).length) return '';
+    var a = model(cleanValue), emitting = isEmitting(a), capturing = isCapturing(a);
+    var playback = a.output === 'silent' ? 'Silent' : outputs[a.output] + (a.playback === 'playing' ? '' : ' · ' + a.playback);
+    var kind = ['recorded','chime','siren'].indexOf(a.output) >= 0 ? a.output : 'speaker';
+    var h = '<div class="fva-audio' + (emitting ? ' fva-is-emitting' : '') + (capturing ? ' fva-is-capturing' : '') + '" data-output="' + a.output + '" data-playback="' + a.playback + '" data-microphone="' + a.microphone + '">';
+    h += '<div class="fva-heading"><span>' + escape(options && options.label || 'Audio') + '</span><span class="fva-connection fva-connection-' + a.connection + '">' + escape(a.connection) + '</span></div>';
+    h += '<div class="fva-channels"><span class="fva-output">' + icon(kind) + '<span>' + playback + '</span><span class="fva-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></span>';
+    h += '<span class="fva-microphone">' + icon('microphone') + '<span>' + microphones[a.microphone] + '</span></span></div>';
+    if (a.text) h += '<div class="fva-caption">' + (a.source ? '<strong>' + escape(a.source) + '</strong>' : '') + '<span>' + escape(a.text) + '</span></div>';
+    else if (a.source) h += '<div class="fva-source">' + escape(a.source) + '</div>';
+    if (a.detection !== 'none') h += '<div class="fva-detection-label">' + icon('detection') + '<span>' + detections[a.detection] + '</span></div>';
+    if (a.reason) h += '<div class="fva-reason">' + escape(a.reason) + '</div>';
+    return h + '</div>';
+  }
+  return {clean:clean, model:model, fields:fields, choices:choices, render:render, effect:effect,
+    isEmitting:isEmitting, isCapturing:isCapturing, icon:icon};
+})();
 /* ---- src/panels/types/battery.js ---- */
 /* battery validation and pure state helpers. */
 
@@ -4860,6 +4975,19 @@ var HOMEMAP_STATES = {
   hub: ['idle', 'rx', 'tx', 'alert'],
 };
 var HOMEMAP_THERMAL = ['normal', 'warm', 'hot', 'cold', 'freezing'];
+var HOMEMAP_SPOTLIGHT = ['off', 'on', 'flash'];
+function homemapAudioValid(value) {
+  var warnings = [];
+  return FlowAudio.clean(value, 'audio', warnings) !== undefined && !warnings.length;
+}
+function homemapSubjectPatchValid(value) {
+  if (value === null) return true;
+  if (!panelObject(value)) return false;
+  var position = Object.prototype.hasOwnProperty.call(value, 'x') || Object.prototype.hasOwnProperty.call(value, 'y');
+  return (!position || homemapSubjectPosition(value)) &&
+    (position || Object.prototype.hasOwnProperty.call(value, 'audio')) &&
+    (!Object.prototype.hasOwnProperty.call(value, 'audio') || homemapAudioValid(value.audio));
+}
 function homemapDevicePatchValid(kind, value) {
   if (typeof value === 'string') return HOMEMAP_STATES[kind].indexOf(value) >= 0;
   return (
@@ -4867,7 +4995,9 @@ function homemapDevicePatchValid(kind, value) {
     Object.keys(value).every(function (k) {
       return k === 'state'
         ? HOMEMAP_STATES[kind].indexOf(value[k]) >= 0
-        : k === 'thermal' && HOMEMAP_THERMAL.indexOf(value[k]) >= 0;
+        : k === 'thermal' ? HOMEMAP_THERMAL.indexOf(value[k]) >= 0
+        : k === 'spotlight' ? HOMEMAP_SPOTLIGHT.indexOf(value[k]) >= 0
+        : k === 'audio' && homemapAudioValid(value[k]);
     })
   );
 }
@@ -4959,17 +5089,26 @@ function homemapPatchWarnings(obj, path, declaration, warnings) {
           );
       });
     } else if (subjects[k]) {
-      if (obj[k] !== null && !homemapSubjectPosition(obj[k]))
+      var subPatch = obj[k];
+      if (subPatch !== null && (!panelObject(subPatch) ||
+          ((!homemapSubjectPosition(subPatch)) &&
+           (subPatch.x !== undefined || subPatch.y !== undefined || !Object.prototype.hasOwnProperty.call(subPatch, 'audio')))))
         warnings.push(
-          path + '.' + k + ': expected an object with finite x/y or null — subject patch ignored'
+          path + '.' + k + ': expected an object with finite x/y or null; audio-only objects also supported — invalid subject position ignored'
         );
+      if (panelObject(subPatch) && Object.prototype.hasOwnProperty.call(subPatch, 'audio'))
+        FlowAudio.clean(subPatch.audio, path + '.' + k + '.audio', warnings);
     } else if (!devices[k]) {
       warnings.push(path + '.' + k + ': undeclared device or subject id — patch ignored');
     } else {
       var vocab = HOMEMAP_STATES[devices[k].kind];
       if (panelObject(obj[k])) {
         Object.keys(obj[k]).forEach(function (field) {
-          var allowed = field === 'state' ? vocab : field === 'thermal' ? HOMEMAP_THERMAL : null;
+          if (field === 'audio') {
+            FlowAudio.clean(obj[k].audio, path + '.' + k + '.audio', warnings);
+            return;
+          }
+          var allowed = field === 'state' ? vocab : field === 'thermal' ? HOMEMAP_THERMAL : field === 'spotlight' ? HOMEMAP_SPOTLIGHT : null;
           if (!allowed || allowed.indexOf(obj[k][field]) < 0)
             warnings.push(
               path +
@@ -4978,7 +5117,7 @@ function homemapPatchWarnings(obj, path, declaration, warnings) {
                 '.' +
                 field +
                 ': invalid device attribute — ignored' +
-                (allowed ? ' (valid: ' + allowed.join(' ') + ')' : ' (use state or thermal)')
+                (allowed ? ' (valid: ' + allowed.join(' ') + ')' : ' (use state, thermal, spotlight, or audio)')
             );
         });
       } else if (vocab.indexOf(obj[k]) < 0)
@@ -5113,7 +5252,26 @@ function foldHomemapStates(panel, steps) {
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return;
     Object.keys(patch).forEach(function (k) {
       if (k === 'signals') return;
-      if (subjects[k] && patch[k] !== null && !homemapSubjectPosition(patch[k])) return;
+      if (subjects[k]) {
+        var subPatch = patch[k];
+        if (subPatch === null) {
+          carried[k] = null;
+          return;
+        }
+        if (!panelObject(subPatch)) return;
+        var position = homemapSubjectPosition(subPatch);
+        var audio = Object.prototype.hasOwnProperty.call(subPatch, 'audio') ? FlowAudio.clean(subPatch.audio) : undefined;
+        if (!position && audio === undefined) return;
+        var subjectNext = Object.assign({}, panelObject(carried[k]) ? carried[k] : {});
+        if (position) {
+          subjectNext.x = subPatch.x;
+          subjectNext.y = subPatch.y;
+          delete subjectNext._homemapHidden;
+        } else if (carried[k] === null) subjectNext._homemapHidden = true;
+        if (audio !== undefined) subjectNext.audio = audio;
+        carried[k] = subjectNext;
+        return;
+      }
       if (devices[k] && (panelObject(patch[k]) || panelObject(carried[k]))) {
         var before = panelObject(carried[k])
           ? carried[k]
@@ -5122,10 +5280,14 @@ function foldHomemapStates(panel, steps) {
           : {};
         var update = panelObject(patch[k]) ? patch[k] : { state: patch[k] };
         var next = Object.assign({}, before);
-        ['state', 'thermal'].forEach(function (field) {
-          var allowed = field === 'state' ? HOMEMAP_STATES[devices[k].kind] : HOMEMAP_THERMAL;
+        ['state', 'thermal', 'spotlight'].forEach(function (field) {
+          var allowed = field === 'state' ? HOMEMAP_STATES[devices[k].kind] : field === 'thermal' ? HOMEMAP_THERMAL : HOMEMAP_SPOTLIGHT;
           if (allowed.indexOf(update[field]) >= 0) next[field] = update[field];
         });
+        if (Object.prototype.hasOwnProperty.call(update, 'audio')) {
+          var audio = FlowAudio.clean(update.audio);
+          if (audio !== undefined) next.audio = audio;
+        }
         /* Legacy scalar values still select the operating state; an invalid
            scalar gets the documented default in homemapModel. */
         if (!panelObject(patch[k])) next.state = patch[k];
@@ -5211,6 +5373,8 @@ function homemapModel(panel, state) {
         panelObject(devicePatch) && HOMEMAP_THERMAL.indexOf(devicePatch.thermal) >= 0
           ? devicePatch.thermal
           : 'normal',
+      spotlight: panelObject(devicePatch) && HOMEMAP_SPOTLIGHT.indexOf(devicePatch.spotlight) >= 0 ? devicePatch.spotlight : 'off',
+      audio: panelObject(devicePatch) ? FlowAudio.clean(devicePatch.audio) : undefined,
       icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
       facing: ((facing % 360) + 360) % 360,
       spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
@@ -5236,7 +5400,8 @@ function homemapModel(panel, state) {
       icon: sub.icon === undefined ? null : ICON_SET.indexOf(sub.icon) >= 0 ? sub.icon : 'gear',
       x: clamp(position.x, 0, 320),
       y: clamp(position.y, 0, 180),
-      hidden: value === null,
+      hidden: value === null || !!(value && value._homemapHidden),
+      audio: panelObject(value) ? FlowAudio.clean(value.audio) : undefined,
     };
   });
   var signals = [];
@@ -5299,6 +5464,35 @@ function homemapRoomModel(panel, model) {
       : 'quiet';
     return { room: room, tone: tone };
   });
+}
+
+/* Effects stay attached to their source; captions below the map carry the full
+   authored text without covering the floor plan or changing drag targets. */
+function homemapAudioHTML(item, scaleY) {
+  var effect = FlowAudio.effect(item.audio);
+  if (!effect) return '';
+  return '<g class="hmaudio-source" data-home-audio="' + esc(item.id) +
+    '" transform="translate(' + item.x + ' ' + item.y * scaleY + ')">' +
+    '<title>' + esc(item.label + ' audio') + '</title>' +
+    (item.x > 270 ? '<g transform="scale(-1 1)">' + effect + '</g>' : effect) + '</g>';
+}
+function homemapSpotlightHTML(d, scaleY) {
+  if (d.spotlight === 'off') return '';
+  var angle = d.spread * Math.PI / 360,
+    length = Math.min(d.range, 95),
+    edgeX = (length * Math.cos(angle)).toFixed(2),
+    edgeY = (length * Math.sin(angle)).toFixed(2);
+  return '<g class="hmspotlight hmspotlight-' + d.spotlight + '" data-home-spotlight="' + esc(d.id) +
+    '" transform="translate(' + d.x + ' ' + d.y * scaleY + ') scale(1 ' + scaleY + ') rotate(' + d.facing + ')">' +
+    '<title>' + esc(d.label + ': spotlight ' + d.spotlight) + '</title>' +
+    '<path class="hmspotlight-beam" d="M0 0 L' + edgeX + ' ' + (-edgeY) + ' A' + length + ' ' + length + ' 0 0 1 ' + edgeX + ' ' + edgeY + ' Z"/>' +
+    '<path class="hmspotlight-core" d="M0 0 L' + (length * .85).toFixed(2) + ' ' + (-edgeY * .32).toFixed(2) + ' L' + (length * .85).toFixed(2) + ' ' + (edgeY * .32).toFixed(2) + ' Z"/>' +
+    '<circle class="hmspotlight-lamp" r="11"/></g>';
+}
+function homemapAudioCaptions(model) {
+  var rows = model.devices.concat(model.subjects.filter(function (s) { return !s.hidden; }))
+    .map(function (item) { return FlowAudio.render(item.audio, { label: item.label }); }).filter(Boolean);
+  return rows.length ? '<div class="hmaudio-captions" aria-label="Home audio activity">' + rows.join('') + '</div>' : '';
 }
 
 function homemapThermalHTML(d, scaleY, clearing) {
@@ -5367,6 +5561,7 @@ function homemapDoorHTML(d, transition, outline, clearing) {
     esc(d.state) +
     '</title>' +
     homemapThermalHTML(d, HOMEMAP_Y_SCALE, clearing) +
+    homemapAudioHTML(d, HOMEMAP_Y_SCALE) +
     '<g transform="translate(' +
     d.x +
     ' ' +
@@ -5696,6 +5891,7 @@ PanelViews.register(
             '"/></g>';
         s += '</g>';
       });
+      hm.devices.forEach(function (d) { s += homemapSpotlightHTML(d, sy); });
       hm.devices.forEach(function (d) {
         if (d.display === 'door') {
           s += homemapDoorHTML(
@@ -5723,6 +5919,7 @@ PanelViews.register(
           (d.thermal !== 'normal' ? ' · ' + d.thermal : '') +
           '</title>';
         s += homemapThermalHTML(d, 1, transient ? hmClearing[d.id] : null);
+        s += homemapAudioHTML(d, 1);
         s += '<circle class="hmdevice-aura" cx="' + d.x + '" cy="' + d.y + '" r="13"/>';
         if (transient && hmFresh[d.id])
           s +=
@@ -5809,6 +6006,7 @@ PanelViews.register(
           '><title>' +
           esc(sub.label) +
           '</title>';
+        s += homemapAudioHTML(sub, 1);
         s +=
           '<ellipse class="hmactor-shadow" cx="' +
           sub.x +
@@ -5868,7 +6066,7 @@ PanelViews.register(
             i * 0.25 +
             's"/>';
         });
-      return s + '</svg>';
+      return s + '</svg>' + homemapAudioCaptions(hm);
     };
     h += buildHomemap(true);
     hBaseline = hmHasFresh || hmHasMoved || hmSignals.length ? buildHomemap(false) : null;
@@ -5910,7 +6108,19 @@ PanelRegistry.extend('homemap', {
       order: 63,
       css: String.raw`.docview .section-layout-tile>.pt-homemap{display:flex;flex-direction:column;}
 .section-layout-tile>.pt-homemap>.ptitle{flex:none;}
-.section-layout-tile>.pt-homemap>.pbody{flex:1;min-height:0;}`,
+.section-layout-tile>.pt-homemap>.pbody{flex:1;min-height:0;}
+.section-layout-tile>.pt-homemap>.pbody:has(>.hmaudio-captions){display:flex;flex-direction:column;}
+.section-layout-tile>.pt-homemap>.pbody:has(>.hmaudio-captions)>.hmframe{flex:1;min-height:80px;}
+.hmaudio-captions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr));gap:5px;padding:7px 2px 0;flex:none;}
+.hmaudio-source{pointer-events:none;}
+.hmspotlight{pointer-events:none;color:#E6AE32;}
+.hmspotlight-beam{fill:currentColor;fill-opacity:.2;stroke:currentColor;stroke-opacity:.5;stroke-width:.7;}
+.hmspotlight-core{fill:currentColor;fill-opacity:.12;}
+.hmspotlight-lamp{fill:currentColor;fill-opacity:.12;stroke:currentColor;stroke-width:1;stroke-dasharray:2 3;}
+.hmspotlight-flash{animation:hmspotlightpulse 2.8s ease-in-out infinite;}
+@keyframes hmspotlightpulse{0%,100%{opacity:.35;}45%,65%{opacity:1;}}
+@media(prefers-reduced-motion:reduce){.hmspotlight-flash{animation:none;opacity:1;}}
+@media print{.hmspotlight-flash{animation:none;opacity:1;}.hmspotlight-beam{fill-opacity:.2;stroke-opacity:.8;}}`,
     },
     { order: 73, css: String.raw`.section-layout-tile .hmframe{height:100%;max-height:100%;}` },
     {
@@ -6337,12 +6547,13 @@ function builderHomemapLayoutScene(panel) {
   var model = homemapModel(panel, state);
   model.subjects.forEach(function (s) {
     if (s.hidden) hidden.push(s.id);
-    state[s.id] = { x: s.x, y: s.y }; /* hidden subjects still have draggable starting positions */
+    state[s.id] = Object.assign({}, panelObject(state[s.id]) ? state[s.id] : {}, { x: s.x, y: s.y }); /* hidden subjects still have draggable starting positions */
+    delete state[s.id]._homemapHidden;
   });
   return { state: state, model: homemapModel(panel, state), hidden: hidden };
 }
 
-/* Change one device attribute without capturing the inherited other attribute. */
+/* Change one device attribute or subject audio without capturing inherited sibling fields. */
 function planHomemapDeviceAttribute(
   text,
   raw,
@@ -6353,7 +6564,7 @@ function planHomemapDeviceAttribute(
   attribute,
   value
 ) {
-  if (['state', 'thermal'].indexOf(attribute) < 0) return { error: 'Unknown device attribute.' };
+  if (['state', 'thermal', 'spotlight', 'audio'].indexOf(attribute) < 0) return { error: 'Unknown device attribute.' };
   var got =
     stepIdx === null
       ? builderDiagram(text, raw, sectionIdx)
@@ -6367,9 +6578,10 @@ function planHomemapDeviceAttribute(
     device = (panel.devices || []).find(function (d) {
       return homemapDeviceValid(d) && d.id === key;
     });
-  if (!device) return { error: 'Device not found.' };
-  var allowed = attribute === 'state' ? HOMEMAP_STATES[device.kind] : HOMEMAP_THERMAL;
-  if (value !== undefined && allowed.indexOf(value) < 0)
+  var subject = homemapSubjects(panel).find(function (sub) { return sub.id === key; });
+  if (!device && !(subject && attribute === 'audio')) return { error: 'Device or subject not found.' };
+  var allowed = attribute === 'state' ? HOMEMAP_STATES[device.kind] : attribute === 'thermal' ? HOMEMAP_THERMAL : HOMEMAP_SPOTLIGHT;
+  if (value !== undefined && (attribute === 'audio' ? !homemapAudioValid(value) : allowed.indexOf(value) < 0))
     return { error: 'Choose a valid ' + attribute + '.' };
   var patch = stepIdx === null ? panel.initial : (stepPanelPatch(got.st) || {})[panelId];
   var current = patch && patch[key];
@@ -6379,7 +6591,7 @@ function planHomemapDeviceAttribute(
     ? { state: current }
     : {};
   if (value === undefined) delete next[attribute];
-  else next[attribute] = value;
+  else next[attribute] = attribute === 'audio' ? FlowAudio.clean(value) : value;
   var result = Object.keys(next).length ? next : undefined;
   if (stepIdx !== null)
     return planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, result);
@@ -6408,15 +6620,12 @@ function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, valu
   if (!device && !subject && key !== 'signals') return { error: 'Unknown homemap field.' };
   if (value !== undefined) {
     if (device && !homemapDevicePatchValid(device.kind, value))
-      return { error: 'Choose a valid device state or thermal condition.' };
+      return { error: 'Choose a valid device state, temperature, spotlight, or audio snapshot.' };
     if (
       subject &&
       value !== null &&
-      (!homemapSubjectPosition(value) ||
-        value.x < 0 ||
-        value.x > 320 ||
-        value.y < 0 ||
-        value.y > 180)
+      (!homemapSubjectPatchValid(value) ||
+        (homemapSubjectPosition(value) && (value.x < 0 || value.x > 320 || value.y < 0 || value.y > 180)))
     )
       return { error: 'Use a position within the map: x 0–320, y 0–180.' };
     if (
@@ -6619,8 +6828,10 @@ PanelRegistry.extend('homemap', {
       var subject = homemapSubjects(p).some(function (s) {
         return s.id === key;
       });
+      if (subject && panelObject(snapshot[key]) && Object.prototype.hasOwnProperty.call(snapshot[key], 'audio'))
+        return history([key], true, 'Subject position and audio history');
       if (!subject && panelObject(snapshot[key]))
-        return history([key], true, 'Device state + thermal history');
+        return history([key], true, 'Device state, spotlight, temperature, and audio history');
       return assignment(
         key,
         subject
@@ -6636,6 +6847,56 @@ PanelRegistry.extend('homemap', {
       function listen(target,type,fn,options){
         if(context.listen)return context.listen(target,type,fn,options);
         target.addEventListener(type,fn,options);
+      }
+      function homemapAudioControl(item, local, commit, initial) {
+        var box = document.createElement('details');
+        box.className = 'home-audio-controls rawjson';
+        var summary = document.createElement('summary');
+        summary.textContent = item.label + ' · audio';
+        box.appendChild(summary);
+        var current = FlowAudio.clean(item.audio) || {},
+          authored = panelObject(local) && Object.prototype.hasOwnProperty.call(local, 'audio');
+        var mode = document.createElement('select');
+        mode.className = 'fctl';
+        mode.setAttribute('aria-label', item.label + (initial ? ' initial' : '') + ' audio snapshot');
+        [['inherit', initial ? 'Default · no audio' : 'Inherit previous audio'], ['author', 'Set audio snapshot'], ['clear', 'Clear audio']].forEach(function (pair) {
+          var option = document.createElement('option');
+          option.value = pair[0]; option.textContent = pair[1]; mode.appendChild(option);
+        });
+        mode.value = authored ? local.audio === null ? 'clear' : 'author' : 'inherit';
+        listen(mode, 'change', function () {
+          commit(mode.value === 'inherit' ? undefined : mode.value === 'clear' ? null : current);
+        });
+        box.appendChild(context.controls.row('Audio', mode));
+        FlowAudio.fields.forEach(function (field) {
+          var key = field[0], input;
+          function save(value) {
+            var next = Object.assign({}, current);
+            if (value == null || value === '') delete next[key];
+            else next[key] = value;
+            return commit(next);
+          }
+          if (field[1] === 'enum') {
+            input = document.createElement('select');
+            input.className = 'fctl';
+            var blank = document.createElement('option');
+            blank.value = ''; blank.textContent = 'Default · ' + FlowAudio.model(current)[key];
+            input.appendChild(blank);
+            field[2].forEach(function (value) {
+              var option = document.createElement('option');
+              option.value = value; option.textContent = value; input.appendChild(option);
+            });
+            input.value = current[key] || '';
+            listen(input, 'change', function () { save(input.value); });
+          } else input = context.controls.text(current[key], save);
+          input.setAttribute('aria-label', item.label + (initial ? ' initial' : '') + ' audio ' + key);
+          box.appendChild(context.controls.row(key.charAt(0).toUpperCase() + key.slice(1), input));
+        });
+        var hint = document.createElement('p');
+        hint.className = 'home-note';
+        hint.textContent = 'Audio replaces the previous snapshot. Connection, microphone, output, and detection are independent. Smoke alarm heard means a sound, not smoke detection.';
+        box.appendChild(hint);
+        return box;
       }
       function homemapLayoutControl(panel, target) {
         var box = document.createElement('fieldset');
@@ -6714,7 +6975,7 @@ PanelRegistry.extend('homemap', {
               });
               if (move.kind === 'subject') {
                 state = Object.assign(Object.create(null), state);
-                state[move.key] = move.point;
+                state[move.key] = Object.assign({}, panelObject(state[move.key]) ? state[move.key] : {}, move.point);
               }
             }
           }
@@ -6935,6 +7196,8 @@ PanelRegistry.extend('homemap', {
                   attribute,
                   value
                 );
+              if (homemapSubjectPosition(value) && panelObject(snapshot.patch[key]) && Object.prototype.hasOwnProperty.call(snapshot.patch[key], 'audio') && !Object.prototype.hasOwnProperty.call(value, 'audio'))
+                value = Object.assign({}, value, { audio: snapshot.patch[key].audio });
               return planStepHomemapField(
                 context.source(),
                 raw,
@@ -6984,7 +7247,7 @@ PanelRegistry.extend('homemap', {
           return select;
         }
         note(
-          'Operating state and temperature condition carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.'
+          'Operating state, temperature, spotlight, and audio carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.'
         );
         var body = document.createElement('div');
         body.className = 'home-edit-body';
@@ -7036,6 +7299,12 @@ PanelRegistry.extend('homemap', {
               )
             )
           );
+          fields.appendChild(context.controls.row('Spotlight', choice(
+            [['', 'Inherit · ' + before.spotlight]].concat(HOMEMAP_SPOTLIGHT.map(function (v) { return [v, v]; })),
+            panelObject(ownPatch) && Object.prototype.hasOwnProperty.call(ownPatch, 'spotlight') ? d.spotlight : '',
+            d.label + ' spotlight', function (v) { commit(d.id, v === '' ? undefined : v, null, 'spotlight'); }
+          )));
+          fields.appendChild(homemapAudioControl(d, ownPatch, function (v) { return commit(d.id, v, null, 'audio'); }, false));
         });
         var armedSubject = null;
         var placementHint =
@@ -7052,12 +7321,12 @@ PanelRegistry.extend('homemap', {
               ['show', 'Show at this position'],
               ['hide', 'Hidden'],
             ],
-            own(sub.id) ? (sub.hidden ? 'hide' : 'show') : 'inherit',
+            own(sub.id) && (snapshot.patch[sub.id] === null || homemapSubjectPosition(snapshot.patch[sub.id])) ? (sub.hidden ? 'hide' : 'show') : 'inherit',
             sub.label + ' visibility',
             function (v) {
               commit(
                 sub.id,
-                v === 'inherit' ? undefined : v === 'hide' ? null : { x: sub.x, y: sub.y }
+                v === 'inherit' ? (panelObject(snapshot.patch[sub.id]) && Object.prototype.hasOwnProperty.call(snapshot.patch[sub.id], 'audio') ? { audio: snapshot.patch[sub.id].audio } : undefined) : v === 'hide' ? null : { x: sub.x, y: sub.y }
               );
             }
           );
@@ -7095,6 +7364,7 @@ PanelRegistry.extend('homemap', {
           place.setAttribute('aria-pressed', 'false');
           subjectControls[sub.id] = place;
           group.appendChild(place);
+          group.appendChild(homemapAudioControl(sub, snapshot.patch[sub.id], function (v) { return commit(sub.id, v, null, 'audio'); }, false));
         });
         if (snapshot.model.subjects.length)
           placementNote.textContent =
@@ -7117,7 +7387,7 @@ PanelRegistry.extend('homemap', {
             state = snapshot.state;
           if (move && move.kind === 'subject') {
             state = Object.assign(Object.create(null), state);
-            state[move.key] = move.point;
+            state[move.key] = Object.assign({}, panelObject(state[move.key]) ? state[move.key] : {}, move.point);
           } else if (move) {
             previewPanel = Object.assign({}, panel);
             var list = move.kind === 'device' ? 'devices' : 'rooms';
@@ -7516,11 +7786,11 @@ PanelRegistry.extend('homemap', {
           var conditions = document.createElement('details');
           conditions.className = 'rawjson';
           var conditionsTitle = document.createElement('summary');
-          conditionsTitle.textContent = 'Starting device conditions';
+          conditionsTitle.textContent = 'Starting device and subject conditions';
           conditions.appendChild(conditionsTitle);
           homemapModel(val, val.initial).devices.forEach(function (device) {
-            ['state', 'thermal'].forEach(function (attribute) {
-              var options = attribute === 'state' ? HOMEMAP_STATES[device.kind] : HOMEMAP_THERMAL;
+            ['state', 'thermal', 'spotlight'].forEach(function (attribute) {
+              var options = attribute === 'state' ? HOMEMAP_STATES[device.kind] : attribute === 'thermal' ? HOMEMAP_THERMAL : HOMEMAP_SPOTLIGHT;
               var input = context.controls.select(options, device[attribute], function (v) {
                 return context.transact(
                   function (raw) {
@@ -7545,11 +7815,19 @@ PanelRegistry.extend('homemap', {
               input.setAttribute('aria-label', device.label + ' initial ' + attribute);
               conditions.appendChild(
                 context.controls.row(
-                  device.label + ' · ' + (attribute === 'thermal' ? 'temperature' : 'state'),
+                  device.label + ' · ' + (attribute === 'thermal' ? 'temperature' : attribute),
                   input
                 )
               );
             });
+          });
+          var initialModel = homemapModel(val, val.initial);
+          initialModel.devices.concat(initialModel.subjects).forEach(function (item) {
+            conditions.appendChild(homemapAudioControl(item, (val.initial || {})[item.id], function (value) {
+              return context.transact(function (raw) {
+                return planHomemapDeviceAttribute(context.source(), raw, t.section, null, val.id, item.id, 'audio', value);
+              }, { after: function () { context.inspect(); } });
+            }, true));
           });
           rows.push(conditions);
         },
@@ -8876,12 +9154,22 @@ function phoneBrandWarnings(panel, path, warnings) {
 }
 
 /* Phone patches are operations, validated for both initial and steps. */
-function phonePatchWarnings(obj, path, warnings) {
+function phonePatchWarnings(obj, path, warnings, allowOnce) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
   Object.keys(obj).forEach(function (k) {
-    if (['clock', 'notify', 'clear'].indexOf(k) < 0)
-      warnings.push(path + '.' + k + ': not a phone field — ignored (valid: clock, notify, clear)');
+    if (['clock', 'notify', 'clear', 'audio'].indexOf(k) < 0 && !(allowOnce && k === 'enterOnce'))
+      warnings.push(path + '.' + k + ': not a phone field — ignored (valid: clock, notify, clear, audio' + (allowOnce ? ', enterOnce' : '') + ')');
   });
+  if (Object.prototype.hasOwnProperty.call(obj, 'audio'))
+    FlowAudio.clean(obj.audio, path + '.audio', warnings);
+  if (allowOnce && Object.prototype.hasOwnProperty.call(obj, 'enterOnce')) {
+    if (!phoneBrandIsPlainObject(obj.enterOnce))
+      warnings.push(path + '.enterOnce: expected {audio} — ignored');
+    else Object.keys(obj.enterOnce).forEach(function (key) {
+      if (key === 'audio') FlowAudio.clean(obj.enterOnce.audio, path + '.enterOnce.audio', warnings);
+      else warnings.push(path + '.enterOnce.' + key + ': only audio supports a phone enterOnce override — ignored');
+    });
+  }
   if (Object.prototype.hasOwnProperty.call(obj, 'clock') && typeof obj.clock !== 'string')
     warnings.push(path + '.clock: must be a string — ignored');
   if (Object.prototype.hasOwnProperty.call(obj, 'clear') && obj.clear !== true)
@@ -8917,6 +9205,7 @@ function foldPhoneStates(panel, steps) {
   steps = Array.isArray(steps) ? steps : [];
   var clock = '',
     notifications = [],
+    audio,
     states = [];
   function validNotification(n) {
     return n && typeof n === 'object' && !Array.isArray(n) && typeof n.app === 'string' && !!n.app;
@@ -8931,6 +9220,10 @@ function foldPhoneStates(panel, steps) {
   function apply(patch) {
     patch = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
     if (typeof patch.clock === 'string') clock = patch.clock;
+    if (Object.prototype.hasOwnProperty.call(patch, 'audio')) {
+      var nextAudio = FlowAudio.clean(patch.audio);
+      if (nextAudio !== undefined) audio = nextAudio;
+    }
     if (patch.clear === true) notifications = [];
     if (!Object.prototype.hasOwnProperty.call(patch, 'notify')) return 0;
     var raw = Array.isArray(patch.notify) ? patch.notify : [patch.notify];
@@ -8938,22 +9231,27 @@ function foldPhoneStates(panel, steps) {
     if (pushed.length) notifications = pushed.concat(notifications);
     return pushed.length;
   }
-  apply(panel.initial);
-  steps.forEach(function (st) {
-    var all = stepPanelPatch(st) || {};
-    var added = apply(all[panel.id]);
-    states.push({
+  function snapshot(added, once) {
+    var result = {
       clock: clock,
       notifications: notifications.map(cleanNotification),
       _phoneAdded: added,
-    });
+    };
+    var transientAudio = phoneBrandIsPlainObject(once) && Object.prototype.hasOwnProperty.call(once, 'audio')
+      ? FlowAudio.clean(once.audio) : undefined;
+    var currentAudio = transientAudio === undefined ? audio : transientAudio;
+    /* Sanitize anew so snapshots never share mutable authored objects. Absent
+       audio keeps the legacy snapshot shape; null explicitly clears a card. */
+    if (currentAudio !== undefined) result.audio = FlowAudio.clean(currentAudio);
+    return result;
+  }
+  apply(panel.initial);
+  steps.forEach(function (st) {
+    var all = stepPanelPatch(st) || {};
+    var patch = all[panel.id], added = apply(patch);
+    states.push(snapshot(added, patch && patch.enterOnce));
   });
-  if (!steps.length)
-    states.push({
-      clock: clock,
-      notifications: notifications.map(cleanNotification),
-      _phoneAdded: 0,
-    });
+  if (!steps.length) states.push(snapshot(0));
   return states;
 }
 
@@ -8963,7 +9261,7 @@ PanelRegistry.extend('phone', {
     phonePatchWarnings(p.initial, PP + '.initial', warnings);
   },
   validatePatch: function (patch, path, panel, warnings, context) {
-    phonePatchWarnings(patch, path, warnings);
+    phonePatchWarnings(patch, path, warnings, true);
   },
   fold: foldPhoneStates,
 });
@@ -9018,7 +9316,7 @@ function phoneModel(panelOrState, stepsOrState, currentStep) {
       };
     })
     .filter(Boolean);
-  return {
+  var model = {
     clock: typeof state.clock === 'string' ? state.clock : '',
     notifications: notifications,
     cards: notifications.slice(0, 3),
@@ -9027,11 +9325,63 @@ function phoneModel(panelOrState, stepsOrState, currentStep) {
     overflow: Math.max(0, notifications.length - 3),
     added: typeof state._phoneAdded === 'number' ? Math.max(0, Math.round(state._phoneAdded)) : 0,
   };
+  if (Object.prototype.hasOwnProperty.call(state, 'audio')) {
+    var audio = FlowAudio.clean(state.audio);
+    if (audio !== undefined) model.audio = audio;
+  }
+  return model;
+}
+
+/* A phone's microphone captures the homeowner; its speaker plays the remote
+   visitor. Direction is derived only from authored audio facts, never a
+   notification or a camera/monitor state elsewhere on the diagram. */
+function phoneAudioModel(audio) {
+  if (audio == null) return null;
+  var clean = FlowAudio.clean(audio);
+  if (clean == null) return null;
+  var m = FlowAudio.model(clean), capturing = FlowAudio.isCapturing(clean), emitting = FlowAudio.isEmitting(clean);
+  var direction = capturing && emitting ? 'You ↔ visitor'
+    : capturing ? 'You → visitor'
+    : emitting ? (m.output === 'speech' ? 'Visitor → you' : 'Audio → you')
+    : m.connection === 'connecting' ? 'Connecting call'
+    : m.connection === 'ended' ? 'Call ended'
+    : m.connection === 'interrupted' ? 'Connection interrupted' : 'No audio flowing';
+  var microphone = {idle:'Mic idle',listening:'Mic listening',capturing:'You are speaking',muted:'Mic muted',unavailable:'Mic unavailable'}[m.microphone];
+  var speaker = m.output === 'silent' ? 'Speaker silent'
+    : m.playback === 'queued' ? 'Audio queued'
+    : m.playback === 'suppressed' ? 'Audio suppressed'
+    : m.playback === 'failed' ? 'Speaker unavailable'
+    : m.playback === 'stopped' ? 'Audio stopped'
+    : {speech:'Visitor speaking',recorded:'Recorded message',chime:'Chime playing',siren:'Siren playing'}[m.output];
+  var detection = {none:'',sound:'Sound detected','smoke-alarm':'Smoke alarm heard','co-alarm':'CO alarm heard','glass-break':'Glass-break sound detected'}[m.detection];
+  return {audio:m, direction:direction, microphone:microphone, speaker:speaker,
+    capturing:capturing, emitting:emitting, detection:detection,
+    description:'Audio ' + m.connection + '. ' + direction + '. ' + microphone + '. ' + speaker +
+      (m.source ? '. ' + m.source : '') + (m.text ? '. ' + m.text : '') + (detection ? '. ' + detection : '') + (m.reason ? '. ' + m.reason : '')};
+}
+
+function phoneAudioHTML(model) {
+  if (!model) return '';
+  var a = model.audio;
+  var mic = '<span class="phonecallicon' + (a.microphone === 'muted' || a.microphone === 'unavailable' ? ' is-muted' : '') + '">' + FlowAudio.icon('microphone') + '</span>';
+  var speaker = '<span class="phonecallicon' + (!model.emitting ? ' is-muted' : '') + '">' + FlowAudio.icon('speaker') + '</span>';
+  return '<div class="phonecall phonecall-' + a.connection + '">' +
+    '<div class="phonecallhead"><span>Live audio</span><span class="phonecallconnection"><i aria-hidden="true"></i>' + esc(a.connection) + '</span></div>' +
+    '<div class="phonecalldirection">' + esc(model.direction) + '</div>' +
+    '<div class="phonecallchannels"><div class="phonecallchannel' + (model.capturing ? ' is-active' : '') + '">' + mic +
+    '<span>' + esc(model.microphone) + '</span></div><div class="phonecallchannel' + (model.emitting ? ' is-active' : '') + '">' + speaker +
+    '<span>' + esc(model.speaker) + '</span></div></div>' +
+    (a.source ? '<div class="phonecallsource" title="' + esc(a.source) + '">' + esc(a.source) + '</div>' : '') +
+    (a.text ? '<div class="phonecallcaption" title="' + esc(a.text) + '">“' + esc(a.text) + '”</div>' : '') +
+    (model.detection ? '<div class="phonecalldetection">' + esc(model.detection) + '</div>' : '') +
+    (a.reason ? '<div class="phonecallreason" title="' + esc(a.reason) + '">' + esc(a.reason) + '</div>' : '') +
+    '</div>';
 }
 
 function phonePanelHTML(panel, state, fresh) {
   panel = panel || {};
   var m = phoneModel(panel, state);
+  var call = phoneAudioModel(m.audio);
   var brand = phoneBrand(panel);
   var styles = [];
   if (brand) {
@@ -9043,8 +9393,9 @@ function phonePanelHTML(panel, state, fresh) {
     ? 'Phone with ' + m.count + ' unread notification' + (m.count === 1 ? '' : 's')
     : 'Phone with no notifications';
   if (brand && brand.app) label = brand.app + ' phone' + label.slice(5);
+  if (call) label += '. ' + call.description;
   var h =
-    '<div class="phoneframe"' +
+    '<div class="phoneframe' + (call ? ' phonehasaudio' : '') + '"' +
     (styles.length ? ' style="' + styles.join(';') + '"' : '') +
     ' role="img" aria-label="' +
     esc(label) +
@@ -9065,6 +9416,7 @@ function phonePanelHTML(panel, state, fresh) {
       '</div>';
   if (m.count) h += '<span class="phonebadge" aria-hidden="true">' + m.badge + '</span>';
   h += '<div class="phonecards">';
+  h += phoneAudioHTML(call);
   if (!m.cards.length) {
     h += '<div class="phoneempty">no notifications</div>';
   } else {
@@ -9180,6 +9532,29 @@ PanelRegistry.extend('phone', {
 .phoneoverflow{text-align:center;font-size:8px;font-weight:700;letter-spacing:.04em;}
 .phoneempty{margin:auto;text-align:center;font-size:8px;letter-spacing:.05em;text-transform:uppercase;opacity:.58;}
 .phonehome{position:absolute;bottom:8px;left:50%;width:42px;height:3px;transform:translateX(-50%);border-radius:999px;}
+.phonecall{--pcacc:var(--phacc, #4956C9);--pcgood:#276D58;--pcwarn:#95601D;box-sizing:border-box;flex:none;padding:9px 8px;
+  border:1px solid color-mix(in srgb,var(--pcacc) 38%,transparent);border-radius:12px;
+  background:color-mix(in srgb,var(--pcacc) 7%,transparent);font:500 8px/1.35 'IBM Plex Sans',sans-serif;}
+.phonecallhead{display:flex;align-items:center;justify-content:space-between;gap:4px;font:600 6.5px/1.4 'IBM Plex Mono',monospace;}
+.phonecallhead>span:first-child{text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+.phonecallconnection{display:flex;align-items:center;gap:3px;min-width:0;text-transform:capitalize;opacity:.8;}
+.phonecallconnection i{flex:none;width:4px;height:4px;border-radius:50%;background:currentColor;}
+.phonecall-connected .phonecallconnection{color:var(--pcgood);opacity:1;}
+.phonecall-interrupted .phonecallconnection,.phonecall-connecting .phonecallconnection{color:var(--pcwarn);opacity:1;}
+.phonecalldirection{margin:8px 0;font-size:11px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;}
+.phonecallchannels{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px;}
+.phonecallchannel{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;min-width:0;padding:7px 2px 5px;
+  border:1px solid color-mix(in srgb,currentColor 12%,transparent);border-radius:7px;text-align:center;font-size:7.5px;line-height:1.2;}
+.phonecallchannel svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.phonecallicon{position:relative;display:block;height:17px;}.phonecallicon.is-muted:after{content:'';position:absolute;top:8px;left:-1px;width:21px;height:1.5px;background:currentColor;transform:rotate(45deg);}
+.phonecallchannel.is-active{color:var(--pcacc);border-color:color-mix(in srgb,var(--pcacc) 45%,transparent);background:color-mix(in srgb,var(--pcacc) 10%,transparent);}
+.phonecallsource{margin-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:7px;font-weight:600;opacity:.68;}
+.phonecallcaption,.phonecallreason{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow-wrap:anywhere;margin-top:6px;}
+.phonecallcaption{font-size:9px;line-height:1.35;}.phonecallreason{font-size:8px;opacity:.72;}
+.phonecalldetection{margin-top:6px;font-size:8px;font-weight:600;color:var(--pcwarn);}
+.phonehasaudio .phoneempty{padding:9px 0;font-size:7px;}
+.sk-aurora .phonecall{--pcacc:var(--phacc, #8AE8FF);--pcgood:#8FDEC0;--pcwarn:#F2C078;}
+.sk-daylight .phonecall{--pcacc:var(--phacc, #4956C9);}
 .sk-aurora .phoneframe{color:var(--phfg, #D9E4F2);background:var(--phbg, #09111E);border-color:#718099;box-shadow:inset 0 0 0 2px #16233A;}
 .sk-aurora .phonespeaker,.sk-aurora .phonehome{background:#718099;}
 .sk-aurora .phonesignal i{background:#C7D3E3;}
@@ -9205,6 +9580,7 @@ PanelRegistry.extend('phone', {
       order: 1207,
       css: String.raw`@media (prefers-reduced-motion: reduce){
   .phonecard.fresh{animation:none !important;}
+  .phonecall,.phonecall *{animation:none !important;transition:none !important;}
 }`,
     },
     {
@@ -9230,6 +9606,8 @@ PanelRegistry.extend('phone', {
 }
 @media print{
   .phonecard.fresh{animation:none !important;}
+  .phonecall{color:#222222 !important;background:#FFFFFF !important;border-color:#777777 !important;}
+  .phonecallconnection,.phonecallchannel.is-active,.phonecalldetection{color:#333333 !important;}
 }`,
     },
     {
@@ -9262,7 +9640,9 @@ body.sk-editorial .sk-daylight .phonetext{color:var(--ed-muted);}
 body.sk-editorial .sk-aurora .phonebadge,
 body.sk-editorial .sk-daylight .phonebadge{color:#FFFDF8;background:var(--phacc, var(--ed-accent-deep));}
 body.sk-editorial .sk-aurora .phonelogo,
-body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, var(--ed-accent-deep));}`,
+body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, var(--ed-accent-deep));}
+body.sk-editorial .phonecall{--pcacc:var(--phacc, var(--ed-accent));--pcgood:#276D58;--pcwarn:#95601D;border-radius:2px;}
+body.sk-editorial .phonecallchannel{border-radius:2px;}`,
     },
     {
       order: 1663,
@@ -9313,6 +9693,9 @@ body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, 
 @media screen {
   body.sk-terminal .sk-aurora .phonelogo,
   body.sk-terminal .sk-daylight .phonelogo{color:var(--tm-ground);background:var(--phacc, var(--tm-alert));}
+  body.sk-terminal .phonecall{--pcacc:var(--phacc, var(--tm-good));--pcgood:var(--tm-good);--pcwarn:var(--tm-alert);border-radius:0;}
+  body.sk-terminal .phonecallchannel{border-radius:0;}
+  body.sk-terminal .phonecall,body.sk-terminal .phonecall *{font-family:'IBM Plex Mono',monospace;}
 }`,
     },
     {
@@ -9364,6 +9747,7 @@ body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, 
 @media screen {
   body.sk-pastel .sk-aurora .phonelogo,
   body.sk-pastel .sk-daylight .phonelogo{color:#FFFFFF;background:var(--phacc, #D36370);}
+  body.sk-pastel .phonecall{--pcacc:var(--phacc, #5263B9);--pcgood:#276D58;--pcwarn:#95601D;}
 }`,
     },
     {
@@ -9415,6 +9799,8 @@ body.sk-editorial .sk-daylight .phonelogo{color:#FFFDF8;background:var(--phacc, 
 @media screen {
   body.sk-blueprint .sk-aurora .phonelogo,
   body.sk-blueprint .sk-daylight .phonelogo{color:#052956;background:var(--phacc, #FFD166);}
+  body.sk-blueprint .phonecall{--pcacc:var(--phacc, #58E7FF);--pcgood:#8FDEC0;--pcwarn:#FFD166;border-radius:0;}
+  body.sk-blueprint .phonecallchannel{border-radius:0;}
 }`,
     },
   ],
@@ -9436,13 +9822,14 @@ PanelRegistry.extend('phone', {
       ['clock', 'text'],
       ['notify', 'jsonAny'],
       ['clear', 'bool', { trueOnly: true }],
+      ['audio', 'objf', FlowAudio.fields],
     ],
     picker: {
       order: 24,
-      name: 'Phone notifications',
+      name: 'Phone notifications & audio',
       category: 'Devices & interfaces',
       tagline: 'The user-facing moment',
-      description: 'Show notifications stacking on a phone as events reach the user.',
+      description: 'Show notifications stacking on a phone and optional live audio with the visitor.',
     },
     origin: function (p, key, snapshot, context) {
       var assignment = context.assignment,
@@ -9459,6 +9846,11 @@ PanelRegistry.extend('phone', {
           },
           false
         );
+      if (key === 'audio') {
+        var once = context.currentPatch && context.currentPatch.enterOnce;
+        return assignment(key, function (value) { return FlowAudio.clean(value) !== undefined; },
+          phoneBrandIsPlainObject(once) && own(once, 'audio') && FlowAudio.clean(once.audio) !== undefined);
+      }
       return { kind: 'engine', label: 'Engine · presentation metadata', inputs: [] };
     },
     example: function (sample, context) {
@@ -10870,12 +11262,33 @@ var SCENE_NAMES = [
   'static-noise',
 ];
 var SCREEN_MODES = ['off', 'boot', 'active', 'live', 'rec', 'save', 'unavailable'];
+var SCREEN_SPOTLIGHTS = ['off', 'on', 'flash'];
+/* Preserve the legacy screen snapshot contract while sanitizing the independent
+   audio/light channels before they enter carried state. */
+function screenCleanState(raw, once) {
+  if (!panelObject(raw)) return {};
+  var out = Object.assign({}, raw);
+  if (panelOwn(raw, 'audio')) {
+    var audio = FlowAudio.clean(raw.audio);
+    if (audio === undefined) delete out.audio;
+    else out.audio = audio;
+  }
+  if (panelOwn(raw, 'spotlight') && SCREEN_SPOTLIGHTS.indexOf(raw.spotlight) < 0) delete out.spotlight;
+  if (panelOwn(raw, 'enterOnce')) {
+    if (once && panelObject(raw.enterOnce)) out.enterOnce = screenCleanState(raw.enterOnce, false);
+    else delete out.enterOnce;
+  }
+  return out;
+}
 function screenPatchWarnings(state, path, warnings) {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return;
   if (state.mode != null && SCREEN_MODES.indexOf(state.mode) < 0)
     warnings.push(path + '.mode: unknown camera mode — using off');
   if (state.reason != null && typeof state.reason !== 'string')
     warnings.push(path + '.reason: expected text or null — using the default explanation');
+  if (panelOwn(state, 'audio')) FlowAudio.clean(state.audio, path + '.audio', warnings);
+  if (panelOwn(state, 'spotlight') && SCREEN_SPOTLIGHTS.indexOf(state.spotlight) < 0)
+    warnings.push(path + '.spotlight: expected off|on|flash — ignored');
   if (
     Object.prototype.hasOwnProperty.call(state, 'scenePlayback') &&
     ['waiting', 'playing'].indexOf(state.scenePlayback) < 0
@@ -10889,6 +11302,7 @@ function screenPatchWarnings(state, path, warnings) {
 }
 
 PanelRegistry.extend('screen', {
+  fold: function (panel, steps) { return foldSanitizedPanelStates(panel, steps, screenCleanState); },
   validateDeclaration: function (p, PP, warnings, errors, d) {
     if (p.scene && SCENE_NAMES.indexOf(p.scene) < 0)
       warnings.push(
@@ -11152,6 +11566,31 @@ var SCENES = {
 
 /* Shared by embedded monitoring consoles. The caller still owns its panel
    lifecycle; this factory owns camera artwork, overlays and clip-preserving patches. */
+function screenDeviceOverlay(audio, spotlight) {
+  var light = SCREEN_SPOTLIGHTS.indexOf(spotlight) >= 0 && spotlight !== 'off';
+  var sound = FlowAudio.render(audio);
+  if (!sound && !light) return '';
+  return '<svg class="ovl screen-devices" viewBox="0 0 320 180" aria-hidden="true">' +
+    (light ? '<g class="screen-spotlight screen-spotlight-' + spotlight + '"><path d="M263 55L101 180H320V122Z" fill="#FFE5A3" opacity=".24"/><path d="M263 55L203 180H320V126Z" fill="#FFF6D6" opacity=".14"/><ellipse cx="250" cy="170" rx="67" ry="12" fill="#FFE5A3" opacity=".2"/></g>' : '') +
+    '<g class="screen-camera-device" transform="translate(260 40)"><rect x="-17" y="-12" width="34" height="25" rx="9" fill="#163046" stroke="#A3CCD6" stroke-width="1.2"/>' +
+    '<circle cx="-5" cy="-1" r="6" fill="#081927" stroke="#65B8C5" stroke-width="2"/><circle cx="-6" cy="-2" r="2" fill="#92D9E2"/>' +
+    '<path d="M6-5H11M6-1H11M6 3H11" stroke="#C7E4DF" stroke-width="1.6" stroke-linecap="round"/>' +
+    (light ? '<rect x="-8" y="12" width="16" height="3" rx="1.5" fill="#FFE5A3"/>' : '') +
+    FlowAudio.effect(audio) + '</g></svg>';
+}
+function screenAudioHTML(audio) {
+  var strip = FlowAudio.render(audio, {label:'Camera audio'});
+  if (!strip) return '';
+  var speaking = FlowAudio.isEmitting(audio), hearing = FlowAudio.isCapturing(audio), model = FlowAudio.model(audio);
+  var action = speaking && hearing ? 'Camera speaker and microphone active' :
+    speaking ? {speech:'Camera speaking to visitor',recorded:'Camera playing recorded message',chime:'Camera sounding a chime',siren:'Camera sounding a siren'}[model.output] :
+    hearing ? 'Camera hearing visitor or nearby sound' :
+    model.microphone === 'muted' ? 'Camera microphone muted' :
+    model.microphone === 'unavailable' ? 'Camera microphone unavailable' :
+    model.playback === 'failed' ? 'Camera speaker playback failed' :
+    model.microphone === 'listening' ? 'Camera microphone listening' : 'Camera audio';
+  return '<div class="screen-audio-direction">' + action + '</div>' + strip;
+}
 function screenFramePresentation(host, panel, state) {
   var h = '';
   var mode = String(state.mode || 'off');
@@ -11184,25 +11623,29 @@ function screenFramePresentation(host, panel, state) {
           : 'Video is temporarily unavailable.'
       ) +
       '</span></div>';
+  scrOvl += screenDeviceOverlay(state.audio, state.spotlight);
+  var audioHTML = screenAudioHTML(state.audio);
+  if (SCREEN_SPOTLIGHTS.indexOf(state.spotlight) >= 0 && state.spotlight !== 'off')
+    scrOvl += '<span class="ovl screen-light-label">Spotlight ' + (state.spotlight === 'flash' ? 'flashing' : 'on') + '</span>';
   h += '<div class="' + scrClass + '">';
   if (mode === 'boot') h += SCENES['static-noise'];
   else if (mode === 'active' || mode === 'live' || mode === 'rec' || mode === 'save')
     h += SCENES[sceneName];
-  h += scrOvl + '</div>';
+  h += scrOvl + '</div><div class="screen-audio-slot">' + audioHTML + '</div>';
   return {
     html: h,
     patch: function () {
       /* screen surgical path: consecutive modes that both show the SAME scene
      (active / live / rec / save) swap only the mode class and the overlay chips,
      keeping the scene subtree — the walker's animation state survives.
-     Any other transition (off/boot involved, or a first render) rebuilds. */
+     A stable off/boot/unavailable frame can patch audio too; entering or
+     leaving one of those modes rebuilds its video content. */
       var surgical = false;
       var SCENE_SHOWING = { active: true, live: true, rec: true, save: true };
       if (
         host._lastHTML != null &&
         sceneName === host._scrScene &&
-        SCENE_SHOWING[mode] &&
-        SCENE_SHOWING[host._scrMode]
+        ((SCENE_SHOWING[mode] && SCENE_SHOWING[host._scrMode]) || mode === host._scrMode)
       ) {
         var scrBox = host.querySelector('.screenbox');
         if (scrBox) {
@@ -11214,11 +11657,17 @@ function screenFramePresentation(host, panel, state) {
               oldOvls[ov].parentNode.removeChild(oldOvls[ov]);
             if (scrOvl) scrBox.insertAdjacentHTML('beforeend', scrOvl);
           }
+          if (audioHTML !== host._scrAudio) {
+            var audioSlot = host.querySelector('.screen-audio-slot');
+            if (audioSlot) audioSlot.innerHTML = audioHTML;
+            else surgical = false;
+          }
         }
       }
       host._scrMode = mode;
       host._scrScene = sceneName;
       host._scrOverlay = scrOvl;
+      host._scrAudio = audioHTML;
       return surgical;
     },
   };
@@ -11236,6 +11685,19 @@ PanelRegistry.extend('screen', {
 
 PanelRegistry.extend('screen', {
   styles: [
+    {
+      order: 490,
+      css: String.raw`.screen-devices{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+.screen-camera-device{color:#B9FFF0;filter:drop-shadow(0 2px 4px #09192788);}
+.screen-spotlight-flash{animation:screen-spotlight-flash 2.6s ease-in-out infinite;}
+.screen-audio-slot:empty{display:none;}.screen-audio-slot{margin-top:7px;min-width:0;}
+.screen-audio-direction{margin:0 2px 5px;color:var(--dtext);font:500 10px/1.4 'IBM Plex Sans',sans-serif;}
+.screen-light-label{position:absolute;right:8px;bottom:8px;padding:3px 6px;border:1px solid #FFE5A355;border-radius:5px;background:#183046D9;color:#FFF0CA;font:500 9px/1.4 'IBM Plex Sans',sans-serif;}
+@keyframes screen-spotlight-flash{0%,34%,100%{opacity:1;}50%,82%{opacity:.16;}}
+@media(prefers-reduced-motion:reduce){.screen-devices *{animation:none!important;}.screen-spotlight-flash{opacity:.8;}}
+@media print{.screen-devices *{animation:none!important;}.screen-audio-slot{break-inside:avoid;}.screen-devices{print-color-adjust:exact;}}
+`,
+    },
     {
       order: 478,
       css: String.raw`.screenbox{position:relative; border-radius:8px; overflow:hidden; aspect-ratio:16/9; background:#05080B;}
@@ -11496,14 +11958,19 @@ PanelRegistry.extend('screen', {
       ['scenePlayback', 'enum', ['waiting', 'playing']],
       ['banner', 'text'],
       ['reason', 'text'],
+      ['audio', 'objf', FlowAudio.fields],
+      ['spotlight', 'enum', SCREEN_SPOTLIGHTS],
     ],
+    origin: function (panel, key, snapshot, context) {
+      return panelSanitizedOrigin(key, context, function (raw) { return screenCleanState(raw, false); });
+    },
     picker: {
       order: 15,
       name: 'Camera view',
       category: 'Places & sensing',
       tagline: 'What the camera sees',
       description:
-        'Show a camera scene moving through live view, recording, saving, and other modes.',
+        'Show camera video, two-way talk, recorded warnings, sound detection and an independent spotlight.',
     },
     example: function (sample, context) {
       var panel = sample.panel,
@@ -11553,7 +12020,7 @@ PanelRegistry.extend('screen', {
           var sceneNote = document.createElement('p');
           sceneNote.className = 'home-note';
           sceneNote.textContent =
-            'Active means on without livestreaming or recording. Unavailable hides the scene and shows the reason (for example, protective shutdown). Mode, reason and scene event carry independently; the reason is visible only in Unavailable mode.';
+            'Active means on without livestreaming or recording. Audio and spotlight carry independently of video. Camera output is heard by the visitor; microphone capturing means the camera hears the visitor. Each audio object replaces the prior audio state; null clears it. Audio is visual only. Unavailable hides video and shows its reason.';
           body.appendChild(sceneNote);
         },
         patchLabel: function (key) {
@@ -11572,14 +12039,26 @@ PanelRegistry.extend('screen', {
   var alarms = ['unknown', 'clear', 'triggered', 'acknowledged'];
   var kinds = ['door', 'motion', 'camera', 'smoke', 'water', 'lock', 'sensor'];
   var videoStates = ['closed', 'opening', 'reviewing', 'unavailable'];
-  var fields = {video:videoStates, scene:SCENE_NAMES, scenePlayback:['waiting','playing'], videoReason:'text', status:statuses, operator:'text', incident:'text', assessment:assessments, detail:'text', note:'text'};
+  var fields = {video:videoStates, scene:SCENE_NAMES, scenePlayback:['waiting','playing'], videoReason:'text', spotlight:SCREEN_SPOTLIGHTS, audio:'text', status:statuses, operator:'text', incident:'text', assessment:assessments, detail:'text', note:'text'};
   var sensorFields = {health:health, alarm:alarms, detail:'text'};
   var labels = {unknown:'Status unknown', disarmed:'Disarmed', armed:'Monitoring', alarm:'Alarm received',
     reviewing:'Operator reviewing', verified:'Incident verified', cleared:'All clear', offline:'Monitoring offline'};
   var assessmentLabels = {unverified:'Unverified', reviewing:'Under review', verified:'Verified', 'false-alarm':'False alarm'};
   function items(panel) { return panelOperationalItems(panel, 'sensors', 12, fields); }
   function clean(panel, raw, path, warnings, once) {
-    return panelOperationalSnapshot(raw, fields, items(panel), sensorFields, path, warnings, once);
+    if (!panelObject(raw)) return panelOperationalSnapshot(raw, fields, items(panel), sensorFields, path, warnings, once);
+    var base = Object.assign({}, raw);
+    delete base.audio; delete base.enterOnce;
+    var out = panelOperationalSnapshot(base, fields, items(panel), sensorFields, path, warnings, false);
+    if (panelOwn(raw, 'audio')) {
+      var audio = FlowAudio.clean(raw.audio, path + '.audio', warnings);
+      if (audio !== undefined) out.audio = audio;
+    }
+    if (once && panelOwn(raw, 'enterOnce')) {
+      if (panelObject(raw.enterOnce)) out.enterOnce = clean(panel, raw.enterOnce, path + '.enterOnce', warnings, false);
+      else if (warnings) warnings.push(path + '.enterOnce: expected a state object — ignored');
+    } else if (panelOwn(raw, 'enterOnce') && warnings) warnings.push(path + '.enterOnce: unknown field or declared item ID — ignored');
+    return out;
   }
   function text(value) { return typeof value === 'string' ? value : ''; }
   function icon(kind) {
@@ -11602,7 +12081,27 @@ PanelRegistry.extend('screen', {
     if (SCENE_NAMES.indexOf(scene) < 0) scene = 'static-noise';
     var modes = {closed:'off', opening:'boot', reviewing:'active', unavailable:'unavailable'};
     return {video:video, panel:{scene:scene}, state:{mode:modes[video], scenePlayback:state.scenePlayback,
-      reason:state.videoReason || 'The operator cannot reach this camera.'}};
+      spotlight:state.spotlight, reason:state.videoReason || 'The operator cannot reach this camera.'}};
+  }
+  function audioClass(audio) {
+    var model = FlowAudio.model(audio);
+    return (FlowAudio.isCapturing(audio) ? ' secmon-audio-speaking' : '') +
+      (FlowAudio.isEmitting(audio) ? ' secmon-audio-listening' : '') +
+      (model.microphone === 'muted' ? ' secmon-audio-muted' : '') +
+      (model.microphone === 'unavailable' ? ' secmon-audio-mic-unavailable' : '') +
+      (model.microphone === 'unavailable' || model.playback === 'failed' || model.connection === 'interrupted' ? ' secmon-audio-failed' : '');
+  }
+  function operatorAudio(audio) {
+    var strip = FlowAudio.render(audio, {label:'Operator headset'});
+    if (!strip) return '';
+    var speaking = FlowAudio.isCapturing(audio), hearing = FlowAudio.isEmitting(audio);
+    var model = FlowAudio.model(audio), action = speaking && hearing ? 'Speaking and hearing remote audio' :
+      speaking ? 'Operator speaking to camera' : hearing ? 'Operator hearing remote audio' :
+      model.microphone === 'muted' ? 'Operator microphone muted' :
+      model.microphone === 'unavailable' ? 'Operator microphone unavailable' :
+      model.connection === 'interrupted' || model.playback === 'failed' ? 'Headset audio interrupted' :
+      model.microphone === 'listening' ? 'Operator microphone ready' : 'Operator audio';
+    return '<div class="secmon-audio"><div class="secmon-audio-action"><span class="secmon-audio-dot" aria-hidden="true"></span>' + action + '</div>' + strip + '</div>';
   }
   function operatorArtwork() {
     return '<svg class="secmon-operator-figure" viewBox="0 0 170 214" aria-hidden="true">' +
@@ -11619,18 +12118,22 @@ PanelRegistry.extend('screen', {
       '<path d="M56 76V95Q64 101 73 94L70 73" fill="#BC896F"/>' +
       '<path d="M43 49Q45 26 68 30Q86 33 84 49L88 61L84 66V78Q80 90 68 86L51 77Z" fill="#E5B797"/>' +
       '<path d="M42 63Q32 58 37 41Q44 17 67 24Q82 20 89 39L83 50L73 41Q62 51 49 49L48 68Z" fill="#26364B"/>' +
-      '<circle cx="77" cy="58" r="2" fill="#26364B"/><path d="M79 75H84" stroke="#8E5B51" stroke-width="2" stroke-linecap="round"/>' +
+      '<circle cx="77" cy="58" r="2" fill="#26364B"/><ellipse class="secmon-mouth" cx="81" cy="75" rx="3" ry="1" fill="#8E5B51"/>' +
       '<path d="M40 57V43Q43 21 63 24Q84 25 85 45" fill="none" stroke="#9EDDEC" stroke-width="5"/>' +
-      '<rect x="38" y="49" width="12" height="25" rx="6" fill="#243C55" stroke="#ACDDE7" stroke-width="3"/>' +
+      '<rect class="secmon-headset-ear" x="38" y="49" width="12" height="25" rx="6" fill="#243C55" stroke="#ACDDE7" stroke-width="3"/>' +
       '<path d="M47 68Q59 81 80 80" fill="none" stroke="#ABDCE5" stroke-width="3" stroke-linecap="round"/>' +
       '<rect x="77" y="76" width="9" height="6" rx="3" fill="#D8F6EE"/>' +
+      '<circle class="secmon-mic-led" cx="82" cy="79" r="2" fill="#536F82"/>' +
+      '<g class="secmon-speech-waves" fill="none" stroke="#B6FFE7" stroke-width="2.6" stroke-linecap="round"><path d="M96 68Q103 76 96 84"/><path d="M105 62Q116 76 105 90"/><path d="M115 56Q130 76 115 96"/></g>' +
+      '<g class="secmon-listen-waves" fill="none" stroke="#9CDBFF" stroke-width="2.6" stroke-linecap="round"><path d="M30 48Q22 61 30 73"/><path d="M21 41Q9 61 21 81"/></g>' +
+      '<path class="secmon-mic-slash" d="M73 71L91 87" stroke="#FFB8AA" stroke-width="3" stroke-linecap="round"/>' +
       '<g class="secmon-control-arm"><path d="M67 106L83 137L122 129" fill="none" stroke="#3F91A5" stroke-width="16" stroke-linecap="round"/>' +
       '<path d="M117 130L133 129" stroke="#E5B797" stroke-width="10" stroke-linecap="round"/>' +
       '<path d="M132 123L137 127L148 128" fill="none" stroke="#E5B797" stroke-width="4" stroke-linecap="round"/></g>' +
       '</svg>';
   }
   function stageHTML(panel, state, model) {
-    return '<div class="secmon-stage secmon-review-' + model.video + '">' +
+    return '<div class="secmon-stage secmon-review-' + model.video + audioClass(state.audio) + '">' +
       '<div class="secmon-stage-top"><span>Monitoring desk</span><span class="secmon-room-signal"><i></i>SIMULATED VIDEO</span></div>' +
       '<div class="secmon-workstation"><div class="secmon-room-grid" aria-hidden="true"></div>' +
       '<div class="secmon-monitor"><div class="secmon-monitor-title"><i aria-hidden="true"></i><span class="secmon-feed-label">' + esc(text(panel.videoLabel) || 'Incident camera') + '</span></div>' +
@@ -11638,7 +12141,8 @@ PanelRegistry.extend('screen', {
       '<div class="secmon-monitor-footer" aria-hidden="true"><span></span><i></i><i></i><i></i></div><div class="secmon-monitor-stand" aria-hidden="true"></div></div>' +
       '<div class="secmon-desk" aria-hidden="true"><span></span></div>' + operatorArtwork() +
       '<div class="secmon-desk-mouse" aria-hidden="true"></div></div>' +
-      '<div class="secmon-review-caption"><span class="secmon-review-indicator" aria-hidden="true"></span><strong>' + reviewLabel(model.video) + '</strong><span class="secmon-review-clip">' + esc(clipLabel(model)) + '</span></div></div>';
+      '<div class="secmon-review-caption"><span class="secmon-review-indicator" aria-hidden="true"></span><strong>' + reviewLabel(model.video) + '</strong><span class="secmon-review-clip">' + esc(clipLabel(model)) + '</span></div>' +
+      '<div class="secmon-audio-slot">' + operatorAudio(state.audio) + '</div></div>';
   }
   function reviewLabel(video) {
     return {closed:'Ready for review', opening:'Opening camera…', reviewing:'Reviewing footage', unavailable:'Video connection lost'}[video];
@@ -11681,7 +12185,7 @@ PanelRegistry.extend('screen', {
       '<details class="secmon-sensor-details"><summary>Sensor detail <span>' + sensorList.length + ' sources · ' + triggered + ' alarms</span></summary>' +
       '<ul class="secmon-sensors" aria-label="Monitored sensors">' + rows + '</ul>' +
       (!sensorList.length ? '<div class="swempty">No sensors configured</div>' : '') + '</details>';
-    var model = videoModel(panel, state), note = state.note ? '<div class="swnote">' + esc(state.note) + '</div>' : '';
+    var model = videoModel(panel, state), note = state.note ? '<div class="swnote">' + esc(state.note) + '</div>' : '', audio = operatorAudio(state.audio);
     var h = '<div class="secmon secmon-' + status + '"><div class="secmon-hero-slot">' + hero + '</div>' + stageHTML(panel, state, model) +
       '<div class="secmon-facts">' + facts + '</div><div class="secmon-note">' + note + '</div></div>';
     function updateFrame(videoHost) {
@@ -11699,7 +12203,8 @@ PanelRegistry.extend('screen', {
         var root = host.querySelector('.secmon'), stage = host.querySelector('.secmon-stage'), videoHost = host.querySelector('.secmon-video');
         if (!root || !stage || !videoHost || host._secmonHero == null) return false;
         root.className = 'secmon secmon-' + status;
-        stage.className = 'secmon-stage secmon-review-' + model.video;
+        stage.className = 'secmon-stage secmon-review-' + model.video + audioClass(state.audio);
+        if (host._secmonAudio !== audio) host.querySelector('.secmon-audio-slot').innerHTML = audio;
         if (host._secmonHero !== hero) host.querySelector('.secmon-hero-slot').innerHTML = hero;
         if (host._secmonFacts !== facts) {
           var details = host.querySelector('.secmon-sensor-details'), wasOpen = details && details.open;
@@ -11714,7 +12219,7 @@ PanelRegistry.extend('screen', {
         return true;
       },
       mounted:function () {
-        host._secmonHero = hero; host._secmonFacts = facts; host._secmonNote = note;
+        host._secmonHero = hero; host._secmonFacts = facts; host._secmonNote = note; host._secmonAudio = audio;
         var videoHost = host.querySelector('.secmon-video');
         if (videoHost && videoHost._lastHTML == null) {
           var frame = screenFramePresentation(videoHost, model.panel, model.state);
@@ -11747,7 +12252,7 @@ PanelRegistry.extend('screen', {
         initial:{status:'armed',operator:'Monitoring team',assessment:'unverified',video:'closed',scenePlayback:'waiting',
           frontDoor:{health:'online',alarm:'clear'},doorbell:{health:'online',alarm:'clear'},hall:{health:'online',alarm:'clear'}}},
       setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'zone'}],max:12}],['initial','json']],
-      patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
+      patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('security').authoring.patchFields.concat(items(panel).map(function (sensor) {
           return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']]];
@@ -11757,7 +12262,7 @@ PanelRegistry.extend('screen', {
         return panelSanitizedOrigin(key, context, function (raw) { return clean(panel, raw, '', null, false); });
       },
       picker:{order:26,name:'Security monitoring',category:'Devices & interfaces',tagline:'From sensor signal to verified incident',
-        description:'An operator at a real monitoring desk opens and reviews the same animated camera clips as Camera Screen. Author the video, incident assessment and sensor facts independently.'},
+        description:'An operator reviews animated camera clips, speaks into a headset and hears remote audio. Author video, audio, spotlight, assessment and sensor facts independently.'},
       example:function (sample) {
         sample.state = {video:'reviewing',scenePlayback:'playing',status:'reviewing',operator:'Alex · monitoring specialist',incident:'Front door opened while armed',assessment:'reviewing',detail:'Reviewing doorbell footage before escalation.',
           frontDoor:{health:'online',alarm:'triggered',detail:'Contact opened · entry zone'},doorbell:{health:'online',alarm:'clear',detail:'Evidence available'},hall:{health:'online',alarm:'clear'}};
@@ -11772,7 +12277,7 @@ PanelRegistry.extend('screen', {
 .secmon-stage{margin:10px 0 0;border-radius:17px;background:linear-gradient(135deg,#1B3149,#263C58 58%,#1D3048);color:#D9E8F1;overflow:hidden;border:1px solid #3A536A;box-shadow:inset 0 1px 0 #5F778344;}
 .secmon-stage-top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 14px 0;font:600 9px/1.4 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.09em;color:#9EB8CC;}
 .secmon-room-signal{font-size:7px;letter-spacing:.04em;white-space:nowrap;display:flex;gap:5px;align-items:center;}.secmon-room-signal i{width:4px;height:4px;border-radius:50%;background:#76BBC5;}
-.secmon-workstation{position:relative;aspect-ratio:1.8;isolation:isolate;margin:0 8px;}
+.secmon-workstation{position:relative;aspect-ratio:1.55;isolation:isolate;overflow:hidden;margin:0 8px;}
 .secmon-room-grid{position:absolute;inset:5% 0 22%;opacity:.21;background:linear-gradient(90deg,transparent 49.5%,#91C3D4 50%,transparent 50.5%) 0 0/42px 100%,linear-gradient(transparent 49%,#91C3D4 50%,transparent 51%) 0 0/100% 36px;}
 .secmon-monitor{position:absolute;left:26%;top:8%;width:70%;border:4px solid #11253C;border-radius:9px;background:#11253C;box-shadow:0 5px 22px #08152077;box-sizing:border-box;}
 .secmon-monitor-title{display:flex;align-items:center;gap:5px;padding:4px 4px 7px;color:#C2D8E5;font:500 8px/1.3 'IBM Plex Sans',sans-serif;min-width:0;}.secmon-feed-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.secmon-monitor-title>i{width:4px;height:4px;flex:none;border-radius:50%;background:#7FC5B2;}
@@ -11782,6 +12287,15 @@ PanelRegistry.extend('screen', {
 .secmon-monitor-stand{position:absolute;z-index:-1;top:100%;left:43%;height:16%;width:17%;background:linear-gradient(90deg,#34516B,#678BA0,#34516B);clip-path:polygon(30% 0,70% 0,75% 77%,100% 84%,100% 100%,0 100%,0 84%,25% 77%);}
 .secmon-desk{position:absolute;z-index:1;left:4%;right:1%;height:7px;bottom:19%;border-radius:3px;background:#8CA2B4;box-shadow:0 4px 0 #173047;}.secmon-desk:before,.secmon-desk:after{content:'';position:absolute;top:7px;width:5px;height:39px;background:#456078;}.secmon-desk:before{left:12%;}.secmon-desk:after{right:12%;}.secmon-desk>span{position:absolute;width:21%;height:5px;bottom:7px;left:53%;border:1px solid #7490A5;transform:skewX(-22deg);background:repeating-linear-gradient(90deg,#435D77 0 6px,#7893A8 6px 7px);border-radius:2px;}
 .secmon-operator-figure{position:absolute;z-index:2;left:1%;bottom:0;width:37%;height:91%;overflow:visible;}.secmon-desk-mouse{position:absolute;z-index:1;width:3.5%;height:5px;left:33%;bottom:calc(19% + 7px);background:#C2D7DF;border-radius:80% 80% 20% 20%;}
+.secmon-speech-waves,.secmon-listen-waves,.secmon-mic-slash{display:none;}.secmon-mouth{transform-origin:81px 75px;}
+.secmon-audio-speaking .secmon-speech-waves,.secmon-audio-listening .secmon-listen-waves{display:block;}.secmon-audio-speaking .secmon-mouth{animation:secmon-speaking .34s ease-in-out infinite alternate;}.secmon-audio-speaking .secmon-mic-led{fill:#9FFFD6;filter:drop-shadow(0 0 3px #9FFFD6);}
+.secmon-speech-waves path,.secmon-listen-waves path{animation:secmon-audio-wave 1.4s ease-in-out infinite;}.secmon-speech-waves path:nth-child(2),.secmon-listen-waves path:nth-child(2){animation-delay:.2s;}.secmon-speech-waves path:nth-child(3){animation-delay:.4s;}
+.secmon-audio-muted .secmon-mic-slash,.secmon-audio-mic-unavailable .secmon-mic-slash{display:block;}.secmon-audio-muted .secmon-mic-led,.secmon-audio-mic-unavailable .secmon-mic-led{fill:#FFB8AA;}.secmon-audio-failed .secmon-headset-ear{stroke:#FFB8AA;}
+.secmon-audio-slot:empty{display:none;}.secmon-audio{padding:10px 12px 12px;border-top:1px solid #7593A633;background:#0D213855;--dink:#E5F4FA;--dtext:#BED4E1;--dfaint:#A5C0CF;}
+.secmon-audio-action{display:flex;align-items:center;gap:6px;margin-bottom:7px;color:#D2EAF3;font:600 10px/1.4 'IBM Plex Sans',sans-serif;}.secmon-audio-dot{width:5px;height:5px;border-radius:50%;background:#9CB8CA;}.secmon-audio-speaking .secmon-audio-dot{background:#9FFFD6;}.secmon-audio-listening .secmon-audio-action{color:#B9E4FF;}.secmon-audio-failed .secmon-audio-dot{background:#FFB8AA;}
+.secmon-video .screen-light-label{font-size:6px;right:4px;bottom:4px;padding:2px 4px;}
+@keyframes secmon-speaking{to{transform:scaleY(3);}}
+@keyframes secmon-audio-wave{0%,100%{opacity:.35;}45%{opacity:1;}}
 .secmon-review-caption{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:9px 13px 11px;background:#0D213888;border-top:1px solid #69859A22;}.secmon-review-caption strong{font:600 10px 'IBM Plex Sans',sans-serif;}.secmon-review-clip{font:400 9px 'IBM Plex Sans',sans-serif;color:#9EBBCC;margin-left:auto;}.secmon-review-indicator{width:5px;height:5px;flex:none;border-radius:50%;background:#8197AB;}
 .secmon-review-opening .secmon-review-indicator{background:#EAC481;animation:secmon-connect 1.6s ease-in-out infinite;}.secmon-review-reviewing .secmon-review-indicator{background:#8CDBBC;}.secmon-review-unavailable .secmon-review-indicator{background:#F2A3A5;}.secmon-review-unavailable .secmon-monitor-title>i{background:#F2A3A5;}.secmon-review-closed .secmon-monitor-title>i{background:#738997;}
 .secmon-control-arm{transform-origin:67px 106px;}.secmon-review-opening .secmon-control-arm{animation:secmon-console-reach .95s ease-out both;}.secmon-review-reviewing .secmon-monitor{box-shadow:0 5px 22px #08152077,0 0 30px #7DCAD615;}

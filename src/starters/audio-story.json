@@ -1,0 +1,1858 @@
+{
+  "page": {
+    "title": "Sound at the door",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "doorstep-conversation",
+        "heading": "A delivery, heard across the home",
+        "text": [
+          "A fictional capability story: one press can ring an indoor speaker, open a conversation, or play a saved reply. Audio is drawn silently; captions carry the words. Service routes are illustrative."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "primaryPanel": "home",
+          "routing": "lanes",
+          "nodes": {
+            "camera": {
+              "title": "Doorbell",
+              "icon": "doorbell",
+              "tint": "dev"
+            },
+            "event": {
+              "title": "Event service",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "relay": {
+              "title": "Media relay",
+              "icon": "server",
+              "tint": "mqtt",
+              "sub": "Illustrative media path"
+            },
+            "app": {
+              "title": "Resident / operator",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "event",
+              "relay",
+              "app"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "event",
+              "kind": "https",
+              "label": "reported event"
+            },
+            {
+              "from": "event",
+              "to": "app",
+              "kind": "https",
+              "label": "notification"
+            },
+            {
+              "from": "app",
+              "to": "relay",
+              "kind": "https",
+              "label": "session request"
+            },
+            {
+              "from": "relay",
+              "to": "camera",
+              "kind": "int",
+              "label": "voice downlink"
+            },
+            {
+              "from": "camera",
+              "to": "relay",
+              "kind": "int",
+              "ret": true,
+              "label": "microphone uplink"
+            },
+            {
+              "from": "relay",
+              "to": "app",
+              "kind": "int",
+              "ret": true,
+              "label": "remote audio"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "Where sound happens",
+              "outline": {
+                "w": 300,
+                "h": 164
+              },
+              "rooms": [
+                {
+                  "label": "PORCH",
+                  "kind": "outdoor",
+                  "x": 10,
+                  "y": 8,
+                  "w": 130,
+                  "h": 164
+                },
+                {
+                  "label": "INSIDE",
+                  "x": 140,
+                  "y": 8,
+                  "w": 170,
+                  "h": 164
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Doorbell",
+                  "x": 38,
+                  "y": 55,
+                  "facing": 65,
+                  "spread": 65,
+                  "range": 92
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "label": "Front door",
+                  "x": 140,
+                  "y": 94
+                },
+                {
+                  "id": "speaker",
+                  "kind": "sensor",
+                  "icon": "speaker",
+                  "label": "Kitchen speaker",
+                  "x": 232,
+                  "y": 54
+                },
+                {
+                  "id": "alarm",
+                  "kind": "sensor",
+                  "icon": "speaker",
+                  "label": "Smoke alarm",
+                  "x": 241,
+                  "y": 131
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "visitor",
+                  "label": "Visitor",
+                  "x": 86,
+                  "y": 125
+                }
+              ],
+              "initial": {
+                "cam": "scan",
+                "door": "closed",
+                "speaker": "ok",
+                "alarm": "ok",
+                "visitor": null
+              }
+            },
+            {
+              "id": "camera",
+              "type": "screen",
+              "title": "Doorbell camera",
+              "scene": "package-drop",
+              "initial": {
+                "mode": "off",
+                "scenePlayback": "waiting"
+              }
+            },
+            {
+              "id": "phone",
+              "type": "phone",
+              "title": "Resident phone",
+              "brand": {
+                "app": "Cedar Home",
+                "logo": "C",
+                "accent": "#5262c6"
+              },
+              "initial": {
+                "clock": "14:32"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "quiet",
+              "text": "The camera is watching the porch. No conversation or device sound has started.",
+              "panels": {}
+            },
+            {
+              "id": "ring",
+              "text": "The visitor presses the doorbell. Recording begins and the resident gets a notification.",
+              "panels": {
+                "home": {
+                  "cam": "rec",
+                  "visitor": {
+                    "x": 82,
+                    "y": 120
+                  }
+                },
+                "camera": {
+                  "mode": "rec",
+                  "scenePlayback": "playing"
+                },
+                "phone": {
+                  "notify": {
+                    "app": "Cedar Home",
+                    "title": "Someone is at the door",
+                    "text": "Front porch · recorded event"
+                  }
+                }
+              },
+              "edges": [
+                "camera->event",
+                "event->app"
+              ]
+            },
+            {
+              "id": "chime",
+              "text": "The kitchen speaker announces the visitor. Sound comes from inside the home, while the doorbell keeps recording.",
+              "panels": {
+                "home": {
+                  "speaker": {
+                    "audio": {
+                      "output": "chime",
+                      "text": "Someone is at the front door.",
+                      "source": "Kitchen speaker"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "connect",
+              "text": "The resident opens the conversation. Video is available while the audio session connects.",
+              "panels": {
+                "home": {
+                  "speaker": {
+                    "audio": null
+                  },
+                  "cam": {
+                    "audio": {
+                      "connection": "connecting"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "connection": "connecting"
+                  }
+                },
+                "phone": {
+                  "audio": {
+                    "connection": "connecting",
+                    "microphone": "idle",
+                    "source": "Front door"
+                  }
+                }
+              },
+              "nodes": [
+                "app",
+                "relay"
+              ]
+            },
+            {
+              "id": "speak",
+              "text": "The resident speaks into the phone; the same words leave the doorbell speaker. Video recording is unchanged.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "connection": "connected",
+                      "microphone": "listening",
+                      "output": "speech",
+                      "text": "Please leave the package beside the blue door.",
+                      "source": "Resident"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "listening",
+                    "output": "speech",
+                    "text": "Please leave the package beside the blue door.",
+                    "source": "Resident"
+                  }
+                },
+                "phone": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "capturing",
+                    "text": "Please leave the package beside the blue door.",
+                    "source": "You"
+                  }
+                }
+              },
+              "edges": [
+                "app->relay",
+                "relay->camera"
+              ]
+            },
+            {
+              "id": "reply",
+              "text": "The visitor replies. The camera captures their voice and the resident hears it through the phone.",
+              "panels": {
+                "home": {
+                  "visitor": {
+                    "x": 82,
+                    "y": 120,
+                    "audio": {
+                      "output": "speech",
+                      "text": "Of course. Have a good afternoon!",
+                      "source": "Visitor"
+                    }
+                  },
+                  "cam": {
+                    "audio": {
+                      "connection": "connected",
+                      "microphone": "capturing"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "capturing",
+                    "text": "Of course. Have a good afternoon!",
+                    "source": "Visitor"
+                  }
+                },
+                "phone": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "listening",
+                    "output": "speech",
+                    "text": "Of course. Have a good afternoon!",
+                    "source": "Visitor"
+                  }
+                }
+              },
+              "edges": [
+                "camera->relay",
+                "relay->app"
+              ]
+            },
+            {
+              "id": "done",
+              "text": "The resident ends the call and the visitor leaves. The recording continues independently.",
+              "panels": {
+                "home": {
+                  "visitor": null,
+                  "cam": {
+                    "audio": {
+                      "connection": "ended"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "connection": "ended"
+                  }
+                },
+                "phone": {
+                  "audio": {
+                    "connection": "ended"
+                  }
+                }
+              }
+            },
+            {
+              "id": "quiet-hours",
+              "text": "Quiet hours suppress the kitchen announcement. The phone notification and camera recording still exist.",
+              "panels": {
+                "home": {
+                  "speaker": {
+                    "audio": {
+                      "output": "chime",
+                      "playback": "suppressed",
+                      "reason": "Quiet hours on kitchen speaker"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "unanswered",
+              "text": "No resident answers. A recorded reply is queued; the device has not spoken yet.",
+              "panels": {
+                "home": {
+                  "speaker": {
+                    "audio": null
+                  },
+                  "cam": {
+                    "audio": {
+                      "output": "recorded",
+                      "playback": "queued",
+                      "text": "Please leave your parcel by the door.",
+                      "source": "Saved greeting"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "output": "recorded",
+                    "playback": "queued",
+                    "text": "Please leave your parcel by the door.",
+                    "source": "Saved greeting"
+                  }
+                }
+              }
+            },
+            {
+              "id": "recorded",
+              "text": "The doorbell plays the saved greeting. No homeowner or monitoring agent is talking live.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "output": "recorded",
+                      "text": "Please leave your parcel by the door.",
+                      "source": "Saved greeting"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "output": "recorded",
+                    "text": "Please leave your parcel by the door.",
+                    "source": "Saved greeting"
+                  }
+                }
+              }
+            },
+            {
+              "id": "mic-denied",
+              "text": "The phone cannot access its microphone. The resident can still hear the visitor, but no resident speech reaches the doorbell.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "connection": "connected",
+                      "microphone": "capturing"
+                    }
+                  },
+                  "visitor": {
+                    "x": 82,
+                    "y": 120,
+                    "audio": {
+                      "output": "speech",
+                      "text": "Hello? Is anyone there?",
+                      "source": "Visitor"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "capturing"
+                  }
+                },
+                "phone": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "unavailable",
+                    "output": "speech",
+                    "text": "Hello? Is anyone there?",
+                    "source": "Visitor",
+                    "reason": "Microphone permission denied"
+                  }
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "conversation",
+              "label": "Conversation",
+              "steps": [
+                "quiet",
+                "ring",
+                "chime",
+                "connect",
+                "speak",
+                "reply",
+                "done"
+              ],
+              "color": "#5262c6"
+            },
+            {
+              "id": "automatic",
+              "label": "Quiet hours / reply",
+              "steps": [
+                "quiet",
+                "ring",
+                "quiet-hours",
+                "unanswered",
+                "recorded"
+              ],
+              "color": "#178778"
+            },
+            {
+              "id": "mic-denied",
+              "label": "Microphone denied",
+              "steps": [
+                "quiet",
+                "ring",
+                "chime",
+                "connect",
+                "mic-denied"
+              ],
+              "color": "#bd712a"
+            }
+          ],
+          "layouts": [
+            {
+              "id": "experience",
+              "name": "At the home",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 27
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 19,
+                    "w": 6,
+                    "h": 8,
+                    "attachTo": "panel:home"
+                  },
+                  {
+                    "panel": "camera",
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
+                    "h": 14
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16,
+                    "hidden": true
+                  },
+                  {
+                    "panel": "phone",
+                    "x": 6,
+                    "y": 14,
+                    "w": 6,
+                    "h": 13
+                  }
+                ]
+              }
+            },
+            {
+              "id": "call",
+              "name": "Call view",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "camera",
+                    "x": 0,
+                    "y": 0,
+                    "w": 7,
+                    "h": 16
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 16,
+                    "w": 7,
+                    "h": 8
+                  },
+                  {
+                    "panel": "phone",
+                    "x": 7,
+                    "y": 0,
+                    "w": 5,
+                    "h": 24
+                  },
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20,
+                    "hidden": true
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "engineering",
+              "name": "Service flow",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 8,
+                    "w": 12,
+                    "h": 8,
+                    "attachTo": "diagram"
+                  },
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20,
+                    "hidden": true
+                  },
+                  {
+                    "panel": "camera",
+                    "x": 0,
+                    "y": 16,
+                    "w": 6,
+                    "h": 22
+                  },
+                  {
+                    "panel": "phone",
+                    "x": 6,
+                    "y": 16,
+                    "w": 6,
+                    "h": 22
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "experience"
+        }
+      },
+      {
+        "id": "operator-intervention",
+        "heading": "The operator has a voice",
+        "text": [
+          "Watch the headset, the sound source at the house, and the visitor. Two-way audio, camera recording, spotlight control and emergency dispatch remain independent authored actions."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "primaryPanel": "home",
+          "routing": "lanes",
+          "nodes": {
+            "camera": {
+              "title": "Doorbell",
+              "icon": "doorbell",
+              "tint": "dev"
+            },
+            "event": {
+              "title": "Event service",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "relay": {
+              "title": "Media relay",
+              "icon": "server",
+              "tint": "mqtt",
+              "sub": "Illustrative media path"
+            },
+            "app": {
+              "title": "Resident / operator",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "event",
+              "relay",
+              "app"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "event",
+              "kind": "https",
+              "label": "reported event"
+            },
+            {
+              "from": "event",
+              "to": "app",
+              "kind": "https",
+              "label": "notification"
+            },
+            {
+              "from": "app",
+              "to": "relay",
+              "kind": "https",
+              "label": "session request"
+            },
+            {
+              "from": "relay",
+              "to": "camera",
+              "kind": "int",
+              "label": "voice downlink"
+            },
+            {
+              "from": "camera",
+              "to": "relay",
+              "kind": "int",
+              "ret": true,
+              "label": "microphone uplink"
+            },
+            {
+              "from": "relay",
+              "to": "app",
+              "kind": "int",
+              "ret": true,
+              "label": "remote audio"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "Where sound happens",
+              "outline": {
+                "w": 300,
+                "h": 164
+              },
+              "rooms": [
+                {
+                  "label": "PORCH",
+                  "kind": "outdoor",
+                  "x": 10,
+                  "y": 8,
+                  "w": 130,
+                  "h": 164
+                },
+                {
+                  "label": "INSIDE",
+                  "x": 140,
+                  "y": 8,
+                  "w": 170,
+                  "h": 164
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Doorbell",
+                  "x": 38,
+                  "y": 55,
+                  "facing": 65,
+                  "spread": 65,
+                  "range": 92
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "label": "Front door",
+                  "x": 140,
+                  "y": 94
+                },
+                {
+                  "id": "speaker",
+                  "kind": "sensor",
+                  "icon": "speaker",
+                  "label": "Kitchen speaker",
+                  "x": 232,
+                  "y": 54
+                },
+                {
+                  "id": "alarm",
+                  "kind": "sensor",
+                  "icon": "speaker",
+                  "label": "Smoke alarm",
+                  "x": 241,
+                  "y": 131
+                }
+              ],
+              "subjects": [
+                {
+                  "id": "visitor",
+                  "label": "Visitor",
+                  "x": 86,
+                  "y": 125
+                }
+              ],
+              "initial": {
+                "cam": "scan",
+                "door": "closed",
+                "speaker": "ok",
+                "alarm": "ok",
+                "visitor": null
+              }
+            },
+            {
+              "id": "monitor",
+              "type": "security",
+              "title": "Security monitoring",
+              "site": "Cedar House · demo property",
+              "sensors": [
+                {
+                  "id": "door",
+                  "label": "Front entry",
+                  "kind": "door",
+                  "zone": "Entry"
+                },
+                {
+                  "id": "camera",
+                  "label": "Doorbell camera",
+                  "kind": "camera",
+                  "zone": "Porch"
+                },
+                {
+                  "id": "motion",
+                  "label": "Hall motion",
+                  "kind": "motion",
+                  "zone": "Hall"
+                }
+              ],
+              "initial": {
+                "status": "armed",
+                "operator": "Morgan · monitoring",
+                "incident": "No active incident",
+                "assessment": "unverified",
+                "detail": "Armed away. Waiting for a reported event.",
+                "door": {
+                  "health": "online",
+                  "alarm": "clear",
+                  "detail": "Closed"
+                },
+                "camera": {
+                  "health": "online",
+                  "alarm": "clear",
+                  "detail": "Monitoring the porch"
+                },
+                "motion": {
+                  "health": "online",
+                  "alarm": "clear",
+                  "detail": "No reported motion"
+                },
+                "video": "closed",
+                "scenePlayback": "waiting"
+              },
+              "scene": "person-at-door-night",
+              "videoLabel": "Porch · live illustrative feed"
+            },
+            {
+              "id": "response",
+              "type": "dispatch",
+              "title": "Emergency dispatch",
+              "agency": "Cedar response desk · illustrative",
+              "responders": [
+                {
+                  "id": "patrol",
+                  "label": "Patrol team",
+                  "kind": "police",
+                  "callsign": "P-12"
+                },
+                {
+                  "id": "backup",
+                  "label": "Property security",
+                  "kind": "security",
+                  "callsign": "S-04"
+                }
+              ],
+              "initial": {
+                "status": "idle",
+                "priority": "routine",
+                "incident": "No request",
+                "location": "Cedar House · front entry",
+                "dispatcher": "Avery · response desk",
+                "detail": "A sensor alarm alone does not assign a responder.",
+                "patrol": {
+                  "status": "available",
+                  "eta": "",
+                  "detail": "Not assigned"
+                },
+                "backup": {
+                  "status": "available",
+                  "eta": "",
+                  "detail": "Not assigned"
+                },
+                "timeOfDay": "night"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "quiet",
+              "text": "The property is armed. The operator has not opened a camera or an audio session.",
+              "panels": {}
+            },
+            {
+              "id": "detected",
+              "text": "The camera reports a person at the door. Recording starts; the operator receives an event to assess.",
+              "panels": {
+                "home": {
+                  "cam": "rec",
+                  "visitor": {
+                    "x": 88,
+                    "y": 115
+                  }
+                },
+                "monitor": {
+                  "status": "reviewing",
+                  "assessment": "reviewing",
+                  "incident": "Porch event · illustrative",
+                  "detail": "Person near the entry. Intent has not been established.",
+                  "video": "opening"
+                }
+              },
+              "edges": [
+                "camera->event",
+                "event->app"
+              ]
+            },
+            {
+              "id": "review",
+              "text": "The operator opens the camera feed and watches before intervening.",
+              "panels": {
+                "monitor": {
+                  "video": "reviewing",
+                  "scenePlayback": "playing"
+                }
+              }
+            },
+            {
+              "id": "connect",
+              "text": "The operator opens two-way audio. No warning has played at the house yet.",
+              "panels": {
+                "monitor": {
+                  "audio": {
+                    "connection": "connecting"
+                  }
+                },
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "connection": "connecting"
+                    }
+                  }
+                }
+              },
+              "nodes": [
+                "app",
+                "relay"
+              ]
+            },
+            {
+              "id": "challenge",
+              "text": "The operator speaks into the headset. The warning comes out of the doorbell, with words anchored to the emitting device.",
+              "panels": {
+                "monitor": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "capturing",
+                    "text": "This is the monitoring center. Please step away from the door.",
+                    "source": "Morgan · operator"
+                  }
+                },
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "connection": "connected",
+                      "microphone": "listening",
+                      "output": "speech",
+                      "text": "This is the monitoring center. Please step away from the door.",
+                      "source": "Morgan · operator"
+                    }
+                  }
+                }
+              },
+              "edges": [
+                "app->relay",
+                "relay->camera"
+              ]
+            },
+            {
+              "id": "reply",
+              "text": "The visitor answers. The operator listens through the headset; the doorbell microphone captures the reply.",
+              "panels": {
+                "monitor": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "listening",
+                    "output": "speech",
+                    "text": "Sorry, I have the wrong address.",
+                    "source": "Visitor"
+                  }
+                },
+                "home": {
+                  "visitor": {
+                    "x": 88,
+                    "y": 115,
+                    "audio": {
+                      "output": "speech",
+                      "text": "Sorry, I have the wrong address.",
+                      "source": "Visitor"
+                    }
+                  },
+                  "cam": {
+                    "audio": {
+                      "connection": "connected",
+                      "microphone": "capturing"
+                    }
+                  }
+                }
+              },
+              "edges": [
+                "camera->relay",
+                "relay->app"
+              ]
+            },
+            {
+              "id": "clear",
+              "text": "The visitor leaves. The operator closes the conversation; no responder is assigned.",
+              "panels": {
+                "home": {
+                  "visitor": null,
+                  "cam": {
+                    "audio": {
+                      "connection": "ended"
+                    }
+                  }
+                },
+                "monitor": {
+                  "audio": {
+                    "connection": "ended"
+                  },
+                  "status": "cleared",
+                  "assessment": "false-alarm",
+                  "detail": "Visitor left after confirming the wrong address."
+                }
+              }
+            },
+            {
+              "id": "spotlight",
+              "text": "In this alternate, the person stays and attempts the door. The operator reports a verified incident and explicitly switches on the spotlight.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "connection": "connected",
+                      "microphone": "listening"
+                    },
+                    "spotlight": "on"
+                  },
+                  "door": "alert"
+                },
+                "monitor": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "listening"
+                  },
+                  "spotlight": "on",
+                  "status": "verified",
+                  "assessment": "verified",
+                  "detail": "Operator observes an attempted entry in this authored branch."
+                }
+              }
+            },
+            {
+              "id": "siren-queued",
+              "text": "The operator requests a siren. The command is queued; the drawing shows no siren sound yet.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "output": "siren",
+                      "playback": "queued",
+                      "reason": "Waiting for device activation"
+                    },
+                    "spotlight": "on"
+                  }
+                },
+                "monitor": {
+                  "detail": "Siren requested; activation is not yet confirmed."
+                }
+              },
+              "nodes": [
+                "app",
+                "relay"
+              ]
+            },
+            {
+              "id": "siren",
+              "text": "The device confirms the siren is sounding. The spotlight flashes, and recording remains active.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "output": "siren"
+                    },
+                    "spotlight": "flash"
+                  }
+                },
+                "monitor": {
+                  "spotlight": "flash",
+                  "detail": "Camera reports siren activation."
+                }
+              },
+              "edges": [
+                "relay->camera"
+              ]
+            },
+            {
+              "id": "dispatch",
+              "text": "The operator requests emergency response as a separate action. The siren itself did not dispatch anyone.",
+              "panels": {
+                "response": {
+                  "status": "requested",
+                  "priority": "urgent",
+                  "incident": "Verified attempted entry",
+                  "detail": "Waiting for dispatch acceptance."
+                }
+              }
+            },
+            {
+              "id": "enroute",
+              "text": "Dispatch confirms a patrol unit is assigned and travelling to the house.",
+              "panels": {
+                "response": {
+                  "status": "enroute",
+                  "patrol": {
+                    "status": "enroute",
+                    "progress": 55,
+                    "lights": "on",
+                    "eta": "Illustrative · 3 min"
+                  }
+                }
+              }
+            },
+            {
+              "id": "onscene",
+              "text": "The patrol unit reports arrival. Resolution of the incident is not assumed.",
+              "panels": {
+                "response": {
+                  "status": "onscene",
+                  "patrol": {
+                    "status": "onscene",
+                    "progress": 100,
+                    "lights": "on"
+                  }
+                }
+              }
+            },
+            {
+              "id": "audio-lost",
+              "text": "The audio downlink fails before the warning reaches the camera. Video continues, but no sound leaves the doorbell.",
+              "panels": {
+                "monitor": {
+                  "audio": {
+                    "connection": "interrupted",
+                    "microphone": "capturing",
+                    "reason": "Voice downlink interrupted; video remains available"
+                  }
+                },
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "connection": "interrupted",
+                      "output": "speech",
+                      "playback": "failed",
+                      "text": "This is the monitoring center. Please step away from the door.",
+                      "source": "Morgan · operator",
+                      "reason": "Warning not delivered"
+                    }
+                  }
+                }
+              },
+              "edges": [
+                "relay->camera"
+              ],
+              "failures": {
+                "relay->camera": "dropped"
+              }
+            },
+            {
+              "id": "siren-failed",
+              "text": "The siren activation fails. The spotlight remains on; no siren animation or automatic dispatch appears.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "output": "siren",
+                      "playback": "failed",
+                      "reason": "Device rejected the command"
+                    },
+                    "spotlight": "on"
+                  }
+                },
+                "monitor": {
+                  "detail": "Siren unavailable. Operator must choose the next action."
+                }
+              },
+              "edges": [
+                "relay->camera"
+              ],
+              "failures": {
+                "relay->camera": "blocked"
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "talk-down",
+              "label": "Talk-down",
+              "steps": [
+                "quiet",
+                "detected",
+                "review",
+                "connect",
+                "challenge",
+                "reply",
+                "clear"
+              ],
+              "color": "#5262c6"
+            },
+            {
+              "id": "escalation",
+              "label": "Escalation",
+              "steps": [
+                "quiet",
+                "detected",
+                "review",
+                "connect",
+                "challenge",
+                "spotlight",
+                "siren-queued",
+                "siren",
+                "dispatch",
+                "enroute",
+                "onscene"
+              ],
+              "color": "#b65a50"
+            },
+            {
+              "id": "audio-lost",
+              "label": "Audio lost",
+              "steps": [
+                "quiet",
+                "detected",
+                "review",
+                "connect",
+                "audio-lost"
+              ],
+              "color": "#b87528"
+            },
+            {
+              "id": "siren-failed",
+              "label": "Siren failed",
+              "steps": [
+                "quiet",
+                "detected",
+                "review",
+                "connect",
+                "challenge",
+                "spotlight",
+                "siren-queued",
+                "siren-failed"
+              ],
+              "color": "#9463a9"
+            }
+          ],
+          "layouts": [
+            {
+              "id": "experience",
+              "name": "At the home",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 27
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 19,
+                    "w": 6,
+                    "h": 8,
+                    "attachTo": "panel:home"
+                  },
+                  {
+                    "panel": "monitor",
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
+                    "h": 27
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16,
+                    "hidden": true
+                  },
+                  {
+                    "panel": "response",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "response",
+              "name": "Response desk",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "monitor",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 29
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 21,
+                    "w": 6,
+                    "h": 8,
+                    "attachTo": "panel:monitor"
+                  },
+                  {
+                    "panel": "response",
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
+                    "h": 29
+                  },
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20,
+                    "hidden": true
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "engineering",
+              "name": "Service flow",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 8,
+                    "w": 12,
+                    "h": 8,
+                    "attachTo": "diagram"
+                  },
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20,
+                    "hidden": true
+                  },
+                  {
+                    "panel": "monitor",
+                    "x": 0,
+                    "y": 16,
+                    "w": 6,
+                    "h": 22
+                  },
+                  {
+                    "panel": "response",
+                    "x": 6,
+                    "y": 16,
+                    "w": 6,
+                    "h": 22
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "experience"
+        }
+      },
+      {
+        "id": "alarm-listening",
+        "heading": "Hearing an alarm is not detecting smoke",
+        "text": [
+          "A sound source, a microphone, a classification and a notification are four separate events. This example uses an alarm test and makes no claim that there is a fire."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "primaryPanel": "home",
+          "routing": "lanes",
+          "nodes": {
+            "camera": {
+              "title": "Indoor camera",
+              "icon": "doorbell",
+              "tint": "dev"
+            },
+            "event": {
+              "title": "Event service",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "relay": {
+              "title": "Media relay",
+              "icon": "server",
+              "tint": "mqtt",
+              "sub": "Illustrative media path"
+            },
+            "app": {
+              "title": "Resident / operator",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "event",
+              "relay",
+              "app"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "event",
+              "kind": "https",
+              "label": "reported event"
+            },
+            {
+              "from": "event",
+              "to": "app",
+              "kind": "https",
+              "label": "notification"
+            },
+            {
+              "from": "app",
+              "to": "relay",
+              "kind": "https",
+              "label": "session request"
+            },
+            {
+              "from": "relay",
+              "to": "camera",
+              "kind": "int",
+              "label": "voice downlink"
+            },
+            {
+              "from": "camera",
+              "to": "relay",
+              "kind": "int",
+              "ret": true,
+              "label": "microphone uplink"
+            },
+            {
+              "from": "relay",
+              "to": "app",
+              "kind": "int",
+              "ret": true,
+              "label": "remote audio"
+            }
+          ],
+          "panels": [
+            {
+              "id": "home",
+              "type": "homemap",
+              "title": "Where sound happens",
+              "outline": {
+                "w": 300,
+                "h": 164
+              },
+              "rooms": [
+                {
+                  "label": "PORCH",
+                  "kind": "outdoor",
+                  "x": 10,
+                  "y": 8,
+                  "w": 130,
+                  "h": 164
+                },
+                {
+                  "label": "INSIDE",
+                  "x": 140,
+                  "y": 8,
+                  "w": 170,
+                  "h": 164
+                }
+              ],
+              "devices": [
+                {
+                  "id": "cam",
+                  "kind": "camera",
+                  "label": "Indoor camera",
+                  "x": 185,
+                  "y": 90,
+                  "facing": 25,
+                  "spread": 65,
+                  "range": 80
+                },
+                {
+                  "id": "door",
+                  "kind": "entry",
+                  "label": "Front door",
+                  "x": 140,
+                  "y": 94
+                },
+                {
+                  "id": "speaker",
+                  "kind": "sensor",
+                  "icon": "speaker",
+                  "label": "Kitchen speaker",
+                  "x": 232,
+                  "y": 54
+                },
+                {
+                  "id": "alarm",
+                  "kind": "sensor",
+                  "icon": "speaker",
+                  "label": "Smoke alarm",
+                  "x": 241,
+                  "y": 131
+                }
+              ],
+              "subjects": [],
+              "initial": {
+                "cam": "rec",
+                "door": "closed",
+                "speaker": "ok",
+                "alarm": "ok"
+              }
+            },
+            {
+              "id": "camera",
+              "type": "screen",
+              "title": "Indoor camera",
+              "scene": "person-through-door",
+              "initial": {
+                "mode": "rec",
+                "scenePlayback": "waiting"
+              }
+            },
+            {
+              "id": "phone",
+              "type": "phone",
+              "title": "Resident phone",
+              "brand": {
+                "app": "Cedar Home",
+                "logo": "C",
+                "accent": "#5262c6"
+              },
+              "initial": {
+                "clock": "14:32"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "quiet",
+              "text": "An indoor camera records an empty room. No sound is classified.",
+              "panels": {}
+            },
+            {
+              "id": "alarm-sounds",
+              "text": "The smoke alarm test emits a siren. Sound starts at that alarm, not at the camera.",
+              "panels": {
+                "home": {
+                  "alarm": {
+                    "audio": {
+                      "output": "siren",
+                      "text": "Smoke alarm test",
+                      "source": "Alarm sounder"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "heard",
+              "text": "The camera microphone picks up the sound. Classification has not happened yet.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "microphone": "capturing",
+                      "detection": "sound"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "microphone": "capturing",
+                    "detection": "sound"
+                  }
+                }
+              }
+            },
+            {
+              "id": "classified",
+              "text": "The event is classified as a smoke-alarm sound and a notification is delivered. This does not establish that smoke or fire exists.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "microphone": "capturing",
+                      "detection": "smoke-alarm"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "microphone": "capturing",
+                    "detection": "smoke-alarm"
+                  }
+                },
+                "phone": {
+                  "notify": {
+                    "app": "Cedar Home",
+                    "title": "Smoke alarm sound heard",
+                    "text": "Indoor camera · sound classification, not a smoke measurement"
+                  }
+                }
+              },
+              "edges": [
+                "camera->event",
+                "event->app"
+              ]
+            },
+            {
+              "id": "unclassified",
+              "text": "The camera heard a sound but cannot classify it as an alarm. It does not claim smoke or request emergency response.",
+              "panels": {
+                "home": {
+                  "cam": {
+                    "audio": {
+                      "microphone": "capturing",
+                      "detection": "sound",
+                      "reason": "Sound class is uncertain"
+                    }
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "microphone": "capturing",
+                    "detection": "sound",
+                    "reason": "Sound class is uncertain"
+                  }
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "recognized",
+              "label": "Alarm recognized",
+              "steps": [
+                "quiet",
+                "alarm-sounds",
+                "heard",
+                "classified"
+              ],
+              "color": "#5262c6"
+            },
+            {
+              "id": "uncertain",
+              "label": "Uncertain sound",
+              "steps": [
+                "quiet",
+                "alarm-sounds",
+                "heard",
+                "unclassified"
+              ],
+              "color": "#bd712a"
+            }
+          ],
+          "layouts": [
+            {
+              "id": "experience",
+              "name": "At the home",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 27
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 19,
+                    "w": 6,
+                    "h": 8,
+                    "attachTo": "panel:home"
+                  },
+                  {
+                    "panel": "camera",
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
+                    "h": 14
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16,
+                    "hidden": true
+                  },
+                  {
+                    "panel": "phone",
+                    "x": 6,
+                    "y": 14,
+                    "w": 6,
+                    "h": 13
+                  }
+                ]
+              }
+            },
+            {
+              "id": "call",
+              "name": "Call view",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "camera",
+                    "x": 0,
+                    "y": 0,
+                    "w": 7,
+                    "h": 16
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 16,
+                    "w": 7,
+                    "h": 8
+                  },
+                  {
+                    "panel": "phone",
+                    "x": 7,
+                    "y": 0,
+                    "w": 5,
+                    "h": 24
+                  },
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20,
+                    "hidden": true
+                  },
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16,
+                    "hidden": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "engineering",
+              "name": "Service flow",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 12,
+                    "h": 16
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 8,
+                    "w": 12,
+                    "h": 8,
+                    "attachTo": "diagram"
+                  },
+                  {
+                    "panel": "home",
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 20,
+                    "hidden": true
+                  },
+                  {
+                    "panel": "camera",
+                    "x": 0,
+                    "y": 16,
+                    "w": 6,
+                    "h": 22
+                  },
+                  {
+                    "panel": "phone",
+                    "x": 6,
+                    "y": 16,
+                    "w": 6,
+                    "h": 22
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "experience"
+        }
+      }
+    ]
+  }
+}

@@ -713,6 +713,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var g = document.createElementNS(SVGNS, 'g');
       var stepDelta = d.steps[stepN - 1].delta === true;
       g.setAttribute('class', 'coin' + (stepDelta ? ' dvd' : ''));
+      applyStepCircleColor(g,d.steps[stepN-1]);
       g.setAttribute('id', prefix + '-coin-' + stepN);
       g.setAttribute('data-dv-step', String(d._sourceIndices ? d._sourceIndices[stepN - 1] : stepN - 1));
       markFragmentElement(g, e);
@@ -986,6 +987,16 @@ function renderRuntimeConditions(board, host, conditions){
   });
 }
 
+/* Explicit marker paint wins over skin/path palettes; all navigation semantics
+   and shared-step opacity remain with the player. */
+function applyStepCircleColor(element,step){
+  var color=stepCircleColor(step);
+  if(!color)return;
+  element.classList.add('step-colored');
+  element.style.setProperty('--step-color',color);
+  element.style.setProperty('--step-ink',stepCircleInk(color));
+}
+
 /* ---------------- stepper (click-through) ---------------- */
 function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
   var autoplay = d.autoplay === true && (!options || options.autoplay !== false);
@@ -1043,6 +1054,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var step = source.steps[path.indices[idx]], b = document.createElement('button');
       var fullPath=paths.find(function(p){return p.id===path.id;}),fullIndex=fullPath.indices.indexOf(path.indices[idx]);
       b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '') + (sharedWith ? ' shared-step-shadow' : '');
+      applyStepCircleColor(b,step);
       b.textContent = idx + 1;
       b.setAttribute('data-step-source',path.indices[idx]);
       b.setAttribute('aria-label','Go to step ' + (idx + 1) + (paths.length > 1 ? ' on ' + path.label : '') +

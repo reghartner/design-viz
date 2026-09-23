@@ -1301,6 +1301,16 @@ An ordered array walking the flow. Each step:
   beat, and apply `ok` only when it says the node recovers or is healthy.
 - `panels` — optional sparse panel patches for this step (see "panels"):
   `{"panels": {"hp": {"state": "BOOT"}, "cam": {"mode": "live"}}}`.
+- `color` — optional **step-circle** color, as opaque `#RGB` or `#RRGGBB`.
+  It colors this step's playback button and matching numbered diagram coin;
+  the number automatically uses black or white for contrast. Use the same color
+  on adjacent steps to mark a phase without creating an alternate. It does not
+  carry forward, change node tones/protocol colors, or imply success or failure.
+  Omit it (or use null) for the normal skin/path styling. Invalid colors warn and
+  fall back. A shared step has the same override in every path; shared shadows
+  keep their opacity, and the current-step ring remains visible. Use a caption
+  to explain each phase, so color is not the only cue. See
+  [step colors](../docs/step-colors.md) for editor controls and an example.
 - `lane` — optional lane tag (declare colors in `page.lanes`).
 - `text` — caption for the step (shown during click-through playback).
   Supports the prose markup and fenced code blocks described above. Prefer a

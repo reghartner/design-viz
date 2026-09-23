@@ -983,3 +983,9 @@ body.sk-aurora.sk-blueprint{
 @media(max-width:720px){.panel-picker-destination{max-width:40%;}}
 @media(max-width:720px){.panel-picker-footer-actions{gap:6px;}}
 @media(max-width:720px){.panel-picker-secondary,.panel-picker-primary{padding:9px 12px;}}
+
+.step-color-control{display:flex;align-items:center;gap:6px;min-width:0;}
+.step-color-control input[type=color]{flex:0 0 36px;width:36px;height:32px;padding:3px;cursor:pointer;}
+.step-color-control input[type=text]{flex:1 1 80px;min-width:0;width:0;}
+.step-color-control button{flex:none;}
+.step-color-help{font-size:11px;line-height:1.5;color:var(--sub);margin:6px 0 12px;}

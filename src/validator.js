@@ -365,6 +365,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   });
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){
+    if(st && st.color!=null && !stepCircleColor(st))
+      warnings.push(DP+'.steps['+ti+'].color: use #RGB or #RRGGBB for the step circles — using the default');
     if (st && Object.prototype.hasOwnProperty.call(st, 'delta') && typeof st.delta !== 'boolean')
       warnings.push(DP + '.steps[' + ti + '].delta: must be true or false — ignored');
     var keys = stepKeys(st);

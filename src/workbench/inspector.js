@@ -555,6 +555,23 @@ function stepForm(val, ctx){
       },{placeholder:'optional stable-step-id'})),
       frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
     ];
+    var colorBox=document.createElement('div');colorBox.className='step-color-control';
+    function commitColor(value){
+      if(value!=null && !stepCircleColor({color:value})){formError('Use a color like #38bdf8 or #abc.');return false;}
+      return commitSimple('color',value==null?null:JSON.stringify(value));
+    }
+    var colorPicker=document.createElement('input');colorPicker.type='color';colorPicker.className='fctl';
+    colorPicker.value=stepCircleColor(val) || '#6875ca';colorPicker.setAttribute('aria-label','Choose step circle color');
+    formLife.listen(colorPicker,'change',function(){commitColor(colorPicker.value);});
+    var colorText=textControl(val.color,commitColor,{placeholder:'Default'});colorText.setAttribute('aria-label','Step circle color');
+    colorBox.appendChild(colorPicker);colorBox.appendChild(colorText);
+    var resetColor=actionButton('Use default',function(){return commitColor(null);});
+    resetColor.setAttribute('aria-label','Use default circle color');colorBox.appendChild(resetColor);
+    var colorRow=document.createElement('div');colorRow.className='frow';
+    var colorLabel=document.createElement('span');colorLabel.className='flab';colorLabel.textContent='Circle color';
+    colorRow.appendChild(colorLabel);colorRow.appendChild(colorBox);rows.push(colorRow);
+    var colorHelp=document.createElement('p');colorHelp.className='step-color-help';
+    colorHelp.textContent='This step only. Repeat the color on adjacent steps to mark a phase; no alternate path is needed.';rows.push(colorHelp);
     var evidence=document.createElement('details');
     var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));

@@ -17,6 +17,92 @@ CHROME = export_gif.find_chrome()
 
 
 class ExportGifPureTests(unittest.TestCase):
+    def named_spec(self):
+        return json.loads((ROOT / "src/starters/named-layouts.json").read_text())
+
+    def test_explicit_view_captures_visible_stops_on_their_actual_paths_once(self):
+        spec = self.named_spec()
+        target = export_gif.choose_target(spec, view="home-story")
+        self.assertEqual(target.step_refs, ("quiet", "notify", "inside", "offline", "leave"))
+        self.assertEqual(target.source_indices, (0, 3, 4, 5, 6))
+        self.assertTrue(all("&v=home-story&" in f for f in target.fragments))
+        self.assertTrue(all("&p=happy&" in f for f in target.fragments[:3]))
+        self.assertTrue(all("&p=offline&" in f for f in target.fragments[3:]))
+        self.assertEqual(target.view.canonical_id, "home-story")
+        # No flag retains the historical registry capture and has no v/p.
+        default = export_gif.choose_target(spec)
+        self.assertEqual(len(default.fragments), 7)
+        self.assertTrue(all("&v=" not in f and "&p=" not in f for f in default.fragments))
+
+    def test_view_filter_excludes_empty_paths_and_preserves_full_path_positions(self):
+        spec = self.named_spec()
+        d = spec["page"]["sections"][0]["diagram"]
+        d["layouts"][0]["steps"] = ["inside", "notify"]
+        target = export_gif.choose_target(spec, view="home-story")
+        self.assertEqual(target.step_refs, ("notify", "inside"))
+        self.assertTrue(all("&p=happy&" in f for f in target.fragments))
+        # A filtered path cannot renumber source positions. Duplicate IDs need
+        # positional references even when one duplicate is the only shown ID.
+        d.pop("paths")
+        d["steps"] = [{"id": "first"}, {"id": "repeat"}, {"id": "repeat"}, {}]
+        d["layouts"][0]["steps"] = ["repeat"]
+        target = export_gif.choose_target(spec, view="home-story")
+        self.assertEqual(target.step_refs, ("2", "3"))
+        self.assertEqual(target.source_indices, (1, 2))
+        self.assertTrue(target.forced_positional_refs)
+
+    def test_explicit_view_uses_path_sequence_not_registry_order_or_orphans(self):
+        spec = self.named_spec()
+        d = spec["page"]["sections"][0]["diagram"]
+        d["paths"] = [{"id": "outcome", "steps": ["notify", "quiet"]}]
+        target = export_gif.choose_target(spec, view="service-flow")
+        self.assertEqual(target.step_refs, ("notify", "quiet"))
+        self.assertEqual(target.source_indices, (3, 0))
+        self.assertTrue(all("&p=outcome&" in f for f in target.fragments))
+
+    def test_view_names_are_exact_and_errors_show_available_ids(self):
+        spec = self.named_spec()
+        for reference in ("Home story", "home", "flow", "", "missing"):
+            with self.subTest(reference=reference), self.assertRaisesRegex(
+                    ValueError, "available: home-story, service-flow"):
+                export_gif.choose_target(spec, view=reference)
+        d = spec["page"]["sections"][0]["diagram"]
+        d["layouts"][0]["id"] = "flow"
+        self.assertEqual(export_gif.choose_target(spec, view="flow").view.layout_id, "flow")
+
+    def test_legacy_view_aliases_and_plain_flow_availability(self):
+        spec = self.named_spec()
+        d = spec["page"]["sections"][0]["diagram"]
+        d.pop("layouts")
+        self.assertEqual(export_gif.choose_target(spec, view="home").view.canonical_id, "home")
+        self.assertEqual(export_gif.choose_target(spec, view="flow").view.canonical_id, "flow")
+        with self.assertRaisesRegex(ValueError, "available: home, flow"):
+            export_gif.choose_target(spec, view="layout")
+        d["sectionLayout"] = {"default": []}
+        for reference in ("home", "layout"):
+            target = export_gif.choose_target(spec, view=reference)
+            self.assertEqual(target.view.canonical_id, "layout")
+            self.assertEqual(target.view.layout_id, "default")
+        d.pop("sectionLayout")
+        d.pop("panels")
+        self.assertEqual(export_gif.choose_target(spec, view="flow").view.canonical_id, "flow")
+        with self.assertRaisesRegex(ValueError, "available: flow"):
+            export_gif.choose_target(spec, view="home")
+
+    def test_empty_or_unreachable_view_filter_matches_renderer_fallback(self):
+        spec = self.named_spec()
+        d = spec["page"]["sections"][0]["diagram"]
+        for step_filter in ([], ["not-a-step"]):
+            d["layouts"][0]["steps"] = step_filter
+            self.assertEqual(len(export_gif.choose_target(spec, view="home-story").fragments), 7)
+
+    def test_view_verification_embeds_json_safely_and_checks_old_html_capability(self):
+        expression = export_gif.view_expression('a"b', export_gif.ViewTarget("home", "home"), 2)
+        self.assertIn('a\\"b', expression)
+        self.assertIn("data-view-id", expression)
+        self.assertIn("rebuild it", expression)
+        self.assertIn("data-step-source", expression)
+
     def test_out_path_resolution_defaults_beside_page_and_accepts_directories(self):
         import pathlib, tempfile
         page = pathlib.Path("/site/diagrams/drip-commander.html")
@@ -239,6 +325,37 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                     except subprocess.TimeoutExpired:
                         process.kill()
                         process.wait(timeout=3)
+
+    def test_cli_named_view_captures_hidden_step_subset_and_distinct_alternate_steps(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            temp_path = pathlib.Path(temp)
+            page, gif = temp_path / "views.html", temp_path / "views.gif"
+            subprocess.run(
+                [sys.executable, str(ROOT / "tools/inject.py"),
+                 str(ROOT / "src/starters/named-layouts.json"),
+                 str(ROOT / "template/flowview.html"), str(page)],
+                check=True, capture_output=True)
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "tools/export_gif.py"), str(page),
+                 "--view", "home-story", "--width", "900", "--scale", "1",
+                 "--out", str(gif), "--chrome", CHROME],
+                capture_output=True, text=True, timeout=90)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("5 frames", result.stdout)
+            self.assertIn("view home-story", result.stdout)
+            self.assertEqual(export_gif.gif_frame_count(gif.read_bytes()), 5)
+
+    def test_view_capture_rejects_old_html_even_when_its_default_matches(self):
+        # This committed page predates view-aware links. Accepting its default
+        # Data flow would falsely imply --view works on all existing exports.
+        page = ROOT / "examples/basecraft-keep/keep.html"
+        target = export_gif.choose_target(export_gif.read_embedded_spec(page), view="flow")
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            with self.assertRaisesRegex(RuntimeError, "does not support view links; rebuild"):
+                export_gif.capture_frames(
+                    page, target.fragments[:1], CHROME, 900, pathlib.Path(temp),
+                    section_reference=target.section_reference, view=target.view,
+                    source_indices=target.source_indices[:1])
 
     def test_below_fold_page_captures_distinct_steps_and_preserves_frame_count(self):
         page = ROOT / "examples" / "basecraft-keep" / "keep.html"

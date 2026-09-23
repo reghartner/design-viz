@@ -80,3 +80,5 @@ and [effective panel state](../docs/workbench-state-inspector.md).
 
 - [Canonical flows and incident traces](canonical-incidents.md): connect real
   catalog/code identities, approve a reference, and derive evidence-aware alternates.
+
+For fan-out endpoints that continue in separate documents, use [diagram handoffs](diagram-handoffs.md). Local domain zooms still use focused drilldowns.

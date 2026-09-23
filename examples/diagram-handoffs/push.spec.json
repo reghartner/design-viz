@@ -1,0 +1,91 @@
+{
+  "page": {
+    "title": "Push notification \u00b7 delivery",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "push",
+        "heading": "Push notification \u00b7 delivery",
+        "text": [
+          "Separate document for the notification inbox. Fictional design for demonstrating diagram handoffs.",
+          "[Return to the event overview](https://diagrams.example.com/diagram-handoffs/overview.html)"
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "inbox": {
+              "title": "Notification inbox",
+              "sub": "doorbell.pressed",
+              "icon": "gear"
+            },
+            "policy": {
+              "title": "Preferences",
+              "sub": "consent & routing",
+              "icon": "gear"
+            },
+            "worker": {
+              "title": "Push provider",
+              "sub": "delivery request",
+              "icon": "gear"
+            },
+            "outcome": {
+              "title": "Resident phone",
+              "sub": "notification received",
+              "icon": "phone"
+            }
+          },
+          "rows": [
+            [
+              "inbox",
+              "policy",
+              "worker",
+              "outcome"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "inbox",
+              "to": "policy",
+              "kind": "int"
+            },
+            {
+              "from": "policy",
+              "to": "worker",
+              "kind": "int"
+            },
+            {
+              "from": "worker",
+              "to": "outcome",
+              "kind": "int"
+            }
+          ],
+          "steps": [
+            {
+              "id": "accept",
+              "nodes": [
+                "inbox"
+              ],
+              "text": "The notification consumer accepts the event from the overview."
+            },
+            {
+              "id": "policy",
+              "edge": "inbox->policy",
+              "text": "Apply the resident\u2019s notification preferences."
+            },
+            {
+              "id": "worker",
+              "edge": "policy->worker",
+              "text": "Submit the notification to the push provider."
+            },
+            {
+              "id": "outcome",
+              "edge": "worker->outcome",
+              "text": "The phone receives the alert in this illustrative happy path."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

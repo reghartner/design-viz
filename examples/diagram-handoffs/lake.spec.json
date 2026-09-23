@@ -1,0 +1,91 @@
+{
+  "page": {
+    "title": "Data lake \u00b7 ingestion",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "lake",
+        "heading": "Data lake \u00b7 ingestion",
+        "text": [
+          "Separate document for the ingestion inbox. Fictional design for demonstrating diagram handoffs.",
+          "[Return to the event overview](https://diagrams.example.com/diagram-handoffs/overview.html)"
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "inbox": {
+              "title": "Ingestion inbox",
+              "sub": "doorbell.pressed",
+              "icon": "gear"
+            },
+            "policy": {
+              "title": "Schema check",
+              "sub": "validate envelope",
+              "icon": "gear"
+            },
+            "worker": {
+              "title": "Partition writer",
+              "sub": "event-date partition",
+              "icon": "gear"
+            },
+            "outcome": {
+              "title": "Analytics table",
+              "sub": "available to query",
+              "icon": "db"
+            }
+          },
+          "rows": [
+            [
+              "inbox",
+              "policy",
+              "worker",
+              "outcome"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "inbox",
+              "to": "policy",
+              "kind": "int"
+            },
+            {
+              "from": "policy",
+              "to": "worker",
+              "kind": "int"
+            },
+            {
+              "from": "worker",
+              "to": "outcome",
+              "kind": "int"
+            }
+          ],
+          "steps": [
+            {
+              "id": "accept",
+              "nodes": [
+                "inbox"
+              ],
+              "text": "The data consumer accepts the event independently of notification delivery."
+            },
+            {
+              "id": "policy",
+              "edge": "inbox->policy",
+              "text": "Validate the event schema and required fields."
+            },
+            {
+              "id": "worker",
+              "edge": "policy->worker",
+              "text": "Write the accepted event to its partition."
+            },
+            {
+              "id": "outcome",
+              "edge": "worker->outcome",
+              "text": "Expose the stored event to analytics."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

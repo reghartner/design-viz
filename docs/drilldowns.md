@@ -189,6 +189,14 @@ emitted. Storage's HTTP 503 is a **received response**, not dropped traffic.
 Use step-local `failures` only for established non-delivery, and author queue,
 status, tone, and notification state separately.
 
+## Continue in another document
+
+For a visible endpoint that continues a process in a separate document, author
+`node.handoff` instead of `detail`. It draws an arrow-shaped card and opens a
+real destination link; see [diagram handoffs](../cookbook/diagram-handoffs.md).
+Keep `detail` for focused exploration. Existing external details below remain
+supported and keep their existing loading behavior.
+
 ## Link another approved spec or a URL
 
 An external spec reference uses its host-approved identifier and optional

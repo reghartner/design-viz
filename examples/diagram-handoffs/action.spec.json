@@ -1,0 +1,91 @@
+{
+  "page": {
+    "title": "Some action \u00b7 automation",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "action",
+        "heading": "Some action \u00b7 automation",
+        "text": [
+          "Separate document for the automation inbox. Fictional design for demonstrating diagram handoffs.",
+          "[Return to the event overview](https://diagrams.example.com/diagram-handoffs/overview.html)"
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "inbox": {
+              "title": "Automation inbox",
+              "sub": "doorbell.pressed",
+              "icon": "gear"
+            },
+            "policy": {
+              "title": "Rule evaluator",
+              "sub": "porch-light rule",
+              "icon": "gear"
+            },
+            "worker": {
+              "title": "Command service",
+              "sub": "authorized command",
+              "icon": "gear"
+            },
+            "outcome": {
+              "title": "Porch light",
+              "sub": "on",
+              "icon": "gear"
+            }
+          },
+          "rows": [
+            [
+              "inbox",
+              "policy",
+              "worker",
+              "outcome"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "inbox",
+              "to": "policy",
+              "kind": "int"
+            },
+            {
+              "from": "policy",
+              "to": "worker",
+              "kind": "int"
+            },
+            {
+              "from": "worker",
+              "to": "outcome",
+              "kind": "int"
+            }
+          ],
+          "steps": [
+            {
+              "id": "accept",
+              "nodes": [
+                "inbox"
+              ],
+              "text": "The automation consumer accepts the event independently."
+            },
+            {
+              "id": "policy",
+              "edge": "inbox->policy",
+              "text": "Evaluate the illustrative resident rule: a button press switches on the porch light."
+            },
+            {
+              "id": "worker",
+              "edge": "policy->worker",
+              "text": "Send the authorized command to the device service."
+            },
+            {
+              "id": "outcome",
+              "edge": "worker->outcome",
+              "text": "The light confirms the new state. This is separately authored behavior, not simulated by the overview."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -9,7 +9,7 @@ var FlowviewCompatibility = (function(){
   var panelFeatures = /* @panel-features */ {};
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
-  var extraLabels={ 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
+  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
@@ -42,6 +42,7 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;

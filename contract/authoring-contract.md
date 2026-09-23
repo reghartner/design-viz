@@ -290,6 +290,18 @@ with no `title` shows its id:
   `data` = stores, `mqtt` = brokers, `dev` = end devices.
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
+- `handoff` — arrow-shaped endpoint that opens another diagram document.
+  Use `{url:"https://…", spec?:"external-spec-id", revision?, section?}` or
+  a spec-only reference resolved by the host. Requires `url` or `spec`;
+  `revision`/`section` require `spec`. URLs are absolute HTTP(S), without
+  credentials, and include the complete route/hash. The native host may supply
+  `resolveDiagramLink(reference)`; its safe URL takes precedence over the fallback.
+  An unresolved spec-only handoff stays visibly unavailable. It never invokes
+  `loadDetail`, imports a timeline, or fetches remote specs. Mutually exclusive
+  with `detail`; ordinary `link` remains a source reference. Short titles fit
+  best; the usual subtitle/icon gives way to the continuation caption.
+  See [diagram handoffs](../cookbook/diagram-handoffs.md) for authoring and a
+  working four-document fan-out.
 - `detail` — optional domain-detail destination. An internal reference has
   `{section:"stable-section-id", mode:"focus", path?, step?, stepMap?}`. Its
   target is an ordinary section with an explicit `id`.

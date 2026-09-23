@@ -1,0 +1,120 @@
+{
+  "page": {
+    "title": "One event \u00b7 three larger stories",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "fanout",
+        "heading": "Follow the handoffs",
+        "text": [
+          "A fictional doorbell event fans out to three independent consumers. Each arrow-shaped endpoint opens a separate diagram document; the overview stays open.",
+          "The overview ends at acceptance by each consumer. Retries, storage and automation rules belong to the linked diagrams."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "icon": "chip",
+              "tint": "dev",
+              "sub": "button press"
+            },
+            "events": {
+              "title": "Event bus",
+              "icon": "antenna",
+              "tint": "mqtt",
+              "sub": "doorbell.pressed"
+            },
+            "push": {
+              "title": "Push notification",
+              "tint": "cmd",
+              "handoff": {
+                "spec": "doorbell-push",
+                "section": "push",
+                "url": "https://diagrams.example.com/diagram-handoffs/push.html"
+              }
+            },
+            "lake": {
+              "title": "Data lake",
+              "tint": "data",
+              "handoff": {
+                "spec": "doorbell-lake",
+                "section": "lake",
+                "url": "https://diagrams.example.com/diagram-handoffs/lake.html"
+              }
+            },
+            "action": {
+              "title": "Some action",
+              "tint": "auth",
+              "handoff": {
+                "spec": "doorbell-action",
+                "section": "action",
+                "url": "https://diagrams.example.com/diagram-handoffs/action.html"
+              }
+            }
+          },
+          "rows": [
+            [
+              "doorbell",
+              "events",
+              [
+                "push",
+                "lake",
+                "action"
+              ]
+            ]
+          ],
+          "edges": [
+            {
+              "from": "doorbell",
+              "to": "events",
+              "kind": "mqtt",
+              "label": "doorbell.pressed"
+            },
+            {
+              "from": "events",
+              "to": "push",
+              "kind": "int",
+              "label": "notify"
+            },
+            {
+              "from": "events",
+              "to": "lake",
+              "kind": "int",
+              "label": "ingest"
+            },
+            {
+              "from": "events",
+              "to": "action",
+              "kind": "int",
+              "label": "evaluate"
+            }
+          ],
+          "steps": [
+            {
+              "id": "publish",
+              "edge": "doorbell->events",
+              "text": "The doorbell publishes a button-press event. This example illustrates a proposed design."
+            },
+            {
+              "id": "push",
+              "edge": "events->push",
+              "text": "The notification consumer accepts the event. Open Push notification for delivery and retry behavior."
+            },
+            {
+              "id": "lake",
+              "edge": "events->lake",
+              "text": "The data consumer accepts the same event independently. Open Data lake for validation and storage."
+            },
+            {
+              "id": "action",
+              "edge": "events->action",
+              "text": "The rules consumer accepts the event. Open Some action for the larger automation flow."
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

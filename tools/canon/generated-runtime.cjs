@@ -12,7 +12,7 @@ var FlowviewCompatibility = (function(){
   var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Camera app panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
-  var extraLabels={ 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
+  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
@@ -45,6 +45,7 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;
@@ -724,6 +725,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   Object.keys(d.nodes).forEach(function(id){
     if (!placed[id]) warnings.push(DP + '.nodes.' + id + ': defined but not placed in rows or floats — it will not be drawn');
     var n = d.nodes[id] || {};
+    validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
     if (n.icon && ICON_SET.indexOf(n.icon) < 0) warnings.push(DP + '.nodes.' + id + '.icon: unknown icon "' + n.icon + '" — using "gear" (valid: ' + ICON_SET.join(' ') + ')');
@@ -2171,6 +2173,30 @@ function validateDetails(page, errors, warnings){
       }
     });
   });
+}
+/* ---- src/core/handoffs.js ---- */
+/* A handoff continues in another document. It never fetches or imports a spec,
+   and its section identity is external: local rename/delete must not rewrite it. */
+function validateHandoff(value, node, at, errors){
+  if(value == null)return;
+  if(!specObject(value)){errors.push(at+': expected a diagram destination object');return;}
+  ['spec','revision','section','url'].forEach(function(key){
+    if(value[key]!=null && (typeof value[key]!=='string' || !value[key].trim()))errors.push(at+'.'+key+': expected a nonempty string');
+  });
+  if(!value.spec && !value.url)errors.push(at+': provide a spec ID or destination URL');
+  if(value.url!=null && !detailURL(value.url))errors.push(at+'.url: expected an HTTP(S) URL without credentials');
+  if((value.revision!=null || value.section!=null) && !value.spec)errors.push(at+': revision and section require an external spec ID');
+  if(node && node.detail!=null)errors.push(at+': a node cannot have both a handoff and a domain detail');
+}
+function diagramHandoffURL(value, resolver){
+  if(!specObject(value))return null;
+  // Only inert reference fields cross the host seam; no renderer state or I/O.
+  if(value.spec && typeof resolver==='function'){
+    var reference={};
+    ['spec','revision','section','url'].forEach(function(key){if(typeof value[key]==='string')reference[key]=value[key];});
+    try{var resolved=detailURL(resolver(reference));if(resolved)return resolved;}catch(_){/* use the portable fallback */}
+  }
+  return detailURL(value.url);
 }
 /* ---- src/panels/shared.js ---- */
 /* Pure panel utilities shared by declarations, folds and render models. */

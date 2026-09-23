@@ -7114,6 +7114,16 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
 @media(prefers-reduced-motion:reduce){.fva-audio *,.fva-audio *:before,.fva-effects *{animation:none!important;transition:none!important;}}
 @media print{.fva-audio *,.fva-audio *:before,.fva-effects *{animation:none!important;transition:none!important;}.fva-audio{break-inside:avoid;}}
 
+/* Cross-document endpoints: shared card/tone styling, distinct arrow silhouette. */
+.node-handoff .handoff-stripe{fill:none;stroke:currentColor;stroke-width:1.6;opacity:.65;pointer-events:none;}
+.node-handoff .handoff-caption{font:600 8px 'IBM Plex Mono',monospace;letter-spacing:.35px;}
+.node-handoff .handoff-hit{fill:transparent;}
+.node-handoff .handoff-link{cursor:pointer;text-decoration:none;}
+.node-handoff .handoff-link:hover .card,.node-handoff:has(.handoff-link:focus-visible) .card{stroke:currentColor;stroke-width:2.2;}
+.node-handoff .handoff-link:focus-visible{outline:2px solid currentColor;outline-offset:4px;}
+.node-handoff .handoff-unavailable .handoff-stripe{stroke-dasharray:3 3;opacity:.4;}
+.node-handoff .handoff-unavailable .handoff-caption{font-size:6.8px;letter-spacing:0;}
+
 
 .dispatch{--dispatch-accent:#6576b3;--dispatch-good:#368068;--dispatch-warn:#b87924;--dispatch-bad:#bd5265;color:var(--dtext);min-width:0;container-type:inline-size;}
 .dispatch-blocked{--dispatch-accent:var(--dispatch-bad);}.dispatch-onscene,.dispatch-resolved{--dispatch-accent:var(--dispatch-good);}.dispatch-unknown,.dispatch-cancelled{--dispatch-accent:var(--dfaint);}
@@ -7285,7 +7295,7 @@ var FlowviewCompatibility = (function(){
   var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Camera app panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
-  var extraLabels={ 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
+  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
@@ -7318,6 +7328,7 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;
@@ -7997,6 +8008,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   Object.keys(d.nodes).forEach(function(id){
     if (!placed[id]) warnings.push(DP + '.nodes.' + id + ': defined but not placed in rows or floats — it will not be drawn');
     var n = d.nodes[id] || {};
+    validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
     if (n.icon && ICON_SET.indexOf(n.icon) < 0) warnings.push(DP + '.nodes.' + id + '.icon: unknown icon "' + n.icon + '" — using "gear" (valid: ' + ICON_SET.join(' ') + ')');
@@ -9444,6 +9456,30 @@ function validateDetails(page, errors, warnings){
       }
     });
   });
+}
+/* ---- src/core/handoffs.js ---- */
+/* A handoff continues in another document. It never fetches or imports a spec,
+   and its section identity is external: local rename/delete must not rewrite it. */
+function validateHandoff(value, node, at, errors){
+  if(value == null)return;
+  if(!specObject(value)){errors.push(at+': expected a diagram destination object');return;}
+  ['spec','revision','section','url'].forEach(function(key){
+    if(value[key]!=null && (typeof value[key]!=='string' || !value[key].trim()))errors.push(at+'.'+key+': expected a nonempty string');
+  });
+  if(!value.spec && !value.url)errors.push(at+': provide a spec ID or destination URL');
+  if(value.url!=null && !detailURL(value.url))errors.push(at+'.url: expected an HTTP(S) URL without credentials');
+  if((value.revision!=null || value.section!=null) && !value.spec)errors.push(at+': revision and section require an external spec ID');
+  if(node && node.detail!=null)errors.push(at+': a node cannot have both a handoff and a domain detail');
+}
+function diagramHandoffURL(value, resolver){
+  if(!specObject(value))return null;
+  // Only inert reference fields cross the host seam; no renderer state or I/O.
+  if(value.spec && typeof resolver==='function'){
+    var reference={};
+    ['spec','revision','section','url'].forEach(function(key){if(typeof value[key]==='string')reference[key]=value[key];});
+    try{var resolved=detailURL(resolver(reference));if(resolved)return resolved;}catch(_){/* use the portable fallback */}
+  }
+  return detailURL(value.url);
 }
 /* ---- src/panels/shared.js ---- */
 /* Pure panel utilities shared by declarations, folds and render models. */
@@ -24223,7 +24259,7 @@ function destroyBoardLinks(el){
     if (controller) controller.destroy();
   });
 }
-function renderBoard(el, d, prefix, skin, protos, backlinks){
+function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
   var SK = SKINS[skinBase(skin)];
   var L = layout(d);
@@ -24236,7 +24272,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   });
 
   var vb = L.vb || {x:0, y:0, w:W, h:L.H};
-  var s = '<svg viewBox="' + vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h + '" role="img" aria-label="' + esc(d.title || 'flow diagram') + '" xmlns="' + SVGNS + '">';
+  var diagramRole=Object.values(d.nodes || {}).some(function(n){return n && n.handoff;})?'group':'img';
+  var s = '<svg viewBox="' + vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h + '" role="' + diagramRole + '" aria-label="' + esc(d.title || 'flow diagram') + '" xmlns="' + SVGNS + '">';
   s += '<defs>';
   Object.keys(kindsUsed).forEach(function(k){
     s += '<marker id="' + prefix + '-m-' + k + '" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">' +
@@ -24296,13 +24333,14 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     var hasNodeLink = nodeLink && typeof nodeLink === 'string';
     var hasReferences=nodeReferenceLinks(d,id).length>0,referenceX=p.w-(hasNodeLink?38:15);
     var backlinkX = p.w - 15 - (hasNodeLink?23:0) - (hasReferences?23:0);
-    s += '<g class="node tint-' + tint + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
+    s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' ? '<title>'+esc(nodeTitle)+'</title>' : '') +
+         (n.handoff ? handoffNodeContent(n,p,id,prefix,options) :
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
          '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
          '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(shownTitle) + '</text>' +
-         '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>' +
+         '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>') +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
            '<circle cx="' + (p.w - 15) + '" cy="14" r="9" fill="transparent"/>' +
@@ -24673,7 +24711,7 @@ function renderRuntimeConditions(board, host, conditions){
   Object.keys(grouped).forEach(function(id){
     var node=board.nodeEls[id],items=grouped[id],c=items[0],card=node.querySelector('.card');
     var badge=document.createElementNS(SVGNS,'g');badge.setAttribute('class','runtime-node-badge runtime-'+c.kind);
-    badge.setAttribute('transform','translate('+(Number(card.getAttribute('width'))-12)+' '+(Number(card.getAttribute('height'))-10)+')');
+    badge.setAttribute('transform','translate('+(Number(card.getAttribute('width') || card.getAttribute('data-node-width'))-12)+' '+(Number(card.getAttribute('height') || card.getAttribute('data-node-height'))-10)+')');
     var title=document.createElementNS(SVGNS,'title');title.textContent=items.map(function(v){return v.label;}).join('; ');badge.appendChild(title);
     var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','11');badge.appendChild(circle);
     var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=symbols[c.kind] || '!';badge.appendChild(text);node.appendChild(badge);
@@ -25628,7 +25666,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     if (primaryPanel && d.panels.length === 1) aside.hidden = true;
   }
 
-  var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks);
+  var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks, options);
   lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
   result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
 
@@ -25736,7 +25774,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {viewSteps:function(ids){printFilter=ids;printSteps(printDiagram);},renderPath:function(next){
     printSteps(next);
-    return renderBoard(bwrap, next, prefix, skin, protos, backlinks);
+    return renderBoard(bwrap, next, prefix, skin, protos, backlinks, options);
   }}));
   stepper.copyButton = copyStep;
   if (view === 'step') stepper.enterStep(true); /* host may disable automatic playback */
@@ -26740,6 +26778,30 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     pause:function(){if(session)session.stack.forEach(pause);},
     destroy:function(){disposed=true;close(true);ctl.view.removeEventListener('click',gesture,true);ctl.view.removeEventListener('keydown',gesture,true);ctl.view.removeEventListener('pointerdown',cancelInteraction,true);}
   };
+}
+/* ---- src/viewer/handoffs.js ---- */
+/* Diagram continuation artwork stays within the ordinary node bounds, so edge
+   routing, stack placement, step focus and semantic tones remain shared. */
+function handoffNodeContent(node, position, id, prefix, options){
+  options=options || {};
+  var w=position.w,h=position.h,tip=19;
+  var href=diagramHandoffURL(node.handoff,options.resolveDiagramLink);
+  var title=node.title || id, available=!!href;
+  var hint=available?'Open '+title+' diagram (new tab)':'Diagram destination unavailable. Add a URL or configure the host diagram-link resolver.';
+  var caption=available?'OPEN DIAGRAM ↗':'DESTINATION UNAVAILABLE';
+  var max=Math.max(10,Math.floor((w-tip-22)/6.6));
+  var chars=Array.from(title),shown=chars.length>max?chars.slice(0,max-1).join('')+'…':title;
+  var outline='M10 0H'+(w-tip)+'L'+w+' '+(h/2)+'L'+(w-tip)+' '+h+'H10Q0 '+h+' 0 '+(h-10)+'V10Q0 0 10 0Z';
+  var body='<path class="card handoff-card" data-node-width="'+w+'" data-node-height="'+h+'" d="'+outline+'"/>'+
+    '<path class="handoff-stripe" d="M'+(w-tip-5)+' 10L'+(w-6)+' '+h/2+'L'+(w-tip-5)+' '+(h-10)+'"/>'+
+    '<text class="t1" x="12" y="'+(h/2-2)+'">'+esc(shown)+'</text>'+
+    '<text class="t2 handoff-caption" x="12" y="'+(h/2+14)+'">'+caption+'</text>';
+  var tooltip=esc(title+(node.sub?' · '+node.sub:'')+' — '+hint);
+  if(!available)return '<g class="handoff-unavailable" role="img" aria-label="'+esc(title+' — '+hint)+'"><title>'+tooltip+'</title>'+body+'</g>';
+  var attrs=' class="handoff-link" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" aria-label="'+esc(hint)+'"';
+  // In the builder, the body remains selectable; the arrow tip is the preview link.
+  if(options.authoring)return '<title>'+tooltip+'</title>'+body+'<a'+attrs+'><title>'+esc(hint)+'</title><path class="handoff-hit" d="M'+(w-tip-7)+' 0H'+(w-tip)+'L'+w+' '+h/2+'L'+(w-tip)+' '+h+'H'+(w-tip-7)+'Z"/></a>';
+  return '<a'+attrs+'><title>'+tooltip+'</title>'+body+'</a>';
 }
 /* ---- src/boot.flowview.js ---- */
 /* boot.flowview.js — boots the standalone render target. The embedded JSON

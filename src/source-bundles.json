@@ -9,6 +9,7 @@
     "core/state.js",
     "core/geometry.js",
     "core/details.js",
+    "core/handoffs.js",
     "panels/shared.js",
     "panels/audio.js",
     "panels/types/*.js"
@@ -16,7 +17,8 @@
   "engine.js": [
     "engine.js",
     "viewer/detail-overview.js",
-    "viewer/details.js"
+    "viewer/details.js",
+    "viewer/handoffs.js"
   ],
   "builder.workbench.js": [
     "workbench/source-edit.js",

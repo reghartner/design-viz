@@ -1,12 +1,20 @@
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {build} from 'esbuild';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, expectTypeOf, it} from 'vitest';
 import * as api from '../src/index';
+import type {DiagramHandoffReference, NativeViewerOptions} from '../src/index';
 
 const app=fileURLToPath(new URL('../',import.meta.url));
 
 describe('loader-injected public API',()=>{
+  it('exports a synchronous optional host resolver with portable handoff metadata',()=>{
+    const reference: DiagramHandoffReference = {spec:'recording',revision:'r1',section:'storage',url:'https://designs.test/fallback'};
+    expectTypeOf<NonNullable<NativeViewerOptions['resolveDiagramLink']>>()
+      .toEqualTypeOf<(reference: DiagramHandoffReference) => string | null | undefined>();
+    const options: NativeViewerOptions = {resolveDiagramLink: handoff => handoff.url};
+    expect(options.resolveDiagramLink?.(reference)).toBe('https://designs.test/fallback');
+  });
   it('loads the core facade without a browser or a Backstage host',()=>{
     expect(typeof api.FlowviewEntityDiagrams).toBe('function');
     expect(typeof api.mountNativeViewer).toBe('function');

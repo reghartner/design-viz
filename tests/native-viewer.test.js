@@ -1,6 +1,27 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 
+test('native mount forwards host diagram routing independently of detail loading',()=>{
+  let pageOptions, detailReads=0;
+  const reference={spec:'recording',revision:'approved-r1',section:'storage'},
+    resolveDiagramLink=value=>'https://designs.test/diagrams/'+value.spec,
+    loadDetail=()=>{detailReads++;return Promise.resolve({});};
+  const view={querySelectorAll:()=>[]};
+  const context={
+    normalize:value=>value,validate:()=>({errors:[],warnings:[]}),resolveSkin:()=>({}),
+    document:{createElement:()=>view},applySkinClasses:()=>{},sectionRecords:()=>[],
+    renderPage:(_view,_page,_skin,_backlinks,options)=>{pageOptions=options;return {};},
+    ResizeObserver:class {observe(){}},
+  };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../src/native/mount.js'),'utf8')+'\nthis.mount=mountNativeSpec;',context);
+  context.mount({body:{appendChild(){}},listen(){},fontsReady:Promise.resolve()}, {},
+    {resolveDiagramLink,loadDetail});
+  assert.equal(pageOptions.resolveDiagramLink,resolveDiagramLink);
+  assert.equal(pageOptions.loadDetail,loadDetail);
+  assert.equal(pageOptions.resolveDiagramLink(reference),'https://designs.test/diagrams/recording');
+  assert.equal(detailReads,0);
+});
+
 test('native CSS maps root type selectors without altering panel names, attributes, strings or keyframes',async()=>{
   const {scopeNativeCss}=await import('../tools/native-viewer-styles.mjs');
   const css='/* body html :root { } */\n:root{--label:"body { :root }";}\n'+

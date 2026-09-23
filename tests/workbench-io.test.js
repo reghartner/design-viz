@@ -125,6 +125,17 @@ test('save downloads exact invalid handwriting; failed download revokes resource
   assert.equal(bad.session.baseline(),INITIAL);assert.deepEqual(bad.saved,[]);assert.match(bad.messages.at(-1),/save failed: download denied/);
 });
 
+test('scoped draft downloads share cleanup without saving or changing the parent document',()=>{
+  const h=harness(),child='{"page":{"title":"Child"}}\n',held=h.io.download;
+  const release=h.io.download('child.spec.json',child,'application/json');
+  assert.equal(typeof release,'function');assert.equal(h.downloads.length,1);
+  assert.equal(h.blobs.get(h.downloads[0].url).text,child);
+  assert.equal(h.text,INITIAL);assert.equal(h.session.baseline(),INITIAL);assert.equal(h.session.canUndo(),false);
+  const callbacks=[...h.timers.values()];release();release();callbacks.forEach(({fn})=>fn());
+  assert.deepEqual(h.revoked,[h.downloads[0].url]);assert.equal(h.timers.size,0);assert.equal(h.doc.body.children.length,0);
+  h.io.destroy();assert.equal(held('old.spec.json',child,'application/json'),undefined);assert.equal(h.downloads.length,1);
+});
+
 test('retired clipboard rejection does not select or focus fallback, and current fallback still works',async()=>{
   for(const retire of ['project','close','input','destroy']){
     const pending=deferred();let fallbacks=0;

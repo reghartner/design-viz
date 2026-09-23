@@ -470,11 +470,13 @@ function initWorkbenchBuilder(opts){
   });
   var inspector=createBuilderInspector({
     document:document,guide:guide,session:session,apply:applyPlan,catalog:opts.catalog,
+    download:function(name,text,mime){return io && io.download(name,text,mime);},
     schedule:function(fn,ms){return life.delay(fn,ms);},cancel:function(timer){life.cancelDelay(timer);},
     surface:{reveal:revealInspector,hideDiff:hideDiff,
       show:function(keepTool){if(opts.workspace && !keepTool)opts.workspace.showTool('inspect');},
       retire:function(){if(secInspect)secInspect.hidden=true;}},
     selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
+      current:function(){return interactions?interactions.selection():[];},
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
     preview:{stepper:stepperFor,targetElement:findTargetEl},
     clipboard:{current:function(){return objectClipboard;},selectHome:homeClipboardSelect,

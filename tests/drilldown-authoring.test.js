@@ -213,7 +213,7 @@ test('duplicate section assigns a fresh stable ID; moves retain each numeric tar
 
 /* The inspector and interaction owners receive a tiny injected DOM. This
    exercises actual form events/session publication without loading a viewer. */
-function ui(spec=fixture()){
+function ui(spec=fixture(),options={}){
   const doc={activeElement:null};
   function element(tag='div'){
     const attrs={},events={},el={tagName:tag.toUpperCase(),children:[],className:'',value:'',textContent:'',style:{},scrollTop:0,scrollLeft:0,
@@ -234,18 +234,18 @@ function ui(spec=fixture()){
   }
   Object.assign(doc,element('document'));doc.createElement=element;doc.body=doc.appendChild(element('body'));doc.createTextNode=text=>Object.assign(element('span'),{textContent:text});
   const C={document:doc,URL};vm.createContext(C);
-  for(const name of ['validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-    'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/inspector','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
+  for(const name of ['validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction',
+    'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/inspector','workbench/io-model','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
   const guide=doc.body.appendChild(element()),view=doc.body.appendChild(element()),src=element('textarea'),win=element('window');
   let text=JSON.stringify(spec,null,2),renders=0;
-  const session=C.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){renders++;},persistence:{read:()=>({}),save(){}}});
+  const session=C.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){renders++;},persistence:{read:()=>({}),save(){},cancel(){}}});
   session.target={kind:'node',section:0,id:'domain'};
   const inspector=C.createBuilderInspector({document:doc,guide,session,schedule:()=>1,cancel(){},surface:{reveal(){},hideDiff(){},retire(){}},
     apply(plan,opt,snapshot){if(plan.error){inspector.error(plan.error);return false;}return session.accept(plan,{snapshot,afterRender(){if(opt && opt.after)opt.after(plan);}});},
-    preview:{stepper:()=>null,targetElement:()=>null},selection:{rehighlight(){},range(){}},modes:{adding:()=>null,connecting:()=>null},clipboard:{current:()=>null}});
+    preview:{stepper:()=>null,targetElement:()=>null},selection:{rehighlight(){},range(){},...options.selection},modes:{adding:()=>null,connecting:()=>null},clipboard:{current:()=>null},download:options.download});
   function field(label,scope=guide){const row=scope.querySelectorAll('.frow').find(row=>row.querySelector('.flab').textContent===label);return row && row.querySelector('input,select,textarea');}
   function button(label){return guide.querySelectorAll('button').find(button=>button.textContent===label);}
-  return {C,doc,element,guide,view,src,win,session,inspector,field,button,get text(){return text;},get renders(){return renders;}};
+  return {C,doc,element,guide,view,src,win,session,inspector,field,button,typeSource(value,notify=true){text=value;if(notify)inspector.sourceChanged();},get text(){return text;},get renders(){return renders;}};
 }
 
 test('node inspector stages a complete local detail and applies it with one Undo',()=>{
@@ -335,60 +335,94 @@ function extractionFixture(){
   }},{heading:'Unrelated',text:'Keep this exact section.'}]}};
 }
 
-test('extraction preserves identities and timeline evidence, creates focus without ports, and is reversible',()=>{
-  const raw=extractionFixture(),text=JSON.stringify(raw,null,3).replace('"title": "Keep formatting"','"title"   : "Keep formatting"'),before=JSON.stringify(raw);
-  const plan=B.planExtractNodeDetail(text,raw,0,['a','b'],'Orders');assert.equal(plan.error,undefined);assert.equal(JSON.stringify(raw),before);
-  const next=JSON.parse(plan.text),outer=next.page.sections[0].diagram,inner=next.page.sections[2].diagram,domain=outer.nodes[plan.id];
-  assert.deepEqual(Object.keys(inner.nodes),['a','b']);assert.deepEqual(inner.nodes.a,raw.page.sections[0].diagram.nodes.a);
-  assert.deepEqual(outer.rows,[['outside','domain1'],['end','idle']]);assert.deepEqual(inner.rows,[[['a','b']]]);
-  assert.deepEqual(outer.edges.map(edge=>[edge.from,edge.to]),[['outside','domain1'],['domain1','end'],['outside','idle']]);
-  assert.deepEqual(inner.edges,[raw.page.sections[0].diagram.edges[1]]);assert.deepEqual(inner.groups,raw.page.sections[0].diagram.groups);
-  assert.equal(domain.detail.ports,undefined);assert.equal(next.page.sections[2].detailOnly,true);
-  assert.equal(domain.group,'inner');
-  assert.deepEqual(outer.steps[1].nodes,['idle','domain1']);assert.equal(outer.steps[1].edge,'outside->idle');
-  assert.deepEqual(outer.steps[1].tone,{idle:'warn'});assert.deepEqual(inner.steps[1].tone,{b:'ok'});
-  assert.deepEqual(inner.steps[1].packets,[{edge:'a->b',label:'payload'}]);assert.deepEqual(outer.steps[1].packets,[{edge:'outside->idle',label:'observe'}]);
-  assert.deepEqual(inner.steps[1].codeRefs,raw.page.sections[0].diagram.steps[1].codeRefs);assert.deepEqual(outer.steps[1].codeRefs,inner.steps[1].codeRefs);
-  assert.deepEqual(inner.steps[2].failures,{'a->b':'dropped'});assert.equal(inner.steps[2].edge,undefined,'failure-only steps stay failure-only');assert.deepEqual(outer.steps[2].failures,{'outside->idle':'blocked'});
-  assert.deepEqual(outer.steps[4],raw.page.sections[0].diagram.steps[4]);assert.equal(inner.steps.length,4);
-  inner.steps.forEach(step=>assert.deepEqual(domain.detail.stepMap[step.id],{step:step.id}));
-  assert.match(plan.text,/"title"   : "Keep formatting"/);
-  for(const path of [['page','sections',0,'text'],['page','sections',1]]){const a=B.jsonLocate(text,path),b=B.jsonLocate(plan.text,path);assert.equal(text.slice(a.start,a.end),plan.text.slice(b.start,b.end));}
-  assert.deepEqual(plain(B.validate(B.normalize(next)).errors),[]);validDetails(next);
-  const h=sessionFor(text);h.session.accept(plan);assert.equal(h.renders,1);h.session.undo();assert.equal(h.text,text);assert.equal(h.session.canUndo(),false);h.session.redo();assert.equal(h.text,plan.text);
-});
-
-test('extracting all selected rows leaves one domain and does not require edges or steps',()=>{
-  const raw={sections:[{diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a'],['b']]}}]};
-  const result=run('planExtractNodeDetail',raw,0,['a','b']).raw;
-  assert.deepEqual(result.sections[0].diagram.rows,[['domain1']]);assert.deepEqual(result.sections[1].diagram.rows,[['a'],['b']]);
-  assert.deepEqual(result.sections[0].diagram.nodes.domain1.detail,{section:'domain1-detail',mode:'focus'});validDetails(result);
-});
-
-test('extraction refuses ambiguous boundaries and unsupported reference scenarios without publishing or mutating source',()=>{
-  const cases=[
-    [d=>d.edges.push({from:'idle',to:'b'}),/multiple different input/],
-    [d=>d.edges.push({from:'a',to:'idle'}),/multiple different output/],
-    [d=>d.panels=[{id:'state',type:'state'}],/panel patches/],
-    [d=>d.steps[0].panels={state:{value:'x'}},/panel patches/],
-    [d=>d.steps[0].conditions=[{nodeId:'a'}],/runtime conditions/],
-    [d=>d.paths=[{id:'happy',steps:['enter']}],/linear timelines/],
-    [d=>d.layouts=[{id:'main'}],/authored layouts/],
-    [d=>d.routing={},/routing/],
-    [d=>d.edges[1].revealAt=2,/timeline rebasing/],
-    [d=>d.steps[0].failures={'outside->a':'blocked'},/boundary failure/],
-    [d=>d.nodes.a.detail={section:'top',mode:'focus'},/existing details/],
-    [d=>d.floats=[{id:'a',side:'above'}],/floated nodes/],
-    [d=>d.nodes.outside.detail={section:'top',mode:'focus',ports:{in:'a'}},/Reassign that port/],
-    [d=>d.steps[1].id='enter',/unique string ID/]
-  ];
-  for(const [mutate,message] of cases){const raw=extractionFixture();mutate(raw.page.sections[0].diagram);const text=JSON.stringify(raw),plan=B.planExtractNodeDetail(text,raw,0,['a','b']);assert.match(plan.error,message);assert.equal(plan.text,undefined);assert.equal(JSON.stringify(raw),text);}
-});
-
-test('multiselect inspector extracts the chosen nodes and lands on the new domain',()=>{
+test('multiselect inspector previews independent extraction, applies once, and lands on the new domain',()=>{
   const h=ui(),initial=h.text,targets=[{kind:'node',section:0,id:'client'},{kind:'node',section:0,id:'domain'}];
   h.inspector.renderMulti(targets);h.button('Create domain from selected nodes').fire('click');
+  assert.equal(h.text,initial);assert.equal(h.renders,0);assert.equal(h.session.canUndo(),false);
+  assert.equal(h.field('Destination').value,'local');assert.equal(h.button('Apply extraction').disabled,false);
+  h.button('Apply extraction').fire('click');
   assert.equal(h.session.target.id,'domain1');assert.equal(h.session.target.kind,'node');assert.equal(h.renders,1);
   const next=JSON.parse(h.text);assert.deepEqual(Object.keys(next.page.blocks.at(-1).diagram.nodes),['client','domain']);
   h.session.undo();assert.equal(h.text,initial);assert.equal(h.session.canUndo(),false);
+});
+
+function extractionUI(options={}){
+  let selected=[{kind:'node',section:0,id:'a'},{kind:'node',section:0,id:'b'}];
+  const downloads=[],released=[];
+  const h=ui(extractionFixture(),{selection:{current:()=>selected,clear(){selected=[];}},
+    download(name,text,mime){if(options.failDownload)throw new Error('Download denied');const item={name,text,mime};downloads.push(item);return ()=>released.push(item);}});
+  h.inspector.renderMulti(selected);h.button('Create domain from selected nodes').fire('click');
+  return Object.assign(h,{downloads,released,change(label,value){h.field(label).value=value;h.field(label).fire('input');h.field(label).fire('change');},
+    select(value){selected=value;},external(){this.change('Destination','external');this.change('Destination URL','https://example.com/orders');}});
+}
+
+test('extraction preview displays every affected link, reference and note without publishing title edits',()=>{
+  const h=extractionUI(),before=h.session.text();
+  const plan=h.C.planExtractIndependentDiagram(before,JSON.parse(before),0,['a','b'],{mode:'local',title:'Orders'});
+  h.change('Domain title','Orders');
+  assert.equal(h.session.text(),before);assert.equal(h.session.canUndo(),false);
+  assert.match(h.guide.querySelector('.extraction-summary').textContent,/2 nodes.*1 internal edge.*0 child steps/);
+  const shown=h.guide.querySelector('.extraction-report').querySelectorAll('li').map(item=>item.textContent);
+  assert.deepEqual(shown,[...plan.report.affectedSteps,...plan.report.boundaryEdges,...plan.report.references,...plan.report.notes]);
+  h.field('Domain title').fire('keydown',{key:'Enter'});assert.equal(h.session.text(),before);
+  h.button('Apply extraction').fire('click');
+  const raw=JSON.parse(h.session.text()),parent=raw.page.sections[0].diagram,child=raw.page.sections.at(-1).diagram;
+  assert.equal(parent.nodes[h.session.target.id].title,'Orders');assert.deepEqual(child.steps,[]);
+  assert.equal(parent.nodes[h.session.target.id].detail.stepMap,undefined);assert.equal(child.initial,undefined);
+  const after=h.session.text();assert.equal(h.session.undo(),true);assert.equal(h.session.text(),before);assert.equal(h.session.canUndo(),false);
+  assert.equal(h.session.redo(),true);assert.equal(h.session.text(),after);
+});
+
+test('separate document requires a downloaded exact draft and changing settings requires another download',()=>{
+  const h=extractionUI(),before=h.session.text();h.external();h.change('Spec ID','approved-orders');h.change('Section ID','orders');
+  assert.equal(h.button('Apply extraction').disabled,true);h.button('Apply extraction').fire('click');assert.equal(h.session.text(),before);
+  h.button('Download destination JSON').fire('click');h.button('Download destination JSON').fire('click');
+  assert.equal(h.downloads.length,2);assert.equal(h.downloads[0].text,h.downloads[1].text);assert.equal(h.button('Apply extraction').disabled,false);
+  assert.equal(h.session.text(),before);assert.equal(h.session.canUndo(),false);
+  h.change('Domain title','Orders');assert.equal(h.button('Apply extraction').disabled,true);assert.equal(h.released.length,2);
+  h.button('Apply extraction').fire('click');assert.equal(h.session.text(),before);
+  h.button('Download destination JSON').fire('click');const child=JSON.parse(h.downloads.at(-1).text).page.sections[0];
+  assert.equal(child.id,'orders');assert.deepEqual(child.diagram.steps,[]);assert.equal(child.diagram.initial,undefined);
+  assert.equal(h.downloads.at(-1).name,'orders.spec.json');
+  h.button('Apply extraction').fire('click');const raw=JSON.parse(h.session.text());
+  assert.equal(raw.page.sections.length,2);assert.equal(raw.page.sections[0].diagram.nodes[h.session.target.id].handoff.section,'orders');
+  assert.equal(h.released.length,3);assert.equal(h.session.undo(),true);assert.equal(h.session.text(),before);assert.equal(h.session.canUndo(),false);
+});
+
+test('external extraction accepts approved spec IDs, rejects unsafe URLs, and preserves a failed download draft',()=>{
+  const settings={failDownload:true},h=extractionUI(settings),before=h.session.text();
+  h.change('Destination','external');assert.equal(h.button('Download destination JSON').disabled,true);
+  h.change('Spec ID','approved-orders');h.change('Revision','v3');assert.equal(h.button('Download destination JSON').disabled,false);
+  h.change('Destination URL','javascript:alert(1)');assert.equal(h.button('Download destination JSON').disabled,true);
+  h.button('Download destination JSON').fire('click');assert.equal(h.downloads.length,0);
+  h.change('Destination URL','');h.button('Download destination JSON').fire('click');
+  assert.match(h.guide.querySelector('.ierr').textContent,/Download denied/);assert.equal(h.button('Apply extraction').disabled,true);assert.equal(h.session.text(),before);
+  settings.failDownload=false;h.button('Download destination JSON').fire('click');assert.equal(h.guide.querySelector('.ierr').hidden,true);
+  const expected=JSON.parse(h.downloads[0].text).page.sections[0].id;h.button('Apply extraction').fire('click');
+  assert.deepEqual(JSON.parse(h.session.text()).page.sections[0].diagram.nodes[h.session.target.id].handoff,{spec:'approved-orders',revision:'v3',section:expected});
+});
+
+test('stale source, selection, project, canceled and retired previews cannot download or publish held controls',()=>{
+  for(const reason of ['source','unannounced-source','selection','project','cancel','escape','rerender','retire','destroy']){
+    const h=extractionUI();h.external();h.button('Download destination JSON').fire('click');
+    const apply=h.button('Apply extraction'),download=h.button('Download destination JSON');
+    if(reason==='source')h.typeSource(h.session.text()+' ');
+    if(reason==='unannounced-source')h.typeSource(h.session.text()+' ',false);
+    if(reason==='selection')h.select([{kind:'node',section:0,id:'outside'},{kind:'node',section:0,id:'a'}]);
+    if(reason==='project')h.session.replaceProject(h.session.text());
+    if(reason==='cancel')h.button('Cancel').fire('click');
+    if(reason==='escape'){const ev=h.guide.querySelector('.extraction-preview').fire('keydown',{key:'Escape'});assert.equal(ev.stopped,true);}
+    if(reason==='rerender')h.inspector.renderMulti([{kind:'node',section:0,id:'outside'},{kind:'node',section:0,id:'a'}]);
+    if(reason==='retire')h.inspector.retire();
+    if(reason==='destroy')h.inspector.destroy();
+    const before=h.session.text(),renders=h.renders;apply.fire('click');download.fire('click');
+    assert.equal(h.session.text(),before,reason);assert.equal(h.renders,renders,reason);assert.equal(h.downloads.length,1,reason);assert.equal(h.released.length,1,reason);
+  }
+});
+
+test('unannounced settings changes require reviewing the newly calculated preview before Apply',()=>{
+  const h=extractionUI(),before=h.session.text();h.field('Domain title').value='New title without an input event';
+  h.button('Apply extraction').fire('click');assert.equal(h.session.text(),before);
+  assert.match(h.guide.querySelector('.ierr').textContent,/Review the updated preview/);
+  h.button('Apply extraction').fire('click');assert.equal(JSON.parse(h.session.text()).page.sections[0].diagram.nodes[h.session.target.id].title,'New title without an input event');
 });

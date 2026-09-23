@@ -137,6 +137,8 @@ var CONTRACT = [
   '  motion is reduced. Failed hops focus the sender and suppress delivery',
   '  packets; other successful hops still work. Effects apply only to this step.',
   '  Use only for established non-delivery, not a received request with an error.',
+  '- Optional step.color: #RGB or #RRGGBB colors that step circle/coin only.',
+  '  Repeat on adjacent steps for phases; omit for default colors. Never carries.',
   '- Optional diagram.paths: [{id, label, color, steps:[step IDs]}]. First path is',
   '  the default; steps becomes a shared registry. Reuse IDs for the shared prefix,',
   '  then reference different outcome steps. Path chips sit left of aligned step',

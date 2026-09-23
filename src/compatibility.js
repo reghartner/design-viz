@@ -9,7 +9,7 @@ var FlowviewCompatibility = (function(){
   var panelFeatures = /* @panel-features */ {};
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
-  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
+  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
@@ -71,6 +71,7 @@ var FlowviewCompatibility = (function(){
           if(object(patches) && Object.prototype.hasOwnProperty.call(patches,p.id))patch(patches[p.id]);
         });
       });
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.color!=null;}))used['flow.step-colors']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
       if(d.sectionLayout)used['layout.arranged']=true;

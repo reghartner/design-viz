@@ -3800,3 +3800,10 @@ body.sk-daylight .docview,body.sk-pastel .docview,body.sk-editorial .docview{--t
 .node-handoff .handoff-link:focus-visible{outline:2px solid currentColor;outline-offset:4px;}
 .node-handoff .handoff-unavailable .handoff-stripe{stroke-dasharray:3 3;opacity:.4;}
 .node-handoff .handoff-unavailable .handoff-caption{font-size:6.8px;letter-spacing:0;}
+
+/* Authored step-circle colors intentionally override every skin, hover and path
+   palette. Keep the current-step ring, keyboard focus and shared-step opacity. */
+.schip.step-colored{background:var(--step-color)!important;color:var(--step-ink)!important;border-color:var(--step-ink)!important;}
+.schip.step-colored[aria-current="true"]{box-shadow:0 0 0 2px var(--dbg,#fff),0 0 0 4px var(--dink,#24324b)!important;}
+.coin.step-colored circle{fill:var(--step-color)!important;stroke:var(--step-ink)!important;}
+.coin.step-colored text{fill:var(--step-ink)!important;}

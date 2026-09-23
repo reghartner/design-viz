@@ -1,0 +1,217 @@
+{
+  "page": {
+    "title": "One flow, three phases",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "step-colors",
+        "heading": "Doorbell event lifecycle",
+        "text": "Blue: delivery. Purple: recording. Teal: resident experience. One linear story with no alternate paths.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "events": {
+              "title": "Event & recording service",
+              "icon": "cloud",
+              "tint": "data"
+            },
+            "resident": {
+              "title": "Resident app",
+              "icon": "phone",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "doorbell"
+            ],
+            [
+              "events"
+            ],
+            [
+              "resident"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "doorbell",
+              "to": "events",
+              "label": "Button pressed"
+            },
+            {
+              "from": "events",
+              "to": "resident",
+              "label": "Notification / update"
+            },
+            {
+              "from": "resident",
+              "to": "events",
+              "ret": true,
+              "label": "Open recording"
+            }
+          ],
+          "panels": [
+            {
+              "id": "app",
+              "type": "deviceapp",
+              "title": "Resident app",
+              "device": "Front door doorbell",
+              "subtitle": "Home \u00b7 Front entry",
+              "fields": [
+                {
+                  "id": "battery",
+                  "label": "Battery",
+                  "kind": "battery"
+                },
+                {
+                  "id": "power",
+                  "label": "Power",
+                  "icon": "bulb"
+                },
+                {
+                  "id": "connection",
+                  "label": "Connection",
+                  "icon": "antenna"
+                },
+                {
+                  "id": "clip",
+                  "label": "Last recording",
+                  "icon": "camera"
+                },
+                {
+                  "id": "firmware",
+                  "label": "Firmware",
+                  "icon": "chip"
+                }
+              ],
+              "initial": {
+                "clock": "9:41",
+                "battery": {
+                  "value": 68,
+                  "status": "ready"
+                },
+                "power": {
+                  "value": "Solar panel",
+                  "status": "ready"
+                },
+                "connection": {
+                  "value": "Connected",
+                  "status": "ready"
+                },
+                "clip": {
+                  "value": "Yesterday",
+                  "status": "ready"
+                },
+                "firmware": {
+                  "value": "v2.4.1",
+                  "status": "ready"
+                }
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "ready",
+              "nodes": [
+                "resident"
+              ],
+              "text": "Delivery phase: The app shows device data tiles. No backend source map is needed.",
+              "color": "#0284c7"
+            },
+            {
+              "id": "press",
+              "edge": "doorbell->events",
+              "text": "Delivery phase: A visitor presses the doorbell. The app has not been notified yet.",
+              "color": "#0284c7"
+            },
+            {
+              "id": "notify",
+              "edge": "events->resident",
+              "text": "Delivery phase: A notification arrives above the existing tiles. Battery and connection values stay unchanged.",
+              "panels": {
+                "app": {
+                  "notify": {
+                    "app": "Homestead",
+                    "title": "Doorbell pressed",
+                    "text": "Someone is at the front door."
+                  }
+                }
+              },
+              "color": "#0284c7"
+            },
+            {
+              "id": "recording",
+              "text": "Recording phase: the app opens the newly available recording; its tile and notification are updated.",
+              "panels": {
+                "app": {
+                  "clip": {
+                    "value": "Just now",
+                    "status": "ready"
+                  },
+                  "notify": {
+                    "app": "Homestead",
+                    "title": "Recording ready",
+                    "text": "Your front-door recording is available."
+                  }
+                }
+              },
+              "color": "#8b5cf6",
+              "edge": "resident->events"
+            },
+            {
+              "id": "dismiss",
+              "nodes": [
+                "resident"
+              ],
+              "text": "Resident experience phase: The resident dismisses notifications. All device data remains on screen.",
+              "panels": {
+                "app": {
+                  "clear": true
+                }
+              },
+              "color": "#0d9488"
+            }
+          ],
+          "layouts": [
+            {
+              "id": "app-and-flow",
+              "name": "App & flow",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "app",
+                    "x": 0,
+                    "y": 0,
+                    "w": 5,
+                    "h": 28
+                  },
+                  {
+                    "x": 5,
+                    "y": 0,
+                    "w": 7,
+                    "h": 28
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 5,
+                    "y": 28,
+                    "w": 7,
+                    "h": 5
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "app-and-flow"
+        }
+      }
+    ]
+  }
+}

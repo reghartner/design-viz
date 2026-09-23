@@ -1,6 +1,19 @@
 /* Pure step/path projection. Uses shared isHex() and navigation stepIndexOf()
    at call time; indices always refer to the authored source step registry. */
 
+/* A step's marker color is presentation-only and never carries to another beat.
+   Opaque hex keeps CSS input bounded and lets us guarantee number contrast. */
+function stepCircleColor(st){
+  var value=st && st.color;
+  if(typeof value!=='string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value))return null;
+  return (value.length===4?'#'+value.slice(1).split('').map(function(c){return c+c;}).join(''):value).toLowerCase();
+}
+function stepCircleInk(color){
+  var channels=[1,3,5].map(function(i){var c=parseInt(color.slice(i,i+2),16)/255;return c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);});
+  var luminance=.2126*channels[0]+.7152*channels[1]+.0722*channels[2];
+  return (luminance+.05)/.05>=1.05/(luminance+.05)?'#000000':'#ffffff';
+}
+
 function stepKeys(st){
   if (!st) return [];
   if (Array.isArray(st.edges)) return st.edges;

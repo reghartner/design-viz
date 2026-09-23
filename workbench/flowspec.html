@@ -1732,6 +1732,12 @@ body.sk-aurora.sk-blueprint{
 @media(max-width:720px){.panel-picker-destination{max-width:40%;}}
 @media(max-width:720px){.panel-picker-footer-actions{gap:6px;}}
 @media(max-width:720px){.panel-picker-secondary,.panel-picker-primary{padding:9px 12px;}}
+
+.step-color-control{display:flex;align-items:center;gap:6px;min-width:0;}
+.step-color-control input[type=color]{flex:0 0 36px;width:36px;height:32px;padding:3px;cursor:pointer;}
+.step-color-control input[type=text]{flex:1 1 80px;min-width:0;width:0;}
+.step-color-control button{flex:none;}
+.step-color-help{font-size:11px;line-height:1.5;color:var(--sub);margin:6px 0 12px;}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -8187,6 +8193,13 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
 .node-handoff .handoff-unavailable .handoff-stripe{stroke-dasharray:3 3;opacity:.4;}
 .node-handoff .handoff-unavailable .handoff-caption{font-size:6.8px;letter-spacing:0;}
 
+/* Authored step-circle colors intentionally override every skin, hover and path
+   palette. Keep the current-step ring, keyboard focus and shared-step opacity. */
+.schip.step-colored{background:var(--step-color)!important;color:var(--step-ink)!important;border-color:var(--step-ink)!important;}
+.schip.step-colored[aria-current="true"]{box-shadow:0 0 0 2px var(--dbg,#fff),0 0 0 4px var(--dink,#24324b)!important;}
+.coin.step-colored circle{fill:var(--step-color)!important;stroke:var(--step-ink)!important;}
+.coin.step-colored text{fill:var(--step-ink)!important;}
+
 
 .dispatch{--dispatch-accent:#6576b3;--dispatch-good:#368068;--dispatch-warn:#b87924;--dispatch-bad:#bd5265;color:var(--dtext);min-width:0;container-type:inline-size;}
 .dispatch-blocked{--dispatch-accent:var(--dispatch-bad);}.dispatch-onscene,.dispatch-resolved{--dispatch-accent:var(--dispatch-good);}.dispatch-unknown,.dispatch-cancelled{--dispatch-accent:var(--dfaint);}
@@ -8736,7 +8749,7 @@ var FlowviewCompatibility = (function(){
   var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
-  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
+  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
@@ -8798,6 +8811,7 @@ var FlowviewCompatibility = (function(){
           if(object(patches) && Object.prototype.hasOwnProperty.call(patches,p.id))patch(patches[p.id]);
         });
       });
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.color!=null;}))used['flow.step-colors']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
       if(d.sectionLayout)used['layout.arranged']=true;
@@ -9510,6 +9524,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   });
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){
+    if(st && st.color!=null && !stepCircleColor(st))
+      warnings.push(DP+'.steps['+ti+'].color: use #RGB or #RRGGBB for the step circles — using the default');
     if (st && Object.prototype.hasOwnProperty.call(st, 'delta') && typeof st.delta !== 'boolean')
       warnings.push(DP + '.steps[' + ti + '].delta: must be true or false — ignored');
     var keys = stepKeys(st);
@@ -10045,6 +10061,19 @@ function contractColumnSpan(value){return [4,6,8,12].indexOf(value)>=0?value:12;
 /* ---- src/core/paths.js ---- */
 /* Pure step/path projection. Uses shared isHex() and navigation stepIndexOf()
    at call time; indices always refer to the authored source step registry. */
+
+/* A step's marker color is presentation-only and never carries to another beat.
+   Opaque hex keeps CSS input bounded and lets us guarantee number contrast. */
+function stepCircleColor(st){
+  var value=st && st.color;
+  if(typeof value!=='string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value))return null;
+  return (value.length===4?'#'+value.slice(1).split('').map(function(c){return c+c;}).join(''):value).toLowerCase();
+}
+function stepCircleInk(color){
+  var channels=[1,3,5].map(function(i){var c=parseInt(color.slice(i,i+2),16)/255;return c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);});
+  var luminance=.2126*channels[0]+.7152*channels[1]+.0722*channels[2];
+  return (luminance+.05)/.05>=1.05/(luminance+.05)?'#000000':'#ffffff';
+}
 
 function stepKeys(st){
   if (!st) return [];
@@ -26031,6 +26060,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var g = document.createElementNS(SVGNS, 'g');
       var stepDelta = d.steps[stepN - 1].delta === true;
       g.setAttribute('class', 'coin' + (stepDelta ? ' dvd' : ''));
+      applyStepCircleColor(g,d.steps[stepN-1]);
       g.setAttribute('id', prefix + '-coin-' + stepN);
       g.setAttribute('data-dv-step', String(d._sourceIndices ? d._sourceIndices[stepN - 1] : stepN - 1));
       markFragmentElement(g, e);
@@ -26304,6 +26334,16 @@ function renderRuntimeConditions(board, host, conditions){
   });
 }
 
+/* Explicit marker paint wins over skin/path palettes; all navigation semantics
+   and shared-step opacity remain with the player. */
+function applyStepCircleColor(element,step){
+  var color=stepCircleColor(step);
+  if(!color)return;
+  element.classList.add('step-colored');
+  element.style.setProperty('--step-color',color);
+  element.style.setProperty('--step-ink',stepCircleInk(color));
+}
+
 /* ---------------- stepper (click-through) ---------------- */
 function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panelCtl, onChange, options){
   var autoplay = d.autoplay === true && (!options || options.autoplay !== false);
@@ -26361,6 +26401,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var step = source.steps[path.indices[idx]], b = document.createElement('button');
       var fullPath=paths.find(function(p){return p.id===path.id;}),fullIndex=fullPath.indices.indexOf(path.indices[idx]);
       b.type = 'button'; b.className = 'schip' + (step && step.delta === true ? ' dvd' : '') + (sharedWith ? ' shared-step-shadow' : '');
+      applyStepCircleColor(b,step);
       b.textContent = idx + 1;
       b.setAttribute('data-step-source',path.indices[idx]);
       b.setAttribute('aria-label','Go to step ' + (idx + 1) + (paths.length > 1 ? ' on ' + path.label : '') +
@@ -32413,6 +32454,23 @@ function stepForm(val, ctx){
       },{placeholder:'optional stable-step-id'})),
       frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
     ];
+    var colorBox=document.createElement('div');colorBox.className='step-color-control';
+    function commitColor(value){
+      if(value!=null && !stepCircleColor({color:value})){formError('Use a color like #38bdf8 or #abc.');return false;}
+      return commitSimple('color',value==null?null:JSON.stringify(value));
+    }
+    var colorPicker=document.createElement('input');colorPicker.type='color';colorPicker.className='fctl';
+    colorPicker.value=stepCircleColor(val) || '#6875ca';colorPicker.setAttribute('aria-label','Choose step circle color');
+    formLife.listen(colorPicker,'change',function(){commitColor(colorPicker.value);});
+    var colorText=textControl(val.color,commitColor,{placeholder:'Default'});colorText.setAttribute('aria-label','Step circle color');
+    colorBox.appendChild(colorPicker);colorBox.appendChild(colorText);
+    var resetColor=actionButton('Use default',function(){return commitColor(null);});
+    resetColor.setAttribute('aria-label','Use default circle color');colorBox.appendChild(resetColor);
+    var colorRow=document.createElement('div');colorRow.className='frow';
+    var colorLabel=document.createElement('span');colorLabel.className='flab';colorLabel.textContent='Circle color';
+    colorRow.appendChild(colorLabel);colorRow.appendChild(colorBox);rows.push(colorRow);
+    var colorHelp=document.createElement('p');colorHelp.className='step-color-help';
+    colorHelp.textContent='This step only. Repeat the color on adjacent steps to mark a phase; no alternate path is needed.';rows.push(colorHelp);
     var evidence=document.createElement('details');
     var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
@@ -38877,6 +38935,8 @@ var CONTRACT = [
   '  motion is reduced. Failed hops focus the sender and suppress delivery',
   '  packets; other successful hops still work. Effects apply only to this step.',
   '  Use only for established non-delivery, not a received request with an error.',
+  '- Optional step.color: #RGB or #RRGGBB colors that step circle/coin only.',
+  '  Repeat on adjacent steps for phases; omit for default colors. Never carries.',
   '- Optional diagram.paths: [{id, label, color, steps:[step IDs]}]. First path is',
   '  the default; steps becomes a shared registry. Reuse IDs for the shared prefix,',
   '  then reference different outcome steps. Path chips sit left of aligned step',

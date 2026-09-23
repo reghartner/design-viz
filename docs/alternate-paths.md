@@ -102,6 +102,9 @@ primary row. On narrow screens the rows scroll together.
 A later shared step is allowed, but its state
 still comes from that path's complete preceding sequence. This models authored
 outcomes, not executable conditions or a simulation of failure probabilities.
+A step may set `color:"#RRGGBB"` to override its numbered markers without
+creating a branch. This travels with its shared body, retains shadow opacity,
+and never changes the path chip. See [step colors](step-colors.md).
 Nodes and edges stay in their declared layout; path colors identify choices
 while edge colors continue to identify protocols. Print uses the selected
 sequence. `ambient-only` omits the step controls; use `step` or `ambient` when

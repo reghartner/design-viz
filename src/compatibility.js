@@ -10,7 +10,7 @@ var FlowviewCompatibility = (function(){
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
-    'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
+    'content.deviceapp':'Device app notifications and optional sources', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
@@ -47,6 +47,11 @@ var FlowviewCompatibility = (function(){
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;
         used['panel.'+p.type]=true;
+        if(p.type==='deviceapp'){
+          var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
+          if(p.showSources!=null || !Array.isArray(p.sources) || !p.sources.length || notify(p.initial) ||
+            (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && notify(patches[p.id]);}))used['content.deviceapp']=true;
+        }
         if(['homemap','screen','security','phone'].indexOf(p.type)<0)return;
         function endpoint(value){
           if(!object(value))return;

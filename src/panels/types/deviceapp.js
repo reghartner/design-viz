@@ -1,10 +1,10 @@
 /* deviceapp validation and pure state helpers. */
-/* Device app values are authored UI data, with explicit per-field provenance.
+/* Device app values are authored UI data, with optional per-field provenance.
    A source node is a diagram reference, never an instruction to fetch an API. */
 var DEVICEAPP_STATUSES = ['unknown', 'loading', 'ready', 'stale', 'error'];
 function deviceAppItems(panel, key) {
   var seen = Object.create(null),
-    reserved = ['clock', 'note', 'constructor', 'prototype'];
+    reserved = ['clock', 'note', 'notify', 'clear', 'notifications', 'constructor', 'prototype'];
   return (Array.isArray(panel && panel[key]) ? panel[key] : [])
     .filter(function (item) {
       if (
@@ -26,9 +26,11 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
     warnings.push(path + ': expected an object — ignored');
     return;
   }
+  FlowNotifications.warnings(obj,path,warnings);
   var fields = deviceAppItems(panel, 'fields'),
     sources = deviceAppItems(panel, 'sources');
   Object.keys(obj).forEach(function (key) {
+    if (key === 'notify' || key === 'clear') return;
     if (key === 'clock' || key === 'note') {
       if (typeof obj[key] !== 'string')
         warnings.push(path + '.' + key + ': expected text — ignored');
@@ -83,17 +85,12 @@ function deviceAppWarnings(panel, d, path, warnings) {
     if (panel[k] != null && typeof panel[k] !== 'string')
       warnings.push(path + '.' + k + ': expected text — ignored');
   });
+  if(panel.showSources!=null && typeof panel.showSources!=='boolean')warnings.push(path+'.showSources: expected true or false — using automatic source visibility');
   ['sources', 'fields'].forEach(function (key) {
     var items = deviceAppItems(panel, key),
       raw = panel[key];
-    if (!Array.isArray(raw) || !raw.length)
-      warnings.push(
-        path +
-          '.' +
-          key +
-          ': declare ' +
-          (key === 'sources' ? '1–6 data sources' : '1–12 phone fields')
-      );
+    if (raw == null) return;
+    if (!Array.isArray(raw))warnings.push(path+'.'+key+': expected an array — ignored');
     else if (items.length !== raw.length)
       warnings.push(
         path +
@@ -101,7 +98,7 @@ function deviceAppWarnings(panel, d, path, warnings) {
           key +
           ': use unique letter-led IDs and at most ' +
           (key === 'sources' ? 6 : 12) +
-          ' entries; clock/note/constructor/prototype are reserved — invalid entries ignored'
+          ' entries; clock/note/notify/clear/notifications/constructor/prototype are reserved — invalid entries ignored'
       );
     items.forEach(function (item, i) {
       var p = path + '.' + key + '[' + i + ']';
@@ -138,9 +135,12 @@ function foldDeviceAppStates(panel, steps) {
   var fields = deviceAppItems(panel, 'fields'),
     sources = deviceAppItems(panel, 'sources'),
     carried = Object.create(null),
+    notifications = FlowNotifications.create(),
+    added = 0,
     states = [];
   function apply(patch) {
     var updated = [];
+    added = notifications.apply(patch);
     if (!panelObject(patch)) return updated;
     ['clock', 'note'].forEach(function (k) {
       if (typeof patch[k] === 'string') carried[k] = patch[k];
@@ -181,13 +181,15 @@ function foldDeviceAppStates(panel, steps) {
       out[k] = panelObject(carried[k]) ? Object.assign({}, carried[k]) : carried[k];
     });
     out._updated = updated;
+    out.notifications = notifications.snapshot();
+    out._phoneAdded = added;
     return out;
   }
   apply(panel.initial);
   (steps || []).forEach(function (st) {
     states.push(snapshot(apply((stepPanelPatch(st) || {})[panel.id])));
   });
-  if (!states.length) states.push(snapshot([]));
+  if (!states.length) {added=0;states.push(snapshot([]));}
   return states;
 }
 
@@ -251,11 +253,13 @@ function deviceAppModel(panel, state) {
     subtitle: str(panel.subtitle, 'Device health'),
     clock: str(state.clock, '9:41'),
     note: str(state.note),
+    showSources: sources.length>0 && panel.showSources!==false,
+    notifications: FlowNotifications.model(state),
     sources: sources,
     fields: fields,
   };
 }
-function deviceAppPanelHTML(panel, state, fresh) {
+function deviceAppPanelHTML(panel, state, fresh, notificationFresh) {
   var m = deviceAppModel(panel, state),
     labels = {
       unknown: 'No data',
@@ -277,39 +281,46 @@ function deviceAppPanelHTML(panel, state, fresh) {
     );
   }
   var h =
-    '<div class="deviceapp"><div class="da-phone"><div class="da-statusbar"><span>' +
+    '<div class="deviceapp'+(m.showSources?'':' da-standalone')+'"><div class="da-phone"><div class="da-statusbar"><span>' +
     esc(m.clock) +
     '</span><span aria-hidden="true">▂▄▆ · ▰</span></div>' +
     '<div class="da-heading"><span class="da-eyebrow">CAMERA DETAILS</span><h3>' +
     esc(m.device) +
     '</h3><span>' +
     esc(m.subtitle) +
-    '</span></div><div class="da-fields">';
+    '</span></div>';
+  if(m.notifications.count){
+    h+='<section class="da-notifications" aria-label="Notifications">'+
+      '<div class="da-notification-heading"><span>Notifications</span><span class="da-notification-count" aria-label="'+m.notifications.count+' unread">'+m.notifications.count+'</span></div>'+
+      '<div class="da-notification-cards">'+FlowNotifications.cardsHTML(m.notifications,notificationFresh)+'</div>'+
+      (m.notifications.overflow?'<div class="phoneoverflow">+'+m.notifications.overflow+' more</div>':'')+'</section>';
+  }
+  h+='<div class="da-fields">';
   m.fields.forEach(function (f) {
+    var mapped=m.showSources && f.source;
     h +=
-      '<button type="button" class="da-field da-' +
+      (mapped?'<button type="button"':'<div')+' class="da-field da-' +
       f.status +
       (f.updated ? ' da-updated' : '') +
       (fresh && f.updated ? ' fresh' : '') +
       '" data-da-field="' +
       esc(f.id) +
       '"' +
-      props(f.source) +
-      ' aria-pressed="false" aria-label="' +
+      (mapped?props(f.source)+' aria-pressed="false"':' style="--da-color:#6875ca"') +
+      ' aria-label="' +
       esc(
         f.label +
           ': ' +
           f.value +
           '. ' +
           labels[f.status] +
-          '. Source: ' +
-          (f.source ? f.source.label : 'Unmapped')
+          (mapped?'. Source: '+f.source.label:'')
       ) +
       '">' +
       '<span class="da-field-top"><span>' +
       esc(f.label) +
       '</span>' +
-      badge(f.source) +
+      (mapped?badge(f.source):'') +
       '</span>' +
       '<span class="da-value">' +
       (f.icon
@@ -328,8 +339,9 @@ function deviceAppPanelHTML(panel, state, fresh) {
       (f.updated ? '<span class="da-update-label">Updated</span>' : '') +
       '</span>' +
       (f.detail ? '<span class="da-detail">' + esc(f.detail) + '</span>' : '') +
-      '</button>';
+      (mapped?'</button>':'</div>');
   });
+  if(!m.showSources)return h+'</div>'+(m.note?'<p class="da-app-note">'+esc(m.note)+'</p>':'')+'<div class="da-home" aria-hidden="true"></div></div></div>';
   h +=
     '</div><div class="da-home" aria-hidden="true"></div></div><div class="da-provenance"><div class="da-eyebrow">WHERE THE DATA COMES FROM</div>' +
     '<h3>One screen. Multiple sources.</h3><p class="da-help">Select a field or source to trace its data' +
@@ -411,7 +423,7 @@ function bindDeviceAppSources(host, panel, state) {
       select(host._daSource === id ? null : id);
     });
   });
-  select(host._daSource);
+  select(m.showSources?host._daSource:null);
 }
 
 /* queue widget: mailbox — a message enqueued, held, dequeued. Pure model +
@@ -429,9 +441,12 @@ PanelViews.register('deviceapp', function (host, panel, state, skin, states, ste
     validRevealIndex(host._daStep) &&
     validRevealIndex(stepIdx) &&
     stepIdx === host._daStep + 1;
+  var notifications=FlowNotifications.model(state);
+  var notificationFresh=daFresh && FlowNotifications.grew(host._daNotifications,notifications.notifications);
+  host._daNotifications=notifications.notifications;
   host._daStep = validRevealIndex(stepIdx) ? stepIdx : null;
-  h += deviceAppPanelHTML(panel, state, daFresh);
-  hBaseline = daFresh ? deviceAppPanelHTML(panel, state, false) : null;
+  h += deviceAppPanelHTML(panel, state, daFresh,notificationFresh);
+  hBaseline = daFresh ? deviceAppPanelHTML(panel, state, false,false) : null;
   return {
     html: h,
     baseline: hBaseline,
@@ -443,7 +458,7 @@ PanelViews.register('deviceapp', function (host, panel, state, skin, states, ste
 
 PanelRegistry.extend('deviceapp', {
   order: 21,
-  label: 'Camera app',
+  label: 'Device app',
   since: '0.1.0',
   layout: {
     large: true,
@@ -457,13 +472,25 @@ PanelRegistry.extend('deviceapp', {
     { order: 375, css: String.raw`.pt-deviceapp{container-type:inline-size;}` },
     {
       order: 377,
-      css: String.raw`.da-phone{position:relative;box-sizing:border-box;border:3px solid #9ba7bd;border-radius:34px;padding:14px 15px 30px;background:#f5f7fc;color:#24324b;box-shadow:0 14px 30px #23324b12;}
+      css: String.raw`.deviceapp.da-standalone{grid-template-columns:minmax(0,390px);max-width:414px;gap:0;justify-content:center;}
+.da-standalone .da-phone{width:100%;max-width:none;}
+.da-phone{min-width:0;position:relative;box-sizing:border-box;border:3px solid #9ba7bd;border-radius:34px;padding:14px 15px 30px;background:#f5f7fc;color:#24324b;box-shadow:0 14px 30px #23324b12;}
 .da-phone::before{content:"";position:absolute;top:13px;left:43%;width:14%;height:5px;border-radius:5px;background:#8a96ac;}
 .da-statusbar{display:flex;justify-content:space-between;font:600 10px 'IBM Plex Mono',monospace;padding:0 5px 18px;}
 .da-heading{padding:5px 4px 16px;}
 .da-eyebrow{font:600 10px/1.5 'IBM Plex Mono',monospace;letter-spacing:.12em;opacity:.7;}
 .da-heading h3,.da-provenance h3{font:600 21px/1.2 'Sora',sans-serif;margin:7px 0 5px;letter-spacing:-.5px;}
 .da-heading>span:last-child{font-size:12px;color:#65728a;}
+.da-notifications{margin:0 0 16px;min-width:0;}
+.da-notification-heading{display:flex;align-items:center;justify-content:space-between;margin:0 3px 8px;font:600 10px/1.5 'IBM Plex Mono',monospace;color:#59677f;text-transform:uppercase;letter-spacing:.06em;}
+.da-notification-count{border-radius:9px;min-width:20px;padding:1px 5px;text-align:center;color:#fff;background:#6875ca;}
+.da-notification-cards{display:grid;gap:7px;}
+.deviceapp .da-notifications .phonecard{max-height:none;padding:10px 12px;border:1px solid #dce2f0;border-left:3px solid #6875ca;background:#fff;color:#24324b;box-shadow:0 3px 8px #23324b08;}
+.deviceapp .da-notifications .phoneapp{font-size:9px;color:#6673c2;}
+.deviceapp .da-notifications .phonetitle{font-size:12px;white-space:normal;overflow-wrap:anywhere;}
+.deviceapp .da-notifications .phonetext{font-size:11px;line-height:1.4;color:#65728a;}
+.deviceapp .da-notifications .phoneoverflow{padding-top:7px;color:#59677f;}
+.da-app-note{font-size:11px;line-height:1.5;color:#65728a;margin:12px 4px 0;}
 .da-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}`,
     },
     {
@@ -529,30 +556,27 @@ PanelRegistry.extend('deviceapp', {
   references: { nodes: ['sources.*.node'] },
   authoring: {
     template: {
-      title: 'Camera app · data sources',
+      title: 'Device app',
       device: 'Front door camera',
       subtitle: 'Device health',
-      sources: [
-        { id: 'telemetry', label: 'Device telemetry', detail: 'Battery and charging reports' },
-        { id: 'registry', label: 'Device registry', detail: 'Camera configuration' },
-      ],
       fields: [
-        { id: 'battery', label: 'Battery', kind: 'battery', source: 'telemetry' },
-        { id: 'power', label: 'Charging source', source: 'telemetry' },
-        { id: 'model', label: 'Camera model', icon: 'camera', source: 'registry' },
-        { id: 'firmware', label: 'Firmware', icon: 'chip', source: 'registry' },
+        { id: 'battery', label: 'Battery', kind: 'battery' },
+        { id: 'power', label: 'Charging source' },
+        { id: 'model', label: 'Camera model', icon: 'camera' },
+        { id: 'firmware', label: 'Firmware', icon: 'chip' },
       ],
       initial: {
         battery: { value: 68, status: 'ready' },
         power: { value: 'Solar panel', status: 'ready' },
         model: { value: 'Doorbell camera', status: 'ready' },
         firmware: { value: 'v2.4.1', status: 'ready' },
-        note: 'Illustrative values. Select a field to see its source.',
+        clock: '9:41',
       },
     },
     setupFields: [
       ['device', 'text'],
       ['subtitle', 'text'],
+      ['showSources', 'jsonAny'],
       [
         'sources',
         'rows',
@@ -586,6 +610,8 @@ PanelRegistry.extend('deviceapp', {
       ['initial', 'json'],
     ],
     patchFields: [
+      ['notify', 'jsonAny'],
+      ['clear', 'bool', { trueOnly: true }],
       ['clock', 'text'],
       ['note', 'text'],
     ],
@@ -593,8 +619,24 @@ PanelRegistry.extend('deviceapp', {
       order: 25,
       name: 'Device app',
       category: 'Devices & interfaces',
-      tagline: 'Values with their sources',
-      description: 'Present device health fields and the backend source that supplied each value.',
+      tagline: 'Data tiles and notifications',
+      description: 'Show device data and incoming notifications in one tiled phone. Add a backend source map when you need it.',
+    },
+    example: function(sample){
+      sample.panel.initial.notify={app:'Homestead',title:'Doorbell pressed',text:'Someone is at the front door.'};
+      sample.state=foldDeviceAppStates(sample.panel,[])[0];sample.states=[sample.state];return sample;
+    },
+    editor: function(context){
+      return {setupField:function(field,panel){
+        if(field[0]!=='showSources')return null;
+        var options=['Automatic (when sources exist)','Show','Hide'];
+        var value=panel.showSources===true?'Show':panel.showSources===false?'Hide':options[0];
+        var control=context.controls.select(options,value,function(next){
+          return context.commit('showSources',next==='Show'?'true':next==='Hide'?'false':null);
+        });
+        control.setAttribute('aria-label','Show data sources');
+        return context.controls.row('Show data sources',control);
+      }};
     },
     expandPatchFields: function (decl) {
       var sourceIds = (Array.isArray(decl.sources) ? decl.sources : [])
@@ -620,6 +662,7 @@ PanelRegistry.extend('deviceapp', {
             ],
           ];
         });
+      if(!sourceIds.length)appFields.forEach(function(field){field[2]=field[2].filter(function(prop){return prop[0]!=='source';});});
       return appFields.concat(PANEL_PATCH_FIELDS.deviceapp);
     },
     origin: function (p, key, snapshot, context) {
@@ -627,6 +670,8 @@ PanelRegistry.extend('deviceapp', {
         history = context.history,
         input = context.input,
         own = context.own;
+      if(key==='notifications')return history(['notify','clear'],true,'Computed notification history');
+      if(key==='_phoneAdded')return {kind:'engine',label:'Engine · notifications added at this step',inputs:[]};
       if (key === '_updated')
         return { kind: 'engine', label: 'Engine · fields changed at this step', inputs: [] };
       if (key === 'clock' || key === 'note')

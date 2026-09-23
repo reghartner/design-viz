@@ -28,9 +28,8 @@ test('adding a renderer file needs no assembly-list or shared lifecycle edit', (
     fs.mkdirSync(path.join(root,'panels/types'),{recursive:true});
     fs.mkdirSync(path.join(root,'core'),{recursive:true});
     fs.copyFileSync(path.join(__dirname,'../src/source-bundles.json'),path.join(root,'source-bundles.json'));
-    fs.copyFileSync(path.join(__dirname,'../src/panels/shared.js'),path.join(root,'panels/shared.js'));
-    fs.copyFileSync(path.join(__dirname,'../src/panels/audio.js'),path.join(root,'panels/audio.js'));
-    fs.copyFileSync(path.join(__dirname,'../src/panels/registry.js'),path.join(root,'panels/registry.js'));
+    for (const file of sourceFiles('validator.js').filter(file => file.startsWith('panels/') && !file.startsWith('panels/types/')))
+      fs.copyFileSync(path.join(__dirname,'../src',file),path.join(root,file));
     fs.copyFileSync(path.join(__dirname,'../src/validator.js'),path.join(root,'validator.js'));
     for (const file of sourceFiles('validator.js').filter(file => file.startsWith('core/')))
       fs.copyFileSync(path.join(__dirname,'../src',file),path.join(root,file));

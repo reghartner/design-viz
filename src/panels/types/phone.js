@@ -56,29 +56,7 @@ function phonePatchWarnings(obj, path, warnings, allowOnce) {
   }
   if (Object.prototype.hasOwnProperty.call(obj, 'clock') && typeof obj.clock !== 'string')
     warnings.push(path + '.clock: must be a string — ignored');
-  if (Object.prototype.hasOwnProperty.call(obj, 'clear') && obj.clear !== true)
-    warnings.push(path + '.clear: must be true — ignored');
-  if (!Object.prototype.hasOwnProperty.call(obj, 'notify')) return;
-  var entries = Array.isArray(obj.notify) ? obj.notify : [obj.notify];
-  entries.forEach(function (n, i) {
-    var np = path + '.notify' + (Array.isArray(obj.notify) ? '[' + i + ']' : '');
-    if (!n || typeof n !== 'object' || Array.isArray(n)) {
-      warnings.push(np + ': expected {app, title?, text?} — notification ignored');
-      return;
-    }
-    if (typeof n.app !== 'string' || !n.app)
-      warnings.push(np + '.app: required non-empty string — notification ignored');
-    ['title', 'text'].forEach(function (k) {
-      if (Object.prototype.hasOwnProperty.call(n, k) && typeof n[k] !== 'string')
-        warnings.push(np + '.' + k + ': must be a string — ignored');
-    });
-    Object.keys(n).forEach(function (k) {
-      if (['app', 'title', 'text'].indexOf(k) < 0)
-        warnings.push(
-          np + '.' + k + ': not a notification field — ignored (valid: app, title, text)'
-        );
-    });
-  });
+  FlowNotifications.warnings(obj, path, warnings);
 }
 /* Fold phone operations into absolute snapshots. The complete unread stack
    is retained newest-step-first; a single step's array keeps authored order.
@@ -88,19 +66,9 @@ function foldPhoneStates(panel, steps) {
   panel = panel || {};
   steps = Array.isArray(steps) ? steps : [];
   var clock = '',
-    notifications = [],
+    notifications = FlowNotifications.create(),
     audio,
     states = [];
-  function validNotification(n) {
-    return n && typeof n === 'object' && !Array.isArray(n) && typeof n.app === 'string' && !!n.app;
-  }
-  function cleanNotification(n) {
-    return {
-      app: n.app,
-      title: typeof n.title === 'string' ? n.title : '',
-      text: typeof n.text === 'string' ? n.text : '',
-    };
-  }
   function apply(patch) {
     patch = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
     if (typeof patch.clock === 'string') clock = patch.clock;
@@ -108,17 +76,12 @@ function foldPhoneStates(panel, steps) {
       var nextAudio = FlowAudio.clean(patch.audio);
       if (nextAudio !== undefined) audio = nextAudio;
     }
-    if (patch.clear === true) notifications = [];
-    if (!Object.prototype.hasOwnProperty.call(patch, 'notify')) return 0;
-    var raw = Array.isArray(patch.notify) ? patch.notify : [patch.notify];
-    var pushed = raw.filter(validNotification).map(cleanNotification);
-    if (pushed.length) notifications = pushed.concat(notifications);
-    return pushed.length;
+    return notifications.apply(patch);
   }
   function snapshot(added, once) {
     var result = {
       clock: clock,
-      notifications: notifications.map(cleanNotification),
+      notifications: notifications.snapshot(),
       _phoneAdded: added,
     };
     var transientAudio = phoneBrandIsPlainObject(once) && Object.prototype.hasOwnProperty.call(once, 'audio')
@@ -189,26 +152,7 @@ function phoneModel(panelOrState, stepsOrState, currentStep) {
     /* Compact renderer form: phoneModel(absoluteState). */
     state = panelOrState || {};
   }
-  var notifications = (Array.isArray(state.notifications) ? state.notifications : [])
-    .map(function (n) {
-      if (!n || typeof n !== 'object' || Array.isArray(n) || typeof n.app !== 'string' || !n.app)
-        return null;
-      return {
-        app: n.app,
-        title: typeof n.title === 'string' ? n.title : '',
-        text: typeof n.text === 'string' ? n.text : '',
-      };
-    })
-    .filter(Boolean);
-  var model = {
-    clock: typeof state.clock === 'string' ? state.clock : '',
-    notifications: notifications,
-    cards: notifications.slice(0, 3),
-    count: notifications.length,
-    badge: notifications.length,
-    overflow: Math.max(0, notifications.length - 3),
-    added: typeof state._phoneAdded === 'number' ? Math.max(0, Math.round(state._phoneAdded)) : 0,
-  };
+  var model = Object.assign({clock:typeof state.clock==='string'?state.clock:''},FlowNotifications.model(state));
   if (Object.prototype.hasOwnProperty.call(state, 'audio')) {
     var audio = FlowAudio.clean(state.audio);
     if (audio !== undefined) model.audio = audio;
@@ -304,24 +248,7 @@ function phonePanelHTML(panel, state, fresh) {
   if (!m.cards.length) {
     h += '<div class="phoneempty">no notifications</div>';
   } else {
-    m.cards.forEach(function (card, i) {
-      h +=
-        '<div class="phonecard' +
-        (fresh && i === 0 ? ' fresh' : '') +
-        '">' +
-        '<div class="phoneapp" title="' +
-        esc(card.app) +
-        '">' +
-        esc(card.app) +
-        '</div>' +
-        (card.title
-          ? '<div class="phonetitle" title="' + esc(card.title) + '">' + esc(card.title) + '</div>'
-          : '') +
-        (card.text
-          ? '<div class="phonetext" title="' + esc(card.text) + '">' + esc(card.text) + '</div>'
-          : '') +
-        '</div>';
-    });
+    h += FlowNotifications.cardsHTML(m, fresh);
   }
   h += '</div>';
   if (m.overflow) h += '<div class="phoneoverflow">+' + m.overflow + ' more</div>';
@@ -342,19 +269,7 @@ PanelViews.register('phone', function (host, panel, state, skin, states, stepIdx
        backward navigation, jumps/deep links, and settled export renders free
        of one-shot markup. */
   var phonePrevStack = Array.isArray(host._phoneStack) ? host._phoneStack : null;
-  var phoneDeeper =
-    phonePrevStack !== null &&
-    phm.notifications.length > phonePrevStack.length &&
-    phonePrevStack.every(function (previousCard, previousIndex) {
-      var nextCard =
-        phm.notifications[phm.notifications.length - phonePrevStack.length + previousIndex];
-      return (
-        nextCard &&
-        nextCard.app === previousCard.app &&
-        nextCard.title === previousCard.title &&
-        nextCard.text === previousCard.text
-      );
-    });
+  var phoneDeeper = FlowNotifications.grew(phonePrevStack, phm.notifications);
   var phoneFresh =
     animate &&
     validRevealIndex(host._phoneStep) &&

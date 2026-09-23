@@ -118,6 +118,10 @@ class ExportGifPureTests(unittest.TestCase):
         # explicit file path wins verbatim
         self.assertEqual(export_gif.resolve_out_path("walk.gif", page, "visit-path"),
                          pathlib.Path("walk.gif"))
+        self.assertEqual(export_gif.resolve_out_path(None, page, "visit-path", "home-story"),
+                         pathlib.Path("/site/diagrams/drip-commander-visit-path-view-home-story.gif"))
+        self.assertEqual(export_gif.resolve_out_path("walk.gif", page, "visit-path", "home-story"),
+                         pathlib.Path("walk.gif"))
         # an existing directory receives the derived name
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
             self.assertEqual(export_gif.resolve_out_path(td, page, None),

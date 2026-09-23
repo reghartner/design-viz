@@ -4539,3 +4539,21 @@ test('coin lint compares steps within each path, not mutually exclusive alternat
   assert.equal(C.lintPage(C.normalize(d)).filter(w=>w.includes('shares first edge')).length,0);
   d.paths[1].steps.push('repeat');assert.equal(C.lintPage(C.normalize(d)).filter(w=>w.includes('shares first edge')).length,1);
 });
+
+test('view links restore the presentation before path and step and canonicalize stale IDs',()=>{
+  const h=deepLinkHarness({kind:'page'}),events=[];let view='home-story',step=0;
+  const presentation={viewId:()=>view,defaultView:()=> 'home-story',setView(id){events.push('view:'+id);if(!['home-story','service-flow'].includes(id))return false;view=id;return true;}};
+  const target={scrollIntoView(){events.push('scroll');}};
+  const stepper={ids:()=>['quiet','notify'],mode:()=> 'step',path:()=> 'happy',paths:()=>[{id:'happy'}],
+    selectPath(id){events.push('path:'+id);},enterStep(){events.push('step-mode');},stepIndexOf:()=>1,
+    jump(index){events.push('jump:'+index);step=index;},current:()=>({n:step}),scrollTargetEl:target};
+  h.ctl.sections.push({number:1,reference:'front-door',presentation,stepper,sectionEl:target});
+  h.ctl.manifest.sections.push({number:1,reference:'front-door',hasDiagram:true,stepIds:['quiet','notify']});
+  h.win.location.hash='#d=front-door&v=service-flow&m=step&s=notify';h.windowListeners.hashchange();
+  assert.deepEqual(events,['view:service-flow','path:happy','step-mode','jump:1','scroll']);
+  assert.equal(h.historyWrites.at(-1),'#d=front-door&v=service-flow&m=step&s=notify');
+  events.length=0;h.win.location.hash='#d=front-door&v=deleted';h.windowListeners.hashchange();
+  assert.equal(view,'home-story');assert.deepEqual(events.slice(0,2),['view:deleted','view:home-story']);
+  view='service-flow';h.win.location.hash='#d=front-door';h.windowListeners.hashchange();
+  assert.equal(view,'home-story','old links use the authored default independent of prior navigation');
+});

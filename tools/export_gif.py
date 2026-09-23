@@ -9,7 +9,8 @@ Usage:
 
 Output lands HERE by default: beside the page, named after it — with the
 section reference appended when --section picked one, so exporting several
-sections never overwrites. --out takes an exact .gif path, or a directory
+sections never overwrites. --view also appends its ID to the derived name.
+--out takes an exact .gif path, or a directory
 (existing, or marked by a trailing slash) to receive the derived name.
 
 Chrome/Chromium captures one PNG for every canonical heading-slug step deep
@@ -1303,15 +1304,19 @@ def resolve_out_path(
     out_arg: str | None,
     page_path: pathlib.Path,
     section_reference: str | None,
+    view_reference: str | None = None,
 ) -> pathlib.Path:
     """Where the GIF lands. Default: beside the page, named after it — with
     the section reference appended when --section chose one, so exporting
-    several sections of one page never overwrites. --out may be an existing
+    several sections of one page never overwrites. An explicit view adds its ID
+    too. --out may be an existing
     directory (or end with a path separator): the derived name lands inside
     it. Otherwise --out names the exact .gif file."""
     default_name = page_path.stem
     if section_reference is not None:
         default_name += "-" + str(section_reference).replace("/", "-")
+    if view_reference is not None:
+        default_name += "-view-" + str(view_reference).replace("/", "-")
     default_name += ".gif"
     if out_arg is None:
         return page_path.parent / default_name
@@ -1380,7 +1385,8 @@ def main(argv: list[str] | None = None) -> int:
         fragments = target.fragments
         out_path = resolve_out_path(
             args.out, page_path,
-            str(target.section_reference) if args.section is not None else None)
+            str(target.section_reference) if args.section is not None else None,
+            target.view.canonical_id if target.view is not None else None)
         if out_path.suffix.lower() != ".gif":
             raise ValueError("--out must name a .gif file or an existing directory")
         if out_path.resolve() == page_path.resolve():

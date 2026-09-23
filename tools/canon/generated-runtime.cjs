@@ -1032,6 +1032,7 @@ function parseHash(h){
           e: kv.e != null ? kv.e : null,
           m: (kv.m === 'step' || kv.m === 'ambient') ? kv.m : null};
   if (kv.p != null) result.p = kv.p;
+  if (kv.v != null) result.v = kv.v;
   if (kv.q != null) result.q = kv.q;
   return result;
 }
@@ -1045,6 +1046,7 @@ function buildHash(st){
   if (st && st.b != null) parts.push('b=' + encodeURIComponent(st.b));
   if (st && st.t != null) parts.push('t=' + encodeURIComponent(st.t));
   if (st && st.d != null) parts.push('d=' + encodeURIComponent(st.d));
+  if (st && st.v != null) parts.push('v=' + encodeURIComponent(st.v));
   if (st && st.m) parts.push('m=' + st.m);
   if (st && st.p != null) parts.push('p=' + encodeURIComponent(st.p));
   if (st && st.s != null) parts.push('s=' + encodeURIComponent(st.s));
@@ -1158,17 +1160,17 @@ function resolveHashTarget(st, manifest){
   if (st.d != null){
     diagramTarget = diagram(sectionAt(st.d), false);
     if (diagramTarget.kind === 'invalid') return diagramTarget;
-  } else if (st.m === 'step' || st.m === 'ambient' || st.s != null){
+  } else if (st.m === 'step' || st.m === 'ambient' || st.s != null || st.v != null){
     var legacySec = null;
     if (block){
       var activeTab = ti >= 0 ? ti : 0;
       for (var j = 0; j < sections.length; j++){
         if (sections[j].tabBlock === block.index && sections[j].tab === activeTab &&
-            Array.isArray(sections[j].stepIds)){ legacySec = sections[j]; break; }
+            (Array.isArray(sections[j].stepIds) || st.v != null && sections[j].hasDiagram)){ legacySec = sections[j]; break; }
       }
     } else {
       for (var k = 0; k < sections.length; k++){
-        if (Array.isArray(sections[k].stepIds)){ legacySec = sections[k]; break; }
+        if (Array.isArray(sections[k].stepIds) || st.v != null && sections[k].hasDiagram){ legacySec = sections[k]; break; }
       }
     }
     diagramTarget = diagram(legacySec, true);

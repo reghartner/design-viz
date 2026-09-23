@@ -432,6 +432,12 @@ See `workbench/starters.example.json` for the shape.
 
 ## Embedding one diagram in an iframe
 
+To target a named view, use `#d=<section-ref>&v=<view-id>`; step and embed
+links retain the selected view. For example,
+`page.html#embed=front-door&v=home-story` embeds that Home arrangement.
+See [view selectors](docs/section-layouts.md#link-to-or-capture-a-particular-view)
+for legacy Home/Data flow aliases and their distinction from host profiles.
+
 Any published page understands `#embed=<section-ref>` in its URL: it
 renders ONLY that section's diagram, panels, and step controls — no page
 title, tabs, prose, or contract card — sized for an iframe (Confluence,
@@ -590,13 +596,15 @@ python3 tools/export_gif.py built-page.html
 python3 tools/export_gif.py built-page.html --section 2 --width 1280 \
     --delay-ms 1600 --out walkthrough.gif
 python3 tools/export_gif.py built-page.html --section 2 --out gifs/
+python3 tools/export_gif.py built-page.html --section 2 --view home-story --out home.gif
 python3 tools/export_gif.py built-page.html --skin daylight --dim-alpha 0.35
 python3 tools/export_gif.py built-page.html --chrome /path/to/chrome
 ```
 
 The GIF lands beside the page by default, named after it — with the section
 reference appended when `--section` picked one, so exporting several sections
-of one page never overwrites. `--out` takes an exact `.gif` path, or a
+of one page never overwrites. `--view` also appends `-view-<id>` to the derived
+name so captures of different views remain separate. `--out` takes an exact `.gif` path, or a
 directory (existing, or marked by a trailing `/`) to receive the derived
 name.
 
@@ -605,9 +613,14 @@ Linux install paths, opens each canonical heading-slug
 `#d=delivery-flow&m=step&s=…` deep link headlessly, and captures one frame per
 step clipped to the diagram itself — the board with its legend, the widget
 panels, and the step bar — with a `--margin` background border (default 16 px).
-Custom and named layouts use the page's authored default view: the Home map,
+Without `--view`, custom and named layouts use the page's authored default view: the Home map,
 visible panels and attached or detached step controls are captured together
 in their arranged positions. Hidden tiles stay hidden and do not enlarge the crop.
+Use `--view <layouts[].id>` to select a named view, or `home`, `flow`, or
+`layout` for the corresponding legacy presentation. An explicit view exports
+its visible steps in authored path order, with shared stops once and alternate
+stops on their own paths. Unknown views and older HTML that cannot apply the
+selector fail clearly. See [view links and captures](docs/section-layouts.md#link-to-or-capture-a-particular-view).
 Section headings, prose, and whatever follows the diagram stay out of frame,
 and a diagram taller than the viewport is captured in full. `--width` still
 sets the layout viewport width the page renders at, and `--scale` (default 2)

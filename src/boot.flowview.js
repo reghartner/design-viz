@@ -103,7 +103,7 @@ function boot(raw){
        default one — inject the embed ref as the selector before the
        deep-link channel reads the hash */
     var st = parseHash(window.location.hash);
-    if (st.d == null && (st.m != null || st.s != null)){
+    if (st.d == null && (st.m != null || st.s != null || st.v != null)){
       try {
         history.replaceState(null, '',
           '#' + window.location.hash.replace(/^#/, '') +

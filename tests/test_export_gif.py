@@ -334,9 +334,13 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             page, gif = temp_path / "views.html", temp_path / "views.gif"
+            spec = json.loads((ROOT / "src/starters/named-layouts.json").read_text())
+            spec["page"]["sections"][0]["id"] = "front-door"
+            source = temp_path / "views.json"
+            source.write_text(json.dumps(spec))
             subprocess.run(
                 [sys.executable, str(ROOT / "tools/inject.py"),
-                 str(ROOT / "src/starters/named-layouts.json"),
+                 str(source),
                  str(ROOT / "template/flowview.html"), str(page)],
                 check=True, capture_output=True)
             result = subprocess.run(
@@ -347,6 +351,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("5 frames", result.stdout)
             self.assertIn("view home-story", result.stdout)
+            self.assertIn("d=front-door", result.stdout)
             self.assertEqual(export_gif.gif_frame_count(gif.read_bytes()), 5)
 
     def test_view_capture_rejects_old_html_even_when_its_default_matches(self):

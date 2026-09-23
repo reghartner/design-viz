@@ -277,7 +277,9 @@ def _sections(page: dict[str, Any]) -> list[PageSection]:
         section.section.get("heading") for section in result)
     return [PageSection(
         section.number, section.section, section.block_index, section.tab_index,
-        section.tab_label, references[index])
+        section.tab_label,
+        section.section["id"] if isinstance(section.section.get("id"), str)
+        and section.section["id"].strip() else references[index])
         for index, section in enumerate(result)]
 
 

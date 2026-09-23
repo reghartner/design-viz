@@ -368,7 +368,36 @@ function nodeForm(val, ctx){
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
       frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); }))
-    ].concat([detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
+    ].concat([handoffControls(val),detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
+  }
+
+function handoffControls(val){
+    var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
+    fold.className='node-handoff-editor';fold.open=val.handoff!=null;summary.textContent='Diagram handoff';fold.appendChild(summary);
+    var note=document.createElement('p');note.className='fnote';
+    note.textContent='The node’s arrow continues in a separate diagram document. Supply a destination URL or a stable spec ID for the host to resolve. Use link above for source documentation. Apply saves these fields together.';
+    fold.appendChild(note);
+    if(val.detail!=null){
+      var conflict=document.createElement('p');conflict.className='fnote';
+      conflict.textContent='Remove the existing domain detail before applying a diagram handoff.';fold.appendChild(conflict);
+    }
+    var draft=val.handoff || {},fields={};
+    [['url','Destination URL','https://…'],['spec','Spec ID (optional)','stable-spec-id'],
+      ['revision','Revision (optional)','pinned revision; requires a spec ID'],['section','Section (optional)','section ID; requires a spec ID']].forEach(function(field){
+      var control=document.createElement('input');control.type='text';control.className='fctl';
+      control.value=draft[field[0]]==null?'':String(draft[field[0]]);control.placeholder=field[2];fields[field[0]]=control;
+      fold.appendChild(frow(field[1],control));
+    });
+    fold.appendChild(actionButton('Apply handoff',function(){
+      var handoff={};Object.keys(fields).forEach(function(key){var value=fields[key].value.trim();if(value)handoff[key]=value;});
+      var ok=commitCascade(function(raw){return planSetNodeHandoff(session.text(),raw,target.section,target.id,handoff);});
+      if(ok)refreshFormSoon();
+    }));
+    if(val.handoff!=null)fold.appendChild(actionButton('Remove handoff',function(){
+      var ok=commitCascade(function(raw){return planSetNodeHandoff(session.text(),raw,target.section,target.id,null);});
+      if(ok)refreshFormSoon();
+    }));
+    return fold;
   }
 
 function detailControls(val,ctx){
@@ -377,6 +406,10 @@ function detailControls(val,ctx){
     var note=document.createElement('p');note.className='fnote';
     note.textContent='Open an ordinary section as this node’s inner flow, or link to an approved spec. Apply saves these fields together.';
     fold.appendChild(note);
+    if(val.handoff!=null){
+      var conflict=document.createElement('p');conflict.className='fnote';
+      conflict.textContent='Remove the existing diagram handoff before applying a domain detail.';fold.appendChild(conflict);
+    }
     var body=document.createElement('div');fold.appendChild(body);
     var draft=val.detail?builderClone(val.detail):{mode:'focus'};
     var type=draft.spec?'Approved spec':draft.url && !draft.section?'URL':'Local section';
@@ -1472,7 +1505,7 @@ function renderInspector(){
         if(t.kind === 'panel')acts.appendChild(actionButton('Duplicate panel',function(){clipboard().duplicate([t]);}));
       }
       if (t.kind === 'node'){
-        if(!val.detail)acts.appendChild(actionButton('Create detail flow',function(){
+        if(!val.detail && val.handoff==null)acts.appendChild(actionButton('Create detail flow',function(){
           commitCascade(function(raw){return planCreateNodeDetail(session.text(),raw,t.section,t.id);},
             {after:function(plan){
               session.target={section:plan.index,kind:'section'};session.insertSection=plan.index;

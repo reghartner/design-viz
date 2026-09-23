@@ -493,8 +493,8 @@ function importHarness(ctl, boardSpec, extraGlobals){
       const node = svg.appendChild(element('g'));
       node.className = 'node'; node.ownerSVGElement = svg;
       node.setAttribute('data-dv-node', id); node.setAttribute('transform', `translate(${x} ${y})`);
-      const rect = node.appendChild(element('rect'));
-      rect.className = 'card'; rect.setAttribute('width', '100'); rect.setAttribute('height', '60');
+      const handoff=boardSpec.nodes[id].handoff,card = node.appendChild(element(handoff?'path':'rect'));
+      card.className = 'card'; card.setAttribute(handoff?'data-node-width':'width', '100'); card.setAttribute(handoff?'data-node-height':'height', '60');
       cards[id] = node;
     }
     boardSpec.rows.forEach((row, r) => row.forEach((slot, i) => {
@@ -1201,6 +1201,17 @@ test('actual row, group and edge-label drags each preserve form focus and publis
     assert.equal(h.doc.activeElement,focused);
     assertOneBuilderUndo(h,before);
   }
+});
+
+test('a row of handoff arrows keeps its measured row handle and moves with one exact Undo',()=>{
+  const spec=nodePlacementFixture();spec.nodes.a.handoff={spec:'next-a'};spec.nodes.b.handoff={spec:'next-b'};
+  const h=importHarness(null,spec),before=' \n'+JSON.stringify(spec,null,2)+'\r\n';h.elements.src.value=before;
+  const handle=h.svg.querySelector('g.dv-rowgrab[data-dv-row="0"]');assert.ok(handle);
+  assert.equal(handle.getAttribute('transform'),'translate(70 119)');
+  handle.fire('mousedown',{button:0,clientX:80,clientY:130});h.move(300,450);h.release();
+  const result=JSON.parse(h.elements.src.value);assert.deepEqual(result.rows,[['c','d'],['a','b']]);
+  assert.deepEqual(result.nodes.a.handoff,spec.nodes.a.handoff);assert.deepEqual(result.nodes.b.handoff,spec.nodes.b.handoff);
+  assertOneBuilderUndo(h,before);
 });
 
 test('node swap target takes precedence over gap lines and retains both ghost previews', () => {

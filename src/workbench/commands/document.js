@@ -247,12 +247,23 @@ function planSetSectionIdentity(text,raw,sectionIdx,key,value){
   var errors=[];validateDetails(normalize(JSON.parse(plan.text)),errors,[]);
   return errors.length?{error:errors.join('\n')}:plan;
 }
+function planSetNodeHandoff(text,raw,sectionIdx,nodeId,handoff){
+  var path=builderTargetPath(raw,{kind:'node',section:sectionIdx,id:nodeId}),node=path && specValueAt(raw,path);
+  if(!node)return {error:'node not found — reselect and try again'};
+  if(handoff!=null){
+    if(node.detail!=null)return {error:'Remove the existing domain detail before applying a diagram handoff.'};
+    var errors=[];validateHandoff(handoff,node,'node '+nodeId+'.handoff',errors);
+    if(errors.length)return {error:errors.join('\n')};
+  }
+  return planSetField(text,raw,path,'handoff',handoff==null?null:JSON.stringify(handoff,null,2));
+}
 function planCreateNodeDetail(text,raw,sectionIdx,nodeId){
   var got=builderDiagram(text,raw,sectionIdx);
   if(got.error)return got;
   var node=got.d.nodes && got.d.nodes[nodeId];
   if(!node)return {error:'Select a node first.'};
   if(node.detail)return {error:'Remove the existing detail before creating a new flow.'};
+  if(node.handoff!=null)return {error:'Remove the existing diagram handoff before creating a detail flow.'};
   var page=raw && raw.page || raw,base=raw && raw.page?['page']:[];
   if(!page || (!page.blocks && !page.sections))return {error:'Wrap this bare diagram in a page with sections before creating a detail flow.'};
   var listPath=base.concat([page.blocks?'blocks':'sections']),taken=Object.create(null);

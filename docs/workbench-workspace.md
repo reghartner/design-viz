@@ -17,6 +17,12 @@ default; changed node sets or default views reset too. Selected-step edits use
 the builder's existing selection tracking. No playback state enters the JSON,
 undo history or saved layout. Standalone published pages retain autoplay.
 
+Reordering rows, inspector edits, Render and Undo/Redo keep the page's current
+scroll position while the preview rebuilds. In Focus workspace, the preview's
+own scroll position is retained instead. If an edit shortens the document past
+that position, scrolling stops at the new bottom. Opening or importing a different
+project keeps its normal navigation behavior.
+
 A failed JSON/validation render leaves the previous preview visible while you
 repair the source. A renderer failure after replacement begins instead reports
 an error and retires that unusable preview; accepted source and Undo history

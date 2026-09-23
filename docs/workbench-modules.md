@@ -247,6 +247,14 @@ The public controller exposes `render(text, request)`, `repaint(skin)`,
 Boot's existing `go(fromText, request)` calls this owner and returns its outcome.
 The host injects skin selection/presentation, findings and lifecycle callbacks.
 
+For existing-document replacements, this owner snapshots the preview's scroll
+ancestors and restores them synchronously after reconciliation. Panel layout
+measurements during partial mounting can otherwise clamp the Focus workspace
+scroller or trigger page scroll anchoring. Disconnected ancestors are skipped;
+shorter content uses the browser's normal end clamp. Project/import replacements
+do not inherit the old position, and there is no delayed scroll restoration to
+override a subsequent user gesture.
+
 Every render attempt returns `{ok, replaced, text, origin, reason?}`. The text is
 the captured attempt, not an assertion that the current editor has that preview.
 Parse or validation rejection reports `ok:false, replaced:false`, leaving the

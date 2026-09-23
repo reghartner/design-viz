@@ -27,13 +27,13 @@ test('legacy specs still work and a newer authoring tool alone does not require 
 });
 test('reports required/installed releases and exact unavailable features across nested sections',()=>{
   const raw=spec(),detected=plain(C.detect(raw));
-  assert.deepEqual(detected,['flow.alternates','flow.failures','layout.named','layout.step-subsets','panel.deviceapp','panel.homemap']);
+  assert.deepEqual(detected,['content.deviceapp','flow.alternates','flow.failures','layout.named','layout.step-subsets','panel.deviceapp','panel.homemap']);
   raw.page.flowview={minVersion:'1.10.0',features:['panel.future']};
   const available={...C.features};delete available['panel.deviceapp'];
   const result=C.check(raw,{version:'1.9.0',contract:'1',features:available});
   assert.equal(result.status,'partial');assert.equal(result.minVersion,'1.10.0');
   assert.deepEqual(plain(result.missingFeatures),['panel.deviceapp','panel.future']);
-  assert.match(result.messages.join(' '),/Camera app panel/);assert.match(result.messages.join(' '),/1.9.0/);
+  assert.match(result.messages.join(' '),/Device app panel/);assert.match(result.messages.join(' '),/1.9.0/);
   assert.match(result.messages.join(' '),/1.10.0/);
 });
 test('schema mismatches and malformed metadata are reported instead of claiming compatibility',()=>{
@@ -101,4 +101,16 @@ test('audio and spotlight features are stamped across endpoint panels, Home subj
   d.panels[2].initial={};d.steps=[{panels:{monitor:{enterOnce:{audio:{output:'speech'},spotlight:'flash'}}}}];
   assert.ok(C.detect(raw).includes('media.spotlight'));
   d.steps=[];assert.ok(!C.detect(raw).includes('media.audio'));
+});
+
+
+test('device app notifications and optional sources warn older viewers without changing existing source maps',()=>{
+  const raw=spec(),d=raw.page.blocks[0].tabs[0].sections[0].diagram,p=d.panels[1];
+  p.sources=[{id:'device'}];assert.ok(!C.detect(raw).includes('content.deviceapp'));
+  const older={...C.features};delete older['content.deviceapp'];
+  for(const configure of [()=>p.showSources=false,()=>p.initial={notify:{app:'Home'}},()=>d.steps[0].panels={phone:{clear:true}}]){
+    configure();const stamped=C.stamp(raw);
+    assert.deepEqual(plain(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures),['content.deviceapp']);
+    delete p.showSources;delete p.initial;delete d.steps[0].panels;
+  }
 });

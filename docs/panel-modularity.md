@@ -58,6 +58,12 @@ Folders must not mutate input or recover state from the DOM. Path selection and
 step filtering remain in the player: alternates have independent carried state,
 and skipped playback stops still contribute state.
 
+`src/panels/notifications.js` owns notification validation, folding and card
+markup shared by Phone and Device app. Both consume absolute snapshots: `notify`
+adds cards and `clear` removes their notification history without clearing other
+panel values. Keep notification behavior in this helper rather than duplicating
+it in each phone surface.
+
 The render result supports `html`, `baseline`, `level`, `glide`, `pulse`,
 `enterBars`, `bars`, `transient`, `settle`, `patch` and `mounted`. These describe
 work for the shared lifecycle, not separate animation loops. Camera screens use

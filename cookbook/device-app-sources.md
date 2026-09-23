@@ -1,8 +1,41 @@
-# Camera phone UX with backend provenance
+# Device app: data tiles, notifications and optional sources
 
-Use `deviceapp` to show which backend supplies each part of a device-details
-screen. Use `phone` for accumulating notifications and `screen` for camera clips.
-These are separate views of the resident experience.
+Use `deviceapp` for data tiles and notifications together in a device-details
+phone. Add source mappings only when explaining the backend is part of the story.
+Use `phone` for a compact notification-only lock screen or two-way audio, and
+`screen` for camera clips.
+
+## A phone without the source explanation
+
+New Device app panels start source-free. Omit `sources` and each field's `source`
+to show plain data tiles. To hide the source map on an existing panel while
+retaining its mappings, set `showSources:false`. The workbench panel inspector
+has **Show data sources → Automatic / Show / Hide**. Automatic shows the map
+only when sources exist; Show also needs at least one source. No source API is
+called. Notes stay visible inside the app when the map is hidden.
+
+Notifications use the same operations as the `phone` panel. This step patch
+adds a notification and updates a tile independently:
+
+```
+{
+  "panels": {
+    "app": {
+      "notify": {"app":"Homestead", "title":"Doorbell pressed", "text":"Someone is at the front door."},
+      "battery": {"value":68, "status":"ready"}
+    }
+  }
+}
+```
+
+A notification never changes data tiles implicitly. `clear:true` dismisses the
+notification stack while keeping the tiles. `notify` can be an array; up to three
+cards are shown with a count for the rest. Both initial state and steps accept
+these operations. `notify`, `clear` and `notifications` are reserved field IDs;
+use descriptive tile IDs instead. Empty `fields` is supported for a notification-only
+device app. The [plain app example](../examples/device-app-notifications/device-app-notifications.spec.json)
+shows a button press, recording update, and dismissal without any source mapping.
+
 
 The complete [doorbell example](../src/starters/device-app-sources.json) is also
 available from welcome under **Start new project → Behind the app**. Its APIs
@@ -33,7 +66,7 @@ A `sources` entry supplies an ID, label, optional hex color, optional diagram
 `node` ID, endpoint label, and detail. Endpoints are inert text; the renderer
 makes no API requests. Up to six sources get redundant color and A–F markers.
 
-Each `fields` entry names its source and display label. `kind:"battery"` draws
+Each `fields` entry supplies its display label and may name a source. `kind:"battery"` draws
 a numeric 0–100 meter; text is the default kind. Other useful fields include
 charging accessory, charging state, signal strength, model, firmware, recording
 availability and last sync. Use supported icons and explicit units.

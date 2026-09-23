@@ -12,6 +12,7 @@
     "core/details.js",
     "core/handoffs.js",
     "panels/shared.js",
+    "panels/notifications.js",
     "panels/audio.js",
     "panels/types/*.js"
   ],

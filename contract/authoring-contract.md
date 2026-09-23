@@ -1180,13 +1180,20 @@ perspectives" of one timeline). Types:
   Steps may then also patch `{"miss":[{"lane":"hb","at":"3h"}]}` (appends) to
   flag an expected beat that never arrived (red marker on that lane), and
   events may carry `"lane":"hb"` to sit on a lane's row.
-- `deviceapp` — camera-details phone UI beside a field-level backend source map.
-  Declare `device` and optional `subtitle`; `sources` is 1–6 objects with unique
+- `deviceapp` — tiled device-details phone with accumulating notifications and an
+  optional backend source map. Declare `device` and optional `subtitle`.
+  `sources` is optional (0–6 objects) with unique
   `id`, `label`, optional hex `color`, diagram `node` ID, `endpoint` and `detail`.
-  `fields` is 1–12 objects with unique `id`, `label`, `source` ID, optional
+  `fields` is optional (0–12 data tiles) with unique `id`, `label`, optional `source` ID,
   `kind` (`text` default or `battery`), `icon` and `unit`. IDs must begin with a
-  letter and contain only letters, digits, `_` or `-`; `clock`, `note`,
-  `constructor` and `prototype` are reserved. Sources receive stable A–F
+  letter and contain only letters, digits, `_` or `-`; `clock`, `note`, `notify`,
+  `clear`, `notifications`, `constructor` and `prototype` are reserved.
+  Source-free panels show only the phone, without unmapped badges or a source
+  explanation block. `showSources:false` also hides that block and its badges
+  while retaining authored mappings. With `showSources` omitted, a nonempty
+  source list retains the existing source-map presentation; `true` shows the map
+  when sources exist. New workbench panels start with no sources.
+  Visible sources receive stable A–F
   markers as well as colors. Selecting a source or field highlights all fields
   using that source and its optional diagram node. Selection is viewer state.
   Initial and step state use field IDs directly, e.g. `{"battery":{"value":68,
@@ -1200,7 +1207,15 @@ perspectives" of one timeline). Types:
   override. Thus `{"battery":{"status":"stale"}}` preserves its last value.
   A field set to `null` resets its value/detail/status and restores its declared
   source; `source:null` alone restores that source without clearing the value.
-  Optional `clock` and `note` strings carry forward. Changed fields show an
+  Patch `notify:{app,title?,text?}` or `notify:[...]` to add notifications above
+  the data tiles; `app` is required. This uses the same contract as `phone`: each
+  step's array keeps its order, newest step first. `clear:true` dismisses only
+  notifications, preserving every tile; `clear` plus `notify` clears then adds.
+  Up to three cards are shown with a remaining-count indicator. Step jumps and
+  alternate paths recompute the stack from initial state. Notifications need no
+  sources and can be used without data tiles.
+  Optional `clock` and `note` strings carry forward. Without the source map,
+  the note appears inside the app. Changed fields show an
   Updated cue; adjacent forward transitions may animate once. Backward/jump
   navigation and reduced motion render the absolute state without entry effects.
   Values, endpoints and freshness text are authored, never fetched or timed.

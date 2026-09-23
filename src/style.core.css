@@ -3762,3 +3762,13 @@ body.sk-daylight .docview,body.sk-pastel .docview,body.sk-editorial .docview{--t
 @keyframes fva-indicator{50%{opacity:.35}}
 @media(prefers-reduced-motion:reduce){.fva-audio *,.fva-audio *:before,.fva-effects *{animation:none!important;transition:none!important;}}
 @media print{.fva-audio *,.fva-audio *:before,.fva-effects *{animation:none!important;transition:none!important;}.fva-audio{break-inside:avoid;}}
+
+/* Cross-document endpoints: shared card/tone styling, distinct arrow silhouette. */
+.node-handoff .handoff-stripe{fill:none;stroke:currentColor;stroke-width:1.6;opacity:.65;pointer-events:none;}
+.node-handoff .handoff-caption{font:600 8px 'IBM Plex Mono',monospace;letter-spacing:.35px;}
+.node-handoff .handoff-hit{fill:transparent;}
+.node-handoff .handoff-link{cursor:pointer;text-decoration:none;}
+.node-handoff .handoff-link:hover .card,.node-handoff:has(.handoff-link:focus-visible) .card{stroke:currentColor;stroke-width:2.2;}
+.node-handoff .handoff-link:focus-visible{outline:2px solid currentColor;outline-offset:4px;}
+.node-handoff .handoff-unavailable .handoff-stripe{stroke-dasharray:3 3;opacity:.4;}
+.node-handoff .handoff-unavailable .handoff-caption{font-size:6.8px;letter-spacing:0;}

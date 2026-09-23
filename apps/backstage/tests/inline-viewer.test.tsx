@@ -14,11 +14,36 @@ const owners:Array<{navigate:ReturnType<typeof vi.fn>;pause:ReturnType<typeof vi
 beforeEach(()=>{
   owners.length=0;mount.mockReset();
   mount.mockImplementation(host=>{
-    const owner={root:host.attachShadow({mode:'open'}),warnings:[],navigate:vi.fn(),pause:vi.fn(),destroy:vi.fn()};
+    const owner={root:host.shadowRoot || host.attachShadow({mode:'open'}),warnings:[],navigate:vi.fn(),pause:vi.fn(),destroy:vi.fn()};
     owners.push(owner);return owner;
   });
 });
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.useRealTimers();});
+it('refreshes host diagram routing and reapplies the target without reloading the spec',async()=>{
+  const load=vi.fn().mockResolvedValue(spec),target={section:'recording',step:'saved'};
+  const first=vi.fn().mockReturnValue('https://designs.test/first'),next=vi.fn().mockReturnValue('https://designs.test/next');
+  const view=render(<InlineFlowview diagram={diagram} loadSpec={load} target={target} resolveDiagramLink={first}/>);
+  await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));
+  expect(mount.mock.calls[0][2]?.resolveDiagramLink).toBe(first);
+  expect(owners[0].navigate).toHaveBeenCalledWith(target);
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target} resolveDiagramLink={first}/>);
+  expect(mount).toHaveBeenCalledTimes(1);
+  const oldWarning=mount.mock.calls[0][2]?.onWarning;
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target} resolveDiagramLink={next}/>);
+  await waitFor(()=>expect(mount).toHaveBeenCalledTimes(2));
+  expect(owners[0].destroy).toHaveBeenCalledTimes(1);
+  expect(mount.mock.calls[1][1]).toBe(spec);
+  expect(mount.mock.calls[1][2]?.resolveDiagramLink).toBe(next);
+  expect(owners[1].navigate).toHaveBeenCalledWith(target);
+  act(()=>oldWarning?.('Retired router callback'));
+  expect(screen.queryByRole('alert')).toBeNull();
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target}/>);
+  await waitFor(()=>expect(mount).toHaveBeenCalledTimes(3));
+  expect(mount.mock.calls[2][2]?.resolveDiagramLink).toBeUndefined();
+  expect(owners[1].destroy).toHaveBeenCalledTimes(1);
+  expect(owners[2].navigate).toHaveBeenCalledWith(target);
+  expect(load).toHaveBeenCalledTimes(1);
+});
 it('warns before rendering a newer spec, lists unavailable features, and passes the original inert spec',async()=>{
   const future={...spec,page:{...spec.page,contract:'1',flowview:{minVersion:'9.0.0',features:['panel.future']}}};
   const load=vi.fn().mockResolvedValue(future);

@@ -18,6 +18,13 @@ export interface DetailNavigation {
   }>;
 }
 export interface DetailReference {spec: string; revision?: string; section?: string}
+/** Another document to open. A spec or URL is required; revision/section accompany a spec. */
+export interface DiagramHandoffReference {
+  spec?: string;
+  revision?: string;
+  section?: string;
+  url?: string;
+}
 export interface NativeViewerTarget {
   section: string;
   drilldown?: DetailNavigation;
@@ -25,6 +32,10 @@ export interface NativeViewerTarget {
   step?: string;
 }
 export interface NativeViewerOptions {
+  /** Synchronous host routing only. Return an absolute, credential-free HTTP(S) URL.
+   * Null, undefined, invalid URLs or thrown errors fall back to the authored URL.
+   * Handoffs open as links and never use loadDetail or fetch a diagram. */
+  resolveDiagramLink?: (reference: DiagramHandoffReference) => string | null | undefined;
   /** Consumer-owned approved-spec transport. Renderer never fetches remote URLs. */
   loadDetail?: (reference: DetailReference, signal: AbortSignal) => Promise<unknown>;
   /** Host may store this state in its own router; Flowview does not change host history. */

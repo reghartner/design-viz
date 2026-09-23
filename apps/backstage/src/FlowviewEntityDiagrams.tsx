@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { DiagramLoader, SpecLoader } from './api/types';
+import type { NativeViewerOptions } from './generated/nativeViewer';
 import { InlineFlowview, type ViewerTarget } from './InlineFlowview';
 import { EvidenceLink } from './components/EvidenceLink';
 import { useEntityDiagrams } from './hooks/useEntityDiagrams';
@@ -8,11 +9,13 @@ export function FlowviewEntityDiagrams({
   entityRef,
   loadDiagrams,
   loadSpec,
+  resolveDiagramLink,
   refreshMs = 60000,
 }: {
   entityRef: string;
   loadDiagrams: DiagramLoader;
   loadSpec: SpecLoader;
+  resolveDiagramLink?: NativeViewerOptions['resolveDiagramLink'];
   refreshMs?: number;
 }) {
   const [selection, setSelection] = useState<{
@@ -175,6 +178,7 @@ export function FlowviewEntityDiagrams({
               key={entityRef + '|' + selected.id + '|' + selected.revision}
               diagram={selected}
               loadSpec={loadSpec}
+              resolveDiagramLink={resolveDiagramLink}
               target={target}
             />
           </article>

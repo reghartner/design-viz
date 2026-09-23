@@ -142,6 +142,7 @@ function planSetNodeDetail(text,raw,sectionIdx,nodeId,detail){
   var path=builderTargetPath(raw,{kind:'node',section:sectionIdx,id:nodeId});
   if(!path || !specValueAt(raw,path))return {error:'node not found — reselect and try again'};
   if(detail!=null){
+    if(specValueAt(raw,path).handoff!=null)return {error:'Remove the existing diagram handoff before applying a domain detail.'};
     if(!detail || typeof detail!=='object' || Array.isArray(detail))return {error:'Detail must be a JSON object.'};
     if(['focus','link'].indexOf(detail.mode)<0)return {error:'Choose focus for a drilldown or link for an external destination. Inline expansion is no longer supported.'};
     if(!detail.section && !detail.spec && !detail.url)return {error:'Choose a local section or enter an external detail target.'};

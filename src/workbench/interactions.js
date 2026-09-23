@@ -682,10 +682,10 @@ function createBuilderInteractions(opts){
         var el = secEl.querySelector('g.node[data-dv-node="' + cssQuote(ids[j]) + '"]');
         if (!el) continue;
         var xy = nodeTranslateXY(el);
-        var card = el.querySelector('rect.card');
+        var card = el.querySelector('.card');
         if (!xy || !card) continue;
-        var w = parseFloat(card.getAttribute('width')) || 0;
-        var h = parseFloat(card.getAttribute('height')) || 0;
+        var w = parseFloat(card.getAttribute('width') || card.getAttribute('data-node-width')) || 0;
+        var h = parseFloat(card.getAttribute('height') || card.getAttribute('data-node-height')) || 0;
         if (x1 > xy.x) x1 = xy.x;
         if (y1 > xy.y) y1 = xy.y;
         if (x2 < xy.x + w) x2 = xy.x + w;

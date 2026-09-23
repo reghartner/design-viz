@@ -573,7 +573,7 @@ function destroyBoardLinks(el){
     if (controller) controller.destroy();
   });
 }
-function renderBoard(el, d, prefix, skin, protos, backlinks){
+function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
   var SK = SKINS[skinBase(skin)];
   var L = layout(d);
@@ -586,7 +586,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
   });
 
   var vb = L.vb || {x:0, y:0, w:W, h:L.H};
-  var s = '<svg viewBox="' + vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h + '" role="img" aria-label="' + esc(d.title || 'flow diagram') + '" xmlns="' + SVGNS + '">';
+  var diagramRole=Object.values(d.nodes || {}).some(function(n){return n && n.handoff;})?'group':'img';
+  var s = '<svg viewBox="' + vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h + '" role="' + diagramRole + '" aria-label="' + esc(d.title || 'flow diagram') + '" xmlns="' + SVGNS + '">';
   s += '<defs>';
   Object.keys(kindsUsed).forEach(function(k){
     s += '<marker id="' + prefix + '-m-' + k + '" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">' +
@@ -646,13 +647,14 @@ function renderBoard(el, d, prefix, skin, protos, backlinks){
     var hasNodeLink = nodeLink && typeof nodeLink === 'string';
     var hasReferences=nodeReferenceLinks(d,id).length>0,referenceX=p.w-(hasNodeLink?38:15);
     var backlinkX = p.w - 15 - (hasNodeLink?23:0) - (hasReferences?23:0);
-    s += '<g class="node tint-' + tint + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
+    s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' ? '<title>'+esc(nodeTitle)+'</title>' : '') +
+         (n.handoff ? handoffNodeContent(n,p,id,prefix,options) :
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
          '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
          '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(shownTitle) + '</text>' +
-         '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>' +
+         '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>') +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
            '<circle cx="' + (p.w - 15) + '" cy="14" r="9" fill="transparent"/>' +
@@ -1023,7 +1025,7 @@ function renderRuntimeConditions(board, host, conditions){
   Object.keys(grouped).forEach(function(id){
     var node=board.nodeEls[id],items=grouped[id],c=items[0],card=node.querySelector('.card');
     var badge=document.createElementNS(SVGNS,'g');badge.setAttribute('class','runtime-node-badge runtime-'+c.kind);
-    badge.setAttribute('transform','translate('+(Number(card.getAttribute('width'))-12)+' '+(Number(card.getAttribute('height'))-10)+')');
+    badge.setAttribute('transform','translate('+(Number(card.getAttribute('width') || card.getAttribute('data-node-width'))-12)+' '+(Number(card.getAttribute('height') || card.getAttribute('data-node-height'))-10)+')');
     var title=document.createElementNS(SVGNS,'title');title.textContent=items.map(function(v){return v.label;}).join('; ');badge.appendChild(title);
     var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','11');badge.appendChild(circle);
     var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=symbols[c.kind] || '!';badge.appendChild(text);node.appendChild(badge);
@@ -1978,7 +1980,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     if (primaryPanel && d.panels.length === 1) aside.hidden = true;
   }
 
-  var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks);
+  var board = renderBoard(bwrap, activeDiagram, prefix, skin, protos, backlinks, options);
   lg.innerHTML = legendHTML(board.kindsUsed, board.anyRet, skin, protos);
   result.boardSize = createBoardSizeControl(boardDiv, lg, d.title || sec.heading);
 
@@ -2086,7 +2088,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
   }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {viewSteps:function(ids){printFilter=ids;printSteps(printDiagram);},renderPath:function(next){
     printSteps(next);
-    return renderBoard(bwrap, next, prefix, skin, protos, backlinks);
+    return renderBoard(bwrap, next, prefix, skin, protos, backlinks, options);
   }}));
   stepper.copyButton = copyStep;
   if (view === 'step') stepper.enterStep(true); /* host may disable automatic playback */

@@ -11,7 +11,7 @@ var FlowviewCompatibility = (function(){
   var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Camera app panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
-  var extraLabels={ 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
+  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications',
     'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
@@ -44,6 +44,7 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;

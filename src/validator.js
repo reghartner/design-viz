@@ -310,6 +310,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   Object.keys(d.nodes).forEach(function(id){
     if (!placed[id]) warnings.push(DP + '.nodes.' + id + ': defined but not placed in rows or floats — it will not be drawn');
     var n = d.nodes[id] || {};
+    validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
     if (n.icon && ICON_SET.indexOf(n.icon) < 0) warnings.push(DP + '.nodes.' + id + '.icon: unknown icon "' + n.icon + '" — using "gear" (valid: ' + ICON_SET.join(' ') + ')');

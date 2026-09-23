@@ -1,5 +1,6 @@
 import type { AssociatedDiagram, SpecLoader } from './api/types';
 import { FlowviewCompatibility } from './generated/compatibility';
+import type { NativeViewerOptions } from './generated/nativeViewer';
 import { useInlineViewer } from './hooks/useInlineViewer';
 import type { ViewerTarget } from './viewer/protocol';
 export type { ViewerTarget } from './viewer/protocol';
@@ -8,10 +9,12 @@ export function InlineFlowview({
   diagram,
   loadSpec,
   target,
+  resolveDiagramLink,
 }: {
   diagram: AssociatedDiagram;
   loadSpec: SpecLoader;
   target?: ViewerTarget;
+  resolveDiagramLink?: NativeViewerOptions['resolveDiagramLink'];
 }) {
   const {
     state,
@@ -19,7 +22,7 @@ export function InlineFlowview({
     rendered,
     host,
     retry,
-  } = useInlineViewer(diagram, loadSpec, target);
+  } = useInlineViewer(diagram, loadSpec, target, resolveDiagramLink);
   const compatibility =
     state.spec === undefined
       ? undefined

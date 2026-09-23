@@ -23,6 +23,57 @@ function run(name,raw,...args){const before=JSON.stringify(raw),plan=B[name](JSO
 function validDetails(raw){const errors=[];B.validateDetails(B.normalize(raw),errors,[]);assert.deepEqual(errors,[]);}
 function sessionFor(initial){let text=initial,renders=0;const session=B.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){renders++;},persistence:{read:()=>({}),save(){}}});return {session,get text(){return text;},get renders(){return renders;}};}
 
+test('handoff assignment and removal preserve source documentation and unrelated bytes as single Undo/Redo actions',()=>{
+  const raw=fixture();parent(raw).nodes.domain.link='https://example.com/source';parent(raw).nodes.domain.codeRefs=[{file:'orders.ts',line:8}];
+  const text=' \n'+JSON.stringify(raw,null,3).replace('Domain map','Domain \\u006dap')+'\n ';
+  const value={spec:'orders-flow',revision:'abc123',section:'process',url:'https://example.com/orders#process'},before=JSON.stringify(raw),given=JSON.stringify(value);
+  const plan=B.planSetNodeHandoff(text,raw,0,'domain',value);assert.equal(plan.error,undefined);
+  assert.equal(JSON.stringify(raw),before);assert.equal(JSON.stringify(value),given);
+  const next=JSON.parse(plan.text),node=parent(next).nodes.domain;
+  assert.deepEqual(node,{...parent(raw).nodes.domain,handoff:value});
+  assert.ok(plan.text.startsWith(' \n'));assert.ok(plan.text.endsWith('\n '));assert.match(plan.text,/Domain \\u006dap/);
+  for(const path of [['page','blocks',1],['page','blocks',0,'diagram','nodes','other'],['page','blocks',0,'diagram','nodes','domain','link']]){
+    const a=B.jsonLocate(text,path),b=B.jsonLocate(plan.text,path);assert.equal(text.slice(a.start,a.end),plan.text.slice(b.start,b.end));
+  }
+  const h=sessionFor(text);assert.equal(h.session.accept(plan),true);assert.equal(h.renders,1);
+  assert.equal(h.session.undo(),true);assert.equal(h.text,text);assert.equal(h.session.canUndo(),false);
+  assert.equal(h.session.redo(),true);assert.equal(h.text,plan.text);
+  const removed=B.planSetNodeHandoff(plan.text,next,0,'domain',null);assert.equal(removed.error,undefined);
+  assert.deepEqual(parent(JSON.parse(removed.text)).nodes.domain,parent(raw).nodes.domain);
+  assert.equal(h.session.accept(removed),true);assert.equal(h.session.undo(),true);assert.equal(h.text,plan.text);
+  assert.equal(h.session.redo(),true);assert.equal(h.text,removed.text);
+});
+
+test('handoff authoring accepts URL-only or spec-only destinations and rejects invalid drafts atomically',()=>{
+  for(const value of [{url:'https://example.com/orders'},{spec:'orders-flow'},{spec:'orders-flow',revision:'v2',section:'process'}]){
+    const next=run('planSetNodeHandoff',fixture(),0,'domain',value).raw;
+    assert.deepEqual(parent(next).nodes.domain.handoff,value);
+  }
+  const raw=fixture(),text=JSON.stringify(raw),h=sessionFor(text);
+  for(const value of [{},[],true,{spec:''},{spec:' '},{spec:123},{revision:'v2'},{section:'process'},
+    {url:'https://example.com/orders',revision:'v2'},{url:'https://example.com/orders',section:'process'},
+    {url:'/orders'},{url:'//example.com/orders'},{url:'javascript:alert(1)'},{url:'https://user:pass@example.com/orders'},
+    {spec:'orders-flow',revision:''},{spec:'orders-flow',section:''}]){
+    const plan=B.planSetNodeHandoff(text,raw,0,'domain',value);assert.ok(plan.error,JSON.stringify(value));assert.equal(plan.text,undefined);
+    assert.equal(h.session.accept(plan),false);assert.equal(h.text,text);assert.equal(h.session.canUndo(),false);
+  }
+  assert.equal(JSON.stringify(raw),text);assert.equal(h.renders,0);
+  assert.match(B.planSetNodeHandoff(text,raw,0,'missing',{spec:'orders-flow'}).error,/node not found/);
+});
+
+test('handoffs and domain details require explicit removal before replacement in either direction',()=>{
+  const raw=linked(),text=JSON.stringify(raw),value={spec:'orders-flow'};
+  const conflict=B.planSetNodeHandoff(text,raw,0,'domain',value);assert.match(conflict.error,/Remove.*domain detail/);assert.equal(conflict.text,undefined);
+  const withoutDetail=run('planSetNodeDetail',raw,0,'domain',null).raw;
+  const assigned=run('planSetNodeHandoff',withoutDetail,0,'domain',value);
+  for(const plan of [B.planSetNodeDetail(assigned.plan.text,assigned.raw,0,'domain',detail()),B.planCreateNodeDetail(assigned.plan.text,assigned.raw,0,'domain')]){
+    assert.match(plan.error,/Remove.*diagram handoff/);assert.equal(plan.text,undefined);
+  }
+  const removed=run('planSetNodeHandoff',assigned.raw,0,'domain',null).raw;
+  assert.equal(run('planCreateNodeDetail',removed,0,'domain').raw.page.blocks.at(-1).id,'domain-detail');
+  assert.equal(JSON.stringify(raw),text);
+});
+
 test('creating a detail flow preserves exact unrelated source and is one Undo/Redo action',()=>{
   const raw=fixture(),text=' \n'+JSON.stringify(raw,null,3).replace('Domain map','Domain \\u006dap')+'\n ';
   const plan=B.planCreateNodeDetail(text,JSON.parse(text),0,'domain');assert.equal(plan.error,undefined);
@@ -162,7 +213,7 @@ test('duplicate section assigns a fresh stable ID; moves retain each numeric tar
 
 /* The inspector and interaction owners receive a tiny injected DOM. This
    exercises actual form events/session publication without loading a viewer. */
-function ui(){
+function ui(spec=fixture()){
   const doc={activeElement:null};
   function element(tag='div'){
     const attrs={},events={},el={tagName:tag.toUpperCase(),children:[],className:'',value:'',textContent:'',style:{},scrollTop:0,scrollLeft:0,
@@ -186,13 +237,13 @@ function ui(){
   for(const name of ['validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
     'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/inspector','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
   const guide=doc.body.appendChild(element()),view=doc.body.appendChild(element()),src=element('textarea'),win=element('window');
-  let text=JSON.stringify(fixture(),null,2),renders=0;
+  let text=JSON.stringify(spec,null,2),renders=0;
   const session=C.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){renders++;},persistence:{read:()=>({}),save(){}}});
   session.target={kind:'node',section:0,id:'domain'};
   const inspector=C.createBuilderInspector({document:doc,guide,session,schedule:()=>1,cancel(){},surface:{reveal(){},hideDiff(){},retire(){}},
     apply(plan,opt,snapshot){if(plan.error){inspector.error(plan.error);return false;}return session.accept(plan,{snapshot,afterRender(){if(opt && opt.after)opt.after(plan);}});},
     preview:{stepper:()=>null,targetElement:()=>null},selection:{rehighlight(){},range(){}},modes:{adding:()=>null,connecting:()=>null},clipboard:{current:()=>null}});
-  function field(label){const row=guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab').textContent===label);return row && row.querySelector('input,select,textarea');}
+  function field(label,scope=guide){const row=scope.querySelectorAll('.frow').find(row=>row.querySelector('.flab').textContent===label);return row && row.querySelector('input,select,textarea');}
   function button(label){return guide.querySelectorAll('button').find(button=>button.textContent===label);}
   return {C,doc,element,guide,view,src,win,session,inspector,field,button,get text(){return text;},get renders(){return renders;}};
 }
@@ -209,9 +260,50 @@ test('node inspector stages a complete local detail and applies it with one Undo
 
 test('external inspector fields save approved references and reject unsafe URLs',()=>{
   const h=ui();h.inspector.render();h.field('Detail target').value='Approved spec';h.field('Detail target').fire('change');
-  h.field('Approved spec ID').value='approved-orders';h.field('External section').value='order-flow';h.field('Revision (optional)').value='v2';h.field('Fallback URL (optional)').value='https://example.com/orders';
+  h.field('Approved spec ID').value='approved-orders';h.field('External section').value='order-flow';h.field('Revision (optional)',h.guide.querySelector('.node-detail-editor')).value='v2';h.field('Fallback URL (optional)').value='https://example.com/orders';
   h.button('Apply detail').fire('click');assert.deepEqual(parent(JSON.parse(h.text)).nodes.domain.detail,{mode:'link',section:'order-flow',spec:'approved-orders',revision:'v2',url:'https://example.com/orders'});
   const saved=h.text;h.field('Fallback URL (optional)').value='javascript:alert(1)';h.button('Apply detail').fire('click');assert.equal(h.text,saved);assert.match(h.guide.querySelector('.ierr').textContent,/URL/);
+});
+
+test('handoff inspector stages its destination fields, applies once and exposes an undoable removal',()=>{
+  const raw=fixture();parent(raw).nodes.domain.link='https://example.com/source';
+  const h=ui(raw),initial=h.text;h.inspector.render();
+  const fold=h.guide.querySelector('.node-handoff-editor'),field=label=>h.field(label,fold);
+  assert.equal(fold.querySelector('summary').textContent,'Diagram handoff');assert.equal(fold.open,false);
+  field('Destination URL').value=' https://example.com/orders ';field('Destination URL').fire('change');
+  field('Spec ID (optional)').value=' orders-flow ';field('Spec ID (optional)').fire('keydown',{key:'Enter'});
+  field('Revision (optional)').value=' v2 ';field('Section (optional)').value=' process ';
+  assert.equal(h.text,initial);assert.equal(h.renders,0);h.button('Apply handoff').fire('click');
+  const saved=h.text;assert.deepEqual(parent(JSON.parse(saved)).nodes.domain.handoff,{url:'https://example.com/orders',spec:'orders-flow',revision:'v2',section:'process'});
+  assert.equal(parent(JSON.parse(saved)).nodes.domain.link,'https://example.com/source');assert.equal(h.renders,1);
+  assert.equal(h.session.undo(),true);assert.equal(h.text,initial);assert.equal(h.session.canUndo(),false);
+  assert.equal(h.session.redo(),true);assert.equal(h.text,saved);h.session.target={kind:'node',section:0,id:'domain'};h.inspector.render();
+  assert.equal(h.guide.querySelector('.node-handoff-editor').open,true);assert.equal(h.button('Create detail flow'),undefined);
+  h.button('Remove handoff').fire('click');assert.deepEqual(parent(JSON.parse(h.text)).nodes.domain,parent(raw).nodes.domain);
+  assert.equal(h.session.undo(),true);assert.equal(h.text,saved);assert.equal(h.session.redo(),true);
+  assert.equal(parent(JSON.parse(h.text)).nodes.domain.handoff,undefined);
+});
+
+test('handoff inspector keeps invalid drafts and source intact with visible validation feedback',()=>{
+  const raw=fixture();parent(raw).nodes.domain.handoff={url:'https://example.com/old'};
+  const h=ui(raw),initial=h.text;h.inspector.render();
+  const fold=h.guide.querySelector('.node-handoff-editor'),field=label=>h.field(label,fold);
+  field('Destination URL').value='https://user:pass@example.com/orders';h.button('Apply handoff').fire('click');
+  assert.equal(h.text,initial);assert.match(h.guide.querySelector('.ierr').textContent,/URL/);
+  assert.equal(field('Destination URL').value,'https://user:pass@example.com/orders');assert.equal(h.renders,0);assert.equal(h.session.canUndo(),false);
+  field('Destination URL').value='https://example.com/orders';field('Section (optional)').value='process';h.button('Apply handoff').fire('click');
+  assert.equal(h.text,initial);assert.match(h.guide.querySelector('.ierr').textContent,/spec/i);assert.equal(h.session.canUndo(),false);
+});
+
+test('inspector conflict feedback preserves details until explicit removal and blocks applying details to handoffs',()=>{
+  const h=ui(linked()),initial=h.text;h.inspector.render();h.field('Destination URL').value='https://example.com/orders';h.button('Apply handoff').fire('click');
+  assert.equal(h.text,initial);assert.match(h.guide.querySelector('.ierr').textContent,/Remove.*domain detail/);assert.equal(h.session.canUndo(),false);
+  h.button('Remove detail').fire('click');h.inspector.render();h.field('Destination URL').value='https://example.com/orders';h.button('Apply handoff').fire('click');
+  const assigned=h.text;h.inspector.render();assert.equal(h.button('Create detail flow'),undefined);
+  h.field('Local section').value='inside';h.field('Local section').fire('change');h.button('Apply detail').fire('click');
+  assert.equal(h.text,assigned);assert.match(h.guide.querySelector('.ierr').textContent,/Remove.*diagram handoff/);
+  assert.equal(h.session.undo(),true);assert.equal(parent(JSON.parse(h.text)).nodes.domain.detail,undefined);
+  assert.equal(h.session.undo(),true);assert.equal(h.text,initial);assert.equal(h.session.canUndo(),false);
 });
 
 test('create action lands in the new section inspector, exposes stable ID/detail-only and undoes both edits',()=>{

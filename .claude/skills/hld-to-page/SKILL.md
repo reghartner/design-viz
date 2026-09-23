@@ -102,6 +102,7 @@ Do not copy its latency, topology, notification, or outcome without evidence.
 | Endpoints continuing in another diagram document | `cookbook/diagram-handoffs.md`; use `node.handoff`, distinct from focused `detail` and evidence `link` |
 | Shared happy/failure paths | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
 | Domain overview with focused internals, nested flows, or mapped child steps | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md`; use ordinary sections with stable IDs and `node.detail.mode:"focus"`; never inline expansion |
+| Extracting selected nodes from a branched or custom-layout flow | `docs/drilldowns.md#extract-an-independent-diagram`; preserve the overview story, create an independent destination with no inherited timeline; preview reference changes and download external destinations before applying |
 | Confirmed dropped or prevented communication | `docs/failed-communications.md` |
 | Physical home, outside grounds, doors | `cookbook/home-story.md` or `cookbook/outdoor-home.md` |
 | Sensing geometry, motion events, range or room presence | `cookbook/motion-detection.md` or `cookbook/radar-range.md`; use Radar with explicit `alert` transitions |

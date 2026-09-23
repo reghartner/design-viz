@@ -39,23 +39,54 @@ detail flow**. The workbench adds a detail-only section with a stable ID and
 one starter node, links it from the selected node in focus mode, and opens the
 new section inspector. One **Undo** restores the exact previous source.
 
-To extract an existing flow, Shift-click at least two nodes in the same
-section and choose **Create domain from selected nodes**. The selected nodes
-and internal edges move into a new detail-only section with their IDs intact.
-A new domain card replaces them in the overview; incoming and outgoing edges
-reconnect to that domain card. Affected parent steps activate the domain and
-map to child step copies, preserving internal failures, tones, packets, and
-code references. The whole extraction is one **Undo** action.
+## Extract an independent diagram
 
-Extraction supports ordinary rows and linear timelines with at most one
-distinct input node and one distinct output node. It refuses multiple boundary
-endpoints, panel declarations or patches, runtime conditions, alternate paths,
-authored layouts, routing or centerpiece settings, selected floats, and nodes
-that already have details. It also refuses selected nodes used as another
-detail's boundary ports, internal edge `revealAt`/`hideAt` windows, failures
-across the extraction boundary, and duplicate or invalid step IDs. The error
-explains the unsupported case and leaves the source unchanged. Use **Create
-detail flow** and assign references explicitly for those flows.
+Try the [branched doorbell extraction example](../examples/independent-extraction/README.md).
+
+Shift-click at least two nodes in the same section and choose **Create domain
+from selected nodes**. The preview offers **Local zoom** (a focused detail in
+this document) or **Separate document** (an arrow-shaped handoff to another
+spec or URL). Set its title and review the affected steps, connections and
+reference changes before **Apply extraction**. Cancel leaves the source alone;
+Apply is one **Undo** action.
+
+This is a graph extraction with an independent timeline. Selected nodes and
+internal edges move with their IDs, service bindings and node code references.
+The destination starts with no steps, alternate paths, panels or inherited
+playback state. Author its own steps afterward. Existing nested details keep
+their explicit entry points, but lose mappings from the old parent timeline.
+The overview keeps its steps, IDs, captions, alternate paths, code references,
+panel patches, runtime evidence and layout profiles. Opening the new domain
+does not select a child beat based on the parent's current step.
+
+Multiple boundary endpoints, branches, stacks, floats, custom layouts and lane
+routing are supported. The preview explains the mechanical changes:
+
+- Boundary edges reconnect to the new domain. If that would merge different
+  edges, interface nodes keep their protocols, packets and failures distinct.
+  Small connecting edges indicate structure; they do not invent delivered hops.
+- Parent steps involving moved internals highlight the domain. Internal failures
+  remain visible as conditions on that domain. Internal packet animations and
+  individual-node tone changes are removed, rather than guessed for the domain.
+- Panel source references, trace-match node references, conditions and incoming
+  legacy detail ports retarget to the domain. Panels remain in the overview.
+- Selected floats become ordinary child rows. Internal edges use automatic
+  routing without the parent's reveal/hide step windows. Parent lane rows remain
+  unstacked and split at five cards when interface nodes require more room.
+
+For **Separate document**, enter an approved spec ID or an absolute HTTP(S)
+URL. Revision and section selectors require a spec ID. **Download destination
+JSON** must succeed before Apply becomes available; changing the title or
+address requires a fresh download. The file is a complete page, including any
+local nested details needed by the moved nodes. Store it in the destination
+repository and register or publish it using your normal workflow. Extraction
+does not publish a file, create an approved revision or make a URL live.
+URL-only destinations open their supplied URL exactly, including any hash.
+
+Invalid source references and duplicate edges with identical endpoints must
+be resolved first. Errors leave the source unchanged. Changing source, project
+or selection retires a stale preview. Previously authored `detail.stepMap`
+relationships remain supported; extraction simply does not create them.
 
 Attach `detail` to the parent node:
 

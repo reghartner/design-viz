@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "A doorbell event crosses the notification boundary",
+    "skin": "pastel",
+    "sections": [{
+      "id": "doorbell",
+      "heading": "One event, independent delivery work",
+      "text": ["A fictional architecture: a doorbell event fans out into delivery work and audit evidence.", "To try extraction, Shift-click Push worker and Delivery audit in the workbench. Their destination will get its own timeline."],
+      "diagram": {
+        "nodes": {
+          "doorbell": {"title": "Doorbell", "icon": "chip", "tint": "dev"},
+          "bus": {"title": "Event bus", "icon": "antenna", "tint": "mqtt"},
+          "push": {"title": "Push worker", "icon": "server", "tint": "cmd"},
+          "audit": {"title": "Delivery audit", "icon": "db", "tint": "data"},
+          "phone": {"title": "Resident", "icon": "phone", "tint": "dev"}
+        },
+        "rows": [["doorbell", "bus", "push", "audit", "phone"]],
+        "routing": "lanes",
+        "edges": [
+          {"from": "doorbell", "to": "bus", "kind": "mqtt", "label": "event"},
+          {"from": "bus", "to": "push", "kind": "mqtt", "label": "job"},
+          {"from": "bus", "to": "audit", "kind": "int", "label": "event accepted"},
+          {"from": "push", "to": "audit", "kind": "https", "label": "try"},
+          {"from": "push", "to": "phone", "kind": "https", "label": "push"}
+        ],
+        "view": "step",
+        "autoplay": false,
+        "panels": [{"id": "jobs", "type": "queue", "initial": {"state": "empty"}}],
+        "sectionLayout": {"default": [{"x": 0, "y": 0, "w": 9, "h": 12}, {"panel": "jobs", "x": 9, "y": 0, "w": 3, "h": 12}]},
+        "steps": [
+          {"id": "press", "edge": "doorbell->bus", "text": "The event bus accepts the doorbell press."},
+          {"id": "fanout", "edges": ["bus->push", "bus->audit"], "text": "The delivery job and its accepted-event record reach separate consumers.", "panels": {"jobs": {"state": "enqueue", "label": "doorbell press"}}},
+          {"id": "attempt", "edge": "push->audit", "text": "The worker records a delivery attempt."},
+          {"id": "delivered", "edge": "push->phone", "text": "The resident receives the push notification.", "panels": {"jobs": {"state": "dequeue"}}},
+          {"id": "audit-down", "failures": {"push->audit": "blocked"}, "text": "Audit persistence is unavailable; the job remains queued for retry.", "conditions": [{"kind": "service-error", "nodeId": "audit", "label": "Audit persistence unavailable"}], "panels": {"jobs": {"state": "held"}}},
+          {"id": "push-lost", "failures": {"push->phone": "dropped"}, "text": "The delivery attempt was recorded, but the notification did not reach the phone.", "panels": {"jobs": {"state": "held"}}}
+        ],
+        "paths": [
+          {"id": "happy", "label": "Happy path", "steps": ["press", "fanout", "attempt", "delivered"]},
+          {"id": "audit-outage", "label": "Audit outage", "steps": ["press", "fanout", "audit-down"]},
+          {"id": "delivery-lost", "label": "Push lost", "steps": ["press", "fanout", "attempt", "push-lost"]}
+        ]
+      }
+    }]
+  }
+}

@@ -2,11 +2,11 @@
    read models remain shared leaves; source/history publication belongs to session. */
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
-  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null;
+  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
   var OPEN_PATCH_EDITORS=new Set(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
-  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();}
+  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
   var accentListId=prefix+'-accents',groupListId=prefix+'-groups';
   function parseEditor(){return session.snapshot();}
@@ -1315,6 +1315,123 @@ function tabForm(val, ctx){
     ];
   }
 
+function renderExtractionPreview(multiSel){
+    var snapshot=parseEditor();
+    if(snapshot.error){formError(snapshot.error);return;}
+    var selected=multiSel.map(function(t){return {kind:t.kind,section:t.section,id:t.id};});
+    var identity=multiIdentity(selected),previous=beginForm('extraction:'+identity),lifetime=formLife;
+    var draft=null,draftKey=null,downloadedKey=null,downloadReleases=[],stale=false;
+    var panel=document.createElement('div');panel.className='extraction-preview';guide.appendChild(panel);
+    var heading=document.createElement('h3');heading.textContent='Create an independent domain';panel.appendChild(heading);
+    function paragraph(text,cls){var p=document.createElement('p');p.className=cls || '';p.textContent=text;panel.appendChild(p);return p;}
+    paragraph('Move '+selected.length+' selected nodes into their own diagram. The child starts with no steps; author its sequence independently.','extraction-intro');
+    var form=document.createElement('div');form.className='iform';panel.appendChild(form);
+    function field(label,value,placeholder,container){
+      var input=document.createElement('input');input.type='text';input.className='fctl';input.value=value || '';
+      if(placeholder)input.placeholder=placeholder;
+      (container || form).appendChild(frow(label,input));listen(input,'input',updatePreview);listen(input,'change',updatePreview);return input;
+    }
+    var title=field('Domain title','New domain');
+    var mode=document.createElement('select');mode.className='fctl';
+    [['local','Local zoom'],['external','Separate document']].forEach(function(choice){
+      var option=document.createElement('option');option.value=choice[0];option.textContent=choice[1];mode.appendChild(option);
+    });
+    mode.value='local';form.appendChild(frow('Destination',mode));listen(mode,'change',updatePreview);
+    var destination=document.createElement('div');destination.className='extraction-destination';form.appendChild(destination);
+    var url=field('Destination URL','','https://example.com/flow',destination);
+    var spec=field('Spec ID','','Optional when a URL is supplied',destination);
+    var revision=field('Revision','','Optional with a spec ID',destination);
+    var section=field('Section ID','','With a spec ID; leave empty to generate',destination);
+    var destinationHelp=document.createElement('p');destinationHelp.className='extraction-help';
+    destinationHelp.textContent='Provide a URL or an approved spec ID. Revision and section ID require a spec ID, which needs a host resolver. Download this JSON, then save or publish it at that destination. Apply adds the parent handoff; it does not publish the child.';
+    destination.appendChild(destinationHelp);
+    var localHelp=paragraph('Local zoom adds a focused detail section in this document. Parent playback does not drive the child.','extraction-help');
+    var error=document.createElement('div');error.className='gerr ierr';error.hidden=true;error.setAttribute('role','alert');panel.appendChild(error);
+    var report=document.createElement('section');report.className='extraction-report';report.setAttribute('aria-label','Extraction preview');panel.appendChild(report);
+    var status=paragraph('','extraction-status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+    var actions=document.createElement('div');actions.className='iacts extraction-actions';panel.appendChild(actions);
+    var download=actionButton('Download destination JSON',function(){
+      if(!ready())return;
+      if(!opts.download){showError('Download is unavailable in this editor. The source is unchanged.');return;}
+      try{
+        var release=opts.download(specFileName(draft.plan.childSpec),draft.childText,'application/json');
+        if(typeof release!=='function')throw new Error('The download could not be started.');
+        downloadReleases.push(release);downloadedKey=draftKey;apply.disabled=false;
+        status.textContent='Download requested. Save or publish this destination separately, then apply the parent handoff.';
+      }catch(ex){showError('Download failed: '+(ex.message || String(ex)));}
+    });
+    actions.appendChild(download);
+    var apply=actionButton('Apply extraction',function(){
+      if(!ready())return;
+      if(mode.value==='external' && downloadedKey!==draftKey){showError('Download the current destination JSON before applying its handoff.');return;}
+      applyPlan(draft.plan,{after:function(plan){
+        if(opts.selection.clear)opts.selection.clear();
+        session.target={kind:'node',section:plan.section,id:plan.id};session.insertSection=plan.section;
+        rehighlight();renderInspector();
+      }},snapshot);
+    },'extraction-apply');
+    actions.appendChild(apply);
+    function cancel(){
+      var current=opts.selection.current?opts.selection.current():selected;
+      if(current && current.length>1)renderMultiInspector(current);
+      else if(session.target)renderInspector();else retire();
+    }
+    actions.appendChild(actionButton('Cancel',cancel));
+    listen(panel,'keydown',function(ev){if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();}});
+    function releaseDownloads(){downloadReleases.splice(0).forEach(function(release){release();});}
+    lifetime.own(releaseDownloads);
+    function showError(message){error.textContent=message || '';error.hidden=!message;}
+    function options(){
+      var out={title:title.value.trim(),mode:mode.value};
+      if(out.mode==='external'){
+        out.handoff={};[['url',url],['spec',spec],['revision',revision],['section',section]].forEach(function(pair){
+          var value=pair[1].value.trim();if(value)out.handoff[pair[0]]=value;
+        });
+      }
+      return out;
+    }
+    function current(){
+      var now=parseEditor(),targets=opts.selection.current?opts.selection.current():multiSel;
+      return !stale && lifetime.alive() && now.project===snapshot.project && now.text===snapshot.text && multiIdentity(targets || [])===identity;
+    }
+    function invalidate(){
+      stale=true;draft=null;downloadedKey=null;releaseDownloads();apply.disabled=true;download.disabled=true;
+      showError('Source or selection changed. Cancel this preview and select the nodes again.');status.textContent='';
+    }
+    invalidateExtraction=invalidate;
+    function ready(){
+      if(!current()){invalidate();return false;}
+      if(JSON.stringify(options())!==draftKey){updatePreview();showError('Settings changed. Review the updated preview before continuing.');return false;}
+      if(draft)showError('');return !!draft;
+    }
+    function reportList(label,items){
+      if(!items || !items.length)return;
+      var heading=document.createElement('h4');heading.textContent=label+' ('+items.length+')';report.appendChild(heading);
+      var list=document.createElement('ul');items.forEach(function(item){var li=document.createElement('li');li.textContent=item;list.appendChild(li);});report.appendChild(list);
+    }
+    function updatePreview(){
+      if(!current()){invalidate();return;}
+      var config=options(),key=JSON.stringify(config),external=config.mode==='external';
+      destination.hidden=!external;localHelp.hidden=external;download.hidden=!external;
+      if(key===draftKey)return;
+      releaseDownloads();downloadedKey=null;draftKey=key;draft=null;apply.disabled=true;download.disabled=true;status.textContent='';report.innerHTML='';
+      if(!config.title){showError('Give the domain a title.');return;}
+      var plan=planExtractIndependentDiagram(snapshot.text,snapshot.raw,selected[0].section,selected.map(function(t){return t.id;}),config);
+      if(plan.error){showError(plan.error);return;}
+      showError('');draft={plan:plan,childText:JSON.stringify(plan.childSpec,null,2)+'\n'};
+      var summary=document.createElement('p');summary.className='extraction-summary';
+      summary.textContent=plan.report.movedNodes+' nodes · '+plan.report.internalEdges+' internal '+(plan.report.internalEdges===1?'edge':'edges')+' · 0 child steps';report.appendChild(summary);
+      var location=document.createElement('p');location.className='extraction-help';location.textContent='Destination section: '+plan.sectionId;report.appendChild(location);
+      reportList('Affected parent steps',plan.report.affectedSteps);
+      reportList('Boundary links',plan.report.boundaryEdges);
+      reportList('References',plan.report.references);
+      reportList('Changes to review',plan.report.notes);
+      download.disabled=false;apply.disabled=external;
+      status.textContent=external?'Download the destination before replacing the selected nodes with a handoff.':'Ready to apply. This creates one Undo action.';
+    }
+    updatePreview();finishForm(previous);title.focus({preventScroll:true});
+  }
+
 function renderMultiInspector(multiSel){
     if(disposed)return;
     cancelRefresh();
@@ -1388,12 +1505,7 @@ function renderMultiInspector(multiSel){
         if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
           formError('Choose nodes from a single section to create a domain.');return;
         }
-        commitGroup(function(raw){return planExtractNodeDetail(session.text(),raw,multiSel[0].section,multiSel.map(function(t){return t.id;}));},
-          {after:function(plan){
-            if(opts.selection.clear)opts.selection.clear();
-            session.target={kind:'node',section:plan.section,id:plan.id};session.insertSection=plan.section;
-            rehighlight();renderInspector();
-          }});
+        renderExtractionPreview(multiSel);
       }));
       acts.appendChild(actionButton('stack together', function(){
         var secs = {};
@@ -1640,7 +1752,7 @@ function renderInspector(){
 
   return {
     render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
-    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();},
+    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();},
     message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},

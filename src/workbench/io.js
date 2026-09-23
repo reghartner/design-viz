@@ -120,6 +120,7 @@ function createBuilderIO(opts){
     catch(ex){releaseUrl(url);throw ex;}
     finally{a.remove();}
     if(urls.has(url))urls.set(url,browser.schedule(function(){releaseUrl(url);},1000));
+    return function(){releaseUrl(url);};
   }
   async function writeIntoDirectory(dir,name,contents,run){
     if(!exportCurrent(run))return false;
@@ -426,6 +427,7 @@ function createBuilderIO(opts){
 
 
   return {
+    download:downloadTextFile,
     retireProject:retireProject,
     destroy:function(){
       if(disposed)return;retireProject();disposed=true;clearListeners();

@@ -34,6 +34,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | security monitoring, alarm verification, emergency dispatch, responder assignment or arrival | [security-response.md](security-response.md) — independent assessment and response with alternate outcomes |
 | a detailed engineering flow and rich business-user story sharing every step and alternate | [two-perspectives.md](two-perspectives.md) — annotated source, storyboard and complete seed |
 | outdoor cameras/sensors around a house, a porch/entry split, or doors in walls | [outdoor-home.md](outdoor-home.md) |
+| two-way conversation, operator talk-down, device sounds, chimes, sirens, sound detection or audio failures | [audio-storytelling.md](audio-storytelling.md) — shared endpoint audio and the complete Sound at the door seed |
 | a color camera clip, doorbell runners, or recording before the visible event | [camera-events.md](camera-events.md) |
 | database/cache/payload state, decision gates, or resource limits | `software-state.md` |
 | retry attempts, backoff, deadline admission, or circuit recovery | `retries-and-circuits.md` |

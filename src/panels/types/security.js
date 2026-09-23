@@ -6,14 +6,26 @@
   var alarms = ['unknown', 'clear', 'triggered', 'acknowledged'];
   var kinds = ['door', 'motion', 'camera', 'smoke', 'water', 'lock', 'sensor'];
   var videoStates = ['closed', 'opening', 'reviewing', 'unavailable'];
-  var fields = {video:videoStates, scene:SCENE_NAMES, scenePlayback:['waiting','playing'], videoReason:'text', status:statuses, operator:'text', incident:'text', assessment:assessments, detail:'text', note:'text'};
+  var fields = {video:videoStates, scene:SCENE_NAMES, scenePlayback:['waiting','playing'], videoReason:'text', spotlight:SCREEN_SPOTLIGHTS, audio:'text', status:statuses, operator:'text', incident:'text', assessment:assessments, detail:'text', note:'text'};
   var sensorFields = {health:health, alarm:alarms, detail:'text'};
   var labels = {unknown:'Status unknown', disarmed:'Disarmed', armed:'Monitoring', alarm:'Alarm received',
     reviewing:'Operator reviewing', verified:'Incident verified', cleared:'All clear', offline:'Monitoring offline'};
   var assessmentLabels = {unverified:'Unverified', reviewing:'Under review', verified:'Verified', 'false-alarm':'False alarm'};
   function items(panel) { return panelOperationalItems(panel, 'sensors', 12, fields); }
   function clean(panel, raw, path, warnings, once) {
-    return panelOperationalSnapshot(raw, fields, items(panel), sensorFields, path, warnings, once);
+    if (!panelObject(raw)) return panelOperationalSnapshot(raw, fields, items(panel), sensorFields, path, warnings, once);
+    var base = Object.assign({}, raw);
+    delete base.audio; delete base.enterOnce;
+    var out = panelOperationalSnapshot(base, fields, items(panel), sensorFields, path, warnings, false);
+    if (panelOwn(raw, 'audio')) {
+      var audio = FlowAudio.clean(raw.audio, path + '.audio', warnings);
+      if (audio !== undefined) out.audio = audio;
+    }
+    if (once && panelOwn(raw, 'enterOnce')) {
+      if (panelObject(raw.enterOnce)) out.enterOnce = clean(panel, raw.enterOnce, path + '.enterOnce', warnings, false);
+      else if (warnings) warnings.push(path + '.enterOnce: expected a state object — ignored');
+    } else if (panelOwn(raw, 'enterOnce') && warnings) warnings.push(path + '.enterOnce: unknown field or declared item ID — ignored');
+    return out;
   }
   function text(value) { return typeof value === 'string' ? value : ''; }
   function icon(kind) {
@@ -36,7 +48,27 @@
     if (SCENE_NAMES.indexOf(scene) < 0) scene = 'static-noise';
     var modes = {closed:'off', opening:'boot', reviewing:'active', unavailable:'unavailable'};
     return {video:video, panel:{scene:scene}, state:{mode:modes[video], scenePlayback:state.scenePlayback,
-      reason:state.videoReason || 'The operator cannot reach this camera.'}};
+      spotlight:state.spotlight, reason:state.videoReason || 'The operator cannot reach this camera.'}};
+  }
+  function audioClass(audio) {
+    var model = FlowAudio.model(audio);
+    return (FlowAudio.isCapturing(audio) ? ' secmon-audio-speaking' : '') +
+      (FlowAudio.isEmitting(audio) ? ' secmon-audio-listening' : '') +
+      (model.microphone === 'muted' ? ' secmon-audio-muted' : '') +
+      (model.microphone === 'unavailable' ? ' secmon-audio-mic-unavailable' : '') +
+      (model.microphone === 'unavailable' || model.playback === 'failed' || model.connection === 'interrupted' ? ' secmon-audio-failed' : '');
+  }
+  function operatorAudio(audio) {
+    var strip = FlowAudio.render(audio, {label:'Operator headset'});
+    if (!strip) return '';
+    var speaking = FlowAudio.isCapturing(audio), hearing = FlowAudio.isEmitting(audio);
+    var model = FlowAudio.model(audio), action = speaking && hearing ? 'Speaking and hearing remote audio' :
+      speaking ? 'Operator speaking to camera' : hearing ? 'Operator hearing remote audio' :
+      model.microphone === 'muted' ? 'Operator microphone muted' :
+      model.microphone === 'unavailable' ? 'Operator microphone unavailable' :
+      model.connection === 'interrupted' || model.playback === 'failed' ? 'Headset audio interrupted' :
+      model.microphone === 'listening' ? 'Operator microphone ready' : 'Operator audio';
+    return '<div class="secmon-audio"><div class="secmon-audio-action"><span class="secmon-audio-dot" aria-hidden="true"></span>' + action + '</div>' + strip + '</div>';
   }
   function operatorArtwork() {
     return '<svg class="secmon-operator-figure" viewBox="0 0 170 214" aria-hidden="true">' +
@@ -53,18 +85,22 @@
       '<path d="M56 76V95Q64 101 73 94L70 73" fill="#BC896F"/>' +
       '<path d="M43 49Q45 26 68 30Q86 33 84 49L88 61L84 66V78Q80 90 68 86L51 77Z" fill="#E5B797"/>' +
       '<path d="M42 63Q32 58 37 41Q44 17 67 24Q82 20 89 39L83 50L73 41Q62 51 49 49L48 68Z" fill="#26364B"/>' +
-      '<circle cx="77" cy="58" r="2" fill="#26364B"/><path d="M79 75H84" stroke="#8E5B51" stroke-width="2" stroke-linecap="round"/>' +
+      '<circle cx="77" cy="58" r="2" fill="#26364B"/><ellipse class="secmon-mouth" cx="81" cy="75" rx="3" ry="1" fill="#8E5B51"/>' +
       '<path d="M40 57V43Q43 21 63 24Q84 25 85 45" fill="none" stroke="#9EDDEC" stroke-width="5"/>' +
-      '<rect x="38" y="49" width="12" height="25" rx="6" fill="#243C55" stroke="#ACDDE7" stroke-width="3"/>' +
+      '<rect class="secmon-headset-ear" x="38" y="49" width="12" height="25" rx="6" fill="#243C55" stroke="#ACDDE7" stroke-width="3"/>' +
       '<path d="M47 68Q59 81 80 80" fill="none" stroke="#ABDCE5" stroke-width="3" stroke-linecap="round"/>' +
       '<rect x="77" y="76" width="9" height="6" rx="3" fill="#D8F6EE"/>' +
+      '<circle class="secmon-mic-led" cx="82" cy="79" r="2" fill="#536F82"/>' +
+      '<g class="secmon-speech-waves" fill="none" stroke="#B6FFE7" stroke-width="2.6" stroke-linecap="round"><path d="M96 68Q103 76 96 84"/><path d="M105 62Q116 76 105 90"/><path d="M115 56Q130 76 115 96"/></g>' +
+      '<g class="secmon-listen-waves" fill="none" stroke="#9CDBFF" stroke-width="2.6" stroke-linecap="round"><path d="M30 48Q22 61 30 73"/><path d="M21 41Q9 61 21 81"/></g>' +
+      '<path class="secmon-mic-slash" d="M73 71L91 87" stroke="#FFB8AA" stroke-width="3" stroke-linecap="round"/>' +
       '<g class="secmon-control-arm"><path d="M67 106L83 137L122 129" fill="none" stroke="#3F91A5" stroke-width="16" stroke-linecap="round"/>' +
       '<path d="M117 130L133 129" stroke="#E5B797" stroke-width="10" stroke-linecap="round"/>' +
       '<path d="M132 123L137 127L148 128" fill="none" stroke="#E5B797" stroke-width="4" stroke-linecap="round"/></g>' +
       '</svg>';
   }
   function stageHTML(panel, state, model) {
-    return '<div class="secmon-stage secmon-review-' + model.video + '">' +
+    return '<div class="secmon-stage secmon-review-' + model.video + audioClass(state.audio) + '">' +
       '<div class="secmon-stage-top"><span>Monitoring desk</span><span class="secmon-room-signal"><i></i>SIMULATED VIDEO</span></div>' +
       '<div class="secmon-workstation"><div class="secmon-room-grid" aria-hidden="true"></div>' +
       '<div class="secmon-monitor"><div class="secmon-monitor-title"><i aria-hidden="true"></i><span class="secmon-feed-label">' + esc(text(panel.videoLabel) || 'Incident camera') + '</span></div>' +
@@ -72,7 +108,8 @@
       '<div class="secmon-monitor-footer" aria-hidden="true"><span></span><i></i><i></i><i></i></div><div class="secmon-monitor-stand" aria-hidden="true"></div></div>' +
       '<div class="secmon-desk" aria-hidden="true"><span></span></div>' + operatorArtwork() +
       '<div class="secmon-desk-mouse" aria-hidden="true"></div></div>' +
-      '<div class="secmon-review-caption"><span class="secmon-review-indicator" aria-hidden="true"></span><strong>' + reviewLabel(model.video) + '</strong><span class="secmon-review-clip">' + esc(clipLabel(model)) + '</span></div></div>';
+      '<div class="secmon-review-caption"><span class="secmon-review-indicator" aria-hidden="true"></span><strong>' + reviewLabel(model.video) + '</strong><span class="secmon-review-clip">' + esc(clipLabel(model)) + '</span></div>' +
+      '<div class="secmon-audio-slot">' + operatorAudio(state.audio) + '</div></div>';
   }
   function reviewLabel(video) {
     return {closed:'Ready for review', opening:'Opening camera…', reviewing:'Reviewing footage', unavailable:'Video connection lost'}[video];
@@ -115,7 +152,7 @@
       '<details class="secmon-sensor-details"><summary>Sensor detail <span>' + sensorList.length + ' sources · ' + triggered + ' alarms</span></summary>' +
       '<ul class="secmon-sensors" aria-label="Monitored sensors">' + rows + '</ul>' +
       (!sensorList.length ? '<div class="swempty">No sensors configured</div>' : '') + '</details>';
-    var model = videoModel(panel, state), note = state.note ? '<div class="swnote">' + esc(state.note) + '</div>' : '';
+    var model = videoModel(panel, state), note = state.note ? '<div class="swnote">' + esc(state.note) + '</div>' : '', audio = operatorAudio(state.audio);
     var h = '<div class="secmon secmon-' + status + '"><div class="secmon-hero-slot">' + hero + '</div>' + stageHTML(panel, state, model) +
       '<div class="secmon-facts">' + facts + '</div><div class="secmon-note">' + note + '</div></div>';
     function updateFrame(videoHost) {
@@ -133,7 +170,8 @@
         var root = host.querySelector('.secmon'), stage = host.querySelector('.secmon-stage'), videoHost = host.querySelector('.secmon-video');
         if (!root || !stage || !videoHost || host._secmonHero == null) return false;
         root.className = 'secmon secmon-' + status;
-        stage.className = 'secmon-stage secmon-review-' + model.video;
+        stage.className = 'secmon-stage secmon-review-' + model.video + audioClass(state.audio);
+        if (host._secmonAudio !== audio) host.querySelector('.secmon-audio-slot').innerHTML = audio;
         if (host._secmonHero !== hero) host.querySelector('.secmon-hero-slot').innerHTML = hero;
         if (host._secmonFacts !== facts) {
           var details = host.querySelector('.secmon-sensor-details'), wasOpen = details && details.open;
@@ -148,7 +186,7 @@
         return true;
       },
       mounted:function () {
-        host._secmonHero = hero; host._secmonFacts = facts; host._secmonNote = note;
+        host._secmonHero = hero; host._secmonFacts = facts; host._secmonNote = note; host._secmonAudio = audio;
         var videoHost = host.querySelector('.secmon-video');
         if (videoHost && videoHost._lastHTML == null) {
           var frame = screenFramePresentation(videoHost, model.panel, model.state);
@@ -181,7 +219,7 @@
         initial:{status:'armed',operator:'Monitoring team',assessment:'unverified',video:'closed',scenePlayback:'waiting',
           frontDoor:{health:'online',alarm:'clear'},doorbell:{health:'online',alarm:'clear'},hall:{health:'online',alarm:'clear'}}},
       setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'zone'}],max:12}],['initial','json']],
-      patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
+      patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('security').authoring.patchFields.concat(items(panel).map(function (sensor) {
           return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']]];
@@ -191,7 +229,7 @@
         return panelSanitizedOrigin(key, context, function (raw) { return clean(panel, raw, '', null, false); });
       },
       picker:{order:26,name:'Security monitoring',category:'Devices & interfaces',tagline:'From sensor signal to verified incident',
-        description:'An operator at a real monitoring desk opens and reviews the same animated camera clips as Camera Screen. Author the video, incident assessment and sensor facts independently.'},
+        description:'An operator reviews animated camera clips, speaks into a headset and hears remote audio. Author video, audio, spotlight, assessment and sensor facts independently.'},
       example:function (sample) {
         sample.state = {video:'reviewing',scenePlayback:'playing',status:'reviewing',operator:'Alex · monitoring specialist',incident:'Front door opened while armed',assessment:'reviewing',detail:'Reviewing doorbell footage before escalation.',
           frontDoor:{health:'online',alarm:'triggered',detail:'Contact opened · entry zone'},doorbell:{health:'online',alarm:'clear',detail:'Evidence available'},hall:{health:'online',alarm:'clear'}};
@@ -206,7 +244,7 @@
 .secmon-stage{margin:10px 0 0;border-radius:17px;background:linear-gradient(135deg,#1B3149,#263C58 58%,#1D3048);color:#D9E8F1;overflow:hidden;border:1px solid #3A536A;box-shadow:inset 0 1px 0 #5F778344;}
 .secmon-stage-top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 14px 0;font:600 9px/1.4 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.09em;color:#9EB8CC;}
 .secmon-room-signal{font-size:7px;letter-spacing:.04em;white-space:nowrap;display:flex;gap:5px;align-items:center;}.secmon-room-signal i{width:4px;height:4px;border-radius:50%;background:#76BBC5;}
-.secmon-workstation{position:relative;aspect-ratio:1.8;isolation:isolate;margin:0 8px;}
+.secmon-workstation{position:relative;aspect-ratio:1.55;isolation:isolate;overflow:hidden;margin:0 8px;}
 .secmon-room-grid{position:absolute;inset:5% 0 22%;opacity:.21;background:linear-gradient(90deg,transparent 49.5%,#91C3D4 50%,transparent 50.5%) 0 0/42px 100%,linear-gradient(transparent 49%,#91C3D4 50%,transparent 51%) 0 0/100% 36px;}
 .secmon-monitor{position:absolute;left:26%;top:8%;width:70%;border:4px solid #11253C;border-radius:9px;background:#11253C;box-shadow:0 5px 22px #08152077;box-sizing:border-box;}
 .secmon-monitor-title{display:flex;align-items:center;gap:5px;padding:4px 4px 7px;color:#C2D8E5;font:500 8px/1.3 'IBM Plex Sans',sans-serif;min-width:0;}.secmon-feed-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.secmon-monitor-title>i{width:4px;height:4px;flex:none;border-radius:50%;background:#7FC5B2;}
@@ -216,6 +254,15 @@
 .secmon-monitor-stand{position:absolute;z-index:-1;top:100%;left:43%;height:16%;width:17%;background:linear-gradient(90deg,#34516B,#678BA0,#34516B);clip-path:polygon(30% 0,70% 0,75% 77%,100% 84%,100% 100%,0 100%,0 84%,25% 77%);}
 .secmon-desk{position:absolute;z-index:1;left:4%;right:1%;height:7px;bottom:19%;border-radius:3px;background:#8CA2B4;box-shadow:0 4px 0 #173047;}.secmon-desk:before,.secmon-desk:after{content:'';position:absolute;top:7px;width:5px;height:39px;background:#456078;}.secmon-desk:before{left:12%;}.secmon-desk:after{right:12%;}.secmon-desk>span{position:absolute;width:21%;height:5px;bottom:7px;left:53%;border:1px solid #7490A5;transform:skewX(-22deg);background:repeating-linear-gradient(90deg,#435D77 0 6px,#7893A8 6px 7px);border-radius:2px;}
 .secmon-operator-figure{position:absolute;z-index:2;left:1%;bottom:0;width:37%;height:91%;overflow:visible;}.secmon-desk-mouse{position:absolute;z-index:1;width:3.5%;height:5px;left:33%;bottom:calc(19% + 7px);background:#C2D7DF;border-radius:80% 80% 20% 20%;}
+.secmon-speech-waves,.secmon-listen-waves,.secmon-mic-slash{display:none;}.secmon-mouth{transform-origin:81px 75px;}
+.secmon-audio-speaking .secmon-speech-waves,.secmon-audio-listening .secmon-listen-waves{display:block;}.secmon-audio-speaking .secmon-mouth{animation:secmon-speaking .34s ease-in-out infinite alternate;}.secmon-audio-speaking .secmon-mic-led{fill:#9FFFD6;filter:drop-shadow(0 0 3px #9FFFD6);}
+.secmon-speech-waves path,.secmon-listen-waves path{animation:secmon-audio-wave 1.4s ease-in-out infinite;}.secmon-speech-waves path:nth-child(2),.secmon-listen-waves path:nth-child(2){animation-delay:.2s;}.secmon-speech-waves path:nth-child(3){animation-delay:.4s;}
+.secmon-audio-muted .secmon-mic-slash,.secmon-audio-mic-unavailable .secmon-mic-slash{display:block;}.secmon-audio-muted .secmon-mic-led,.secmon-audio-mic-unavailable .secmon-mic-led{fill:#FFB8AA;}.secmon-audio-failed .secmon-headset-ear{stroke:#FFB8AA;}
+.secmon-audio-slot:empty{display:none;}.secmon-audio{padding:10px 12px 12px;border-top:1px solid #7593A633;background:#0D213855;--dink:#E5F4FA;--dtext:#BED4E1;--dfaint:#A5C0CF;}
+.secmon-audio-action{display:flex;align-items:center;gap:6px;margin-bottom:7px;color:#D2EAF3;font:600 10px/1.4 'IBM Plex Sans',sans-serif;}.secmon-audio-dot{width:5px;height:5px;border-radius:50%;background:#9CB8CA;}.secmon-audio-speaking .secmon-audio-dot{background:#9FFFD6;}.secmon-audio-listening .secmon-audio-action{color:#B9E4FF;}.secmon-audio-failed .secmon-audio-dot{background:#FFB8AA;}
+.secmon-video .screen-light-label{font-size:6px;right:4px;bottom:4px;padding:2px 4px;}
+@keyframes secmon-speaking{to{transform:scaleY(3);}}
+@keyframes secmon-audio-wave{0%,100%{opacity:.35;}45%{opacity:1;}}
 .secmon-review-caption{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:9px 13px 11px;background:#0D213888;border-top:1px solid #69859A22;}.secmon-review-caption strong{font:600 10px 'IBM Plex Sans',sans-serif;}.secmon-review-clip{font:400 9px 'IBM Plex Sans',sans-serif;color:#9EBBCC;margin-left:auto;}.secmon-review-indicator{width:5px;height:5px;flex:none;border-radius:50%;background:#8197AB;}
 .secmon-review-opening .secmon-review-indicator{background:#EAC481;animation:secmon-connect 1.6s ease-in-out infinite;}.secmon-review-reviewing .secmon-review-indicator{background:#8CDBBC;}.secmon-review-unavailable .secmon-review-indicator{background:#F2A3A5;}.secmon-review-unavailable .secmon-monitor-title>i{background:#F2A3A5;}.secmon-review-closed .secmon-monitor-title>i{background:#738997;}
 .secmon-control-arm{transform-origin:67px 106px;}.secmon-review-opening .secmon-control-arm{animation:secmon-console-reach .95s ease-out both;}.secmon-review-reviewing .secmon-monitor{box-shadow:0 5px 22px #08152077,0 0 30px #7DCAD615;}

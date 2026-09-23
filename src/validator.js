@@ -2,7 +2,7 @@
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
    IIFE. Contains no DOM access, so tests load it under Node via vm. */
 
-var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car'];
+var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car','speaker'];
 var TINT_SET = ['cmd','auth','data','mqtt','dev'];
 /* Per-step node state is semantic narrative state, never an authored color.
    `base` is the explicit clearing token; null clears too. */

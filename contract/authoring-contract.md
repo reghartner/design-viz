@@ -446,6 +446,38 @@ listed (gRPC, Kafka, NATS...), declare it in `page.protocols`, e.g.
 `"grpc": {"label": "gRPC", "color": "#7BD88F"}`, then use `"kind": "grpc"`
 on edges. Undeclared kinds fall back to `int` with a warning.
 
+### Shared audio and spotlight state
+
+Camera Screen, Security monitoring and Phone accept optional `initial.audio`
+and step `panels.<id>.audio`. Home map accepts `audio` inside each device or
+subject state object. The same shared contract renders sound at the endpoint;
+there is no audible playback, microphone access or live service connection.
+
+Audio fields: `connection` (`idle|connecting|connected|interrupted|ended`),
+`microphone` (`idle|listening|capturing|muted|unavailable`), `output`
+(`silent|speech|recorded|chime|siren`), `playback`
+(`playing|queued|suppressed|failed|stopped`), `detection`
+(`none|sound|smoke-alarm|co-alarm|glass-break`), plus plain-text `text`, `source`
+and `reason`. Omitted connection/microphone/detection are idle/idle/none.
+Output defaults to silent; an explicit non-silent output defaults to playing.
+Only playing output emits sound waves. Capturing and playback are independent;
+connection does not change either one. Alarm-sound classification is not a
+smoke or CO measurement.
+
+Audio objects replace the whole prior audio object; omitted audio carries,
+null/empty objects clear, wholly invalid objects warn and preserve prior facts.
+Screen/Security support transient `enterOnce.audio`; Phone supports that audio
+subfield without making notifications transient. Home preserves its own device
+and subject semantics. `spotlight` (`off|on|flash`) is independently available
+on Home camera device patches, Screen and Security; Security illuminates its
+embedded camera view. Existing recording and scenePlayback behavior is unchanged.
+The `speaker` icon is available for ordinary nodes and generic Home sensors.
+
+Read [the audio recipe](../cookbook/audio-storytelling.md) for endpoint direction,
+workbench editing, failure examples and the complete teaching seed. New exports
+advertise `media.audio` / `media.spotlight` so older installed renderers can warn
+about unsupported capabilities.
+
 ### panels — synchronized inspector widgets
 
 `"panels": [...]` at the diagram level declares inspector widgets rendered in

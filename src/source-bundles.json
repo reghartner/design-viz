@@ -10,6 +10,7 @@
     "core/geometry.js",
     "core/details.js",
     "panels/shared.js",
+    "panels/audio.js",
     "panels/types/*.js"
   ],
   "engine.js": [

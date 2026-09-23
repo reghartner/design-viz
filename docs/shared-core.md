@@ -108,3 +108,9 @@ the root Canon entity suite follows a real entity-index link through the shared
 core and native mount to a hidden alternate's original source step. Plugin
 unit tests stay self-contained so the documented standalone copy can verify
 without the upstream tools or fixtures.
+
+`src/core/contracts.js` owns legacy/plural contract enumeration, stable block
+references and allowed column spans. `src/viewer/contracts.js` renders their
+shared grid/card markup; `src/workbench/commands/contracts.js` owns source edits.
+The optional `ct` fragment parameter selects a block within `c`, while `r` stays
+local to that block. All three viewer entrypoints use these shared owners.

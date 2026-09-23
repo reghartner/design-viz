@@ -249,5 +249,36 @@ class PageBuildDiffPrevTests(unittest.TestCase):
         self.assertTrue(all("delta" not in row for row in copied_fields))
 
 
+class MultipleContractTests(unittest.TestCase):
+    def test_reorder_and_rename_pair_by_block_id_and_annotate_only_that_block(self):
+        old = {"page": {"blocks": [{"tabs": [{"label": "Wire", "sections": [{
+            "heading": "Event", "contract": {"fields": [{"k": "legacy", "v": "same"}]},
+            "contracts": [
+                {"id": "request", "title": "Payload", "fields": [{"k": "status", "v": "send"}]},
+                {"id": "response", "title": "Payload", "fields": [{"k": "status", "v": "accepted"}]}
+            ]}]}]}]}}
+        new = copy.deepcopy(old)
+        section = new["page"]["blocks"][0]["tabs"][0]["sections"][0]
+        section["contracts"].reverse()
+        section["contracts"][0]["title"] = "Response renamed"
+        section["contracts"][0]["fields"][0]["v"] = "rejected"
+        before = copy.deepcopy(new)
+        diff = spec_diff.compare_specs(old, new)
+        self.assertEqual([(c.kind, c.card_title, c.key) for c in diff.field_changes],
+                         [("changed", "Response renamed", "status")])
+        annotated = spec_diff.annotate_spec(old, new)["page"]["blocks"][0]["tabs"][0]["sections"][0]
+        self.assertEqual(annotated["contracts"][0]["fields"][0]["delta"], "changed")
+        self.assertNotIn("delta", annotated["contracts"][1]["fields"][0])
+        self.assertNotIn("delta", annotated["contract"]["fields"][0])
+        self.assertEqual(new, before)
+
+    def test_added_removed_blocks_and_bad_entries(self):
+        old = {"sections": [{"heading": "Wire", "contracts": [None, {"title": "Removed", "fields": [{"k": "old"}]}]}]}
+        new = {"sections": [{"heading": "Wire", "contracts": [{"title": "Added", "fields": [{"k": "new"}]}]}]}
+        changes = spec_diff.compare_specs(old, new).field_changes
+        self.assertEqual({(c.kind, c.key) for c in changes}, {("removed", "old"), ("added", "new")})
+        self.assertEqual(spec_diff.annotate_spec(old, new)["sections"][0]["contracts"][0]["fields"][0]["delta"], "added")
+
+
 if __name__ == "__main__":
     unittest.main()

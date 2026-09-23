@@ -3176,7 +3176,7 @@ test('contract card: renders k/v/gloss rows, hot emphasis, permalinks, escaping'
 
 test('contract card: addressed markup exposes a copy chip and focusable row anchors', () => {
   const h = C.contractCardHTML({fields: [{k: 'event/id'}, {k: 'ttl'}]}, 7);
-  assert.ok(h.includes('<div class="ctcard" id="contract-7">'), h);
+  assert.ok(h.includes('id="contract-7"') && h.includes('data-dv-contract="legacy"'), h);
   assert.ok(h.includes('class="copychip contractcopy"'), h);
   assert.ok(h.includes('class="copyglyph"'), 'chip carries the link glyph, not text: ' + h);
   assert.ok(!h.includes('copy link<'), 'no visible chip text: ' + h);

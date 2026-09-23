@@ -691,7 +691,10 @@ textarea.fctl{resize:vertical; min-height:44px;}
 /* builder: selection highlight on the rendered page (svg + widget cards) */
 .docview .grp, .docview .node, .docview .edge, .docview .halo, .docview .coin,
 .docview .pwidget, .docview .sec-text[data-dv-para],
-.docview .sec-bullets li[data-dv-bullet], .docview .ctrow{cursor:pointer;}
+.docview .sec-bullets li[data-dv-bullet], .docview .ctrow, .docview .cttitle{cursor:pointer;}
+.docview .ctcard.dv-sel{outline:2px dashed var(--accent);outline-offset:2px;}
+.contract-manager{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.contract-manager button{text-align:left;white-space:normal;overflow-wrap:anywhere;}
 .docview text.lbl{cursor:grab;}
 /* drag nudges labelDx/labelDy; click selects */
 /* the selection ring animates its dashes — nothing else on the page moves

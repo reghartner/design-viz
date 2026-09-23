@@ -129,7 +129,9 @@ One accent-colored bounding box on the page:
   collapsed; the heading, source chip, contract card, and diagram stay visible.
   Omit it for the expanded default. Viewers can still override either authored
   default, and copy links preserve that presentation choice.
-- `contract` — optional message-contract card (next subsection).
+- `contract` — optional legacy single message-contract card (next subsection).
+- `contracts` — optional ordered array of contract blocks, each with its own width.
+  If both forms are supplied, the legacy `contract` renders first; no card is discarded.
 - `diagram` — optional. A section may be prose-only, but usually carries one.
 - `detailOnly` — optional boolean. `true` hides the section from the initial
   reader view until opened as a detail. The section remains ordinary authored
@@ -212,6 +214,48 @@ flow moves:
   also hand-authorable. A row without `k` is skipped with a warning; a
   non-string `link` is ignored with a warning.
 - `note` — optional footer sentence.
+
+### Multiple contract blocks and widths
+
+Use `section.contracts` for multiple independent field tables. Each block has
+all the fields described above, plus optional `id` and `span`:
+
+```json
+"contracts": [
+  {"id":"request", "title":"Request", "span":6,
+   "fields":[{"k":"event_id", "v":"evt-123", "g":"Idempotency key"}]},
+  {"id":"response", "title":"Response", "span":6,
+   "fields":[{"k":"status", "v":"accepted", "g":"Durably queued"}]},
+  {"id":"failure", "title":"Failure contract", "span":12,
+   "fields":[{"k":"error", "v":"unavailable", "g":"Retry with the same key"}]}
+]
+```
+
+`span` is the width in a 12-column grid: **4 = third, 6 = half, 8 = two-thirds,
+12 = full**. Omitted or invalid widths use 12. Two `span:6` blocks share a row;
+full-width blocks stack. Blocks fill left-to-right in source order and wrap
+when they no longer fit. A block's height follows its content. At content widths
+of 720px or less, all blocks stack, including in ShadowRoot/Forge hosts.
+The legacy `contract` object can also use `span`.
+
+Use stable IDs for links: an ASCII letter followed by letters, digits,
+underscores or hyphens, unique in the section; `legacy` is reserved. Without an
+ID, links use the block's 1-based position in `contracts`. Duplicate/invalid
+IDs fall back to positions and warn. Copy links add `ct=<id-or-position>` after
+`c=<section-ref>`; `r` remains a 1-based rendered row **inside that block**.
+Omitting `ct` retains the existing first-card behavior.
+
+In the workbench, use **Add to diagram → Contracts & page structure → Add
+contract block**, or select the section and use **+ Add contract block**.
+Click a block heading or note to set its width, title, source and note; click a
+row to edit its fields. The block inspector adds fields, duplicates, reorders,
+and deletes blocks. Reordering explicitly migrates a legacy single card into
+`contracts`; appending leaves its original JSON intact. These are undoable.
+
+See [contract block recipe](../docs/contract-blocks.md) and the
+[doorbell example](../examples/contract-blocks/contract-blocks.spec.json).
+The compatibility capability is `content.contracts`; rebuild existing HTML
+and upgrade the packaged viewer to use it. No schema-major change is needed.
 
 ### fragment-level reveals
 
@@ -1364,7 +1408,7 @@ You do not author these, but they shape what ids are worth writing:
   - `d=<section-ref>&m=<ambient|step>[&p=<path-id>][&s=<step-id-or-1-based-number>]` selects
     any stepped diagram, opens its containing tab, and restores its mode and
     folded step state. `p` chooses a declared path; absent `p` uses the default.
-  - `c=<section-ref>[&r=<1-based-rendered-field-row>]` targets a message-contract
+  - `c=<section-ref>[&ct=<contract-id-or-position>][&r=<1-based-rendered-field-row>]` targets a message-contract
     card and optionally focuses and highlights one rendered row. It does not
     reset diagram mode or step state.
   - `x=<section-ref>[,<section-ref>...]` forces those sections' prose collapsed;

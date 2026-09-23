@@ -4,6 +4,7 @@
     "validator.js",
     "core/navigation.js",
     "core/document.js",
+    "core/contracts.js",
     "core/paths.js",
     "core/section-layout.js",
     "core/state.js",
@@ -16,6 +17,7 @@
   ],
   "engine.js": [
     "viewer/prose.js",
+    "viewer/contracts.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",
@@ -27,6 +29,7 @@
     "workbench/commands/common.js",
     "workbench/commands/graph.js",
     "workbench/commands/document.js",
+    "workbench/commands/contracts.js",
     "workbench/commands/extraction.js",
     "workbench/commands/narrative.js",
     "workbench/commands/layout.js",

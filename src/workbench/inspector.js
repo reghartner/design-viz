@@ -21,11 +21,11 @@ function createBuilderInspector(opts){
   function clipboard(){return disposed?null:opts.clipboard.current();}
   function targetIdentity(){
     var t=session.target;
-    return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.block,t.tab,t.pathId]):null;
+    return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.card,t.block,t.tab,t.pathId]):null;
   }
   function multiIdentity(targets){
     return JSON.stringify([session.snapshot().project,targets.map(function(t){
-      return JSON.stringify([t.kind,t.section,t.id,t.index,t.block,t.tab,t.pathId]);
+      return JSON.stringify([t.kind,t.section,t.id,t.index,t.card,t.block,t.tab,t.pathId]);
     }).sort()]);
   }
   function beginForm(identity){
@@ -1234,12 +1234,47 @@ function panelForm(val, ctx){
     return rows.concat(panelSetupRows(val));
   }
 
+function selectContract(section,card,kind,index){
+    var t={section:section,kind:kind || 'contract',card:card,index:index};
+    selectTarget(Object.assign(t,{el:findTargetEl(t)}),false);
+  }
+function addContract(section,copy){
+    return commitCascade(function(raw){return planAddContract(session.text(),raw,section,copy);},
+      {after:function(plan){selectContract(section,plan.card);}});
+  }
+function contractManager(section,val){
+    var list=document.createElement('div');list.className='contract-manager';
+    sectionContracts(val).forEach(function(rec){
+      var width={4:'⅓',6:'½',8:'⅔',12:'full'}[contractColumnSpan(rec.value.span)];
+      list.appendChild(actionButton((rec.value.title || 'On the wire')+' · '+width+' width',function(){selectContract(section,rec.key);}));
+    });
+    list.appendChild(actionButton('+ Add contract block',function(){addContract(section);}));
+    return list;
+  }
+function contractForm(val,ctx){
+    var t=session.target,widths={'Full width':12,'Half width':6,'Third width':4,'Two-thirds width':8};
+    var selected=Object.keys(widths).find(function(label){return widths[label]===contractColumnSpan(val.span);});
+    var widthControl=selectControl(Object.keys(widths),selected,function(v){return commitSimple('span',String(widths[v]));});
+    widthControl.setAttribute('aria-label','Contract block width');
+    return [
+      frow('title',textControl(val.title,function(v){return commitSimple('title',v==null?null:JSON.stringify(v));})),
+      frow('Width',widthControl),
+      frow('source',textControl(val.source,function(v){return commitSimple('source',v==null?null:JSON.stringify(v));},{placeholder:'permalink URL'})),
+      frow('note',textControl(val.note,function(v){return commitSimple('note',v==null?null:JSON.stringify(v));},{textarea:true})),
+      frowBlock('Fields',actionButton('+ Add field',function(){
+        commitCascade(function(raw){return planAddContractField(session.text(),raw,t);},
+          {after:function(plan){selectContract(t.section,t.card,'crow',plan.index);}});
+      })),
+      frowBlock('Section',actionButton('All contract blocks',function(){selectTarget({kind:'section',section:t.section,el:findTargetEl({kind:'section',section:t.section})},false);}))
+    ];
+  }
 function sectionForm(val, ctx){
     ensureAccentDatalist();
     var target=session.target;
     function identity(key,value){return commitCascade(function(raw){return planSetSectionIdentity(session.text(),raw,target.section,key,value);});}
     return [
       frow('heading', textControl(val.heading, function(v){ return identity('heading',v); })),
+      frowBlock('Contract blocks',contractManager(target.section,val)),
       frow('Stable section ID',textControl(val.id,function(v){return identity('id',v);},{placeholder:'optional stable-section-id'})),
       frow('Detail only',checkboxControl(val.detailOnly,function(on){return commitSimple('detailOnly',on?'true':null);})),
       frow('accent', textControl(val.accent, function(v){ return commitSimple('accent', v == null ? null : JSON.stringify(v)); },
@@ -1274,7 +1309,9 @@ function paraForm(val, ctx){
   }
 
 function crowForm(val, ctx){
+    var target=session.target;
     return [
+      frowBlock('Block',actionButton('Edit contract block',function(){selectContract(target.section,target.card);})),
       frow('k', textControl(val.k, function(v){
         if (v == null){ formError('a contract row needs k — the field name'); return false; }
         return commitSimple('k', JSON.stringify(v));
@@ -1605,6 +1642,7 @@ function renderInspector(){
         t.kind === 'bullet' ? bulletForm(val, ctx) :
         t.kind === 'para' ? paraForm(val, ctx) :
         t.kind === 'crow' ? crowForm(val, ctx) :
+        t.kind === 'contract' ? contractForm(val,ctx) :
         t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);
       rows.forEach(function(r){ form.appendChild(r); });
       guide.appendChild(form);
@@ -1631,6 +1669,17 @@ function renderInspector(){
               renderInspector();
             }});
         }));
+      }
+      if(t.kind==='contract'){
+        acts.appendChild(actionButton('Duplicate block',function(){addContract(t.section,val);}));
+        var contracts=sectionContracts(specValueAt(parsed.raw,rec.section)),ci=contracts.findIndex(function(c){return c.key===(t.card==null?'legacy':String(t.card));});
+        [-1,1].forEach(function(delta){
+          var move=actionButton(delta<0?'↑ Move earlier':'↓ Move later',function(){
+            commitCascade(function(raw){return planMoveContract(session.text(),raw,t,delta);},
+              {after:function(plan){selectContract(t.section,plan.card);}});
+          });
+          move.disabled=ci+delta<0 || ci+delta>=contracts.length;acts.appendChild(move);
+        });
       }
       if (t.kind === 'section'){
         acts.appendChild(actionButton('duplicate', function(){
@@ -1709,7 +1758,7 @@ function renderInspector(){
         }));
       }
       if (!armedHere)
-        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : 'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
+        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       guide.appendChild(acts);
     }
 

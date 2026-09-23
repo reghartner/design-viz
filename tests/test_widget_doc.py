@@ -73,11 +73,15 @@ class WidgetDocTest(unittest.TestCase):
         p = run("--contract-card")
         self.assertEqual(p.returncode, 0, p.stderr)
         contract = CONTRACT.read_text()
-        start = contract.index("### message-contract card")
-        ends = [contract.find(m, start + 1) for m in ("\n### ", "\n## ")]
-        end = min(e for e in ends if e != -1)
-        expected = contract[start:end].rstrip()
+        def section(heading):
+            start = contract.index(heading)
+            ends = [contract.find(m, start + 1) for m in ("\n### ", "\n## ")]
+            end = min(e for e in ends if e != -1)
+            return contract[start:end]
+        expected = (section("### message-contract card") + "\n\n" +
+                    section("### Multiple contract blocks and widths")).rstrip()
         self.assertEqual(p.stdout.rstrip(), expected)
+        self.assertIn('"span":6', p.stdout)
 
     def test_unknown_type_fails_with_valid_list(self):
         p = run("nope")

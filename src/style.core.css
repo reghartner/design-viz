@@ -477,7 +477,16 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
    empty) so a longer or shorter reason cannot change the panel height */
 /* @panel-style-order:1064 */
 /* message-contract card: "on the wire" field table under a section's prose */
-.ctcard{margin:10px 0 8px; border-radius:10px; padding:10px 12px 11px;}
+.contract-region{container-type:inline-size; margin:10px 0 8px; min-width:0;}
+.contract-grid{display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:12px; align-items:start;}
+.ctcard{margin:10px 0 8px; border-radius:10px; padding:10px 12px 11px; min-width:0;}
+.contract-grid>.ctcard{margin:0; grid-column:span var(--contract-span,12); overflow-wrap:anywhere;}
+.contract-grid .cttable{table-layout:fixed;}
+.contract-grid .ctk{width:24%; white-space:normal; overflow-wrap:anywhere;}
+.contract-grid .ctv{width:26%; white-space:normal; overflow-wrap:anywhere;}
+.cttitle>span{min-width:0; overflow-wrap:anywhere;}
+@container (max-width:720px){.contract-grid>.ctcard{grid-column:1/-1;}}
+@media print{.ctcard{break-inside:avoid;}}
 .sk-aurora .ctcard{background:#0B1220; border:1px solid #25364F;}
 .sk-daylight .ctcard{background:#FFFFFF; border:1px solid #E0DCD1;}
 .cttitle{display:flex; align-items:center; justify-content:space-between; gap:10px;

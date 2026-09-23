@@ -15,6 +15,11 @@ function builderPositionLine(raw, target){
     }
     return 'step ' + (target.index + 1) + ' of ' + d.steps.length;
   }
+  if(target.kind==='contract'){
+    var cr=specSectionPaths(raw)[target.section],blocks=cr?sectionContracts(specValueAt(raw,cr.section)):[];
+    var index=blocks.findIndex(function(c){return c.key===(target.card==null?'legacy':String(target.card));});
+    return index<0?null:'block '+(index+1)+' of '+blocks.length;
+  }
   if (target.kind === 'section'){
     var n = specSectionPaths(raw).length;
     if (typeof target.section !== 'number' || target.section < 0 || target.section >= n) return null;
@@ -176,6 +181,11 @@ var BUILDER_GUIDES = {
       ['text', 'plain prose; `code` spans render in monospace']
     ]
   },
+  contract: {
+    title:'Contract block — size and content',
+    how:'Choose half width for two blocks side by side, or full width to stack. Blocks fill in source order and stack automatically in narrow embeds. Click a field row to edit it.',
+    fields:[['title','block heading'],['span','4 = third, 6 = half, 8 = two-thirds, 12 = full (default)'],['id','optional stable ID for links'],['source','source permalink'],['note','prose below the fields; supports code spans and fenced code'],['fields','k/v/g rows, each with optional step reveal timing']]
+  },
   crow: {
     title: 'Contract field — one "on the wire" row',
     how: 'Edit the row and Render. Rows without a k key are skipped by the renderer.',
@@ -200,7 +210,7 @@ var BUILDER_GUIDES = {
   },
   section: {
     title: 'Section — one accent-colored box',
-    how: 'Edit the selected JSON, then click Render. Everything inside is optional; a section is prose, an optional contract card, and an optional diagram.',
+    how: 'Edit the selected JSON, then click Render. Everything inside is optional; a section is prose, optional contract blocks, and an optional diagram.',
     fields: [
       ['heading', 'section heading'],
       ['id', 'optional stable identity for links and node details; renaming updates local detail references'],
@@ -209,7 +219,7 @@ var BUILDER_GUIDES = {
       ['source', 'permalink URL — "source ↗" chip beside the heading'],
       ['text', 'paragraph or list of paragraphs above the diagram'],
       ['bullets', 'bullet list; entries may reveal/hide per step'],
-      ['contract', '"on the wire" message-contract card'],
+      ['contract / contracts', 'legacy single card or an ordered array of sized contract blocks'],
       ['diagram', 'the board: nodes, rows, edges, panels, steps']
     ]
   }

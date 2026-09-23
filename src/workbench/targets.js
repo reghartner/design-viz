@@ -58,7 +58,10 @@ function builderTargetPath(raw, target){
     if (sec && typeof sec.text === 'string') return rec.section.concat(['text']);
     return rec.section.concat(['text', target.index]);
   }
-  if (target.kind === 'crow') return rec.section.concat(['contract', 'fields', target.index]);
+  if (target.kind === 'contract' || target.kind === 'crow'){
+    var card=target.card==null || target.card==='legacy'?['contract']:['contracts',Number(target.card)];
+    return rec.section.concat(card,target.kind==='crow'?['fields',target.index]:[]);
+  }
   return null;
 }
 

@@ -60,7 +60,7 @@
                   },
                   "rows": [
                     ["press", "sentry", "relay", "pulse"],
-                    ["herald", "pns", "phone"]
+                    ["phone", "pns", "herald"]
                   ],
                   "edges": [
                     { "from": "press", "to": "sentry", "kind": "device", "label": "button IRQ" },
@@ -130,7 +130,7 @@
                   },
                   "rows": [
                     [["sentry", "vision"], "relay", "pulse", "herald"],
-                    ["phone", "beam", "vault"]
+                    ["vault", "beam", "phone"]
                   ],
                   "edges": [
                     { "from": "sentry", "to": "relay", "kind": "mqtt", "label": "evt/door/motion" },
@@ -274,7 +274,7 @@
                   },
                   "rows": [
                     ["pir", "sentry", "vision", "zones"],
-                    ["pulse", "phone"]
+                    ["phone", "pulse"]
                   ],
                   "edges": [
                     { "from": "pir", "to": "sentry", "kind": "device", "label": "heat-delta IRQ" },
@@ -334,7 +334,7 @@
                   },
                   "rows": [
                     ["phone", "doorbell", "router"],
-                    ["sentinel", "registry", "relay"]
+                    ["relay", "registry", "sentinel"]
                   ],
                   "edges": [
                     { "from": "phone", "to": "doorbell", "kind": "ble", "label": "pair · QR-derived key" },
@@ -386,7 +386,7 @@
                   },
                   "rows": [
                     ["sun", "pmic", "batt"],
-                    ["sentry", "radio", "vision"]
+                    ["vision", "radio", "sentry"]
                   ],
                   "edges": [
                     { "from": "sun", "to": "pmic", "kind": "power", "label": "harvest ≤500 mW" },
@@ -434,7 +434,7 @@
                   },
                   "rows": [
                     ["vision", "enc", "vault"],
-                    ["thumb", "phone"]
+                    ["phone", "thumb"]
                   ],
                   "edges": [
                     { "from": "vision", "to": "enc", "kind": "device", "label": "raw clip + pre-roll" },
@@ -472,7 +472,7 @@
                   },
                   "rows": [
                     ["vision", "enc"],
-                    ["vault", "phone"]
+                    ["phone", "vault"]
                   ],
                   "edges": [
                     { "from": "vision", "to": "enc", "kind": "device", "label": "seal with user key" },
@@ -526,7 +526,7 @@
                   },
                   "rows": [
                     ["press", "sentry", "chime"],
-                    ["vision", "flash"]
+                    ["flash", "vision"]
                   ],
                   "edges": [
                     { "from": "press", "to": "sentry", "kind": "device", "label": "button IRQ" },
@@ -574,7 +574,7 @@
                   },
                   "rows": [
                     ["sentry", "router", "relay"],
-                    ["flash", "vault", "phone"]
+                    ["phone", "vault", "flash"]
                   ],
                   "edges": [
                     { "from": "sentry", "to": "router", "kind": "int", "label": "WLAN rejoin" },

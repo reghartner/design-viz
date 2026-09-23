@@ -807,12 +807,17 @@ const LAY_SPEC = {
   edges: [{from: 'c', to: 'd'}, {from: 'a', to: 'b'}]
 };
 
-test('serpentine: odd rows reverse x order', () => {
-  const L = C.layout(LAY_SPEC);
-  // row 0 left->right
-  assert.ok(L.pos.a.cx < L.pos.b.cx && L.pos.b.cx < L.pos.c.cx);
-  // row 1 right->left: first slot (d) has the LARGEST x
-  assert.ok(L.pos.d.cx > L.pos.e.cx && L.pos.e.cx > L.pos.g.cx);
+test('every row follows authored left-to-right slot order, independent of its index', () => {
+  for (const routing of ['curves','lanes']) {
+    const spec={...LAY_SPEC,routing,rows:routing==='lanes' ? [['a','b','c'],['d','e','f','g']] : LAY_SPEC.rows},before=JSON.stringify(spec),L=C.layout(spec);
+    assert.ok(L.pos.a.cx < L.pos.b.cx && L.pos.b.cx < L.pos.c.cx);
+    assert.ok(L.pos.d.cx < L.pos.e.cx && L.pos.e.cx < L.pos.g.cx);
+    const moved=C.layout({...spec,rows:[spec.rows[1],spec.rows[0]]});
+    for(const id of Object.keys(spec.nodes)) assert.equal(moved.pos[id].cx,L.pos[id].cx,id);
+    const inserted=C.layout({...spec,nodes:{...spec.nodes,new:{}},rows:[['new'],...spec.rows]});
+    for(const id of Object.keys(spec.nodes)) assert.equal(inserted.pos[id].cx,L.pos[id].cx,id);
+    assert.equal(JSON.stringify(spec),before);
+  }
 });
 
 test('stack members share a column and distribute vertically', () => {
@@ -822,10 +827,11 @@ test('stack members share a column and distribute vertically', () => {
   assert.ok(L.pos.e.stack && L.pos.f.stack);
 });
 
-test('wrap edge detected between last slot of row N and first of row N+1', () => {
-  const L = C.layout(LAY_SPEC);
-  assert.strictEqual(C.isWrap({from: 'c', to: 'd'}, L), true);
-  assert.strictEqual(C.isWrap({from: 'a', to: 'b'}, L), false);
+test('last-to-first cross-row edges leave the bottom and enter the top without a margin loop', () => {
+  const L=C.layout(LAY_SPEC),e={from:'c',to:'d'},p=C.edgePath(e,L),pts=C.samplePathD(p);
+  assert.equal(pts[0].y,L.pos.c.cy+L.pos.c.h/2);
+  const end=pts.at(-1);assert.ok(Math.abs(end.y-(L.pos.d.cy-L.pos.d.h/2))<.01);
+  assert.ok(pts.every(p=>p.x>=L.pos.d.cx && p.x<=L.pos.c.cx && p.y>=pts[0].y && p.y<=end.y));
 });
 
 test('vertical interconnect between stack members is a straight vertical path', () => {
@@ -3401,11 +3407,10 @@ test('straight-drop: x-aligned cross-row pair renders as a vertical line', () =>
   assert.ok(Math.abs(parseFloat(m[1]) - parseFloat(m[3])) <= 2, p);
 });
 
-test('straight-drop intercepts an x-aligned wrap edge (no margin loop)', () => {
-  const L = C.layout(LAY_SPEC);          // c = last slot row 0, d = first slot row 1, aligned
-  assert.strictEqual(C.isWrap({from: 'c', to: 'd'}, L), true);
-  const p = C.edgePath({from: 'c', to: 'd'}, L);
-  assert.ok(/^M \S+ \S+ L \S+ \S+$/.test(p), 'aligned wrap should drop straight, got: ' + p);
+test('straight-drop connects aligned columns across rows without a margin loop', () => {
+  const L = C.layout(LAY_SPEC);          // a and d are both first-column nodes
+  const p = C.edgePath({from: 'a', to: 'd'}, L);
+  assert.ok(/^M \S+ \S+ L \S+ \S+$/.test(p), 'aligned columns should drop straight, got: ' + p);
   const m = p.match(/^M (\S+) \S+ L (\S+) \S+$/);
   assert.ok(Math.abs(parseFloat(m[1]) - parseFloat(m[2])) <= 2, p);
 });
@@ -3415,11 +3420,11 @@ test('near-aligned cross-row pair gets a vertical-tangent S, not the wide route'
   const spec = {nodes: {a: {}, b: {}, c: {}, d: {}, e: {}},
                 rows: [['a', 'b', 'c'], ['d', 'e']]};
   const L = C.layout(spec);
-  // find a cross-row non-wrap pair within (STRAIGHT_TOL, NEAR_TOL]
+  // find a cross-row pair within (STRAIGHT_TOL, NEAR_TOL]
   let found = null;
   ['a', 'b', 'c'].forEach(f => ['d', 'e'].forEach(t => {
     const dx = Math.abs(L.pos[f].cx - L.pos[t].cx);
-    if (!found && dx > 40 && dx <= 96 && !C.isWrap({from: f, to: t}, L)) found = {f, t};
+    if (!found && dx > 40 && dx <= 96) found = {f, t};
   }));
   if (!found) return; // layout did not produce such a pair; covered by acceptance tests
   const p = C.edgePath({from: found.f, to: found.t}, L);

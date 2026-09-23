@@ -152,14 +152,14 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
   });
 }
 
-function builderSlotGapXs(boxes, reversed){
-  /* Slot order follows the engine's serpentine rows, so "before" is on
-     the right for a reversed row. Boxes already union stacked cards. */
+function builderSlotGapXs(boxes){
+  /* Every row follows authored left-to-right slot order. Boxes already
+     union all cards in a stack, so insertion gaps clear its full width. */
   if (!boxes.length) return [];
-  var xs = [reversed ? boxes[0].x2 + 8 : boxes[0].x1 - 8];
+  var xs = [boxes[0].x1 - 8];
   for (var i = 1; i < boxes.length; i++)
-    xs.push(reversed ? (boxes[i - 1].x1 + boxes[i].x2) / 2 : (boxes[i - 1].x2 + boxes[i].x1) / 2);
-  xs.push(reversed ? boxes[boxes.length - 1].x1 - 8 : boxes[boxes.length - 1].x2 + 8);
+    xs.push((boxes[i - 1].x2 + boxes[i].x1) / 2);
+  xs.push(boxes[boxes.length - 1].x2 + 8);
   return xs;
 }
 

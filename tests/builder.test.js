@@ -499,7 +499,7 @@ function importHarness(ctl, boardSpec, extraGlobals){
     }
     boardSpec.rows.forEach((row, r) => row.forEach((slot, i) => {
       (Array.isArray(slot) ? slot : [slot]).forEach((id, j) =>
-        card(id, 100 + (r % 2 ? row.length - i - 1 : i) * 300, 100 + r * 250 + j * 80));
+        card(id, 100 + i * 300, 100 + r * 250 + j * 80));
     }));
     (boardSpec.floats || []).forEach((f, i) => card(f.id, 100 + i * 300, 0));
   }
@@ -1151,11 +1151,11 @@ function nodePlacementFixture(rows = [['a', 'b'], ['c', 'd']]){
     edges: [{from: 'a', to: 'f'}], steps: [{nodes: ['a', 'f'], text: 'Keep me'}]};
 }
 
-test('node gap drag shows serpentine slot and row lines and commits with undo and selection', () => {
+test('node gap drag shows left-to-right slot and row lines and commits with undo and selection', () => {
   for (const [id, x, y, lineClass, expected] of [
     ['a', 300, 375, 'dv-slotline', [['b'], ['c', 'a', 'd']]],
     ['a', 300, 250, 'dv-rowline', [['b'], ['a'], ['c', 'd']]],
-    ['f', 550, 375, 'dv-slotline', [['a', 'b'], ['f', 'c', 'd']]]
+    ['f', 550, 375, 'dv-slotline', [['a', 'b'], ['c', 'd', 'f']]]
   ]){
     const h = importHarness(null, nodePlacementFixture());
     const before='  '+JSON.stringify(nodePlacementFixture(),null,2)+'\r\n';
@@ -1220,10 +1220,10 @@ test('node swap target takes precedence over gap lines and retains both ghost pr
   h.cards.a.fire('mousedown', {button: 0, clientX: 120, clientY: 120});
   h.move(300, 250);
   const line = h.svg.querySelector('.dv-rowline');
-  h.move(420, 375, h.cards.c);
+  h.move(120, 375, h.cards.c);
   assert.equal(line.getAttribute('visibility'), 'hidden');
   assert.ok(h.cards.c.classList.contains('dv-droptgt'));
-  assert.equal(h.svg.querySelector('.dv-ghost').getAttribute('transform'), 'translate(400 350)');
+  assert.equal(h.svg.querySelector('.dv-ghost').getAttribute('transform'), 'translate(100 350)');
   assert.equal(h.svg.querySelector('.dv-ghostback').getAttribute('transform'), 'translate(100 100)');
   h.release();
   assert.deepStrictEqual(JSON.parse(h.elements.src.value).rows, [['c', 'b'], ['a', 'd']]);

@@ -16,7 +16,7 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 |---|---|---|
 | "move that floating node up / right a little" | `floats[i].dx` / `floats[i].dy` (px) | "a little" ≈ 20–40 px; up = negative `dy` |
 | "move this box left of that one" | reorder ids inside the `rows` array | row nodes have NO free x/y — columns are computed, evenly spaced across x 110–885 |
-| "put it on the row below" | move the id between `rows` arrays | odd-numbered rows render RIGHT-TO-LEFT (serpentine flow) — position accordingly |
+| "put it on the row below" | move the id between `rows` arrays | every row renders LEFT-TO-RIGHT in its authored order; other rows keep their horizontal order |
 | "those two chips should read as one device" | make them one stacked slot: `["lp", "soc"]` inside a row, plus a `groups` boundary | stacked cards share a column |
 | "that label is sitting on the line / hanging off" | shorten the label, or nudge with `edges[i].labelDx` / `labelDy` (px) | budget ≈ 6.4 px per character vs the edge's length; the lint prints both numbers |
 | "curve that arrow / it cuts through a box" | `edges[i].bend` | positive/negative bows the path to either side |

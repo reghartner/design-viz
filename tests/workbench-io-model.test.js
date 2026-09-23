@@ -57,7 +57,7 @@ test('mermaidToSpec extracts the first markdown mermaid fence as the Python orac
     MERMAID_SEQ + '```'), /line 1: not a sequenceDiagram/);
 });
 
-test('mermaidToSpec infers protocols in Python priority order and splits serpentine rows', () => {
+test('mermaidToSpec infers protocols in Python priority order and splits long flows into rows', () => {
   const d = mermaidDiagram('sequenceDiagram\nautonumber\nA->>B: GET mqtt status\n' +
     'B->>C: PUBLISH topic (QoS 1)\nC->>D: plain call\nD->>E: subscribe\n');
   assert.deepStrictEqual(plain(d.edges.map(e => e.kind)), ['https', 'mqtt', 'int', 'mqtt']);

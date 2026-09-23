@@ -53,8 +53,8 @@
               "motion"
             ],
             [
-              "motion-adapter",
-              "button-adapter"
+              "button-adapter",
+              "motion-adapter"
             ],
             [
               "processor",

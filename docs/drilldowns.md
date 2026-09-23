@@ -41,6 +41,8 @@ new section inspector. One **Undo** restores the exact previous source.
 
 ## Extract an independent diagram
 
+Try the [branched doorbell extraction example](../examples/independent-extraction/README.md).
+
 Shift-click at least two nodes in the same section and choose **Create domain
 from selected nodes**. The preview offers **Local zoom** (a focused detail in
 this document) or **Separate document** (an arrow-shaped handoff to another

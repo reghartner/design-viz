@@ -1216,6 +1216,24 @@ body.workspace-focus .workwrap{max-width:none;}
   padding:5px 10px; border-radius:7px; cursor:pointer;}
 .bbtn:hover{color:var(--ink); border-color:var(--accent);}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+.extraction-preview{min-width:0;}
+.extraction-preview h3{margin:0 0 8px;font:600 17px/1.35 'Sora',sans-serif;}
+.extraction-intro{margin:0 0 16px;font-size:13px;line-height:1.55;color:var(--sub);}
+.extraction-help{font-size:12px;line-height:1.5;color:var(--sub);margin:8px 0;overflow-wrap:anywhere;}
+.extraction-destination{padding:8px 0 0;border-top:1px solid var(--line);}
+.extraction-preview .frow{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;}
+.extraction-preview .flab{text-align:left;}
+.extraction-preview .fctl{box-sizing:border-box;min-height:36px;width:100%;}
+.extraction-report{margin:14px 0;padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--codebg);overflow-wrap:anywhere;}
+.extraction-report:empty{display:none;}
+.extraction-summary{margin:0;font-size:13px;font-weight:600;color:var(--ink);}
+.extraction-report h4{margin:14px 0 5px;font-size:12px;color:var(--ink);}
+.extraction-report ul{margin:0;padding-left:18px;font-size:12px;line-height:1.6;}
+.extraction-status{margin:12px 0;font-size:12px;line-height:1.5;color:var(--sub);}
+.extraction-preview .extraction-actions{display:flex;flex-wrap:wrap;gap:8px;padding:0;}
+.extraction-actions .bbtn{min-height:36px;white-space:normal;}
+.extraction-actions .extraction-apply{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+.extraction-actions .bbtn:disabled{opacity:.5;cursor:default;}
 /* the always-visible escape hatch from ADD TO STEP mode: a solid accent
    pill so the way out is never in doubt, in the app's own callout colour */
 .bexit{background:var(--accent); border:1px solid var(--accent); color:var(--accent-ink); font:700 11px 'IBM Plex Mono',monospace;
@@ -29870,119 +29888,246 @@ function planCreateNodeDetail(text,raw,sectionIdx,nodeId){
   var range=jsonLocate(assigned.text,newPath);
   return {text:assigned.text,start:range.start,end:range.end,kind:'section',index:index,sectionId:id};
 }
+/* ---- src/workbench/commands/extraction.js ---- */
+/* Independent extraction is a graph edit, not a timeline split. The parent
+   keeps its story and panel ownership; the destination starts without steps. */
+function extractionClearRoute(edge, windows){
+  ['bend','labelDx','labelDy','labelAt','fromDx','fromDy','toDx','toDy'].forEach(function(key){delete edge[key];});
+  if(windows){delete edge.revealAt;delete edge.hideAt;}
+  return edge;
+}
+function extractionRows(rows, project){
+  return rows.map(function(row){return row.map(function(slot){
+    var values=(Array.isArray(slot)?slot:[slot]).flatMap(project);
+    if(Array.isArray(slot) && values.length===slot.length && values.every(function(id,i){return id===slot[i];}))return values;
+    return values.length===1?values[0]:values;
+  }).filter(function(slot){return !Array.isArray(slot) || slot.length;});}).filter(function(row){return row.length;});
+}
+function extractionSetMap(object,key,value){
+  if(Object.keys(value).length)object[key]=value;else delete object[key];
+}
 
-/* Extract an ordinary linear flow without changing authored node identities.
-   Cases needing per-edge boundary ports or independent panel/path ownership
-   are refused before either source splice is published. */
-function planExtractNodeDetail(text,raw,sectionIdx,ids,title){
-  var got=builderDiagram(text,raw,sectionIdx);
-  if(got.error)return got;
-  var d=builderClone(got.d),selected=new Set(Array.isArray(ids)?ids:[]),page=raw && raw.page || raw,base=raw && raw.page?['page']:[];
-  if(!Array.isArray(ids) || selected.size<2 || ids.some(function(id){return !Object.prototype.hasOwnProperty.call(d.nodes || {},id);}))
-    return {error:'Choose at least two existing nodes in one section.'};
-  ids=Array.from(selected);
-  if(!page || (!page.blocks && !page.sections))return {error:'Wrap this bare diagram in a page with sections before extracting a domain.'};
-  if(d.paths || d.layouts || d.sectionLayout || d.routing || d.centerpiece)
-    return {error:'Domain extraction currently supports linear timelines with ordinary rows. Remove alternate paths, authored layouts, routing or centerpiece settings first.'};
-  if((d.panels || []).length || (d.steps || []).some(function(step){return step.panels || step.patch || step.conditions;}))
-    return {error:'Domain extraction cannot yet split panel patches or runtime conditions. Keep this flow together until those references can be assigned explicitly.'};
-  if(ids.some(function(id){return d.nodes[id].detail;}))return {error:'Extract ordinary nodes first; nodes with existing details need explicit nested step mappings.'};
-  var rowIds=builderFlatRowIds(d.rows);
-  if(ids.some(function(id){return rowIds.indexOf(id)<0;}) || (d.floats || []).some(function(f){return selected.has(f.id);}))
-    return {error:'Place every selected node in ordinary rows before extracting a domain; floated nodes are not supported yet.'};
-  var records=builderDetailRecords(raw),incomingPort=false;
-  records.forEach(function(record){
-    var diagram=specValueAt(raw,record.diagram);
-    Object.keys(diagram && diagram.nodes || {}).forEach(function(id){
-      var detail=diagram.nodes[id].detail;
-      if(builderDetailIndex(records,detail)===sectionIdx && detail.ports && Object.keys(detail.ports).some(function(k){return selected.has(detail.ports[k]);}))incomingPort=true;
-    });
+/* Give an exported destination its own dependency closure. Local references
+   are section identities, never positions in a different document's list. */
+function extractionChildSpec(raw, section, report){
+  var sourcePage=raw.page || raw, page={title:section.heading,sections:[builderClone(section)]};
+  delete page.sections[0].detailOnly;
+  ['skin','protocols','lanes'].forEach(function(key){if(sourcePage[key]!=null)page[key]=builderClone(sourcePage[key]);});
+  var records=builderDetailRecords(raw),ids=new Map(),taken=Object.create(null),queue=[page.sections[0]];
+  // Reserve original and new heading aliases before allocating any copied ID;
+  // a later dependency may have the heading "Dependency1" even without that ID.
+  builderDetailRecords({page:page}).concat(records).forEach(function(record){
+    taken[record.reference]=true;(record.aliases || []).forEach(function(alias){taken[alias]=true;});
   });
-  if(incomingPort)return {error:'Another detail uses a selected node as its boundary port. Reassign that port before extracting this domain.'};
-  var ingress=new Set(),egress=new Set(),internal=new Set(),boundary=new Set(),touching=new Set(),edgeMap=Object.create(null);
-  var taken=Object.create(null);Object.keys(d.nodes).forEach(function(id){taken[id]=true;});
-  var domainId=builderUniqueKey(taken,'domain'),sectionId=domainId+'-detail',sectionTaken=Object.create(null);
-  records.forEach(function(record){sectionTaken[record.reference]=true;record.aliases.forEach(function(alias){sectionTaken[alias]=true;});});
-  if(sectionTaken[sectionId])sectionId=builderUniqueKey(sectionTaken,sectionId+'-');
-  (d.edges || []).forEach(function(edge){
-    var from=selected.has(edge.from),to=selected.has(edge.to),key=builderEdgeKey(edge);
-    if(from && to)internal.add(key);
-    else if(to){ingress.add(edge.to);boundary.add(key);}
-    else if(from){egress.add(edge.from);boundary.add(key);}
-    if(from || to)touching.add(key);
-    edgeMap[key]=(from?domainId:edge.from)+'->'+(to?domainId:edge.to);
-  });
-  if(ingress.size>1 || egress.size>1)return {error:'These nodes have multiple different '+(ingress.size>1?'input':'output')+' boundary nodes. Extract a flow with one input and one output; per-edge boundary ports are not supported yet.'};
-  if((d.edges || []).some(function(edge){return internal.has(builderEdgeKey(edge)) && (edge.revealAt!=null || edge.hideAt!=null);}))
-    return {error:'Internal edges with revealAt/hideAt need timeline rebasing. Remove those edge windows before extracting this domain.'};
-  if((d.steps || []).some(function(step){return Object.keys(step.failures || {}).some(function(key){return boundary.has(key);});}))
-    return {error:'A step records a failure across this domain boundary. Keep the flow together until boundary failure mapping is supported.'};
-  var child={nodes:Object.create(null),rows:[],edges:[],steps:[]},placed=false;
-  ids.forEach(function(id){child.nodes[id]=d.nodes[id];delete d.nodes[id];});
-  function rowsFor(rows,inside){
-    return rows.map(function(row){return row.map(function(slot){
-      var values=(Array.isArray(slot)?slot:[slot]).flatMap(function(id){
-        if(inside)return selected.has(id)?[id]:[];
-        if(!selected.has(id))return [id];
-        if(placed)return [];placed=true;return [domainId];
-      });
-      return Array.isArray(slot)?(values.length===1?values[0]:values):(values[0] || null);
-    }).filter(function(slot){return slot!=null && (!Array.isArray(slot) || slot.length);});}).filter(function(row){return row.length;});
-  }
-  child.rows=rowsFor(d.rows,true);d.rows=rowsFor(d.rows,false);
-  child.edges=(d.edges || []).filter(function(edge){return internal.has(builderEdgeKey(edge));});
-  d.edges=(d.edges || []).filter(function(edge){return !internal.has(builderEdgeKey(edge));}).map(function(edge){
-    if(selected.has(edge.from))edge.from=domainId;if(selected.has(edge.to))edge.to=domainId;return edge;
-  });
-  var groups=Object.create(null);
-  function copyGroup(id){if(!id || groups[id] || !d.groups || !Object.prototype.hasOwnProperty.call(d.groups,id))return;groups[id]=builderClone(d.groups[id]);copyGroup(groups[id].parent);}
-  ids.forEach(function(id){copyGroup(child.nodes[id].group);});if(Object.keys(groups).length)child.groups=groups;
-  var stepIds=Object.create(null),stepMap=Object.create(null);
-  var invalidStepIds=(d.steps || []).some(function(step){
-    if(step.id==null || step.id==='')return false;
-    if(typeof step.id!=='string' || stepIds[step.id])return true;
-    stepIds[step.id]=true;return false;
-  });
-  if(invalidStepIds)return {error:'Give each existing step a unique string ID before extracting a domain.'};
-  function putHops(step,hops){delete step.edge;delete step.edges;if(hops.length===1)step.edge=hops[0];else if(hops.length)step.edges=hops;}
-  function putMap(step,key,value){if(Object.keys(value).length)step[key]=value;else delete step[key];}
-  (d.steps || []).forEach(function(step){
-    var hops=stepKeys(step),failures=step.failures || {},tones=step.tone || {},packets=step.packets || [];
-    var affected=hops.some(function(key){return touching.has(key);}) || Object.keys(failures).some(function(key){return touching.has(key);}) ||
-      (step.nodes || []).some(function(id){return selected.has(id);}) || Object.keys(tones).some(function(id){return selected.has(id);}) || packets.some(function(packet){return touching.has(packet.edge);});
-    if(!affected)return;
-    if(!step.id){step.id=builderUniqueKey(stepIds,'step-');stepIds[step.id]=true;}
-    var inner=builderClone(step);stepMap[step.id]={step:inner.id};
-    putHops(inner,hops.filter(function(key){return internal.has(key);}));
-    putHops(step,hops.filter(function(key){return !internal.has(key);}).map(function(key){return edgeMap[key] || key;}));
-    var innerNodes=(inner.nodes || []).filter(function(id){return selected.has(id);});
-    hops.filter(function(key){return boundary.has(key);}).forEach(function(key){key.split('->').forEach(function(id){if(selected.has(id) && innerNodes.indexOf(id)<0)innerNodes.push(id);});});
-    if(innerNodes.length)inner.nodes=innerNodes;else delete inner.nodes;
-    step.nodes=(step.nodes || []).filter(function(id){return !selected.has(id);});if(step.nodes.indexOf(domainId)<0)step.nodes.push(domainId);
-    var insideFailure=Object.create(null),outsideFailure=Object.create(null),insideTone=Object.create(null),outsideTone=Object.create(null);
-    Object.keys(failures).forEach(function(key){if(internal.has(key))insideFailure[key]=failures[key];else outsideFailure[edgeMap[key] || key]=failures[key];});
-    Object.keys(tones).forEach(function(id){if(selected.has(id))insideTone[id]=tones[id];else outsideTone[id]=tones[id];});
-    putMap(inner,'failures',insideFailure);putMap(step,'failures',outsideFailure);putMap(inner,'tone',insideTone);putMap(step,'tone',outsideTone);
-    if(step.packets){
-      inner.packets=packets.filter(function(packet){return internal.has(packet.edge);});
-      step.packets=packets.filter(function(packet){return !internal.has(packet.edge);}).map(function(packet){return Object.assign({},packet,{edge:edgeMap[packet.edge] || packet.edge});});
-      if(!inner.packets.length)delete inner.packets;if(!step.packets.length)delete step.packets;
+  function copyTarget(detail){
+    var index=builderDetailIndex(records,detail);
+    if(index<0)return;
+    var target=records[index],id=ids.get(index);
+    if(!id){
+      id=builderUniqueKey(taken,'dependency');taken[id]=true;ids.set(index,id);
+      var copy=builderClone(specValueAt(raw,target.path));copy.id=id;copy.detailOnly=true;
+      page.sections.push(copy);queue.push(copy);
+      report.notes.push('Destination includes its referenced detail: '+(copy.heading || target.reference)+'.');
     }
-    child.steps.push(inner);
-  });
-  var detail={section:sectionId,mode:'focus'};
-  if(Object.keys(stepMap).length)detail.stepMap=stepMap;
-  d.nodes[domainId]={title:typeof title==='string' && title.trim() || 'New domain',icon:'package',tint:'cmd',detail:detail};
-  var group=child.nodes[ids[0]].group;
-  if(group && ids.every(function(id){return child.nodes[id].group===group;}))d.nodes[domainId].group=group;
-  var section={id:sectionId,heading:d.nodes[domainId].title+' detail',detailOnly:true,accent:'cyan',diagram:child};
-  var rewritten=jsonReplaceValue(text,got.path,JSON.stringify(d,null,2));
-  if(!rewritten)return {error:'could not rewrite the parent flow'};
-  var added=jsonInsertMember(rewritten.text,base.concat([page.blocks?'blocks':'sections']),null,JSON.stringify(section,null,2));
-  if(!added)return {error:'could not add the extracted detail section'};
-  var errors=[];validateDetails(normalize(JSON.parse(added.text)),errors,[]);if(errors.length)return {error:errors.join('\n')};
-  var range=jsonLocate(added.text,got.path.concat(['nodes',domainId]));
-  return {text:added.text,start:range.start,end:range.end,kind:'node',id:domainId,section:sectionIdx,detailSection:records.length,sectionId:sectionId};
+    detail.section=id;
+  }
+  for(var i=0;i<queue.length;i++){
+    Object.values(queue[i].diagram && queue[i].diagram.nodes || {}).forEach(function(node){
+      if(node.detail && !node.detail.spec && node.detail.section)copyTarget(node.detail);
+    });
+  }
+  return {page:page};
+}
+
+function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options){
+  options=options || {};
+  try{
+    var before=validate(normalize(raw));
+    if(before.errors.length)return {error:'Fix the source validation errors before extracting: '+before.errors.join('\n')};
+    // Preserve support for the bare-diagram authoring shorthand. Undo still
+    // restores the exact caller text because only the returned plan is applied.
+    if(raw && !raw.page && !raw.blocks && !raw.sections && raw.nodes && raw.rows){
+      var wrapped={page:{sections:[{heading:'Overview',diagram:builderClone(raw)}]}};
+      return planExtractIndependentDiagram(JSON.stringify(wrapped,null,2),wrapped,sectionIdx,ids,options);
+    }
+    var got=builderDiagram(text,raw,sectionIdx);
+    if(got.error)return got;
+    var d=builderClone(got.d),selected=new Set(Array.isArray(ids)?ids:[]);
+    if(!Array.isArray(ids) || selected.size<2 || ids.some(function(id){return typeof id!=='string' || !Object.prototype.hasOwnProperty.call(d.nodes || {},id);}))
+      return {error:'Choose at least two existing nodes in one section.'};
+    ids=Array.from(selected);
+    var mode=options.mode || 'local';
+    if(mode!=='local' && mode!=='external')return {error:'Choose Local zoom or Separate document.'};
+    var title=typeof options.title==='string' && options.title.trim() || 'New domain';
+    var report={movedNodes:ids.length,internalEdges:0,affectedSteps:[],boundaryEdges:[],references:[],notes:[]};
+    var page=raw.page || raw,base=raw.page?['page']:[],records=builderDetailRecords(raw);
+    var taken=Object.assign(Object.create(null),d.nodes),domainId=builderUniqueKey(taken,'domain');taken[domainId]=true;
+    var sectionTaken=Object.create(null);records.forEach(function(r){sectionTaken[r.reference]=true;(r.aliases || []).forEach(function(a){sectionTaken[a]=true;});});
+    var sectionId=domainId+'-detail';if(sectionTaken[sectionId])sectionId=builderUniqueKey(sectionTaken,sectionId+'-');
+    var handoff;
+    if(mode==='external'){
+      handoff=builderClone(options.handoff || {});
+      var errors=[];validateHandoff(handoff,null,'Destination',errors);
+      if(errors.length)return {error:errors.join('\n')};
+      if(handoff.section){
+        if(!/^[a-zA-Z][\w.-]*$/.test(handoff.section))return {error:'The destination section ID must begin with a letter and use letters, digits, _, . or -.'};
+        sectionId=handoff.section;
+      }else if(handoff.spec)handoff.section=sectionId;
+    }
+    var originalNodes=d.nodes,child={nodes:Object.create(null),rows:[],edges:[],steps:[],autoplay:false};
+    ids.forEach(function(id){
+      child.nodes[id]=builderClone(originalNodes[id]);
+      if(child.nodes[id].detail && child.nodes[id].detail.stepMap){
+        delete child.nodes[id].detail.stepMap;
+        report.references.push('Removed inherited parent-step mapping from '+id+'; its nested detail keeps its own entry point.');
+      }
+    });
+    child.rows=extractionRows(d.rows,function(id){return selected.has(id)?[id]:[];});
+    var placedChild=new Set(builderFlatRowIds(child.rows)),extra=ids.filter(function(id){return !placedChild.has(id);});
+    for(var offset=0;offset<extra.length;offset+=4)child.rows.push(extra.slice(offset,offset+4));
+    if(extra.length)report.notes.push('Selected floats or unplaced nodes become ordinary rows in the destination.');
+    var groups=Object.create(null);
+    function copyGroup(id){if(!id || groups[id] || !d.groups || !Object.prototype.hasOwnProperty.call(d.groups,id))return;groups[id]=builderClone(d.groups[id]);copyGroup(groups[id].parent);}
+    ids.forEach(function(id){copyGroup(child.nodes[id].group);});if(Object.keys(groups).length)child.groups=groups;
+
+    var laneRows=d.routing==='lanes' && !(d.floats || []).length && d.rows.every(function(row){return row.length<=5 && !row.some(Array.isArray);});
+    var allEdges=d.edges || [],internal=new Set(),collapse=new Map(),ports=new Map(),edgeMap=new Map(),bridges=new Map();
+    var edgeSeen=new Set();
+    for(var ei=0;ei<allEdges.length;ei++){
+      var edge=allEdges[ei],key=builderEdgeKey(edge),from=selected.has(edge.from),to=selected.has(edge.to);
+      if(edgeSeen.has(key))return {error:'The source has duplicate edge '+key+'. Give these connections distinct endpoints before extracting.'};
+      edgeSeen.add(key);
+      if(from && to){internal.add(key);edgeMap.set(key,null);child.edges.push(extractionClearRoute(builderClone(edge),true));}
+      else if(from || to){
+        var collapsed=(from?domainId:edge.from)+'->'+(to?domainId:edge.to);
+        var group=collapse.get(collapsed) || [];group.push(edge);collapse.set(collapsed,group);
+      }else edgeMap.set(key,key);
+    }
+    report.internalEdges=child.edges.length;
+    collapse.forEach(function(edges){
+      if(edges.length<2)return;
+      edges.forEach(function(edge){
+        var id=selected.has(edge.from)?edge.from:edge.to;
+        if(!ports.has(id)){var port=builderUniqueKey(taken,'boundary');taken[port]=true;ports.set(id,port);}
+      });
+    });
+    if(ports.size)report.notes.push('Added '+ports.size+' boundary interface nodes so parallel connections keep distinct edges, protocols and failure states.');
+    var nextNodes=Object.create(null);
+    Object.keys(d.nodes).forEach(function(id){if(!selected.has(id))nextNodes[id]=d.nodes[id];});
+    var domain={title:title,icon:'package',tint:'cmd'};
+    if(mode==='local')domain.detail={section:sectionId,mode:'focus'};else domain.handoff=handoff;
+    var commonGroup=originalNodes[ids[0]].group;
+    if(commonGroup && ids.every(function(id){return originalNodes[id].group===commonGroup;}))domain.group=commonGroup;
+    nextNodes[domainId]=domain;
+    ports.forEach(function(port,id){
+      var original=originalNodes[id];
+      nextNodes[port]={title:original.title || id,sub:'Domain boundary',icon:original.icon || 'package',tint:original.tint || 'cmd'};
+      if(original.group)nextNodes[port].group=original.group;
+    });
+    d.nodes=nextNodes;
+    var placedDomain=false;
+    d.rows=extractionRows(d.rows,function(id){
+      if(!selected.has(id))return [id];
+      var list=[];if(!placedDomain){list.push(domainId);placedDomain=true;}if(ports.has(id))list.push(ports.get(id));return list;
+    });
+    if(laneRows){
+      var reflowed=false;
+      d.rows=d.rows.flatMap(function(row){
+        var flat=row.flat(),rows=[];if(row.some(Array.isArray) || flat.length>5)reflowed=true;
+        for(var offset=0;offset<flat.length;offset+=5)rows.push(flat.slice(offset,offset+5));
+        return rows;
+      });
+      if(reflowed)report.notes.push('Boundary interfaces use unstacked rows of at most five cards, preserving lane routing.');
+    }
+    if(d.floats){
+      d.floats=d.floats.flatMap(function(f){
+        if(!selected.has(f.id))return [f];
+        var list=[];if(!placedDomain){list.push(Object.assign({},f,{id:domainId}));placedDomain=true;}
+        if(ports.has(f.id))list.push({id:ports.get(f.id),side:f.side});return list;
+      });
+      if(!d.floats.length)delete d.floats;
+    }
+    if(!placedDomain)d.rows.push([domainId]);
+    // Selections may include a defined but unplaced endpoint through commands.
+    var placedParent=new Set(builderFlatRowIds(d.rows).concat((d.floats || []).map(function(f){return f.id;})));
+    ports.forEach(function(port){if(!placedParent.has(port))d.rows.push([port]);});
+    d.edges=allEdges.filter(function(edge){return !internal.has(builderEdgeKey(edge));}).map(function(edge){
+      var beforeKey=builderEdgeKey(edge),from=selected.has(edge.from),to=selected.has(edge.to);
+      if(!from && !to)return edge;
+      var id=from?edge.from:edge.to,port=ports.get(id),next=builderClone(edge);
+      next[from?'from':'to']=port || domainId;
+      extractionClearRoute(next,false);edgeMap.set(beforeKey,builderEdgeKey(next));
+      report.boundaryEdges.push(beforeKey+' → '+builderEdgeKey(next)+(port?' (via '+domainId+')':''));
+      if(port){
+        var bridge={from:from?domainId:port,to:from?port:domainId,kind:'int',label:'boundary'};
+        bridges.set(builderEdgeKey(bridge),bridge);
+      }
+      return next;
+    });
+    bridges.forEach(function(edge){d.edges.push(edge);});
+
+    var nodeMap=Object.create(null);ids.forEach(function(id){nodeMap[id]=domainId;});
+    (d.panels || []).forEach(function(panel){
+      var previous=JSON.stringify(panel);panelRemapReferences(panel,'nodes',nodeMap);
+      if(previous!==JSON.stringify(panel))report.references.push('Panel '+panel.id+': extracted-node references now point to '+title+'. Panel state stays in the overview.');
+    });
+    var toneCount=0,packetCount=0;
+    (d.steps || []).forEach(function(step,index){
+      var affected=false,keys=stepKeys(step),nextKeys=[];
+      keys.forEach(function(key){if(internal.has(key) || (edgeMap.has(key) && edgeMap.get(key)!==key))affected=true;var next=edgeMap.has(key)?edgeMap.get(key):key;if(next && nextKeys.indexOf(next)<0)nextKeys.push(next);});
+      if(affected){delete step.edge;delete step.edges;if(nextKeys.length===1)step.edge=nextKeys[0];else if(nextKeys.length)step.edges=nextKeys;}
+      var failures=Object.create(null);
+      Object.keys(step.failures || {}).forEach(function(key){
+        if(internal.has(key)){
+          affected=true;
+          (step.conditions || (step.conditions=[])).push({kind:'delivery-failed',nodeId:domainId,label:'Inside '+title+': '+key+' '+step.failures[key]});
+        }else{var next=edgeMap.has(key)?edgeMap.get(key):key;failures[next]=step.failures[key];if(next!==key)affected=true;}
+      });
+      if(step.failures)extractionSetMap(step,'failures',failures);
+      if(step.nodes)step.nodes=Array.from(new Set(step.nodes.map(function(id){if(selected.has(id)){affected=true;return domainId;}return id;})));
+      if(step.tone){
+        var tone=Object.create(null);Object.keys(step.tone).forEach(function(id){if(selected.has(id)){affected=true;toneCount++;}else tone[id]=step.tone[id];});
+        extractionSetMap(step,'tone',tone);
+      }
+      if(step.packets){
+        step.packets=step.packets.filter(function(packet){if(internal.has(packet.edge)){affected=true;packetCount++;return false;}return true;}).map(function(packet){
+          var next=edgeMap.get(packet.edge);if(next && next!==packet.edge){packet.edge=next;affected=true;}return packet;
+        });if(!step.packets.length)delete step.packets;
+      }
+      (step.conditions || []).forEach(function(condition){if(selected.has(condition.nodeId)){condition.nodeId=domainId;affected=true;}});
+      if(step.traceMatch && selected.has(step.traceMatch.nodeId)){step.traceMatch.nodeId=domainId;affected=true;report.references.push('Trace match in '+(step.id || 'step '+(index+1))+': node now points to '+title+'; matching criteria stay unchanged.');}
+      if(affected){
+        var nodes=step.nodes || (step.nodes=[]);if(nodes.indexOf(domainId)<0)nodes.push(domainId);
+        report.affectedSteps.push(step.id || 'Step '+(index+1));
+      }
+    });
+    if(toneCount)report.notes.push('Removed '+toneCount+' per-node tone changes for extracted internals; the replacement highlights involvement without inventing an aggregate state.');
+    if(packetCount)report.notes.push('Removed '+packetCount+' internal packet animations from the overview. Boundary packet animations remain.');
+    report.notes.push('Parent steps, alternate paths, captions, code references, panel state and layout profiles remain in the overview.');
+    report.notes.push('The destination starts with no steps or alternates. Author its own timeline; opening it does not inherit parent playback or state.');
+    if(child.edges.length)report.notes.push('Internal connections use fresh automatic routing with no inherited reveal/hide step windows.');
+
+    var section={id:sectionId,heading:title,detailOnly:true,accent:'cyan',diagram:child};
+    var childSpec=extractionChildSpec(raw,section,report);
+    var rewritten=jsonReplaceValue(text,got.path,JSON.stringify(d,null,2));
+    if(!rewritten)return {error:'Could not rewrite the overview.'};
+    var result=rewritten;
+    if(mode==='local'){
+      result=jsonInsertMember(result.text,base.concat([page.blocks?'blocks':'sections']),null,JSON.stringify(section,null,2));
+      if(!result)return {error:'Could not add the independent detail section.'};
+    }
+    var cascaded=builderEditDetails(result.text,JSON.parse(result.text),function(detail,owner,target){
+      if(target!==sectionIdx || !detail.ports)return;
+      Object.keys(detail.ports).forEach(function(key){if(selected.has(detail.ports[key])){report.references.push('Detail boundary '+key+': '+detail.ports[key]+' → '+domainId+'.');detail.ports[key]=domainId;}});
+    });
+    if(cascaded.error)return cascaded;
+    result.text=cascaded.text;
+    var findings=validate(normalize(JSON.parse(result.text))),childFindings=validate(normalize(childSpec));
+    if(findings.errors.length || childFindings.errors.length)return {error:'Extraction could not preserve valid references: '+findings.errors.concat(childFindings.errors).join('\n')};
+    var range=jsonLocate(result.text,got.path.concat(['nodes',domainId]));
+    return {text:result.text,start:range.start,end:range.end,kind:'node',id:domainId,section:sectionIdx,
+      detailSection:mode==='local'?records.length:undefined,sectionId:sectionId,childSpec:childSpec,report:report};
+  }catch(error){return {error:'Could not extract this selection: '+error.message};}
 }
 /* ---- src/workbench/commands/narrative.js ---- */
 /* Pure authored steps, paths, communications and panel patches. Source step
@@ -31380,11 +31525,11 @@ function wireBuilderCommit(input,commit,options){
    read models remain shared leaves; source/history publication belongs to session. */
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
-  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null;
+  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
   var OPEN_PATCH_EDITORS=new Set(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
-  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();}
+  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
   var accentListId=prefix+'-accents',groupListId=prefix+'-groups';
   function parseEditor(){return session.snapshot();}
@@ -32693,6 +32838,123 @@ function tabForm(val, ctx){
     ];
   }
 
+function renderExtractionPreview(multiSel){
+    var snapshot=parseEditor();
+    if(snapshot.error){formError(snapshot.error);return;}
+    var selected=multiSel.map(function(t){return {kind:t.kind,section:t.section,id:t.id};});
+    var identity=multiIdentity(selected),previous=beginForm('extraction:'+identity),lifetime=formLife;
+    var draft=null,draftKey=null,downloadedKey=null,downloadReleases=[],stale=false;
+    var panel=document.createElement('div');panel.className='extraction-preview';guide.appendChild(panel);
+    var heading=document.createElement('h3');heading.textContent='Create an independent domain';panel.appendChild(heading);
+    function paragraph(text,cls){var p=document.createElement('p');p.className=cls || '';p.textContent=text;panel.appendChild(p);return p;}
+    paragraph('Move '+selected.length+' selected nodes into their own diagram. The child starts with no steps; author its sequence independently.','extraction-intro');
+    var form=document.createElement('div');form.className='iform';panel.appendChild(form);
+    function field(label,value,placeholder,container){
+      var input=document.createElement('input');input.type='text';input.className='fctl';input.value=value || '';
+      if(placeholder)input.placeholder=placeholder;
+      (container || form).appendChild(frow(label,input));listen(input,'input',updatePreview);listen(input,'change',updatePreview);return input;
+    }
+    var title=field('Domain title','New domain');
+    var mode=document.createElement('select');mode.className='fctl';
+    [['local','Local zoom'],['external','Separate document']].forEach(function(choice){
+      var option=document.createElement('option');option.value=choice[0];option.textContent=choice[1];mode.appendChild(option);
+    });
+    mode.value='local';form.appendChild(frow('Destination',mode));listen(mode,'change',updatePreview);
+    var destination=document.createElement('div');destination.className='extraction-destination';form.appendChild(destination);
+    var url=field('Destination URL','','https://example.com/flow',destination);
+    var spec=field('Spec ID','','Optional when a URL is supplied',destination);
+    var revision=field('Revision','','Optional with a spec ID',destination);
+    var section=field('Section ID','','With a spec ID; leave empty to generate',destination);
+    var destinationHelp=document.createElement('p');destinationHelp.className='extraction-help';
+    destinationHelp.textContent='Provide a URL or an approved spec ID. Revision and section ID require a spec ID, which needs a host resolver. Download this JSON, then save or publish it at that destination. Apply adds the parent handoff; it does not publish the child.';
+    destination.appendChild(destinationHelp);
+    var localHelp=paragraph('Local zoom adds a focused detail section in this document. Parent playback does not drive the child.','extraction-help');
+    var error=document.createElement('div');error.className='gerr ierr';error.hidden=true;error.setAttribute('role','alert');panel.appendChild(error);
+    var report=document.createElement('section');report.className='extraction-report';report.setAttribute('aria-label','Extraction preview');panel.appendChild(report);
+    var status=paragraph('','extraction-status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+    var actions=document.createElement('div');actions.className='iacts extraction-actions';panel.appendChild(actions);
+    var download=actionButton('Download destination JSON',function(){
+      if(!ready())return;
+      if(!opts.download){showError('Download is unavailable in this editor. The source is unchanged.');return;}
+      try{
+        var release=opts.download(specFileName(draft.plan.childSpec),draft.childText,'application/json');
+        if(typeof release!=='function')throw new Error('The download could not be started.');
+        downloadReleases.push(release);downloadedKey=draftKey;apply.disabled=false;
+        status.textContent='Download requested. Save or publish this destination separately, then apply the parent handoff.';
+      }catch(ex){showError('Download failed: '+(ex.message || String(ex)));}
+    });
+    actions.appendChild(download);
+    var apply=actionButton('Apply extraction',function(){
+      if(!ready())return;
+      if(mode.value==='external' && downloadedKey!==draftKey){showError('Download the current destination JSON before applying its handoff.');return;}
+      applyPlan(draft.plan,{after:function(plan){
+        if(opts.selection.clear)opts.selection.clear();
+        session.target={kind:'node',section:plan.section,id:plan.id};session.insertSection=plan.section;
+        rehighlight();renderInspector();
+      }},snapshot);
+    },'extraction-apply');
+    actions.appendChild(apply);
+    function cancel(){
+      var current=opts.selection.current?opts.selection.current():selected;
+      if(current && current.length>1)renderMultiInspector(current);
+      else if(session.target)renderInspector();else retire();
+    }
+    actions.appendChild(actionButton('Cancel',cancel));
+    listen(panel,'keydown',function(ev){if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();}});
+    function releaseDownloads(){downloadReleases.splice(0).forEach(function(release){release();});}
+    lifetime.own(releaseDownloads);
+    function showError(message){error.textContent=message || '';error.hidden=!message;}
+    function options(){
+      var out={title:title.value.trim(),mode:mode.value};
+      if(out.mode==='external'){
+        out.handoff={};[['url',url],['spec',spec],['revision',revision],['section',section]].forEach(function(pair){
+          var value=pair[1].value.trim();if(value)out.handoff[pair[0]]=value;
+        });
+      }
+      return out;
+    }
+    function current(){
+      var now=parseEditor(),targets=opts.selection.current?opts.selection.current():multiSel;
+      return !stale && lifetime.alive() && now.project===snapshot.project && now.text===snapshot.text && multiIdentity(targets || [])===identity;
+    }
+    function invalidate(){
+      stale=true;draft=null;downloadedKey=null;releaseDownloads();apply.disabled=true;download.disabled=true;
+      showError('Source or selection changed. Cancel this preview and select the nodes again.');status.textContent='';
+    }
+    invalidateExtraction=invalidate;
+    function ready(){
+      if(!current()){invalidate();return false;}
+      if(JSON.stringify(options())!==draftKey){updatePreview();showError('Settings changed. Review the updated preview before continuing.');return false;}
+      if(draft)showError('');return !!draft;
+    }
+    function reportList(label,items){
+      if(!items || !items.length)return;
+      var heading=document.createElement('h4');heading.textContent=label+' ('+items.length+')';report.appendChild(heading);
+      var list=document.createElement('ul');items.forEach(function(item){var li=document.createElement('li');li.textContent=item;list.appendChild(li);});report.appendChild(list);
+    }
+    function updatePreview(){
+      if(!current()){invalidate();return;}
+      var config=options(),key=JSON.stringify(config),external=config.mode==='external';
+      destination.hidden=!external;localHelp.hidden=external;download.hidden=!external;
+      if(key===draftKey)return;
+      releaseDownloads();downloadedKey=null;draftKey=key;draft=null;apply.disabled=true;download.disabled=true;status.textContent='';report.innerHTML='';
+      if(!config.title){showError('Give the domain a title.');return;}
+      var plan=planExtractIndependentDiagram(snapshot.text,snapshot.raw,selected[0].section,selected.map(function(t){return t.id;}),config);
+      if(plan.error){showError(plan.error);return;}
+      showError('');draft={plan:plan,childText:JSON.stringify(plan.childSpec,null,2)+'\n'};
+      var summary=document.createElement('p');summary.className='extraction-summary';
+      summary.textContent=plan.report.movedNodes+' nodes · '+plan.report.internalEdges+' internal '+(plan.report.internalEdges===1?'edge':'edges')+' · 0 child steps';report.appendChild(summary);
+      var location=document.createElement('p');location.className='extraction-help';location.textContent='Destination section: '+plan.sectionId;report.appendChild(location);
+      reportList('Affected parent steps',plan.report.affectedSteps);
+      reportList('Boundary links',plan.report.boundaryEdges);
+      reportList('References',plan.report.references);
+      reportList('Changes to review',plan.report.notes);
+      download.disabled=false;apply.disabled=external;
+      status.textContent=external?'Download the destination before replacing the selected nodes with a handoff.':'Ready to apply. This creates one Undo action.';
+    }
+    updatePreview();finishForm(previous);title.focus({preventScroll:true});
+  }
+
 function renderMultiInspector(multiSel){
     if(disposed)return;
     cancelRefresh();
@@ -32766,12 +33028,7 @@ function renderMultiInspector(multiSel){
         if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
           formError('Choose nodes from a single section to create a domain.');return;
         }
-        commitGroup(function(raw){return planExtractNodeDetail(session.text(),raw,multiSel[0].section,multiSel.map(function(t){return t.id;}));},
-          {after:function(plan){
-            if(opts.selection.clear)opts.selection.clear();
-            session.target={kind:'node',section:plan.section,id:plan.id};session.insertSection=plan.section;
-            rehighlight();renderInspector();
-          }});
+        renderExtractionPreview(multiSel);
       }));
       acts.appendChild(actionButton('stack together', function(){
         var secs = {};
@@ -33018,7 +33275,7 @@ function renderInspector(){
 
   return {
     render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
-    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();},
+    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();},
     message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},
@@ -33307,6 +33564,7 @@ function createBuilderIO(opts){
     catch(ex){releaseUrl(url);throw ex;}
     finally{a.remove();}
     if(urls.has(url))urls.set(url,browser.schedule(function(){releaseUrl(url);},1000));
+    return function(){releaseUrl(url);};
   }
   async function writeIntoDirectory(dir,name,contents,run){
     if(!exportCurrent(run))return false;
@@ -33613,6 +33871,7 @@ function createBuilderIO(opts){
 
 
   return {
+    download:downloadTextFile,
     retireProject:retireProject,
     destroy:function(){
       if(disposed)return;retireProject();disposed=true;clearListeners();
@@ -35355,11 +35614,13 @@ function initWorkbenchBuilder(opts){
   });
   var inspector=createBuilderInspector({
     document:document,guide:guide,session:session,apply:applyPlan,catalog:opts.catalog,
+    download:function(name,text,mime){return io && io.download(name,text,mime);},
     schedule:function(fn,ms){return life.delay(fn,ms);},cancel:function(timer){life.cancelDelay(timer);},
     surface:{reveal:revealInspector,hideDiff:hideDiff,
       show:function(keepTool){if(opts.workspace && !keepTool)opts.workspace.showTool('inspect');},
       retire:function(){if(secInspect)secInspect.hidden=true;}},
     selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
+      current:function(){return interactions?interactions.selection():[];},
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
     preview:{stepper:stepperFor,targetElement:findTargetEl},
     clipboard:{current:function(){return objectClipboard;},selectHome:homeClipboardSelect,

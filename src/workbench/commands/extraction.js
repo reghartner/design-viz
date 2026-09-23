@@ -23,7 +23,11 @@ function extractionChildSpec(raw, section, report){
   delete page.sections[0].detailOnly;
   ['skin','protocols','lanes'].forEach(function(key){if(sourcePage[key]!=null)page[key]=builderClone(sourcePage[key]);});
   var records=builderDetailRecords(raw),ids=new Map(),taken=Object.create(null),queue=[page.sections[0]];
-  taken[section.id]=true;
+  // Reserve original and new heading aliases before allocating any copied ID;
+  // a later dependency may have the heading "Dependency1" even without that ID.
+  builderDetailRecords({page:page}).concat(records).forEach(function(record){
+    taken[record.reference]=true;(record.aliases || []).forEach(function(alias){taken[alias]=true;});
+  });
   function copyTarget(detail){
     var index=builderDetailIndex(records,detail);
     if(index<0)return;

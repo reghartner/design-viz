@@ -11,6 +11,9 @@ test('inline code is literal, including markup, tags, entities and shorter backt
   assert.equal(C.inlineMarkup('Use ``a `quoted` value`` and `x`'), 'Use <code>a `quoted` value</code> and <code>x</code>');
   assert.equal(C.inlineMarkup('An unmatched `tick'), 'An unmatched `tick');
   assert.equal(C.inlineMarkup('**Call `receive()`** with *care*'), '<strong>Call <code>receive()</code></strong> with <em>care</em>');
+  assert.equal(C.inlineMarkup('**Run `a*b` now**'), '<strong>Run <code>a*b</code> now</strong>');
+  assert.equal(C.inlineMarkup('*Use `a*b` here*'), '<em>Use <code>a*b</code> here</em>');
+  assert.equal(C.inlineMarkup('**Use `**literal**` now**'), '<strong>Use <code>**literal**</code> now</strong>');
 });
 
 test('inline links cannot acquire HTML from formatting their attributes',()=>{

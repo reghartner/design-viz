@@ -26,6 +26,7 @@
     "workbench/commands/common.js",
     "workbench/commands/graph.js",
     "workbench/commands/document.js",
+    "workbench/commands/extraction.js",
     "workbench/commands/narrative.js",
     "workbench/commands/layout.js",
     "workbench/persistence.js",

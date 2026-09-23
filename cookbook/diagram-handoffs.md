@@ -59,6 +59,13 @@ A handoff and a domain detail cannot coexist on the same node. Keep titles
 short; long titles are truncated with the full title and `sub` in the tooltip.
 The handoff caption replaces the usual subtitle/icon to emphasize continuation.
 
+To move an existing selection into its own document, Shift-click two or more
+nodes, choose **Create domain from selected nodes**, and select **Separate
+document**. Review the preview, download the destination JSON, then apply the
+handoff. Branches and playback stay in the overview; the new destination gets
+its own independently authored steps. The download does not publish the spec or
+create a reachable URL. See [independent extraction](../docs/drilldowns.md#extract-an-independent-diagram).
+
 Start from [the four-document example](../examples/diagram-handoffs/README.md).
 Replace its fictional destinations with real links before publishing. Test
 every endpoint, including in the intended embedded host, and confirm the

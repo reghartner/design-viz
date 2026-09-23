@@ -21,6 +21,15 @@ its legacy `expand` mode with `focus` and omit ports. The viewer accepts old
 expansion references as focused views for compatibility. External approved-spec
 and URL destinations retain `link` mode.
 
+To split an existing complex flow, select its nodes in the workbench and use
+**Create domain from selected nodes**. Preview **Local zoom** or **Separate
+document**. This creates an **independent** destination with no inherited steps
+or branches; the overview keeps its story and panels. Author a new child
+sequence only when needed. External extraction downloads the complete destination
+JSON before applying the handoff; publish that file separately. See the
+[extraction rules](../docs/drilldowns.md#extract-an-independent-diagram) for
+boundary interfaces, reference rewrites and timeline evidence.
+
 Read [the drilldown contract and guide](../docs/drilldowns.md) for the field
 shapes, step mapping, approved external loading, and compatibility stamping.
 Retain the [alternate-path rules](alternate-paths.md): identical beats can

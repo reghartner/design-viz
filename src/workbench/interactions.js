@@ -261,7 +261,6 @@ function createBuilderInteractions(opts){
                     index: only.index, card:only.card, el: only.el}, false);
       return;
     }
-    if (opts.workspace) opts.workspace.showTool('inspect', {closeUtilities:true});
     renderMultiInspector();
   }
   function bulkDeleteSelected(){
@@ -411,7 +410,7 @@ function createBuilderInteractions(opts){
     var section = ev.target.closest('.doc-sec');
     if (followStep && section){
       var ordinal = Number(section.getAttribute('data-dv-section')), player = stepperFor(ordinal);
-      if (player) selectTarget({section:ordinal, kind:'step', index:player.sourceIndex()}, false);
+      if (player) selectTarget({section:ordinal, kind:'step', index:player.sourceIndex()}, false, true);
     }
   });
 
@@ -1275,7 +1274,7 @@ function createBuilderInteractions(opts){
       return;
     }
     if (multiSel.length) clearMultiSelect(); /* a plain click is single-select again */
-    selectTarget(target);
+    selectTarget(target, false, true);
   });
 
 

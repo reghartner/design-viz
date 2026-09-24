@@ -412,7 +412,6 @@ function initWorkbenchBuilder(opts){
   var targetLabel = document.getElementById('btarget');
   var addModeExit = document.getElementById('addmode-exit');
   var undoBtn = document.getElementById('undo-builder');
-  var specbox = document.querySelector('.specbox');
   var secInsert = document.getElementById('sec-insert');
   var secInspect = document.getElementById('sec-inspect');
   var secSource = document.getElementById('sec-source');
@@ -437,19 +436,15 @@ function initWorkbenchBuilder(opts){
   if (secInsert) life.listen(secInsert,'toggle', persistSections);
   if (secSource) life.listen(secSource,'toggle', persistSections);
   function sourceVisible(){
-    return (!specbox || specbox.open) && (!secSource || secSource.open) &&
+    return (!secSource || secSource.open) &&
       (!opts.workspace || opts.workspace.tool() === 'json');
   }
   function openSource(){
     if (opts.workspace) opts.workspace.showTool('json', {closeUtilities:true});
-    if (specbox && !specbox.open) specbox.open = true;
     if (secSource && !secSource.open) secSource.open = true; /* toggle listener persists */
   }
-  /* the inspector section only exists while it has content. Revealing it
-     also opens the OUTER editor box (else a collapsed specbox hides the
-     freshly rendered inspector) — but never the JSON source section. */
+  /* Inspector content can refresh while a different workspace stays active. */
   function revealInspector(){
-    if (specbox && !specbox.open) specbox.open = true;
     if (!secInspect) return;
     secInspect.hidden = false;
     if (!secInspect.open) secInspect.open = true;
@@ -709,6 +704,8 @@ function initWorkbenchBuilder(opts){
   var outlineSearch = document.getElementById('outline-search');
   var outlineResults = document.getElementById('outline-results');
   var outlineStatus = document.getElementById('outline-status');
+  var outlineInspect=document.getElementById('outline-inspect');
+  if(outlineInspect)life.listen(outlineInspect,'click',function(){if(opts.workspace)opts.workspace.showTool('inspect',{focus:true});});
   function refreshOutline(){
     outlineLife.destroy();outlineLife=createWorkbenchLifetime();
     if (!outlineResults) return;
@@ -744,7 +741,7 @@ function initWorkbenchBuilder(opts){
           if (tabButton) tabButton.click();
         }
         var el = findTargetEl(entry.target);
-        selectTarget(Object.assign({}, entry.target, {el: el}), false);
+        selectTarget(Object.assign({}, entry.target, {el: el}), false, true);
         var loc = jsonLocate(session.text(), entry.path);
         if (loc && sourceVisible()){
           src.setSelectionRange(loc.start, loc.end);
@@ -768,7 +765,7 @@ function initWorkbenchBuilder(opts){
       if (opts.isActive && !opts.isActive()) return;
       if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || interactions.adding()) return;
       ev.preventDefault();
-      if (specbox) specbox.open = true;
+      if(opts.workspace)opts.workspace.showTool('outline');
       outline.open = true; outlineSearch.focus(); outlineSearch.select();
     });
     refreshOutline();

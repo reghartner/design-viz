@@ -88,7 +88,7 @@ test('chooser cancels cleanly, blocks stale/invalid source, and retires on build
 test('Add UI stays within a narrow editor and its modal fits supported skins',async({page,server},testInfo)=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await page.locator('#workspace-columns').focus();await page.keyboard.press('Home');
-  const box=await page.locator('#spec-editor').boundingBox();
+  const box=await page.locator('.workspace-tools').boundingBox();
   for(const id of ['diagram-add','diagram-add-target']){
     const child=await page.locator('#'+id).boundingBox();expect(child.x+child.width).toBeLessThanOrEqual(box.x+box.width);
   }

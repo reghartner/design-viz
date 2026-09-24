@@ -28,7 +28,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Starting a project, importing spec JSON, templates, or copyable agent prompts | `docs/workbench-welcome.md`; the welcome screen replaces the old Starters gallery |
 | Adding workbench nodes, connections, steps or panels; choosing an insertion destination | `docs/workbench-workspace.md` → Add to diagram and Alt/Option-click quick connections; `docs/workbench-panel-picker.md` for the visual library |
 | Company service/API choices, repository catalog sync, or nginx-bundled service references | `docs/workbench-catalog-sync.md`; use the approved `workbench/catalog.json` identities, never infer bindings from display labels |
-| A crowded editor, resizing, focus, or diagram fit controls | `docs/workbench-workspace.md` |
+| Left editor rail (Inspect, Steps, Outline, JSON, File), resizing, focus, or diagram fit controls | `docs/workbench-workspace.md`; global Add/Undo/Redo/Save are in the project toolbar; catalog and import/export controls are in File |
 | Database/payload state, checks, budgets, retry/circuit behavior, replicas, or rollout decisions | Matching recipes in `cookbook/README.md` and the corresponding widget docs |
 
 Paths, failed communications, centerpiece views, scene-event controls, and

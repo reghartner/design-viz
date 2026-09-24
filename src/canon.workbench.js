@@ -1,7 +1,7 @@
 /* The approved catalog ships beside the editor. The optional company backend
    supplies spec/review context; manual imports remain available offline. */
 function initCanonWorkbench(opts){
-  var context={catalog:null,revision:null}, catalogPriority=0, host=document.querySelector('.workspace-tools');
+  var context={catalog:null,revision:null}, catalogPriority=0, host=document.querySelector('#editor-company') || document.querySelector('.workspace-tools');
   if(!host) return context;
   var details=document.createElement('details');details.className='canon-tools';
   var summary=document.createElement('summary');summary.textContent='Company repository';details.appendChild(summary);

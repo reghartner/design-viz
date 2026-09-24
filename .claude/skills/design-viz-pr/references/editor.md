@@ -13,6 +13,15 @@
   Canon visits must retire on local replacement, including older traversed entries
   and blocked session storage, without affecting unrelated future visits; late
   Canon completion must not reopen a hidden editor. See `docs/workbench-welcome.md`.
+- The left rail owns five mounted workspaces: Inspect, Steps, Outline, JSON,
+  and File. Add/Undo/Redo/Save/User guide share the project toolbar. File owns
+  import/export, Company repository, and workspace preferences. Keep IDs and
+  element ownership stable when moving controls. Divider drag/arrow direction
+  follows the left editor boundary; resizing never rerenders the preview.
+  Verify drafts, active tools, nested disclosures, source selection, and scroll
+  through navigation, plus desktop geometry and narrow fallbacks. Plain canvas
+  selection preserves the active workspace; explicit inspection/source actions
+  navigate. Outline selection remains in its list until Inspect selection.
 - Follow the user action through selection, the mutation planner, JSON write,
   rerender and restored selection. Check one Undo/Redo per logical operation,
   invalid-input preservation and stale dialogs after source/section changes.

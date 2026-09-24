@@ -7183,6 +7183,28 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
 
 .path-matrix:has(.shared-step-link){padding:0 5px 5px 0;}
 
+/* Shared runs form a common track, with incoming/outgoing routes still visible. */
+.path-timeline{--timeline-bg:#fff;position:relative;isolation:isolate;max-width:none;}
+.sk-aurora .path-timeline{--timeline-bg:#101a2c;}
+.sk-daylight .path-timeline,.sk-pastel .path-timeline{--timeline-bg:#fff;}
+body.sk-editorial .path-timeline{--timeline-bg:#fbf8f1;}
+body.sk-terminal .path-timeline{--timeline-bg:#0c1411;}
+body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
+.path-timeline-lines{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible;}
+.path-timeline-route .path-chip{position:absolute;z-index:3;max-width:140px;min-height:32px;box-sizing:border-box;}
+.path-timeline-stop{position:absolute;z-index:3;width:32px;}
+.termbar.has-paths .path-timeline .schip{width:32px;height:32px;margin:0;border:1px solid color-mix(in srgb,var(--path-color) 50%,var(--dfaint));background:var(--timeline-bg);color:var(--dink);}
+.termbar.has-paths .path-timeline .schip[aria-current="true"]{border:2px solid var(--path-color);background:color-mix(in srgb,var(--path-color) 13%,var(--timeline-bg));box-shadow:0 0 0 3px var(--timeline-bg),0 0 0 5px var(--path-color);color:var(--dink);}
+.termbar.has-paths .path-timeline .schip.shared-step-shadow{opacity:.35;}
+.termbar.has-paths .path-timeline .schip.shared-step-shadow[aria-current="true"],.termbar.has-paths .path-timeline .schip.shared-step-shadow:focus-visible{opacity:1;}
+.path-timeline .schip:focus-visible{outline:2px solid var(--path-color);outline-offset:5px;}
+.path-shared-block{position:absolute;z-index:0;height:94px;border-radius:13px;background:color-mix(in srgb,var(--dtext) 7%,var(--timeline-bg));border:1px solid color-mix(in srgb,var(--dfaint) 24%,transparent);box-sizing:border-box;}
+.path-shared-block[data-selected="false"]{opacity:.6;}
+.path-shared-heading{display:block;text-align:center;padding:7px 4px;font:500 10px/1.25 'IBM Plex Mono',monospace;color:var(--dtext);}
+.path-shared-caption{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;position:relative;left:-28px;width:88px;margin-top:9px;max-height:30px;text-align:center;font:400 11px/1.3 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.path-timeline-owner{position:sticky;left:0;width:max-content;max-width:100%;display:flex;align-items:center;gap:6px;font:500 10px/1.5 'IBM Plex Mono',monospace;color:var(--dtext);padding:2px 0 4px;}
+.path-timeline-owner::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--path-color);flex:none;}
+
 
 .dispatch{--dispatch-accent:#6576b3;--dispatch-good:#368068;--dispatch-warn:#b87924;--dispatch-bad:#bd5265;color:var(--dtext);min-width:0;container-type:inline-size;}
 .dispatch-blocked{--dispatch-accent:var(--dispatch-bad);}.dispatch-onscene,.dispatch-resolved{--dispatch-accent:var(--dispatch-good);}.dispatch-unknown,.dispatch-cancelled{--dispatch-accent:var(--dfaint);}
@@ -8788,6 +8810,136 @@ function pathStepSharing(paths){
     });
   });
   return byStep;
+}
+
+/* Geometry only: state and playback still fold each authored path separately.
+   Decide joins and block boundaries before filtering a named view. Prefix-only
+   identities keep separate occurrences, just like the legacy timeline rows. */
+function pathTimelineGraph(paths,shownPaths){
+  var joined=new Set(),pathById=new Map();
+  paths.forEach(function(path){pathById.set(path.id,path);});
+  pathStepSharing(paths).forEach(function(step){
+    var members=new Set(step.occurrences.map(function(o){return o.path.id;}));
+    if(step.downstream && members.size>1 && members.size===step.occurrences.length)joined.add(step.sourceIndex);
+  });
+  function authoredGraph(){
+    var nodes=[],byId=new Map(),sequences=new Map(),next=new Map(),previous=new Map();
+    paths.forEach(function(path){
+      var sequence=path.indices.map(function(sourceIndex,index){
+        var id=joined.has(sourceIndex)?'shared:'+sourceIndex:'path:'+JSON.stringify([path.id,index]);
+        var node=byId.get(id);
+        if(!node){
+          node={id:id,sourceIndex:sourceIndex,occurrences:[],pathIds:[],shared:joined.has(sourceIndex),blockId:null};
+          nodes.push(node);byId.set(id,node);next.set(id,new Set());previous.set(id,new Set());
+        }
+        node.occurrences.push({pathId:path.id,index:index});node.pathIds.push(path.id);
+        return node;
+      });
+      sequences.set(path.id,sequence);
+      sequence.forEach(function(node,index){
+        if(index){var prior=sequence[index-1];next.get(prior.id).add(node.id);previous.get(node.id).add(prior.id);}
+      });
+    });
+    return {nodes:nodes,byId:byId,sequences:sequences,next:next,previous:previous};
+  }
+  var full=authoredGraph();
+  /* Contracting shared identities can create cycles (x,y versus y,x), even
+     across three or more paths. Find cyclic components with iterative graph
+     walks, then keep every identity in those components as separate instances.
+     Joins outside a conflicting component, such as a later ending, survive. */
+  var visited=new Set(),finished=[];
+  full.nodes.forEach(function(node){
+    if(visited.has(node.id))return;
+    var stack=[{id:node.id,exit:false}];
+    while(stack.length){
+      var frame=stack.pop();
+      if(frame.exit){finished.push(frame.id);continue;}
+      if(visited.has(frame.id))continue;
+      visited.add(frame.id);stack.push({id:frame.id,exit:true});
+      full.next.get(frame.id).forEach(function(id){if(!visited.has(id))stack.push({id:id,exit:false});});
+    }
+  });
+  var assigned=new Set(),unsafe=new Set();
+  finished.reverse().forEach(function(id){
+    if(assigned.has(id))return;
+    var stack=[id],component=[];assigned.add(id);
+    while(stack.length){
+      var current=stack.pop();component.push(current);
+      full.previous.get(current).forEach(function(prior){if(!assigned.has(prior)){assigned.add(prior);stack.push(prior);}});
+    }
+    if(component.length>1 || full.next.get(id).has(id))component.forEach(function(member){
+      var node=full.byId.get(member);if(node.shared)unsafe.add(node.sourceIndex);
+    });
+  });
+  if(unsafe.size){unsafe.forEach(function(sourceIndex){joined.delete(sourceIndex);});full=authoredGraph();}
+
+  /* A block extends only over immediate authored successors with the same
+     membership. Hidden forks or membership changes never fuse two blocks. */
+  var blockNext=new Map(),blockPrevious=new Set(),fullBlocks=[];
+  full.nodes.forEach(function(node){
+    if(!node.shared)return;
+    var first=node.occurrences[0],next=full.sequences.get(first.pathId)[first.index+1];
+    if(next && next.shared && next.pathIds.length===node.pathIds.length &&
+      next.pathIds.every(function(id,index){return id===node.pathIds[index];}) &&
+      node.occurrences.every(function(o){return full.sequences.get(o.pathId)[o.index+1]===next;})){
+      blockNext.set(node.id,next);blockPrevious.add(next.id);
+    }
+  });
+  full.nodes.forEach(function(node){
+    if(!node.shared || blockPrevious.has(node.id))return;
+    var block={id:'block:'+node.id,nodeIds:[],pathIds:node.pathIds.slice()};
+    while(node){node.blockId=block.id;block.nodeIds.push(node.id);node=blockNext.get(node.id);}
+    fullBlocks.push(block);
+  });
+
+  var visible=new Map(),edgeMap=new Map(),edges=[];
+  (shownPaths==null?paths:shownPaths).forEach(function(shown){
+    var path=pathById.get(shown.id);if(!path)return;
+    var cursor=0,prior=null;
+    shown.indices.forEach(function(sourceIndex,visibleIndex){
+      var index=path.indices.indexOf(sourceIndex,cursor);if(index<0)return;
+      cursor=index+1;
+      var authored=full.sequences.get(path.id)[index],node=visible.get(authored.id);
+      if(!node){
+        node={id:authored.id,sourceIndex:sourceIndex,occurrences:[],pathIds:[],column:0,shared:false,blockId:null};
+        visible.set(node.id,node);
+      }
+      node.occurrences.push({pathId:path.id,index:index,visibleIndex:visibleIndex});node.pathIds.push(path.id);
+      if(prior){
+        var key=JSON.stringify([prior.id,node.id]),edge=edgeMap.get(key);
+        if(!edge){edge={from:prior.id,to:node.id,pathIds:[]};edgeMap.set(key,edge);edges.push(edge);}
+        edge.pathIds.push(path.id);
+      }
+      prior=node;
+    });
+  });
+  var nodes=full.nodes.filter(function(node){return visible.has(node.id);}).map(function(authored){
+    var node=visible.get(authored.id);node.shared=node.occurrences.length>1;
+    if(node.shared)node.blockId=authored.blockId;
+    return node;
+  });
+  var blocks=fullBlocks.map(function(block){
+    var nodeIds=block.nodeIds.filter(function(id){return visible.has(id) && visible.get(id).shared;});
+    if(!nodeIds.length)return null;
+    var last=full.byId.get(nodeIds[nodeIds.length-1]);
+    return {id:block.id,nodeIds:nodeIds,pathIds:block.pathIds.slice(),
+      ending:last.occurrences.every(function(o){return o.index===pathById.get(o.pathId).indices.length-1;})};
+  }).filter(function(block){return block!==null;});
+
+  /* Longest-path ranks align incoming routes of different lengths. Filtering
+     only shortcuts authored edges, so the projected graph remains acyclic. */
+  var incoming=new Map(),outgoing=new Map(),queue=[],columns=0;
+  nodes.forEach(function(node){incoming.set(node.id,0);outgoing.set(node.id,[]);});
+  edges.forEach(function(edge){incoming.set(edge.to,incoming.get(edge.to)+1);outgoing.get(edge.from).push(edge.to);});
+  nodes.forEach(function(node){if(!incoming.get(node.id))queue.push(node);});
+  for(var head=0;head<queue.length;head++){
+    var node=queue[head];columns=Math.max(columns,node.column+1);
+    outgoing.get(node.id).forEach(function(id){
+      var next=visible.get(id);next.column=Math.max(next.column,node.column+1);
+      incoming.set(id,incoming.get(id)-1);if(!incoming.get(id))queue.push(next);
+    });
+  }
+  return {nodes:nodes,edges:edges,blocks:blocks,hasShared:nodes.some(function(node){return node.shared;}),columns:columns};
 }
 /* ---- src/core/section-layout.js ---- */
 /* Pure section/view layout. Uses diagramPathList() and panelCapability() at
@@ -24036,6 +24188,124 @@ function contractBlocksHTML(section,reference){
     return contractCardHTML(rec.value,reference,rec);
   }).join('')+'</div></div>';
 }
+/* ---- src/viewer/path-timeline.js ---- */
+/* Presentation of a pathTimelineGraph. Positions are derived from the graph,
+   not the selected path; switching outcomes only changes paint and numbering.
+   No runtime state is combined here and no document listeners are retained. */
+function createPathTimeline(host, source, paths, shownPaths, graph, pick){
+  var retired=false, pathById=new Map(paths.map(function(p){return [p.id,p];}));
+  var order=new Map(paths.map(function(p,i){return [p.id,i];}));
+  var rowGap=94, top=44, labelWidth=150, columnWidth=94;
+  var memberships=new Map();
+  graph.blocks.forEach(function(block){
+    var key=JSON.stringify(block.pathIds);
+    if(!memberships.has(key))memberships.set(key,{key:key,ids:block.pathIds,
+      at:block.pathIds.reduce(function(n,id){return n+order.get(id);},0)/block.pathIds.length});
+  });
+  var lanePositions=new Map(paths.map(function(p,i){return [p.id,i*rowGap+top];}));
+  var sharedPositions=new Map();
+  if(paths.length<=2){memberships.forEach(function(group){sharedPositions.set(group.key,top+group.at*rowGap);});}
+  else {
+    // Dedicated bands keep subset joins away from non-participating routes.
+    var bands=paths.map(function(p,i){return {path:p.id,at:i};});
+    memberships.forEach(function(group){bands.push({group:group.key,at:group.at+.01});});
+    bands.sort(function(a,b){return a.at-b.at;});
+    bands.forEach(function(band,i){(band.path?lanePositions:sharedPositions).set(band.path || band.group,top+i*rowGap);});
+  }
+  var width=labelWidth+Math.max(1,graph.columns)*columnWidth+28;
+  var height=Math.max.apply(null,Array.from(lanePositions.values()).concat(Array.from(sharedPositions.values())))+62;
+  function element(tag,className,parent){var e=document.createElement(tag);e.className=className;if(parent)parent.appendChild(e);return e;}
+  function position(e,x,y){e.style.left=x+'px';e.style.top=y+'px';}
+  var root=element('div','path-timeline',host);
+  root.setAttribute('role','group');root.setAttribute('aria-label','Paths with shared processing');
+  root.style.width=width+'px';root.style.height=height+'px';
+  var canvas=document.createElementNS(SVGNS,'svg');canvas.setAttribute('class','path-timeline-lines');
+  canvas.setAttribute('width',width);canvas.setAttribute('height',height);canvas.setAttribute('viewBox','0 0 '+width+' '+height);
+  canvas.setAttribute('aria-hidden','true');root.appendChild(canvas);
+  var nodes=new Map(),buttons=[],choices=[],tracks=[],regions=[];
+  graph.nodes.forEach(function(node){
+    var block=graph.blocks.find(function(b){return b.id===node.blockId;});
+    nodes.set(node.id,{node:node,x:labelWidth+node.column*columnWidth+columnWidth/2,
+      y:block?sharedPositions.get(JSON.stringify(block.pathIds)):lanePositions.get(node.pathIds[0])});
+  });
+  graph.blocks.forEach(function(block){
+    var members=block.nodeIds.map(function(id){return nodes.get(id);}).filter(Boolean);
+    if(!members.length)return;
+    var first=members[0],last=members[members.length-1],region=element('div','path-shared-block',root);
+    region.setAttribute('data-shared-block',block.id);region.setAttribute('data-shared-ending',String(block.ending));
+    position(region,first.x-44,first.y-36);region.style.width=(last.x-first.x+88)+'px';
+    var heading=element('span','path-shared-heading',region);
+    heading.textContent=block.ending?'Shared ending':members.length===1?'Shared step':'Shared steps';
+    region.title=block.pathIds.map(function(id){return pathById.get(id).label;}).join(' · ');
+    regions.push({element:region,pathIds:block.pathIds});
+  });
+  paths.forEach(function(path){
+    var row=element('div','path-timeline-route',root);row.setAttribute('data-path-row',path.id);
+    var choice=element('button','path-chip',row);choice.type='button';choice.textContent=path.label;
+    choice.setAttribute('data-dv-path',path.id);choice.style.setProperty('--path-color',path.color);
+    position(choice,0,lanePositions.get(path.id)-16);
+    choice.disabled=!shownPaths.find(function(p){return p.id===path.id;}).indices.length;
+    if(choice.disabled)choice.title='No steps from this path are shown in this view.';
+    choice.addEventListener('click',function(event){event.stopPropagation();if(!retired)pick(path.id,0,true);});
+    choices.push({button:choice,row:row,path:path});
+  });
+  var sharing=pathStepSharing(paths);
+  graph.nodes.forEach(function(node){
+    var point=nodes.get(node.id),wrap=element('div','path-timeline-stop',root);
+    position(wrap,point.x-16,point.y-16);
+    var step=source.steps[node.sourceIndex],button=element('button','schip'+(step.delta===true?' dvd':'')+(node.shared?' shared-downstream-step':''),wrap);
+    button.type='button';button.setAttribute('data-step-source',node.sourceIndex);button.setAttribute('data-timeline-node',node.id);
+    applyStepCircleColor(button,step);
+    if(node.shared){
+      var name=element('span','path-shared-caption',wrap),caption=String(step.text || step.id || '').replace(/\s+/g,' ').trim();
+      name.textContent=caption.length>54?caption.slice(0,51)+'…':caption;name.title=caption;
+    }
+    var entry={button:button,node:node,occurrence:node.occurrences[0]};buttons.push(entry);
+    button.addEventListener('click',function(){if(!retired)pick(entry.occurrence.pathId,entry.occurrence.index,false);});
+  });
+  function stroke(d,pathIds){
+    var line=document.createElementNS(SVGNS,'path');line.setAttribute('d',d);line.setAttribute('fill','none');
+    line.setAttribute('stroke-width','2');line.setAttribute('stroke-linecap','round');canvas.appendChild(line);
+    tracks.push({element:line,pathIds:pathIds});
+  }
+  graph.edges.forEach(function(edge){
+    var a=nodes.get(edge.from),b=nodes.get(edge.to),middle=(a.x+b.x)/2;
+    stroke('M '+a.x+' '+a.y+' C '+middle+' '+a.y+' '+middle+' '+b.y+' '+b.x+' '+b.y,edge.pathIds);
+  });
+  // A cap belongs to an authored ending, never to the last stop of a filtered view.
+  graph.nodes.forEach(function(node){
+    var ending=node.occurrences.filter(function(o){return o.index===pathById.get(o.pathId).indices.length-1;}).map(function(o){return o.pathId;});
+    if(!ending.length)return;
+    var point=nodes.get(node.id),capX=point.x+22;
+    stroke('M '+point.x+' '+point.y+' H '+capX+' M '+capX+' '+(point.y-5)+' V '+(point.y+5),ending);
+  });
+  var owner=element('div','path-timeline-owner',host);
+  function sync(selectedId,index){
+    if(retired)return;
+    var selected=pathById.get(selectedId);owner.textContent='Following '+selected.label;
+    owner.style.setProperty('--path-color',selected.color);
+    choices.forEach(function(choice){var active=choice.path.id===selectedId;choice.button.setAttribute('aria-pressed',String(active));choice.row.setAttribute('data-selected',String(active));});
+    buttons.forEach(function(entry){
+      var node=entry.node,occurrence=node.occurrences.find(function(o){return o.pathId===selectedId;}) || node.occurrences[0];
+      entry.occurrence=occurrence;
+      var path=pathById.get(occurrence.pathId),shared=sharing.get(node.sourceIndex),shadow=!node.shared && shared && shared.owner.id!==path.id;
+      var current=occurrence.pathId===selectedId && occurrence.index===index;
+      entry.button.textContent=String(occurrence.visibleIndex+1);
+      entry.button.setAttribute('data-step-path',path.id);entry.button.setAttribute('aria-current',String(current));
+      entry.button.style.setProperty('--path-color',shadow?shared.owner.color:path.color);
+      entry.button.classList.toggle('shared-step-shadow',!!shadow);
+      var peers=node.shared?node.occurrences.map(function(o){return pathById.get(o.pathId).label+' (step '+(o.visibleIndex+1)+')';}).join(', '):'';
+      entry.button.setAttribute('aria-label','Go to step '+(occurrence.visibleIndex+1)+' on '+path.label+(peers?', shared by '+peers:''));
+      entry.button.title=peers?'Shared step — '+peers:shadow?'Shared with '+shared.owner.label:String(source.steps[node.sourceIndex].text || '');
+    });
+    tracks.forEach(function(track){
+      var active=track.pathIds.indexOf(selectedId)>=0,path=active?selected:pathById.get(track.pathIds[0]);
+      track.element.setAttribute('stroke',path.color);track.element.setAttribute('opacity',active?'.85':'.25');
+    });
+    regions.forEach(function(region){region.element.setAttribute('data-selected',String(region.pathIds.indexOf(selectedId)>=0));});
+  }
+  return {sync:sync,destroy:function(){retired=true;}};
+}
 /* ---- src/engine.js ---- */
 /* engine.js — board renderer, stepper and page renderer.
    Consumes document, navigation, path, layout, state and geometry helpers
@@ -25071,7 +25341,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
-  var chipButtons = [], pathButtons = [];
+  var chipButtons = [], pathButtons = [], pathTimeline = null;
   function paintStepCoins(){
     var visible=stops();
     svg.querySelectorAll('.coin[data-dv-step]').forEach(function(coin){
@@ -25088,6 +25358,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function paintChips(){
     paintStepCoins();
+    if(pathTimeline){pathTimeline.destroy();pathTimeline=null;}
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
     chipButtons = []; pathButtons = [];
     function appendStep(parent,path,idx,rowNumber,sharedWith,sharing){
@@ -25127,9 +25398,22 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var only=viewPath(selectedPath);only.indices.forEach(function(unused,idx){appendStep(chipsBox,only,idx,0);});
       return;
     }
+    var shownPaths=paths.map(viewPath),timelineGraph=pathTimelineGraph(paths,shownPaths);
+    if(timelineGraph.hasShared){
+      pathTimeline=createPathTimeline(chipsBox,source,paths,shownPaths,timelineGraph,function(pathId,index,restart){
+        if(destroyed)return;
+        var changedPath=pathId!==selectedPath.id;
+        stopAuto();
+        if(restart){clearEditingPreview();selectPath(pathId,0);}
+        else if(pathId!==selectedPath.id)selectPath(pathId,index);
+        else setStep(index);
+        if(restart || changedPath)secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
+      });
+      pathTimeline.sync(selectedPath.id,cur);
+      return;
+    }
     var matrix = document.createElement('div'); matrix.className = 'path-matrix';
     matrix.setAttribute('role','group'); matrix.setAttribute('aria-label','Execution paths');
-    var shownPaths=paths.map(viewPath);
     matrix.style.setProperty('--path-step-count',Math.max(1,Math.max.apply(null,shownPaths.map(function(p){return p.indices.length;}))));
     pathStepRows(shownPaths).forEach(function(row,rowNumber){
       var path = row.path, line = document.createElement('div'); line.className = 'path-row';
@@ -25162,6 +25446,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
   }
   function syncPathControls(){
+    if(pathTimeline){pathTimeline.sync(selectedPath.id,cur);return;}
     pathButtons.forEach(function(choice){
       var active = choice.path.id === selectedPath.id;
       choice.button.setAttribute('aria-pressed',String(active));
@@ -25480,6 +25765,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     pause: stopAuto,
     destroy: function(){
       destroyed = true; stopAuto(); clearLit(); clearCaptionTween();
+      if(pathTimeline)pathTimeline.destroy();
       if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
     },
     onHide: function(){ if (!destroyed && !hidden){

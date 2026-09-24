@@ -19,6 +19,7 @@
   "engine.js": [
     "viewer/prose.js",
     "viewer/contracts.js",
+    "viewer/path-timeline.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",

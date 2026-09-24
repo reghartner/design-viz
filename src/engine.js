@@ -1032,7 +1032,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
-  var chipButtons = [], pathButtons = [];
+  var chipButtons = [], pathButtons = [], pathTimeline = null;
   function paintStepCoins(){
     var visible=stops();
     svg.querySelectorAll('.coin[data-dv-step]').forEach(function(coin){
@@ -1049,6 +1049,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function paintChips(){
     paintStepCoins();
+    if(pathTimeline){pathTimeline.destroy();pathTimeline=null;}
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
     chipButtons = []; pathButtons = [];
     function appendStep(parent,path,idx,rowNumber,sharedWith,sharing){
@@ -1088,9 +1089,22 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var only=viewPath(selectedPath);only.indices.forEach(function(unused,idx){appendStep(chipsBox,only,idx,0);});
       return;
     }
+    var shownPaths=paths.map(viewPath),timelineGraph=pathTimelineGraph(paths,shownPaths);
+    if(timelineGraph.hasShared){
+      pathTimeline=createPathTimeline(chipsBox,source,paths,shownPaths,timelineGraph,function(pathId,index,restart){
+        if(destroyed)return;
+        var changedPath=pathId!==selectedPath.id;
+        stopAuto();
+        if(restart){clearEditingPreview();selectPath(pathId,0);}
+        else if(pathId!==selectedPath.id)selectPath(pathId,index);
+        else setStep(index);
+        if(restart || changedPath)secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
+      });
+      pathTimeline.sync(selectedPath.id,cur);
+      return;
+    }
     var matrix = document.createElement('div'); matrix.className = 'path-matrix';
     matrix.setAttribute('role','group'); matrix.setAttribute('aria-label','Execution paths');
-    var shownPaths=paths.map(viewPath);
     matrix.style.setProperty('--path-step-count',Math.max(1,Math.max.apply(null,shownPaths.map(function(p){return p.indices.length;}))));
     pathStepRows(shownPaths).forEach(function(row,rowNumber){
       var path = row.path, line = document.createElement('div'); line.className = 'path-row';
@@ -1123,6 +1137,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
   }
   function syncPathControls(){
+    if(pathTimeline){pathTimeline.sync(selectedPath.id,cur);return;}
     pathButtons.forEach(function(choice){
       var active = choice.path.id === selectedPath.id;
       choice.button.setAttribute('aria-pressed',String(active));
@@ -1441,6 +1456,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     pause: stopAuto,
     destroy: function(){
       destroyed = true; stopAuto(); clearLit(); clearCaptionTween();
+      if(pathTimeline)pathTimeline.destroy();
       if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
     },
     onHide: function(){ if (!destroyed && !hidden){

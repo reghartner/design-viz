@@ -56,8 +56,12 @@ relationship. A timeout by itself cannot support the same claim.
 - Panel and tone state fold from initial values through this path. Inspect the
   full state at its first distinct step and its end; sparse patches retain old
   values unless changed. A shared ending does not restore success automatically.
-- Common cleanup can be shared only when its body is truthful for each incoming
-  state. Do not reset uncertainty or mark recovery without evidence.
+- Shared middle operations or cleanup can use the same consecutive IDs only
+  when their bodies are truthful for each incoming state. Paths may split after
+  a common track and rejoin later. Every participant must finish at a block for
+  it to be a shared ending; an early-ending path never joins a later block it
+  does not reference. Hidden stops retain their place in this classification.
+  Do not reset uncertainty or mark recovery without evidence.
 - End where the source ends. Do not add recovery, retries, compensation, or a
   user notification to provide narrative closure.
 

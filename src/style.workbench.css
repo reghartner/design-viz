@@ -1039,6 +1039,7 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .human-guide-timeline{padding:22px 20px 13px;border:1px solid #e0d9ef;border-radius:14px;background:#fbf9fe;margin:24px 0}
 .human-guide-timeline>div{display:grid;grid-template-columns:105px repeat(5,1fr);gap:12px;align-items:center;margin-bottom:12px;color:#6d5caa;font-size:12px}
 .human-guide-timeline span{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#e7e0f6;border:1px solid #ab9bd3;font-weight:700}
+.human-guide-shared-ending span{grid-column:6;}
 .human-guide-timeline .human-guide-alternate{color:#a96324}.human-guide-alternate span{background:#f8e6d5;border-color:#d59d65}
 .human-guide-alternate .shared{opacity:.35;background:#e7e0f6;border-color:#ab9bd3;color:#6d5caa}
 .human-guide-timeline p{font-size:11px;color:#686477;margin:14px 0 0;text-align:center}

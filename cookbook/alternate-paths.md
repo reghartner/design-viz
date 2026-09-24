@@ -85,6 +85,37 @@ detaches one shared occurrence in place. **Continue from here** can reuse a
 source ending; inspect **Destination preview** before applying it. See
 [step reuse](../docs/workbench-step-reuse.md).
 
+## Rejoin in the middle, then branch again
+
+For common operations after a divergence, reference the same consecutive IDs:
+
+```json
+[
+  {"id":"normal", "label":"First attempt", "steps":["press", "record", "store", "index", "notify", "ready"]},
+  {"id":"retry", "label":"After retry", "steps":["press", "record-failed", "record-retry", "store", "index", "notify-recovery", "ready"]},
+  {"id":"offline", "label":"Device offline", "steps":["press", "offline"]}
+]
+```
+
+- `store` and `index` appear once on a common track labeled **Shared steps**.
+  The retry has an extra stop before joining, so the numbers follow the selected
+  path. Clicking a shared circle keeps that path if it participates; otherwise
+  the circle identifies the participating path it will select.
+- The paths split for `notify` and `notify-recovery`, then rejoin at `ready`.
+  That block is **Shared ending** because both participating paths finish there.
+  A one-step shared block in the middle is **Shared step**.
+- The offline path stops after `offline`; it never connects to either later
+  block. Other subsets of paths can share their own runs.
+- Editing `store` changes both paths. Its patch receives each path's own prior
+  state, so an unchanged retry flag and earlier log entries remain distinct.
+
+The [complete doorbell example](../examples/shared-downstream/shared-blocks.spec.json)
+includes small state and log panels for checking those differences. Use shared
+IDs only when the operation's caption and patches are truthful on every incoming
+path. Common blocks are inferred from the full authored sequences; hidden stops
+do not join separated runs or turn a middle block into an ending. Conflicting
+shared orders retain separate occurrences with individual sharing cues.
+
 ## Failed communication is a separate claim
 
 `failures` references an existing edge and lasts only for that step.
@@ -95,6 +126,7 @@ A received error response, timeout, or Honeycomb error span alone does not
 establish non-delivery. See [failed communications](../docs/failed-communications.md).
 
 Run the [cookbook build loop](README.md#the-loop-every-recipe-ends-here), then
-visit step 1, the fork, and the ending of EVERY path. Switch from Applied to
-Lost and verify success state does not carry over. Full [path contract and
+visit step 1, every split and rejoin, and the ending of EVERY path. Switch from
+Applied to Lost and verify success state does not carry over. At shared blocks,
+check the selected path's numbers and retained state. Full [path contract and
 editor guide](../docs/alternate-paths.md).

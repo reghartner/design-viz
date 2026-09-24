@@ -919,129 +919,85 @@ h1{font-family:'Sora',sans-serif; font-weight:700; font-size:clamp(30px,4.5vw,42
 .lede b{color:var(--ink);}
 h2{font-family:'Sora',sans-serif; font-weight:600; font-size:21px; margin:0;}
 .mdesc{color:var(--sub); max-width:80ch; margin:6px 0 14px; font-size:14.5px;}
-/* Keep one editor tool visible; resizing changes space, never content. */
-.workwrap{max-width:1720px;margin:0 auto;padding:0 22px;}
+/* Left tools and editor share a workspace; resizing never rebuilds its content. */
+.workwrap{margin:0 auto;padding:0 22px;display:grid;grid-template-columns:72px var(--workspace-editor,440px) 24px minmax(0,1fr);align-items:start;}
 .workmain{min-width:0;}
-.canon-tools{font-size:12px;max-width:100%;}
-.canon-tools summary{cursor:pointer;}
-.canon-tools textarea{display:block;box-sizing:border-box;width:min(600px,100%);min-height:90px;font:11px monospace;}
-.canon-tools button{margin:6px 8px 6px 0;}
-.workspace-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:1676px;margin:18px auto 0;padding:8px 22px;background:var(--bg);}
-.workspace-hint{font-size:11px;color:var(--sub);}
-.workspace-divider{display:none;touch-action:none;user-select:none;position:relative;cursor:col-resize;}
+.workmain .toolrow{margin-top:12px;}
+.workspace-tools{display:flex;align-items:center;gap:12px;flex:1;min-width:0;box-sizing:border-box;}
+body.welcome-active .workspace-tools{display:none;}
+.workspace-tools button{white-space:nowrap;}
+.workspace-create{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.workspace-tools .editor-add-button{min-height:34px;padding:6px 12px;font-size:12px;flex:none;}
+.workspace-tools .editor-add-destination{margin:0;flex:1;max-width:250px;}
+.workspace-history,.workspace-save{display:flex;align-items:center;gap:6px;flex:none;}
+.workspace-save{margin-left:auto;}
+.workspace-tools .rbtn{padding:7px 16px;}
+body:not(.welcome-active) .workbench-header{position:sticky;top:0;z-index:60;max-width:none;padding:12px 22px;gap:20px;background:var(--bg);}
+body:not(.welcome-active) .workbench-brand-detail{display:none;}
+body:not(.welcome-active) .workbench-header-links{display:none;}
+.workspace-divider{display:block;align-self:stretch;min-height:200px;touch-action:none;user-select:none;position:relative;cursor:col-resize;}
 .workspace-divider::after{content:"";position:absolute;width:2px;left:11px;top:12px;bottom:12px;border-radius:3px;background:var(--line);}
 .workspace-divider>span{display:block;position:sticky;top:45dvh;z-index:1;margin:120px auto 0;padding:12px 0;width:18px;text-align:center;border:1px solid var(--accent);border-radius:14px;background:var(--card);color:var(--accent);font:600 15px/1 monospace;}
 .workspace-divider:hover::after,.workspace-divider:focus-visible::after{background:var(--accent);}
 .workspace-divider:hover>span{box-shadow:0 0 0 3px var(--selglow);}
 .workspace-divider:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
-body.workspace-dragging,body.workspace-dragging *{user-select:none !important;cursor:inherit !important;}
-body.workspace-focus{margin:0;}
-body.workspace-focus>header,body.workspace-focus #workbench-workspace>.wrap,body.workspace-focus>footer{display:none;}
-body.workspace-focus .workspace-tools{position:sticky;top:0;z-index:60;margin-top:0;max-width:none;}
-body.workspace-focus .workwrap{max-width:none;}
-#workspace-focus[aria-pressed="true"],#workspace-expand[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
-.editor-tabs{display:flex;gap:3px;padding:6px 10px 0;border-bottom:1px solid var(--line);flex:none;}
-.editor-tabs [role="tab"]{flex:1;min-width:0;min-height:38px;padding:8px 4px;border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;background:transparent;color:var(--sub);font:600 12px 'IBM Plex Sans',sans-serif;cursor:pointer;}
-.editor-tabs [aria-selected="true"]{border-bottom-color:var(--accent);color:var(--ink);background:var(--codebg);}
-.editor-tabs [role="tab"]:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;}
-.editor-utilities{flex:none;min-height:0;overflow:auto;}
-.editor-pane{min-width:0;}
-.editor-pane>.ssec>summary{display:none;}
+body.workspace-dragging,body.workspace-dragging *{user-select:none!important;cursor:inherit!important;}
+.workwrap .workspace-rail,.workwrap .specbox{position:sticky;top:calc(var(--workspace-toolbar,60px) + 12px);margin-top:12px;height:calc(100dvh - var(--workspace-toolbar,60px) - 24px);box-sizing:border-box;min-height:240px;min-width:0;}
+.workwrap .workspace-rail{display:flex;flex-direction:column;gap:7px;padding:12px 5px;background:var(--codebg);border:1px solid var(--line);border-radius:12px 0 0 12px;overflow:auto;}
+.workspace-rail [role="tab"]{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:61px;padding:8px 2px;border:0;border-radius:7px;background:transparent;color:var(--sub);font:500 11px 'IBM Plex Sans',sans-serif;cursor:pointer;}
+.workspace-rail [aria-selected="true"]{color:var(--ink);background:var(--card);box-shadow:inset 3px 0 var(--accent);font-weight:600;}
+.workspace-rail [role="tab"]:hover{background:var(--card);}
+.workspace-rail [role="tab"]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+.editor-tool-icon{font:22px/24px 'IBM Plex Mono',monospace;color:var(--accent);}
+.workspace-rail #editor-tab-file{margin-top:auto;}
+.workwrap .specbox{display:flex;flex-direction:column;border-left:0;border-radius:0 12px 12px 0;overflow:hidden;}
+.editor-pane{min-width:0;flex:1 1 0;min-height:0;overflow:auto;}
+.editor-pane:not(#editor-file)>.ssec>summary{display:none;}
+.editor-pane-heading{padding:18px 16px 12px;}
+.editor-pane-heading h2{font-size:17px;}
+.editor-pane-heading p{font-size:12px;line-height:1.5;color:var(--sub);margin:7px 0 12px;}
 .editor-empty{padding:18px;margin:0;font-size:13px;color:var(--sub);}
 #editor-inspect:has(#sec-inspect:not([hidden]) #guide:not([hidden])) .editor-empty{display:none;}
 .editor-inspect-selection{margin:10px 14px 4px;}
-#editor-steps .story-list{max-height:none;overflow:visible;}
-.editor-file-tools{flex:none;gap:6px !important;}
-.editor-file-tools .msgs{flex-basis:100%;margin:0;}
+#editor-steps .story-list,#editor-outline .outline-results{max-height:none;overflow:visible;}
+#editor-outline #sec-outline{padding:0 14px 14px;border-top:0;}
+.workwrap #editor-inspect,.workwrap #editor-json{display:flex;flex-direction:column;}
+.workwrap #sec-source[open],.workwrap #sec-inspect[open]{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+.workwrap #sec-source[open]::details-content,.workwrap #sec-inspect[open]::details-content{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+.workwrap #sec-source[open] #src{flex:1 1 auto;height:auto;min-height:120px;resize:none;}
+.workwrap #sec-inspect[open] .guide{overflow:auto;max-height:none;min-height:0;flex:1 1 auto;container-type:inline-size;container-name:inspector;}
+.editor-json-actions,.editor-clipboard{flex:none;}
+#editor-json .diffbox{flex:none;max-height:40%;overflow:auto;}
+.editor-file-tools{gap:8px!important;}
+.editor-pane .canon-tools{font-size:12px;padding:12px 14px;border-top:1px solid var(--line);}
+.canon-tools summary{cursor:pointer;}
+.canon-tools textarea{display:block;box-sizing:border-box;width:100%;min-height:90px;font:11px monospace;}
+.canon-tools button{margin:6px 8px 6px 0;}
+.workspace-preferences>.fnote{padding:0 14px 10px;}
+.specbox>.draftbar,.specbox>.editor-add-status{flex:none;max-height:130px;overflow:auto;}
+.specbox>.editor-add-status{margin:8px;}
+.specbox>.msgs{flex:none;max-height:100px;overflow:auto;margin:0;padding:8px 14px;}
+.specbox>.msgs:empty{display:none;}
 .confluence-handoff{flex-basis:100%;min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px;}
 .confluence-handoff label{font-size:12px;font-weight:600;}
 .confluence-handoff textarea{box-sizing:border-box;width:100%;height:110px;margin-top:6px;resize:vertical;font:11px monospace;}
 .confluence-handoff p{font-size:12px;margin:8px 0;}
-@media (max-width:1180px){.workwrap{padding:0 12px;}}
-@media (max-width:1180px){.workspace-tools{padding:8px 12px;}}
-@media (min-width:800px){
-  .workwrap{display:grid;grid-template-columns:minmax(0,1fr) 24px var(--workspace-editor,440px);align-items:start;}
-}
-@media (min-width:800px){
-  #workspace-columns{display:block;align-self:stretch;min-height:200px;}
-}
-@media (min-width:800px){
-  .workwrap .specbox{position:sticky;top:12px;margin-top:12px;min-width:0;box-sizing:border-box;}
-}
-@media (min-width:800px){
-  .workwrap .specbox[open]{display:flex;flex-direction:column;height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);}
-}
-@media (min-width:800px){
-  .workwrap .specbox[open]::details-content{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;}
-}
-@media (min-width:800px){
-  .workwrap .specbox>summary{flex:none;}
-}
-@media (min-width:800px){
-  .workwrap .editor-utilities{max-height:42%;}
-}
-@media (min-width:800px){
-  .workwrap .editor-pane{flex:1 1 0;min-height:160px;overflow:auto;}
-}
-@media (min-width:800px){
-  .workwrap #editor-inspect,.workwrap #editor-json{display:flex;flex-direction:column;}
-}
-@media (min-width:800px){
-  .workwrap #sec-source[open],.workwrap #sec-inspect[open]{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
-}
-@media (min-width:800px){
-  .workwrap #sec-source[open]::details-content,.workwrap #sec-inspect[open]::details-content{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
-}
-@media (min-width:800px){
-  .workwrap #sec-source[open] #src{flex:1 1 auto;height:auto;min-height:120px;resize:none;}
-}
-@media (min-width:800px){
-  .workwrap #sec-inspect[open] .guide{overflow:auto;max-height:none;min-height:0;flex:1 1 auto;}
-}
-@media (min-width:800px){
-  .workwrap .msgs{max-height:100px;overflow:auto;}
-}
-@media (min-width:800px){
-  body.workspace-focus .workmain{max-height:calc(100dvh - var(--workspace-toolbar,48px));overflow:auto;}
-}
-@media (min-width:800px){
-  body.workspace-focus .toolrow{margin-top:12px;}
-}
-@media (min-width:800px){
-  body.workspace-focus .workwrap .specbox{top:calc(var(--workspace-toolbar,48px) + 6px);margin-top:6px;}
-}
-@media (min-width:800px){
-  body.workspace-focus .workwrap .specbox[open]{height:calc(100dvh - var(--workspace-toolbar,48px) - 12px);max-height:calc(100dvh - var(--workspace-toolbar,48px) - 12px);}
-}
-@media (min-width:800px){
-  body.editor-expanded .workwrap{grid-template-columns:minmax(0,1fr) 320px;gap:16px;}
-}
-@media (min-width:800px){
-  body.editor-expanded .workmain{grid-column:2;grid-row:1;}
-}
-@media (min-width:800px){
-  body.editor-expanded .specbox{grid-column:1;grid-row:1;}
-}
-@media (min-width:800px){
-  body.editor-expanded #workspace-columns{display:none;}
-}
-@media (min-width:800px){
-  body.editor-expanded .workmain .docview{padding:12px;}
-}
-@media (max-width:799px){
-  .workspace-hint,#workspace-expand{display:none;}
-}
-@media (max-width:799px){
-  .editor-utilities{max-height:50dvh;}
-}
-@media (max-width:799px){
-  .editor-pane{max-height:75dvh;overflow:auto;}
-}
-@media (max-width:799px){
-  #editor-inspect .guide{max-height:none;overflow:visible;}
-}
-@media (max-width:799px){
-  .editor-tabs [role="tab"]{min-height:44px;}
+body.workspace-focus{margin:0;}
+body.workspace-focus #workbench-workspace>.wrap,body.workspace-focus>footer{display:none;}
+body.workspace-focus .workspace-tools{margin-top:0;}
+#workspace-focus[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
+@media(min-width:800px){body.workspace-focus .workmain{max-height:calc(100dvh - var(--workspace-toolbar,60px));overflow:auto;}}
+@media(max-width:1180px){.workwrap{padding:0 12px;}.workspace-tools{gap:8px;}body:not(.welcome-active) .workbench-header{padding:10px 12px;gap:12px;}.workspace-tools .editor-add-destination{max-width:180px;}}
+@media(max-width:1100px){body:not(.welcome-active) .workbench-header{flex-wrap:wrap;}body:not(.welcome-active) .workbench-brand{font-size:17px;}.workspace-tools{flex-wrap:wrap;}.workspace-create{flex-basis:50%;}.workspace-tools .editor-add-destination{max-width:none;}}
+@media(max-width:799px){
+  .workwrap{grid-template-columns:56px minmax(0,1fr);padding:0 8px;}
+  .workwrap .workspace-rail,.workwrap .specbox{position:relative;top:auto;height:75dvh;min-height:400px;}
+  .workspace-rail [role="tab"]{font-size:10px;min-height:58px;}
+  #workspace-columns{display:none;}
+  .workmain{grid-column:1/-1;grid-row:2;}
+  .workspace-tools .editor-add-destination{max-width:100%;}
+  .workspace-create{flex-basis:100%;order:2;}
+  .workspace-tools{gap:6px;}
 }
 @media (max-width:640px){body{margin:0;}}
 @media (max-width:640px){.workwrap{padding:0 8px;}}
@@ -1186,12 +1142,6 @@ body.workspace-focus .workwrap{max-width:none;}
 .doc-sub{font:500 11px 'IBM Plex Mono',monospace; color:var(--dfaint); margin:0;}
 /* spec editor */
 .specbox{margin-top:14px; border:1px solid var(--line); border-radius:10px; background:var(--card);}
-.specbox > summary{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer; padding:9px 14px; font:600 12px 'IBM Plex Mono',monospace; color:var(--sub);}
-.specbox > summary:hover{color:var(--ink);}
-.specbox>summary>span::before{content:"▸ ";}
-.specbox[open]>summary>span::before{content:"▾ ";}
-.specbox>summary::-webkit-details-marker{display:none;}
-.specbox[open] > summary{border-bottom:1px solid var(--line);}
 /* collapsible editor sections: import / inspector / JSON source */
 /* class display rules (flex on .draftbar and the section rows
    above) would otherwise beat the hidden attribute's UA display:none */
@@ -1217,11 +1167,9 @@ body.workspace-focus .workwrap{max-width:none;}
 .bbtn:hover{color:var(--ink); border-color:var(--accent);}
 .bbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 /* One persistent insertion entry point above the editor tools. */
-.editor-add{flex:none;min-width:0;padding:12px 14px;border-bottom:1px solid var(--line);}
 .editor-add-button{display:flex;align-items:center;justify-content:center;gap:9px;box-sizing:border-box;
   min-height:46px;padding:11px 18px;border:1px solid var(--accent);border-radius:10px;
   background:var(--accent);color:var(--accent-ink);font:600 14px/1.4 'Sora',sans-serif;cursor:pointer;}
-.editor-add > .editor-add-button{width:100%;}
 .editor-add-button:hover:not(:disabled){box-shadow:0 3px 12px var(--selglow);filter:brightness(1.06);}
 .editor-add-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
 .editor-add-button:disabled{opacity:.5;cursor:default;}
@@ -1329,6 +1277,13 @@ body.workspace-focus .workwrap{max-width:none;}
 .guide .gtokens{margin-top:6px; font:500 11px 'IBM Plex Mono',monospace;}
 /* inspector: per-element edit form written through to the spec JSON */
 /* Long catalog options must not set the minimum width of the whole form. */
+.step-form-columns,.step-form-story,.step-form-panels{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0;align-content:start;}
+.step-form-panels{border-top:1px solid var(--line);padding-top:14px;margin-top:14px;}
+.step-form-panels>h3{font-size:13px;color:var(--ink);margin:0 0 7px;}
+@container inspector (min-width:650px){
+  .step-form-columns{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start;}
+  .step-form-panels{margin:0;padding:0 0 0 18px;border-top:0;border-left:1px solid var(--line);}
+}
 .iform{margin-top:8px; display:grid; grid-template-columns:minmax(0,1fr); min-width:0; gap:5px;}
 .frow{display:flex; min-width:0; align-items:center; gap:8px;}
 .flab{flex:0 0 88px; font:600 11px 'IBM Plex Mono',monospace; color:var(--sub); text-align:right;}
@@ -8442,6 +8397,15 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
     <span>Flowview</span><span class="workbench-brand-detail">Workbench</span>
   </button>
   <div class="workbench-header-links"><button type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button type="button" id="welcome-header-resume" hidden>Back to project <span aria-hidden="true">↗</span></button><a id="welcome-repo-link" href="https://github.com/reghartner/design-viz" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
+  <div class="workspace-tools" aria-label="Project actions">
+    <button class="bbtn" id="workspace-home" type="button">← New / open</button>
+    <div class="workspace-create">
+        <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
+        <label class="editor-add-destination" for="diagram-add-target">Into <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
+    </div>
+    <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
+    <div class="workspace-save"><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save">Save</button></div>
+  </div>
 </header>
 
 <dialog id="human-guide" class="human-guide" aria-labelledby="human-guide-title">
@@ -8459,7 +8423,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       </section>
       <section id="hg-workspace" tabindex="-1"><p class="human-guide-eyebrow">02 / FIND YOUR WAY</p><h3>Preview on one side. The selected thing on the other.</h3><p>Click a node, connection, panel, or step to inspect it. <b>Inspect</b> edits the selection, <b>Steps</b> manages the story, and <b>JSON</b> exposes the complete source. You can do ordinary editing without writing JSON. If you do edit JSON, choose <b>Render</b> and read any validation messages.</p>
         <dl class="human-guide-glossary"><dt>Page</dt><dd>The whole document, with one or more sections and optional tabs.</dd><dt>Section</dt><dd>One diagram, its panels, and its timeline.</dd><dt>Node / connection</dt><dd>An actor and a directed communication between actors.</dd><dt>Step / path</dt><dd>A moment in the story and the sequence of moments for an outcome.</dd><dt>View</dt><dd>An arrangement of the same section for an audience. It can show fewer panels and fewer stops.</dd></dl>
-        <p>Drag the divider for more editing room. <b>Expand editor</b> and <b>Focus workspace</b> give you more space; <b>Reset layout</b> in the workspace toolbar resets that split. This is different from arranging the contents of a diagram section. The document outline (<kbd>⌘/Ctrl K</kbd>) helps find objects across sections and tabs.</p><p>The Flowview wordmark and <b>← New / open</b> return home. Browser Back and Forward work between entry screens and the editor. <b>Continue</b> brings back your current project.</p>
+        <p>The left rail opens <b>Inspect</b>, <b>Steps</b>, <b>Outline</b>, <b>JSON</b>, or <b>File</b> beside it. Each fills the editor; the preview stays on the right. Drag the visible divider right for more editing room. <b>File → Workspace preferences</b> contains <b>Focus workspace</b> and <b>Reset editor width</b>. The top toolbar keeps <b>Add to diagram</b>, <b>Undo</b>, <b>Redo</b>, <b>User guide</b>, and <b>Save</b> available. Use <b>Outline</b> (<kbd>⌘/Ctrl K</kbd>) to find objects across sections and tabs. Canvas selection updates Inspect without switching away from another tool.</p><p>The Flowview wordmark and <b>← New / open</b> return home. Browser Back and Forward work between entry screens and the editor. <b>Continue</b> brings back your current project.</p>
       </section>
       <section id="hg-connect" tabindex="-1"><p class="human-guide-eyebrow">03 / NODES & CONNECTIONS</p><h3>Arrange the actors. Make each connection explain itself.</h3><p><strong>Rows</strong> keep nodes ordered left to right. Drag a node to another row or position to reorganize the flow. For arbitrary placement, select the node and choose <b>float → Free placement</b>, then drag it anywhere or adjust <b>Float X / Y</b>. Choose an automatic float position or return it to rows when you want automatic placement again.</p><p>To draw a connection, <b>Alt/Option-click a source, then click a destination</b>. You can also use <b>Connect from this node</b> in the inspector, or <b>Add to diagram → Connection</b>. A preview arrow shows where you are connecting. <kbd>Esc</kbd> cancels. Connections stay within a section; an existing ordinary connection is not duplicated.</p><p>Select the connection to edit its label, protocol, and arrow behavior. <b>Exit side</b> and <b>Entry side</b> choose its attachment edges; the position percentage moves an endpoint along that side. Use these when automatic routing obscures a relationship.</p><p><b>Fit width</b> uses the available width; <b>Readable</b> preserves node readability and lets you pan horizontally when the board overflows. These controls change your viewing scale, not the authored node positions.</p><aside class="human-guide-tip"><strong>Give a large process its own detail.</strong> A node’s <b>Create detail flow</b> starts a drilldown into another section. Readers keep context through the overview map and breadcrumbs. A pointer to another diagram is a separate document handoff, useful for an independently maintained process.</aside>
       </section>
@@ -8477,7 +8441,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       </section>
       <section id="hg-views" tabindex="-1"><p class="human-guide-eyebrow">08 / LAYOUTS & AUDIENCES</p><h3>One story. More than one useful view.</h3><p>Choose <b>Arrange section</b> to position and resize the diagram, panels, and step controls. Use <b>View name</b> for reader-facing names such as “At home” and “Service flow.” Duplicate a view, then tailor it for another audience.</p><p>Under <b>Visible elements</b>, each panel and the data diagram has its own checkbox for the selected layout. Hide Home in the engineering view or hide Data flow in the customer view. <b>Optimize layout</b> arranges the visible elements and respects the hidden set. <b>Make default</b> chooses the opening view. Property edits, Undo/Redo, and host preview changes keep your current view selected. Opening another project uses its own default; deleting the selected view falls back to the remaining default. <b>Done arranging</b> returns to ordinary use.</p><p>Attach the step controls to Home or Data flow to keep them in the same outlined frame, or detach them for independent placement. Resize attached controls with their height adjustment. Under <b>Steps shown in this view</b>, select only the stops that audience needs. <strong>Skipped steps still happen:</strong> their effects carry forward. This shortens the presentation, not the story.</p><p>Preview <b>Responsive</b>, <b>Backstage</b>, or <b>Confluence</b> to tune space for the destination. These are layout previews, not live connections to those products. Named views are the complete set of view buttons; create a view named “Data flow” if you want one alongside your other arrangements.</p>
       </section>
-      <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Canon diagrams</b> on the home page opens the published library read-only. You can play steps, switch paths and views, and follow evidence links. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships; they do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, expand <b>Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, expand <b>Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
+      <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Canon diagrams</b> on the home page opens the published library read-only. You can play steps, switch paths and views, and follow evidence links. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships; they do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, choose <b>File → Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, choose <b>File → Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
       </section>
       <section id="hg-reuse" tabindex="-1"><p class="human-guide-eyebrow">10 / COPY & REUSE</p><h3>Choose whether the relationship should stay shared.</h3><p>Use <b>Copy</b>, <b>Paste…</b>, and <b>Duplicate</b> for selected nodes, panels, or sections. Multi-select nodes to copy a group; internal connections travel with them when both endpoints are included. A copied section includes its story and alternate paths. A copied panel carries its layout and starting state, not the current step’s animation.</p><p>In Home’s shared layout inspector, use <b>Copy element</b> or <b>Duplicate element</b> for its contents. For story events, use <b>Reuse steps…</b>: copying creates an independent event, while sharing deliberately keeps one event on multiple paths. Undo reverses an operation as a unit.</p><p><kbd>⌘/Ctrl C</kbd>, <kbd>⌘/Ctrl V</kbd>, and <kbd>⌘/Ctrl D</kbd> operate on diagram objects outside text fields. Inside a text field, normal text editing takes priority. If clipboard permission is unavailable, <b>Paste…</b> provides a manual text option.</p>
       </section>
@@ -8485,7 +8449,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       </section>
       <section id="hg-agent" tabindex="-1"><p class="human-guide-eyebrow">12 / WORK WITH AN AGENT</p><h3>Give it the question, the evidence, and the audience.</h3><p>On the home page choose <b>Build it with your agent</b>. Select whether to explain a design, explore a codebase, or improve a diagram. Add your brief, choose the audience, and copy the prompt. It points your agent to the authoring skill in the selected repository. Use <b>Using a company fork?</b> to set your team’s repository and revision.</p><blockquote>Explain what happens from a doorbell press to a resident seeing the clip. Include the successful path, a recording timeout with recovery, and an outage that ends early. Give engineers a service view and business readers a Home view of the same steps. Use the attached design as evidence; identify anything it does not establish.</blockquote><p>Run the agent in your own tools with the relevant design or code. Bring its JSON back using <b>Paste JSON</b> or <b>Open file</b>, then walk every path. Ask it to check readability, animation, failure consequences, and shared-step behavior as well as JSON validity.</p>
       </section>
-      <section id="hg-help" tabindex="-1"><p class="human-guide-eyebrow">13 / WHEN SOMETHING SURPRISES YOU</p><h3>Usually, it is the editing context.</h3><dl class="human-guide-fixes"><dt>“Editing the alternate changed the happy path.”</dt><dd>That event is shared. Use <b>Make independent here</b> before changing its content for one path.</dd><dt>“My new branch starts with the same event.”</dt><dd>Create it <em>after the last shared step</em>. The next step is the first independent outcome. The shared lead-in still plays from step 1.</dd><dt>“The camera is still recording on this step.”</dt><dd>State carries forward. Set recording off at the appropriate beat; changing a scene does not automatically end recording.</dd><dt>“I hid a step, but its result is still visible.”</dt><dd>A view skips presentation stops, not their effects. Use an alternate path to change what actually happens.</dd><dt>“I can’t move the house or edit its rooms.”</dt><dd>Choose <b>Edit shared home layout</b>; step editing changes the event rather than the floor plan.</dd><dt>“Clicks keep highlighting things instead of editing them.”</dt><dd>Finish <b>ADD TO STEP</b> or cancel a pending connection with <kbd>Esc</kbd>.</dd><dt>“The service dropdown is empty.”</dt><dd>The catalog has not loaded or has no matching services. Check <b>Company repository</b> for its status, then import a snapshot if needed.</dd><dt>“The editor or diagram feels squeezed.”</dt><dd>Resize the workspace divider, expand the editor, or use Focus workspace. Try Readable size for a wide graph, and arrange the section for the target host.</dd></dl><p class="human-guide-end">Start small. Walk every outcome. Let every animation explain a change.</p>
+      <section id="hg-help" tabindex="-1"><p class="human-guide-eyebrow">13 / WHEN SOMETHING SURPRISES YOU</p><h3>Usually, it is the editing context.</h3><dl class="human-guide-fixes"><dt>“Editing the alternate changed the happy path.”</dt><dd>That event is shared. Use <b>Make independent here</b> before changing its content for one path.</dd><dt>“My new branch starts with the same event.”</dt><dd>Create it <em>after the last shared step</em>. The next step is the first independent outcome. The shared lead-in still plays from step 1.</dd><dt>“The camera is still recording on this step.”</dt><dd>State carries forward. Set recording off at the appropriate beat; changing a scene does not automatically end recording.</dd><dt>“I hid a step, but its result is still visible.”</dt><dd>A view skips presentation stops, not their effects. Use an alternate path to change what actually happens.</dd><dt>“I can’t move the house or edit its rooms.”</dt><dd>Choose <b>Edit shared home layout</b>; step editing changes the event rather than the floor plan.</dd><dt>“Clicks keep highlighting things instead of editing them.”</dt><dd>Finish <b>ADD TO STEP</b> or cancel a pending connection with <kbd>Esc</kbd>.</dd><dt>“The service dropdown is empty.”</dt><dd>The catalog has not loaded or has no matching services. Check <b>File → Company repository</b> for its status, then import a snapshot if needed.</dd><dt>“The editor or diagram feels squeezed.”</dt><dd>Drag the workspace divider, or choose File → Workspace preferences → Focus workspace. Try Readable size for a wide graph, and arrange the section for the target host.</dd></dl><p class="human-guide-end">Start small. Walk every outcome. Let every animation explain a change.</p>
       </section>
     </article>
   </div>
@@ -8588,87 +8552,27 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
   </section>
 
   <div id="workbench-workspace" hidden>
-  <div class="workspace-tools" aria-label="Workspace layout">
-    <button class="bbtn" id="workspace-home" type="button">← New / open</button>
-    <button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button>
-    <button class="bbtn" id="workspace-reset">Reset layout</button>
-    <button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button>
-    <span class="workspace-hint">Drag the divider to resize · Expand editor for more room.</span>
-  </div>
   <div class="workwrap">
-    <div class="workmain">
-      <div class="toolrow">
-        <span class="lab">SKIN</span>
-        <span id="skinbtns"><!-- one button per skin, built by boot from SKIN_NAMES --></span>
-      </div>
-
-      <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
-    </div>
-
-    <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
-    <details class="specbox" id="spec-editor" open>
-      <summary><span>Editor</span><button class="bbtn" type="button" id="workspace-expand" aria-pressed="false">⤢ Expand editor</button></summary>
-      <div class="editor-add">
-        <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
-        <label class="editor-add-destination" for="diagram-add-target">Into <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
-        <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
-      </div>
-      <div class="editor-tabs" role="tablist" aria-label="Editor tools">
-        <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true">Inspect</button>
-        <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1">Steps</button>
-        <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1">JSON</button>
-      </div>
+    <nav class="editor-tabs workspace-rail" role="tablist" aria-label="Editor tools" aria-orientation="vertical">
+      <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true" tabindex="0"><span class="editor-tool-icon" aria-hidden="true">↖</span>Inspect</button>
+      <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">≡</span>Steps</button>
+      <button type="button" role="tab" id="editor-tab-outline" aria-controls="editor-outline" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▤</span>Outline</button>
+      <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">{}</span>JSON</button>
+      <button type="button" role="tab" id="editor-tab-file" aria-controls="editor-file" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▱</span>File</button>
+    </nav>
+    <section class="specbox" id="spec-editor" aria-label="Editing workspace">
       <div class="draftbar" id="draftbar" hidden></div>
-      <div class="editor-utilities">
-      <details class="ssec" id="sec-insert">
-        <summary>import</summary>
-        <div class="buildrow">
-          <span class="bgroup" role="group" aria-label="load and import">
-            <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
-            <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
-          </span>
-        </div>
-        <div class="importbox" id="importbox" hidden>
-          <textarea class="fctl" id="import-mermaid-text" rows="8" spellcheck="false" aria-label="Mermaid sequence diagram" placeholder="paste a sequenceDiagram or markdown mermaid fence"></textarea>
-          <button class="bbtn" id="import-mermaid-convert">convert</button>
-          <button class="bbtn" id="import-mermaid-cancel">cancel</button>
-        </div>
+        <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
+      <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
+      <p class="editor-empty" id="editor-empty">Select an element in the preview, or choose a step in the Steps tab to edit it here.</p>
+      <details class="ssec" id="sec-inspect" open hidden>
+        <summary>inspector</summary>
+        <div class="guide" id="guide" hidden></div>
       </details>
-      <div class="diffbox" id="diffbox" hidden></div>
-      <div class="tracebox" id="tracebox" hidden>
-        <b>Honeycomb trace → diagram</b>
-        <p>Paste event JSON or open an export, preview its size, then choose all exported spans or a focused branch. Conversion runs locally. Build diagram replaces the editor in one undo step.</p>
-        <button class="bbtn" id="trace-open">open trace JSON…</button>
-        <input type="file" id="trace-file" accept=".json,application/json" hidden>
-        <label>Trace events<textarea class="fctl" id="trace-text" rows="5" spellcheck="false" placeholder='[{"trace.trace_id":"…", "trace.span_id":"…", "duration_ms":20, …}]'></textarea></label>
-        <label>Trace ID <small>only needed for multiple traces</small><input class="fctl" id="trace-id" type="text"></label>
-        <label>Source link <small>optional Honeycomb trace URL</small><input class="fctl" id="trace-url" type="url" placeholder="https://ui.honeycomb.io/…"></label>
-        <details><summary>Custom field names</summary>
-          <p>Default fields: trace.trace_id, trace.span_id, trace.parent_id, service.name, name, timestamp, duration_ms, error. Override only the fields that differ. Time is ISO with timezone or Unix seconds; duration is milliseconds.</p>
-          <textarea class="fctl" id="trace-fields" rows="3" aria-label="Trace field mapping" placeholder='{"service":"app.service", "timestamp":"time"}'></textarea>
-        </details>
-        <label>Import scope<select class="fctl" id="trace-scope"><option value="all">All exported spans</option><option value="subtree">One span and its descendants</option><option value="service">One service and its descendants</option></select></label>
-        <label id="trace-root-label" hidden>Root span ID<input class="fctl" id="trace-root" type="text" placeholder="Exact span ID, or choose a search result below"></label>
-        <label id="trace-service-label" hidden>Service name<input class="fctl" id="trace-service" type="text" list="trace-services" placeholder="Exact service name"></label>
-        <datalist id="trace-services"></datalist>
-        <p>Focus keeps exported descendants so included spans retain child timing. Parent IDs at the boundary remain unchanged.</p>
-        <div class="specrow"><button class="bbtn" id="trace-preview">Preview trace</button><button class="bbtn" id="trace-clear-focus" hidden>Clear focus</button></div>
-        <div id="trace-feedback" role="status"></div>
-        <div id="trace-preview-box" hidden>
-          <p id="trace-summary"></p><p id="trace-breadcrumbs"></p>
-          <ul id="trace-warnings"></ul>
-          <label>Find a span<input class="fctl" id="trace-search" type="search" placeholder="Span ID, operation, service, or recorded error"></label>
-          <p id="trace-search-count"></p>
-          <div id="trace-search-results" aria-label="Trace subtree choices"></div>
+        <div class="specrow editor-clipboard">
+        <span class="bgroup" role="group" aria-label="Object clipboard"><button class="bbtn" id="object-copy" title="Copy selected objects (⌘/Ctrl C)">Copy</button><button class="bbtn" id="object-paste" aria-haspopup="dialog">Paste…</button><button class="bbtn" id="object-duplicate" title="Duplicate selected objects (⌘/Ctrl D)">Duplicate</button></span>
+        <p id="object-clipboard-status" class="object-clipboard-status" role="status"></p>
         </div>
-        <div class="specrow"><button class="rbtn" id="trace-convert" disabled>Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
-      </div>
-      <details class="ssec" id="sec-outline">
-        <summary>document outline <small>⌘/Ctrl K</small></summary>
-        <input class="fctl" type="search" id="outline-search" aria-label="Search document outline" placeholder="Find a node, panel, step, or section…">
-        <div class="outline-status" id="outline-status" role="status"></div>
-        <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
-      </details>
       </div>
       <div class="editor-pane" id="editor-steps" role="tabpanel" aria-labelledby="editor-tab-steps" hidden>
       <details class="ssec" id="sec-steps" open>
@@ -8717,11 +8621,13 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
         </div>
       </details>
       </div>
-      <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
-      <p class="editor-empty" id="editor-empty">Select an element in the preview, or choose a step in the Steps tab to edit it here.</p>
-      <details class="ssec" id="sec-inspect" open hidden>
-        <summary>inspector</summary>
-        <div class="guide" id="guide" hidden></div>
+      <div class="editor-pane" id="editor-outline" role="tabpanel" aria-labelledby="editor-tab-outline" hidden>
+        <div class="editor-pane-heading"><h2>Document outline</h2><p>Find an element, then inspect its properties.</p><button class="bbtn" id="outline-inspect" type="button">Inspect selection</button></div>
+      <details class="ssec" id="sec-outline" open>
+        <summary>document outline <small>⌘/Ctrl K</small></summary>
+        <input class="fctl" type="search" id="outline-search" aria-label="Search document outline" placeholder="Find a node, panel, step, or section…">
+        <div class="outline-status" id="outline-status" role="status"></div>
+        <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
       </details>
       </div>
       <div class="editor-pane" id="editor-json" role="tabpanel" aria-labelledby="editor-tab-json" hidden>
@@ -8729,18 +8635,16 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
         <summary>JSON source</summary>
         <textarea id="src" spellcheck="false" aria-label="Page spec JSON source"></textarea>
       </details>
+        <div class="diffbox" id="diffbox" hidden></div>
+        <div class="specrow editor-json-actions"><button class="rbtn" id="go">Render</button><button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">Diff</button></div>
       </div>
-      <div class="specrow editor-file-tools">
-        <span class="bgroup" role="group" aria-label="history"><button class="bbtn" id="undo-builder" disabled>undo</button><button class="bbtn" id="redo-builder" disabled>redo</button></span>
-        <span class="bgroup" role="group" aria-label="Object clipboard"><button class="bbtn" id="object-copy" title="Copy selected objects (⌘/Ctrl C)">Copy</button><button class="bbtn" id="object-paste" aria-haspopup="dialog">Paste…</button><button class="bbtn" id="object-duplicate" title="Duplicate selected objects (⌘/Ctrl D)">Duplicate</button></span>
-        <p id="object-clipboard-status" class="object-clipboard-status" role="status"></p>
-        <button class="rbtn" id="go">Render</button>
+      <div class="editor-pane" id="editor-file" role="tabpanel" aria-labelledby="editor-tab-file" hidden>
+        <div class="editor-pane-heading"><h2>Project files</h2><p>Open, export, and connect this project to your company catalog. Save downloads your current JSON.</p></div>
+        <div class="specrow editor-file-tools">
         <button class="bbtn" id="file-open">open&#8230;</button>
-        <button class="bbtn" id="file-save">save</button>
         <button class="bbtn" id="file-export" title="write the spec JSON and the published page HTML into a folder you pick">export&#8230;</button>
         <button class="bbtn" id="confluence-export">Export for Confluence</button>
         <button class="bbtn" id="confluence-copy">Copy JSON for Confluence</button>
-        <button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">diff</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
         <div id="confluence-handoff" class="confluence-handoff" hidden>
           <label for="confluence-json">Confluence JSON</label>
@@ -8748,9 +8652,64 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
           <p id="confluence-status" role="status"></p>
           <button class="bbtn" id="confluence-close">Close</button>
         </div>
-        <ul class="msgs" id="msgs"></ul>
+        </div>
+      <details class="ssec" id="sec-insert">
+        <summary>import</summary>
+        <div class="buildrow">
+          <span class="bgroup" role="group" aria-label="load and import">
+            <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
+            <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
+          </span>
+        </div>
+        <div class="importbox" id="importbox" hidden>
+          <textarea class="fctl" id="import-mermaid-text" rows="8" spellcheck="false" aria-label="Mermaid sequence diagram" placeholder="paste a sequenceDiagram or markdown mermaid fence"></textarea>
+          <button class="bbtn" id="import-mermaid-convert">convert</button>
+          <button class="bbtn" id="import-mermaid-cancel">cancel</button>
+        </div>
+      </details>
+      <div class="tracebox" id="tracebox" hidden>
+        <b>Honeycomb trace → diagram</b>
+        <p>Paste event JSON or open an export, preview its size, then choose all exported spans or a focused branch. Conversion runs locally. Build diagram replaces the editor in one undo step.</p>
+        <button class="bbtn" id="trace-open">open trace JSON…</button>
+        <input type="file" id="trace-file" accept=".json,application/json" hidden>
+        <label>Trace events<textarea class="fctl" id="trace-text" rows="5" spellcheck="false" placeholder='[{"trace.trace_id":"…", "trace.span_id":"…", "duration_ms":20, …}]'></textarea></label>
+        <label>Trace ID <small>only needed for multiple traces</small><input class="fctl" id="trace-id" type="text"></label>
+        <label>Source link <small>optional Honeycomb trace URL</small><input class="fctl" id="trace-url" type="url" placeholder="https://ui.honeycomb.io/…"></label>
+        <details><summary>Custom field names</summary>
+          <p>Default fields: trace.trace_id, trace.span_id, trace.parent_id, service.name, name, timestamp, duration_ms, error. Override only the fields that differ. Time is ISO with timezone or Unix seconds; duration is milliseconds.</p>
+          <textarea class="fctl" id="trace-fields" rows="3" aria-label="Trace field mapping" placeholder='{"service":"app.service", "timestamp":"time"}'></textarea>
+        </details>
+        <label>Import scope<select class="fctl" id="trace-scope"><option value="all">All exported spans</option><option value="subtree">One span and its descendants</option><option value="service">One service and its descendants</option></select></label>
+        <label id="trace-root-label" hidden>Root span ID<input class="fctl" id="trace-root" type="text" placeholder="Exact span ID, or choose a search result below"></label>
+        <label id="trace-service-label" hidden>Service name<input class="fctl" id="trace-service" type="text" list="trace-services" placeholder="Exact service name"></label>
+        <datalist id="trace-services"></datalist>
+        <p>Focus keeps exported descendants so included spans retain child timing. Parent IDs at the boundary remain unchanged.</p>
+        <div class="specrow"><button class="bbtn" id="trace-preview">Preview trace</button><button class="bbtn" id="trace-clear-focus" hidden>Clear focus</button></div>
+        <div id="trace-feedback" role="status"></div>
+        <div id="trace-preview-box" hidden>
+          <p id="trace-summary"></p><p id="trace-breadcrumbs"></p>
+          <ul id="trace-warnings"></ul>
+          <label>Find a span<input class="fctl" id="trace-search" type="search" placeholder="Span ID, operation, service, or recorded error"></label>
+          <p id="trace-search-count"></p>
+          <div id="trace-search-results" aria-label="Trace subtree choices"></div>
+        </div>
+        <div class="specrow"><button class="rbtn" id="trace-convert" disabled>Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
       </div>
-    </details>
+        <div id="editor-company"></div>
+        <details class="ssec workspace-preferences"><summary>Workspace preferences</summary><div class="specrow"><button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button><button class="bbtn" id="workspace-reset">Reset editor width</button></div><p class="fnote">Drag the divider to resize the editor. Double-click it for an even split.</p></details>
+      </div>
+      <ul class="msgs" id="msgs" aria-live="polite"></ul>
+    </section>
+    <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
+    <div class="workmain">
+      <div class="toolrow">
+        <span class="lab">SKIN</span>
+        <span id="skinbtns"><!-- one button per skin, built by boot from SKIN_NAMES --></span>
+      </div>
+
+      <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
+    </div>
+
   </div>
 
   <dialog id="diagram-add-menu" class="diagram-add-menu" aria-labelledby="diagram-add-title" aria-describedby="diagram-add-destination">
@@ -32344,7 +32303,7 @@ function wireBuilderCommit(input,commit,options){
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
-  var OPEN_PATCH_EDITORS=new Set(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
+  var OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
@@ -32928,7 +32887,7 @@ function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){
   }
 
 function stepForm(val, ctx){
-    var t = session.target;
+    var t = session.target, panelRows=[];
     function toggled(planFn){
       return function(key){
         commitCascade(function(raw){ return planFn(session.text(), raw, t.section, t.index, key); },
@@ -32967,7 +32926,14 @@ function stepForm(val, ctx){
     rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){
       var editor=p && panelEditor(p.type);
-      if(editor && editor.stepControl) rows.push(editor.stepControl(ctx.diagram,p,t));
+      if(editor && editor.stepControl){
+        var fold=document.createElement('details'),key=JSON.stringify([session.snapshot().project,t.section,p.type,p.id]);
+        fold.className='patchedit panel-step-group';fold.open=CUSTOM_PANEL_FOLDS.get(key)!==false;
+        var summary=document.createElement('summary');summary.textContent=(p.title || p.id)+' · '+p.type;fold.appendChild(summary);
+        fold.appendChild(editor.stepControl(ctx.diagram,p,t));
+        formLife.listen(fold,'toggle',function(ev){if(ev.target===fold && guide.contains(fold))CUSTOM_PANEL_FOLDS.set(key,fold.open);});
+        panelRows.push(fold);
+      }
     });
     var laneNames = Object.keys((ctx.page && ctx.page.lanes) || {});
     rows.push(frow('lane', selectControl(laneNames, val.lane, function(v){
@@ -33058,17 +33024,23 @@ function stepForm(val, ctx){
     });
     rows.push(frow('Add node tone', addTone));
     var pids = Object.keys(val.panels || {});
-    rows.push(chipRow('panels',
+    panelRows.push(chipRow('panels',
       pids.map(function(pid){ return {key: pid, label: pid}; }),
       'none', toggled(planStepTogglePanel)));
     var declarations = (ctx.diagram && ctx.diagram.panels) || [];
     pids.forEach(function(pid){
       var decl = Array.isArray(declarations) ? declarations.filter(function(p){ return p && p.id === pid; })[0] : null;
       if (decl && panelEditor(decl.type).stepControl) return;
-      rows.push(panelPatchControl(pid, val.panels[pid], decl, t));
+      panelRows.push(panelPatchControl(pid, val.panels[pid], decl, t));
     });
     if (declarations.length) rows.push(effectiveStateControl(t));
-    return rows;
+    var columns=document.createElement('div');columns.className='step-form-columns';
+    var story=document.createElement('div');story.className='step-form-story';
+    rows.forEach(function(row){story.appendChild(row);});columns.appendChild(story);
+    var panels=document.createElement('div');panels.className='step-form-panels';
+    var heading=document.createElement('h3');heading.textContent='Panel changes';panels.appendChild(heading);
+    panelRows.forEach(function(row){panels.appendChild(row);});columns.appendChild(panels);
+    return [columns];
   }
 
 function effectiveStateControl(target){
@@ -35077,10 +35049,9 @@ function createBuilderInteractions(opts){
       var only = multiSel[0];
       clearMultiSelect();
       selectTarget({section: only.section, kind: only.kind, id: only.id,
-                    index: only.index, card:only.card, el: only.el}, false);
+                    index: only.index, card:only.card, el: only.el}, false, true);
       return;
     }
-    if (opts.workspace) opts.workspace.showTool('inspect', {closeUtilities:true});
     renderMultiInspector();
   }
   function bulkDeleteSelected(){
@@ -35230,7 +35201,7 @@ function createBuilderInteractions(opts){
     var section = ev.target.closest('.doc-sec');
     if (followStep && section){
       var ordinal = Number(section.getAttribute('data-dv-section')), player = stepperFor(ordinal);
-      if (player) selectTarget({section:ordinal, kind:'step', index:player.sourceIndex()}, false);
+      if (player) selectTarget({section:ordinal, kind:'step', index:player.sourceIndex()}, false, true);
     }
   });
 
@@ -36094,7 +36065,7 @@ function createBuilderInteractions(opts){
       return;
     }
     if (multiSel.length) clearMultiSelect(); /* a plain click is single-select again */
-    selectTarget(target);
+    selectTarget(target, false, true);
   });
 
 
@@ -36803,7 +36774,6 @@ function initWorkbenchBuilder(opts){
   var targetLabel = document.getElementById('btarget');
   var addModeExit = document.getElementById('addmode-exit');
   var undoBtn = document.getElementById('undo-builder');
-  var specbox = document.querySelector('.specbox');
   var secInsert = document.getElementById('sec-insert');
   var secInspect = document.getElementById('sec-inspect');
   var secSource = document.getElementById('sec-source');
@@ -36828,19 +36798,15 @@ function initWorkbenchBuilder(opts){
   if (secInsert) life.listen(secInsert,'toggle', persistSections);
   if (secSource) life.listen(secSource,'toggle', persistSections);
   function sourceVisible(){
-    return (!specbox || specbox.open) && (!secSource || secSource.open) &&
+    return (!secSource || secSource.open) &&
       (!opts.workspace || opts.workspace.tool() === 'json');
   }
   function openSource(){
     if (opts.workspace) opts.workspace.showTool('json', {closeUtilities:true});
-    if (specbox && !specbox.open) specbox.open = true;
     if (secSource && !secSource.open) secSource.open = true; /* toggle listener persists */
   }
-  /* the inspector section only exists while it has content. Revealing it
-     also opens the OUTER editor box (else a collapsed specbox hides the
-     freshly rendered inspector) — but never the JSON source section. */
+  /* Inspector content can refresh while a different workspace stays active. */
   function revealInspector(){
-    if (specbox && !specbox.open) specbox.open = true;
     if (!secInspect) return;
     secInspect.hidden = false;
     if (!secInspect.open) secInspect.open = true;
@@ -37100,6 +37066,8 @@ function initWorkbenchBuilder(opts){
   var outlineSearch = document.getElementById('outline-search');
   var outlineResults = document.getElementById('outline-results');
   var outlineStatus = document.getElementById('outline-status');
+  var outlineInspect=document.getElementById('outline-inspect');
+  if(outlineInspect)life.listen(outlineInspect,'click',function(){if(opts.workspace)opts.workspace.showTool('inspect',{focus:true});});
   function refreshOutline(){
     outlineLife.destroy();outlineLife=createWorkbenchLifetime();
     if (!outlineResults) return;
@@ -37135,7 +37103,7 @@ function initWorkbenchBuilder(opts){
           if (tabButton) tabButton.click();
         }
         var el = findTargetEl(entry.target);
-        selectTarget(Object.assign({}, entry.target, {el: el}), false);
+        selectTarget(Object.assign({}, entry.target, {el: el}), false, true);
         var loc = jsonLocate(session.text(), entry.path);
         if (loc && sourceVisible()){
           src.setSelectionRange(loc.start, loc.end);
@@ -37159,7 +37127,7 @@ function initWorkbenchBuilder(opts){
       if (opts.isActive && !opts.isActive()) return;
       if (!(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.key.toLowerCase() !== 'k' || interactions.adding()) return;
       ev.preventDefault();
-      if (specbox) specbox.open = true;
+      if(opts.workspace)opts.workspace.showTool('outline');
       outline.open = true; outlineSearch.focus(); outlineSearch.select();
     });
     refreshOutline();
@@ -38670,24 +38638,23 @@ function workspacePrefs(raw){
   try { value = JSON.parse(raw); } catch (ex){ return prefs; }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return prefs;
   if (typeof value.editor === 'number' && Number.isFinite(value.editor)) prefs.editor = Math.max(320, Math.min(1100, value.editor));
-  if (['inspect','steps','json'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
+  if (['inspect','steps','outline','json','file'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
   return prefs;
 }
 function workspaceEditorBounds(contentWidth){
-  return {min:320, max:Math.max(320, Math.min(1100, Math.floor(contentWidth - 300 - 24)))};
+  return {min:320, max:Math.max(320, Math.min(1100, Math.floor(contentWidth - 300 - 24 - 72)))};
 }
 function initWorkbenchWorkspace(){
   var wrap = document.querySelector('.workwrap');
   var cols = document.getElementById('workspace-columns');
   var editor = document.getElementById('spec-editor');
   var focus = document.getElementById('workspace-focus');
-  var expand = document.getElementById('workspace-expand');
   var reset = document.getElementById('workspace-reset');
-  var toolbar = document.querySelector('.workspace-tools');
+  var toolbar = document.querySelector('.workbench-header');
   var src = document.getElementById('src');
   var guide = document.getElementById('guide');
-  if (!wrap || !cols || !editor || !focus || !expand || !reset || !toolbar || !src) return null;
-  var names = ['inspect','steps','json'], tabs = {}, panes = {}, scrolls = {};
+  if (!wrap || !cols || !editor || !focus || !reset || !toolbar || !src) return null;
+  var names = ['inspect','steps','outline','json','file'], tabs = {}, panes = {}, scrolls = {};
   names.forEach(function(name){
     tabs[name] = document.getElementById('editor-tab-' + name);
     panes[name] = document.getElementById('editor-' + name);
@@ -38695,7 +38662,7 @@ function initWorkbenchWorkspace(){
   if (names.some(function(name){ return !tabs[name] || !panes[name]; })) return null;
   var key = 'dv-workbench-layout-v2', raw = null;
   try { raw = localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v1'); } catch (ex){}
-  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0, expanded = false, priorFocus = false;
+  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0;
   function persist(){
     try { localStorage.setItem(key, JSON.stringify(prefs)); } catch (ex){}
   }
@@ -38714,9 +38681,6 @@ function initWorkbenchWorkspace(){
     cols.setAttribute('aria-valuemax', b.max);
     cols.setAttribute('aria-valuenow', Math.round(width));
     cols.setAttribute('aria-valuetext', Math.round(width) + ' pixels of editor width');
-    document.body.classList.toggle('editor-expanded', expanded);
-    expand.setAttribute('aria-pressed', String(expanded));
-    expand.textContent = expanded ? '↙ Return to split' : '⤢ Expand editor';
   }
   /* Show/hide existing panes; do not rebuild a form, source textarea, or
      preview. Keep both editor scroll positions and native text selection. */
@@ -38729,7 +38693,6 @@ function initWorkbenchWorkspace(){
         inspector:guide ? guide.scrollTop : 0, form:guide && guide.firstChild};
       prefs.tool = name;
     }
-    editor.open = true;
     names.forEach(function(n){
       var active = n === name;
       tabs[n].setAttribute('aria-selected', String(active));
@@ -38744,9 +38707,6 @@ function initWorkbenchWorkspace(){
       if (name === 'inspect' && guide)
         guide.scrollTop = guide.firstChild === scrolls[name].form ? scrolls[name].inspector : 0;
     }
-    if (options.closeUtilities){
-      ['sec-insert','sec-outline'].forEach(function(id){ var el = document.getElementById(id); if (el) el.open = false; });
-    }
     if (options.focus) tabs[name].focus({preventScroll:true});
     if (changed) persist();
     return true;
@@ -38756,8 +38716,8 @@ function initWorkbenchWorkspace(){
     tabs[name].addEventListener('keydown', function(ev){
       if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
       var next;
-      if (ev.key === 'ArrowRight') next = (index + 1) % names.length;
-      else if (ev.key === 'ArrowLeft') next = (index + names.length - 1) % names.length;
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowRight') next = (index + 1) % names.length;
+      else if (ev.key === 'ArrowUp' || ev.key === 'ArrowLeft') next = (index + names.length - 1) % names.length;
       else if (ev.key === 'Home') next = 0;
       else if (ev.key === 'End') next = names.length - 1;
       else return;
@@ -38779,7 +38739,7 @@ function initWorkbenchWorkspace(){
     if (!cancel) persist();
   }
   cols.addEventListener('pointerdown', function(ev){
-    if (expanded || ev.button !== 0 || !ev.isPrimary || drag) return;
+    if (ev.button !== 0 || !ev.isPrimary || drag) return;
     ev.preventDefault(); cols.focus({preventScroll:true});
     drag = {id:ev.pointerId, before:prefs.editor, start:ev.clientX,
       value:effectiveWidth(), cursor:document.body.style.cursor};
@@ -38787,24 +38747,24 @@ function initWorkbenchWorkspace(){
     document.body.classList.add('workspace-dragging'); document.body.style.cursor = 'col-resize';
   });
   cols.addEventListener('pointermove', function(ev){
-    if (drag && drag.id === ev.pointerId) assign(drag.value + drag.start - ev.clientX);
+    if (drag && drag.id === ev.pointerId) assign(drag.value + ev.clientX - drag.start);
   });
   cols.addEventListener('pointerup', function(ev){ if (drag && drag.id === ev.pointerId) finish(false); });
   cols.addEventListener('pointercancel', function(ev){ if (drag && drag.id === ev.pointerId) finish(true); });
   cols.addEventListener('lostpointercapture', function(){ if (drag) finish(true); });
   cols.addEventListener('keydown', function(ev){
-    if (expanded || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
     var value = effectiveWidth(), amount = ev.shiftKey ? 50 : 20;
     if (ev.key === 'Home') value = bounds().min;
     else if (ev.key === 'End') value = bounds().max;
-    else if (ev.key === 'ArrowLeft') value += amount;
-    else if (ev.key === 'ArrowRight') value -= amount;
+    else if (ev.key === 'ArrowLeft') value -= amount;
+    else if (ev.key === 'ArrowRight') value += amount;
     else return;
     ev.preventDefault(); ev.stopPropagation(); assign(value); persist();
   });
   cols.addEventListener('dblclick', function(){
     var style = getComputedStyle(wrap);
-    assign((wrap.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0) - 24) / 2);
+    assign((wrap.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0) - 24 - 72) / 2);
     persist();
   });
   function setFocus(on){
@@ -38815,24 +38775,12 @@ function initWorkbenchWorkspace(){
     focus.setAttribute('aria-pressed', String(on)); focus.textContent = on ? 'Exit focus' : 'Focus workspace';
     paint(); window.scrollTo(0, on ? 0 : pageScroll);
   }
-  function setExpanded(on){
-    finish(true);
-    if (expanded === on) return;
-    if (on) priorFocus = document.body.classList.contains('workspace-focus');
-    expanded = on; editor.open = true;
-    setFocus(on ? true : priorFocus); paint();
-  }
-  expand.addEventListener('click', function(ev){
-    ev.preventDefault(); ev.stopPropagation(); /* button inside the editor summary */
-    setExpanded(!expanded);
-  });
   focus.addEventListener('click', function(){
     finish(true);
-    if (expanded){ setExpanded(false); setFocus(false); }
-    else setFocus(!document.body.classList.contains('workspace-focus'));
+    setFocus(!document.body.classList.contains('workspace-focus'));
   });
   reset.addEventListener('click', function(){
-    finish(true); setExpanded(false); prefs.editor = 440; paint(); persist();
+    finish(true); prefs.editor = 440; paint(); persist();
   });
   window.addEventListener('resize', function(){ finish(true); paint(); });
   window.addEventListener('blur', function(){ finish(true); });
@@ -38840,8 +38788,7 @@ function initWorkbenchWorkspace(){
     var observer = new ResizeObserver(paint); observer.observe(wrap); observer.observe(toolbar);
   }
   showTool(prefs.tool); paint();
-  return {showTool:showTool, tool:function(){return prefs.tool;},
-    setExpanded:setExpanded, expanded:function(){return expanded;}};
+  return {showTool:showTool, tool:function(){return prefs.tool;}};
 }
 /* ---- src/layout.workbench.js ---- */
 /* Layout controls use the pure commands assembled before the builder. */
@@ -39148,7 +39095,7 @@ function initSectionLayoutEditor(opts){
 /* The approved catalog ships beside the editor. The optional company backend
    supplies spec/review context; manual imports remain available offline. */
 function initCanonWorkbench(opts){
-  var context={catalog:null,revision:null}, catalogPriority=0, host=document.querySelector('.workspace-tools');
+  var context={catalog:null,revision:null}, catalogPriority=0, host=document.querySelector('#editor-company') || document.querySelector('.workspace-tools');
   if(!host) return context;
   var details=document.createElement('details');details.className='canon-tools';
   var summary=document.createElement('summary');summary.textContent='Company repository';details.appendChild(summary);
@@ -39510,7 +39457,6 @@ function initWorkbenchWelcome(opts){
   }
   function displayWelcome(name,focus){
     if (builder.prepareWelcome) builder.prepareWelcome();
-    if (opts.workspace && opts.workspace.setExpanded) opts.workspace.setExpanded(false);
     /* Focus mode hides the header and source reference. Exit through its own control. */
     if (document.body.classList.contains('workspace-focus')) el('workspace-focus').click();
     editor.hidden = true; root.hidden = false;

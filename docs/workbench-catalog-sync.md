@@ -227,7 +227,7 @@ binding and title together. API/operation changes do not rename the node.
 A removed service can remain in an older spec’s
 binding until an author explicitly updates it.
 
-Manual **Company repository → Load catalog** overrides the bundled snapshot for
+Manual **File → Company repository → Load catalog** overrides the bundled snapshot for
 the session. A valid bundled snapshot takes precedence over a legacy live
 `?canon=…` context catalog. The empty, unconfigured file shipped by Flowview allows
 that legacy fallback; it contains no sample company services. Catalog arrival

@@ -15,11 +15,12 @@ test('builder destruction retires captured gestures and old controls across same
     const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Camera '+cycle);await title.press('Enter');
     expect(JSON.parse(await src.inputValue()).page.blocks[0].diagram.nodes.a.title).toBe('Camera '+cycle);
     await page.locator('#undo-builder').click();await expect(src).toHaveValue(source);
+    await page.locator('#editor-tab-file').click();
     if(!await page.locator('#import-mermaid').isVisible())await page.locator('#sec-insert > summary').click();
     await page.locator('#import-mermaid').click();await page.evaluate(()=>__oldBuilder.destroy());
     await expect(page.locator('#importbox')).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('#importbox')).toBeHidden();
     if(cycle===0){
-      await page.locator('.pt-homemap [data-home-layout]').click();
+      await page.locator('#editor-tab-inspect').click();await page.locator('.pt-homemap [data-home-layout]').click();
       const map=page.locator('#guide .home-layout-map'),device=map.locator('[data-device="doorbell"]');
       await device.hover();const box=await device.boundingBox(),held=await map.elementHandle();
       await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();

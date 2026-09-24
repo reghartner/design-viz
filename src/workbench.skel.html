@@ -15,6 +15,15 @@
     <span>Flowview</span><span class="workbench-brand-detail">Workbench</span>
   </button>
   <div class="workbench-header-links"><button type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button type="button" id="welcome-header-resume" hidden>Back to project <span aria-hidden="true">↗</span></button><a id="welcome-repo-link" href="https://github.com/reghartner/design-viz" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
+  <div class="workspace-tools" aria-label="Project actions">
+    <button class="bbtn" id="workspace-home" type="button">← New / open</button>
+    <div class="workspace-create">
+        <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
+        <label class="editor-add-destination" for="diagram-add-target">Into <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
+    </div>
+    <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
+    <div class="workspace-save"><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save">Save</button></div>
+  </div>
 </header>
 
 {{HUMAN_GUIDE}}
@@ -115,87 +124,27 @@
   </section>
 
   <div id="workbench-workspace" hidden>
-  <div class="workspace-tools" aria-label="Workspace layout">
-    <button class="bbtn" id="workspace-home" type="button">← New / open</button>
-    <button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button>
-    <button class="bbtn" id="workspace-reset">Reset layout</button>
-    <button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button>
-    <span class="workspace-hint">Drag the divider to resize · Expand editor for more room.</span>
-  </div>
   <div class="workwrap">
-    <div class="workmain">
-      <div class="toolrow">
-        <span class="lab">SKIN</span>
-        <span id="skinbtns"><!-- one button per skin, built by boot from SKIN_NAMES --></span>
-      </div>
-
-      <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
-    </div>
-
-    <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
-    <details class="specbox" id="spec-editor" open>
-      <summary><span>Editor</span><button class="bbtn" type="button" id="workspace-expand" aria-pressed="false">⤢ Expand editor</button></summary>
-      <div class="editor-add">
-        <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
-        <label class="editor-add-destination" for="diagram-add-target">Into <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
-        <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
-      </div>
-      <div class="editor-tabs" role="tablist" aria-label="Editor tools">
-        <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true">Inspect</button>
-        <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1">Steps</button>
-        <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1">JSON</button>
-      </div>
+    <nav class="editor-tabs workspace-rail" role="tablist" aria-label="Editor tools" aria-orientation="vertical">
+      <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true" tabindex="0"><span class="editor-tool-icon" aria-hidden="true">↖</span>Inspect</button>
+      <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">≡</span>Steps</button>
+      <button type="button" role="tab" id="editor-tab-outline" aria-controls="editor-outline" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▤</span>Outline</button>
+      <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">{}</span>JSON</button>
+      <button type="button" role="tab" id="editor-tab-file" aria-controls="editor-file" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▱</span>File</button>
+    </nav>
+    <section class="specbox" id="spec-editor" aria-label="Editing workspace">
       <div class="draftbar" id="draftbar" hidden></div>
-      <div class="editor-utilities">
-      <details class="ssec" id="sec-insert">
-        <summary>import</summary>
-        <div class="buildrow">
-          <span class="bgroup" role="group" aria-label="load and import">
-            <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
-            <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
-          </span>
-        </div>
-        <div class="importbox" id="importbox" hidden>
-          <textarea class="fctl" id="import-mermaid-text" rows="8" spellcheck="false" aria-label="Mermaid sequence diagram" placeholder="paste a sequenceDiagram or markdown mermaid fence"></textarea>
-          <button class="bbtn" id="import-mermaid-convert">convert</button>
-          <button class="bbtn" id="import-mermaid-cancel">cancel</button>
-        </div>
+        <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
+      <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
+      <p class="editor-empty" id="editor-empty">Select an element in the preview, or choose a step in the Steps tab to edit it here.</p>
+      <details class="ssec" id="sec-inspect" open hidden>
+        <summary>inspector</summary>
+        <div class="guide" id="guide" hidden></div>
       </details>
-      <div class="diffbox" id="diffbox" hidden></div>
-      <div class="tracebox" id="tracebox" hidden>
-        <b>Honeycomb trace → diagram</b>
-        <p>Paste event JSON or open an export, preview its size, then choose all exported spans or a focused branch. Conversion runs locally. Build diagram replaces the editor in one undo step.</p>
-        <button class="bbtn" id="trace-open">open trace JSON…</button>
-        <input type="file" id="trace-file" accept=".json,application/json" hidden>
-        <label>Trace events<textarea class="fctl" id="trace-text" rows="5" spellcheck="false" placeholder='[{"trace.trace_id":"…", "trace.span_id":"…", "duration_ms":20, …}]'></textarea></label>
-        <label>Trace ID <small>only needed for multiple traces</small><input class="fctl" id="trace-id" type="text"></label>
-        <label>Source link <small>optional Honeycomb trace URL</small><input class="fctl" id="trace-url" type="url" placeholder="https://ui.honeycomb.io/…"></label>
-        <details><summary>Custom field names</summary>
-          <p>Default fields: trace.trace_id, trace.span_id, trace.parent_id, service.name, name, timestamp, duration_ms, error. Override only the fields that differ. Time is ISO with timezone or Unix seconds; duration is milliseconds.</p>
-          <textarea class="fctl" id="trace-fields" rows="3" aria-label="Trace field mapping" placeholder='{"service":"app.service", "timestamp":"time"}'></textarea>
-        </details>
-        <label>Import scope<select class="fctl" id="trace-scope"><option value="all">All exported spans</option><option value="subtree">One span and its descendants</option><option value="service">One service and its descendants</option></select></label>
-        <label id="trace-root-label" hidden>Root span ID<input class="fctl" id="trace-root" type="text" placeholder="Exact span ID, or choose a search result below"></label>
-        <label id="trace-service-label" hidden>Service name<input class="fctl" id="trace-service" type="text" list="trace-services" placeholder="Exact service name"></label>
-        <datalist id="trace-services"></datalist>
-        <p>Focus keeps exported descendants so included spans retain child timing. Parent IDs at the boundary remain unchanged.</p>
-        <div class="specrow"><button class="bbtn" id="trace-preview">Preview trace</button><button class="bbtn" id="trace-clear-focus" hidden>Clear focus</button></div>
-        <div id="trace-feedback" role="status"></div>
-        <div id="trace-preview-box" hidden>
-          <p id="trace-summary"></p><p id="trace-breadcrumbs"></p>
-          <ul id="trace-warnings"></ul>
-          <label>Find a span<input class="fctl" id="trace-search" type="search" placeholder="Span ID, operation, service, or recorded error"></label>
-          <p id="trace-search-count"></p>
-          <div id="trace-search-results" aria-label="Trace subtree choices"></div>
+        <div class="specrow editor-clipboard">
+        <span class="bgroup" role="group" aria-label="Object clipboard"><button class="bbtn" id="object-copy" title="Copy selected objects (⌘/Ctrl C)">Copy</button><button class="bbtn" id="object-paste" aria-haspopup="dialog">Paste…</button><button class="bbtn" id="object-duplicate" title="Duplicate selected objects (⌘/Ctrl D)">Duplicate</button></span>
+        <p id="object-clipboard-status" class="object-clipboard-status" role="status"></p>
         </div>
-        <div class="specrow"><button class="rbtn" id="trace-convert" disabled>Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
-      </div>
-      <details class="ssec" id="sec-outline">
-        <summary>document outline <small>⌘/Ctrl K</small></summary>
-        <input class="fctl" type="search" id="outline-search" aria-label="Search document outline" placeholder="Find a node, panel, step, or section…">
-        <div class="outline-status" id="outline-status" role="status"></div>
-        <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
-      </details>
       </div>
       <div class="editor-pane" id="editor-steps" role="tabpanel" aria-labelledby="editor-tab-steps" hidden>
       <details class="ssec" id="sec-steps" open>
@@ -244,11 +193,13 @@
         </div>
       </details>
       </div>
-      <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
-      <p class="editor-empty" id="editor-empty">Select an element in the preview, or choose a step in the Steps tab to edit it here.</p>
-      <details class="ssec" id="sec-inspect" open hidden>
-        <summary>inspector</summary>
-        <div class="guide" id="guide" hidden></div>
+      <div class="editor-pane" id="editor-outline" role="tabpanel" aria-labelledby="editor-tab-outline" hidden>
+        <div class="editor-pane-heading"><h2>Document outline</h2><p>Find an element, then inspect its properties.</p><button class="bbtn" id="outline-inspect" type="button">Inspect selection</button></div>
+      <details class="ssec" id="sec-outline" open>
+        <summary>document outline <small>⌘/Ctrl K</small></summary>
+        <input class="fctl" type="search" id="outline-search" aria-label="Search document outline" placeholder="Find a node, panel, step, or section…">
+        <div class="outline-status" id="outline-status" role="status"></div>
+        <nav class="outline-results" id="outline-results" aria-label="Document outline"></nav>
       </details>
       </div>
       <div class="editor-pane" id="editor-json" role="tabpanel" aria-labelledby="editor-tab-json" hidden>
@@ -256,18 +207,16 @@
         <summary>JSON source</summary>
         <textarea id="src" spellcheck="false" aria-label="Page spec JSON source"></textarea>
       </details>
+        <div class="diffbox" id="diffbox" hidden></div>
+        <div class="specrow editor-json-actions"><button class="rbtn" id="go">Render</button><button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">Diff</button></div>
       </div>
-      <div class="specrow editor-file-tools">
-        <span class="bgroup" role="group" aria-label="history"><button class="bbtn" id="undo-builder" disabled>undo</button><button class="bbtn" id="redo-builder" disabled>redo</button></span>
-        <span class="bgroup" role="group" aria-label="Object clipboard"><button class="bbtn" id="object-copy" title="Copy selected objects (⌘/Ctrl C)">Copy</button><button class="bbtn" id="object-paste" aria-haspopup="dialog">Paste…</button><button class="bbtn" id="object-duplicate" title="Duplicate selected objects (⌘/Ctrl D)">Duplicate</button></span>
-        <p id="object-clipboard-status" class="object-clipboard-status" role="status"></p>
-        <button class="rbtn" id="go">Render</button>
+      <div class="editor-pane" id="editor-file" role="tabpanel" aria-labelledby="editor-tab-file" hidden>
+        <div class="editor-pane-heading"><h2>Project files</h2><p>Open, export, and connect this project to your company catalog. Save downloads your current JSON.</p></div>
+        <div class="specrow editor-file-tools">
         <button class="bbtn" id="file-open">open&#8230;</button>
-        <button class="bbtn" id="file-save">save</button>
         <button class="bbtn" id="file-export" title="write the spec JSON and the published page HTML into a folder you pick">export&#8230;</button>
         <button class="bbtn" id="confluence-export">Export for Confluence</button>
         <button class="bbtn" id="confluence-copy">Copy JSON for Confluence</button>
-        <button class="bbtn" id="spec-diff" aria-controls="diffbox" aria-expanded="false">diff</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
         <div id="confluence-handoff" class="confluence-handoff" hidden>
           <label for="confluence-json">Confluence JSON</label>
@@ -275,9 +224,64 @@
           <p id="confluence-status" role="status"></p>
           <button class="bbtn" id="confluence-close">Close</button>
         </div>
-        <ul class="msgs" id="msgs"></ul>
+        </div>
+      <details class="ssec" id="sec-insert">
+        <summary>import</summary>
+        <div class="buildrow">
+          <span class="bgroup" role="group" aria-label="load and import">
+            <button class="bbtn" id="import-mermaid">import mermaid&#8230;</button>
+            <button class="bbtn" id="import-trace" aria-controls="tracebox" aria-expanded="false">import trace&#8230;</button>
+          </span>
+        </div>
+        <div class="importbox" id="importbox" hidden>
+          <textarea class="fctl" id="import-mermaid-text" rows="8" spellcheck="false" aria-label="Mermaid sequence diagram" placeholder="paste a sequenceDiagram or markdown mermaid fence"></textarea>
+          <button class="bbtn" id="import-mermaid-convert">convert</button>
+          <button class="bbtn" id="import-mermaid-cancel">cancel</button>
+        </div>
+      </details>
+      <div class="tracebox" id="tracebox" hidden>
+        <b>Honeycomb trace → diagram</b>
+        <p>Paste event JSON or open an export, preview its size, then choose all exported spans or a focused branch. Conversion runs locally. Build diagram replaces the editor in one undo step.</p>
+        <button class="bbtn" id="trace-open">open trace JSON…</button>
+        <input type="file" id="trace-file" accept=".json,application/json" hidden>
+        <label>Trace events<textarea class="fctl" id="trace-text" rows="5" spellcheck="false" placeholder='[{"trace.trace_id":"…", "trace.span_id":"…", "duration_ms":20, …}]'></textarea></label>
+        <label>Trace ID <small>only needed for multiple traces</small><input class="fctl" id="trace-id" type="text"></label>
+        <label>Source link <small>optional Honeycomb trace URL</small><input class="fctl" id="trace-url" type="url" placeholder="https://ui.honeycomb.io/…"></label>
+        <details><summary>Custom field names</summary>
+          <p>Default fields: trace.trace_id, trace.span_id, trace.parent_id, service.name, name, timestamp, duration_ms, error. Override only the fields that differ. Time is ISO with timezone or Unix seconds; duration is milliseconds.</p>
+          <textarea class="fctl" id="trace-fields" rows="3" aria-label="Trace field mapping" placeholder='{"service":"app.service", "timestamp":"time"}'></textarea>
+        </details>
+        <label>Import scope<select class="fctl" id="trace-scope"><option value="all">All exported spans</option><option value="subtree">One span and its descendants</option><option value="service">One service and its descendants</option></select></label>
+        <label id="trace-root-label" hidden>Root span ID<input class="fctl" id="trace-root" type="text" placeholder="Exact span ID, or choose a search result below"></label>
+        <label id="trace-service-label" hidden>Service name<input class="fctl" id="trace-service" type="text" list="trace-services" placeholder="Exact service name"></label>
+        <datalist id="trace-services"></datalist>
+        <p>Focus keeps exported descendants so included spans retain child timing. Parent IDs at the boundary remain unchanged.</p>
+        <div class="specrow"><button class="bbtn" id="trace-preview">Preview trace</button><button class="bbtn" id="trace-clear-focus" hidden>Clear focus</button></div>
+        <div id="trace-feedback" role="status"></div>
+        <div id="trace-preview-box" hidden>
+          <p id="trace-summary"></p><p id="trace-breadcrumbs"></p>
+          <ul id="trace-warnings"></ul>
+          <label>Find a span<input class="fctl" id="trace-search" type="search" placeholder="Span ID, operation, service, or recorded error"></label>
+          <p id="trace-search-count"></p>
+          <div id="trace-search-results" aria-label="Trace subtree choices"></div>
+        </div>
+        <div class="specrow"><button class="rbtn" id="trace-convert" disabled>Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
       </div>
-    </details>
+        <div id="editor-company"></div>
+        <details class="ssec workspace-preferences"><summary>Workspace preferences</summary><div class="specrow"><button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button><button class="bbtn" id="workspace-reset">Reset editor width</button></div><p class="fnote">Drag the divider to resize the editor. Double-click it for an even split.</p></details>
+      </div>
+      <ul class="msgs" id="msgs" aria-live="polite"></ul>
+    </section>
+    <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
+    <div class="workmain">
+      <div class="toolrow">
+        <span class="lab">SKIN</span>
+        <span id="skinbtns"><!-- one button per skin, built by boot from SKIN_NAMES --></span>
+      </div>
+
+      <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
+    </div>
+
   </div>
 
   <dialog id="diagram-add-menu" class="diagram-add-menu" aria-labelledby="diagram-add-title" aria-describedby="diagram-add-destination">

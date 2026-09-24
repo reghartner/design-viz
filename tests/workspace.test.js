@@ -23,8 +23,8 @@ function harness(saved, unavailable = false, current = null){
     };
   }
   const names = ['workspace-columns','spec-editor','sec-inspect','sec-source','sec-steps','sec-insert','sec-outline',
-    'workspace-focus','workspace-expand','workspace-reset','src','guide'];
-  ['inspect','steps','json'].forEach(n=>names.push('editor-tab-'+n,'editor-'+n));
+    'workspace-focus','workspace-reset','src','guide'];
+  ['inspect','steps','outline','json','file'].forEach(n=>names.push('editor-tab-'+n,'editor-'+n));
   const elements = Object.fromEntries(names.map(id=>[id,element()]));
   const wrap = element(), body = element(), toolbar = element(), win = element();
   toolbar.height=42; win.scrollY=500;
@@ -41,7 +41,7 @@ function harness(saved, unavailable = false, current = null){
 
 test('workspace migrates saved widths without the obsolete inspector split and clamps only the displayed width',()=>{
   const h=harness('{"editor":1000,"inspector":65}'), col=h['workspace-columns'];
-  assert.equal(col.attrs['aria-valuenow'],'872'); // 1240 - 44 padding - 300 preview - 24 divider
+  assert.equal(col.attrs['aria-valuenow'],'800'); // 1240 - 44 padding - 300 preview - 24 divider - 72 rail
   h.wrap.clientWidth=1720; h.win.fire('resize');
   assert.equal(col.attrs['aria-valuenow'],'1000');
   assert.equal(h.ctl.tool(),'inspect'); assert.equal(h.writes.length,0);
@@ -56,17 +56,17 @@ test('workspace migrates saved widths without the obsolete inspector split and c
 
 test('keyboard divider enforces bounds, balances on double-click and leaves editor shortcuts alone',()=>{
   const h=harness(), col=h['workspace-columns'];
-  col.fire('keydown',{key:'ArrowLeft'}); assert.equal(col.attrs['aria-valuenow'],'460');
-  col.fire('keydown',{key:'End'}); assert.equal(col.attrs['aria-valuenow'],'872');
+  col.fire('keydown',{key:'ArrowRight'}); assert.equal(col.attrs['aria-valuenow'],'460');
+  col.fire('keydown',{key:'End'}); assert.equal(col.attrs['aria-valuenow'],'800');
   col.fire('keydown',{key:'Home'}); assert.equal(col.attrs['aria-valuenow'],'320');
   const ignored=col.fire('keydown',{key:'ArrowLeft',metaKey:true}); assert.equal(ignored.prevented,undefined);
-  col.fire('dblclick'); assert.equal(col.attrs['aria-valuenow'],'586');
+  col.fire('dblclick'); assert.equal(col.attrs['aria-valuenow'],'550');
   assert.deepEqual([...new Set(h.writes)],['dv-workbench-layout-v2']);
 });
 
 test('pointer capture commits once; cancellation, lost focus and window resize restore the preference',()=>{
   const h=harness(), col=h['workspace-columns'];
-  col.fire('pointerdown'); col.fire('pointermove',{clientX:730});
+  col.fire('pointerdown'); col.fire('pointermove',{clientX:870});
   assert.equal(col.attrs['aria-valuenow'],'510'); assert.equal(h.writes.length,0);
   col.fire('pointerup'); assert.equal(h.writes.length,1); assert.equal(col.capture,null);
   for(const action of ['pointercancel','blur','resize','lostpointercapture']){
@@ -79,42 +79,32 @@ test('pointer capture commits once; cancellation, lost focus and window resize r
   assert.equal(col.attrs['aria-valuenow'],'510');
 });
 
-test('expansion retains the split width, selected tool and content; Return restores the earlier focus and scroll',()=>{
-  const h=harness(), expand=h['workspace-expand'];
-  h.ctl.showTool('json'); const src=h.src;
+test('focus and resizing retain the selected workspace, source draft and native selection',()=>{
+  const h=harness(),src=h.src;h.ctl.showTool('json');
   src.value='unsaved source';src.selectionStart=3;src.selectionEnd=8;src.scrollTop=200;
-  const selected={path:'offline',step:'lost'};h['editor-inspect'].form=selected;
-  const click=expand.fire('click');assert.equal(click.prevented,true);assert.equal(click.stopped,true);
-  assert.equal(h.ctl.expanded(),true);assert.equal(h.body.classList.contains('workspace-focus'),true);
-  assert.equal(h['spec-editor'].open,true);assert.equal(h.win.scrollY,0);
-  h['workspace-columns'].fire('pointerdown');h['workspace-columns'].fire('keydown',{key:'End'});
-  assert.equal(h['workspace-columns'].attrs['aria-valuenow'],'440','hidden divider cannot resize while expanded');
-  expand.fire('click');assert.equal(h.ctl.expanded(),false);assert.equal(h.win.scrollY,500);
-  assert.equal(h.body.classList.contains('workspace-focus'),false);
-  assert.equal(h.ctl.tool(),'json');assert.equal(h.src,src);assert.equal(src.value,'unsaved source');
-  assert.equal(src.selectionStart,3);assert.equal(src.selectionEnd,8);assert.equal(src.scrollTop,200);
-  assert.equal(h['editor-inspect'].form,selected);
-  assert.equal(h.writes.length,1,'only the explicit tab choice persists, not focus or expansion');
-  h['workspace-focus'].fire('click');expand.fire('click');expand.fire('click');
-  assert.equal(h.body.classList.contains('workspace-focus'),true,'Return retains preexisting focus mode');
+  h['workspace-focus'].fire('click');assert.equal(h.body.classList.contains('workspace-focus'),true);assert.equal(h.win.scrollY,0);
+  h['workspace-columns'].fire('keydown',{key:'End'});assert.equal(h['workspace-columns'].attrs['aria-valuenow'],'800');
+  h['workspace-focus'].fire('click');assert.equal(h.win.scrollY,500);assert.equal(h.ctl.tool(),'json');
+  assert.equal(h.src,src);assert.equal(src.value,'unsaved source');assert.equal(src.selectionStart,3);assert.equal(src.selectionEnd,8);assert.equal(src.scrollTop,200);
 });
 
 test('editor tabs expose one pane, support arrow navigation and preserve the same source and inspector nodes',()=>{
   const h=harness(),src=h.src,form={caption:'draft caption'};
   h['editor-inspect'].form=form;src.value='draft JSON';src.selectionStart=2;src.selectionEnd=7;
   h.guide.scrollTop=520;
-  h['editor-tab-inspect'].fire('keydown',{key:'ArrowRight'});
+  h['editor-tab-inspect'].fire('keydown',{key:'ArrowDown'});
   h.guide.scrollTop=0; // a hidden scrolling form may have its offset clamped by the browser
   assert.equal(h.ctl.tool(),'steps');assert.equal(h['editor-tab-steps'].focused,true);
   assert.equal(h['editor-tab-inspect'].tabIndex,-1);assert.equal(h['editor-tab-steps'].tabIndex,0);
-  h['editor-tab-steps'].fire('keydown',{key:'End'});assert.equal(h.ctl.tool(),'json');
+  h['editor-tab-steps'].fire('keydown',{key:'End'});assert.equal(h.ctl.tool(),'file');
+  h['editor-tab-file'].fire('keydown',{key:'ArrowUp'});assert.equal(h.ctl.tool(),'json');
   src.scrollTop=340;
-  h['editor-tab-json'].fire('keydown',{key:'ArrowRight'});assert.equal(h.ctl.tool(),'inspect');
+  h['editor-tab-json'].fire('keydown',{key:'Home'});assert.equal(h.ctl.tool(),'inspect');
   assert.equal(h.guide.scrollTop,520);
   h.ctl.showTool('json');assert.equal(src.scrollTop,340);
   assert.equal(h.src,src);assert.equal(src.value,'draft JSON');assert.equal(src.selectionStart,2);assert.equal(src.selectionEnd,7);
   assert.equal(h['editor-inspect'].form,form);
-  for(const name of ['inspect','steps','json']){
+  for(const name of ['inspect','steps','outline','json','file']){
     assert.equal(h['editor-'+name].hidden,name!=='json');
     assert.equal(h['editor-tab-'+name].attrs['aria-selected'],String(name==='json'));
   }
@@ -123,17 +113,18 @@ test('editor tabs expose one pane, support arrow navigation and preserve the sam
   h.ctl.showTool('inspect');assert.equal(h.guide.scrollTop,0,'a new selection starts at the top of its own form');
 });
 
-test('explicit tool navigation reveals the outer editor and keeps optional utilities out of its way',()=>{
-  const h=harness();h['spec-editor'].open=false;
-  h.ctl.showTool('json',{closeUtilities:true});
-  assert.equal(h['spec-editor'].open,true);assert.equal(h['sec-source'].open,true);
-  assert.equal(h['sec-insert'].open,false);assert.equal(h['sec-outline'].open,false);
+test('each workspace retains its scroll and nested disclosure state across navigation',()=>{
+  const h=harness();h.ctl.showTool('file');h['editor-file'].scrollTop=250;h['sec-insert'].open=true;
+  h.ctl.showTool('outline');h['editor-outline'].scrollTop=120;h.ctl.showTool('json');
+  assert.equal(h['sec-source'].open,true);h['editor-file'].scrollTop=0;h['editor-outline'].scrollTop=0;
+  h.ctl.showTool('file');assert.equal(h['editor-file'].scrollTop,250);assert.equal(h['sec-insert'].open,true);
+  h.ctl.showTool('outline');assert.equal(h['editor-outline'].scrollTop,120);assert.equal(h['sec-outline'].open,true);
 });
 
 test('reset restores width without changing the active tool and works when storage is unavailable',()=>{
   const h=harness(null,true);
   h.ctl.showTool('steps');h['workspace-columns'].fire('keydown',{key:'End'});
-  h['workspace-expand'].fire('click');h['workspace-reset'].fire('click');
+  h['workspace-reset'].fire('click');
   assert.equal(h['workspace-columns'].attrs['aria-valuenow'],'440');
-  assert.equal(h.ctl.expanded(),false);assert.equal(h.ctl.tool(),'steps');assert.equal(h.win.scrollY,500);
+  assert.equal(h.ctl.tool(),'steps');assert.equal(h.win.scrollY,500);
 });

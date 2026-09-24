@@ -18,7 +18,10 @@ function longSpec(){
 for(const focus of [false,true])test(`row reorder keeps the ${focus?'focused preview':'page'} in place`,async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(longSpec()));
   await page.evaluate(()=>document.fonts.ready);
-  if(focus)await page.locator('#workspace-focus').click();
+  if(focus){
+    await page.locator('#editor-tab-file').click();await page.locator('.workspace-preferences summary').click();
+    await page.locator('#workspace-focus').click();await page.locator('#editor-tab-inspect').click();
+  }
   const position=()=>page.evaluate(focus=>focus?document.querySelector('.workmain').scrollTop:scrollY,focus);
   const settled=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const rows=async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[3].diagram.rows;

@@ -4,24 +4,23 @@ function workspacePrefs(raw){
   try { value = JSON.parse(raw); } catch (ex){ return prefs; }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return prefs;
   if (typeof value.editor === 'number' && Number.isFinite(value.editor)) prefs.editor = Math.max(320, Math.min(1100, value.editor));
-  if (['inspect','steps','json'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
+  if (['inspect','steps','outline','json','file'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
   return prefs;
 }
 function workspaceEditorBounds(contentWidth){
-  return {min:320, max:Math.max(320, Math.min(1100, Math.floor(contentWidth - 300 - 24)))};
+  return {min:320, max:Math.max(320, Math.min(1100, Math.floor(contentWidth - 300 - 24 - 72)))};
 }
 function initWorkbenchWorkspace(){
   var wrap = document.querySelector('.workwrap');
   var cols = document.getElementById('workspace-columns');
   var editor = document.getElementById('spec-editor');
   var focus = document.getElementById('workspace-focus');
-  var expand = document.getElementById('workspace-expand');
   var reset = document.getElementById('workspace-reset');
-  var toolbar = document.querySelector('.workspace-tools');
+  var toolbar = document.querySelector('.workbench-header');
   var src = document.getElementById('src');
   var guide = document.getElementById('guide');
-  if (!wrap || !cols || !editor || !focus || !expand || !reset || !toolbar || !src) return null;
-  var names = ['inspect','steps','json'], tabs = {}, panes = {}, scrolls = {};
+  if (!wrap || !cols || !editor || !focus || !reset || !toolbar || !src) return null;
+  var names = ['inspect','steps','outline','json','file'], tabs = {}, panes = {}, scrolls = {};
   names.forEach(function(name){
     tabs[name] = document.getElementById('editor-tab-' + name);
     panes[name] = document.getElementById('editor-' + name);
@@ -29,7 +28,7 @@ function initWorkbenchWorkspace(){
   if (names.some(function(name){ return !tabs[name] || !panes[name]; })) return null;
   var key = 'dv-workbench-layout-v2', raw = null;
   try { raw = localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v1'); } catch (ex){}
-  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0, expanded = false, priorFocus = false;
+  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0;
   function persist(){
     try { localStorage.setItem(key, JSON.stringify(prefs)); } catch (ex){}
   }
@@ -48,9 +47,6 @@ function initWorkbenchWorkspace(){
     cols.setAttribute('aria-valuemax', b.max);
     cols.setAttribute('aria-valuenow', Math.round(width));
     cols.setAttribute('aria-valuetext', Math.round(width) + ' pixels of editor width');
-    document.body.classList.toggle('editor-expanded', expanded);
-    expand.setAttribute('aria-pressed', String(expanded));
-    expand.textContent = expanded ? '↙ Return to split' : '⤢ Expand editor';
   }
   /* Show/hide existing panes; do not rebuild a form, source textarea, or
      preview. Keep both editor scroll positions and native text selection. */
@@ -63,7 +59,6 @@ function initWorkbenchWorkspace(){
         inspector:guide ? guide.scrollTop : 0, form:guide && guide.firstChild};
       prefs.tool = name;
     }
-    editor.open = true;
     names.forEach(function(n){
       var active = n === name;
       tabs[n].setAttribute('aria-selected', String(active));
@@ -78,9 +73,6 @@ function initWorkbenchWorkspace(){
       if (name === 'inspect' && guide)
         guide.scrollTop = guide.firstChild === scrolls[name].form ? scrolls[name].inspector : 0;
     }
-    if (options.closeUtilities){
-      ['sec-insert','sec-outline'].forEach(function(id){ var el = document.getElementById(id); if (el) el.open = false; });
-    }
     if (options.focus) tabs[name].focus({preventScroll:true});
     if (changed) persist();
     return true;
@@ -90,8 +82,8 @@ function initWorkbenchWorkspace(){
     tabs[name].addEventListener('keydown', function(ev){
       if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
       var next;
-      if (ev.key === 'ArrowRight') next = (index + 1) % names.length;
-      else if (ev.key === 'ArrowLeft') next = (index + names.length - 1) % names.length;
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowRight') next = (index + 1) % names.length;
+      else if (ev.key === 'ArrowUp' || ev.key === 'ArrowLeft') next = (index + names.length - 1) % names.length;
       else if (ev.key === 'Home') next = 0;
       else if (ev.key === 'End') next = names.length - 1;
       else return;
@@ -113,7 +105,7 @@ function initWorkbenchWorkspace(){
     if (!cancel) persist();
   }
   cols.addEventListener('pointerdown', function(ev){
-    if (expanded || ev.button !== 0 || !ev.isPrimary || drag) return;
+    if (ev.button !== 0 || !ev.isPrimary || drag) return;
     ev.preventDefault(); cols.focus({preventScroll:true});
     drag = {id:ev.pointerId, before:prefs.editor, start:ev.clientX,
       value:effectiveWidth(), cursor:document.body.style.cursor};
@@ -121,24 +113,24 @@ function initWorkbenchWorkspace(){
     document.body.classList.add('workspace-dragging'); document.body.style.cursor = 'col-resize';
   });
   cols.addEventListener('pointermove', function(ev){
-    if (drag && drag.id === ev.pointerId) assign(drag.value + drag.start - ev.clientX);
+    if (drag && drag.id === ev.pointerId) assign(drag.value + ev.clientX - drag.start);
   });
   cols.addEventListener('pointerup', function(ev){ if (drag && drag.id === ev.pointerId) finish(false); });
   cols.addEventListener('pointercancel', function(ev){ if (drag && drag.id === ev.pointerId) finish(true); });
   cols.addEventListener('lostpointercapture', function(){ if (drag) finish(true); });
   cols.addEventListener('keydown', function(ev){
-    if (expanded || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
     var value = effectiveWidth(), amount = ev.shiftKey ? 50 : 20;
     if (ev.key === 'Home') value = bounds().min;
     else if (ev.key === 'End') value = bounds().max;
-    else if (ev.key === 'ArrowLeft') value += amount;
-    else if (ev.key === 'ArrowRight') value -= amount;
+    else if (ev.key === 'ArrowLeft') value -= amount;
+    else if (ev.key === 'ArrowRight') value += amount;
     else return;
     ev.preventDefault(); ev.stopPropagation(); assign(value); persist();
   });
   cols.addEventListener('dblclick', function(){
     var style = getComputedStyle(wrap);
-    assign((wrap.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0) - 24) / 2);
+    assign((wrap.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0) - 24 - 72) / 2);
     persist();
   });
   function setFocus(on){
@@ -149,24 +141,12 @@ function initWorkbenchWorkspace(){
     focus.setAttribute('aria-pressed', String(on)); focus.textContent = on ? 'Exit focus' : 'Focus workspace';
     paint(); window.scrollTo(0, on ? 0 : pageScroll);
   }
-  function setExpanded(on){
-    finish(true);
-    if (expanded === on) return;
-    if (on) priorFocus = document.body.classList.contains('workspace-focus');
-    expanded = on; editor.open = true;
-    setFocus(on ? true : priorFocus); paint();
-  }
-  expand.addEventListener('click', function(ev){
-    ev.preventDefault(); ev.stopPropagation(); /* button inside the editor summary */
-    setExpanded(!expanded);
-  });
   focus.addEventListener('click', function(){
     finish(true);
-    if (expanded){ setExpanded(false); setFocus(false); }
-    else setFocus(!document.body.classList.contains('workspace-focus'));
+    setFocus(!document.body.classList.contains('workspace-focus'));
   });
   reset.addEventListener('click', function(){
-    finish(true); setExpanded(false); prefs.editor = 440; paint(); persist();
+    finish(true); prefs.editor = 440; paint(); persist();
   });
   window.addEventListener('resize', function(){ finish(true); paint(); });
   window.addEventListener('blur', function(){ finish(true); });
@@ -174,6 +154,5 @@ function initWorkbenchWorkspace(){
     var observer = new ResizeObserver(paint); observer.observe(wrap); observer.observe(toolbar);
   }
   showTool(prefs.tool); paint();
-  return {showTool:showTool, tool:function(){return prefs.tool;},
-    setExpanded:setExpanded, expanded:function(){return expanded;}};
+  return {showTool:showTool, tool:function(){return prefs.tool;}};
 }

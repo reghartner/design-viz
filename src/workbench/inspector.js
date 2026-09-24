@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
-  var OPEN_PATCH_EDITORS=new Set(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
+  var OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
@@ -587,7 +587,7 @@ function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){
   }
 
 function stepForm(val, ctx){
-    var t = session.target;
+    var t = session.target, panelRows=[];
     function toggled(planFn){
       return function(key){
         commitCascade(function(raw){ return planFn(session.text(), raw, t.section, t.index, key); },
@@ -626,7 +626,14 @@ function stepForm(val, ctx){
     rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){
       var editor=p && panelEditor(p.type);
-      if(editor && editor.stepControl) rows.push(editor.stepControl(ctx.diagram,p,t));
+      if(editor && editor.stepControl){
+        var fold=document.createElement('details'),key=JSON.stringify([session.snapshot().project,t.section,p.type,p.id]);
+        fold.className='patchedit panel-step-group';fold.open=CUSTOM_PANEL_FOLDS.get(key)!==false;
+        var summary=document.createElement('summary');summary.textContent=(p.title || p.id)+' · '+p.type;fold.appendChild(summary);
+        fold.appendChild(editor.stepControl(ctx.diagram,p,t));
+        formLife.listen(fold,'toggle',function(ev){if(ev.target===fold && guide.contains(fold))CUSTOM_PANEL_FOLDS.set(key,fold.open);});
+        panelRows.push(fold);
+      }
     });
     var laneNames = Object.keys((ctx.page && ctx.page.lanes) || {});
     rows.push(frow('lane', selectControl(laneNames, val.lane, function(v){
@@ -717,17 +724,23 @@ function stepForm(val, ctx){
     });
     rows.push(frow('Add node tone', addTone));
     var pids = Object.keys(val.panels || {});
-    rows.push(chipRow('panels',
+    panelRows.push(chipRow('panels',
       pids.map(function(pid){ return {key: pid, label: pid}; }),
       'none', toggled(planStepTogglePanel)));
     var declarations = (ctx.diagram && ctx.diagram.panels) || [];
     pids.forEach(function(pid){
       var decl = Array.isArray(declarations) ? declarations.filter(function(p){ return p && p.id === pid; })[0] : null;
       if (decl && panelEditor(decl.type).stepControl) return;
-      rows.push(panelPatchControl(pid, val.panels[pid], decl, t));
+      panelRows.push(panelPatchControl(pid, val.panels[pid], decl, t));
     });
     if (declarations.length) rows.push(effectiveStateControl(t));
-    return rows;
+    var columns=document.createElement('div');columns.className='step-form-columns';
+    var story=document.createElement('div');story.className='step-form-story';
+    rows.forEach(function(row){story.appendChild(row);});columns.appendChild(story);
+    var panels=document.createElement('div');panels.className='step-form-panels';
+    var heading=document.createElement('h3');heading.textContent='Panel changes';panels.appendChild(heading);
+    panelRows.forEach(function(row){panels.appendChild(row);});columns.appendChild(panels);
+    return [columns];
   }
 
 function effectiveStateControl(target){

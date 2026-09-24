@@ -9,11 +9,12 @@ playback. Selecting the already displayed step also pauses it. Pausing does
 not replace panel contents or disturb a focused control.
 
 Render, skin changes and inspector edits dispose the previous playback before
-building a paused preview. Within the same page title, a unique section with
-the same heading, tab label, node IDs and default view retains its preview mode
-and current beat. Steps match by a unique `id`, or by their complete unchanged
-content when they have no ID. Removed or ambiguous matches keep the rendered
-default; changed node sets or default views reset too. Selected-step edits use
+building a paused preview. The current view and beat follow a uniquely matched
+section across property edits, Undo/Redo, and skin/host preview changes. Steps
+match by a unique `id`, or by their complete unchanged content when they have no
+ID. Removed or ambiguous matches keep the rendered default; changing the authored
+playback mode resets playback. New projects start at their authored defaults.
+Selected-step edits use
 the builder's existing selection tracking. No playback state enters the JSON,
 undo history or saved layout. Standalone published pages retain autoplay.
 
@@ -36,12 +37,13 @@ source uses `\n`. Code remains literal, preserves indentation, and scrolls withi
 its block. Node/edge labels and panel values remain plain text. See
 [prose markup](../contract/authoring-contract.md#section-object) for syntax and examples.
 
-Use **Focus workspace** above the skin controls to hide the introduction and
+Use **File → Workspace preferences → Focus workspace** to hide the introduction and
 reference material. On a desktop, the preview scrolls beside a viewport-sized
 editor. **Exit focus** returns to the normal page and its previous scroll
 position. Focus mode lasts only until you exit or reload.
 
-**Add to diagram** stays at the top of the editor, above all three tools. The
+**Add to diagram**, **Undo**, **Redo**, **User guide**, and **Save** share the
+project toolbar above the workspace. The
 **Into** selector names the destination section, including its tab when applicable.
 Selecting a section in the preview updates this selector; choosing a destination
 here opens its tab and selects that section without switching editor tools.
@@ -67,23 +69,28 @@ cancel without changing the spec. Render handwritten JSON edits before starting.
 Ctrl/Cmd/Shift-click still control multiselect; ordinary drags still move nodes.
 Finish **ADD TO STEP** before using the quick connection shortcut.
 
-The editor has three tools, with one visible at a time:
+The tool rail is on the far left, with its editor immediately beside it and
+the diagram preview on the right. One workspace fills the editor at a time:
 
-- **Inspect** edits the selected element. Selecting something in the preview
-  opens this pane. Click the path beneath its title to open that element in
-  JSON. With no selection, it shows a short starting hint.
+- **Inspect** edits the selected element. Choose an element in the preview,
+  then Inspect to see its fields. When already inspecting, selecting another
+  element updates its fields. The path beneath the title opens it in JSON.
 - **Steps** provides the searchable story list and path controls. Selecting a
-  beat stays in this pane; **Inspect selected step** opens its fields.
-- **JSON** gives the source the full pane. Validation links and explicit source
-  jumps open it automatically. Raw edits still require **Render** before using
-  builder actions.
+  beat stays in this workspace; **Inspect selected step** opens its fields.
+- **Outline** finds nodes, panels, steps, and sections across the document.
+  **⌘/Ctrl K** opens it and focuses search. Selecting a result stays in the
+  outline; **Inspect selection** opens the selected object's fields.
+- **JSON** gives the source the full pane, with **Render** and **Diff** below.
+  Validation links and explicit source jumps open it automatically. Raw edits
+  require Render before using builder actions.
+- **File** contains open/export actions, Mermaid and trace imports, Company
+  repository/catalog controls, and Workspace preferences.
 
-Tab into the tool bar, then use Left/Right or Home/End to switch tools. Changing
-tools retains the existing forms and source textarea, including uncommitted
-source text and its selection. **Import** and **Document outline**
-remain collapsible above the active tool. Undo/redo and file actions stay
-visible below it. Selecting a tool or a preview element closes those utilities
-to make room; an active import or diff can still be closed using its own controls.
+Tab into the rail, then use Up/Down or Home/End to switch tools. Changing tools
+retains existing forms, disclosure state, scroll positions, and source drafts.
+Ordinary canvas selections do not leave Steps, Outline, JSON, or File. Explicit
+creation and inspection actions can open the relevant controls. Object clipboard
+actions stay with Inspect; Save and Undo/Redo remain available in the top toolbar.
 
 At widths of 800 pixels and up, drag the vertical divider's visible handle to
 change editor width. The divider is also keyboard accessible:
@@ -91,19 +98,16 @@ change editor width. The divider is also keyboard accessible:
 - Tab to the divider. Left/right moves the editor boundary. Shift uses larger
   increments.
 - Home and End choose the minimum and maximum sizes.
-- Double-click the divider for a balanced split. **Reset layout** restores the
+- Double-click the divider for a balanced split. **File → Workspace preferences → Reset editor width** restores the
   default 440-pixel editor width and keeps the selected tool.
 
 The editor stays between 320 and 1100 pixels wide, with at least 300 pixels
-reserved for the preview. **Expand editor** moves the editor to the left and
-keeps a 320-pixel live preview on the right. It also enters Focus workspace.
-**Return to split** restores the previous width and focus setting. Expansion
-does not render the preview again or change the selected step, path or view.
-Wide home-step inspectors place the map beside its device, person and signal
-controls. Narrow inspectors stack them.
-Inspector fields stay within the editor column even when service/API choices
-or field values are long. Use **Expand editor** when you want more space to read
-and edit those values.
+reserved for the preview. Drag right to widen it or left to shrink it. Resizing
+does not rerender the preview or change the selected step, path, or view. Wide
+step inspectors place narrative controls beside panel changes; individual panel
+controls stay collapsible. Wide Home inspectors put the map beside its device,
+person, and signal controls. Narrow inspectors stack them. Fields stay within
+the editor even when service/API choices or field values are long.
 
 Preview panels move below the diagram when its section has 1000 pixels or
 less of usable width. This follows the space left by the editor and section
@@ -113,15 +117,14 @@ behavior in the workbench, standalone pages and embeds.
 
 Editor width and selected tool persist in this browser when local storage is
 available. Widths from the earlier layout are carried forward; the former
-inspector/JSON height split is no longer used. Focus and expansion are temporary.
+inspector/JSON height split is no longer used. Focus mode is temporary.
 Resizing the window clamps the displayed editor width without losing its saved size.
 These preferences are independent of the spec, drafts and undo history.
 Cancelling a pointer drag or moving focus out of the window restores the size
 from before that drag.
 
 At smaller widths, including phones, the preview and editor stack vertically
-and the divider and Expand editor control disappear. The three tools remain
-available. Focus mode still hides reference material. The JSON
+and the divider disappears. The five tools remain available beside the editor. Focus mode still hides reference material. The JSON
 textarea keeps native text editing and vertical resizing where the browser
 supports it. This is a browser layout, not an operating-system fullscreen mode.
 

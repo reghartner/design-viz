@@ -170,7 +170,6 @@ function initWorkbenchWelcome(opts){
   }
   function displayWelcome(name,focus){
     if (builder.prepareWelcome) builder.prepareWelcome();
-    if (opts.workspace && opts.workspace.setExpanded) opts.workspace.setExpanded(false);
     /* Focus mode hides the header and source reference. Exit through its own control. */
     if (document.body.classList.contains('workspace-focus')) el('workspace-focus').click();
     editor.hidden = true; root.hidden = false;

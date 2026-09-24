@@ -12,7 +12,7 @@ var FlowviewCompatibility = (function(){
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
-    'content.deviceapp':'Device app notifications and optional sources', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
+    'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
@@ -53,6 +53,9 @@ var FlowviewCompatibility = (function(){
         used['panel.'+p.type]=true;
         if(p.type==='deviceapp'){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
+          var navigation=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'phoneScreen') ||
+            (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && object(v[f.id]) && Object.prototype.hasOwnProperty.call(v[f.id],'visible');}));};
+          if(navigation(p.initial) || (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && navigation(patches[p.id]);}))used['content.deviceapp-navigation']=true;
           if(p.showSources!=null || !Array.isArray(p.sources) || !p.sources.length || notify(p.initial) ||
             (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && notify(patches[p.id]);}))used['content.deviceapp']=true;
         }

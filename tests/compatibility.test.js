@@ -114,3 +114,15 @@ test('device app notifications and optional sources warn older viewers without c
     delete p.showSources;delete p.initial;delete d.steps[0].panels;
   }
 });
+
+test('device app phone screens and card visibility require the navigation capability',()=>{
+ const raw={page:{sections:[{diagram:{panels:[{id:'app',type:'deviceapp',sources:[{id:'backend'}],fields:[{id:'battery'}]}]}}]}};
+ const d=raw.page.sections[0].diagram,p=d.panels[0],older={...C.features};delete older['content.deviceapp-navigation'];
+ for(const patch of [{phoneScreen:'home'},{battery:{visible:false}}]){
+  p.initial=patch;
+  assert.ok(C.detect(raw).includes('content.deviceapp-navigation'));
+  assert.deepEqual(plain(C.check(C.stamp(raw),{version:C.version,contract:'1',features:older}).missingFeatures),['content.deviceapp-navigation']);
+  delete p.initial;d.steps=[{patch:{app:patch}}];assert.ok(C.detect(raw).includes('content.deviceapp-navigation'));delete d.steps;
+ }
+ assert.ok(!C.detect(raw).includes('content.deviceapp-navigation'));
+});

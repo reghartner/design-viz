@@ -1,9 +1,51 @@
-# Device app: data tiles, notifications and optional sources
+# Device app: home screen, data cards, notifications and optional sources
 
-Use `deviceapp` for data tiles and notifications together in a device-details
-phone. Add source mappings only when explaining the backend is part of the story.
+Use `deviceapp` for one phone that moves from its home screen into a device app,
+with data cards and notifications. Add source mappings only when explaining the backend is part of the story.
 Use `phone` for a compact notification-only lock screen or two-way audio, and
 `screen` for camera clips.
+
+## Move from the home screen into the app
+
+Set `initial.phoneScreen:"home"` on a Device app panel. Use `appName` for its
+app icon and app header. Send a notification on a step, then open the app on the
+next step:
+
+```json
+{"panels":{"app":{"notify":{"app":"Homestead","title":"Doorbell pressed","text":"Someone is at the door."}}}}
+```
+
+```json
+{"panels":{"app":{"phoneScreen":"app","clear":true}}}
+```
+
+Return home with `{"panels":{"app":{"phoneScreen":"home"}}}`. `clear:true`
+is optional and explicitly dismisses notifications; opening the app alone does
+not do that. Screen selection, card visibility, and data carry independently.
+Omitting `phoneScreen` starts in the app, so existing specs keep their opening
+screen. The home-screen icons illustrate the phone; timeline steps drive navigation.
+
+In the workbench, select the panel and choose **Starting phone screen**. On a
+step, expand the panel controls and choose **Phone screen → Home screen / Device
+app / Inherit**. The [complete seven-step example](../examples/device-app-navigation/device-app-navigation.spec.json)
+shows notification arrival, opening the app, adding/removing cards, and returning home.
+
+## Add and remove cards on steps
+
+Declare possible cards once in `fields`. They start visible unless their initial
+state sets `visible:false`; use **Cards shown initially** in the panel inspector.
+Each step’s card controls offer **Card visibility → Show card / Hide card /
+Inherit**. Inherit keeps the previous choice; it does not necessarily show the card.
+
+```json
+{"panels":{"app":{"clip":{"visible":true,"value":"Just now","status":"ready"},"power":{"visible":false}}}}
+```
+
+This adds the recording card and removes the power card. Hiding a card does not
+clear its data. It can update while hidden and show the latest value when restored.
+Use `initial.clip.visible:false` to hold the recording card back until it exists.
+The phone frame keeps its size even with zero cards; long content scrolls inside.
+A whole-field null reset restores default visibility and unknown data.
 
 ## A phone without the source explanation
 
@@ -90,10 +132,10 @@ field set to `null` clears it to unknown. Never author computed `_updated` data.
 
 ## Edit and view
 
-- Add a **deviceapp** panel, then edit its device, sources and fields in the panel
-  inspector. Keep IDs stable; changing them requires updating references/patches.
+- Add a **deviceapp** panel, then edit its app name, device, starting screen,
+  initially shown cards, sources and fields in the panel inspector. Keep IDs stable; changing them requires updating references/patches.
 - Select a step and expand the panel patch. Every declared field has value,
-  status, source and detail controls. Blank controls mean no override in that
+  status, source, detail and visibility controls. Blank controls mean no override in that
   patch; use raw JSON for an explicit null reset.
 - Use a wide named-layout tile for phone + source map. The example's **App +
   sources** view emphasizes the UI; **End-to-end** also includes the backend

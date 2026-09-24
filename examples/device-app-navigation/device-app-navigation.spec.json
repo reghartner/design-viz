@@ -1,0 +1,255 @@
+{
+  "page": {
+    "title": "From a doorbell notification into the app",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "phone-to-app",
+        "heading": "One phone, from home screen to device details",
+        "text": "An illustrative doorbell story: a notification arrives on the home screen, the resident opens the app, and data cards enter and leave as the story unfolds. All data is fictional.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "events": {
+              "title": "Event & recording service",
+              "icon": "cloud",
+              "tint": "data"
+            },
+            "resident": {
+              "title": "Resident app",
+              "icon": "phone",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "doorbell"
+            ],
+            [
+              "events"
+            ],
+            [
+              "resident"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "doorbell",
+              "to": "events",
+              "label": "Button pressed"
+            },
+            {
+              "from": "events",
+              "to": "resident",
+              "label": "Notification / update"
+            }
+          ],
+          "panels": [
+            {
+              "id": "app",
+              "type": "deviceapp",
+              "title": "Resident phone",
+              "device": "Front door doorbell",
+              "subtitle": "Home · Front entry",
+              "fields": [
+                {
+                  "id": "battery",
+                  "label": "Battery",
+                  "kind": "battery"
+                },
+                {
+                  "id": "power",
+                  "label": "Power",
+                  "icon": "bulb"
+                },
+                {
+                  "id": "connection",
+                  "label": "Connection",
+                  "icon": "antenna"
+                },
+                {
+                  "id": "clip",
+                  "label": "Last recording",
+                  "icon": "camera"
+                },
+                {
+                  "id": "firmware",
+                  "label": "Firmware",
+                  "icon": "chip"
+                }
+              ],
+              "initial": {
+                "clock": "9:41",
+                "battery": {
+                  "value": 68,
+                  "status": "ready"
+                },
+                "power": {
+                  "value": "Solar panel",
+                  "status": "ready"
+                },
+                "connection": {
+                  "value": "Connected",
+                  "status": "ready"
+                },
+                "clip": {
+                  "value": "Yesterday",
+                  "status": "ready",
+                  "visible": false
+                },
+                "firmware": {
+                  "value": "v2.4.1",
+                  "status": "ready",
+                  "visible": false
+                },
+                "phoneScreen": "home"
+              },
+              "appName": "Homestead"
+            }
+          ],
+          "steps": [
+            {
+              "id": "home",
+              "nodes": [
+                "resident"
+              ],
+              "text": "The resident is on the phone home screen. Device data is kept in the background."
+            },
+            {
+              "id": "notification",
+              "edges": [
+                "doorbell->events",
+                "events->resident"
+              ],
+              "text": "A visitor presses the doorbell. A notification appears on the phone home screen.",
+              "panels": {
+                "app": {
+                  "notify": {
+                    "app": "Homestead",
+                    "title": "Doorbell pressed",
+                    "text": "Someone is at the front door."
+                  }
+                }
+              }
+            },
+            {
+              "id": "open",
+              "nodes": [
+                "resident"
+              ],
+              "text": "The resident opens Homestead. Battery, power, and connection cards appear inside the same phone. The notification is dismissed explicitly.",
+              "panels": {
+                "app": {
+                  "phoneScreen": "app",
+                  "clear": true
+                }
+              }
+            },
+            {
+              "id": "recording",
+              "nodes": [
+                "events",
+                "resident"
+              ],
+              "text": "The recording is ready. Add its card to the app without changing the existing cards.",
+              "panels": {
+                "app": {
+                  "clip": {
+                    "visible": true,
+                    "value": "Just now",
+                    "status": "ready"
+                  },
+                  "notify": {
+                    "app": "Homestead",
+                    "title": "Recording ready",
+                    "text": "Your front-door clip is available."
+                  }
+                }
+              }
+            },
+            {
+              "id": "focus",
+              "nodes": [
+                "resident"
+              ],
+              "text": "Focus on battery and the recording: remove the power and connection cards. Their values remain stored.",
+              "panels": {
+                "app": {
+                  "power": {
+                    "visible": false
+                  },
+                  "connection": {
+                    "visible": false
+                  },
+                  "clear": true
+                }
+              }
+            },
+            {
+              "id": "return-home",
+              "nodes": [
+                "resident"
+              ],
+              "text": "Return to the phone home screen. Screen navigation does not reset device data or card choices.",
+              "panels": {
+                "app": {
+                  "phoneScreen": "home"
+                }
+              }
+            },
+            {
+              "id": "reopen",
+              "nodes": [
+                "resident"
+              ],
+              "text": "Reopen the app. The same two cards and the latest recording remain.",
+              "panels": {
+                "app": {
+                  "phoneScreen": "app"
+                }
+              }
+            }
+          ],
+          "layouts": [
+            {
+              "id": "app-and-flow",
+              "name": "App & flow",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "app",
+                    "x": 0,
+                    "y": 0,
+                    "w": 5,
+                    "h": 20
+                  },
+                  {
+                    "x": 5,
+                    "y": 0,
+                    "w": 7,
+                    "h": 20
+                  },
+                  {
+                    "controls": "steps",
+                    "attachTo": "diagram",
+                    "x": 5,
+                    "y": 20,
+                    "w": 7,
+                    "h": 5
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "app-and-flow"
+        }
+      }
+    ]
+  }
+}

@@ -1239,11 +1239,27 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 
 .deviceapp{display:grid;grid-template-columns:minmax(240px,330px) minmax(220px,1fr);gap:30px;max-width:930px;margin:auto;padding:12px;color:var(--dink);font:13px/1.45 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
 
-.deviceapp.da-standalone{grid-template-columns:minmax(0,390px);max-width:414px;gap:0;justify-content:center;}
-.da-standalone .da-phone{width:100%;max-width:none;}
-.da-phone{min-width:0;position:relative;box-sizing:border-box;border:3px solid #9ba7bd;border-radius:34px;padding:14px 15px 30px;background:#f5f7fc;color:#24324b;box-shadow:0 14px 30px #23324b12;}
-.da-phone::before{content:"";position:absolute;top:13px;left:43%;width:14%;height:5px;border-radius:5px;background:#8a96ac;}
-.da-statusbar{display:flex;justify-content:space-between;font:600 10px 'IBM Plex Mono',monospace;padding:0 5px 18px;}
+.deviceapp.da-standalone{grid-template-columns:minmax(0,330px);max-width:354px;gap:0;justify-content:center;}
+.da-phone{width:100%;max-width:330px;min-width:0;min-height:0;aspect-ratio:9/18.5;align-self:start;position:relative;box-sizing:border-box;display:flex;flex-direction:column;border:4px solid #79869e;border-radius:38px;padding:18px 12px 27px;background:#f5f7fc;color:#24324b;box-shadow:0 14px 30px #23324b18,inset 0 0 0 1px #ffffffa8;overflow:hidden;}
+.da-phone::before{content:"";position:absolute;top:12px;left:calc(50% - 23px);width:46px;height:9px;border-radius:8px;background:#42506a;}
+.da-statusbar{display:flex;flex:none;justify-content:space-between;gap:55px;font:600 10px 'IBM Plex Mono',monospace;padding:0 5px 18px;}
+.da-statusbar>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.da-screen{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border-radius:10px;padding:2px 3px 8px;}
+.da-screen:focus-visible{outline:2px solid #6875ca;outline-offset:-2px;}
+.da-appbar{display:flex;align-items:center;gap:7px;font:600 11px/1.4 'Sora',sans-serif;color:#6673c2;padding:3px 4px 8px;}
+.da-appbar svg{width:20px;height:20px;flex:none;}
+.da-phone-home{background:radial-gradient(ellipse at 15% 10%,#f8dbfa 0,transparent 58%),radial-gradient(ellipse at 95% 85%,#9fcef1 0,transparent 60%),linear-gradient(150deg,#e8e8fc,#c3d3ee);}
+.da-screen-home{display:flex;flex-direction:column;}
+.da-home-clock{padding:24px 0 22px;text-align:center;color:#384b71;}
+.da-home-clock>span{display:block;font:600 10px/1.5 'Sora',sans-serif;letter-spacing:.12em;text-transform:uppercase;}
+.da-home-clock strong{display:block;font:500 clamp(28px,10cqi,54px)/1.2 'Sora',sans-serif;letter-spacing:-.06em;margin-top:5px;overflow-wrap:anywhere;}
+.da-home-empty,.da-empty-cards{padding:20px 12px;text-align:center;font:12px/1.5 'Sora',sans-serif;color:#65728a;}
+.da-launcher{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:16px 7px 8px;margin-top:auto;flex:none;}
+.da-launcher-app{min-width:0;text-align:center;font:500 9px/1.35 'Sora',sans-serif;color:#344762;}
+.da-launcher-icon{position:relative;display:grid;place-items:center;width:min(100%,47px);aspect-ratio:1;margin:0 auto 6px;border-radius:13px;background:#ffffffa8;box-shadow:0 4px 9px #536f8d13;color:#627494;}
+.da-launcher-icon svg{width:25px;height:25px;}
+.da-launcher-primary .da-launcher-icon{background:linear-gradient(145deg,#8292ec,#5564c2);color:#fff;}
+.da-launcher-icon i{position:absolute;top:-5px;right:-5px;min-width:16px;padding:2px 4px;border-radius:10px;background:#cc4d6c;color:#fff;font:700 9px/1.4 'IBM Plex Mono',monospace;font-style:normal;}
 .da-heading{padding:5px 4px 16px;}
 .da-eyebrow{font:600 10px/1.5 'IBM Plex Mono',monospace;letter-spacing:.12em;opacity:.7;}
 .da-heading h3,.da-provenance h3{font:600 21px/1.2 'Sora',sans-serif;margin:7px 0 5px;letter-spacing:-.5px;}
@@ -1287,6 +1303,10 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 
 .da-field.fresh{animation:da-arrive .6s ease-out;}
 @keyframes da-arrive{from{transform:translateY(4px);background:#e8f1ff;}to{transform:none;background:#fff;}}
+.da-screen-app.fresh{animation:da-open-app .45s cubic-bezier(.2,.8,.2,1);transform-origin:20% 90%;}
+.da-screen-home.fresh{animation:da-return-home .35s ease-out;}
+@keyframes da-open-app{from{opacity:0;transform:translateY(24px) scale(.9);}to{opacity:1;transform:none;}}
+@keyframes da-return-home{from{opacity:0;transform:scale(1.04);}to{opacity:1;transform:none;}}
 .da-home{position:absolute;bottom:10px;left:37%;width:26%;height:4px;border-radius:4px;background:#8694ab;}
 .da-provenance{align-self:center;min-width:0;}
 .da-help{color:var(--dtext);font-size:12px;margin:10px 0 20px;}
@@ -1304,8 +1324,10 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 @container (max-width:560px){.da-phone{width:100%;max-width:330px;margin:auto;}}
 @container (max-width:560px){.da-provenance h3{font-size:17px;}}
 @media(prefers-reduced-motion:reduce){.da-field.fresh{animation:none;}}
+@media(prefers-reduced-motion:reduce){.da-screen.fresh{animation:none;}}
 @media(prefers-reduced-motion:reduce){.da-field{transition:none;}}
 @media print{.da-field.fresh{animation:none;}}
+@media print{.da-screen.fresh{animation:none;}}
 @media print{.da-provenance{color:#222;--dink:#222;--dtext:#444;}}
 @media print{.da-phone{box-shadow:none;}}
 
@@ -7374,7 +7396,7 @@ var FlowviewCompatibility = (function(){
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
-    'content.deviceapp':'Device app notifications and optional sources', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
+    'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
@@ -7415,6 +7437,9 @@ var FlowviewCompatibility = (function(){
         used['panel.'+p.type]=true;
         if(p.type==='deviceapp'){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
+          var navigation=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'phoneScreen') ||
+            (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && object(v[f.id]) && Object.prototype.hasOwnProperty.call(v[f.id],'visible');}));};
+          if(navigation(p.initial) || (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && navigation(patches[p.id]);}))used['content.deviceapp-navigation']=true;
           if(p.showSources!=null || !Array.isArray(p.sources) || !p.sources.length || notify(p.initial) ||
             (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && notify(patches[p.id]);}))used['content.deviceapp']=true;
         }
@@ -11711,9 +11736,10 @@ PanelRegistry.extend('checks', {
 /* Device app values are authored UI data, with optional per-field provenance.
    A source node is a diagram reference, never an instruction to fetch an API. */
 var DEVICEAPP_STATUSES = ['unknown', 'loading', 'ready', 'stale', 'error'];
+var DEVICEAPP_SCREENS = ['home', 'app'];
 function deviceAppItems(panel, key) {
   var seen = Object.create(null),
-    reserved = ['clock', 'note', 'notify', 'clear', 'notifications', 'constructor', 'prototype'];
+    reserved = ['phoneScreen', 'clock', 'note', 'notify', 'clear', 'notifications', 'constructor', 'prototype'];
   return (Array.isArray(panel && panel[key]) ? panel[key] : [])
     .filter(function (item) {
       if (
@@ -11740,6 +11766,10 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
     sources = deviceAppItems(panel, 'sources');
   Object.keys(obj).forEach(function (key) {
     if (key === 'notify' || key === 'clear') return;
+    if (key === 'phoneScreen') {
+      if (DEVICEAPP_SCREENS.indexOf(obj[key]) < 0) warnings.push(path + '.phoneScreen: expected home or app — ignored');
+      return;
+    }
     if (key === 'clock' || key === 'note') {
       if (typeof obj[key] !== 'string')
         warnings.push(path + '.' + key + ': expected text — ignored');
@@ -11756,11 +11786,11 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
     }
     if (v === null) return;
     if (!panelObject(v)) {
-      warnings.push(p + ': expected {value, status?, source?, detail?} or null — ignored');
+      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?} or null — ignored');
       return;
     }
     Object.keys(v).forEach(function (k) {
-      if (['value', 'status', 'source', 'detail'].indexOf(k) < 0)
+      if (['value', 'status', 'source', 'detail', 'visible'].indexOf(k) < 0)
         warnings.push(p + '.' + k + ': unknown field property — ignored');
     });
     if (
@@ -11787,10 +11817,12 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
       warnings.push(p + '.source: unknown source ID — ignored');
     if (panelOwn(v, 'detail') && v.detail !== null && typeof v.detail !== 'string')
       warnings.push(p + '.detail: expected text or null — ignored');
+    if (panelOwn(v, 'visible') && typeof v.visible !== 'boolean')
+      warnings.push(p + '.visible: expected true or false — ignored');
   });
 }
 function deviceAppWarnings(panel, d, path, warnings) {
-  ['device', 'subtitle'].forEach(function (k) {
+  ['device', 'subtitle', 'appName'].forEach(function (k) {
     if (panel[k] != null && typeof panel[k] !== 'string')
       warnings.push(path + '.' + k + ': expected text — ignored');
   });
@@ -11807,7 +11839,7 @@ function deviceAppWarnings(panel, d, path, warnings) {
           key +
           ': use unique letter-led IDs and at most ' +
           (key === 'sources' ? 6 : 12) +
-          ' entries; clock/note/notify/clear/notifications/constructor/prototype are reserved — invalid entries ignored'
+          ' entries; phoneScreen/clock/note/notify/clear/notifications/constructor/prototype are reserved — invalid entries ignored'
       );
     items.forEach(function (item, i) {
       var p = path + '.' + key + '[' + i + ']';
@@ -11851,6 +11883,7 @@ function foldDeviceAppStates(panel, steps) {
     var updated = [];
     added = notifications.apply(patch);
     if (!panelObject(patch)) return updated;
+    if (DEVICEAPP_SCREENS.indexOf(patch.phoneScreen) >= 0) carried.phoneScreen = patch.phoneScreen;
     ['clock', 'note'].forEach(function (k) {
       if (typeof patch[k] === 'string') carried[k] = patch[k];
     });
@@ -11878,6 +11911,7 @@ function foldDeviceAppStates(panel, steps) {
         )
           next.source = v.source;
         if (v.detail === null || typeof v.detail === 'string') next.detail = v.detail || '';
+        if (typeof v.visible === 'boolean') next.visible = v.visible;
       } else return;
       if (JSON.stringify(next) !== JSON.stringify(carried[f.id] || {})) updated.push(f.id);
       carried[f.id] = next;
@@ -11954,10 +11988,13 @@ function deviceAppModel(panel, state) {
       pct: battery && valid ? v.value : 0,
       status: DEVICEAPP_STATUSES.indexOf(v.status) >= 0 ? v.status : 'unknown',
       detail: str(v.detail),
+      visible: v.visible !== false,
       updated: Array.isArray(state._updated) && state._updated.indexOf(f.id) >= 0,
     };
   });
   return {
+    screen: state.phoneScreen === 'home' ? 'home' : 'app',
+    appName: str(panel.appName, 'Device app'),
     device: str(panel.device, 'Camera'),
     subtitle: str(panel.subtitle, 'Device health'),
     clock: str(state.clock, '9:41'),
@@ -11968,7 +12005,27 @@ function deviceAppModel(panel, state) {
     fields: fields,
   };
 }
-function deviceAppPanelHTML(panel, state, fresh, notificationFresh) {
+function deviceAppNotificationsHTML(m, fresh) {
+  if (!m.notifications.count) return '';
+  return '<section class="da-notifications" aria-label="Notifications">'+
+    '<div class="da-notification-heading"><span>Notifications</span><span class="da-notification-count" aria-label="'+m.notifications.count+' unread">'+m.notifications.count+'</span></div>'+
+    '<div class="da-notification-cards">'+FlowNotifications.cardsHTML(m.notifications,fresh)+'</div>'+
+    (m.notifications.overflow?'<div class="phoneoverflow">+'+m.notifications.overflow+' more</div>':'')+'</section>';
+}
+function deviceAppHomeHTML(m, fresh) {
+  var h='<div class="da-home-clock"><span>Home screen</span><strong>'+esc(m.clock)+'</strong></div>'+
+    deviceAppNotificationsHTML(m,fresh)+
+    (!m.notifications.count?'<div class="da-home-empty">No notifications</div>':'')+
+    '<div class="da-launcher" aria-label="Home screen apps">';
+  [['camera',m.appName],['phone','Calls'],['speaker','Music'],['gear','Settings']].forEach(function(app,index){
+    // Decorative phone UI: story steps own navigation, not these app icons.
+    h+='<div class="da-launcher-app'+(index===0?' da-launcher-primary':'')+'"><span class="da-launcher-icon" aria-hidden="true">'+
+      '<svg viewBox="0 0 24 24"><use href="#i-'+app[0]+'"/></svg>'+
+      (index===0 && m.notifications.count?'<i>'+m.notifications.count+'</i>':'')+'</span><span>'+esc(app[1])+'</span></div>';
+  });
+  return h+'</div>'+(!m.showSources && m.note?'<p class="da-app-note">'+esc(m.note)+'</p>':'');
+}
+function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh) {
   var m = deviceAppModel(panel, state),
     labels = {
       unknown: 'No data',
@@ -11990,69 +12047,66 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh) {
     );
   }
   var h =
-    '<div class="deviceapp'+(m.showSources?'':' da-standalone')+'"><div class="da-phone"><div class="da-statusbar"><span>' +
-    esc(m.clock) +
-    '</span><span aria-hidden="true">▂▄▆ · ▰</span></div>' +
-    '<div class="da-heading"><span class="da-eyebrow">CAMERA DETAILS</span><h3>' +
-    esc(m.device) +
-    '</h3><span>' +
-    esc(m.subtitle) +
-    '</span></div>';
-  if(m.notifications.count){
-    h+='<section class="da-notifications" aria-label="Notifications">'+
-      '<div class="da-notification-heading"><span>Notifications</span><span class="da-notification-count" aria-label="'+m.notifications.count+' unread">'+m.notifications.count+'</span></div>'+
-      '<div class="da-notification-cards">'+FlowNotifications.cardsHTML(m.notifications,notificationFresh)+'</div>'+
-      (m.notifications.overflow?'<div class="phoneoverflow">+'+m.notifications.overflow+' more</div>':'')+'</section>';
+    '<div class="deviceapp'+(m.showSources?'':' da-standalone')+'"><div class="da-phone da-phone-'+m.screen+'" data-da-screen="'+m.screen+'">'+
+    '<div class="da-statusbar"><span>'+esc(m.clock)+'</span><span aria-hidden="true">▂▄▆ · ▰</span></div>'+
+    '<div class="da-screen da-screen-'+m.screen+(screenFresh?' fresh':'')+'" tabindex="0" aria-label="'+(m.screen==='home'?'Phone home screen':'Device app screen')+'">';
+  if(m.screen==='home') h+=deviceAppHomeHTML(m,notificationFresh);
+  else {
+    h+='<div class="da-appbar"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg>'+esc(m.appName)+'</div>'+
+      '<div class="da-heading"><span class="da-eyebrow">CAMERA DETAILS</span><h3>'+esc(m.device)+'</h3><span>'+esc(m.subtitle)+'</span></div>'+
+      deviceAppNotificationsHTML(m,notificationFresh)+'<div class="da-fields">';
+    m.fields.filter(function(f){return f.visible;}).forEach(function (f) {
+      var mapped=m.showSources && f.source;
+      h +=
+        (mapped?'<button type="button"':'<div')+' class="da-field da-' +
+        f.status +
+        (f.updated ? ' da-updated' : '') +
+        (fresh && f.updated ? ' fresh' : '') +
+        '" data-da-field="' +
+        esc(f.id) +
+        '"' +
+        (mapped?props(f.source)+' aria-pressed="false"':' style="--da-color:#6875ca"') +
+        ' aria-label="' +
+        esc(
+          f.label +
+            ': ' +
+            f.value +
+            '. ' +
+            labels[f.status] +
+            (mapped?'. Source: '+f.source.label:'')
+        ) +
+        '">' +
+        '<span class="da-field-top"><span>' +
+        esc(f.label) +
+        '</span>' +
+        (mapped?badge(f.source):'') +
+        '</span>' +
+        '<span class="da-value">' +
+        (f.icon
+          ? '<svg class="da-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
+            f.icon +
+            '"/></svg>'
+          : '') +
+        esc(f.value) +
+        '</span>' +
+        (f.battery
+          ? '<span class="da-meter" aria-hidden="true"><i style="width:' + f.pct + '%"></i></span>'
+          : '') +
+        '<span class="da-meta"><span class="da-state">' +
+        labels[f.status] +
+        '</span>' +
+        (f.updated ? '<span class="da-update-label">Updated</span>' : '') +
+        '</span>' +
+        (f.detail ? '<span class="da-detail">' + esc(f.detail) + '</span>' : '') +
+        (mapped?'</button>':'</div>');
+    });
+    h+='</div>';
+    if(!m.fields.some(function(f){return f.visible;}))h+='<div class="da-empty-cards">No data cards shown</div>';
+    if(!m.showSources && m.note)h+='<p class="da-app-note">'+esc(m.note)+'</p>';
   }
-  h+='<div class="da-fields">';
-  m.fields.forEach(function (f) {
-    var mapped=m.showSources && f.source;
-    h +=
-      (mapped?'<button type="button"':'<div')+' class="da-field da-' +
-      f.status +
-      (f.updated ? ' da-updated' : '') +
-      (fresh && f.updated ? ' fresh' : '') +
-      '" data-da-field="' +
-      esc(f.id) +
-      '"' +
-      (mapped?props(f.source)+' aria-pressed="false"':' style="--da-color:#6875ca"') +
-      ' aria-label="' +
-      esc(
-        f.label +
-          ': ' +
-          f.value +
-          '. ' +
-          labels[f.status] +
-          (mapped?'. Source: '+f.source.label:'')
-      ) +
-      '">' +
-      '<span class="da-field-top"><span>' +
-      esc(f.label) +
-      '</span>' +
-      (mapped?badge(f.source):'') +
-      '</span>' +
-      '<span class="da-value">' +
-      (f.icon
-        ? '<svg class="da-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
-          f.icon +
-          '"/></svg>'
-        : '') +
-      esc(f.value) +
-      '</span>' +
-      (f.battery
-        ? '<span class="da-meter" aria-hidden="true"><i style="width:' + f.pct + '%"></i></span>'
-        : '') +
-      '<span class="da-meta"><span class="da-state">' +
-      labels[f.status] +
-      '</span>' +
-      (f.updated ? '<span class="da-update-label">Updated</span>' : '') +
-      '</span>' +
-      (f.detail ? '<span class="da-detail">' + esc(f.detail) + '</span>' : '') +
-      (mapped?'</button>':'</div>');
-  });
-  if(!m.showSources)return h+'</div>'+(m.note?'<p class="da-app-note">'+esc(m.note)+'</p>':'')+'<div class="da-home" aria-hidden="true"></div></div></div>';
-  h +=
-    '</div><div class="da-home" aria-hidden="true"></div></div><div class="da-provenance"><div class="da-eyebrow">WHERE THE DATA COMES FROM</div>' +
+  h+='</div><div class="da-home" aria-hidden="true"></div></div>';
+  if(!m.showSources)return h+'</div>';
+  h += '<div class="da-provenance"><div class="da-eyebrow">WHERE THE DATA COMES FROM</div>' +
     '<h3>One screen. Multiple sources.</h3><p class="da-help">Select a field or source to trace its data' +
     (m.sources.some(function (s) {
       return s.node;
@@ -12062,7 +12116,7 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh) {
     '.</p><div class="da-sources">';
   m.sources.forEach(function (s) {
     var fields = m.fields.filter(function (f) {
-      return f.source && f.source.id === s.id;
+      return f.visible && f.source && f.source.id === s.id;
     });
     h +=
       '<button type="button" class="da-source"' +
@@ -12135,13 +12189,6 @@ function bindDeviceAppSources(host, panel, state) {
   select(m.showSources?host._daSource:null);
 }
 
-/* queue widget: mailbox — a message enqueued, held, dequeued. Pure model +
-   markup builder so node tests cover them without a DOM. Directional context:
-   `from` shows during enqueue (arrival side), `to` during dequeue (departure
-   side), `reason` while held (the waiting-on line). Carried like any patch
-   field; only the state-relevant one renders. Non-strings are ignored (the
-   validator warns). */
-
 PanelViews.register('deviceapp', function (host, panel, state, skin, states, stepIdx, animate) {
   var h = '';
   var hBaseline = null;
@@ -12152,10 +12199,13 @@ PanelViews.register('deviceapp', function (host, panel, state, skin, states, ste
     stepIdx === host._daStep + 1;
   var notifications=FlowNotifications.model(state);
   var notificationFresh=daFresh && FlowNotifications.grew(host._daNotifications,notifications.notifications);
+  var screen=deviceAppModel(panel,state).screen;
+  var screenFresh=daFresh && host._daScreen!==screen;
+  host._daScreen=screen;
   host._daNotifications=notifications.notifications;
   host._daStep = validRevealIndex(stepIdx) ? stepIdx : null;
-  h += deviceAppPanelHTML(panel, state, daFresh,notificationFresh);
-  hBaseline = daFresh ? deviceAppPanelHTML(panel, state, false,false) : null;
+  h += deviceAppPanelHTML(panel, state, daFresh,notificationFresh,screenFresh);
+  hBaseline = daFresh ? deviceAppPanelHTML(panel, state, false,false,false) : null;
   return {
     html: h,
     baseline: hBaseline,
@@ -12181,11 +12231,27 @@ PanelRegistry.extend('deviceapp', {
     { order: 375, css: String.raw`.pt-deviceapp{container-type:inline-size;}` },
     {
       order: 377,
-      css: String.raw`.deviceapp.da-standalone{grid-template-columns:minmax(0,390px);max-width:414px;gap:0;justify-content:center;}
-.da-standalone .da-phone{width:100%;max-width:none;}
-.da-phone{min-width:0;position:relative;box-sizing:border-box;border:3px solid #9ba7bd;border-radius:34px;padding:14px 15px 30px;background:#f5f7fc;color:#24324b;box-shadow:0 14px 30px #23324b12;}
-.da-phone::before{content:"";position:absolute;top:13px;left:43%;width:14%;height:5px;border-radius:5px;background:#8a96ac;}
-.da-statusbar{display:flex;justify-content:space-between;font:600 10px 'IBM Plex Mono',monospace;padding:0 5px 18px;}
+      css: String.raw`.deviceapp.da-standalone{grid-template-columns:minmax(0,330px);max-width:354px;gap:0;justify-content:center;}
+.da-phone{width:100%;max-width:330px;min-width:0;min-height:0;aspect-ratio:9/18.5;align-self:start;position:relative;box-sizing:border-box;display:flex;flex-direction:column;border:4px solid #79869e;border-radius:38px;padding:18px 12px 27px;background:#f5f7fc;color:#24324b;box-shadow:0 14px 30px #23324b18,inset 0 0 0 1px #ffffffa8;overflow:hidden;}
+.da-phone::before{content:"";position:absolute;top:12px;left:calc(50% - 23px);width:46px;height:9px;border-radius:8px;background:#42506a;}
+.da-statusbar{display:flex;flex:none;justify-content:space-between;gap:55px;font:600 10px 'IBM Plex Mono',monospace;padding:0 5px 18px;}
+.da-statusbar>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.da-screen{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border-radius:10px;padding:2px 3px 8px;}
+.da-screen:focus-visible{outline:2px solid #6875ca;outline-offset:-2px;}
+.da-appbar{display:flex;align-items:center;gap:7px;font:600 11px/1.4 'Sora',sans-serif;color:#6673c2;padding:3px 4px 8px;}
+.da-appbar svg{width:20px;height:20px;flex:none;}
+.da-phone-home{background:radial-gradient(ellipse at 15% 10%,#f8dbfa 0,transparent 58%),radial-gradient(ellipse at 95% 85%,#9fcef1 0,transparent 60%),linear-gradient(150deg,#e8e8fc,#c3d3ee);}
+.da-screen-home{display:flex;flex-direction:column;}
+.da-home-clock{padding:24px 0 22px;text-align:center;color:#384b71;}
+.da-home-clock>span{display:block;font:600 10px/1.5 'Sora',sans-serif;letter-spacing:.12em;text-transform:uppercase;}
+.da-home-clock strong{display:block;font:500 clamp(28px,10cqi,54px)/1.2 'Sora',sans-serif;letter-spacing:-.06em;margin-top:5px;overflow-wrap:anywhere;}
+.da-home-empty,.da-empty-cards{padding:20px 12px;text-align:center;font:12px/1.5 'Sora',sans-serif;color:#65728a;}
+.da-launcher{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:16px 7px 8px;margin-top:auto;flex:none;}
+.da-launcher-app{min-width:0;text-align:center;font:500 9px/1.35 'Sora',sans-serif;color:#344762;}
+.da-launcher-icon{position:relative;display:grid;place-items:center;width:min(100%,47px);aspect-ratio:1;margin:0 auto 6px;border-radius:13px;background:#ffffffa8;box-shadow:0 4px 9px #536f8d13;color:#627494;}
+.da-launcher-icon svg{width:25px;height:25px;}
+.da-launcher-primary .da-launcher-icon{background:linear-gradient(145deg,#8292ec,#5564c2);color:#fff;}
+.da-launcher-icon i{position:absolute;top:-5px;right:-5px;min-width:16px;padding:2px 4px;border-radius:10px;background:#cc4d6c;color:#fff;font:700 9px/1.4 'IBM Plex Mono',monospace;font-style:normal;}
 .da-heading{padding:5px 4px 16px;}
 .da-eyebrow{font:600 10px/1.5 'IBM Plex Mono',monospace;letter-spacing:.12em;opacity:.7;}
 .da-heading h3,.da-provenance h3{font:600 21px/1.2 'Sora',sans-serif;margin:7px 0 5px;letter-spacing:-.5px;}
@@ -12229,6 +12295,10 @@ PanelRegistry.extend('deviceapp', {
       order: 407,
       css: String.raw`.da-field.fresh{animation:da-arrive .6s ease-out;}
 @keyframes da-arrive{from{transform:translateY(4px);background:#e8f1ff;}to{transform:none;background:#fff;}}
+.da-screen-app.fresh{animation:da-open-app .45s cubic-bezier(.2,.8,.2,1);transform-origin:20% 90%;}
+.da-screen-home.fresh{animation:da-return-home .35s ease-out;}
+@keyframes da-open-app{from{opacity:0;transform:translateY(24px) scale(.9);}to{opacity:1;transform:none;}}
+@keyframes da-return-home{from{opacity:0;transform:scale(1.04);}to{opacity:1;transform:none;}}
 .da-home{position:absolute;bottom:10px;left:37%;width:26%;height:4px;border-radius:4px;background:#8694ab;}
 .da-provenance{align-self:center;min-width:0;}
 .da-help{color:var(--dtext);font-size:12px;margin:10px 0 20px;}
@@ -12246,8 +12316,10 @@ PanelRegistry.extend('deviceapp', {
       css: String.raw`@container (max-width:560px){.da-phone{width:100%;max-width:330px;margin:auto;}}
 @container (max-width:560px){.da-provenance h3{font-size:17px;}}
 @media(prefers-reduced-motion:reduce){.da-field.fresh{animation:none;}}
+@media(prefers-reduced-motion:reduce){.da-screen.fresh{animation:none;}}
 @media(prefers-reduced-motion:reduce){.da-field{transition:none;}}
 @media print{.da-field.fresh{animation:none;}}
+@media print{.da-screen.fresh{animation:none;}}
 @media print{.da-provenance{color:#222;--dink:#222;--dtext:#444;}}
 @media print{.da-phone{box-shadow:none;}}`,
     },
@@ -12266,6 +12338,7 @@ PanelRegistry.extend('deviceapp', {
   authoring: {
     template: {
       title: 'Device app',
+      appName: 'Homestead',
       device: 'Front door camera',
       subtitle: 'Device health',
       fields: [
@@ -12283,6 +12356,7 @@ PanelRegistry.extend('deviceapp', {
       },
     },
     setupFields: [
+      ['appName', 'text'],
       ['device', 'text'],
       ['subtitle', 'text'],
       ['showSources', 'jsonAny'],
@@ -12319,6 +12393,7 @@ PanelRegistry.extend('deviceapp', {
       ['initial', 'json'],
     ],
     patchFields: [
+      ['phoneScreen', 'enum', DEVICEAPP_SCREENS],
       ['notify', 'jsonAny'],
       ['clear', 'bool', { trueOnly: true }],
       ['clock', 'text'],
@@ -12328,15 +12403,52 @@ PanelRegistry.extend('deviceapp', {
       order: 25,
       name: 'Device app',
       category: 'Devices & interfaces',
-      tagline: 'Data tiles and notifications',
-      description: 'Show device data and incoming notifications in one tiled phone. Add a backend source map when you need it.',
+      tagline: 'Home screen to device app',
+      description: 'Receive notifications on a phone home screen, open the app, and show or hide data cards as the story unfolds. Backend source mapping is optional.',
     },
     example: function(sample){
       sample.panel.initial.notify={app:'Homestead',title:'Doorbell pressed',text:'Someone is at the front door.'};
       sample.state=foldDeviceAppStates(sample.panel,[])[0];sample.states=[sample.state];return sample;
     },
     editor: function(context){
-      return {setupField:function(field,panel){
+      var initialCardsOpen=false;
+      function initialChange(update){
+        return context.transact(function(raw){
+          var path=builderTargetPath(raw,context.target()),panel=path && specValueAt(raw,path);
+          if(!panel)return {error:'Select the device app panel again.'};
+          var initial=Object.assign({},panelObject(panel.initial)?panel.initial:{});
+          update(initial);
+          return planSetField(context.source(),raw,path,'initial',JSON.stringify(initial));
+        },{after:function(){context.refresh();}});
+      }
+      return {setupRows:function(panel,diagram,target,rows){
+        var initial=panelObject(panel.initial)?panel.initial:{};
+        var screen=context.controls.select(['Device app','Home screen'],initial.phoneScreen==='home'?'Home screen':'Device app',function(next){
+          return initialChange(function(value){value.phoneScreen=next==='Home screen'?'home':'app';});
+        });
+        screen.setAttribute('aria-label','Starting phone screen');rows.push(context.controls.row('Starting phone screen',screen));
+        var cards=document.createElement('details'),summary=document.createElement('summary');
+        cards.className='rawjson';cards.open=initialCardsOpen;summary.textContent='Cards shown initially';cards.appendChild(summary);
+        context.listen(cards,'toggle',function(){initialCardsOpen=cards.open;});
+        deviceAppItems(panel,'fields').forEach(function(field){
+          var control=context.controls.select(['Shown','Hidden'],initial[field.id] && initial[field.id].visible===false?'Hidden':'Shown',function(next){
+            return initialChange(function(value){value[field.id]=Object.assign({},panelObject(value[field.id])?value[field.id]:{},{visible:next==='Shown'});});
+          });
+          control.setAttribute('aria-label',(field.label || field.id)+' initially');cards.appendChild(context.controls.row(field.label || field.id,control));
+        });
+        if(deviceAppItems(panel,'fields').length)rows.push(cards);
+      },patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key;},
+      patchField:function(field,input){
+        if(field[0]!=='phoneScreen' && field[0]!=='visible')return;
+        input.setAttribute('aria-label',field[0]==='phoneScreen'?'Phone screen':'Card visibility');
+        Array.from(input.options).forEach(function(option){
+          option.textContent=option.value===''?'Inherit':({home:'Home screen',app:'Device app',true:'Show card',false:'Hide card'}[option.value] || option.textContent);
+        });
+      },patchIntro:function(body){
+        var note=document.createElement('p');note.className='home-note';
+        note.textContent='Phone screen switches between Home screen and Device app. Each card’s visibility carries forward; hiding it keeps its data. Notify adds a notification independently of the screen.';
+        body.appendChild(note);
+      },setupField:function(field,panel){
         if(field[0]!=='showSources')return null;
         var options=['Automatic (when sources exist)','Show','Hide'];
         var value=panel.showSources===true?'Show':panel.showSources===false?'Hide':options[0];
@@ -12368,11 +12480,12 @@ PanelRegistry.extend('deviceapp', {
               ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
+              ['visible', 'bool'],
             ],
           ];
         });
       if(!sourceIds.length)appFields.forEach(function(field){field[2]=field[2].filter(function(prop){return prop[0]!=='source';});});
-      return appFields.concat(PANEL_PATCH_FIELDS.deviceapp);
+      return PANEL_PATCH_FIELDS.deviceapp.concat(appFields);
     },
     origin: function (p, key, snapshot, context) {
       var assignment = context.assignment,
@@ -12383,6 +12496,7 @@ PanelRegistry.extend('deviceapp', {
       if(key==='_phoneAdded')return {kind:'engine',label:'Engine · notifications added at this step',inputs:[]};
       if (key === '_updated')
         return { kind: 'engine', label: 'Engine · fields changed at this step', inputs: [] };
+      if (key === 'phoneScreen')return assignment(key,function(v){return DEVICEAPP_SCREENS.indexOf(v)>=0;},false);
       if (key === 'clock' || key === 'note')
         return assignment(
           key,

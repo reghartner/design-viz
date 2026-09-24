@@ -195,10 +195,13 @@ test('styles and compatibility feature metadata are derived from the same added 
 test('the real build packages the added panel into viewer, editor and the headless backend without source edits', () => {
   for (const name of ['template','workbench','tools/canon','docs/diagrams/backstage','docs/diagrams/doorbell-perspectives','examples/canon/specs'])
     fs.mkdirSync(path.join(temp,name),{recursive:true});
-  for (const name of ['tools/build.py','tools/source-loader.cjs','docs/diagrams/backstage/backstage.spec.json','docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json','examples/canon/registry.json','examples/canon/specs/doorbell.json'])
+  for (const name of ['tools/build.py','tools/source-loader.cjs','tools/canon/library.mjs','tools/canon/registry.mjs','tools/canon/drift.mjs','tools/canon/core.cjs','docs/diagrams/backstage/backstage.spec.json','docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json','examples/canon/registry.json','examples/canon/specs/doorbell.json'])
     fs.copyFileSync(path.join(ROOT,name),path.join(temp,name));
+  const published={page:{title:'Extension story',canon:{version:1,id:'extension',kind:'design',owner:'group:default/test'},sections:[{diagram:fixture()}]}};
+  fs.writeFileSync(path.join(temp,'docs/diagrams/extension.json'),JSON.stringify(published));
   const output=execFileSync('python3',[path.join(temp,'tools/build.py')],{cwd:temp,encoding:'utf8',timeout:30000});
   assert.match(output,/built template\/flowview.html/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(temp,'workbench/diagrams.json'))).diagrams[0].spec,published);
   for (const name of ['template/flowview.html','workbench/flowspec.html']) {
     const html=fs.readFileSync(path.join(temp,name),'utf8');
     assert.ok(html.includes("PanelRegistry.define('extension-meter'"),name);

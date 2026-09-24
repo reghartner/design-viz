@@ -17,51 +17,74 @@ Editing does not write to GitHub or approve a canonical change. Save JSON and
 submit changes through the company's repository review process. The separate
 legacy `?canon=…` review adapter continues to open its explicit editor workflow.
 
-## Ship a static company library
+## Publish by saving a spec
 
-Publish the same reviewed registry used for associations and drift scans:
-
-```sh
-node tools/canon/library.mjs --registry registry.json --out workbench/diagrams.json
-```
-
-The registry uses the existing version-1 `{diagrams:[{id,path,title}]}` shape.
-Paths resolve relative to the registry. Each spec must validate and its
-`page.canon.id` must match the registry ID. The publisher validates the complete
-set before writing, preserves the spec and code-reference revisions, and writes
-its output atomically. It does not change or promote any source spec.
-
-Deploy `diagrams.json` beside `flowspec.html`. The existing
-`deploy/workbench/Dockerfile` copies the entire workbench folder, so the snapshot
-travels in that nginx image. Regenerate it as part of the repository's reviewed
-build/release process whenever approved specs change. No API, browser GitHub
-token, or live call to Backstage is needed for browsing.
-
-The snapshot is a JSON object, not the service catalog or the registry itself:
+Save the diagram JSON anywhere under **`docs/diagrams/`**, keeping its existing
+folder and filename. Add `page.canon` to opt that document into the library:
 
 ```json
 {
   "version": 1,
-  "diagrams": [
-    {
-      "id": "doorbell",
-      "title": "Doorbell recording",
-      "spec": {
-        "page": {
-          "title": "Doorbell recording",
-          "canon": {"version": 1, "id": "doorbell", "kind": "canonical"},
-          "blocks": []
-        }
-      }
-    }
-  ]
+  "id": "doorbell",
+  "kind": "canonical",
+  "owner": "group:default/home-team"
 }
 ```
 
-Use the publisher to include the real complete specs rather than constructing
-this snapshot manually. The browser loads it on first library entry with
-`cache: no-cache`; reload the page to receive a newly deployed snapshot. The
-publisher and reader limit the snapshot to 30 MB.
+This is the value of the existing page's `canon` property, not a replacement
+spec. Use a stable, unique ID and the actual owning team's Backstage reference.
+`kind:"canonical"` means human-reviewed current behavior; `kind:"design"`
+publishes an explicitly proposed design. Saving metadata does not grant approval.
+Specs without a `page.canon` property are not published. Other JSON such as
+per-folder `manifest.json` files is not a second registration mechanism.
+
+Commit the spec through your normal review process. Both standard builds
+**automatically discover** the marked documents and generate
+`workbench/diagrams.json`:
+
+```sh
+python3 tools/build.py
+```
+
+```sh
+docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
+```
+
+The Python build uses the freshly generated runtime to validate the documents.
+The Docker build has a Node build stage that reads `docs/diagrams/` and the
+shipped `tools/canon/` runtime, then copies the generated snapshot into nginx
+beside `flowspec.html`. It replaces any stale snapshot in the build context.
+The final nginx image needs no Node process, API, browser GitHub token or live
+Backstage connection. Connect the company's normal reviewed-merge deployment
+so saving and merging the spec is the only per-document publishing step.
+
+No `registry.json` entry or hand-edited `diagrams.json` is required. The snapshot
+is ignored by Git and contains complete specs, preserving code references and
+their pinned revisions. Rebuilding picks up edits, file additions and removals;
+removing `page.canon` removes the document from the next snapshot. An empty set
+produces a valid empty library, replacing any previous entries.
+
+Discovery reads regular `.json` files recursively in deterministic path order;
+symlinks are not followed. Malformed JSON, invalid marked specs/metadata,
+duplicate canon IDs, a missing source directory, or a snapshot over 30 MB fails
+the build. Errors name the offending files. Validation completes before the
+snapshot is replaced, so failure preserves the last successful snapshot.
+
+For a custom build pipeline or source directory, run the publisher directly:
+
+```sh
+node tools/canon/library.mjs --diagrams docs/diagrams --out workbench/diagrams.json
+```
+
+Running it with no arguments uses those same defaults relative to the current
+working directory. Output must be outside the scanned source directory. The
+explicit `--registry registry.json --out workbench/diagrams.json` mode remains
+available for integrations that intentionally curate a list. Existing drift
+scanner registry configuration is separate from this automatic site build.
+
+The browser fetches `diagrams.json` on first library entry with `cache: no-cache`;
+nginx serves it with revalidation too. Reload the page after deployment to receive
+the latest snapshot. The publisher and reader limit the snapshot to 30 MB.
 
 A missing `diagrams.json` (HTTP 404) uses the explicitly labeled bundled
 **fictional example**. Downloaded `file:` workbenches use that example too.

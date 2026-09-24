@@ -66,9 +66,11 @@ is unknown, not a failure. Agent suggestions require review before publication.
 ## Browse the static published library
 
 The workbench home page exposes **Canon diagrams** as a read-only library with
-an explicit **Edit in Workbench** handoff. Build its `diagrams.json` snapshot
-from the existing registry; see the [deployment recipe](workbench-canon-library.md).
-This works with the static nginx deployment and needs no read API.
+an explicit **Edit in Workbench** handoff. Save specs with `page.canon` under
+`docs/diagrams/`; the normal Python build and nginx image build automatically
+discover them and generate `workbench/diagrams.json`. No library registry entry
+is needed. See the [deployment recipe](workbench-canon-library.md). This works
+with the static nginx deployment and needs no read API.
 
 ## Run the simulated company repository
 

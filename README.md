@@ -368,7 +368,9 @@ workspace toolbar. The [bundled guide](docs/workbench-user-guide.md) includes
 a first-diagram walkthrough, alternate paths, shared steps, Home animation,
 layouts, catalogs, and sharing. **Canon diagrams** on welcome opens the
 [read-only repository library](docs/workbench-canon-library.md), with an explicit
-**Edit in Workbench** handoff.
+**Edit in Workbench** handoff. Save a spec with `page.canon` under `docs/diagrams/`;
+the normal build and nginx image build discover it automatically. No separate
+library registry entry is needed.
 
 Open `workbench/flowspec.html` to **Paste JSON**, **Open file**, or start a **New project**
 from a curated template or a blank diagram. The [welcome guide](docs/workbench-welcome.md)

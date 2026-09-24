@@ -11,7 +11,8 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD = ROOT / "tools" / "build.py"
 PAGES = [ROOT / "template" / "flowview.html", ROOT / "workbench" / "flowspec.html"]
-OUTPUTS = PAGES + [ROOT / "tools" / "canon" / "generated-runtime.cjs"]
+OUTPUTS = PAGES + [ROOT / "tools" / "canon" / "generated-runtime.cjs",
+                   ROOT / "workbench" / "diagrams.json"]
 
 BLOCK_RE = re.compile(r'^(<script type="application/json" id="flowspec">)\n(.*?)\n(</script>)',
                       re.S | re.M)

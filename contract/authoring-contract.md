@@ -1208,7 +1208,9 @@ perspectives" of one timeline). Types:
 - `deviceapp` — a portrait phone with a home screen, a device-details app,
   accumulating notifications and an optional backend source map. Declare `device`,
   optional `subtitle` and `appName` (default `Device app`). The frame keeps its
-  proportions as content changes; long app content scrolls inside the phone.
+  proportions as content changes. Resizing a panel scales the phone, text and
+  icons together; named layouts fit it to the available width and height without
+  enlarging it beyond its normal size. Long app content scrolls inside the phone.
   `initial.phoneScreen` and step patches accept `"home"` or `"app"`; omitted
   means app, preserving existing diagrams. The screen choice carries forward.
   Home shows a wallpaper, clock, notification cards and an illustrative app dock.

@@ -217,3 +217,53 @@ test('changing paths to an adjacent ordinal does not replay screen or notificati
  await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','home');
  await expect(app(root).locator('.phonetitle')).toHaveText('Other path');
 });
+
+test('phone text and geometry scale together when its tile gets narrower or shorter',async({page,server},testInfo)=>{
+ await writeFile(path.join(server.root,'phone-sizing.json'),navigationSource);
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'phone-sizing.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'phone-sizing.html')]);
+ await page.goto(server.origin+'/phone-sizing.html');
+ async function check(root){
+  const tile=root.locator('.section-layout-tile:has(.pt-deviceapp)'),phone=app(root),shell=phone.locator('.da-phone');
+  for(const [width,height] of [[500,792],[500,400],[220,792],[220,400],[500,792]]){
+   await tile.evaluate((el,{width,height})=>{el.style.width=width+'px';el.style.height=height+'px';},{width,height});
+   for(const index of [2,5]){
+    await step(root,index);
+    const size=await shell.evaluate(el=>{
+     const box=el.getBoundingClientRect(),body=el.closest('.pbody'),text=el.querySelector('.phonetitle')||el.querySelector('.da-value');
+     return {width:box.width,height:box.height,font:parseFloat(getComputedStyle(text).fontSize),bodyHeight:body.clientHeight,bodyScroll:body.scrollHeight,overflow:el.scrollWidth-el.clientWidth};
+    });
+    expect(size.width).toBeLessThanOrEqual(330);expect(size.width).toBeGreaterThan(140);
+    expect(Math.abs(size.height/size.width-18.5/9)).toBeLessThan(.02);
+    expect(size.font).toBeCloseTo((index===2?12:29)*size.width/330,1);
+    expect(size.bodyScroll).toBeLessThanOrEqual(size.bodyHeight+1);expect(size.overflow).toBeLessThanOrEqual(1);
+    if(width===220 || height===400)expect(size.width).toBeLessThan(200);
+    else expect(size.width).toBeCloseTo(330,0);
+   }
+  }
+  await tile.evaluate(el=>{el.style.width='240px';el.style.height='440px';});
+  await testInfo.attach('scaled-phone',{body:await tile.screenshot(),contentType:'image/png'});
+ }
+ await check(page.locator('.docview'));
+ await page.goto(server.origin+'/workbench.html');await paste(page,navigationSource);
+ await check(page.locator('#docview'));
+ // The same CSS must work in the native ShadowRoot, including a host resize.
+ await writeFile(path.join(server.root,'sizing-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'sizing-native.html'),'<div id="host" style="width:1200px"></div><script type="module">import {mountNativeViewer} from "./sizing-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/sizing-native.html');await page.waitForFunction(()=>!!window.mount);
+ await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},navigationRaw);
+ await check(page.locator('#host'));
+ // Scaling the phone must not shrink the explanatory source map beside it.
+ const mapped=structuredClone(navigationRaw),p=diagram(mapped).panels[0];
+ p.sources=[{id:'health',label:'Device telemetry'}];p.fields[0].source='health';
+ await page.evaluate(raw=>{viewer.destroy();window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},mapped);
+ const root=page.locator('#host'),tile=root.locator('.section-layout-tile:has(.pt-deviceapp)');
+ for(const height of [792,400]){
+  await tile.evaluate((el,h)=>{el.style.width='500px';el.style.height=h+'px';},height);await step(root,5);
+  expect(await root.locator('.da-source .da-badge').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBe(11);
+  expect(await root.locator('.da-heading h3').evaluate(el=>parseFloat(getComputedStyle(el).letterSpacing))).toBeLessThan(0);
+ }
+ await page.emulateMedia({media:'print'});
+ expect((await root.locator('.da-phone').boundingBox()).width).toBeGreaterThan(200);
+ expect(await root.locator('.pt-deviceapp>.pbody').evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThan(600);
+ await page.evaluate(()=>viewer.destroy());
+});

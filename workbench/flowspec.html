@@ -7933,7 +7933,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .termbar.has-paths .schips {display:block;flex-basis:100%;overflow-x:auto;max-width:100%;min-width:0;padding:4px 2px}
 .path-matrix {display:grid;grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),32px);gap:8px 3px;align-items:center;width:max-content}
 .path-row {display:contents}
-.path-matrix .path-chip {justify-self:start;max-width:180px;min-height:32px;box-sizing:border-box}
+.path-matrix .path-chip {justify-self:start;max-width:220px;min-height:32px;box-sizing:border-box}
 .termbar.has-paths .path-row .schip {width:32px;height:32px;margin:0;border-color:color-mix(in srgb,var(--path-color) 45%,transparent)}
 .termbar.has-paths .path-row .schip[aria-current="true"] {border-color:var(--path-color);box-shadow:0 0 0 1px var(--path-color);color:var(--dink)}
 .termbar.has-paths .path-row .schip.shared-step-shadow {opacity:.35}
@@ -7942,7 +7942,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .termbar.has-paths .stepline {flex-basis:100%}
 .termbar.has-paths .tbtn:disabled {opacity:.3;cursor:default}
 @media(max-width:640px){.path-matrix{grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),34px)}}
-@media(max-width:640px){.path-matrix .path-chip{max-width:140px;min-height:34px}}
+@media(max-width:640px){.path-matrix .path-chip{max-width:220px;min-height:34px}}
 @media(max-width:640px){.termbar.has-paths .path-row .schip{width:34px;height:34px}}
 /* No full-edge arrow or successful packet is shown for a failed attempt. */
 .comm-failure,.comm-status {--comm-color:#fb923c;color:var(--comm-color)}
@@ -8329,7 +8329,7 @@ body.sk-editorial .path-timeline{--timeline-bg:#fbf8f1;}
 body.sk-terminal .path-timeline{--timeline-bg:#0c1411;}
 body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .path-timeline-lines{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible;}
-.path-timeline-route .path-chip{position:absolute;z-index:3;max-width:140px;height:28px;padding-top:3px;padding-bottom:3px;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.path-timeline-route .path-chip{position:absolute;z-index:3;max-width:220px;height:28px;padding-top:3px;padding-bottom:3px;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .path-timeline-label{min-width:0;overflow:hidden;text-overflow:ellipsis;}
 .path-timeline-stop{position:absolute;z-index:3;width:28px;}
 .termbar.has-paths .path-timeline .schip{width:28px;height:28px;margin:0;border:1px solid color-mix(in srgb,var(--path-color) 50%,var(--dfaint));background:var(--timeline-bg);color:var(--dink);}
@@ -25940,7 +25940,7 @@ function pathTimelineRows(paths,graph){
    No runtime state is combined here and no document listeners are retained. */
 function createPathTimeline(host, source, paths, shownPaths, graph, pick){
   var retired=false, pathById=new Map(paths.map(function(p){return [p.id,p];}));
-  var rowGap=32, top=22, labelWidth=150, columnWidth=44;
+  var rowGap=32, top=22, labelWidth=230, columnWidth=44;
   var rows=pathTimelineRows(paths,graph);
   var lanePositions=new Map(Array.from(rows.lanes,function(pair){return [pair[0],top+pair[1]*rowGap];}));
   var sharedPositions=new Map(Array.from(rows.shared,function(pair){return [pair[0],top+pair[1]*rowGap];}));

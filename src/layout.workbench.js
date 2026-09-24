@@ -76,7 +76,6 @@ function initSectionLayoutEditor(opts){
   }
   function updateTarget(){
     cancel();editing=null;setFrame();opts.render();
-    var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){if(rec.presentation && rec.sectionEl.querySelector('.section-layout-grid'))rec.presentation.setMode('layout');});
     refresh();
   }
   life.listen(target,'change',updateTarget);

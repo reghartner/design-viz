@@ -121,7 +121,10 @@ visibility and rearranges only visible elements in that profile.
 Arrange section, Optimize, or the first duplication converts an older
 `sectionLayout` / `layoutName` pair into named views as one undoable edit. Existing specs keep working unchanged.
 Reader view switches do not write JSON or create undo entries. The workbench
-retains the active named view across edits and skin/host preview changes.
+retains the active named view or Home / Data flow choice across property edits,
+Undo/Redo, and skin/host preview changes. Renaming nodes, sections, the page, or
+the primary panel does not change that choice. Opening another project uses its
+authored default; deleting the selected view falls back to the remaining default.
 
 ## Link to or capture a particular view
 

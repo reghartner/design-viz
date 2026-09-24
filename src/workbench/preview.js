@@ -1,27 +1,42 @@
 /* Preview position and layout never enter the spec or undo history. */
 function workbenchPreviewSections(page){
-  var sections = [];
-  if (!page) return sections;
-  function add(sec, tab){
-    var d = sec.diagram || {};
-    sections.push({diagram:d, key:JSON.stringify([tab, sec.heading || '',
-      Object.keys(d.nodes || {}).sort(), VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient'])});
-  }
-  blocksOf(page).forEach(function(block){
-    if (block.type === 'section') add(block.sec, null);
-    else block.tabs.forEach(function(tab){ tab.sections.forEach(function(sec){ add(sec, tab.label); }); });
+  return sectionRecords(page).map(function(record){
+    var sec=record.section,d=sec.diagram || {};
+    return {diagram:d,sectionId:typeof sec.id==='string' && sec.id ? sec.id : null,
+      context:JSON.stringify([record.tabLabel,sec.heading || '']),content:JSON.stringify(d)};
   });
-  return sections;
+}
+/* Match sections one-to-one, without treating editable node IDs, headings or
+   page titles as document identity. Explicit IDs survive arbitrary edits;
+   unique contextual headings survive graph edits; unchanged diagrams survive
+   heading/tab renames. Ambiguous copies never borrow another section's view. */
+function matchWorkbenchPreviewSections(previous,next){
+  var matches=new Map(),used=new Set();
+  ['sectionId','context','content'].forEach(function(key){
+    next.forEach(function(section,index){
+      var value=section[key];
+      if(matches.has(index) || value==null || next.filter(function(s){return s[key]===value;}).length!==1)return;
+      var candidates=previous.filter(function(s){return s[key]===value;});
+      if(candidates.length!==1 || used.has(candidates[0]))return;
+      if(key==='context' && section.sectionId && candidates[0].sectionId && section.sectionId!==candidates[0].sectionId)return;
+      matches.set(index,candidates[0]);used.add(candidates[0]);
+    });
+  });
+  return matches;
 }
 function workbenchPreviewSnapshot(page, ctl){
   var sections = workbenchPreviewSections(page), saved = [];
   ((ctl && ctl.sections) || []).forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
-    if (!section || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
-    var prior = {key:section.key};
+    if (!section) return;
+    var prior = {sectionId:section.sectionId,context:section.context,content:section.content,
+      playbackDefault:VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient'};
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
-    if (rec.presentation){ prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId; }
+    if (rec.presentation){
+      prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId;
+      if(rec.presentation.viewId)prior.viewId=rec.presentation.viewId();
+    }
     if(rec.presentation && rec.presentation.layoutId)prior.layoutId=rec.presentation.layoutId();
     if (rec.presentation && rec.presentation.diagramVisible){
       prior.layoutFlowVisible = rec.presentation.diagramVisible();
@@ -43,26 +58,28 @@ function workbenchPreviewSnapshot(page, ctl){
       : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
     prior.mode = stepper.mode(); prior.id = id; prior.signature = signature;
   });
-  return {title:page && page.title || '', sections:saved};
+  return {sections:saved};
 }
 function restoreWorkbenchPreview(page, ctl, saved){
-  if (!saved || (page.title || '') !== saved.title) return;
-  var sections = workbenchPreviewSections(page);
+  if (!saved) return;
+  var sections = workbenchPreviewSections(page),matches=matchWorkbenchPreviewSections(saved.sections,sections);
   ctl.sections.forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
-    if (!section || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
-    var matches = saved.sections.filter(function(s){ return s.key === section.key; });
-    if (matches.length !== 1) return;
-    var prior = matches[0];
-    if(rec.presentation && rec.presentation.setLayout && prior.layoutId)rec.presentation.setLayout(prior.layoutId);
+    var prior=matches.get(rec.number-1);
+    if (!section || !prior) return;
+    if(rec.presentation){
+      if(prior.viewId!=null && rec.presentation.setView)rec.presentation.setView(prior.viewId);
+      else {
+        if(rec.presentation.setLayout && prior.layoutId)rec.presentation.setLayout(prior.layoutId);
+        if(prior.focusPanel===rec.presentation.panelId && prior.primaryPanel===section.diagram.primaryPanel)rec.presentation.setMode(prior.focusMode);
+      }
+    }
     if (rec.presentation && rec.presentation.setDiagramVisible && prior.layoutConfig===JSON.stringify([section.diagram.sectionLayout,section.diagram.layouts]) &&
         (!rec.presentation.layoutId || rec.presentation.layoutId()===prior.layoutId)) rec.presentation.setDiagramVisible(prior.layoutFlowVisible);
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
       rec.flowDisclosure.open = prior.flowOpen;
-    if (rec.presentation && prior.focusPanel === rec.presentation.panelId && prior.primaryPanel === section.diagram.primaryPanel)
-      rec.presentation.setMode(prior.focusMode);
-    if (!stepper || !prior.mode) return;
+    if (!stepper || !prior.mode || prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
     if (prior.mode === 'ambient'){
       if(prior.path && stepper.selectPath && !stepper.selectPath(prior.path))return;
       if (stepper.mode() !== 'ambient') stepper.enterAmbient();
@@ -85,8 +102,8 @@ function restoreWorkbenchPreview(page, ctl, saved){
   });
 }
 function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lifecycle){
-  var tabs = activeTabReferences(previousCtl);
-  var saved = workbenchPreviewSnapshot(previousPage, previousCtl);
+  var tabs = previousPage ? activeTabReferences(previousCtl) : null;
+  var saved = previousPage ? workbenchPreviewSnapshot(previousPage, previousCtl) : null;
   if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
   var target = typeof document !== 'undefined' && document.getElementById ? document.getElementById('layout-preview-target') : null;
@@ -123,7 +140,7 @@ function createWorkbenchPreviewController(opts){
     }
   }
   function rebuild(next,text,skin,request){
-    var replaced=false,previousPage=page,previousCtl=ctl;
+    var replaced=false,previousPage=request.origin==='project' || request.origin==='import' ? null : page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
         beforeReplace:function(){

@@ -420,7 +420,7 @@ bounding-box rule applies at every level.
 }
 ```
 
-### rows — layout by flow order (no coordinates)
+### rows — left-to-right slots (no coordinates)
 
 Optional `diagram.routing: "lanes"` routes connectors along reserved tracks
 between rows and channels around cards. It spreads ports and scores crossings
@@ -428,7 +428,7 @@ and coincident segments; dense graphs can still cross, with visual breaks at
 intersections. Supports 1–5 unstacked cards per row, no floats or self-loops.
 Unsupported layouts fall back to curves with a warning. Authored edge bends
 are ignored in lanes mode; label offsets remain available. Omit routing or use
-`"curves"` for existing behavior. Honeycomb imports generate dependency rows
+`"curves"` for curved connectors. Honeycomb imports generate dependency rows
 (at most four cards per row), retaining service cycles and all relationships.
 Their row order describes dependencies, not elapsed time.
 
@@ -444,19 +444,16 @@ The engine computes all positions:
 - A slot is a node id, or an **array of node ids = a stack**: one column whose
   members stack vertically. Use a stack for fan-out targets (the devices a
   broker publishes to).
-- Every row lays out left→right, including stacks as whole slots. Adding,
-  deleting or moving a row never mirrors the horizontal order of another row.
-- Cross-row edges use their actual endpoints. Aligned columns drop vertically;
-  other pairs use the normal cross-row routing, with no row-parity wrap shortcut.
+- Every row lays out left to right, including stacks as whole slots. Each row
+  retains its authored horizontal order when other rows are added, moved, or removed.
+- Cross-row edges follow their endpoint positions. Aligned columns connect
+  vertically; other pairs use the selected routing style.
 - Keep 3–5 slots per row. Split a sequence longer than ~5 hops onto more
   rows — two or three rows are both normal shapes. The crowding signal is the
   edges-crossing-a-corridor lint, not the row count.
   Stacks of 2–4 members work well.
 
-Older renderer builds reversed odd-index rows. Rebuild standalone exports and
-upgrade embedded viewers to use this ordering. Existing row arrays are not
-rewritten on load; reorder an old row explicitly if you want to retain its former
-visual arrangement. Steps and edge direction continue to define story order.
+Steps and edge direction define the story order.
 
 ### floats — branch nodes
 

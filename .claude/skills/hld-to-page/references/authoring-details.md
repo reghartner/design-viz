@@ -194,10 +194,7 @@ new arithmetic, no new attributions.
 
 ## Row placement
 
-Author every `rows` array in visual left-to-right order. Row parity no longer
-reverses placement, drag insertion targets, or edge labels. Stacks remain one
-slot, with their members in top-to-bottom order. Adding/removing rows preserves
-other rows’ horizontal order. Do not reverse alternate rows to compensate for
-the old renderer; use ordinary cross-row edges and verify the resulting routes.
-When updating an older export, rebuild it with the current renderer. Reorder any
-old row explicitly if its former visual arrangement needs to stay the same.
+Author every `rows` array in visual left-to-right order. A stack occupies one
+slot, with its members in top-to-bottom order. Each row retains its authored
+horizontal order when other rows are added, moved, or removed. Cross-row edges
+follow their endpoint positions; steps and edges define the story order.

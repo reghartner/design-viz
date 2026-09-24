@@ -54,6 +54,19 @@ section or tab block. Each addition is one Undo. Escape closes the chooser and
 returns focus to **Add to diagram**. If the source or destination changes while it
 is open, reopen it before adding.
 
+For quick connections, **Alt/Option-click a source node**, release the modifier,
+then **click its destination**. The source and eligible targets highlight, and a
+preview arrow follows the pointer. You can also select a node and use **Connect
+from this node** at the top of its inspector. The new edge opens in the inspector
+for its label, protocol and entry/exit ports; one Undo removes the addition.
+
+Connections stay within one section. The source itself and existing ordinary
+`from->to` edges are excluded from target highlighting. Escape, the on-canvas
+**Cancel** button, a background click, focus loss, source changes or re-rendering
+cancel without changing the spec. Render handwritten JSON edits before starting.
+Ctrl/Cmd/Shift-click still control multiselect; ordinary drags still move nodes.
+Finish **ADD TO STEP** before using the quick connection shortcut.
+
 The editor has three tools, with one visible at a time:
 
 - **Inspect** edits the selected element. Selecting something in the preview

@@ -993,6 +993,20 @@ body.sk-aurora.sk-blueprint{
 /* Shared catalog chooser: a searchable service list and a persistent summary. */
 .dv-free-edge-source{opacity:.18!important;}
 .dv-free-edge-preview{pointer-events:none;opacity:.8;}
+.dv-connect-preview{pointer-events:none;}
+.dv-connect-line{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 4;}
+.dv-connect-arrow{fill:var(--accent);}
+g.node.dv-connect-source,g.node.dv-connect-candidate{opacity:1!important;cursor:crosshair;}
+g.node.dv-connect-source .card{stroke:var(--accent)!important;stroke-width:3.5!important;}
+g.node.dv-connect-candidate .card{stroke:var(--accent)!important;stroke-width:2!important;stroke-dasharray:4 4;}
+g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;filter:drop-shadow(0 0 5px var(--accent));}
+.dv-connect-replaced{visibility:hidden;}
+.dv-connect-hint{position:absolute;top:2px;left:8px;z-index:8;max-width:calc(100% - 16px);box-sizing:border-box;
+  display:flex;gap:12px;align-items:center;padding:3px 8px;border:1px solid var(--accent);border-radius:8px;
+  background:var(--card);color:var(--ink);box-shadow:0 3px 14px var(--selglow);font:600 11px/1.4 'IBM Plex Mono',monospace;}
+.dv-connect-hint span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dv-connect-hint button{flex-shrink:0;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;cursor:pointer;font:inherit;}
+.node-connect-button{margin-top:10px;min-height:34px;border-color:var(--accent);}
 .welcome-actions{grid-template-columns:repeat(2,minmax(0,1fr));}
 #welcome-new-catalog{margin:8px 0 18px;}
 .diagram-add-choices [data-add-kind="catalog"]{grid-column:1/-1;min-height:82px;}

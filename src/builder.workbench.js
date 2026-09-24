@@ -486,6 +486,7 @@ function initWorkbenchBuilder(opts){
     clipboard:{current:function(){return objectClipboard;},selectHome:homeClipboardSelect,
       clearHome:function(){if(interactions)interactions.clearHome();}},
     modes:{adding:function(){return interactions.adding();},connecting:function(){return interactions.connecting();},
+      connectFrom:function(t){interactions.startConnect(t.section,t.id);},
       editPathStep:function(action){if(stepList)stepList.editPathStep(action);},
       toggleAdding:function(t){interactions.toggleAdding(t);}}
   });

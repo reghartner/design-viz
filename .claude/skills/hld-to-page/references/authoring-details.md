@@ -26,7 +26,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Sensing geometry, motion events, range, or room presence | `cookbook/motion-detection.md`, `cookbook/radar-range.md`; Radar alerts are authored separately from geometry |
 | Honeycomb trace JSON, readable service rows, or a service's internal wall time | `docs/trace-import.md`; `src/starters/honeycomb-trace.json` / `src/starters/complex-trace.json` |
 | Starting a project, importing spec JSON, templates, or copyable agent prompts | `docs/workbench-welcome.md`; the welcome screen replaces the old Starters gallery |
-| Adding workbench nodes, connections, steps or panels; choosing an insertion destination | `docs/workbench-workspace.md` → Add to diagram; `docs/workbench-panel-picker.md` for the visual library |
+| Adding workbench nodes, connections, steps or panels; choosing an insertion destination | `docs/workbench-workspace.md` → Add to diagram and Alt/Option-click quick connections; `docs/workbench-panel-picker.md` for the visual library |
 | Company service/API choices, repository catalog sync, or nginx-bundled service references | `docs/workbench-catalog-sync.md`; use the approved `workbench/catalog.json` identities, never infer bindings from display labels |
 | A crowded editor, resizing, focus, or diagram fit controls | `docs/workbench-workspace.md` |
 | Database/payload state, checks, budgets, retry/circuit behavior, replicas, or rollout decisions | Matching recipes in `cookbook/README.md` and the corresponding widget docs |

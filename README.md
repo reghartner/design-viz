@@ -388,7 +388,11 @@ sections inside tabs; clicking a section in the preview updates it too. Choose
 **Node** for icon presets (Console, API, Auth, Store, Broker, Sensor, …), or **Panel**
 for the visual panel library. Each addition uses an explicit button and is one
 Undo. **Connection** asks you to click a source and target in the chosen section
-(Esc cancels; duplicate `from->to` pairs are refused). **Step** appends to its
+(Esc cancels; duplicate `from->to` pairs are refused). For a shortcut,
+**Alt/Option-click a node, then click its destination**, or select a node and use
+**Connect from this node** in its inspector. A live arrow previews the connection
+and eligible targets highlight. The new edge opens for label/protocol/port edits;
+one Undo removes it. **Step** appends to its
 selected timeline. **Page structure** inside the chooser adds sections or tabs. **Dragging an edge label** commits the movement as
 `labelDx`/`labelDy` nudges — the hand-tuning chore for crowded corridors —
 while a plain click still selects. Prose is selectable too: paragraphs,

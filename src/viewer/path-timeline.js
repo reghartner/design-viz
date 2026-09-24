@@ -10,11 +10,13 @@ function pathTimelineRows(paths,graph){
     if(columns.length)occupied.push({pathId:path.id,row:lanes.get(path.id),first:Math.min.apply(null,columns),last:Math.max.apply(null,columns)});
   });
   graph.blocks.forEach(function(block){
-    var columns=block.nodeIds.map(function(id){return byId.get(id).column;});
+    var members=block.nodeIds.map(function(id){return byId.get(id);});
+    var columns=members.map(function(node){return node.column;});
+    var participating=block.pathIds.filter(function(id){return members.every(function(node){return node.pathIds.indexOf(id)>=0;});});
     var first=Math.min.apply(null,columns),last=Math.max.apply(null,columns);
     var ideal=block.pathIds.reduce(function(sum,id){return sum+lanes.get(id);},0)/block.pathIds.length;
     function clear(row){return !occupied.some(function(track){
-      if(track.pathId!==undefined && block.pathIds.indexOf(track.pathId)>=0)return false;
+      if(track.pathId!==undefined && participating.indexOf(track.pathId)>=0)return false;
       return track.first<=last && first<=track.last && Math.abs(track.row-row)<1;
     });}
     var candidates=[ideal];

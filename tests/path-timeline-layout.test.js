@@ -55,6 +55,13 @@ test('filtering all inputs keeps the three-way join on an existing row',()=>{
   const result=layout(routes,routes.map(route=>({...route,indices:[5,6]})));
   assert.deepEqual([...result.rows.shared.values()],[1]);
 });
+test('a hidden authored member still reserves its visible route through a shared block',()=>{
+  const routes=paths([1,6,2,7,4],[3,6,7,5,4],[1,6,7,2,5]);
+  const sequences=[[6,7],[3,7,5],[6,2,5]];
+  const result=layout(routes,routes.map((route,index)=>({...route,indices:sequences[index]})));
+  const shared=result.graph.nodes.find(node=>node.sourceIndex===6 && node.shared);
+  assert.ok(Math.abs(result.rows.shared.get(shared.blockId)-result.rows.lanes.get('1'))>=1);
+});
 test('empty paths and layouts are bounded and deterministic',()=>{
   const routes=paths([],[]),result=layout(routes);
   assert.deepEqual([...result.rows.lanes.values()],[0,1]);

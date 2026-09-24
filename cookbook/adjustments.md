@@ -14,7 +14,9 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 
 | Operator says | Knob (spec field) | Notes |
 |---|---|---|
-| "move that floating node up / right a little" | `floats[i].dx` / `floats[i].dy` (px) | "a little" ≈ 20–40 px; up = negative `dy` |
+| "move that floating node up / right a little" | drag it, or set both `floats[i].x` / `y` to pin its center | diagram units, not screen pixels; up decreases Y; `dx`/`dy` still nudge an unpinned automatic float |
+| "put this node anywhere, outside the rows" | node inspector **float → Free placement**, then drag or edit **Float X/Y** | choose **in rows** to restore the grid; other row nodes keep their drag behavior |
+| "leave from the left / enter at the top" | `edges[i].fromPort` / `toPort`: `{side:"left",offset:0.5}` | inspector Exit/Entry side + position (%); offset 0–1 starts at left/top; removing a port restores Auto |
 | "move this box left of that one" | reorder ids inside the `rows` array | slots render left to right; the engine computes evenly spaced columns |
 | "put it on the row below" | move the id between `rows` arrays | every row renders LEFT-TO-RIGHT in its authored order; other rows keep their horizontal order |
 | "those two chips should read as one device" | make them one stacked slot: `["lp", "soc"]` inside a row, plus a `groups` boundary | stacked cards share a column |

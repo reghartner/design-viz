@@ -74,7 +74,10 @@ function builderLiftAndInsert(copy, members, drop, opts){
   });
   if (opts.liftOnly){
     /* The caller checked that at least one placed id survives. */
-    if (!kept.length) return {error: 'the last node in rows cannot float'};
+    if (!kept.length){
+      if(opts.allowEmpty)kept.push([]);
+      else return {error: 'the last node in rows cannot float'};
+    }
   } else if (inRow){
     /* Keep the pre-removal row's identity, convert the slot to the
        surviving row's indexing, then clamp. A wholly lifted target row
@@ -116,12 +119,32 @@ function planMoveNode(text, raw, sectionIdx, id, drop){
   return planSetFields(text, raw, got.path, pairs);
 }
 
+function planPlaceFloat(text,raw,sectionIdx,id,x,y){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  if(!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes,id))return {error:'node not found'};
+  if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'X and Y must be finite coordinates between -100000 and 100000.'};
+  return builderRewrite(text,raw,got.path,function(d){
+    if(builderFlatRowIds(d.rows).indexOf(id)>=0){
+      var members=Object.create(null);members[id]=true;
+      var out=builderLiftAndInsert(d.rows,members,null,{liftOnly:true,allowEmpty:true});if(out && out.error)return out;
+    }
+    if(!Array.isArray(d.floats))d.floats=[];
+    var f=d.floats.find(function(item){return item && item.id===id;});
+    if(!f){f={id:id,side:'below'};d.floats.push(f);}
+    f.x=Math.round(x*10)/10;f.y=Math.round(y*10)/10;delete f.dx;delete f.dy;
+  });
+}
+
 function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
   var side = sideOrNull == null || sideOrNull === '' ? null : sideOrNull;
+  if(side==='free'){
+    var p=layout(got.d).pos[id] || {cx:W/2,cy:70};
+    return planPlaceFloat(text,raw,sectionIdx,id,p.cx,p.cy);
+  }
   if (side !== null && side !== 'above' && side !== 'below') return {error: 'float side must be above or below'};
   var ids = builderFlatRowIds(got.d.rows), inRows = ids.indexOf(id) >= 0;
   var floating = (got.d.floats || []).some(function(f){ return f && f.id === id; });
@@ -134,7 +157,7 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
       builderRemoveFloat(d, id);
       /* a node malformed into BOTH rows and floats just loses the float
          entry — appending would duplicate its rows placement */
-      if (!inRows) d.rows.push([id]);
+      if (!inRows){if(!builderFlatRowIds(d.rows).length)d.rows=[[id]];else d.rows.push([id]);}
       return;
     }
     if (inRows){
@@ -144,7 +167,7 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
       if (out && out.error) return out;
     }
     if (floating){
-      d.floats.forEach(function(f){ if (f && f.id === id) f.side = side; });
+      d.floats.forEach(function(f){ if (f && f.id === id){f.side = side;delete f.x;delete f.y;} });
     } else {
       if (!Array.isArray(d.floats)) d.floats = [];
       d.floats.push({id: id, side: side});

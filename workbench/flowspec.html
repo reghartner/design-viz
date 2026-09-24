@@ -1740,6 +1740,8 @@ body.sk-aurora.sk-blueprint{
 .step-color-help{font-size:11px;line-height:1.5;color:var(--sub);margin:6px 0 12px;}
 
 /* Shared catalog chooser: a searchable service list and a persistent summary. */
+.dv-free-edge-source{opacity:.18!important;}
+.dv-free-edge-preview{pointer-events:none;opacity:.8;}
 .welcome-actions{grid-template-columns:repeat(2,minmax(0,1fr));}
 #welcome-new-catalog{margin:8px 0 18px;}
 .diagram-add-choices [data-add-kind="catalog"]{grid-column:1/-1;min-height:82px;}
@@ -8673,8 +8675,8 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       <tr><td>diagram.groups</td><td><code>{groupId: {title?}}</code></td><td>Declares containment boundaries: a dashed titled box drawn around all member nodes (a device holding two chips). Put members in one stack column; an edge between stack members draws as a vertical interconnect.</td></tr>
       <tr><td>diagram.rows</td><td><code>[[slot, ...], ...]</code></td><td>Slots render left to right in every row. A slot is a node id, or an <b>array of ids = a stack</b> (members render top to bottom in one column). Cross-row edges follow their endpoint positions.</td></tr>
       <tr><td>diagram.routing</td><td><code>"curves" | "lanes"</code></td><td>Optional lane routing reserves tracks and ports around cards. Supports 1–5 unstacked cards per row, no floats or self-loops; otherwise warns and uses curves. Imports use dependency rows and lanes. Readable size enlarges the board for horizontal scrolling.</td></tr>
-      <tr><td>diagram.floats</td><td><code>[{id, side:"above"}]</code></td><td>Branch nodes off the main flow (auth, signing). X position computed from the edges that touch them.</td></tr>
-      <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> of the hop (default <code>int</code>). Zero-based reveal indices draw the edge only for the selected step interval. <code>bend</code>/<code>labelDx</code>/<code>labelDy</code> are optional manual nudges.</td></tr>
+      <tr><td>diagram.floats</td><td><code>[{id, side:"above", x?, y?}]</code></td><td>Nodes outside the rows. Without coordinates, above/below placement is automatic. Both <code>x</code> and <code>y</code> pin the center in diagram units. Drag any float to pin it; use inspector Float X/Y for precision or choose Auto above/below to release it. Row nodes keep their row/slot gestures.</td></tr>
+      <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, fromPort?, toPort?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> (default <code>int</code>). Optional ports are <code>{side:"top|right|bottom|left",offset:0.5}</code>, with offset 0–1 along the side. Inspector Exit/Entry side and position (%) pin endpoints; Auto restores routing. Pinned edges use curves even in lane layouts. Zero-based reveal indices draw the edge only for the selected step interval; bend/label offsets tune geometry.</td></tr>
       <tr><td>diagram.sectionLayout</td><td><code>{default:[{x:0,y:0,w:8,h:12},{panel:"home",x:8,y:0,w:4,h:12}]}</code></td><td>Saved twelve-column tile layouts: default, backstage, confluence. Use <code>controls:"steps"</code> for a movable playback/path/caption tile. Arrange section to drag/resize; Preview selects the target and Optimize layout supplies a starting arrangement. Coordinates are zero-based, height 3–40 rows. Unspecified tiles stay visible; narrow views stack. <a href="../docs/section-layouts.md">Layout guide</a>.</td></tr>
       <tr><td>diagram.primaryPanel</td><td><code>"home"</code></td><td>Optional centerpiece panel ID: show it large with playback below it and a collapsible Data flow underneath. Set Presentation → Centerpiece in the panel inspector. Homemap steps have device states, subject drag/tap placement, visibility, inheritance, and signal controls.</td></tr>
       <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Panel types are documented in <code>contract/authoring-contract.md</code>, including static embedded <code>image</code> references, <code>table</code> for data snapshots, <code>checks</code> for authored decisions, <code>budget</code> for resource limits, and <code>replicas</code> for positions and reported lag. <code>waterfall</code> supports <code>startMs</code> offsets for overlapping trace spans; <code>trace</code> shows service internals and child-covered versus uncovered wall time.</td></tr>
@@ -8705,16 +8707,16 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
           <li>One diagram spec, both flavors: ambient + step playback from the same <code>steps</code></li>
           <li>Synchronized inspector panels: state machines, LEDs, gauges, logs, camera screen — sparse patches folded to complete per-step state</li>
           <li>Containment groups (a device boundary around chips) with vertical stack interconnects</li>
-          <li>Left-to-right rows with 3–5 slots per row; one float per gap; stacks of 2–4</li>
+          <li>Left-to-right rows with 3–5 slots; stacks of 2–4; automatic or freely positioned floats</li>
           <li>Legend, edges, packets, and arrowheads all from the one protocol table</li>
         </ul>
       </div>
       <div><b>Known limits (by design, for now)</b>
         <ul>
-          <li>No collision detection — crowded corridors need <code>bend</code>/<code>labelDy</code> nudges</li>
+          <li>Automatic avoidance is best-effort; crowded corridors may need ports, <code>bend</code> or label nudges</li>
           <li>Hidden tabs stop painting, but SMIL clocks keep running — ambient dots are mid-path when a tab is revealed (harmless for loops)</li>
           <li>Switching tabs pauses a click-through. In this workbench, use Play to resume from the same step.</li>
-          <li>Two floats in one gap overlap; 3+ rows collide corridor labels; stack&#8594;stack edges unsupported</li>
+          <li>Freely placed nodes can overlap; choose their positions and check the resulting connections</li>
           <li>Group members must be placed adjacently (one stack column works best); the boundary is a bounding box, not a layout constraint</li>
         </ul>
       </div>
@@ -8834,7 +8836,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
+    'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
@@ -8865,6 +8867,8 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if((Array.isArray(d.floats)?d.floats:[]).some(function(f){return f && (f.x!=null || f.y!=null);}))used['layout.free-nodes']=true;
+      if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && (e.fromPort!=null || e.toPort!=null);}))used['layout.edge-ports']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
@@ -9534,7 +9538,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if ((d.floats || []).length || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
         (d.edges || []).some(function(e){ return e.from === e.to; }))
       warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no floats or self-loops — using curves');
-    else if ((d.edges || []).some(function(e){ return e.bend; }))
+    else if ((d.edges || []).some(function(e){ return e.bend && !validEdgePort(e.fromPort) && !validEdgePort(e.toPort); }))
       warnings.push(DP + '.routing: lanes computes its own routes; authored edge bends are ignored');
   }
 
@@ -9553,6 +9557,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     else placed[f.id] = true;
     if (f && f.side && f.side !== 'above' && f.side !== 'below')
       warnings.push(DP + '.floats[' + fi + '].side: unknown side "' + f.side + '" — using "above" (valid: above, below)');
+    if(f && (Object.prototype.hasOwnProperty.call(f,'x') || Object.prototype.hasOwnProperty.call(f,'y')) && !positionedFloat(f))
+      errors.push(DP+'.floats['+fi+']: free placement requires both x and y as finite coordinates between -100000 and 100000');
   });
   var groups = (d.groups && typeof d.groups === 'object') ? d.groups : {};
   sanitizedGroupParents(groups, function(key, reason){
@@ -9580,6 +9586,9 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var edgeKeys = {};
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
+    ['fromPort','toPort'].forEach(function(key){
+      if(e && e[key]!=null && !validEdgePort(e[key]))errors.push(EP+'.'+key+': expected {side: top|right|bottom|left, offset?: 0..1}');
+    });
     if (e && Object.prototype.hasOwnProperty.call(e, 'delta') && typeof e.delta !== 'boolean')
       warnings.push(EP + '.delta: must be true or false — ignored');
     if (!e || !placed[e.from]) errors.push(EP + '.from: "' + (e && e.from) + '" is not a placed node');
@@ -10432,6 +10441,14 @@ var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
    strip when Auto or Fit width scaled the entire canvas. */
 var LEFT_X = 110, RIGHT_X = W - LEFT_X;
 
+function floatCoordinate(value){return Number.isFinite(value) && Math.abs(value)<=100000;}
+function positionedFloat(f){return !!f && floatCoordinate(f.x) && floatCoordinate(f.y);}
+var EDGE_PORT_SIDES=['top','right','bottom','left'];
+function validEdgePort(port){
+  return !!port && typeof port==='object' && !Array.isArray(port) && EDGE_PORT_SIDES.indexOf(port.side)>=0 &&
+    (port.offset==null || Number.isFinite(port.offset) && port.offset>=0 && port.offset<=1);
+}
+
 /* Shared, pure parent-link tolerance for layout, validation and the inspector.
    Inspect all chains before dropping cyclic links so declaration order cannot
    decide which cycle member becomes the outer box. Incoming links survive. */
@@ -10548,7 +10565,9 @@ function layout(spec){
          float up into the inter-row gap; dx shifts it sideways */
       var cx = xs[i] + (typeof f.dx === 'number' ? f.dx : 0);
       var cy = fy + (typeof f.dy === 'number' ? f.dy : 0);
+      if(positionedFloat(f)){cx=f.x;cy=f.y;}
       pos[f.id] = {cx:cx, cy:cy, w:150, h:FLOAT_H, row:-1, flow:-1, stack:false, float:true};
+      if(positionedFloat(f))pos[f.id].free=true;
     });
   });
 
@@ -10598,6 +10617,11 @@ function layout(spec){
      a float member's row) — widen the drawable area instead of clipping.
      Flat specs keep vb = {0, 0, W, H}, so their markup stays identical. */
   var vbX = 0, vbY = 0, vbR = W;
+  floats.forEach(function(f){
+    var p=f && pos[f.id];if(!p || !positionedFloat(f))return;
+    vbX=Math.min(vbX,p.cx-p.w/2-24);vbY=Math.min(vbY,p.cy-p.h/2-24);
+    vbR=Math.max(vbR,p.cx+p.w/2+24);H=Math.max(H,p.cy+p.h/2+24);
+  });
   Object.keys(groupBoxes).forEach(function(g){
     var b = groupBoxes[g];
     if (b.x - 2 < vbX) vbX = b.x - 2;
@@ -10788,7 +10812,48 @@ function edgeAutoAdjust(edges, L){
    NEAR_TOL it gets a minimal vertical-tangent S instead of the wide route. */
 var STRAIGHT_TOL = 40, NEAR_TOL = 96;
 
+function edgeHasPlacement(e,L){
+  return validEdgePort(e.fromPort) || validEdgePort(e.toPort) ||
+    !!(L.pos[e.from] && L.pos[e.from].free || L.pos[e.to] && L.pos[e.to].free);
+}
+function edgePortPoint(node,other,port,selfSide){
+  var side=validEdgePort(port) ? port.side : selfSide ||
+    (Math.abs(other.cx-node.cx)/node.w >= Math.abs(other.cy-node.cy)/node.h ?
+      (other.cx>=node.cx?'right':'left') : (other.cy>=node.cy?'bottom':'top'));
+  var offset=validEdgePort(port) && port.offset!=null ? port.offset : .5;
+  var horizontal=side==='top' || side==='bottom';
+  return {x:horizontal ? node.cx-node.w/2+node.w*offset : node.cx+(side==='right'?node.w/2:-node.w/2),
+    y:horizontal ? node.cy+(side==='bottom'?node.h/2:-node.h/2) : node.cy-node.h/2+node.h*offset,
+    nx:horizontal?0:side==='right'?1:-1,ny:horizontal?(side==='bottom'?1:-1):0};
+}
+function placedEdgePath(e,L,adj){
+  var a=L.pos[e.from],b=L.pos[e.to],self=e.from===e.to;
+  var start=edgePortPoint(a,b,e.fromPort,self?'right':null),end=edgePortPoint(b,a,e.toPort,self?'top':null);
+  var reach=clamp(Math.hypot(end.x-start.x,end.y-start.y)*.4,40,180);
+  var bend=Number.isFinite(e.bend)?e.bend:0,bowX=adj.avoidMx || 0,bowY=(adj.avoidMy || 0)+bend;
+  var c1={x:start.x+start.nx*reach+bowX,y:start.y+start.ny*reach+bowY};
+  var c2={x:end.x+end.nx*reach+bowX,y:end.y+end.ny*reach+bowY};
+  if(start.x===end.x && start.y===end.y){
+    c1.x-=start.ny*45;c1.y+=start.nx*45;c2.x+=end.ny*45;c2.y-=end.nx*45;
+  }
+  return 'M '+start.x+' '+start.y+' C '+c1.x+' '+c1.y+' '+c2.x+' '+c2.y+' '+end.x+' '+end.y;
+}
+
+/* Explicit routes may leave any side of an outermost card. Include their
+   actual curves in the viewBox without moving the row grid or node positions. */
+function expandPlacedEdgeBounds(edges,L,adjust){
+  var vb=L.vb,left=vb.x,top=vb.y,right=vb.x+vb.w,bottom=vb.y+vb.h;
+  edges.forEach(function(e,i){
+    if(!L.pos[e.from] || !L.pos[e.to] || !edgeHasPlacement(e,L))return;
+    samplePathD(edgePath(e,L,adjust[i])).forEach(function(p){
+      left=Math.min(left,p.x-24);top=Math.min(top,p.y-24);right=Math.max(right,p.x+24);bottom=Math.max(bottom,p.y+24);
+    });
+  });
+  L.vb={x:left,y:top,w:right-left,h:bottom-top};L.H=Math.max(L.H,bottom);
+}
+
 function edgePath(e, L, adj){
+  if(edgeHasPlacement(e,L))return placedEdgePath(e,L,adj || {});
   if (adj && adj.path) return adj.path;
   var a = L.pos[e.from], b = L.pos[e.to];
   adj = adj || {fromDx:0, fromDy:0, toDx:0, toDy:0, bend:0};
@@ -26011,6 +26076,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   var L = layout(d);
   var ADJ = L.routing === 'lanes' ? laneRoutes(d,L) : edgeAutoAdjust(d.edges || [], L);
   if (L.routing !== 'lanes') resolveEdgeAvoidance(d.edges || [], L, ADJ);
+  expandPlacedEdgeBounds(d.edges || [],L,ADJ);
   var kindsUsed = {}, anyRet = false;
   (d.edges || []).forEach(function(e){
     kindsUsed[protos[e.kind] ? e.kind : 'int'] = true;
@@ -31119,7 +31185,10 @@ function builderLiftAndInsert(copy, members, drop, opts){
   });
   if (opts.liftOnly){
     /* The caller checked that at least one placed id survives. */
-    if (!kept.length) return {error: 'the last node in rows cannot float'};
+    if (!kept.length){
+      if(opts.allowEmpty)kept.push([]);
+      else return {error: 'the last node in rows cannot float'};
+    }
   } else if (inRow){
     /* Keep the pre-removal row's identity, convert the slot to the
        surviving row's indexing, then clamp. A wholly lifted target row
@@ -31161,12 +31230,32 @@ function planMoveNode(text, raw, sectionIdx, id, drop){
   return planSetFields(text, raw, got.path, pairs);
 }
 
+function planPlaceFloat(text,raw,sectionIdx,id,x,y){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  if(!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes,id))return {error:'node not found'};
+  if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'X and Y must be finite coordinates between -100000 and 100000.'};
+  return builderRewrite(text,raw,got.path,function(d){
+    if(builderFlatRowIds(d.rows).indexOf(id)>=0){
+      var members=Object.create(null);members[id]=true;
+      var out=builderLiftAndInsert(d.rows,members,null,{liftOnly:true,allowEmpty:true});if(out && out.error)return out;
+    }
+    if(!Array.isArray(d.floats))d.floats=[];
+    var f=d.floats.find(function(item){return item && item.id===id;});
+    if(!f){f={id:id,side:'below'};d.floats.push(f);}
+    f.x=Math.round(x*10)/10;f.y=Math.round(y*10)/10;delete f.dx;delete f.dy;
+  });
+}
+
 function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
   var side = sideOrNull == null || sideOrNull === '' ? null : sideOrNull;
+  if(side==='free'){
+    var p=layout(got.d).pos[id] || {cx:W/2,cy:70};
+    return planPlaceFloat(text,raw,sectionIdx,id,p.cx,p.cy);
+  }
   if (side !== null && side !== 'above' && side !== 'below') return {error: 'float side must be above or below'};
   var ids = builderFlatRowIds(got.d.rows), inRows = ids.indexOf(id) >= 0;
   var floating = (got.d.floats || []).some(function(f){ return f && f.id === id; });
@@ -31179,7 +31268,7 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
       builderRemoveFloat(d, id);
       /* a node malformed into BOTH rows and floats just loses the float
          entry — appending would duplicate its rows placement */
-      if (!inRows) d.rows.push([id]);
+      if (!inRows){if(!builderFlatRowIds(d.rows).length)d.rows=[[id]];else d.rows.push([id]);}
       return;
     }
     if (inRows){
@@ -31189,7 +31278,7 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
       if (out && out.error) return out;
     }
     if (floating){
-      d.floats.forEach(function(f){ if (f && f.id === id) f.side = side; });
+      d.floats.forEach(function(f){ if (f && f.id === id){f.side = side;delete f.x;delete f.y;} });
     } else {
       if (!Array.isArray(d.floats)) d.floats = [];
       d.floats.push({id: id, side: side});
@@ -31930,6 +32019,7 @@ var BUILDER_GUIDES = {
       ['icon', 'icon on the chip (see tokens below; default gear)'],
       ['tint', 'chip color (default cmd)'],
       ['group', 'containment-boundary id — members get a dashed box'],
+      ['float', 'Free placement enables arbitrary dragging and Float X/Y; Auto above/below releases the pin; in rows restores row placement'],
       ['link', 'permalink URL — clickable ↗ on the card corner'],
       ['detail', 'inner flow: choose a section for a focused drilldown with an overview map; map parent beats or link an external destination in Domain detail']
     ],
@@ -31940,6 +32030,7 @@ var BUILDER_GUIDES = {
     how: 'Edit the selected JSON, then click Render. from/to are node ids; the arrow, packets, and legend all follow kind.',
     fields: [
       ['from, to', 'node ids the hop connects'],
+      ['fromPort, toPort', 'Exit/Entry side and position (%) pin the arrow on each card; Auto restores routing'],
       ['kind', 'protocol: https | int | mqtt, or a key declared in page.protocols'],
       ['ret', 'true = response/ack, drawn as a fine dash'],
       ['label', 'short verb or topic on the arrow (POST /x, PUBLISH a/b/c)'],
@@ -32437,15 +32528,34 @@ function protocolKinds(page){
 function nodeForm(val, ctx){
     var t = session.target;
     ensureGroupDatalist([ctx.diagram]);
-    var floatSide = '';
+    var floatSide = '',floatEntry=null;
     ((ctx.diagram && ctx.diagram.floats) || []).forEach(function(f){
-      if (f && f.id === t.id) floatSide = f.side === 'below' ? 'below' : 'above';
+      if (f && f.id === t.id){floatEntry=f;floatSide=positionedFloat(f)?'free':f.side === 'below' ? 'below' : 'above';}
     });
-    var floatControl = selectControl(['above', 'below'], floatSide, function(v){
+    var floatControl = selectControl(['free','above', 'below'], floatSide, function(v){
       return commitCascade(function(raw){ return planSetNodeFloat(session.text(), raw, t.section, t.id, v); },
         {after: function(){ renderInspector(); }});
     }, true);
     floatControl.firstChild.textContent = 'in rows';
+    Array.from(floatControl.children).forEach(function(option){
+      if(option.value)option.textContent={free:'Free placement',above:'Auto above',below:'Auto below'}[option.value];
+    });
+    var floatRows=[];
+    if(floatEntry){
+      var position=layout(ctx.diagram).pos[t.id];
+      [['x','Float X','cx'],['y','Float Y','cy']].forEach(function(field){
+        floatRows.push(frow(field[1],numberControl(position[field[2]],function(value){
+          return commitCascade(function(raw){
+            var got=builderDiagram(session.text(),raw,t.section);if(got.error)return got;
+            var p=layout(got.d).pos[t.id];
+            return planPlaceFloat(session.text(),raw,t.section,t.id,field[0]==='x'?value:p.cx,field[0]==='y'?value:p.cy);
+          },{after:function(){renderInspector();}});
+        })));
+      });
+      var hint=document.createElement('p');hint.className='fnote';
+      hint.textContent='Drag anywhere to pin this node. X/Y locate its center in diagram units, independent of zoom. Choose Auto above/below to release the pin, or in rows to restore row placement.';
+      floatRows.push(hint);
+    }
     return [
       frow('id', textControl(t.id, function(v){
         if (v == null){ formError('a node needs an id'); return false; }
@@ -32458,13 +32568,14 @@ function nodeForm(val, ctx){
         return commitGroup(function(raw){ return planSetNodeGroup(session.text(), raw, t.section, t.id, v); },
           {after: function(){ ensureGroupDatalist([builderDiagram(session.text(), JSON.parse(session.text()), t.section).d]); }});
       })),
-      frow('float', floatControl),
+      frow('float', floatControl)
+    ].concat(floatRows,[
       frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
       frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
       frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); }))
-    ].concat([handoffControls(val),detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
+    ],[handoffControls(val),detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
   }
 
 function handoffControls(val){
@@ -32595,9 +32706,35 @@ function edgeForm(val, ctx){
         });
       });
     }
+    function portRows(field,label){
+      var current=validEdgePort(val[field])?val[field]:null;
+      function update(side,offset){
+        return commitCascade(function(raw){
+          var got=builderDiagram(session.text(),raw,t.section);if(got.error)return got;
+          var edge=got.d.edges[t.index],port=edge[field],next=null;
+          if(side){next={side:side,offset:validEdgePort(port) && port.offset!=null?port.offset:.5};}
+          else if(offset!=null && validEdgePort(port))next={side:port.side,offset:offset};
+          return planSetField(session.text(),raw,got.path.concat(['edges',t.index]),field,next?JSON.stringify(next):null);
+        },side!==undefined?{after:function(){renderInspector();}}:undefined);
+      }
+      var control=selectControl(EDGE_PORT_SIDES,current && current.side,function(side){return update(side || '',null);},true);
+      control.firstChild.textContent='Auto';
+      var rows=[frow(label+' side',control)];
+      if(current){
+        var position=numberControl((current.offset==null ? .5 : current.offset)*100,function(value){
+          if(!Number.isFinite(value) || value<0 || value>100){formError('Port position must be between 0 and 100%.');return false;}
+          return update(undefined,value/100);
+        });
+        rows.push(frow(label+' position (%)',position));
+      }
+      return rows;
+    }
+    var portHint=document.createElement('p');portHint.className='fnote';
+    portHint.textContent='Entry/exit positions run from 0% at the left or top to 100% at the right or bottom. Pinned ports use a curve, including in lane routing; Auto restores automatic routing.';
     return [
       frow('from', endpoint('from')),
-      frow('to', endpoint('to')),
+      frow('to', endpoint('to'))
+    ].concat(portRows('fromPort','Exit'),portRows('toPort','Entry'),[portHint,
       frow('kind', selectControl(protocolKinds(ctx.page), val.kind || 'int', function(v){ return commitSimple('kind', JSON.stringify(v || 'int')); })),
       frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
@@ -32605,7 +32742,7 @@ function edgeForm(val, ctx){
       frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
       frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
       frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
-    ];
+    ]);
   }
 
 function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){
@@ -35095,6 +35232,7 @@ function createBuilderInteractions(opts){
     if (nd.el && nd.el.classList) nd.el.classList.remove('dv-dragsrc');
     if (nd.target && nd.target.classList) nd.target.classList.remove('dv-droptgt');
     dropNodeDragGhosts(nd);
+    (nd.edgeGhosts || []).forEach(function(pair){pair.source.classList.remove('dv-free-edge-source');pair.ghost.remove();});
     if (nd.line && nd.line.parentNode) nd.line.parentNode.removeChild(nd.line);
   }
   function cancelGroupDrag(){
@@ -35183,6 +35321,24 @@ function createBuilderInteractions(opts){
     if (!isFinite(here.x) || !isFinite(here.y) || !isFinite(start.x) || !isFinite(start.y)) return;
     nd.ghost.setAttribute('transform', 'translate(' + (nd.srcXY.x + (here.x - start.x)) +
                           ' ' + (nd.srcXY.y + (here.y - start.y)) + ')');
+    if(nd.floating){
+      nd.position={x:nd.origin.cx+here.x-start.x,y:nd.origin.cy+here.y-start.y};
+      var draft=builderClone(nd.diagram),f=draft.floats.find(function(item){return item.id===nd.id;});
+      f.x=nd.position.x;f.y=nd.position.y;
+      var L=layout(draft);
+      if(!nd.edgeGhosts){
+        nd.edgeGhosts=[];
+        nd.svg.querySelectorAll('path.edge[data-dv-edge]').forEach(function(source){
+          var index=Number(source.getAttribute('data-dv-edge')),edge=draft.edges[index];
+          if(!edge || edge.from!==nd.id && edge.to!==nd.id)return;
+          var ghost=source.cloneNode(false);ghost.removeAttribute('id');ghost.removeAttribute('data-dv-edge');
+          ghost.classList.add('dv-free-edge-preview');ghost.setAttribute('aria-hidden','true');
+          source.classList.add('dv-free-edge-source');source.parentNode.appendChild(ghost);
+          nd.edgeGhosts.push({source:source,ghost:ghost,index:index});
+        });
+      }
+      nd.edgeGhosts.forEach(function(pair){pair.ghost.setAttribute('d',edgePath(draft.edges[pair.index],L));});
+    }
   }
   /* ---- drag a row grab-handle to move a whole layout row ---- */
   var rowDrag = null;
@@ -35484,6 +35640,15 @@ function createBuilderInteractions(opts){
         nodeDrag = {el: nodeEl, secEl: ndSec, svg: nodeEl.ownerSVGElement, id: nodeEl.getAttribute('data-dv-node'),
                     gi: ndGi, rowsJSON: JSON.stringify(sectionRowsFor(ndGi)), renderRowsJSON: rowGrabRows[ndGi],
                     x0: ev.clientX, y0: ev.clientY, moved: false, target: null, pick: null, line: null};
+        var startSnapshot=parseEditor(),startRecord=!startSnapshot.error && specSectionPaths(startSnapshot.raw)[ndGi];
+        var startDiagram=startRecord && specValueAt(startSnapshot.raw,startRecord.diagram);
+        if(startDiagram && (startDiagram.floats || []).some(function(f){return f && f.id===nodeDrag.id;})){
+          if(startSnapshot.renderedText!=null && startSnapshot.renderedText!==startSnapshot.text){
+            cancelNodeDrag();inspectorMessage('The JSON changed since the preview. Render it before moving a float.');return;
+          }
+          nodeDrag.floating=true;nodeDrag.snapshot=startSnapshot;nodeDrag.diagram=startDiagram;
+          nodeDrag.origin=layout(startDiagram).pos[nodeDrag.id];
+        }
         ev.preventDefault(); /* no text selection while dragging */
       }
       return;
@@ -35528,6 +35693,10 @@ function createBuilderInteractions(opts){
       var ddx = ev.clientX - nodeDrag.x0, ddy = ev.clientY - nodeDrag.y0;
       if (ddx * ddx + ddy * ddy > 25) nodeDrag.moved = true; /* > 5px straight-line */
       if (!nodeDrag.moved) return;
+      if(nodeDrag.floating){
+        if(session.text()!==nodeDrag.snapshot.text){cancelNodeDrag();inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        nodeDrag.el.classList.add('dv-dragsrc');updateNodeDragGhost(ev);return;
+      }
       nodeDrag.el.classList.add('dv-dragsrc');
       var over = document.elementFromPoint(ev.clientX, ev.clientY);
       var tgt = over && over.closest ? over.closest('g.node[data-dv-node]') : null;
@@ -35583,11 +35752,14 @@ function createBuilderInteractions(opts){
       if (!nd.moved) return; /* a plain click: selection proceeds normally */
       suppressClick = true;
       life.delay(function(){ suppressClick = false; }, 0);
-      if (!nd.target && !nd.pick) return; /* released without a destination */
+      if (!nd.target && !nd.pick && !nd.position) return; /* released without a destination */
       var ndParsed = parseEditor();
       if (ndParsed.error){ inspectorMessage(ndParsed.error); return; }
       var ndPlan;
-      if (nd.target){
+      if(nd.floating){
+        if(ndParsed.text!==nd.snapshot.text || ndParsed.project!==nd.snapshot.project){inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        ndPlan=planPlaceFloat(session.text(),ndParsed.raw,nd.gi,nd.id,nd.position.x,nd.position.y);
+      }else if (nd.target){
         ndPlan = planSwapNodes(session.text(), ndParsed.raw, nd.gi, nd.id,
                                  nd.target.getAttribute('data-dv-node'));
       } else {
@@ -35742,6 +35914,8 @@ function createBuilderInteractions(opts){
     cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
     if(drag){drag.lbl.removeAttribute('transform');drag=null;}
   }
+  life.listen(window,'blur',cancelGestures);
+  life.listen(window,'pointercancel',cancelGestures);
   function beforeReplace(request){
     var retention=request && request.retention || {};
     cancelGestures();
@@ -39179,8 +39353,10 @@ var CONTRACT = [
   '               ["<id>", ["<id>","<id>"], ...]], // row 2, left-to-right; nested array = stack',
   '    "routing":"curves",                     // optional "lanes": reserved tracks; 1–5 flat cards/row, no floats/self-loops',
   '    "floats": [{"id":"<id>", "side":"above"}],  // branch nodes (auth, signing)',
+  '                // optional x/y pin a float center in diagram units; row nodes keep their grid layout',
   '    "edges":  [{"from":"<id>", "to":"<id>", "kind":"https|int|mqtt",',
   '                "ret":false, "label":"<short label>", "revealAt":1, "hideAt":3}],',
+  '                // optional fromPort/toPort: {"side":"right","offset":0.5}; top/right/bottom/left, offset 0–1',
   '    "panels": [                              // optional synchronized inspector panels',
   '      {"id":"copies", "type":"replicas", "replicas":[{"id":"remote","label":"Remote"}]}',
   '                                     // patch reference:{series,position} and replicas:{remote:{series,position,status,lagMs}}; same-sequence comparisons only',

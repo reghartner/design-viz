@@ -1154,8 +1154,7 @@ function nodePlacementFixture(rows = [['a', 'b'], ['c', 'd']]){
 test('node gap drag shows left-to-right slot and row lines and commits with undo and selection', () => {
   for (const [id, x, y, lineClass, expected] of [
     ['a', 300, 375, 'dv-slotline', [['b'], ['c', 'a', 'd']]],
-    ['a', 300, 250, 'dv-rowline', [['b'], ['a'], ['c', 'd']]],
-    ['f', 550, 375, 'dv-slotline', [['a', 'b'], ['c', 'd', 'f']]]
+    ['a', 300, 250, 'dv-rowline', [['b'], ['a'], ['c', 'd']]]
   ]){
     const h = importHarness(null, nodePlacementFixture());
     const before='  '+JSON.stringify(nodePlacementFixture(),null,2)+'\r\n';
@@ -1168,7 +1167,6 @@ test('node gap drag shows left-to-right slot and row lines and commits with undo
     assert.equal(line.getAttribute('visibility'), 'visible');
     h.release();
     assert.deepStrictEqual(JSON.parse(h.elements.src.value).rows, expected);
-    if (id === 'f') assert.ok(!JSON.parse(h.elements.src.value).floats);
     assert.equal(h.svg.querySelector('line.' + lineClass), null);
     assert.equal(h.svg.querySelector('.dv-ghost'), null);
     assert.ok(h.cards[id].classList.contains('dv-sel'));

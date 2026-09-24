@@ -198,3 +198,21 @@ Author every `rows` array in visual left-to-right order. A stack occupies one
 slot, with its members in top-to-bottom order. Each row retains its authored
 horizontal order when other rows are added, moved, or removed. Cross-row edges
 follow their endpoint positions; steps and edges define the story order.
+
+## Free node placement and edge ports
+
+Use `floats:[{id,side:"below",x:430,y:220}]` for freely placed cards. X/Y are
+the center in diagram units, not screen pixels; Y increases downward. Fixed
+positions override automatic placement and nudges. Preserve an existing float's
+side when pinning it so the row headroom stays stable. All-free diagrams use
+`rows:[[]]`. Row layout and order remain automatic. Do not duplicate placement
+of one node in both rows and floats.
+
+Use optional `edges[].fromPort` / `toPort` objects to pin exit/entry:
+`{side:"right",offset:0.25}`. Offset is 0–1 along the side, starting at its left
+or top. These edges use curves, including in lane diagrams; other edges retain
+their routing. Neither pinning nor manual placement guarantees no overlaps.
+Inspect the rendered result and use bends/label nudges if needed. Workbench
+controls are **float → Free placement**, **Float X/Y**, and **Exit / Entry side**
+with **position (%)**. See `docs/free-node-placement.md` and the executable
+`examples/free-placement/free-placement.spec.json` example.

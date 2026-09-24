@@ -579,6 +579,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   var L = layout(d);
   var ADJ = L.routing === 'lanes' ? laneRoutes(d,L) : edgeAutoAdjust(d.edges || [], L);
   if (L.routing !== 'lanes') resolveEdgeAvoidance(d.edges || [], L, ADJ);
+  expandPlacedEdgeBounds(d.edges || [],L,ADJ);
   var kindsUsed = {}, anyRet = false;
   (d.edges || []).forEach(function(e){
     kindsUsed[protos[e.kind] ? e.kind : 'int'] = true;

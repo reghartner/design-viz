@@ -7,6 +7,14 @@ var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
    strip when Auto or Fit width scaled the entire canvas. */
 var LEFT_X = 110, RIGHT_X = W - LEFT_X;
 
+function floatCoordinate(value){return Number.isFinite(value) && Math.abs(value)<=100000;}
+function positionedFloat(f){return !!f && floatCoordinate(f.x) && floatCoordinate(f.y);}
+var EDGE_PORT_SIDES=['top','right','bottom','left'];
+function validEdgePort(port){
+  return !!port && typeof port==='object' && !Array.isArray(port) && EDGE_PORT_SIDES.indexOf(port.side)>=0 &&
+    (port.offset==null || Number.isFinite(port.offset) && port.offset>=0 && port.offset<=1);
+}
+
 /* Shared, pure parent-link tolerance for layout, validation and the inspector.
    Inspect all chains before dropping cyclic links so declaration order cannot
    decide which cycle member becomes the outer box. Incoming links survive. */
@@ -123,7 +131,9 @@ function layout(spec){
          float up into the inter-row gap; dx shifts it sideways */
       var cx = xs[i] + (typeof f.dx === 'number' ? f.dx : 0);
       var cy = fy + (typeof f.dy === 'number' ? f.dy : 0);
+      if(positionedFloat(f)){cx=f.x;cy=f.y;}
       pos[f.id] = {cx:cx, cy:cy, w:150, h:FLOAT_H, row:-1, flow:-1, stack:false, float:true};
+      if(positionedFloat(f))pos[f.id].free=true;
     });
   });
 
@@ -173,6 +183,11 @@ function layout(spec){
      a float member's row) — widen the drawable area instead of clipping.
      Flat specs keep vb = {0, 0, W, H}, so their markup stays identical. */
   var vbX = 0, vbY = 0, vbR = W;
+  floats.forEach(function(f){
+    var p=f && pos[f.id];if(!p || !positionedFloat(f))return;
+    vbX=Math.min(vbX,p.cx-p.w/2-24);vbY=Math.min(vbY,p.cy-p.h/2-24);
+    vbR=Math.max(vbR,p.cx+p.w/2+24);H=Math.max(H,p.cy+p.h/2+24);
+  });
   Object.keys(groupBoxes).forEach(function(g){
     var b = groupBoxes[g];
     if (b.x - 2 < vbX) vbX = b.x - 2;
@@ -363,7 +378,48 @@ function edgeAutoAdjust(edges, L){
    NEAR_TOL it gets a minimal vertical-tangent S instead of the wide route. */
 var STRAIGHT_TOL = 40, NEAR_TOL = 96;
 
+function edgeHasPlacement(e,L){
+  return validEdgePort(e.fromPort) || validEdgePort(e.toPort) ||
+    !!(L.pos[e.from] && L.pos[e.from].free || L.pos[e.to] && L.pos[e.to].free);
+}
+function edgePortPoint(node,other,port,selfSide){
+  var side=validEdgePort(port) ? port.side : selfSide ||
+    (Math.abs(other.cx-node.cx)/node.w >= Math.abs(other.cy-node.cy)/node.h ?
+      (other.cx>=node.cx?'right':'left') : (other.cy>=node.cy?'bottom':'top'));
+  var offset=validEdgePort(port) && port.offset!=null ? port.offset : .5;
+  var horizontal=side==='top' || side==='bottom';
+  return {x:horizontal ? node.cx-node.w/2+node.w*offset : node.cx+(side==='right'?node.w/2:-node.w/2),
+    y:horizontal ? node.cy+(side==='bottom'?node.h/2:-node.h/2) : node.cy-node.h/2+node.h*offset,
+    nx:horizontal?0:side==='right'?1:-1,ny:horizontal?(side==='bottom'?1:-1):0};
+}
+function placedEdgePath(e,L,adj){
+  var a=L.pos[e.from],b=L.pos[e.to],self=e.from===e.to;
+  var start=edgePortPoint(a,b,e.fromPort,self?'right':null),end=edgePortPoint(b,a,e.toPort,self?'top':null);
+  var reach=clamp(Math.hypot(end.x-start.x,end.y-start.y)*.4,40,180);
+  var bend=Number.isFinite(e.bend)?e.bend:0,bowX=adj.avoidMx || 0,bowY=(adj.avoidMy || 0)+bend;
+  var c1={x:start.x+start.nx*reach+bowX,y:start.y+start.ny*reach+bowY};
+  var c2={x:end.x+end.nx*reach+bowX,y:end.y+end.ny*reach+bowY};
+  if(start.x===end.x && start.y===end.y){
+    c1.x-=start.ny*45;c1.y+=start.nx*45;c2.x+=end.ny*45;c2.y-=end.nx*45;
+  }
+  return 'M '+start.x+' '+start.y+' C '+c1.x+' '+c1.y+' '+c2.x+' '+c2.y+' '+end.x+' '+end.y;
+}
+
+/* Explicit routes may leave any side of an outermost card. Include their
+   actual curves in the viewBox without moving the row grid or node positions. */
+function expandPlacedEdgeBounds(edges,L,adjust){
+  var vb=L.vb,left=vb.x,top=vb.y,right=vb.x+vb.w,bottom=vb.y+vb.h;
+  edges.forEach(function(e,i){
+    if(!L.pos[e.from] || !L.pos[e.to] || !edgeHasPlacement(e,L))return;
+    samplePathD(edgePath(e,L,adjust[i])).forEach(function(p){
+      left=Math.min(left,p.x-24);top=Math.min(top,p.y-24);right=Math.max(right,p.x+24);bottom=Math.max(bottom,p.y+24);
+    });
+  });
+  L.vb={x:left,y:top,w:right-left,h:bottom-top};L.H=Math.max(L.H,bottom);
+}
+
 function edgePath(e, L, adj){
+  if(edgeHasPlacement(e,L))return placedEdgePath(e,L,adj || {});
   if (adj && adj.path) return adj.path;
   var a = L.pos[e.from], b = L.pos[e.to];
   adj = adj || {fromDx:0, fromDy:0, toDx:0, toDy:0, bend:0};

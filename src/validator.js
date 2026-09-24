@@ -288,7 +288,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if ((d.floats || []).length || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
         (d.edges || []).some(function(e){ return e.from === e.to; }))
       warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no floats or self-loops — using curves');
-    else if ((d.edges || []).some(function(e){ return e.bend; }))
+    else if ((d.edges || []).some(function(e){ return e.bend && !validEdgePort(e.fromPort) && !validEdgePort(e.toPort); }))
       warnings.push(DP + '.routing: lanes computes its own routes; authored edge bends are ignored');
   }
 
@@ -307,6 +307,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     else placed[f.id] = true;
     if (f && f.side && f.side !== 'above' && f.side !== 'below')
       warnings.push(DP + '.floats[' + fi + '].side: unknown side "' + f.side + '" — using "above" (valid: above, below)');
+    if(f && (Object.prototype.hasOwnProperty.call(f,'x') || Object.prototype.hasOwnProperty.call(f,'y')) && !positionedFloat(f))
+      errors.push(DP+'.floats['+fi+']: free placement requires both x and y as finite coordinates between -100000 and 100000');
   });
   var groups = (d.groups && typeof d.groups === 'object') ? d.groups : {};
   sanitizedGroupParents(groups, function(key, reason){
@@ -334,6 +336,9 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var edgeKeys = {};
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
+    ['fromPort','toPort'].forEach(function(key){
+      if(e && e[key]!=null && !validEdgePort(e[key]))errors.push(EP+'.'+key+': expected {side: top|right|bottom|left, offset?: 0..1}');
+    });
     if (e && Object.prototype.hasOwnProperty.call(e, 'delta') && typeof e.delta !== 'boolean')
       warnings.push(EP + '.delta: must be true or false — ignored');
     if (!e || !placed[e.from]) errors.push(EP + '.from: "' + (e && e.from) + '" is not a placed node');

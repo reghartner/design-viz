@@ -196,6 +196,9 @@ function initWorkbenchWelcome(opts){
   resume.addEventListener('click', resumeProject);
   el('welcome-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
   el('welcome-new').addEventListener('click', function(){ navigation.go('new'); });
+  ['welcome-catalog','welcome-new-catalog'].forEach(function(id){
+    el(id).addEventListener('click',function(){builder.openCatalog({newProject:true,onCreated:enterEditor});});
+  });
   ['welcome-agent', 'welcome-new-agent'].forEach(function(id){ el(id).addEventListener('click', function(){ navigation.go('agent'); }); });
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
   root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });

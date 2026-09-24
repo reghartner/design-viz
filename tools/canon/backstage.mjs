@@ -14,7 +14,13 @@ export function catalogFromEntities(entities,baseUrl){
   const services=entities.filter(e=>e.kind?.toLowerCase()==='component').map(e=>{
     const annotations=e.metadata.annotations || {},ns=e.metadata.namespace || 'default';
     const provided=(e.relations || []).filter(r=>r.type==='providesApi').map(r=>r.targetRef).concat(e.spec?.providesApis || []);
+    const links={};
+    for(const [field,type,kind] of [['dependsOn','dependsOn','component'],['consumesApis','consumesApi','api']]){
+      const values=(e.relations || []).filter(r=>r.type===type).map(r=>r.targetRef).concat(e.spec?.[field] || []);
+      if(values.length)links[field]=[...new Set(values.map(value=>qualify(value,kind,ns)))].sort();
+    }
     return {entityRef:ref(e),title:e.metadata.title || e.metadata.name,owner:qualify(e.spec?.owner,'group',ns),catalogUrl:entityUrl(e),
+      ...links,
       telemetry:{serviceName:annotations['flowview.io/telemetry-service'] || e.metadata.name},
       apis:[...new Set(provided.map(a=>qualify(a,'api',ns)))].map(id=>{
         const a=apis.get(id);if(!a){warnings.push('API '+id+' was not returned by the catalog.');return null;}

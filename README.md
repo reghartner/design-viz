@@ -125,6 +125,9 @@ browse actual panel previews, select a type, and confirm with **Add panel**.
 [Repository catalog sync](docs/workbench-catalog-sync.md) reads company catalog/API
 files from GitHub, proposes an updated service catalog, and bundles the approved
 snapshot with the nginx editor. New projects load those dropdown choices automatically.
+Use **From service catalog** on the homepage or **Add to diagram → Services from
+catalog** to select services and optionally create their declared dependency edges.
+See [catalog graph seeding](docs/workbench-catalog-sync.md#start-a-graph-from-the-catalog).
 
 The [effective-state inspector](docs/workbench-state-inspector.md) explains
 the panel values at a selected step, including inherited and transient values,

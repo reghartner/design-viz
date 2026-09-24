@@ -180,6 +180,10 @@ var FlowCanon = (function(){
     var services=input.services.map(function(s){
       if (!object(s) || !entityRef(s.entityRef) || seen.has(s.entityRef)) throw new Error('Catalog: missing or duplicate service entityRef.');
       seen.add(s.entityRef);
+      ['dependsOn','consumesApis'].forEach(function(key){
+        if(s[key]!=null && (!Array.isArray(s[key]) || s[key].some(function(ref){return !entityRef(ref);})))
+          throw new Error('Catalog: '+key+' must be an array of fully qualified entity references.');
+      });
       var apiIds=new Set();
       (s.apis || []).forEach(function(a){
         if (!entityRef(a.entityRef) || apiIds.has(a.entityRef)) throw new Error('Catalog: missing or duplicate API entityRef.');

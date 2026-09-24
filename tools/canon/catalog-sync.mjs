@@ -17,6 +17,7 @@ export function canonicalCatalog(raw) {
   const catalog = C.catalog(raw);
   catalog.services.sort((a,b) => order(a.entityRef,b.entityRef));
   for (const service of catalog.services) {
+    for(const field of ['dependsOn','consumesApis'])if(service[field])service[field]=[...new Set(service[field])].sort(order);
     (service.apis || []).sort((a,b) => order(a.entityRef,b.entityRef));
     for (const api of service.apis || []) (api.operations || []).sort((a,b) => order(a.operationId,b.operationId));
   }

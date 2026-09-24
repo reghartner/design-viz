@@ -327,6 +327,7 @@ var workspace = initWorkbenchWorkspace();
 var canonContext, loadingCanon=false;
 var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(request){return go(true,request);}, workspace:workspace,
   catalog:function(){return canonContext && canonContext.catalog;},
+  importCatalog:function(raw){if(canonContext)canonContext.importCatalog(raw);},
   deferInitialSave:true,
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
   beforeProjectLoad:function(){

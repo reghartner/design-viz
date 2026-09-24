@@ -2255,7 +2255,7 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 .sk-aurora .tbtn:hover{border-color:#38E1FF; color:#8AE8FF;}
 .sk-daylight .tbtn{background:#FFFFFF; border:1px solid #E0DCD1; color:#6B6F7A;}
 .sk-daylight .tbtn:hover{border-color:#4956C9; color:#4956C9;}
-.schips{display:flex; gap:5px; flex-wrap:wrap;}
+.schips{display:flex; gap:5px 2.5px; flex-wrap:wrap;}
 .step-transport{display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:100%;}
 .step-transport .tbtn{min-width:34px;min-height:34px;}
 .step-transport .playback-button{min-width:88px;white-space:nowrap;}
@@ -6509,7 +6509,7 @@ body.sk-editorial .errbox{
   body.sk-blueprint .tbtn{padding:3px 8px;font-size:11px;}
 }
 @media screen {
-  body.sk-blueprint .schips{gap:3px;}
+  body.sk-blueprint .schips{gap:3px 1.5px;}
 }
 @media screen {
   body.sk-blueprint .schip{width:23px;height:23px;font-size:10px;}
@@ -6828,7 +6828,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .path-chip[aria-pressed="true"] {box-shadow:inset 0 0 0 1px var(--path-color);font-weight:700}
 .path-chip:focus-visible {outline:2px solid var(--path-color);outline-offset:3px}
 .termbar.has-paths .schips {display:block;flex-basis:100%;overflow-x:auto;max-width:100%;min-width:0;padding:4px 2px}
-.path-matrix {display:grid;grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),32px);gap:8px 6px;align-items:center;width:max-content}
+.path-matrix {display:grid;grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),32px);gap:8px 3px;align-items:center;width:max-content}
 .path-row {display:contents}
 .path-matrix .path-chip {justify-self:start;max-width:180px;min-height:32px;box-sizing:border-box}
 .termbar.has-paths .path-row .schip {width:32px;height:32px;margin:0;border-color:color-mix(in srgb,var(--path-color) 45%,transparent)}
@@ -24365,7 +24365,7 @@ function pathTimelineRows(paths,graph){
    No runtime state is combined here and no document listeners are retained. */
 function createPathTimeline(host, source, paths, shownPaths, graph, pick){
   var retired=false, pathById=new Map(paths.map(function(p){return [p.id,p];}));
-  var rowGap=32, top=22, labelWidth=150, columnWidth=60;
+  var rowGap=32, top=22, labelWidth=150, columnWidth=44;
   var rows=pathTimelineRows(paths,graph);
   var lanePositions=new Map(Array.from(rows.lanes,function(pair){return [pair[0],top+pair[1]*rowGap];}));
   var sharedPositions=new Map(Array.from(rows.shared,function(pair){return [pair[0],top+pair[1]*rowGap];}));

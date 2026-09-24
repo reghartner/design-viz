@@ -1693,6 +1693,13 @@ function renderInspector(){
           independent.disabled = !!modes.adding() || !!modes.connecting(); guide.appendChild(independent);
         }
       }
+      if(t.kind==='node'){
+        var connectButton=actionButton('Connect from this node',function(){modes.connectFrom(t);});
+        connectButton.className+=' node-connect-button';connectButton.title='Alt/Option-click a node, then click its destination';
+        guide.appendChild(connectButton);
+        var connectTip=document.createElement('p');connectTip.className='fnote';
+        connectTip.textContent='Shortcut: Alt/Option-click this node, then click a destination. Escape cancels.';guide.appendChild(connectTip);
+      }
       var form = document.createElement('div');
       form.className = 'iform';
       if (t.kind === 'tab') ensureAccentDatalist();

@@ -222,8 +222,11 @@ insertion to section zero and cancels a pending draft save.
 All ordinary builder writes use `accept()`: the common `applyPlan()` path,
 connect, row/node/group/edge-label drags, generic insertion and tabs insertion.
 Inspector edits keep their current field focus and scroll the resulting source
-range without taking source focus. Insertion/connect still select their source
-range when the source panel is visible; drags keep their existing selection and
+range without taking source focus. Menu insertion/connect select their source
+range when the source panel is visible. Quick connections (Alt/Option-click or
+the node inspector action) open the edge inspector without moving source focus;
+their preview DOM/listeners retire on cancel, source change or builder disposal.
+Drags keep their existing selection and
 focus policies. Errors, cancel and stale gesture rejection do not publish.
 Pure bulk/reuse/clipboard planners continue to reach one outer application.
 

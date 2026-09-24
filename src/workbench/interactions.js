@@ -510,28 +510,97 @@ function createBuilderInteractions(opts){
 
   /* ---- connect mode: draw an edge by clicking its two nodes ---- */
   var connect = null; /* null | {stage:1} | {stage:2, section, fromId} */
+  var connectLife=null,connectChrome=null;
+  function clearConnectChrome(){
+    if(connectLife){connectLife.destroy();connectLife=null;}
+    if(connectChrome){
+      connectChrome.layer.remove();connectChrome.hint.remove();
+      connectChrome.replaced.forEach(function(el){el.classList.remove('dv-connect-replaced');});
+      connectChrome.nodes.forEach(function(node){node.classList.remove('dv-connect-source','dv-connect-candidate','dv-connect-target');});
+      connectChrome=null;
+    }
+  }
+  function connectSnapshot(){
+    var parsed=parseEditor();
+    if(parsed.error)return {error:parsed.error};
+    if(parsed.renderedText!=null && parsed.renderedText!==parsed.text)return {error:'The JSON changed since the preview. Render it before connecting nodes.'};
+    if(connect && connect.snapshot && (parsed.text!==connect.snapshot.text || parsed.project!==connect.snapshot.project))
+      return {error:'Connection cancelled — the source changed. Start again after rendering.'};
+    return parsed;
+  }
+  function showConnectChrome(target,diagram){
+    clearConnectChrome();
+    var svg=target.el && target.el.ownerSVGElement;
+    if(!svg || !svg.createSVGPoint)return;
+    var board=svg.closest('.board'),legend=board && board.querySelector('.lg');if(!legend)return;
+    var L=layout(diagram),source=L.pos[target.id];if(!source)return;
+    var layer=document.createElementNS(SVG_NS,'g'),line=document.createElementNS(SVG_NS,'path'),arrow=document.createElementNS(SVG_NS,'path');
+    layer.setAttribute('class','dv-connect-preview');layer.setAttribute('aria-hidden','true');
+    line.setAttribute('class','dv-connect-line');arrow.setAttribute('class','dv-connect-arrow');
+    layer.appendChild(line);layer.appendChild(arrow);svg.appendChild(layer);
+    var hint=document.createElement('div'),label=document.createElement('span'),cancel=document.createElement('button');
+    hint.className='dv-connect-hint';label.setAttribute('role','status');
+    label.textContent='Connect from '+(diagram.nodes[target.id].title || target.id)+' → click a highlighted node';
+    cancel.type='button';cancel.textContent='Cancel · Esc';cancel.setAttribute('aria-label','Cancel connection');
+    hint.appendChild(label);hint.appendChild(cancel);
+    var replaced=Array.from(legend.querySelectorAll('.li'));
+    if(!replaced.length){var sizing=legend.querySelector('.board-size');if(sizing)replaced.push(sizing);}
+    replaced.forEach(function(el){el.classList.add('dv-connect-replaced');});legend.appendChild(hint);
+    var nodes=Array.from(svg.querySelectorAll('g.node[data-dv-node]')),valid=Object.create(null);
+    nodes.forEach(function(node){
+      var id=node.getAttribute('data-dv-node');
+      if(id===target.id)node.classList.add('dv-connect-source');
+      else if(!(diagram.edges || []).some(function(e){return builderEdgeKey(e)===target.id+'->'+id;})){
+        valid[id]=true;node.classList.add('dv-connect-candidate');
+      }
+    });
+    connectChrome={layer:layer,hint:hint,nodes:nodes,replaced:replaced};connectLife=createWorkbenchLifetime();
+    connectLife.listen(cancel,'click',function(ev){ev.stopPropagation();cancelConnect('Connection cancelled');});
+    connectLife.listen(view,'mousemove',function(ev){
+      if(session.text()!==connect.snapshot.text){cancelConnect('Connection cancelled — the source changed.');return;}
+      var hovered=ev.target.closest && ev.target.closest('g.node[data-dv-node]');
+      var id=hovered && hovered.ownerSVGElement===svg && !inDetailPreview(hovered) && hovered.getAttribute('data-dv-node');
+      nodes.forEach(function(node){node.classList.toggle('dv-connect-target',node===hovered && !!valid[id]);});
+      var matrix=svg.getScreenCTM();if(!matrix)return;
+      var point=svg.createSVGPoint();point.x=ev.clientX;point.y=ev.clientY;point=point.matrixTransform(matrix.inverse());
+      var positions=Object.create(null);positions.source=source;positions.target=valid[id]?L.pos[id]:{cx:point.x,cy:point.y,w:1,h:1};
+      var p=placedEdgePoints({from:'source',to:'target'},{pos:positions},{});
+      if(!valid[id])p[3]={x:point.x,y:point.y};
+      line.setAttribute('d','M '+p[0].x+' '+p[0].y+' C '+p[1].x+' '+p[1].y+' '+p[2].x+' '+p[2].y+' '+p[3].x+' '+p[3].y);
+      var angle=Math.atan2(p[3].y-p[2].y,p[3].x-p[2].x),dx=Math.cos(angle)*10,dy=Math.sin(angle)*10;
+      arrow.setAttribute('d','M '+p[3].x+' '+p[3].y+' L '+(p[3].x-dx-dy*.45)+' '+(p[3].y-dy+dx*.45)+' L '+(p[3].x-dx+dy*.45)+' '+(p[3].y-dy-dx*.45)+' Z');
+    });
+  }
   function connectStatus(text){
     if (targetLabel) targetLabel.textContent = text;
     if (buildRow) buildRow.classList.add('dv-connectmode');
     opts.refreshInsertion();
   }
   function cancelConnect(message){
+    clearConnectChrome();
     connect = null;
     if (buildRow) buildRow.classList.remove('dv-connectmode');
     var parsed = parseEditor();
     updateTargetLabel(parsed.error ? null : parsed.raw);
-    if (message) inspectorMessage(message);
+    rehighlight();
+    if (message){
+      if(document.activeElement===src)inspectorMessage(message,true);
+      else formError(message);
+    }
   }
-  function startConnect(section){
+  function startConnect(section,fromId){
     if (addToStep) cancelAddToStep(null);
-    if (connect){ cancelConnect('connect cancelled'); return; }
-    var parsed = parseEditor();
+    if (connect){ cancelConnect('connect cancelled');if(fromId==null)return; }
+    var parsed = connectSnapshot();
     if (parsed.error){ inspectorMessage(parsed.error + ' — fix it before inserting'); return; }
     if (!specSectionPaths(parsed.raw).length){ inspectorMessage('no sections found in the editor text'); return; }
-    connect = {stage: 1,section:typeof section==='number'?section:undefined};
+    cancelGestures();pausePreview();if(multiSel.length){clearMultiSelect();dropMultiUI();}
+    connect = {stage: 1,section:typeof section==='number'?section:undefined,snapshot:parsed,quick:fromId!=null};
     connectStatus('connect: click the SOURCE node (Esc cancels)');
+    if(fromId!=null)handleConnectClick({section:section,kind:'node',id:fromId,el:findTargetEl({section:section,kind:'node',id:fromId})});
   }
   function handleConnectClick(target){
+    var parsed=connectSnapshot();if(parsed.error){cancelConnect(parsed.error);return;}
     if (!target || target.kind !== 'node'){
       cancelConnect('connect cancelled — that was not a node');
       return;
@@ -540,8 +609,11 @@ function createBuilderInteractions(opts){
       if(typeof connect.section==='number' && target.section!==connect.section){
         connectStatus('connect: choose a SOURCE node in section '+(connect.section+1)+' (Esc cancels)');return;
       }
-      connect = {stage: 2, section: target.section, fromId: target.id};
+      var got=builderDiagram(session.text(),parsed.raw,target.section);
+      if(got.error || !got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes,target.id)){cancelConnect('Source node no longer exists');return;}
+      connect.stage=2;connect.section=target.section;connect.fromId=target.id;
       setSelected(target.el);
+      showConnectChrome(target,got.d);
       connectStatus('connect: ' + target.id + ' → click the TARGET node');
       return;
     }
@@ -549,17 +621,15 @@ function createBuilderInteractions(opts){
       cancelConnect('connect cancelled — the two nodes are in different sections');
       return;
     }
-    var fromId = connect.fromId;
+    var fromId = connect.fromId,quick=connect.quick;
     session.insertSection = target.section;
-    var parsed = parseEditor();
-    if (parsed.error){ cancelConnect(parsed.error); return; }
     var plan = planAddEdgeBetween(session.text(), parsed.raw, target.section, fromId, target.id);
     if (plan.error){ cancelConnect(plan.error); return; }
     if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
     cancelConnect(null);
     var el = findTargetEl({section: target.section, kind: 'edge', index: plan.index});
     selectTarget({section: target.section, kind: 'edge', index: plan.index, el: el}, false);
-    selectRange(plan);
+    if(!quick)selectRange(plan);
   }
 
   /* ---- drag an edge label to set its labelDx/labelDy nudges;
@@ -957,7 +1027,7 @@ function createBuilderInteractions(opts){
   }
   life.listen(view,'mousedown', function(ev){
     if(inDetailPreview(ev.target))return;
-    if (ev.button !== 0 || connect) return;
+    if (ev.button !== 0 || connect || ev.altKey) return;
     if (!ev.target.closest) return;
     if (targetFromEvent(ev)) pausePreview();
     var grabEl = ev.target.closest('g.dv-rowgrab');
@@ -1197,6 +1267,9 @@ function createBuilderInteractions(opts){
       return;
     }
     if (!target) return;
+    if(ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && target.kind==='node'){
+      ev.preventDefault();startConnect(target.section,target.id);return;
+    }
     if (ev.shiftKey || ev.metaKey || ev.ctrlKey){
       toggleMultiSelect(target);
       return;
@@ -1258,6 +1331,8 @@ function createBuilderInteractions(opts){
   }
   life.listen(window,'blur',cancelGestures);
   life.listen(window,'pointercancel',cancelGestures);
+  life.listen(src,'input',function(){if(connect)cancelConnect('Connection cancelled — the source changed.');});
+  life.listen(window,'blur',function(){if(connect)cancelConnect('Connection cancelled');});
   function beforeReplace(request){
     var retention=request && request.retention || {};
     cancelGestures();
@@ -1267,7 +1342,8 @@ function createBuilderInteractions(opts){
     setSelected(null);
   }
   function retire(){
-    cancelGestures();addToStep=null;connect=null;clipboardHomeTarget=null;suppressClick=false;
+    cancelGestures();clearConnectChrome();addToStep=null;connect=null;clipboardHomeTarget=null;suppressClick=false;
+    if(buildRow)buildRow.classList.remove('dv-connectmode');
     clearAddModeChrome();clearMultiSelect();clearStepMarkers();setSelected(null);rowGrabRows={};
   }
   return {

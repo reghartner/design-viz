@@ -89,13 +89,11 @@ source ending; inspect **Destination preview** before applying it. See
 
 For common operations after a divergence, reference the same consecutive IDs:
 
-```json
-[
-  {"id":"normal", "label":"First attempt", "steps":["press", "record", "store", "index", "notify", "ready"]},
-  {"id":"retry", "label":"After retry", "steps":["press", "record-failed", "record-retry", "store", "index", "notify-recovery", "ready"]},
-  {"id":"offline", "label":"Device offline", "steps":["press", "offline"]}
-]
-```
+| Path | Step IDs in order |
+| --- | --- |
+| First attempt | `press` → `record` → `store` → `index` → `notify` → `ready` |
+| After retry | `press` → `record-failed` → `record-retry` → `store` → `index` → `notify-recovery` → `ready` |
+| Device offline | `press` → `offline` |
 
 - `store` and `index` appear once on a common track labeled **Shared steps**.
   The retry has an extra stop before joining, so the numbers follow the selected

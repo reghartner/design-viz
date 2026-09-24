@@ -14,7 +14,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
+    'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
@@ -45,6 +45,8 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if((Array.isArray(d.floats)?d.floats:[]).some(function(f){return f && (f.x!=null || f.y!=null);}))used['layout.free-nodes']=true;
+      if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && (e.fromPort!=null || e.toPort!=null);}))used['layout.edge-ports']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
@@ -714,7 +716,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if ((d.floats || []).length || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
         (d.edges || []).some(function(e){ return e.from === e.to; }))
       warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no floats or self-loops — using curves');
-    else if ((d.edges || []).some(function(e){ return e.bend; }))
+    else if ((d.edges || []).some(function(e){ return e.bend && !validEdgePort(e.fromPort) && !validEdgePort(e.toPort); }))
       warnings.push(DP + '.routing: lanes computes its own routes; authored edge bends are ignored');
   }
 
@@ -733,6 +735,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     else placed[f.id] = true;
     if (f && f.side && f.side !== 'above' && f.side !== 'below')
       warnings.push(DP + '.floats[' + fi + '].side: unknown side "' + f.side + '" — using "above" (valid: above, below)');
+    if(f && (Object.prototype.hasOwnProperty.call(f,'x') || Object.prototype.hasOwnProperty.call(f,'y')) && !positionedFloat(f))
+      errors.push(DP+'.floats['+fi+']: free placement requires both x and y as finite coordinates between -100000 and 100000');
   });
   var groups = (d.groups && typeof d.groups === 'object') ? d.groups : {};
   sanitizedGroupParents(groups, function(key, reason){
@@ -760,6 +764,9 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var edgeKeys = {};
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
+    ['fromPort','toPort'].forEach(function(key){
+      if(e && e[key]!=null && !validEdgePort(e[key]))errors.push(EP+'.'+key+': expected {side: top|right|bottom|left, offset?: 0..1}');
+    });
     if (e && Object.prototype.hasOwnProperty.call(e, 'delta') && typeof e.delta !== 'boolean')
       warnings.push(EP + '.delta: must be true or false — ignored');
     if (!e || !placed[e.from]) errors.push(EP + '.from: "' + (e && e.from) + '" is not a placed node');
@@ -1612,6 +1619,14 @@ var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
    strip when Auto or Fit width scaled the entire canvas. */
 var LEFT_X = 110, RIGHT_X = W - LEFT_X;
 
+function floatCoordinate(value){return Number.isFinite(value) && Math.abs(value)<=100000;}
+function positionedFloat(f){return !!f && floatCoordinate(f.x) && floatCoordinate(f.y);}
+var EDGE_PORT_SIDES=['top','right','bottom','left'];
+function validEdgePort(port){
+  return !!port && typeof port==='object' && !Array.isArray(port) && EDGE_PORT_SIDES.indexOf(port.side)>=0 &&
+    (port.offset==null || Number.isFinite(port.offset) && port.offset>=0 && port.offset<=1);
+}
+
 /* Shared, pure parent-link tolerance for layout, validation and the inspector.
    Inspect all chains before dropping cyclic links so declaration order cannot
    decide which cycle member becomes the outer box. Incoming links survive. */
@@ -1728,7 +1743,9 @@ function layout(spec){
          float up into the inter-row gap; dx shifts it sideways */
       var cx = xs[i] + (typeof f.dx === 'number' ? f.dx : 0);
       var cy = fy + (typeof f.dy === 'number' ? f.dy : 0);
+      if(positionedFloat(f)){cx=f.x;cy=f.y;}
       pos[f.id] = {cx:cx, cy:cy, w:150, h:FLOAT_H, row:-1, flow:-1, stack:false, float:true};
+      if(positionedFloat(f))pos[f.id].free=true;
     });
   });
 
@@ -1778,6 +1795,11 @@ function layout(spec){
      a float member's row) — widen the drawable area instead of clipping.
      Flat specs keep vb = {0, 0, W, H}, so their markup stays identical. */
   var vbX = 0, vbY = 0, vbR = W;
+  floats.forEach(function(f){
+    var p=f && pos[f.id];if(!p || !positionedFloat(f))return;
+    vbX=Math.min(vbX,p.cx-p.w/2-24);vbY=Math.min(vbY,p.cy-p.h/2-24);
+    vbR=Math.max(vbR,p.cx+p.w/2+24);H=Math.max(H,p.cy+p.h/2+24);
+  });
   Object.keys(groupBoxes).forEach(function(g){
     var b = groupBoxes[g];
     if (b.x - 2 < vbX) vbX = b.x - 2;
@@ -1968,7 +1990,70 @@ function edgeAutoAdjust(edges, L){
    NEAR_TOL it gets a minimal vertical-tangent S instead of the wide route. */
 var STRAIGHT_TOL = 40, NEAR_TOL = 96;
 
+function edgeHasPlacement(e,L){
+  return validEdgePort(e.fromPort) || validEdgePort(e.toPort) ||
+    !!(L.pos[e.from] && L.pos[e.from].free || L.pos[e.to] && L.pos[e.to].free);
+}
+function edgePortPoint(node,other,port,selfSide){
+  var side=validEdgePort(port) ? port.side : selfSide ||
+    (Math.abs(other.cx-node.cx)/node.w >= Math.abs(other.cy-node.cy)/node.h ?
+      (other.cx>=node.cx?'right':'left') : (other.cy>=node.cy?'bottom':'top'));
+  var offset=validEdgePort(port) && port.offset!=null ? port.offset : .5;
+  var horizontal=side==='top' || side==='bottom';
+  return {x:horizontal ? node.cx-node.w/2+node.w*offset : node.cx+(side==='right'?node.w/2:-node.w/2),
+    y:horizontal ? node.cy+(side==='bottom'?node.h/2:-node.h/2) : node.cy-node.h/2+node.h*offset,
+    nx:horizontal?0:side==='right'?1:-1,ny:horizontal?(side==='bottom'?1:-1):0};
+}
+function placedEdgePoints(e,L,adj){
+  var a=L.pos[e.from],b=L.pos[e.to],self=e.from===e.to;
+  var start=edgePortPoint(a,b,e.fromPort,self?'right':null),end=edgePortPoint(b,a,e.toPort,self?'top':null);
+  var reach=clamp(Math.hypot(end.x-start.x,end.y-start.y)*.4,40,180);
+  var bend=Number.isFinite(e.bend)?e.bend:0,bowX=adj.avoidMx || 0,bowY=(adj.avoidMy || 0)+bend;
+  var c1={x:start.x+start.nx*reach+bowX,y:start.y+start.ny*reach+bowY};
+  var c2={x:end.x+end.nx*reach+bowX,y:end.y+end.ny*reach+bowY};
+  if(start.x===end.x && start.y===end.y){
+    c1.x-=start.ny*45;c1.y+=start.nx*45;c2.x+=end.ny*45;c2.y-=end.nx*45;
+  }
+  return [start,c1,c2,end];
+}
+function placedEdgePath(e,L,adj){
+  var p=placedEdgePoints(e,L,adj);
+  return 'M '+p[0].x+' '+p[0].y+' C '+p[1].x+' '+p[1].y+' '+p[2].x+' '+p[2].y+' '+p[3].x+' '+p[3].y;
+}
+/* Endpoints plus derivative roots bound the whole cubic, even when an
+   authored bend makes extrema fall between the avoidance sampler's points. */
+function cubicAxisBounds(v){
+  var a=-v[0]+3*v[1]-3*v[2]+v[3],b=2*(v[0]-2*v[1]+v[2]),c=v[1]-v[0];
+  var roots=[],values=[v[0],v[3]];
+  if(a===0){if(b!==0)roots.push(-c/b);}
+  else {
+    var discriminant=b*b-4*a*c;
+    if(discriminant>=0){
+      var root=Math.sqrt(discriminant);
+      roots.push((-b+root)/(2*a),(-b-root)/(2*a));
+    }
+  }
+  roots.forEach(function(t){
+    if(t>0 && t<1){var u=1-t;values.push(u*u*u*v[0]+3*u*u*t*v[1]+3*u*t*t*v[2]+t*t*t*v[3]);}
+  });
+  return {min:Math.min.apply(null,values),max:Math.max.apply(null,values)};
+}
+
+/* Explicit routes may leave any side of an outermost card. Include their
+   actual curves in the viewBox without moving the row grid or node positions. */
+function expandPlacedEdgeBounds(edges,L,adjust){
+  var vb=L.vb,left=vb.x,top=vb.y,right=vb.x+vb.w,bottom=vb.y+vb.h;
+  edges.forEach(function(e,i){
+    if(!L.pos[e.from] || !L.pos[e.to] || !edgeHasPlacement(e,L))return;
+    var points=placedEdgePoints(e,L,adjust[i] || {});
+    var x=cubicAxisBounds(points.map(function(p){return p.x;})),y=cubicAxisBounds(points.map(function(p){return p.y;}));
+    left=Math.min(left,x.min-24);top=Math.min(top,y.min-24);right=Math.max(right,x.max+24);bottom=Math.max(bottom,y.max+24);
+  });
+  L.vb={x:left,y:top,w:right-left,h:bottom-top};L.H=Math.max(L.H,bottom);
+}
+
 function edgePath(e, L, adj){
+  if(edgeHasPlacement(e,L))return placedEdgePath(e,L,adj || {});
   if (adj && adj.path) return adj.path;
   var a = L.pos[e.from], b = L.pos[e.to];
   adj = adj || {fromDx:0, fromDy:0, toDx:0, toDy:0, bend:0};

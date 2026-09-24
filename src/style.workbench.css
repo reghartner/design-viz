@@ -991,6 +991,8 @@ body.sk-aurora.sk-blueprint{
 .step-color-help{font-size:11px;line-height:1.5;color:var(--sub);margin:6px 0 12px;}
 
 /* Shared catalog chooser: a searchable service list and a persistent summary. */
+.dv-free-edge-source{opacity:.18!important;}
+.dv-free-edge-preview{pointer-events:none;opacity:.8;}
 .welcome-actions{grid-template-columns:repeat(2,minmax(0,1fr));}
 #welcome-new-catalog{margin:8px 0 18px;}
 .diagram-add-choices [data-add-kind="catalog"]{grid-column:1/-1;min-height:82px;}

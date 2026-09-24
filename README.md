@@ -402,6 +402,12 @@ loop is durable: **open…** loads a `.spec.json` from disk (undoable),
 when it does not parse — unfinished work is still work), every edit
 auto-saves a draft to browser storage, and after a reload a bar offers to
 **restore** or **discard** the unsaved draft (restore is one undo step).
+
+For [free node placement and explicit edge ports](docs/free-node-placement.md),
+choose **float → Free placement**, then drag the node or edit **Float X/Y**.
+Floating nodes can move anywhere; row nodes keep their reorder/swap behavior.
+Edges expose **Exit / Entry side** and **position (%)**. Each drag is one Undo.
+Try the [flexible service map](examples/free-placement/free-placement.spec.json).
 **undo** has a matching **redo** (a new action clears the redo line; hand
 edits in the editor are not snapshotted, but undo stashes the current text
 on the redo side first, so nothing is discarded). **Validation findings

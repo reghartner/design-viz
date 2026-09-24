@@ -455,7 +455,7 @@ The engine computes all positions:
 
 Steps and edge direction define the story order.
 
-### floats — branch nodes
+### floats — automatic or freely placed nodes
 
 Nodes that sit off the rows: an auth service a request round-trips to, a
 signing service, a terminal alarm state. `{"id": "auth", "side": "above"}`
@@ -463,6 +463,21 @@ draws it above the first row; `"side": "below"` draws it under the last row.
 Do not also place the id in `rows`. The engine positions each float
 horizontally between the nodes its edges touch, and floats sharing a side are
 spread apart automatically so they cannot overlap.
+
+For fixed placement, supply **both** `x` and `y`: `{"id":"auth",
+"side":"below","x":430,"y":220}`. These are the node center in SVG diagram
+units, independent of zoom. X increases rightward; Y increases downward. Finite
+coordinates from -100000 to 100000 are accepted; the canvas expands to contain
+the node. Fixed coordinates override automatic positioning and `dx`/`dy`.
+The side still controls the reserved above-row band; preserve it when moving
+an existing float so the rows stay in place. New free placements use `below`.
+Pinned nodes do not move when their connections or rows change, and may overlap
+if authored that way. A diagram with every node in floats uses `rows:[[]]`.
+
+In the workbench, select **float → Free placement** or drag any floating node
+to pin it. **Float X/Y** provide numeric control. Select **Auto above/below** to
+release the pin, or **in rows** to return the node to the grid. Row nodes retain
+their row insertion/swap gestures. See `docs/free-node-placement.md`.
 
 Optional `dx` / `dy` (numbers, px) manually nudge a float from its computed
 spot — a below float pinned under a tall last row can be raised into the
@@ -475,12 +490,22 @@ float above connects to its top. An arrow into a float lands at the center
 of the float's facing edge; when a card sits in the way of every centered
 route, that arrow attaches at the float's near corner instead so the path
 can route around the card.
+Free placements instead use the facing horizontal or vertical side. Explicit
+edge ports below take precedence over both behaviors.
 
 ### edges
 
 Directed arrows between placed nodes:
 
 - `from`, `to` — node ids. Required.
+- `fromPort`, `toPort` — optional `{side:"top"|"right"|"bottom"|"left",
+  offset:0.5}` attachment on the source/target card. Offset is a fraction in
+  0–1 (default 0.5), measured left to right on a horizontal side and top to
+  bottom on a vertical side. In the inspector these are **Exit / Entry side**
+  and **position (%)**. Remove either field to restore that endpoint's auto
+  choice. A pinned edge uses a curve even with `routing:"lanes"`; other lane
+  edges and row positions retain their normal behavior. Ports fix endpoints,
+  not a collision-free route: use `bend` and label offsets for crowded paths.
 - `kind` — the **protocol** of the hop (see "Edge kinds"). Default `int`.
 - `ret` — `true` marks a response/acknowledgment: drawn as a fine dash in the
   protocol's color (a request/response pair is a normal edge one way and a

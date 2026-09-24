@@ -13,7 +13,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops', 'media.audio':'Audio conversations and device sounds',
+    'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
@@ -44,6 +44,8 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if((Array.isArray(d.floats)?d.floats:[]).some(function(f){return f && (f.x!=null || f.y!=null);}))used['layout.free-nodes']=true;
+      if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && (e.fromPort!=null || e.toPort!=null);}))used['layout.edge-ports']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){

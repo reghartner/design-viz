@@ -123,6 +123,7 @@ var BUILDER_GUIDES = {
       ['icon', 'icon on the chip (see tokens below; default gear)'],
       ['tint', 'chip color (default cmd)'],
       ['group', 'containment-boundary id — members get a dashed box'],
+      ['float', 'Free placement enables arbitrary dragging and Float X/Y; Auto above/below releases the pin; in rows restores row placement'],
       ['link', 'permalink URL — clickable ↗ on the card corner'],
       ['detail', 'inner flow: choose a section for a focused drilldown with an overview map; map parent beats or link an external destination in Domain detail']
     ],
@@ -133,6 +134,7 @@ var BUILDER_GUIDES = {
     how: 'Edit the selected JSON, then click Render. from/to are node ids; the arrow, packets, and legend all follow kind.',
     fields: [
       ['from, to', 'node ids the hop connects'],
+      ['fromPort, toPort', 'Exit/Entry side and position (%) pin the arrow on each card; Auto restores routing'],
       ['kind', 'protocol: https | int | mqtt, or a key declared in page.protocols'],
       ['ret', 'true = response/ack, drawn as a fine dash'],
       ['label', 'short verb or topic on the arrow (POST /x, PUBLISH a/b/c)'],

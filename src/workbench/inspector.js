@@ -341,15 +341,34 @@ function protocolKinds(page){
 function nodeForm(val, ctx){
     var t = session.target;
     ensureGroupDatalist([ctx.diagram]);
-    var floatSide = '';
+    var floatSide = '',floatEntry=null;
     ((ctx.diagram && ctx.diagram.floats) || []).forEach(function(f){
-      if (f && f.id === t.id) floatSide = f.side === 'below' ? 'below' : 'above';
+      if (f && f.id === t.id){floatEntry=f;floatSide=positionedFloat(f)?'free':f.side === 'below' ? 'below' : 'above';}
     });
-    var floatControl = selectControl(['above', 'below'], floatSide, function(v){
+    var floatControl = selectControl(['free','above', 'below'], floatSide, function(v){
       return commitCascade(function(raw){ return planSetNodeFloat(session.text(), raw, t.section, t.id, v); },
         {after: function(){ renderInspector(); }});
     }, true);
     floatControl.firstChild.textContent = 'in rows';
+    Array.from(floatControl.children).forEach(function(option){
+      if(option.value)option.textContent={free:'Free placement',above:'Auto above',below:'Auto below'}[option.value];
+    });
+    var floatRows=[];
+    if(floatEntry){
+      var position=layout(ctx.diagram).pos[t.id];
+      [['x','Float X','cx'],['y','Float Y','cy']].forEach(function(field){
+        floatRows.push(frow(field[1],numberControl(position[field[2]],function(value){
+          return commitCascade(function(raw){
+            var got=builderDiagram(session.text(),raw,t.section);if(got.error)return got;
+            var p=layout(got.d).pos[t.id];
+            return planPlaceFloat(session.text(),raw,t.section,t.id,field[0]==='x'?value:p.cx,field[0]==='y'?value:p.cy);
+          },{after:function(){renderInspector();}});
+        })));
+      });
+      var hint=document.createElement('p');hint.className='fnote';
+      hint.textContent='Drag anywhere to pin this node. X/Y locate its center in diagram units, independent of zoom. Choose Auto above/below to release the pin, or in rows to restore row placement.';
+      floatRows.push(hint);
+    }
     return [
       frow('id', textControl(t.id, function(v){
         if (v == null){ formError('a node needs an id'); return false; }
@@ -362,13 +381,14 @@ function nodeForm(val, ctx){
         return commitGroup(function(raw){ return planSetNodeGroup(session.text(), raw, t.section, t.id, v); },
           {after: function(){ ensureGroupDatalist([builderDiagram(session.text(), JSON.parse(session.text()), t.section).d]); }});
       })),
-      frow('float', floatControl),
+      frow('float', floatControl)
+    ].concat(floatRows,[
       frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
       frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
       frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); }))
-    ].concat([handoffControls(val),detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
+    ],[handoffControls(val),detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
   }
 
 function handoffControls(val){
@@ -499,9 +519,35 @@ function edgeForm(val, ctx){
         });
       });
     }
+    function portRows(field,label){
+      var current=validEdgePort(val[field])?val[field]:null;
+      function update(side,offset){
+        return commitCascade(function(raw){
+          var got=builderDiagram(session.text(),raw,t.section);if(got.error)return got;
+          var edge=got.d.edges[t.index],port=edge[field],next=null;
+          if(side){next={side:side,offset:validEdgePort(port) && port.offset!=null?port.offset:.5};}
+          else if(offset!=null && validEdgePort(port))next={side:port.side,offset:offset};
+          return planSetField(session.text(),raw,got.path.concat(['edges',t.index]),field,next?JSON.stringify(next):null);
+        },side!==undefined?{after:function(){renderInspector();}}:undefined);
+      }
+      var control=selectControl(EDGE_PORT_SIDES,current && current.side,function(side){return update(side || '',null);},true);
+      control.firstChild.textContent='Auto';
+      var rows=[frow(label+' side',control)];
+      if(current){
+        var position=numberControl((current.offset==null ? .5 : current.offset)*100,function(value){
+          if(!Number.isFinite(value) || value<0 || value>100){formError('Port position must be between 0 and 100%.');return false;}
+          return update(undefined,value/100);
+        });
+        rows.push(frow(label+' position (%)',position));
+      }
+      return rows;
+    }
+    var portHint=document.createElement('p');portHint.className='fnote';
+    portHint.textContent='Entry/exit positions run from 0% at the left or top to 100% at the right or bottom. Pinned ports use a curve, including in lane routing; Auto restores automatic routing.';
     return [
       frow('from', endpoint('from')),
-      frow('to', endpoint('to')),
+      frow('to', endpoint('to'))
+    ].concat(portRows('fromPort','Exit'),portRows('toPort','Entry'),[portHint,
       frow('kind', selectControl(protocolKinds(ctx.page), val.kind || 'int', function(v){ return commitSimple('kind', JSON.stringify(v || 'int')); })),
       frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
@@ -509,7 +555,7 @@ function edgeForm(val, ctx){
       frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
       frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
       frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
-    ];
+    ]);
   }
 
 function chipRow(labelText, items, emptyText, onRemove, onBody, ownerKind){

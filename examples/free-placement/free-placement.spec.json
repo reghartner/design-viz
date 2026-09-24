@@ -1,0 +1,43 @@
+{
+  "page": {
+    "title": "Doorbell event · a flexible service map",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "event",
+        "heading": "A row for the main flow, room around it for everything else",
+        "text": "Identity and analytics have saved positions. The main processing row keeps its left-to-right layout. Explicit entry and exit ports keep side conversations on the intended sides of each service.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "doorbell": {"title": "Doorbell", "icon": "doorbell", "tint": "dev"},
+            "gateway": {"title": "Gateway", "icon": "router", "tint": "mqtt"},
+            "recording": {"title": "Recording", "icon": "server", "tint": "data"},
+            "identity": {"title": "Identity", "icon": "shield", "tint": "auth"},
+            "analytics": {"title": "Analytics", "icon": "db", "tint": "data"}
+          },
+          "rows": [["doorbell", "gateway", "recording"]],
+          "floats": [
+            {"id": "identity", "side": "above", "x": 590, "y": 45},
+            {"id": "analytics", "side": "below", "x": 1240, "y": 330}
+          ],
+          "edges": [
+            {"from": "doorbell", "to": "gateway", "kind": "mqtt", "label": "button event"},
+            {"from": "gateway", "to": "identity", "kind": "https", "label": "check device", "fromPort": {"side": "top", "offset": 0.35}, "toPort": {"side": "bottom", "offset": 0.35}},
+            {"from": "identity", "to": "gateway", "kind": "https", "ret": true, "label": "authorized", "fromPort": {"side": "bottom", "offset": 0.75}, "toPort": {"side": "top", "offset": 0.75}},
+            {"from": "gateway", "to": "recording", "kind": "int", "label": "begin recording"},
+            {"from": "recording", "to": "analytics", "kind": "int", "label": "recording event", "fromPort": {"side": "right", "offset": 0.6}, "toPort": {"side": "top", "offset": 0.3}}
+          ],
+          "steps": [
+            {"id": "press", "edge": "doorbell->gateway", "text": "The doorbell sends its button event to the gateway."},
+            {"id": "check", "edge": "gateway->identity", "text": "The gateway verifies the device before starting the recording."},
+            {"id": "authorized", "edge": "identity->gateway", "text": "Identity returns the authorization result on a separate port."},
+            {"id": "record", "edge": "gateway->recording", "text": "Recording starts on the main flow."},
+            {"id": "analytics", "edge": "recording->analytics", "text": "An independent analytics consumer receives the recording event."}
+          ]
+        }
+      }
+    ]
+  }
+}

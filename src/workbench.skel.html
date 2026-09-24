@@ -314,8 +314,8 @@
       <tr><td>diagram.groups</td><td><code>{groupId: {title?}}</code></td><td>Declares containment boundaries: a dashed titled box drawn around all member nodes (a device holding two chips). Put members in one stack column; an edge between stack members draws as a vertical interconnect.</td></tr>
       <tr><td>diagram.rows</td><td><code>[[slot, ...], ...]</code></td><td>Slots render left to right in every row. A slot is a node id, or an <b>array of ids = a stack</b> (members render top to bottom in one column). Cross-row edges follow their endpoint positions.</td></tr>
       <tr><td>diagram.routing</td><td><code>"curves" | "lanes"</code></td><td>Optional lane routing reserves tracks and ports around cards. Supports 1–5 unstacked cards per row, no floats or self-loops; otherwise warns and uses curves. Imports use dependency rows and lanes. Readable size enlarges the board for horizontal scrolling.</td></tr>
-      <tr><td>diagram.floats</td><td><code>[{id, side:"above"}]</code></td><td>Branch nodes off the main flow (auth, signing). X position computed from the edges that touch them.</td></tr>
-      <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> of the hop (default <code>int</code>). Zero-based reveal indices draw the edge only for the selected step interval. <code>bend</code>/<code>labelDx</code>/<code>labelDy</code> are optional manual nudges.</td></tr>
+      <tr><td>diagram.floats</td><td><code>[{id, side:"above", x?, y?}]</code></td><td>Nodes outside the rows. Without coordinates, above/below placement is automatic. Both <code>x</code> and <code>y</code> pin the center in diagram units. Drag any float to pin it; use inspector Float X/Y for precision or choose Auto above/below to release it. Row nodes keep their row/slot gestures.</td></tr>
+      <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, fromPort?, toPort?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> (default <code>int</code>). Optional ports are <code>{side:"top|right|bottom|left",offset:0.5}</code>, with offset 0–1 along the side. Inspector Exit/Entry side and position (%) pin endpoints; Auto restores routing. Pinned edges use curves even in lane layouts. Zero-based reveal indices draw the edge only for the selected step interval; bend/label offsets tune geometry.</td></tr>
       <tr><td>diagram.sectionLayout</td><td><code>{default:[{x:0,y:0,w:8,h:12},{panel:"home",x:8,y:0,w:4,h:12}]}</code></td><td>Saved twelve-column tile layouts: default, backstage, confluence. Use <code>controls:"steps"</code> for a movable playback/path/caption tile. Arrange section to drag/resize; Preview selects the target and Optimize layout supplies a starting arrangement. Coordinates are zero-based, height 3–40 rows. Unspecified tiles stay visible; narrow views stack. <a href="../docs/section-layouts.md">Layout guide</a>.</td></tr>
       <tr><td>diagram.primaryPanel</td><td><code>"home"</code></td><td>Optional centerpiece panel ID: show it large with playback below it and a collapsible Data flow underneath. Set Presentation → Centerpiece in the panel inspector. Homemap steps have device states, subject drag/tap placement, visibility, inheritance, and signal controls.</td></tr>
       <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Panel types are documented in <code>contract/authoring-contract.md</code>, including static embedded <code>image</code> references, <code>table</code> for data snapshots, <code>checks</code> for authored decisions, <code>budget</code> for resource limits, and <code>replicas</code> for positions and reported lag. <code>waterfall</code> supports <code>startMs</code> offsets for overlapping trace spans; <code>trace</code> shows service internals and child-covered versus uncovered wall time.</td></tr>
@@ -346,16 +346,16 @@
           <li>One diagram spec, both flavors: ambient + step playback from the same <code>steps</code></li>
           <li>Synchronized inspector panels: state machines, LEDs, gauges, logs, camera screen — sparse patches folded to complete per-step state</li>
           <li>Containment groups (a device boundary around chips) with vertical stack interconnects</li>
-          <li>Left-to-right rows with 3–5 slots per row; one float per gap; stacks of 2–4</li>
+          <li>Left-to-right rows with 3–5 slots; stacks of 2–4; automatic or freely positioned floats</li>
           <li>Legend, edges, packets, and arrowheads all from the one protocol table</li>
         </ul>
       </div>
       <div><b>Known limits (by design, for now)</b>
         <ul>
-          <li>No collision detection — crowded corridors need <code>bend</code>/<code>labelDy</code> nudges</li>
+          <li>Automatic avoidance is best-effort; crowded corridors may need ports, <code>bend</code> or label nudges</li>
           <li>Hidden tabs stop painting, but SMIL clocks keep running — ambient dots are mid-path when a tab is revealed (harmless for loops)</li>
           <li>Switching tabs pauses a click-through. In this workbench, use Play to resume from the same step.</li>
-          <li>Two floats in one gap overlap; 3+ rows collide corridor labels; stack&#8594;stack edges unsupported</li>
+          <li>Freely placed nodes can overlap; choose their positions and check the resulting connections</li>
           <li>Group members must be placed adjacently (one stack column works best); the boundary is a bounding box, not a layout constraint</li>
         </ul>
       </div>

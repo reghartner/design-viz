@@ -574,6 +574,7 @@ function createBuilderInteractions(opts){
     if (nd.el && nd.el.classList) nd.el.classList.remove('dv-dragsrc');
     if (nd.target && nd.target.classList) nd.target.classList.remove('dv-droptgt');
     dropNodeDragGhosts(nd);
+    (nd.edgeGhosts || []).forEach(function(pair){pair.source.classList.remove('dv-free-edge-source');pair.ghost.remove();});
     if (nd.line && nd.line.parentNode) nd.line.parentNode.removeChild(nd.line);
   }
   function cancelGroupDrag(){
@@ -662,6 +663,24 @@ function createBuilderInteractions(opts){
     if (!isFinite(here.x) || !isFinite(here.y) || !isFinite(start.x) || !isFinite(start.y)) return;
     nd.ghost.setAttribute('transform', 'translate(' + (nd.srcXY.x + (here.x - start.x)) +
                           ' ' + (nd.srcXY.y + (here.y - start.y)) + ')');
+    if(nd.floating){
+      nd.position={x:nd.origin.cx+here.x-start.x,y:nd.origin.cy+here.y-start.y};
+      var draft=builderClone(nd.diagram),f=draft.floats.find(function(item){return item.id===nd.id;});
+      f.x=nd.position.x;f.y=nd.position.y;
+      var L=layout(draft);
+      if(!nd.edgeGhosts){
+        nd.edgeGhosts=[];
+        nd.svg.querySelectorAll('path.edge[data-dv-edge]').forEach(function(source){
+          var index=Number(source.getAttribute('data-dv-edge')),edge=draft.edges[index];
+          if(!edge || edge.from!==nd.id && edge.to!==nd.id)return;
+          var ghost=source.cloneNode(false);ghost.removeAttribute('id');ghost.removeAttribute('data-dv-edge');
+          ghost.classList.add('dv-free-edge-preview');ghost.setAttribute('aria-hidden','true');
+          source.classList.add('dv-free-edge-source');source.parentNode.appendChild(ghost);
+          nd.edgeGhosts.push({source:source,ghost:ghost,index:index});
+        });
+      }
+      nd.edgeGhosts.forEach(function(pair){pair.ghost.setAttribute('d',edgePath(draft.edges[pair.index],L));});
+    }
   }
   /* ---- drag a row grab-handle to move a whole layout row ---- */
   var rowDrag = null;
@@ -963,6 +982,15 @@ function createBuilderInteractions(opts){
         nodeDrag = {el: nodeEl, secEl: ndSec, svg: nodeEl.ownerSVGElement, id: nodeEl.getAttribute('data-dv-node'),
                     gi: ndGi, rowsJSON: JSON.stringify(sectionRowsFor(ndGi)), renderRowsJSON: rowGrabRows[ndGi],
                     x0: ev.clientX, y0: ev.clientY, moved: false, target: null, pick: null, line: null};
+        var startSnapshot=parseEditor(),startRecord=!startSnapshot.error && specSectionPaths(startSnapshot.raw)[ndGi];
+        var startDiagram=startRecord && specValueAt(startSnapshot.raw,startRecord.diagram);
+        if(startDiagram && (startDiagram.floats || []).some(function(f){return f && f.id===nodeDrag.id;})){
+          if(startSnapshot.renderedText!=null && startSnapshot.renderedText!==startSnapshot.text){
+            cancelNodeDrag();inspectorMessage('The JSON changed since the preview. Render it before moving a float.');return;
+          }
+          nodeDrag.floating=true;nodeDrag.snapshot=startSnapshot;nodeDrag.diagram=startDiagram;
+          nodeDrag.origin=layout(startDiagram).pos[nodeDrag.id];
+        }
         ev.preventDefault(); /* no text selection while dragging */
       }
       return;
@@ -1007,6 +1035,10 @@ function createBuilderInteractions(opts){
       var ddx = ev.clientX - nodeDrag.x0, ddy = ev.clientY - nodeDrag.y0;
       if (ddx * ddx + ddy * ddy > 25) nodeDrag.moved = true; /* > 5px straight-line */
       if (!nodeDrag.moved) return;
+      if(nodeDrag.floating){
+        if(session.text()!==nodeDrag.snapshot.text){cancelNodeDrag();inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        nodeDrag.el.classList.add('dv-dragsrc');updateNodeDragGhost(ev);return;
+      }
       nodeDrag.el.classList.add('dv-dragsrc');
       var over = document.elementFromPoint(ev.clientX, ev.clientY);
       var tgt = over && over.closest ? over.closest('g.node[data-dv-node]') : null;
@@ -1062,11 +1094,14 @@ function createBuilderInteractions(opts){
       if (!nd.moved) return; /* a plain click: selection proceeds normally */
       suppressClick = true;
       life.delay(function(){ suppressClick = false; }, 0);
-      if (!nd.target && !nd.pick) return; /* released without a destination */
+      if (!nd.target && !nd.pick && !nd.position) return; /* released without a destination */
       var ndParsed = parseEditor();
       if (ndParsed.error){ inspectorMessage(ndParsed.error); return; }
       var ndPlan;
-      if (nd.target){
+      if(nd.floating){
+        if(ndParsed.text!==nd.snapshot.text || ndParsed.project!==nd.snapshot.project){inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        ndPlan=planPlaceFloat(session.text(),ndParsed.raw,nd.gi,nd.id,nd.position.x,nd.position.y);
+      }else if (nd.target){
         ndPlan = planSwapNodes(session.text(), ndParsed.raw, nd.gi, nd.id,
                                  nd.target.getAttribute('data-dv-node'));
       } else {
@@ -1221,6 +1256,8 @@ function createBuilderInteractions(opts){
     cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
     if(drag){drag.lbl.removeAttribute('transform');drag=null;}
   }
+  life.listen(window,'blur',cancelGestures);
+  life.listen(window,'pointercancel',cancelGestures);
   function beforeReplace(request){
     var retention=request && request.retention || {};
     cancelGestures();

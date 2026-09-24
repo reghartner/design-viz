@@ -13,8 +13,9 @@ panel patches, links and any additional fields. Editing a copy leaves the
 source steps unchanged. **Use shared steps** adds references to the original
 steps instead; subsequent edits affect every path referencing them. Consecutive
 shared steps after a divergence form one visible common track. Paths can join
-for **Shared steps**, split for independent outcomes, and join again later.
-**Shared ending** means every path participating in that block ends there;
+for common operations, split for independent outcomes, and join again later.
+Connecting lines show these joins without boxes or extra labels. A shared
+ending means every path participating in that block ends there;
 an early-ending path has no connection to later blocks it does not reference.
 Separate copies remain independent; matching captions do not establish sharing.
 

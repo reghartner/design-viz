@@ -95,13 +95,13 @@ For common operations after a divergence, reference the same consecutive IDs:
 | After retry | `press` → `record-failed` → `record-retry` → `store` → `index` → `notify-recovery` → `ready` |
 | Device offline | `press` → `offline` |
 
-- `store` and `index` appear once on a common track labeled **Shared steps**.
+- `store` and `index` appear once on a common track; connecting lines show the join.
   The retry has an extra stop before joining, so the numbers follow the selected
   path. Clicking a shared circle keeps that path if it participates; otherwise
   the circle identifies the participating path it will select.
 - The paths split for `notify` and `notify-recovery`, then rejoin at `ready`.
-  That block is **Shared ending** because both participating paths finish there.
-  A one-step shared block in the middle is **Shared step**.
+  Both participating paths finish there. A shared middle track can also contain
+  a single step. The timeline needs no extra labels or enclosing boxes.
 - The offline path stops after `offline`; it never connects to either later
   block. Other subsets of paths can share their own runs.
 - Editing `store` changes both paths. Its patch receives each path's own prior

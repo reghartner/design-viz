@@ -9,11 +9,77 @@ fresh workbench launch loads it automatically, including **Start new project**.
 The static editor never needs to contact Backstage. API mode contacts Backstage
 only from CI; repository mode does not contact it at all.
 
+## Start a graph from the catalog
+
+Choose **From service catalog** on the homepage (also available in **Start new
+project**), or **Add to diagram → Services from catalog → Choose services** in an
+existing project. Search by service title, entity reference or owner. Check a
+subset, or use **Select shown** to select the current search results. Selection
+persists when you change the search. **Clear** removes the full selection.
+
+**Create connections** is optional. The preview counts new nodes, reused service
+nodes and new edges before you confirm. The picker reads the same approved
+`catalog.json` as the inspector. With no bundled catalog, expand **Use a catalog
+JSON snapshot**, paste a version-1 snapshot, and click **Load snapshot**. This
+session import also supplies the inspector dropdowns; it does not update the
+repository or survive a reload. Bad imports preserve the current catalog.
+
+- New nodes carry the exact service binding and catalog title. Choose a specific
+  API/operation later in the inspector; the picker does not guess an operation.
+- Connections use `dependsOn` component references and `consumesApis` references
+  joined to selected providers' `apis[].entityRef`. Arrows point from dependent
+  to dependency, or API consumer to provider. Only selected endpoints participate;
+  unselected dependencies and resource entities are not automatically added.
+- One edge per directed pair: an explicit dependency takes precedence over an
+  API-use label. Self-relations and existing edges are skipped. Catalog relations
+  describe structure, including build-time dependencies; they are not proof of a
+  runtime call, protocol, timing, or execution sequence. No steps are synthesized.
+  Generated connections have their own **Catalog relationship** legend; existing
+  protocol definitions are preserved.
+- Existing nodes with matching service identities are reused without overwriting
+  authored content or positions. New nodes append in rows of up to four cards,
+  left to right in dependency order. Cycles retain every selected node and edge.
+  Other sections, panels, steps, and layouts remain intact. The whole insertion
+  is one Undo/Redo action.
+- An older snapshot with no dependency data can still seed nodes. Rerun catalog
+  sync to include relationships available in Backstage or the repository files.
+  A diagram is a saved starting point, not a live subscription to the catalog.
+
+Example snapshot (fictional services):
+
+```json
+{
+  "version": 1,
+  "source": "Example company",
+  "services": [
+    {
+      "entityRef": "component:default/doorbell-gateway",
+      "title": "Doorbell gateway",
+      "dependsOn": ["component:default/recording"],
+      "consumesApis": ["api:default/recording"],
+      "apis": []
+    },
+    {
+      "entityRef": "component:default/recording",
+      "title": "Recording service",
+      "apis": [{"entityRef": "api:default/recording", "title": "Recording API"}]
+    }
+  ]
+}
+```
+
+Snapshot relation arrays are optional and contain fully qualified entity refs.
+The exporter qualifies shorthand references relative to the source entity's
+namespace and keeps `dependsOn` / `consumesApi` relations as well as their
+descriptor fields. See Backstage's
+[relation semantics](https://backstage.io/docs/features/software-catalog/well-known-relations/).
+
 ## Seed from the processed Backstage API
 
 Prefer API mode when a runner can reach the company Backstage backend. It uses
 `GET /api/catalog/entities/by-query`, paginates Component and API entities, and
-exports the final entity identities and `providesApi` relationships. OpenAPI
+exports the final entity identities and `providesApi`, `dependsOn`, and
+`consumesApi` relationships. OpenAPI
 JSON and YAML definitions are normalized for operation pickers. It does not fetch
 API server URLs, follow arbitrary definition references, or execute service code.
 
@@ -73,7 +139,8 @@ source token’s access. Being in the same GitHub organization alone grants no a
 Supported input:
 
 - JSON or YAML entity documents, including multi-document YAML.
-- Component identities, namespace, title, owner, `providesApis`, and the optional
+- Component identities, namespace, title, owner, `providesApis`, `dependsOn`,
+  `consumesApis`, and the optional
   `flowview.io/telemetry-service` annotation.
 - API entities with inline OpenAPI JSON/YAML or repository `$text`, `$json`, and
   `$yaml` substitutions. Operations with `operationId` and declared server URLs

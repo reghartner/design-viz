@@ -25,6 +25,7 @@ function initCanonWorkbench(opts){
     catalogStatus.textContent=next.services.length+' services · '+origin+'. Select a node to bind it.';
     if(opts.catalogChanged)opts.catalogChanged();
   }
+  context.importCatalog=function(raw){acceptCatalog(raw,3,'imported catalog');};
   button('Load catalog',function(){try{acceptCatalog(JSON.parse(input.value),3,'imported catalog');}catch(e){catalogStatus.textContent=e.message;}});
   details.appendChild(catalogStatus);
   host.appendChild(details);

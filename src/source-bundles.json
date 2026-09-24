@@ -29,6 +29,7 @@
     "workbench/targets.js",
     "workbench/commands/common.js",
     "workbench/commands/graph.js",
+    "workbench/catalog-graph.js",
     "workbench/commands/document.js",
     "workbench/commands/contracts.js",
     "workbench/commands/extraction.js",
@@ -46,6 +47,7 @@
     "workbench/io.js",
     "workbench/interactions.js",
     "workbench/add-menu.js",
+    "workbench/catalog-picker.js",
     "builder.workbench.js"
   ],
   "clipboard.workbench.js": [

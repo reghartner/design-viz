@@ -12,6 +12,7 @@ function initDiagramAddMenu(opts){
   var copy={node:'Choose a preset, then edit the node in the inspector.',
     edge:'Choose a source node, then a target node in this section. Escape cancels.',
     step:'Append a step to the selected timeline in this section.',
+    catalog:'Choose company services and optionally connect their declared dependencies.',
     panel:'Browse large previews, then explicitly add a panel from the library.'};
   NODE_PRESETS.forEach(function(item,index){var option=doc.createElement('option');option.value=String(index);option.textContent=item.title;preset.appendChild(option);});
   function showError(message){error.textContent=message || '';error.hidden=!message;}

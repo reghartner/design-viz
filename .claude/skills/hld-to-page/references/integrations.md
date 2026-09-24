@@ -48,6 +48,14 @@ immutable `codeRefs`; do not invent destinations from node titles. Code from
 steps involving the node is labeled **Related step code**, not node ownership.
 The workbench service picker seeds a missing or blank node title from the catalog
 name in the same Undo action as the binding; existing titles remain authored.
+For bulk graph seeding, use **From service catalog** on the homepage or **Add to
+diagram → Services from catalog**. Choose an explicit subset of approved service
+identities. Optional connections come from `dependsOn` or `consumesApis` joined
+to selected API providers; arrows point to the dependency/provider. These are
+structural relationships, not observed calls or an execution timeline. Author
+steps from actual evidence separately. Existing bound nodes are reused; the
+whole insertion is undoable. See `docs/workbench-catalog-sync.md` for the snapshot
+shape, import path and dependency export configuration.
 See the node-reference menu section in `docs/backstage-integration.md`.
 For approved reference traces and incident alternates, use
 `cookbook/canonical-incidents.md` and `tools/canon/trace-cli.mjs`. Bind exact

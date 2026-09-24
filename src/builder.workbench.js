@@ -854,6 +854,7 @@ function initWorkbenchBuilder(opts){
   function beforePreviewReplace(request){
     if(panelPicker)panelPicker.invalidate();
     if(addMenu)addMenu.invalidate();
+    if(catalogPicker)catalogPicker.invalidate();
     interactions.beforeReplace(request);
     if(sectionLayoutEditor && sectionLayoutEditor.beforeReplace)sectionLayoutEditor.beforeReplace();
     hideDiff();
@@ -960,8 +961,7 @@ function initWorkbenchBuilder(opts){
   }) : null;
   var panelBtn = document.getElementById('add-panel');
   if (panelBtn) life.listen(panelBtn,'click',function(){confirmAddition(function(){if(panelPicker)panelPicker.open();});});
-  var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,
-    context:function(){
+  function additionContext(){
       var parsed=parseEditor(),locked=!!interactions.adding() || !!interactions.connecting();
       var error=locked ? 'Finish adding to the step or connecting nodes first (Done or Esc).' : parsed.error;
       if(!error){var findings=validate(normalize(parsed.raw));if(findings.errors.length)error='Fix the diagram’s validation errors before adding.';}
@@ -972,7 +972,19 @@ function initWorkbenchBuilder(opts){
       return {text:session.text(),raw:parsed.raw,section:session.insertSection,sections:sections,
         label:rec ? builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'') : '',
         diagram:rec && specValueAt(parsed.raw,rec.diagram),error:error,locked:locked};
-    },
+  }
+  var catalogPicker=initCatalogGraphPicker({document:document,src:src,pause:pausePreview,error:inspectorMessage,
+    catalog:opts.catalog,importCatalog:opts.importCatalog,context:additionContext,
+    create:function(raw){return loadText(JSON.stringify(raw,null,2));},
+    insert:function(catalog,refs,connect){
+      var parsed=parseEditor();if(parsed.error)return false;
+      var plan=planCatalogGraph(session.text(),parsed.raw,session.insertSection,catalog,refs,connect);
+      return applyPlan(plan,{after:function(){clearMultiSelect();selectTarget({kind:'section',section:session.insertSection},false);}},parsed);
+    }
+  });
+  var catalogBtn=document.getElementById('add-catalog');
+  if(catalogBtn)life.listen(catalogBtn,'click',function(){confirmAddition(function(){if(catalogPicker)catalogPicker.open();});});
+  var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
     chooseSection:function(index){
       var parsed=parseEditor();if(parsed.error || interactions.adding() || interactions.connecting())return;
       var rec=specSectionPaths(parsed.raw)[index];if(!rec)return;
@@ -1002,6 +1014,7 @@ function initWorkbenchBuilder(opts){
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();
     pausePreview();
     interactions.retire();
+    if(catalogPicker)catalogPicker.close(false);
     if(addMenu)addMenu.close(false); if (panelPicker) panelPicker.close(); hideDiff(); clearMultiSelect(); clearStepMarkers();
     setSelected(null); retireInspector();
   }
@@ -1039,13 +1052,15 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(sectionLayoutEditor)sectionLayoutEditor.destroy();});
   life.own(function(){if(panelPicker)panelPicker.destroy();});
   life.own(function(){if(addMenu)addMenu.destroy();});
+  life.own(function(){if(catalogPicker)catalogPicker.destroy();});
   life.own(function(){interactions.destroy();});
   life.own(function(){hideDiff();if(guide)guide.hidden=true;});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },
     destroy:destroy,
-    refreshCatalog:inspector.refreshCatalog,
+    refreshCatalog:function(){inspector.refreshCatalog();if(catalogPicker)catalogPicker.refresh();},
+    openCatalog:life.guard(function(options){if(catalogPicker)catalogPicker.open(options);}),
     loadText:loadText, restoreDraft:life.guard(restoreDraft), prepareWelcome:life.guard(prepareWelcome),
     beforePreviewReplace:life.guard(beforePreviewReplace),previewRendered:life.guard(previewRendered),
     isProjectOpen:session.isProjectOpen,

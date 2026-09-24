@@ -1738,6 +1738,53 @@ body.sk-aurora.sk-blueprint{
 .step-color-control input[type=text]{flex:1 1 80px;min-width:0;width:0;}
 .step-color-control button{flex:none;}
 .step-color-help{font-size:11px;line-height:1.5;color:var(--sub);margin:6px 0 12px;}
+
+/* Shared catalog chooser: a searchable service list and a persistent summary. */
+.welcome-actions{grid-template-columns:repeat(2,minmax(0,1fr));}
+#welcome-new-catalog{margin:8px 0 18px;}
+.diagram-add-choices [data-add-kind="catalog"]{grid-column:1/-1;min-height:82px;}
+.catalog-picker{box-sizing:border-box;width:min(1080px,calc(100vw - 40px));max-width:none;max-height:calc(100dvh - 40px);padding:0;overflow:auto;border:1px solid var(--line);border-radius:22px;background:var(--card);color:var(--ink);box-shadow:0 24px 100px #18234640;font:14px/1.5 'Sora',sans-serif;}
+.catalog-picker[open]{display:flex;flex-direction:column;}
+.catalog-picker [hidden]{display:none!important;}
+.catalog-picker::backdrop{background:#17213c66;backdrop-filter:blur(5px);}
+.catalog-picker button,.catalog-picker input,.catalog-picker textarea{box-sizing:border-box;}
+.catalog-picker button:focus-visible,.catalog-picker input:focus-visible,.catalog-picker textarea:focus-visible,.catalog-picker summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+.catalog-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:26px 30px;border-bottom:1px solid var(--line);}
+.catalog-header h2{margin:5px 0;font-size:27px;letter-spacing:-.035em;}
+.catalog-header p{margin:0;color:var(--sub);}
+.catalog-header .catalog-kicker{color:var(--accent);font:600 10px/1.5 'IBM Plex Mono',monospace;letter-spacing:.12em;}
+.catalog-header .bbtn{border-radius:50%;min-height:36px;min-width:36px;}
+.catalog-body{display:grid;grid-template-columns:minmax(0,1fr) 320px;min-height:0;overflow:auto;}
+.catalog-main{padding:24px 30px;min-width:0;}
+.catalog-field{display:block;font-weight:600;font-size:12px;}
+.catalog-field input,.catalog-field textarea{display:block;width:100%;min-width:0;margin-top:8px;border:1px solid var(--line);border-radius:9px;padding:11px 12px;background:var(--card);color:var(--ink);font:13px/1.5 'Sora',sans-serif;}
+.catalog-field textarea{resize:vertical;font:12px/1.5 'IBM Plex Mono',monospace;}
+.catalog-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:16px 0 12px;}
+.catalog-toolbar span{flex:1;color:var(--sub);font-size:11px;}
+.catalog-services{display:flex;flex-direction:column;gap:8px;max-height:410px;overflow:auto;padding:3px;}
+.catalog-service{display:flex;align-items:flex-start;gap:13px;padding:14px;border:1px solid var(--line);border-radius:11px;cursor:pointer;background:var(--card);}
+.catalog-service:has(input:checked){border-color:var(--accent);background:var(--selglow);box-shadow:inset 3px 0 var(--accent);}
+.catalog-service:hover{border-color:var(--accent);}
+.catalog-service input,.catalog-edge-toggle input{flex:none;accent-color:var(--accent);width:17px;height:17px;margin:3px 0 0;}
+.catalog-service strong{display:block;font-size:14px;}
+.catalog-service small{display:block;overflow-wrap:anywhere;color:var(--sub);font:11px/1.6 'IBM Plex Mono',monospace;}
+.catalog-service span{min-width:0;}
+.catalog-options{padding:24px;border-left:1px solid var(--line);background:var(--codebg);min-width:0;}
+.catalog-edge-toggle{display:flex;gap:12px;align-items:flex-start;margin:24px 0 10px;cursor:pointer;}
+.catalog-edge-toggle small{display:block;font-size:12px;color:var(--sub);margin-top:6px;line-height:1.65;}
+.catalog-note,.catalog-empty{font-size:12px;line-height:1.7;color:var(--sub);overflow-wrap:anywhere;}
+.catalog-empty{padding:30px 12px;}
+.catalog-summary{margin:22px 0;padding:17px;border:1px solid var(--line);border-radius:12px;background:var(--card);}
+.catalog-summary b{font-size:12px;}
+.catalog-summary p{font-size:13px;margin:8px 0 0;line-height:1.8;}
+#catalog-import{margin-top:24px;font-size:12px;}
+#catalog-import summary{cursor:pointer;color:var(--accent);}
+#catalog-load{margin-top:10px;}
+#catalog-import-error,#catalog-error{color:var(--ink);font-size:12px;overflow-wrap:anywhere;}
+.catalog-footer{display:flex;justify-content:flex-end;align-items:center;gap:20px;padding:20px 30px;border-top:1px solid var(--line);}
+.catalog-footer p{flex:1;margin:0;}
+.catalog-footer button{flex:none;}
+@media(max-width:760px){.welcome-actions{grid-template-columns:1fr;}.catalog-body{grid-template-columns:1fr;}.catalog-options{border-left:0;border-top:1px solid var(--line);}.catalog-header,.catalog-main,.catalog-options,.catalog-footer{padding:18px;}.catalog-picker{width:calc(100vw - 20px);max-height:calc(100dvh - 20px);}.catalog-services{max-height:260px;}.catalog-footer{flex-wrap:wrap;}.catalog-header h2{font-size:23px;}}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -8351,6 +8398,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
         </div>
       </div>
       <div class="welcome-actions" aria-label="Choose how to begin">
+        <button type="button" class="welcome-action" id="welcome-catalog"><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">⌘</span><span class="welcome-action-copy"><strong>From service catalog</strong><span>Choose services. Map their connections.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
         <button type="button" class="welcome-action" id="welcome-paste"><span class="welcome-action-icon welcome-icon-lilac" aria-hidden="true">{ }</span><span class="welcome-action-copy"><strong>Paste JSON</strong><span>Pick up where your agent left off.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
         <button type="button" class="welcome-action" id="welcome-open"><span class="welcome-action-icon welcome-icon-mint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 3h9l-2 10H3V7Zm0 0V4h7l2 3h7v3"/></svg></span><span class="welcome-action-copy"><strong>Open file</strong><span>Bring a Flowview JSON file.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
         <button type="button" class="welcome-action welcome-action-primary" id="welcome-new"><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">+</span><span class="welcome-action-copy"><strong>Start new project</strong><span>A useful example or a blank canvas.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
@@ -8378,6 +8426,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       <button class="welcome-back" type="button" data-welcome-back>← Back</button>
       <div class="welcome-screen-heading"><div><p class="welcome-kicker">Make it your own</p><h1 tabindex="-1">Every story starts somewhere.</h1><p class="welcome-description">Start simple, explore a complete example, or make space for something new.</p></div><button type="button" id="welcome-new-agent" class="welcome-button">Build with your agent <span aria-hidden="true">↗</span></button></div>
       <div id="welcome-template-filters" class="welcome-filters" role="group" aria-label="Filter templates"></div>
+      <button type="button" id="welcome-new-catalog" class="welcome-button">Start from your service catalog →</button>
       <p class="welcome-note" id="welcome-template-status" role="status"></p>
       <div class="welcome-template-grid" id="welcome-templates"></div>
       <div id="welcome-company-templates" hidden><div class="welcome-company-heading"><h2>From your team</h2><p class="welcome-note">Templates provided with this workbench.</p></div><div class="welcome-template-grid" id="welcome-company-grid"></div></div>
@@ -8578,6 +8627,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       <button type="button" data-add-kind="edge" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">→</span><span><b>Connection</b><small>A message between nodes</small></span></button>
       <button type="button" data-add-kind="step" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">≡</span><span><b>Step</b><small>The next moment in the story</small></span></button>
       <button type="button" data-add-kind="panel" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">▤</span><span><b>Panel</b><small>Browse the visual panel library</small></span></button>
+      <button type="button" data-add-kind="catalog" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">⌘</span><span><b>Services from catalog</b><small>Select services and their connections</small></span></button>
     </div>
     <div class="diagram-add-options"><label id="diagram-add-preset-label" for="diagram-add-preset">Node preset<select id="diagram-add-preset" class="fctl"></select></label><p id="diagram-add-help"></p><p id="diagram-add-error" role="status" hidden></p></div>
     <div class="diagram-add-footer">
@@ -8586,6 +8636,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       <button type="button" class="editor-add-button" id="add-edge" data-add-action="edge" hidden>Choose source and target</button>
       <button type="button" class="editor-add-button" id="add-step" data-add-action="step" hidden>Add step</button>
       <button type="button" class="editor-add-button" id="add-panel" data-add-action="panel" aria-haspopup="dialog" aria-controls="panel-picker" hidden>Browse panels</button>
+      <button type="button" class="editor-add-button" id="add-catalog" data-add-action="catalog" aria-haspopup="dialog" aria-controls="catalog-picker" hidden>Choose services</button>
     </div>
   </dialog>
 
@@ -8743,6 +8794,26 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
     </div>
   </div>
   <div class="reuse-footer"><p id="reuse-feedback" role="status"></p><button class="bbtn" id="reuse-cancel">Cancel</button><button class="rbtn" id="reuse-apply" disabled>Copy steps</button></div>
+</dialog>
+
+<dialog id="catalog-picker" class="catalog-picker" aria-labelledby="catalog-heading" aria-describedby="catalog-destination">
+  <header class="catalog-header"><div><p class="catalog-kicker">BUILD FROM WHAT EXISTS</p><h2 id="catalog-heading">Your services. Your scope.</h2><p id="catalog-destination"></p></div><button type="button" id="catalog-close" class="bbtn" aria-label="Close service catalog">✕</button></header>
+  <div class="catalog-body">
+    <div class="catalog-main">
+      <label class="catalog-field" for="catalog-search">Find services<input id="catalog-search" type="search" placeholder="Search by service, entity reference or owner" autocomplete="off"></label>
+      <div class="catalog-toolbar"><span id="catalog-count" role="status"></span><button type="button" id="catalog-select-visible" class="bbtn">Select shown</button><button type="button" id="catalog-clear" class="bbtn">Clear</button></div>
+      <div id="catalog-services" class="catalog-services" role="group" aria-label="Services"></div><p id="catalog-empty" class="catalog-empty"></p>
+    </div>
+    <aside class="catalog-options">
+      <label id="catalog-title-row" class="catalog-field" for="catalog-project-title">Project title<input id="catalog-project-title" type="text" maxlength="200"></label>
+      <label class="catalog-edge-toggle"><input id="catalog-edges" type="checkbox" checked><span><b>Create connections</b><small>Use declared service dependencies and consumed APIs between your selected services.</small></span></label>
+      <p class="catalog-note">Arrows point from a service to its dependency or API provider. They describe structure; add steps later to explain behavior.</p>
+      <div class="catalog-summary"><b>Ready to place</b><p id="catalog-preview" role="status"></p></div>
+      <p class="catalog-note">Existing nodes keep their names and positions. New nodes are arranged left to right in rows.</p>
+      <details id="catalog-import"><summary>Use a catalog JSON snapshot</summary><p id="catalog-source" class="catalog-note"></p><label class="catalog-field" for="catalog-json">Catalog JSON<textarea id="catalog-json" rows="5" spellcheck="false" placeholder='{"version":1,"services":[…]}'></textarea></label><button type="button" id="catalog-load" class="bbtn">Load snapshot</button><p id="catalog-import-error" role="alert"></p></details>
+    </aside>
+  </div>
+  <footer class="catalog-footer"><p id="catalog-error" role="alert" hidden></p><button type="button" id="catalog-add" class="editor-add-button" disabled>Create diagram</button></footer>
 </dialog>
 
 <script>
@@ -8929,6 +9000,10 @@ var FlowCanon = (function(){
     var services=input.services.map(function(s){
       if (!object(s) || !entityRef(s.entityRef) || seen.has(s.entityRef)) throw new Error('Catalog: missing or duplicate service entityRef.');
       seen.add(s.entityRef);
+      ['dependsOn','consumesApis'].forEach(function(key){
+        if(s[key]!=null && (!Array.isArray(s[key]) || s[key].some(function(ref){return !entityRef(ref);})))
+          throw new Error('Catalog: '+key+' must be an array of fully qualified entity references.');
+      });
       var apiIds=new Set();
       (s.apis || []).forEach(function(a){
         if (!entityRef(a.entityRef) || apiIds.has(a.entityRef)) throw new Error('Catalog: missing or duplicate API entityRef.');
@@ -29952,6 +30027,104 @@ function planDuplicateNode(text, raw, sectionIdx, id){
   if (!def) return {error: 'could not edit nodes in the editor text'};
   return {text: def.text, start: def.start, end: def.end, kind: 'node', id: newId};
 }
+/* ---- src/workbench/catalog-graph.js ---- */
+/* Catalog graph planning is data-only. Identity comes from the approved snapshot;
+   catalog dependencies describe structure, never an observed execution sequence. */
+function catalogGraphProtocol(){return {label:'Catalog relationship',color:{aurora:'#94A3B8',daylight:'#64748B'}};}
+
+function catalogGraphSeed(catalog, refs, connect, diagram, edgeKind){
+  var registry=FlowCanon.catalog(catalog), byRef=new Map(), selected=new Set();
+  registry.services.forEach(function(service){
+    var key=service.entityRef.toLowerCase();
+    if(byRef.has(key))throw new Error('Catalog contains duplicate service identities: '+key);
+    byRef.set(key,service);
+  });
+  refs.forEach(function(ref){
+    var key=ref.toLowerCase();
+    if(!byRef.has(key))throw new Error('A selected service is no longer in the catalog. Reopen the picker.');
+    selected.add(key);
+  });
+  if(!selected.size)throw new Error('Select at least one service.');
+  var services=registry.services.filter(function(s){return selected.has(s.entityRef.toLowerCase());});
+  var next=builderClone(diagram || {nodes:{},rows:[],edges:[],steps:[]});
+  next.nodes=next.nodes || {};next.rows=next.rows || [];next.edges=next.edges || [];
+  var ids=new Map(), placed=new Set(builderFlatRowIds(next.rows));
+  (next.floats || []).forEach(function(f){placed.add(f.id);});
+  Object.keys(next.nodes).forEach(function(id){
+    var binding=next.nodes[id].binding;
+    if(binding && typeof binding.entityRef==='string' && !ids.has(binding.entityRef.toLowerCase()))ids.set(binding.entityRef.toLowerCase(),id);
+  });
+  var created=0,reused=0,newIds=[];
+  services.forEach(function(service){
+    var key=service.entityRef.toLowerCase(),id=ids.get(key);
+    if(id)reused++;
+    else{
+      var stem=service.entityRef.split('/').pop().replace(/[^a-z0-9_-]/gi,'-') || 'service';
+      id=builderUniqueKey(next.nodes,stem+'-');
+      next.nodes[id]={title:service.title || service.entityRef,icon:'server',tint:'cmd',binding:FlowCanon.binding(registry,service.entityRef)};
+      ids.set(key,id);created++;
+    }
+    if(!placed.has(id)){newIds.push(id);placed.add(id);}
+  });
+  var pairs=new Set(next.edges.map(function(e){return e.from+'->'+e.to;})),addedEdges=[];
+  function edge(from,to,label){
+    var a=ids.get(from),b=ids.get(to),key=a+'->'+b;
+    if(from===to || !selected.has(to) || pairs.has(key))return;
+    pairs.add(key);var item={from:a,to:b,kind:edgeKind || 'catalog',label:label};next.edges.push(item);addedEdges.push(item);
+  }
+  if(connect){
+    var providers=new Map();
+    services.forEach(function(s){(s.apis || []).forEach(function(api){
+      var ref=api.entityRef.toLowerCase();if(!providers.has(ref))providers.set(ref,[]);
+      providers.get(ref).push({service:s.entityRef.toLowerCase(),title:api.title || api.entityRef});
+    });});
+    services.forEach(function(s){
+      var from=s.entityRef.toLowerCase();
+      (s.dependsOn || []).forEach(function(to){edge(from,to.toLowerCase(),'depends on');});
+      (s.consumesApis || []).forEach(function(api){
+        (providers.get(api.toLowerCase()) || []).forEach(function(provider){edge(from,provider.service,'uses '+provider.title);});
+      });
+    });
+  }
+  /* Stable dependency order, four cards per row, left to right. Cycles retain
+     every selected node and connection; breaking an ordering tie drops no data. */
+  var remaining=new Set(newIds),incoming=new Map(newIds.map(function(id){return [id,new Set()];}));
+  next.edges.forEach(function(e){if(remaining.has(e.from) && remaining.has(e.to))incoming.get(e.to).add(e.from);});
+  var ordered=[];
+  while(remaining.size){
+    var candidates=Array.from(remaining).filter(function(id){return !Array.from(incoming.get(id)).some(function(from){return remaining.has(from);});});
+    var id=candidates[0] || remaining.values().next().value;ordered.push(id);remaining.delete(id);
+  }
+  if(ordered.length){
+    if(next.rows.length===1 && next.rows[0].length===0)next.rows=[];
+    for(var i=0;i<ordered.length;i+=4)next.rows.push(ordered.slice(i,i+4));
+  }
+  if(!diagram)next.routing='lanes';
+  return {diagram:next,created:created,reused:reused,edges:addedEdges.length,placed:newIds.length};
+}
+
+function planCatalogGraph(text,raw,section,catalog,refs,connect){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  try{
+    var page=raw.page || raw,protocols=builderClone(page.protocols || {}),definition=catalogGraphProtocol();
+    var kind=Object.keys(protocols).find(function(key){return JSON.stringify(protocols[key])===JSON.stringify(definition);}) || 'catalog';
+    if(protocols[kind] && JSON.stringify(protocols[kind])!==JSON.stringify(definition))kind=builderUniqueKey(protocols,'catalog-');
+    var seed=catalogGraphSeed(catalog,refs,connect,got.d,kind);
+    if(!seed.created && !seed.edges && !seed.placed)return {error:'Those services and connections are already in this diagram.'};
+    if(!got.path.length && seed.edges){
+      protocols[kind]=definition;
+      return Object.assign(jsonReplaceValue(text,[],JSON.stringify({protocols:protocols,sections:[{diagram:seed.diagram}]},null,2)),{kind:'section',index:0});
+    }
+    var plan=jsonReplaceValue(text,got.path,JSON.stringify(seed.diagram,null,2));
+    if(!plan)return {error:'Could not update the selected diagram.'};
+    if(seed.edges && !protocols[kind]){
+      protocols[kind]=definition;
+      plan=jsonSetField(plan.text,raw.page?['page']:[],'protocols',JSON.stringify(protocols,null,2));
+      if(!plan)return {error:'Could not add the catalog relationship legend.'};
+    }
+    return Object.assign(plan,{kind:'section',index:section});
+  }catch(ex){return {error:ex.message};}
+}
 /* ---- src/workbench/commands/document.js ---- */
 /* Pure page/section/tab commands. Preserve raw source block/list addresses
    and rendered section ordinals; common commands supply clone/rewrite. */
@@ -35631,6 +35804,7 @@ function initDiagramAddMenu(opts){
   var copy={node:'Choose a preset, then edit the node in the inspector.',
     edge:'Choose a source node, then a target node in this section. Escape cancels.',
     step:'Append a step to the selected timeline in this section.',
+    catalog:'Choose company services and optionally connect their declared dependencies.',
     panel:'Browse large previews, then explicitly add a panel from the library.'};
   NODE_PRESETS.forEach(function(item,index){var option=doc.createElement('option');option.value=String(index);option.textContent=item.title;preset.appendChild(option);});
   function showError(message){error.textContent=message || '';error.hidden=!message;}
@@ -35693,6 +35867,115 @@ function initDiagramAddMenu(opts){
   return {refresh:life.guard(refresh),invalidate:life.guard(invalidate),close:life.guard(close),confirm:life.guard(confirm),
     preset:function(){return NODE_PRESETS[Number(preset.value)] || NODE_PRESETS[0];},
     destroy:function(){if(!life.alive())return;life.destroy();close(false);preset.replaceChildren();target.replaceChildren();}};
+}
+/* ---- src/workbench/catalog-picker.js ---- */
+/* One chooser for project creation and section insertion. The builder owns the
+   commit; this dialog owns selection, preview and cancellation only. */
+function initCatalogGraphPicker(opts){
+  var doc=opts.document,dialog=doc.getElementById('catalog-picker');if(!dialog)return null;
+  var life=createWorkbenchLifetime(),el=function(id){return doc.getElementById('catalog-'+id);};
+  var search=el('search'),list=el('services'),connect=el('edges'),submit=el('add');
+  var registry=null,selected=new Set(),snapshot=null,mode=null,opener=null,onCreated=null,invalid=false;
+  function message(text){el('error').textContent=text || '';el('error').hidden=!text;}
+  function services(){return registry ? registry.services : [];}
+  function filtered(){
+    var query=search.value.trim().toLowerCase();
+    return services().filter(function(s){return [s.title,s.entityRef,s.owner].join(' ').toLowerCase().includes(query);});
+  }
+  function same(){
+    var current=opts.context();
+    return snapshot && current.text===snapshot.text && (mode==='new' || (!current.error && current.section===snapshot.section));
+  }
+  function paintSummary(){
+    if(!dialog.open)return;
+    if(!same())invalid=true;
+    var seed,error='';
+    if(invalid)error='The source or destination changed. Close and reopen the catalog picker.';
+    else if(selected.size){
+      try{seed=catalogGraphSeed(registry,Array.from(selected),connect.checked,mode==='new'?null:snapshot.diagram);}
+      catch(ex){error=ex.message;}
+    }
+    el('count').textContent=selected.size+' selected · '+filtered().length+' of '+services().length+' services shown';
+    el('preview').textContent=seed ? seed.created+' new nodes · '+seed.reused+' already on the diagram · '+seed.edges+' new connections' : 'Choose the services that belong in this diagram.';
+    if(seed && !seed.created && !seed.edges && !seed.placed)error='Those services and connections are already in this diagram.';
+    if(seed && connect.checked && !seed.edges && !error)el('preview').textContent+=' · No new relationships between these services.';
+    submit.disabled=!!error || !seed;
+    message(error);
+  }
+  function render(){
+    list.replaceChildren();
+    filtered().forEach(function(service){
+      var label=doc.createElement('label');label.className='catalog-service';
+      var checkbox=doc.createElement('input');checkbox.type='checkbox';checkbox.value=service.entityRef;checkbox.checked=selected.has(service.entityRef);
+      var copy=doc.createElement('span'),title=doc.createElement('strong'),ref=doc.createElement('small'),owner=doc.createElement('small');
+      title.textContent=service.title || service.entityRef;ref.textContent=service.entityRef;owner.textContent=service.owner || 'Owner not supplied';
+      copy.append(title,ref,owner);label.append(checkbox,copy);list.appendChild(label);
+    });
+    el('empty').hidden=!!list.children.length;
+    el('empty').textContent=services().length ? 'No services match your search.' : 'No services loaded. This workbench reads catalog.json beside the editor. You can also paste a catalog snapshot below.';
+    el('source').textContent=registry ? registry.source || 'Imported catalog snapshot' : 'Waiting for a bundled or imported catalog';
+    el('select-visible').disabled=!list.children.length;
+    paintSummary();
+  }
+  function close(focus){
+    if(dialog.open)dialog.close();snapshot=null;mode=null;onCreated=null;selected.clear();
+    if(focus!==false && opener && opener.isConnected)opener.focus({preventScroll:true});
+  }
+  function refresh(){
+    if(!dialog.open)return;
+    var current=opts.catalog && opts.catalog();
+    if(current!==registry){registry=current;selected.clear();render();}
+    else paintSummary();
+  }
+  function open(options){
+    close(false);mode=options && options.newProject?'new':'add';onCreated=options && options.onCreated;
+    snapshot=opts.context();invalid=false;
+    if(mode==='add' && (snapshot.error || !snapshot.diagram)){opts.error(snapshot.error || 'Choose a diagram first.');mode=null;return;}
+    opener=doc.activeElement;if(opts.pause)opts.pause();
+    registry=opts.catalog && opts.catalog();search.value='';connect.checked=true;el('json').value='';
+    el('import-error').textContent='';el('import').open=false;
+    el('title-row').hidden=mode!=='new';el('project-title').value='Service landscape';
+    el('destination').textContent=mode==='new'?'Create a project from your company’s services.':'Add to '+snapshot.label;
+    submit.textContent=mode==='new'?'Create diagram':'Add selected services';
+    dialog.showModal();render();search.focus({preventScroll:true});
+  }
+  life.listen(search,'input',render);
+  life.listen(list,'change',function(ev){
+    if(ev.target.type!=='checkbox')return;
+    if(ev.target.checked)selected.add(ev.target.value);else selected.delete(ev.target.value);
+    paintSummary();
+  });
+  life.listen(connect,'change',paintSummary);
+  life.listen(el('select-visible'),'click',function(){filtered().forEach(function(s){selected.add(s.entityRef);});render();});
+  life.listen(el('clear'),'click',function(){selected.clear();render();});
+  life.listen(el('close'),'click',function(){close();});
+  life.listen(dialog,'cancel',function(ev){ev.preventDefault();close();});
+  life.listen(dialog,'keydown',function(ev){ev.stopPropagation();});
+  life.listen(dialog,'click',function(ev){ev.stopPropagation();});
+  life.listen(opts.src,'input',refresh);
+  life.listen(window,'popstate',function(){close(false);});
+  life.listen(el('load'),'click',function(){
+    try{
+      var raw=FlowCanon.catalog(JSON.parse(el('json').value));
+      if(!opts.importCatalog)throw new Error('Catalog import is unavailable.');
+      opts.importCatalog(raw);refresh();el('import-error').textContent='';el('import').open=false;
+    }catch(ex){el('import-error').textContent=ex.message;}
+  });
+  life.listen(submit,'click',function(){
+    paintSummary();if(submit.disabled)return;
+    var savedMode=mode,callback=onCreated,refs=Array.from(selected),addEdges=connect.checked;
+    try{
+      if(savedMode==='new'){
+        var raw=welcomeBlankSpec(el('project-title').value.trim() || 'Service landscape');
+        raw.page.blocks[0].heading='Services';raw.page.blocks[0].diagram=catalogGraphSeed(registry,refs,addEdges).diagram;
+        if(raw.page.blocks[0].diagram.edges.length)raw.page.protocols={catalog:catalogGraphProtocol()};
+        if(!opts.create(raw))throw new Error('Could not open the project.');
+      }else if(!opts.insert(registry,refs,addEdges))throw new Error('Could not add services. Close the picker and check the diagram.');
+      close(savedMode!=='new');if(savedMode==='new' && callback)callback();
+    }catch(ex){message(ex.message);}
+  });
+  return {open:open,close:close,refresh:refresh,invalidate:function(){if(dialog.open){invalid=true;paintSummary();}},
+    destroy:function(){life.destroy();close(false);list.replaceChildren();}};
 }
 /* ---- src/builder.workbench.js ---- */
 /* Workbench composition, outline/diff and interaction/preview coordination.
@@ -36551,6 +36834,7 @@ function initWorkbenchBuilder(opts){
   function beforePreviewReplace(request){
     if(panelPicker)panelPicker.invalidate();
     if(addMenu)addMenu.invalidate();
+    if(catalogPicker)catalogPicker.invalidate();
     interactions.beforeReplace(request);
     if(sectionLayoutEditor && sectionLayoutEditor.beforeReplace)sectionLayoutEditor.beforeReplace();
     hideDiff();
@@ -36657,8 +36941,7 @@ function initWorkbenchBuilder(opts){
   }) : null;
   var panelBtn = document.getElementById('add-panel');
   if (panelBtn) life.listen(panelBtn,'click',function(){confirmAddition(function(){if(panelPicker)panelPicker.open();});});
-  var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,
-    context:function(){
+  function additionContext(){
       var parsed=parseEditor(),locked=!!interactions.adding() || !!interactions.connecting();
       var error=locked ? 'Finish adding to the step or connecting nodes first (Done or Esc).' : parsed.error;
       if(!error){var findings=validate(normalize(parsed.raw));if(findings.errors.length)error='Fix the diagram’s validation errors before adding.';}
@@ -36669,7 +36952,19 @@ function initWorkbenchBuilder(opts){
       return {text:session.text(),raw:parsed.raw,section:session.insertSection,sections:sections,
         label:rec ? builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'') : '',
         diagram:rec && specValueAt(parsed.raw,rec.diagram),error:error,locked:locked};
-    },
+  }
+  var catalogPicker=initCatalogGraphPicker({document:document,src:src,pause:pausePreview,error:inspectorMessage,
+    catalog:opts.catalog,importCatalog:opts.importCatalog,context:additionContext,
+    create:function(raw){return loadText(JSON.stringify(raw,null,2));},
+    insert:function(catalog,refs,connect){
+      var parsed=parseEditor();if(parsed.error)return false;
+      var plan=planCatalogGraph(session.text(),parsed.raw,session.insertSection,catalog,refs,connect);
+      return applyPlan(plan,{after:function(){clearMultiSelect();selectTarget({kind:'section',section:session.insertSection},false);}},parsed);
+    }
+  });
+  var catalogBtn=document.getElementById('add-catalog');
+  if(catalogBtn)life.listen(catalogBtn,'click',function(){confirmAddition(function(){if(catalogPicker)catalogPicker.open();});});
+  var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
     chooseSection:function(index){
       var parsed=parseEditor();if(parsed.error || interactions.adding() || interactions.connecting())return;
       var rec=specSectionPaths(parsed.raw)[index];if(!rec)return;
@@ -36699,6 +36994,7 @@ function initWorkbenchBuilder(opts){
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();
     pausePreview();
     interactions.retire();
+    if(catalogPicker)catalogPicker.close(false);
     if(addMenu)addMenu.close(false); if (panelPicker) panelPicker.close(); hideDiff(); clearMultiSelect(); clearStepMarkers();
     setSelected(null); retireInspector();
   }
@@ -36736,13 +37032,15 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(sectionLayoutEditor)sectionLayoutEditor.destroy();});
   life.own(function(){if(panelPicker)panelPicker.destroy();});
   life.own(function(){if(addMenu)addMenu.destroy();});
+  life.own(function(){if(catalogPicker)catalogPicker.destroy();});
   life.own(function(){interactions.destroy();});
   life.own(function(){hideDiff();if(guide)guide.hidden=true;});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },
     destroy:destroy,
-    refreshCatalog:inspector.refreshCatalog,
+    refreshCatalog:function(){inspector.refreshCatalog();if(catalogPicker)catalogPicker.refresh();},
+    openCatalog:life.guard(function(options){if(catalogPicker)catalogPicker.open(options);}),
     loadText:loadText, restoreDraft:life.guard(restoreDraft), prepareWelcome:life.guard(prepareWelcome),
     beforePreviewReplace:life.guard(beforePreviewReplace),previewRendered:life.guard(previewRendered),
     isProjectOpen:session.isProjectOpen,
@@ -38446,6 +38744,7 @@ function initCanonWorkbench(opts){
     catalogStatus.textContent=next.services.length+' services · '+origin+'. Select a node to bind it.';
     if(opts.catalogChanged)opts.catalogChanged();
   }
+  context.importCatalog=function(raw){acceptCatalog(raw,3,'imported catalog');};
   button('Load catalog',function(){try{acceptCatalog(JSON.parse(input.value),3,'imported catalog');}catch(e){catalogStatus.textContent=e.message;}});
   details.appendChild(catalogStatus);
   host.appendChild(details);
@@ -38688,6 +38987,9 @@ function initWorkbenchWelcome(opts){
   resume.addEventListener('click', resumeProject);
   el('welcome-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
   el('welcome-new').addEventListener('click', function(){ navigation.go('new'); });
+  ['welcome-catalog','welcome-new-catalog'].forEach(function(id){
+    el(id).addEventListener('click',function(){builder.openCatalog({newProject:true,onCreated:enterEditor});});
+  });
   ['welcome-agent', 'welcome-new-agent'].forEach(function(id){ el(id).addEventListener('click', function(){ navigation.go('agent'); }); });
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
   root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });
@@ -39149,6 +39451,7 @@ var workspace = initWorkbenchWorkspace();
 var canonContext, loadingCanon=false;
 var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(request){return go(true,request);}, workspace:workspace,
   catalog:function(){return canonContext && canonContext.catalog;},
+  importCatalog:function(raw){if(canonContext)canonContext.importCatalog(raw);},
   deferInitialSave:true,
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
   beforeProjectLoad:function(){

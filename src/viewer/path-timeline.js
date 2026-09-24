@@ -33,7 +33,7 @@ function pathTimelineRows(paths,graph){
    No runtime state is combined here and no document listeners are retained. */
 function createPathTimeline(host, source, paths, shownPaths, graph, pick){
   var retired=false, pathById=new Map(paths.map(function(p){return [p.id,p];}));
-  var rowGap=32, top=22, labelWidth=150, columnWidth=44;
+  var rowGap=32, top=22, labelWidth=230, columnWidth=44;
   var rows=pathTimelineRows(paths,graph);
   var lanePositions=new Map(Array.from(rows.lanes,function(pair){return [pair[0],top+pair[1]*rowGap];}));
   var sharedPositions=new Map(Array.from(rows.shared,function(pair){return [pair[0],top+pair[1]*rowGap];}));

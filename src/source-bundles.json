@@ -94,6 +94,8 @@
         "workspace.workbench.js",
         "layout.workbench.js",
         "canon.workbench.js",
+        "human-guide.workbench.js",
+        "library.workbench.js",
         "welcome.workbench.js"
       ],
       "boot": "boot.workbench.js",

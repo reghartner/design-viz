@@ -341,10 +341,12 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   },
   renderedText:workbenchPreview.renderedText,
   ctl:workbenchPreview.controller});
-var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,
+var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,canon:WORKBENCH_CANON,
   workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
 canonContext=initCanonWorkbench({src:src,catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){
   loadingCanon=true;
   try{var result=workbenchBuilder.loadSpec(raw);welcome.canonicalLoaded();return result;}
   finally{loadingCanon=false;}
 }});
+
+initWorkbenchHumanGuide();

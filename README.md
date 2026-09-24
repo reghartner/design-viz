@@ -363,6 +363,13 @@ staleness is acceptable. For fully fresh links use this loop:
 Skipping step 3 simply leaves those pages one catalog run behind; no authoring
 field or agent-authored cross-reference data is required.
 
+For human authoring instructions, open **User guide** in the workbench header or
+workspace toolbar. The [bundled guide](docs/workbench-user-guide.md) includes
+a first-diagram walkthrough, alternate paths, shared steps, Home animation,
+layouts, catalogs, and sharing. **Canon diagrams** on welcome opens the
+[read-only repository library](docs/workbench-canon-library.md), with an explicit
+**Edit in Workbench** handoff.
+
 Open `workbench/flowspec.html` to **Paste JSON**, **Open file**, or start a **New project**
 from a curated template or a blank diagram. The [welcome guide](docs/workbench-welcome.md)
 also covers saved drafts and copyable instructions for building with your agent.

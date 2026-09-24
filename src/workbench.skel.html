@@ -14,8 +14,10 @@
     <svg class="workbench-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 8h11a7 7 0 0 1 0 14H7" fill="none" stroke="currentColor" stroke-width="3"/><rect x="2" y="3" width="10" height="10" rx="3" fill="currentColor"/><rect x="2" y="17" width="10" height="10" rx="3" fill="currentColor"/><circle cx="24" cy="15" r="5" fill="currentColor"/></svg>
     <span>Flowview</span><span class="workbench-brand-detail">Workbench</span>
   </button>
-  <div class="workbench-header-links"><button type="button" id="welcome-header-resume" hidden>Back to project <span aria-hidden="true">↗</span></button><a id="welcome-repo-link" href="https://github.com/reghartner/design-viz" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
+  <div class="workbench-header-links"><button type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button type="button" id="welcome-header-resume" hidden>Back to project <span aria-hidden="true">↗</span></button><a id="welcome-repo-link" href="https://github.com/reghartner/design-viz" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
 </header>
+
+{{HUMAN_GUIDE}}
 
 <main>
   <section class="welcome" id="workbench-welcome" aria-label="Welcome to Flowview">
@@ -45,10 +47,26 @@
         <button type="button" class="welcome-action welcome-action-primary" id="welcome-new"><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">+</span><span class="welcome-action-copy"><strong>Start new project</strong><span>A useful example or a blank canvas.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
       </div>
       <button type="button" class="welcome-resume" id="welcome-resume" hidden><span class="welcome-resume-icon" aria-hidden="true">↶</span><span><strong id="welcome-resume-title">Resume your draft</strong><span id="welcome-resume-detail"></span></span><span aria-hidden="true">Continue →</span></button>
+      <button type="button" class="welcome-library-entry" id="welcome-library"><span><b>Canon diagrams</b><span>Browse the published stories. Open read-only, edit when you choose.</span></span><span aria-hidden="true">→</span></button>
       <div class="welcome-bottom">
         <button type="button" class="welcome-agent-card" id="welcome-agent"><span class="welcome-agent-spark" aria-hidden="true">✧</span><span><span class="welcome-kicker">An idea is enough to begin</span><strong>Build it with your agent.</strong><span>Give your agent the right instructions. Bring the result back here.</span></span><span class="welcome-arrow" aria-hidden="true">→</span></button>
         <div class="welcome-principles"><p><b>Show how it works.</b> Animate connections and walk through each step.</p><p><b>Keep the whole story.</b> Explore happy paths, failures, and what changes.</p></div>
       </div>
+    </div>
+
+    <div id="welcome-library-screen" class="welcome-screen" hidden>
+      <button class="welcome-back" type="button" data-welcome-back>← Back</button>
+      <p class="welcome-kicker">THE SHARED PICTURE</p><h1 tabindex="-1">Canon diagrams.</h1>
+      <p class="welcome-description">Explore the published stories, follow the steps, and see how things connect. Editing starts only when you choose it.</p>
+      <p id="welcome-library-status" class="welcome-note" role="status"></p><button id="welcome-library-retry" type="button" class="welcome-button" hidden>Retry loading library</button>
+      <div id="welcome-library-grid" class="canon-library-grid"></div>
+    </div>
+    <div id="welcome-reader-screen" class="welcome-screen canon-reader-screen" hidden>
+      <div class="canon-reader-toolbar"><button class="welcome-back" type="button" data-welcome-back>← Back</button><span class="canon-library-badge">READ ONLY</span><button id="canon-reader-edit" class="welcome-button welcome-button-primary" type="button" disabled>Edit in Workbench →</button></div>
+      <h1 id="canon-reader-title" tabindex="-1">Diagram</h1><p id="canon-reader-origin" class="welcome-note"></p>
+      <p class="welcome-note">Editing opens a local copy. Save and submit changes through your team’s repository review process.</p>
+      <p id="canon-reader-error" class="welcome-error" role="alert" hidden></p><button id="canon-reader-retry" class="welcome-button" type="button" hidden>Retry loading diagram</button>
+      <div id="canon-reader" class="docview" aria-label="Read-only canon diagram"></div>
     </div>
 
     <div id="welcome-paste-screen" class="welcome-screen welcome-narrow" hidden>
@@ -101,6 +119,7 @@
     <button class="bbtn" id="workspace-home" type="button">← New / open</button>
     <button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button>
     <button class="bbtn" id="workspace-reset">Reset layout</button>
+    <button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button>
     <span class="workspace-hint">Drag the divider to resize · Expand editor for more room.</span>
   </div>
   <div class="workwrap">
@@ -461,6 +480,7 @@
 (function(){
   'use strict';
 var WORKBENCH_TEMPLATES = {{WORKBENCH_TEMPLATES}};
+var WORKBENCH_CANON = {{WORKBENCH_CANON}};
 {{JS}}
 })();
 </script>

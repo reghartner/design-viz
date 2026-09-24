@@ -63,6 +63,13 @@ Unsafe or credential-bearing URLs do not become evidence links.
 See `docs/canon-build-plan.md` for the drift/incident workflow. Missing telemetry
 is unknown, not a failure. Agent suggestions require review before publication.
 
+## Browse the static published library
+
+The workbench home page exposes **Canon diagrams** as a read-only library with
+an explicit **Edit in Workbench** handoff. Build its `diagrams.json` snapshot
+from the existing registry; see the [deployment recipe](workbench-canon-library.md).
+This works with the static nginx deployment and needs no read API.
+
 ## Run the simulated company repository
 
 From the design-viz root:

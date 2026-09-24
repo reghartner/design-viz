@@ -127,3 +127,13 @@ test('missing or unsupported route metadata falls back safely without losing hos
   context.createWelcomeNavigation(array,'home',()=>{});
   assert.deepEqual(array.history.state.flowviewPreviousState,['host',1]);
 });
+
+test('canon library navigation retains only the diagram ID across Back, Forward and reload',()=>{
+  const win=navigationWindow(),seen=[],nav=context.createWelcomeNavigation(win,'home',name=>seen.push(name));
+  nav.go('library');nav.go('reader','doorbell');assert.equal(nav.diagram(),'doorbell');
+  win.history.back();assert.equal(nav.screen(),'library');assert.equal(nav.diagram(),undefined);
+  win.history.forward();assert.equal(nav.diagram(),'doorbell');
+  const restored=context.createWelcomeNavigation(win,'home',()=>{});assert.equal(restored.screen(),'reader');assert.equal(restored.diagram(),'doorbell');
+  assert.equal(win.history.length,3);assert.equal(win.location.hash,'#host');
+  restored.go('editor');assert.equal(restored.diagram(),undefined);
+});

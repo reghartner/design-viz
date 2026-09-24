@@ -40,7 +40,7 @@ function welcomeAgentPrompt(kind, brief, audience, repository){
    only retires an old Canon attachment; authored text stays in the draft owner. */
 function createWelcomeNavigation(win, initial, changed){
   var key='flowviewWorkbenchEntry', retiredPrefix='dv-workbench-retired-entry-';
-  var names=['home','paste','new','agent','editor'];
+  var names=['home','paste','new','agent','editor','library','reader'];
   function read(state){
     var value=state && state[key];
     return value && value.v===1 && names.indexOf(value.screen)>=0 &&
@@ -73,14 +73,16 @@ function createWelcomeNavigation(win, initial, changed){
     });
     win.history.replaceState(win.history.state,'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
   }
-  function write(screen,replace){
+  function write(screen,replace,diagram){
+    var selected=diagram===undefined?current.diagram:diagram;
     current={v:1,screen:screen,visit:current.visit,depth:current.depth+(replace?0:1),canon:!!current.canon,retired:retired};
+    if(screen==='reader' && typeof selected==='string' && selected.length<=200)current.diagram=selected;
     win.history[replace?'replaceState':'pushState'](stateWith(current),'');
     cleanCanon();
   }
-  function move(screen,replace,focus){
+  function move(screen,replace,focus,diagram){
     if(names.indexOf(screen)<0)return;
-    if(screen!==current.screen || replace)write(screen,!!replace);
+    if(screen!==current.screen || replace || diagram!==undefined && diagram!==current.diagram)write(screen,!!replace,diagram);
     changed(screen,focus);
   }
   function pop(){
@@ -95,8 +97,9 @@ function createWelcomeNavigation(win, initial, changed){
   win.addEventListener('popstate',pop);
   return {
     screen:function(){return current.screen;},
+    diagram:function(){return current.diagram;},
     retired:function(){return retired;},
-    go:function(screen){move(screen,false,true);},
+    go:function(screen,diagram){move(screen,false,true,diagram);},
     replace:function(screen,focus){move(screen,true,focus);},
     back:function(){if(current.depth>0)win.history.back();else move('home',false,true);},
     localProject:function(){
@@ -113,8 +116,8 @@ function initWorkbenchWelcome(opts){
   var editor = document.getElementById('workbench-workspace');
   if (!root || !editor) return {show:function(){}, enterEditor:function(){}, openWorkspace:function(){},localProjectOpened:function(){},canonicalLoaded:function(){}};
   var builder = opts.builder, templates = opts.templates || [];
-  var screens = {home:'welcome-home', paste:'welcome-paste-screen', new:'welcome-new-screen', agent:'welcome-agent-screen'};
-  var screen = 'home', operation = 0, manifestStarted = false, activeReader=null, navigation;
+  var screens = {home:'welcome-home', paste:'welcome-paste-screen', new:'welcome-new-screen', agent:'welcome-agent-screen', library:'welcome-library-screen', reader:'welcome-reader-screen'};
+  var screen = 'home', operation = 0, manifestStarted = false, activeReader=null, navigation, library;
   function retireRead(){
     operation++;
     if(activeReader && activeReader.readyState===1){try{activeReader.abort();}catch(ex){}}
@@ -151,6 +154,7 @@ function initWorkbenchWelcome(opts){
     error('welcome-file-error', '');
     updateResume();
     if (name === 'new') loadManifest();
+    if(library && (name==='library' || name==='reader'))library.show(name,navigation.diagram());
     if (focus !== false){
       window.scrollTo(0, 0);
       var target = el(screens[name]).querySelector('h1');
@@ -174,6 +178,7 @@ function initWorkbenchWelcome(opts){
     selectScreen(name,focus);
   }
   function display(screen,focus){
+    if(library)library.hide();
     if(screen==='editor'){
       if(builder.isProjectOpen() || (opts.skipWelcome && !navigation.retired()))displayEditor(focus);
       else if(builder.restoreDraft()){navigation.localProject();displayEditor(focus);}
@@ -195,6 +200,7 @@ function initWorkbenchWelcome(opts){
   headerResume.addEventListener('click', resumeProject);
   resume.addEventListener('click', resumeProject);
   el('welcome-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
+  el('welcome-library').addEventListener('click',function(){navigation.go('library');});
   el('welcome-new').addEventListener('click', function(){ navigation.go('new'); });
   ['welcome-catalog','welcome-new-catalog'].forEach(function(id){
     el(id).addEventListener('click',function(){builder.openCatalog({newProject:true,onCreated:enterEditor});});
@@ -324,6 +330,7 @@ function initWorkbenchWelcome(opts){
   });
   renderTemplates(); updatePrompt();
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
+  library=initWorkbenchLibrary({builtin:opts.canon,selected:navigation.diagram,open:function(id){navigation.go('reader',id);},edit:function(spec){builder.loadSpec(spec);enterEditor();}});
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});
   return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor,

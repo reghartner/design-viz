@@ -193,9 +193,9 @@ test('styles and compatibility feature metadata are derived from the same added 
 });
 
 test('the real build packages the added panel into viewer, editor and the headless backend without source edits', () => {
-  for (const name of ['template','workbench','tools/canon','docs/diagrams/backstage','docs/diagrams/doorbell-perspectives'])
+  for (const name of ['template','workbench','tools/canon','docs/diagrams/backstage','docs/diagrams/doorbell-perspectives','examples/canon/specs'])
     fs.mkdirSync(path.join(temp,name),{recursive:true});
-  for (const name of ['tools/build.py','tools/source-loader.cjs','docs/diagrams/backstage/backstage.spec.json','docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json'])
+  for (const name of ['tools/build.py','tools/source-loader.cjs','docs/diagrams/backstage/backstage.spec.json','docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json','examples/canon/registry.json','examples/canon/specs/doorbell.json'])
     fs.copyFileSync(path.join(ROOT,name),path.join(temp,name));
   const output=execFileSync('python3',[path.join(temp,'tools/build.py')],{cwd:temp,encoding:'utf8',timeout:30000});
   assert.match(output,/built template\/flowview.html/);

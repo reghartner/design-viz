@@ -36,8 +36,8 @@ All rows below are authored illustration, not sourced system facts.
 
 ## Review points
 
-- The two-step common middle is labeled Shared steps. Only the final `ready`
-  block is Shared ending. The paths split visibly at their notification events.
+- The connecting lines join at the two-step common middle, split visibly at
+  the notification events, and rejoin at the final `ready` circle.
 - Selecting After retry and clicking either common block keeps After retry,
   uses its numbers, and preserves its earlier failure and retry log entries.
 - Selecting Device offline never produces storage, indexing or notification.

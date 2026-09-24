@@ -71,7 +71,7 @@ shared processing IDs in both paths:
 ```
 
 The paths converge into one visible track for `process`, `persist`, and `notify`,
-labeled **Shared ending** because both paths finish there. `process` is still
+where both paths finish. Connections show the join without extra boxes or text. `process` is still
 step 3 on Button press and step 4 on Motion event: the selected path supplies
 the numbers and panel state. Clicking a shared circle keeps that path selected
 when it participates. If it does not, the circle identifies the participating
@@ -96,9 +96,9 @@ outcomes. The paths can share another block later:
 ]
 ```
 
-Here `store` and `index` form **Shared steps**. The normal and retry paths then
-split for their different notifications and rejoin at `ready`, their **Shared
-ending**. A one-step middle block is labeled **Shared step**. The offline path
+Here `store` and `index` form a shared middle track. The normal and retry paths then
+split for their different notifications and rejoin at `ready`, their shared
+ending. A shared track can also contain a single step. The offline path
 ends at `offline`; it has no connection to either later block. Different subsets
 of paths may have their own shared blocks.
 
@@ -149,9 +149,10 @@ shared shadows, with no invented branch. Space after an ending stays blank.
 
 When paths reuse later steps, consecutive shared IDs form common tracks with
 connections showing where the participating paths join and split. The selected
-path owns playback, numbering, captions and state throughout. A shared track
-is **Shared ending** only when every participating path actually finishes there;
-otherwise it is **Shared steps** or **Shared step**. Sharing does not add steps
+path owns playback, numbering, captions and state throughout. Compact rows and
+connecting lines show the joins and splits without enclosing boxes or repeated
+captions. A shared ending occurs only when every participating path finishes
+there. Sharing does not add steps
 to any path or change their order.
 
 The full authored sequences determine blocks and endings. Hiding stops in a

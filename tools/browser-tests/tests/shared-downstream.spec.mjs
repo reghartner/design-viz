@@ -27,7 +27,7 @@ async function standalone(page,server,name,text){
 async function checkGeometry(root){
  const issues=await root.locator('.path-timeline').evaluate(timeline=>{
   const outer=timeline.getBoundingClientRect(),issues=[];
-  const controls=[...timeline.querySelectorAll('.path-chip,button.schip,.path-shared-caption')].map((element,index)=>({
+  const controls=[...timeline.querySelectorAll('.path-chip,button.schip')].map((element,index)=>({
    label:element.getAttribute('aria-label') || element.textContent || String(index),rect:element.getBoundingClientRect()
   }));
   for(const {label,rect} of controls){
@@ -44,8 +44,8 @@ async function checkGeometry(root){
 }
 async function checkShared(root){
  await expect(root.locator('.path-timeline')).toHaveCount(1);await expect(root.locator('.path-matrix')).toHaveCount(0);
- await expect(root.locator('.path-shared-block[data-shared-ending="true"]')).toHaveCount(1);
- await expect(root.locator('.path-shared-heading')).toHaveText('Shared ending');
+ await expect(root.locator('.path-shared-block,.path-shared-heading,.path-shared-caption')).toHaveCount(0);
+ expect(await root.locator('.path-timeline').evaluate(el=>el.offsetHeight)).toBeLessThanOrEqual(90);
  await expect(root.locator('.shared-step-link')).toHaveCount(0);
  for(const index of [processIndex,persistIndex,notifyIndex]){
   await expect(step(root,index)).toHaveCount(1);await expect(step(root,index)).toHaveClass(/shared-downstream-step/);
@@ -112,7 +112,7 @@ test('native viewer keeps joins when a named view hides the separate input steps
  const shared=step(root,processIndex);
  await expect(shared).toHaveCount(1);await expect(shared).toHaveText('1');await expect(shared).toHaveClass(/dvd/);
  await expect(shared).toHaveClass(/shared-downstream-step/);await expect(root.locator('.shared-step-link')).toHaveCount(0);
- await expect(root.locator('.path-shared-block[data-shared-ending="true"]')).toHaveCount(1);
+ await expect(root.locator('.path-shared-block,.path-shared-heading,.path-shared-caption')).toHaveCount(0);
  await choose(root,'motion','Motion detected');await shared.click();await expect(shared).toHaveAttribute('data-step-path','motion');
  await expect(root.locator('.pt-state .preadout')).toHaveText('Motion');
  await expect(root.locator('.step-shared-note')).toHaveText('Shared step · also in Button press (step 1)');
@@ -134,9 +134,8 @@ test('middle shared operations split and rejoin with route state intact while of
  const readout=id=>root.locator('.pt-state[data-dv-panel="'+d.panels.findIndex(panel=>panel.id===id)+'"] .preadout');
  const log=root.locator('.pt-log'),next=root.getByRole('button',{name:'Next step',exact:true});
  await expect(root.locator('.path-timeline')).toHaveCount(1);await expect(root.locator('.path-matrix')).toHaveCount(0);
- await expect(root.locator('.path-shared-block[data-shared-ending="false"]')).toHaveCount(1);
- await expect(root.locator('.path-shared-block[data-shared-ending="true"]')).toHaveCount(1);
- await expect(root.locator('.path-shared-block[data-shared-ending="false"] .path-shared-heading')).toHaveText('Shared steps');
+ expect(await root.locator('.path-timeline').evaluate(el=>el.offsetHeight)).toBeLessThanOrEqual(170);
+ await expect(root.locator('.path-shared-block,.path-shared-heading,.path-shared-caption')).toHaveCount(0);
  for(const index of [indices.store,indices.index,indices.ready]){
   await expect(step(root,index)).toHaveCount(1);await expect(step(root,index)).toHaveClass(/shared-downstream-step/);
  }
@@ -176,6 +175,5 @@ test('middle shared operations split and rejoin with route state intact while of
  await expect(readout('route')).toHaveText('Offline');await expect(readout('notice')).toHaveText('None');
  await expect(log).toContainText('Offline: recording request not sent');await expect(log).not.toContainText('Recording stored');await expect(log).not.toContainText('Clip ready');
  await expect(root.locator('.shared-downstream-step[aria-current="true"]')).toHaveCount(0);
- await expect(root.locator('.path-shared-block[data-selected="true"]')).toHaveCount(0);
  await expect(root.locator('.step-shared-note')).toBeHidden();await expect(next).toBeDisabled();await expect(root.locator('.playback-status')).toHaveText('Paused · reduced motion');
 });

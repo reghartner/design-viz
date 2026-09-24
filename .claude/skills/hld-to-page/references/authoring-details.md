@@ -191,3 +191,13 @@ new arithmetic, no new attributions.
   two edge-bearing steps must never share the same FIRST edge (reorder each step's `edges` list —
   true firing order is preserved with `packets`); an overflowing edge
   label gets shortened, not nudged.
+
+## Row placement
+
+Author every `rows` array in visual left-to-right order. Row parity no longer
+reverses placement, drag insertion targets, or edge labels. Stacks remain one
+slot, with their members in top-to-bottom order. Adding/removing rows preserves
+other rows’ horizontal order. Do not reverse alternate rows to compensate for
+the old renderer; use ordinary cross-row edges and verify the resulting routes.
+When updating an older export, rebuild it with the current renderer. Reorder any
+old row explicitly if its former visual arrangement needs to stay the same.

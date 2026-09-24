@@ -121,7 +121,7 @@ narrative finalization; layout and clipboard use common/source/core helpers.
 Load the leaves needed by the actual operation, with the validator/panel core
 first. No command reaches back into `initWorkbenchBuilder()` for a dependency.
 
-`builderSlotGapXs()` receives measured boxes and row direction. DOM measurement,
+`builderSlotGapXs()` receives measured boxes in authored left-to-right order. DOM measurement,
 pointer capture, gesture previews, focus and render freshness stay in controllers.
 `builderReusePreview()` calls the core path and panel-state fold; it returns data
 for the dialog. Commands copy authored patches, never that folded preview state.

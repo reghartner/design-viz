@@ -84,7 +84,6 @@ function layout(spec){
     for (var i = 0; i < k; i++){
       xs.push(k === 1 ? (LEFT_X + RIGHT_X) / 2 : LEFT_X + i * (RIGHT_X - LEFT_X) / (k - 1));
     }
-    if (r % 2 === 1) xs.reverse(); /* serpentine */
 
     slots.forEach(function(s, i){
       if (Array.isArray(s)){
@@ -319,7 +318,6 @@ function edgeAutoAdjust(edges, L){
     var a = L.pos[e.from], b = L.pos[e.to];
     if (!a || !b || a.float || b.float) return;
     if (a.row === b.row && Math.abs(a.cx - b.cx) < 1) return;      /* vertical stack edge */
-    if (isWrap(e, L)) return;
     if (a.row === b.row){
       var dir = b.cx > a.cx ? 1 : -1;
       addSide(e.from + (dir > 0 ? ':R' : ':L'), ei, b.cx, 'y', 'from');
@@ -360,14 +358,7 @@ function edgeAutoAdjust(edges, L){
   return adj;
 }
 
-function isWrap(e, L){
-  if (L.routing === 'lanes') return false;
-  var a = L.pos[e.from], b = L.pos[e.to];
-  return a && b && !a.float && !b.float && b.row === a.row + 1 &&
-         a.flow === L.rows[a.row].k - 1 && b.flow === 0;
-}
-
-/* Straight-drop preference: a cross-row edge (wrap included) whose endpoint
+/* Straight-drop preference: a cross-row edge whose endpoint
    x-centers align within STRAIGHT_TOL renders as a vertical drop; within
    NEAR_TOL it gets a minimal vertical-tangent S instead of the wide route. */
 var STRAIGHT_TOL = 40, NEAR_TOL = 96;
@@ -414,9 +405,8 @@ function edgePath(e, L, adj){
     return 'M ' + vx + ' ' + vsy + ' L ' + vx + ' ' + vty;
   }
 
-  /* straight-drop / minimal-S for x-aligned cross-row pairs — intercepts
-     aligned wrap edges too, so a serpentine junction whose columns line up
-     drops straight instead of looping around the margin */
+  /* Straight-drop / minimal-S for x-aligned cross-row pairs. Row identity
+     never changes the attachment side or creates an outside-margin loop. */
   if (a.row !== b.row && Math.abs(a.cx - b.cx) <= NEAR_TOL){
     var upN = b.cy < a.cy;
     var syN = a.cy + (upN ? -a.h/2 : a.h/2);
@@ -435,20 +425,6 @@ function edgePath(e, L, adj){
     return 'M ' + lx1 + ' ' + syN +
            ' C ' + lx1 + ' ' + (syN + dmn*0.45) + ' ' +
            lx2 + ' ' + (tyN - dmn*0.45) + ' ' + lx2 + ' ' + tyN;
-  }
-
-  if (isWrap(e, L)){
-    var side = a.row % 2 === 0 ? 1 : -1;
-    var xO = (side > 0 ? W - 12 : 12) + avX;
-    var s1x = a.cx + side * a.w/2, t1x = b.cx + side * b.w/2;
-    /* Full-width columns leave a narrow outside gutter. Bound the curve's
-       handles there instead of projecting them 115px beyond the canvas. */
-    var sControl = side > 0 ? Math.min(s1x + 115, xO) : Math.max(s1x - 115, xO);
-    var tControl = side > 0 ? Math.min(t1x + 115, xO) : Math.max(t1x - 115, xO);
-    var mid = (a.cy + b.cy) / 2;
-    return 'M ' + s1x + ' ' + a.cy +
-           ' C ' + sControl + ' ' + a.cy + ' ' + xO + ' ' + (a.cy + 55) + ' ' + xO + ' ' + mid +
-           ' C ' + xO + ' ' + (b.cy - 55) + ' ' + tControl + ' ' + b.cy + ' ' + t1x + ' ' + b.cy;
   }
 
   if (a.row === b.row){

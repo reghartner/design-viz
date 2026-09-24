@@ -6,7 +6,7 @@ var TRACE_FIELDS = {
 };
 
 /* Collapse service cycles before ranking, then order each level by its
-   neighbours. Output is ordinary editable serpentine rows, not stored XYs. */
+   neighbours. Output is ordinary editable left-to-right rows, not stored XYs. */
 function traceRows(ids, edges){
   var next = new Map(), prev = new Map(), index = new Map(), low = new Map();
   var stack = [], active = new Set(), components = [], serial = 0;
@@ -57,7 +57,7 @@ function traceRows(ids, edges){
   }
   var rows = [];
   levels.forEach(function(level){ for (var i=0; i<level.length; i+=4) rows.push(level.slice(i,i+4)); });
-  return rows.map(function(row,i){ return i%2 ? row.reverse() : row; });
+  return rows;
 }
 
 function traceSpanStats(spans, traceId){

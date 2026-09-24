@@ -136,9 +136,9 @@
               "herald"
             ],
             [
-              "phone",
+              "vault",
               "beam",
-              "vault"
+              "phone"
             ]
           ],
           "edges": [
@@ -647,8 +647,8 @@
               "pulse"
             ],
             [
-              "phone",
-              "beam"
+              "beam",
+              "phone"
             ]
           ],
           "edges": [

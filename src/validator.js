@@ -497,7 +497,7 @@ function validate(page){
 /* ---------------- lint (advisory warnings, never errors) ----------------
    Layout-aware heuristics for spec authors who cannot see the render — an
    authoring agent gets these from tools/validate.js before any browser is
-   involved. Uses layout()/isWrap() from core/geometry.js (same logical bundle).
+   involved. Uses layout() from core/geometry.js (same logical bundle).
    Defensive: a diagram that fails basic validation is skipped, never thrown
    on. */
 var LINT_CHAR_PX = 6.35;      /* mono label width estimate, px per char */
@@ -524,8 +524,7 @@ function lintDiagram(d, DP, usedKinds, warnings){
     if (e.label){
       var chord = Math.sqrt(Math.pow(b.cx - a.cx, 2) + Math.pow(b.cy - a.cy, 2));
       var usable;
-      if (isWrap(e, L)) usable = chord * 2.2;
-      else if (a.row === b.row && a.row >= 0) usable = Math.max(30, chord - (a.w + b.w) / 2);
+      if (a.row === b.row && a.row >= 0) usable = Math.max(30, chord - (a.w + b.w) / 2);
       else usable = chord * 1.25;
       var labelPx = String(e.label).length * LINT_CHAR_PX;
       if (labelPx > usable){

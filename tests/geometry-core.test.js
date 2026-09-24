@@ -65,7 +65,7 @@ test('rows use both sides equally for curves, lanes, stacks and single-node rows
   assert.equal(L.pos.a.cx - L.pos.a.w / 2, L.vb.w - L.pos.c.cx - L.pos.c.w / 2);
 });
 
-test('curved row wraps stay inside the canvas after rows use the full width', () => {
+test('cross-row curves stay inside the canvas and between rows at full width', () => {
   const core = withoutDOM();
   vm.runInContext(readSource('validator.js'), core);
   for (const rows of [[['a', 'b'], ['c']], [['a'], ['b', 'c']], [['a', 'b'], ['c'], ['d', 'e']]]) {
@@ -75,9 +75,12 @@ test('curved row wraps stay inside the canvas after rows use the full width', ()
       const edge = {from: rows[r - 1].at(-1), to: rows[r][0]};
       const points = core.samplePathD(core.edgePath(edge, L));
       assert.ok(points.every(p => p.x >= L.vb.x && p.x <= L.vb.x + L.vb.w), JSON.stringify(edge));
-      const node = L.pos[edge.from], first = points[1];
-      assert.ok(r % 2 ? first.x > node.cx + node.w / 2 : first.x < node.cx - node.w / 2,
-        'wrap must leave outward from its node');
+      const from = L.pos[edge.from], to = L.pos[edge.to];
+      const bottom = from.cy + from.h/2, top = to.cy - to.h/2;
+      assert.equal(points[0].y, bottom);
+      assert.ok(Math.abs(points.at(-1).y-top)<.001);
+      assert.ok(points.every(p=>p.y>=bottom-.001 && p.y<=top+.001),
+        'cross-row routes must stay in the gap rather than wrap around a row');
     }
   }
 });

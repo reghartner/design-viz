@@ -905,7 +905,7 @@ function createBuilderInteractions(opts){
       var slots = gd.rows[row];
       var slotBoxes = sectionRowBoxes(gd.secEl, slots.map(function(slot){ return [slot]; }));
       for (var s = 0; s < slotBoxes.length; s++) if (!slotBoxes[s]){ cancel(); return; }
-      var gapXs = builderSlotGapXs(slotBoxes, row % 2 === 1);
+      var gapXs = builderSlotGapXs(slotBoxes);
       var slot = 0;
       for (var j = 1; j < gapXs.length; j++)
         if (Math.abs(pt.x - gapXs[j]) < Math.abs(pt.x - gapXs[slot])) slot = j;

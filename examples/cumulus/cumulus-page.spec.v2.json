@@ -167,13 +167,13 @@
                       "registryd"
                     ],
                     [
-                      "registryr",
-                      "acktopic",
+                      "relay",
                       [
                         "pump",
                         "gateway"
                       ],
-                      "relay"
+                      "acktopic",
+                      "registryr"
                     ]
                   ],
                   "floats": [
@@ -416,10 +416,10 @@
                       "t100"
                     ],
                     [
-                      "relayack",
-                      "dispatchack",
+                      "consolepending",
                       "registryr",
-                      "consolepending"
+                      "dispatchack",
+                      "relayack"
                     ]
                   ],
                   "edges": [
@@ -592,10 +592,10 @@
                       "canary"
                     ],
                     [
-                      "fleet",
-                      "soak",
+                      "complete",
                       "next",
-                      "complete"
+                      "soak",
+                      "fleet"
                     ]
                   ],
                   "floats": [
@@ -809,11 +809,11 @@
                       "artifact"
                     ],
                     [
-                      "verify",
-                      "flash",
-                      "reboot",
+                      "dispatchcheck",
                       "acktopic",
-                      "dispatchcheck"
+                      "reboot",
+                      "flash",
+                      "verify"
                     ]
                   ],
                   "edges": [
@@ -1006,13 +1006,13 @@
                       "retry2"
                     ],
                     [
-                      "wait16",
-                      "retry3",
+                      "console",
                       [
                         "deadletter",
                         "undeliverable"
                       ],
-                      "console"
+                      "retry3",
+                      "wait16"
                     ]
                   ],
                   "edges": [

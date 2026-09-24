@@ -249,12 +249,11 @@ test('planMoveRow refuses bad indices and no-op moves', () => {
   assert.ok(B.planMoveRow(text, spec, 9, 0, 1).error); /* no such section */
 });
 
-test('group slot geometry follows serpentine order, including unequal stack widths and single slots', () => {
+test('group slot geometry follows left-to-right order, including unequal stack widths and single slots', () => {
   const boxes = [{x1: 20, x2: 100}, {x1: 200, x2: 350}, {x1: 400, x2: 480}];
-  assert.deepStrictEqual(plain(B.builderSlotGapXs(boxes, false)), [12, 150, 375, 488]);
-  assert.deepStrictEqual(plain(B.builderSlotGapXs([...boxes].reverse(), true)), [488, 375, 150, 12]);
-  assert.deepStrictEqual(plain(B.builderSlotGapXs([boxes[0]], true)), [108, 12]);
-  assert.deepStrictEqual(plain(B.builderSlotGapXs([], false)), []);
+  assert.deepStrictEqual(plain(B.builderSlotGapXs(boxes)), [12, 150, 375, 488]);
+  assert.deepStrictEqual(plain(B.builderSlotGapXs([boxes[0]])), [12, 108]);
+  assert.deepStrictEqual(plain(B.builderSlotGapXs([])), []);
 });
 
 test('planMoveGroup converts pre-removal slots within a row and clamps the result', () => {

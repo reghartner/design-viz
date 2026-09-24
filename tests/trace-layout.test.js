@@ -31,7 +31,7 @@ function verify(d){
   assert.deepEqual(plain(routes),plain(C.laneRoutes(d,C.layout(d))));
   return {L,routes};
 }
-test('dependency rows follow parent levels, pack at four and remain editable serpentine rows',()=>{
+test('dependency rows follow parent levels, pack at four and remain editable left-to-right rows',()=>{
   const d=graph(['root','a','b','c','d','e','db'],[['root','a'],['root','b'],['root','c'],['root','d'],['root','e'],['a','db'],['b','db']]);
   assert.deepEqual(plain(d.rows[0]),['root']);
   assert.ok(d.rows.every(row=>row.length<=4));

@@ -438,22 +438,25 @@ at column widths of 640 pixels or less. Readable keeps that minimum and enables
 horizontal scrolling; Fit width fits the available column. These are temporary
 viewing choices, not spec fields; they do not change rows or edge routes.
 
-`rows` is an array of rows; each row is an array of slots **in flow order**.
+`rows` is an array of rows; each row is an array of slots **in visual left-to-right order**.
 The engine computes all positions:
 
 - A slot is a node id, or an **array of node ids = a stack**: one column whose
   members stack vertically. Use a stack for fan-out targets (the devices a
   broker publishes to).
-- Even-index rows lay out left→right; odd-index rows right→left. This makes a
-  serpentine: a long sequence reads row 1 across, wraps down, and continues.
-- The **wrap edge** (from the last slot of one row to the first slot of the
-  next) is detected automatically and drawn as a large curve around the row
-  edge. Just declare the edge normally.
+- Every row lays out left→right, including stacks as whole slots. Adding,
+  deleting or moving a row never mirrors the horizontal order of another row.
+- Cross-row edges use their actual endpoints. Aligned columns drop vertically;
+  other pairs use the normal cross-row routing, with no row-parity wrap shortcut.
 - Keep 3–5 slots per row. Split a sequence longer than ~5 hops onto more
-  rows — two or three rows are both normal shapes, and the serpentine
-  keeps the reading order. The crowding signal to watch is the
+  rows — two or three rows are both normal shapes. The crowding signal is the
   edges-crossing-a-corridor lint, not the row count.
   Stacks of 2–4 members work well.
+
+Older renderer builds reversed odd-index rows. Rebuild standalone exports and
+upgrade embedded viewers to use this ordering. Existing row arrays are not
+rewritten on load; reorder an old row explicitly if you want to retain its former
+visual arrangement. Steps and edge direction continue to define story order.
 
 ### floats — branch nodes
 

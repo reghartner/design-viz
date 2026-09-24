@@ -124,8 +124,8 @@ test('size choices survive edits independently of playback, including diagrams w
   next.ctl.setMode('auto'); h.context.restoreWorkbenchPreview(after,makeCtl(next.ctl),noSteps);
   assert.equal(next.ctl.mode(),'fit');
   assert.equal(JSON.stringify(page),before);
-  next.ctl.setMode('auto'); after.title='New document';
-  h.context.restoreWorkbenchPreview(after,makeCtl(next.ctl),saved); assert.equal(next.ctl.mode(),'auto');
-  after.title=page.title; after.sections.push(JSON.parse(JSON.stringify(after.sections[0])));
+  next.ctl.setMode('auto'); after.title='Renamed document';
+  h.context.restoreWorkbenchPreview(after,makeCtl(next.ctl),saved); assert.equal(next.ctl.mode(),'fit');
+  next.ctl.setMode('auto'); after.title=page.title; after.sections.push(JSON.parse(JSON.stringify(after.sections[0])));
   h.context.restoreWorkbenchPreview(after,makeCtl(next.ctl),saved); assert.equal(next.ctl.mode(),'auto');
 });

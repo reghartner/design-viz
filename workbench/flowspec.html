@@ -8475,7 +8475,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       </section>
       <section id="hg-home" tabindex="-1"><p class="human-guide-eyebrow">07 / A STORY AT HOME</p><h3>Place the house once. Animate what happens there.</h3><p>Start with <b>A connected home</b> to see rooms, actors, devices, and an outage together. Choose <b>Edit layout</b> on the Home panel to edit its shared house, rooms, devices, doors, and subjects. Expand an element’s collapsed inspector group to see its fields.</p><p>In shared layout mode, drag devices, doors, and people; use a room’s border or label to move it. The house grip moves its outline, and corner handles resize the house or rooms. Moving a room or the house outline does not move its contents. Outdoor areas can sit around the house or beside an indoor room.</p><p>Choose <b>Edit home at current step</b> to animate an event. This edits that moment instead of the shared floor plan. Use <b>Inherit</b> to remove an override and take the earlier path value. A device’s temperature and operating state are separate, so an overheated camera can remain visibly hot after shutting down.</p><p>Doors pivot at their hinge: width sets the leaf’s length, facing sets the closed direction, and swing sets its opening angle. Change the door’s state at the relevant step. Subject labels are off by default; enable them when names help. A cloud belongs under devices using the cloud icon; subjects are moving actors.</p><aside class="human-guide-tip"><strong>Keep time honest.</strong> “Recording begins,” “visitor walks away,” and “resident receives the clip” are often different steps. Give each its own visible change.</aside>
       </section>
-      <section id="hg-views" tabindex="-1"><p class="human-guide-eyebrow">08 / LAYOUTS & AUDIENCES</p><h3>One story. More than one useful view.</h3><p>Choose <b>Arrange section</b> to position and resize the diagram, panels, and step controls. Use <b>View name</b> for reader-facing names such as “At home” and “Service flow.” Duplicate a view, then tailor it for another audience.</p><p>Under <b>Visible elements</b>, each panel and the data diagram has its own checkbox for the selected layout. Hide Home in the engineering view or hide Data flow in the customer view. <b>Optimize layout</b> arranges the visible elements and respects the hidden set. <b>Make default</b> chooses the opening view. <b>Done arranging</b> returns to ordinary use.</p><p>Attach the step controls to Home or Data flow to keep them in the same outlined frame, or detach them for independent placement. Resize attached controls with their height adjustment. Under <b>Steps shown in this view</b>, select only the stops that audience needs. <strong>Skipped steps still happen:</strong> their effects carry forward. This shortens the presentation, not the story.</p><p>Preview <b>Responsive</b>, <b>Backstage</b>, or <b>Confluence</b> to tune space for the destination. These are layout previews, not live connections to those products. Named views are the complete set of view buttons; create a view named “Data flow” if you want one alongside your other arrangements.</p>
+      <section id="hg-views" tabindex="-1"><p class="human-guide-eyebrow">08 / LAYOUTS & AUDIENCES</p><h3>One story. More than one useful view.</h3><p>Choose <b>Arrange section</b> to position and resize the diagram, panels, and step controls. Use <b>View name</b> for reader-facing names such as “At home” and “Service flow.” Duplicate a view, then tailor it for another audience.</p><p>Under <b>Visible elements</b>, each panel and the data diagram has its own checkbox for the selected layout. Hide Home in the engineering view or hide Data flow in the customer view. <b>Optimize layout</b> arranges the visible elements and respects the hidden set. <b>Make default</b> chooses the opening view. Property edits, Undo/Redo, and host preview changes keep your current view selected. Opening another project uses its own default; deleting the selected view falls back to the remaining default. <b>Done arranging</b> returns to ordinary use.</p><p>Attach the step controls to Home or Data flow to keep them in the same outlined frame, or detach them for independent placement. Resize attached controls with their height adjustment. Under <b>Steps shown in this view</b>, select only the stops that audience needs. <strong>Skipped steps still happen:</strong> their effects carry forward. This shortens the presentation, not the story.</p><p>Preview <b>Responsive</b>, <b>Backstage</b>, or <b>Confluence</b> to tune space for the destination. These are layout previews, not live connections to those products. Named views are the complete set of view buttons; create a view named “Data flow” if you want one alongside your other arrangements.</p>
       </section>
       <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Canon diagrams</b> on the home page opens the published library read-only. You can play steps, switch paths and views, and follow evidence links. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships; they do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, expand <b>Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, expand <b>Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
       </section>
@@ -38483,28 +38483,43 @@ function initWorkbenchStepReuse(opts){
 /* ---- src/workbench/preview.js ---- */
 /* Preview position and layout never enter the spec or undo history. */
 function workbenchPreviewSections(page){
-  var sections = [];
-  if (!page) return sections;
-  function add(sec, tab){
-    var d = sec.diagram || {};
-    sections.push({diagram:d, key:JSON.stringify([tab, sec.heading || '',
-      Object.keys(d.nodes || {}).sort(), VIEW_SET.indexOf(d.view) >= 0 ? d.view : 'ambient'])});
-  }
-  blocksOf(page).forEach(function(block){
-    if (block.type === 'section') add(block.sec, null);
-    else block.tabs.forEach(function(tab){ tab.sections.forEach(function(sec){ add(sec, tab.label); }); });
+  return sectionRecords(page).map(function(record){
+    var sec=record.section,d=sec.diagram || {};
+    return {diagram:d,sectionId:typeof sec.id==='string' && sec.id ? sec.id : null,
+      context:JSON.stringify([record.tabLabel,sec.heading || '']),content:JSON.stringify(d)};
   });
-  return sections;
+}
+/* Match sections one-to-one, without treating editable node IDs, headings or
+   page titles as document identity. Explicit IDs survive arbitrary edits;
+   unique contextual headings survive graph edits; unchanged diagrams survive
+   heading/tab renames. Ambiguous copies never borrow another section's view. */
+function matchWorkbenchPreviewSections(previous,next){
+  var matches=new Map(),used=new Set();
+  ['sectionId','context','content'].forEach(function(key){
+    next.forEach(function(section,index){
+      var value=section[key];
+      if(matches.has(index) || value==null || next.filter(function(s){return s[key]===value;}).length!==1)return;
+      var candidates=previous.filter(function(s){return s[key]===value;});
+      if(candidates.length!==1 || used.has(candidates[0]))return;
+      if(key==='context' && section.sectionId && candidates[0].sectionId && section.sectionId!==candidates[0].sectionId)return;
+      matches.set(index,candidates[0]);used.add(candidates[0]);
+    });
+  });
+  return matches;
 }
 function workbenchPreviewSnapshot(page, ctl){
   var sections = workbenchPreviewSections(page), saved = [];
   ((ctl && ctl.sections) || []).forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
-    if (!section || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
-    var prior = {key:section.key};
+    if (!section) return;
+    var prior = {sectionId:section.sectionId,context:section.context,content:section.content,
+      playbackDefault:VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient'};
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
     if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
-    if (rec.presentation){ prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId; }
+    if (rec.presentation){
+      prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId;
+      if(rec.presentation.viewId)prior.viewId=rec.presentation.viewId();
+    }
     if(rec.presentation && rec.presentation.layoutId)prior.layoutId=rec.presentation.layoutId();
     if (rec.presentation && rec.presentation.diagramVisible){
       prior.layoutFlowVisible = rec.presentation.diagramVisible();
@@ -38526,26 +38541,28 @@ function workbenchPreviewSnapshot(page, ctl){
       : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
     prior.mode = stepper.mode(); prior.id = id; prior.signature = signature;
   });
-  return {title:page && page.title || '', sections:saved};
+  return {sections:saved};
 }
 function restoreWorkbenchPreview(page, ctl, saved){
-  if (!saved || (page.title || '') !== saved.title) return;
-  var sections = workbenchPreviewSections(page);
+  if (!saved) return;
+  var sections = workbenchPreviewSections(page),matches=matchWorkbenchPreviewSections(saved.sections,sections);
   ctl.sections.forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
-    if (!section || sections.filter(function(s){ return s.key === section.key; }).length !== 1) return;
-    var matches = saved.sections.filter(function(s){ return s.key === section.key; });
-    if (matches.length !== 1) return;
-    var prior = matches[0];
-    if(rec.presentation && rec.presentation.setLayout && prior.layoutId)rec.presentation.setLayout(prior.layoutId);
+    var prior=matches.get(rec.number-1);
+    if (!section || !prior) return;
+    if(rec.presentation){
+      if(prior.viewId!=null && rec.presentation.setView)rec.presentation.setView(prior.viewId);
+      else {
+        if(rec.presentation.setLayout && prior.layoutId)rec.presentation.setLayout(prior.layoutId);
+        if(prior.focusPanel===rec.presentation.panelId && prior.primaryPanel===section.diagram.primaryPanel)rec.presentation.setMode(prior.focusMode);
+      }
+    }
     if (rec.presentation && rec.presentation.setDiagramVisible && prior.layoutConfig===JSON.stringify([section.diagram.sectionLayout,section.diagram.layouts]) &&
         (!rec.presentation.layoutId || rec.presentation.layoutId()===prior.layoutId)) rec.presentation.setDiagramVisible(prior.layoutFlowVisible);
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
     if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
       rec.flowDisclosure.open = prior.flowOpen;
-    if (rec.presentation && prior.focusPanel === rec.presentation.panelId && prior.primaryPanel === section.diagram.primaryPanel)
-      rec.presentation.setMode(prior.focusMode);
-    if (!stepper || !prior.mode) return;
+    if (!stepper || !prior.mode || prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;
     if (prior.mode === 'ambient'){
       if(prior.path && stepper.selectPath && !stepper.selectPath(prior.path))return;
       if (stepper.mode() !== 'ambient') stepper.enterAmbient();
@@ -38568,8 +38585,8 @@ function restoreWorkbenchPreview(page, ctl, saved){
   });
 }
 function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lifecycle){
-  var tabs = activeTabReferences(previousCtl);
-  var saved = workbenchPreviewSnapshot(previousPage, previousCtl);
+  var tabs = previousPage ? activeTabReferences(previousCtl) : null;
+  var saved = previousPage ? workbenchPreviewSnapshot(previousPage, previousCtl) : null;
   if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
   var target = typeof document !== 'undefined' && document.getElementById ? document.getElementById('layout-preview-target') : null;
@@ -38606,7 +38623,7 @@ function createWorkbenchPreviewController(opts){
     }
   }
   function rebuild(next,text,skin,request){
-    var replaced=false,previousPage=page,previousCtl=ctl;
+    var replaced=false,previousPage=request.origin==='project' || request.origin==='import' ? null : page,previousCtl=ctl;
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
         beforeReplace:function(){
@@ -38905,7 +38922,6 @@ function initSectionLayoutEditor(opts){
   }
   function updateTarget(){
     cancel();editing=null;setFrame();opts.render();
-    var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){if(rec.presentation && rec.sectionEl.querySelector('.section-layout-grid'))rec.presentation.setMode('layout');});
     refresh();
   }
   life.listen(target,'change',updateTarget);

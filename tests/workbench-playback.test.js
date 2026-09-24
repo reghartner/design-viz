@@ -219,10 +219,10 @@ test('steps without IDs require a unique complete match; no positional substitut
   assert.equal(h.restore(duplicate,before).sections[0].stepper.mode(),'ambient');
 });
 
-test('new documents, changed defaults/topology and ambiguous sections do not inherit a preview position',()=>{
+test('changed playback defaults and ambiguous steps or sections do not inherit a preview position',()=>{
   const h=previewHarness(), before=pageFixture();
-  for(const mutation of [p=>p.title='Another page', p=>diagramOf(p).view='ambient',
-    p=>diagramOf(p).nodes.c={}, p=>diagramOf(p).steps.push(copy(diagramOf(p).steps[1])),
+  for(const mutation of [p=>diagramOf(p).view='ambient',
+    p=>diagramOf(p).steps.push(copy(diagramOf(p).steps[1])),
     p=>p.blocks[0].tabs[0].sections.push(copy(p.blocks[0].tabs[0].sections[0]))]){
     const after=copy(before); mutation(after);
     assert.equal(h.restore(before,after).sections[0].stepper.mode(),'ambient');
@@ -273,8 +273,8 @@ test('data flow disclosure stays open across scene edits without writing viewing
   const next=h.controller(after,0,'ambient'); next.sections[0].flowDisclosure={open:false};
   h.context.restoreWorkbenchPreview(after,next,saved);
   assert.equal(next.sections[0].flowDisclosure.open,true); assert.equal(JSON.stringify(after),source);
-  after.title='Different story'; next.sections[0].flowDisclosure.open=false;
-  h.context.restoreWorkbenchPreview(after,next,saved); assert.equal(next.sections[0].flowDisclosure.open,false);
+  after.title='Renamed story'; next.sections[0].flowDisclosure.open=false;
+  h.context.restoreWorkbenchPreview(after,next,saved); assert.equal(next.sections[0].flowDisclosure.open,true);
 });
 
 test('switching live focus moves one board, panel and transport without repainting or interrupting playback',()=>{
@@ -320,8 +320,8 @@ test('live focus works without steps and chooses an explicit centerpiece before 
   assert.equal(focus.mode(),'panel');assert.equal(layout.primaryHost.parentNode,layout.grid);
 });
 
-test('live view focus survives edits but authored presentation changes and different panels take precedence',()=>{
-  function presentation(panelId,initial){let value=initial;return {panelId,mode:()=>value,setMode:next=>{value=next;}};}
+test('live view focus survives edits to the primary panel and authored opening focus',()=>{
+  function presentation(panelId,initial){let value=initial;return {panelId,mode:()=>value,viewId:()=>value==='panel'?'home':'flow',setView:id=>{value=id==='home'?'panel':'flow';}};}
   const h=previewHarness(),before=pageFixture(),old=h.controller(before,1,'step');
   diagramOf(before).primaryPanel='p';old.sections[0].flowDisclosure={open:false};
   old.sections[0].presentation=presentation('p','flow');
@@ -332,9 +332,9 @@ test('live view focus survives edits but authored presentation changes and diffe
   assert.equal(next.sections[0].presentation.mode(),'flow');assert.equal(next.sections[0].stepper.current().n,1);
   assert.equal(JSON.stringify(after),source);
   next.sections[0].presentation=presentation('different','panel');h.context.restoreWorkbenchPreview(after,next,saved);
-  assert.equal(next.sections[0].presentation.mode(),'panel');
+  assert.equal(next.sections[0].presentation.mode(),'flow');
   delete diagramOf(after).primaryPanel;next.sections[0].presentation=presentation('p','panel');
-  h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(next.sections[0].presentation.mode(),'panel');
+  h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(next.sections[0].presentation.mode(),'flow');
 });
 
 
@@ -404,4 +404,34 @@ test('hidden alternate authoring and preview restoration keep exact source indic
   assert.equal(next.paints.at(-1).tween,false,'restoration settles instead of replaying a transition');
   next.stepper.setVisibleSteps(['done']);assert.equal(next.stepper.path(),'happy');assert.equal(next.stepper.current().id,'done');
   assert.equal(next.stepper.selectPath('failed'),false,'authoring did not rewrite the subset');
+});
+
+
+test('section identity survives graph and metadata edits without mixing views across reordered sections',()=>{
+  const h=previewHarness(),before=pageFixture();
+  const section=before.blocks[0].tabs[0].sections[0];section.id='original';
+  const other=copy(section);other.id='other';other.diagram.nodes={different:{}};
+  before.blocks[0].tabs[0].sections.push(other);
+  const old=h.controller(before,1,'step');
+  function presentation(initial){let id=initial;return {mode:()=> 'layout',viewId:()=>id,setView:next=>{id=next;}};}
+  old.sections[0].presentation=presentation('flow');old.sections[1].presentation=presentation('home');
+  const saved=h.context.workbenchPreviewSnapshot(before,old),after=copy(before);
+  after.title='Renamed page';after.blocks[0].tabs[0].label='Renamed tab';
+  after.blocks[0].tabs[0].sections.reverse();
+  const moved=after.blocks[0].tabs[0].sections[1];moved.heading='Renamed section';moved.diagram.nodes.added={};
+  const unchanged=JSON.stringify(after),next=h.controller(after,0,'ambient');
+  next.sections.forEach(rec=>rec.presentation=presentation('default'));
+  h.context.restoreWorkbenchPreview(after,next,saved);
+  assert.equal(next.sections[0].presentation.viewId(),'home');assert.equal(next.sections[1].presentation.viewId(),'flow');
+  assert.equal(next.sections[1].stepper.current().n,1);assert.equal(JSON.stringify(after),unchanged);
+});
+
+test('unidentified sections retain their view through single-property edits and discard genuinely ambiguous matches',()=>{
+  const h=previewHarness(),before=pageFixture();
+  for(const mutate of [p=>p.title='Renamed',p=>diagramOf(p).nodes.added={},p=>p.blocks[0].tabs[0].sections[0].heading='Renamed',p=>p.blocks[0].tabs[0].label='Renamed tab']){
+    const after=copy(before);mutate(after);const restored=h.restore(before,after);
+    assert.equal(restored.sections[0].stepper.mode(),'step');assert.equal(restored.sections[0].stepper.current().n,1);
+  }
+  const duplicate=copy(before);duplicate.blocks[0].tabs[0].sections.push(copy(duplicate.blocks[0].tabs[0].sections[0]));
+  assert.equal(h.restore(before,duplicate).sections[0].stepper.mode(),'ambient');
 });

@@ -85,3 +85,14 @@ test('existing preview replacements restore scroll ancestors; project/import nav
   pane.scrollTop=600;root.scrollTop=1500;p.forgetDocument();
   p.render(SOURCE);assert.equal(pane.scrollTop,0);assert.equal(root.scrollTop,0);
 });
+
+
+test('new project and import boundaries discard previous preview identity even with matching titles and sections',()=>{
+  const h=harness(),p=h.preview,render=h.c.renderWorkbenchPreview,previous=[];
+  h.c.renderWorkbenchPreview=(...args)=>{previous.push(args[3]);return render(...args);};
+  p.render(SOURCE);p.render(SOURCE,{origin:'edit'});assert.ok(previous.at(-1));
+  for(const origin of ['project','import']){
+    const old=p.controller();p.render(SOURCE,{origin});assert.equal(previous.at(-1),null);assert.equal(old.dead,true);
+  }
+  p.forgetDocument();p.render(SOURCE);assert.equal(previous.at(-1),null);
+});

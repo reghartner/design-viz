@@ -71,6 +71,12 @@
   controller and never reports success. Accepted source/history remains repairable.
   Retention belongs to that operation, without child-list observers or survival
   flags. Preserve `dv:pathrender` versus `dv:pathchange` semantics.
+  Match sections one-to-one by stable section IDs, unique tab/heading context,
+  or unchanged diagram content. Editable page titles and node IDs must not reset
+  the current named view or Home/Data flow choice. Project/import boundaries
+  discard prior viewing state; ambiguous sections and removed views use defaults.
+  Host preview changes preserve the selected view; explicit Arrange actions may
+  select their target layout. Check Undo/Redo and primary-panel renames too.
   Hidden-route authoring and restore call `jumpSource(sourceIndex,pathId)` without
   requiring `selectPath()` first; keep raw indices, route occurrences, visible
   stops, unique-step restoration and the existing view filter distinct.

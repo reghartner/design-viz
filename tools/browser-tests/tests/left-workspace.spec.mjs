@@ -36,6 +36,10 @@ test('drag and keyboard resize move the left boundary naturally without replacin
   await page.keyboard.press('Shift+ArrowLeft');await expect(split).toHaveAttribute('aria-valuenow',String(before+70));
   await expect(src).toHaveValue(draft);expect(await handle.evaluate(e=>e===document.querySelector('#src'))).toBe(true);expect(await preview.evaluate(e=>e.isConnected)).toBe(true);
   await page.locator('[data-dv-node="a"]').click();await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-selected','true');await expect(src).toHaveValue(draft);
+  await page.locator('[data-dv-node="b"]').click({modifiers:['Shift']});
+  await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-selected','true');
+  await page.locator('[data-dv-node="b"]').click({modifiers:['Shift']});
+  await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-selected','true');await expect(src).toHaveValue(draft);
   await page.locator('#editor-tab-file').click();await page.locator('.workspace-preferences summary').click();await page.locator('#workspace-reset').click();
   await expect(split).toHaveAttribute('aria-valuenow','440');await expect(page.locator('#editor-tab-file')).toHaveAttribute('aria-selected','true');
   await handle.dispose();await preview.dispose();
@@ -79,8 +83,24 @@ test('wide step inspectors share space with nested panel controls and retain the
   const caption=page.locator('#guide').getByLabel('text',{exact:true});await caption.fill('Edited while Home is collapsed');await caption.press('Tab');
   await expect(page.locator('.panel-step-group')).not.toHaveAttribute('open','');
   expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.steps[0].text).toBe('Edited while Home is collapsed');
+  await page.locator('#workspace-home').click();await paste(page,source);
+  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#steps-inspect').click();
+  await expect(page.locator('.panel-step-group')).toHaveAttribute('open','');
   for(const width of [1280,1024,820,720]){
     await page.setViewportSize({width,height:900});
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),{message:'Workspace fits '+width+'px after responsive layout settles'}).toBe(true);
   }
+});
+
+test('panel disclosure state is independent between sections with the same panel ID',async({page,server})=>{
+  const spec=editorSpec();spec.page.blocks.push(structuredClone(spec.page.blocks[0]));spec.page.blocks[1].heading='Other delivery';
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec));
+  const inspectStep=async section=>{
+    await page.locator('#editor-tab-steps').click();await page.locator('#steps-section').selectOption(String(section));
+    await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#steps-inspect').click();
+  };
+  await inspectStep(0);await page.locator('.panel-step-group > summary').click();
+  await expect(page.locator('.panel-step-group')).not.toHaveAttribute('open','');
+  await inspectStep(1);await expect(page.locator('.panel-step-group')).toHaveAttribute('open','');
+  await inspectStep(0);await expect(page.locator('.panel-step-group')).not.toHaveAttribute('open','');
 });

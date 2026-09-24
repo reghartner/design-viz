@@ -27,7 +27,8 @@ test('human guide is readable, keyboard accessible and isolates the active edito
   await paste(page,source);await page.locator('#docview [data-dv-node="a"]').click();
   await page.locator('#guide').getByLabel('title',{exact:true}).fill('My camera');await page.locator('#guide').getByLabel('title',{exact:true}).press('Enter');
   const edited=await page.locator('#src').inputValue();const selection=await page.locator('#guide').textContent();
-  await page.locator('#workspace-focus').click();await openGuide(page);
+  await page.locator('#editor-tab-file').click();await page.locator('.workspace-preferences summary').click();
+  await page.locator('#workspace-focus').click();await page.locator('#editor-tab-inspect').click();await openGuide(page);
   await guide(page).getByRole('link',{name:'05 · Alternate outcomes'}).click();
   for(const key of ['Delete','Backspace','ControlOrMeta+d','ControlOrMeta+z','ControlOrMeta+k'])await page.keyboard.press(key);
   await expect(page.locator('#src')).toHaveValue(edited);await expect(guide(page)).toBeVisible();

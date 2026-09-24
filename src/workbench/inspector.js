@@ -627,7 +627,7 @@ function stepForm(val, ctx){
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){
       var editor=p && panelEditor(p.type);
       if(editor && editor.stepControl){
-        var fold=document.createElement('details'),key=p.type+':'+p.id;
+        var fold=document.createElement('details'),key=JSON.stringify([session.snapshot().project,t.section,p.type,p.id]);
         fold.className='patchedit panel-step-group';fold.open=CUSTOM_PANEL_FOLDS.get(key)!==false;
         var summary=document.createElement('summary');summary.textContent=(p.title || p.id)+' · '+p.type;fold.appendChild(summary);
         fold.appendChild(editor.stepControl(ctx.diagram,p,t));

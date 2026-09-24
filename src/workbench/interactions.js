@@ -258,7 +258,7 @@ function createBuilderInteractions(opts){
       var only = multiSel[0];
       clearMultiSelect();
       selectTarget({section: only.section, kind: only.kind, id: only.id,
-                    index: only.index, card:only.card, el: only.el}, false);
+                    index: only.index, card:only.card, el: only.el}, false, true);
       return;
     }
     renderMultiInspector();

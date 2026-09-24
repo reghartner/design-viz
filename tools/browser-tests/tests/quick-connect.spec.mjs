@@ -52,7 +52,9 @@ test('first connections in a step-free graph keep the header clear of nodes acro
     await page.locator('#sk-'+skin).click();const before=await node(page,'a').boundingBox();
     await start(page);await node(page,'c').hover();
     const hint=await page.locator('.dv-connect-hint').boundingBox(),a=await node(page,'a').boundingBox();
-    expect(a).toEqual(before);expect(hint.y+hint.height).toBeLessThanOrEqual(a.y);
+    // Highlight strokes expand the painted bounds; the card's center must stay fixed.
+    expect(a.x+a.width/2).toBeCloseTo(before.x+before.width/2,3);expect(a.y+a.height/2).toBeCloseTo(before.y+before.height/2,3);
+    expect(hint.y+hint.height).toBeLessThanOrEqual(a.y);
     await expect(page.getByRole('button',{name:'Cancel connection',exact:true})).toBeVisible();
     if(skin==='aurora')await testInfo.attach('first-connection-aurora',{body:await page.locator('#docview .doc-sec').first().screenshot(),contentType:'image/png'});
     await node(page,'c').click();expect((await diagram(page)).edges).toHaveLength(1);await clean(page);

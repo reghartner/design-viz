@@ -74,3 +74,15 @@ For a runnable code-drift demonstration, use the fixed fictional app in
 `examples/canon/doorbell-app/` and `tools/canon/doorbell-rehearsal.mjs`; it tests a
 refactor and a timeout regression in an isolated local Git history. The rehearsal's
 review decisions are simulations, never automatic approval of company changes.
+
+
+### Direct links to published canon diagrams
+
+The static workbench serves read-only diagrams at
+`workbench/flowspec.html?diagram=<page.canon.id>` (URL-encode the ID). Library
+cards and the reader’s **Copy link** action expose that address. It needs the
+built `workbench/diagrams.json`, not a Backstage connection or read API. Keep
+canon IDs stable when moving spec files. Links show the latest published
+snapshot at the document’s initial view/step; use standalone viewer links for a
+specific playback position. `?canon=` is the legacy backend editing route, not
+the public reader link. See [the publishing guide](../../../../docs/workbench-canon-library.md).

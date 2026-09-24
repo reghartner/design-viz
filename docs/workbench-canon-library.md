@@ -9,13 +9,39 @@ a reader restores its selected diagram from the published snapshot.
 **Edit in Workbench** opens a local editable copy through the normal import
 transaction. A single Undo restores the previous project. Browsing alone never
 replaces a current project, draft, or its history. Returning to a reader displays
-the published version, not unsaved editor changes. The reader uses local browser
-history; use a hosted standalone export when you need shareable step/embed links. Use **Continue** on welcome
+the published version, not unsaved editor changes. Use **Continue** on welcome
 or **Back to project** in the header to return to the current local project.
 
 Editing does not write to GitHub or approve a canonical change. Save JSON and
 submit changes through the company's repository review process. The separate
 legacy `?canon=…` review adapter continues to open its explicit editor workflow.
+
+## Link directly to a diagram
+
+Every published diagram has a read-only URL using its stable `page.canon.id`:
+
+```text
+https://your-diagrams-site/workbench/flowspec.html?diagram=doorbell
+```
+
+Open **Canon diagrams → a diagram → Copy link**. The library cards are also
+normal links: right-click to copy one or open it in a new tab. Adjust the path
+above if your deployment gives the workbench a different address. These links
+work before Backstage is integrated, using only the static site's published
+`diagrams.json`. They open directly in fresh tabs, survive reloads, and support
+browser Back/Forward. Reading never replaces a saved local draft.
+
+The ID, rather than the source filename, identifies the diagram, so moving its
+JSON within `docs/diagrams/` preserves its link. The link opens the latest
+published version; changing/removing the ID makes an old link unavailable.
+Unknown IDs or a missing published snapshot show an error with Retry.
+
+**Copy link** shares the document at its initial view/step, not the current
+playback position. Use a hosted standalone export for step/view/embed links.
+The bundled fictional demo remains available from the library when no snapshot
+exists, but has no public Copy link. Direct `?diagram=…` links never substitute
+that demo for missing published content. `?diagram=…` is the read-only route;
+`?canon=…` remains the separate legacy backend editing route.
 
 ## Publish by saving a spec
 

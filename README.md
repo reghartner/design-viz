@@ -92,6 +92,10 @@ choose **import trace…**, paste or open event JSON, and **Build diagram**.
 The result is a service board, an offset-aware waterfall, and a step for each
 span. No account connection is required. **Start new project → A trace, explained** opens
 a fictional trace example. Agents use `node tools/trace2spec.js`.
+
+Every `rows` array renders its slots left to right. Stack members render top to
+bottom within one slot.
+
 All row diagrams offer **Auto**, **Fit width** and **Readable** views, with
 curved edges or lane routing. In a narrow diagram column, Auto keeps labels
 legible and lets you scroll sideways; Fit width shows the complete graph.

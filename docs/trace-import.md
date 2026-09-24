@@ -126,7 +126,8 @@ Imports place upstream services before their downstream dependencies. Service
 cycles are grouped at the same dependency level; large levels wrap into rows
 of at most four cards. Neighbour ordering reduces avoidable crossings. The
 result is ordinary `rows` data you can edit, with `routing: "lanes"` enabled.
-Row position represents dependency order, not timestamp order or duration.
+Row position represents dependency order. Slots within each row render left to
+right. Position does not represent timestamp order or duration.
 
 Lane routing spreads attachment ports, reserves horizontal tracks between
 rows, and chooses vertical channels that clear every card. Tracks expand the

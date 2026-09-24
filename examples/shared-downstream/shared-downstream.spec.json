@@ -6,7 +6,7 @@
       {
         "id": "shared-downstream",
         "heading": "Button press or motion \u2192 one downstream pipeline",
-        "text": "Select either input. The linked circles identify the same downstream steps, even though they have different step numbers. Alternate occurrences are shadows until selected.",
+        "text": "Select either input. Its translation joins one common track for processing, storage, and notification. The shared ending uses the selected path’s step numbers and retains its event origin.",
         "diagram": {
           "view": "step",
           "autoplay": false,

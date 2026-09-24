@@ -11,10 +11,19 @@ Selections remain checked when searching or paging.
 its own complete authored content: caption, hops, node focus, tones, failures,
 panel patches, links and any additional fields. Editing a copy leaves the
 source steps unchanged. **Use shared steps** adds references to the original
-steps instead; subsequent edits affect every path referencing them. Shared
-downstream occurrences show link badges in the viewer, with shadows on later
-rows, even when the same step has a different number on each path. Separate
-copies do not get these cues; identical captions alone do not establish sharing.
+steps instead; subsequent edits affect every path referencing them. Consecutive
+shared steps after a divergence form one visible common track. Paths can join
+for **Shared steps**, split for independent outcomes, and join again later.
+**Shared ending** means every path participating in that block ends there;
+an early-ending path has no connection to later blocks it does not reference.
+Separate copies remain independent; matching captions do not establish sharing.
+
+The selected path supplies the common track's numbers and incoming state.
+Clicking a shared circle keeps that path when it participates; otherwise the
+circle identifies the participating path it will select. Clicking a path chip
+returns to step 1. Shared beginnings keep their faded circles when there is no
+downstream common block. See [alternate paths](alternate-paths.md) for full
+sequence classification, views that hide stops, and conflicting shared orders.
 
 Choose where the selection goes:
 

@@ -68,8 +68,12 @@ plan concise; it is a reviewable artifact, not a reasoning transcript.
   Reuse IDs only for identical shared content. The **first differing beat gets
   its own ID**. Reuse downstream IDs after translation or a rejoin only when
   their captions and patches have compatible meaning on every incoming path.
-  Shared suffixes gain linked-circle cues automatically; see `docs/alternate-paths.md`.
-  Identical-looking copies are not shared. Retries use distinct IDs.
+  Consecutive shared IDs after divergence form a common track; paths can split
+  again after a shared middle block and rejoin later. Only a block where every
+  participating path finishes is a shared ending. Full authored sequences govern
+  this, including hidden stops. See `docs/alternate-paths.md` for examples and
+  conflicting shared orders. Identical-looking copies are not shared. Retries
+  use distinct IDs.
 - Each path starts from panel initial state and folds its own sparse patches.
   Specify honest endings, including early termination. Never inherit another
   outcome's notification, recovery, or success to make an ending feel complete.

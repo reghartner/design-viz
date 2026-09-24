@@ -1788,6 +1788,7 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .human-guide-timeline{padding:22px 20px 13px;border:1px solid #e0d9ef;border-radius:14px;background:#fbf9fe;margin:24px 0}
 .human-guide-timeline>div{display:grid;grid-template-columns:105px repeat(5,1fr);gap:12px;align-items:center;margin-bottom:12px;color:#6d5caa;font-size:12px}
 .human-guide-timeline span{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#e7e0f6;border:1px solid #ab9bd3;font-weight:700}
+.human-guide-shared-ending span{grid-column:6;}
 .human-guide-timeline .human-guide-alternate{color:#a96324}.human-guide-alternate span{background:#f8e6d5;border-color:#d59d65}
 .human-guide-alternate .shared{opacity:.35;background:#e7e0f6;border-color:#ab9bd3;color:#6d5caa}
 .human-guide-timeline p{font-size:11px;color:#686477;margin:14px 0 0;text-align:center}
@@ -8282,6 +8283,28 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
 
 .path-matrix:has(.shared-step-link){padding:0 5px 5px 0;}
 
+/* Shared runs form a common track, with incoming/outgoing routes still visible. */
+.path-timeline{--timeline-bg:#fff;position:relative;isolation:isolate;max-width:none;}
+.sk-aurora .path-timeline{--timeline-bg:#101a2c;}
+.sk-daylight .path-timeline,.sk-pastel .path-timeline{--timeline-bg:#fff;}
+body.sk-editorial .path-timeline{--timeline-bg:#fbf8f1;}
+body.sk-terminal .path-timeline{--timeline-bg:#0c1411;}
+body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
+.path-timeline-lines{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible;}
+.path-timeline-route .path-chip{position:absolute;z-index:3;max-width:140px;min-height:32px;box-sizing:border-box;}
+.path-timeline-stop{position:absolute;z-index:3;width:32px;}
+.termbar.has-paths .path-timeline .schip{width:32px;height:32px;margin:0;border:1px solid color-mix(in srgb,var(--path-color) 50%,var(--dfaint));background:var(--timeline-bg);color:var(--dink);}
+.termbar.has-paths .path-timeline .schip[aria-current="true"]{border:2px solid var(--path-color);background:color-mix(in srgb,var(--path-color) 13%,var(--timeline-bg));box-shadow:0 0 0 3px var(--timeline-bg),0 0 0 5px var(--path-color);color:var(--dink);}
+.termbar.has-paths .path-timeline .schip.shared-step-shadow{opacity:.35;}
+.termbar.has-paths .path-timeline .schip.shared-step-shadow[aria-current="true"],.termbar.has-paths .path-timeline .schip.shared-step-shadow:focus-visible{opacity:1;}
+.path-timeline .schip:focus-visible{outline:2px solid var(--path-color);outline-offset:5px;}
+.path-shared-block{position:absolute;z-index:0;height:94px;border-radius:13px;background:color-mix(in srgb,var(--dtext) 7%,var(--timeline-bg));border:1px solid color-mix(in srgb,var(--dfaint) 24%,transparent);box-sizing:border-box;}
+.path-shared-block[data-selected="false"]{opacity:.6;}
+.path-shared-heading{display:block;text-align:center;padding:7px 4px;font:500 10px/1.25 'IBM Plex Mono',monospace;color:var(--dtext);}
+.path-shared-caption{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;position:relative;left:-28px;width:88px;margin-top:9px;max-height:30px;text-align:center;font:400 11px/1.3 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.path-timeline-owner{position:sticky;left:0;width:max-content;max-width:100%;display:flex;align-items:center;gap:6px;font:500 10px/1.5 'IBM Plex Mono',monospace;color:var(--dtext);padding:2px 0 4px;}
+.path-timeline-owner::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--path-color);flex:none;}
+
 
 .dispatch{--dispatch-accent:#6576b3;--dispatch-good:#368068;--dispatch-warn:#b87924;--dispatch-bad:#bd5265;color:var(--dtext);min-width:0;container-type:inline-size;}
 .dispatch-blocked{--dispatch-accent:var(--dispatch-bad);}.dispatch-onscene,.dispatch-resolved{--dispatch-accent:var(--dispatch-good);}.dispatch-unknown,.dispatch-cancelled{--dispatch-accent:var(--dfaint);}
@@ -8430,10 +8453,10 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       <section id="hg-steps" tabindex="-1"><p class="human-guide-eyebrow">04 / STEPS & PLAYBACK</p><h3>A step is a change, not a screenshot.</h3><p>Use <b>Steps</b> to select, search, append, duplicate, or move beats earlier and later. A useful caption explains what changed and why: “The recording service stores the clip before notifying the resident.” Captions and prose support backticks for inline code and triple backticks for code blocks; node labels stay plain text.</p><p><b>ADD TO STEP</b> selects the nodes, edges, and panels involved in a beat. Finish this mode before trying to edit or connect objects normally. Panel fields describe what changes at that beat. A value you do not change usually carries forward from earlier steps on the selected path. The <b>Effective state · all panels</b> inspector explains whether a value is initial, set here, inherited, or transient.</p><p>Use the numbered circles and previous/next controls to walk the story. Play starts automatic advancement; Pause holds the current beat. Under <b>Playback settings</b>, choose the opening view and whether it should autoplay. The editor starts paused even when the exported viewer is configured to autoplay. Ambient view animates the overall diagram; step view follows one path.</p><p>You can color an individual step circle to mark a phase change without making an alternate path. Use a branch only when the outcome or sequence actually differs.</p>
       </section>
       <section id="hg-alternates" tabindex="-1"><p class="human-guide-eyebrow">05 / ALTERNATE OUTCOMES</p><h3>Show where the same story goes differently.</h3><p>An alternate belongs on the same diagram: a dropped signal, a retry, a rejected request, or a recovery. Keep the common lead-in shared, then show the first different event.</p>
-        <div class="human-guide-timeline" role="img" aria-label="Happy path steps 1 to 5. Recovery shares steps 1 and 2, differs at 3 and 4, and rejoins shared step 5."><div><b>Happy path</b><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="human-guide-alternate"><b>Recovery</b><span class="shared">1</span><span class="shared">2</span><span>3</span><span>4</span><span class="shared">5</span></div><p>Shared beginning → independent outcome → shared ending</p></div>
-        <ol><li>Select the <strong>last shared step</strong> in the Steps tab. If the first different event is step 3, select step 2.</li><li>Choose <b>+ Alternate after selected step</b>. The first branch creates a happy path and an orange alternate. Rename the alternate to its outcome and set its color with <b>Update path</b>.</li><li>Edit the new independent step, then append what happens next. An alternate can end early; it does not need as many steps as the happy path.</li><li>To rejoin downstream processing, use <b>Reuse steps… → Use shared steps</b> for the common suffix. Use <b>Copy and customize</b> when the events only look similar and should evolve separately.</li></ol>
-        <aside class="human-guide-tip"><strong>Shared means one editable event.</strong> Editing a shared step changes it in every path that uses it. Choose <b>Make independent here</b> before making a path-specific change. Faded circles and shared indicators show reuse; a matching caption alone does not make two steps shared.</aside>
-        <p>Clicking a path chip starts at step 1, including its shared lead-in. State is rebuilt along that path, so a failure does not inherit changes from a happy-path step it never visited. Represent a communication that fails with <b>Add failed communication</b> on that step; make the edge visibly break and explain the consequence. Do not animate a successful delivery that never happened.</p><p><b>Remove from this path</b> only removes membership. <b>Delete from all paths</b> removes the event everywhere. Read the affected paths before deleting a shared step.</p>
+        <div class="human-guide-timeline" role="img" aria-label="Happy path and Recovery share steps 1 and 2, differ at steps 3 and 4, and converge on one shared ending at step 5."><div><b>Happy path</b><span>1</span><span>2</span><span>3</span><span>4</span></div><div class="human-guide-alternate"><b>Recovery</b><span class="shared">1</span><span class="shared">2</span><span>3</span><span>4</span></div><div class="human-guide-shared-ending"><b>Shared ending</b><span>5</span></div><p>Shared beginning → independent outcome → one shared ending</p></div>
+        <ol><li>Select the <strong>last shared step</strong> in the Steps tab. If the first different event is step 3, select step 2.</li><li>Choose <b>+ Alternate after selected step</b>. The first branch creates a happy path and an orange alternate. Rename the alternate to its outcome and set its color with <b>Update path</b>.</li><li>Edit the new independent step, then append what happens next. An alternate can end early; it does not need as many steps as the happy path.</li><li>To rejoin downstream processing, use <b>Reuse steps… → Use shared steps</b> for the common operations. They appear on one track labeled <b>Shared steps</b> or <b>Shared step</b>. Add independent events afterward to split again, and share later events to rejoin. <b>Shared ending</b> means every participating path finishes there. Use <b>Copy and customize</b> when events should evolve separately.</li></ol>
+        <aside class="human-guide-tip"><strong>Shared means one editable event.</strong> Editing a shared step changes it in every path that uses it. Choose <b>Make independent here</b> before making a path-specific change. A common track shows shared downstream operations. Shared beginnings can appear as faded circles. A matching caption alone does not make two steps shared.</aside>
+        <p>Clicking a path chip starts at step 1, including its shared lead-in. Clicking a shared circle keeps the selected path if it participates; otherwise the circle identifies the path it will select. Its numbers and state follow that path. A retry flag or earlier log entry carries through shared operations unless a step changes it. An early-ending path never joins a later block it does not visit. Hiding stops in a view does not change the authored joins or endings. Represent a communication that fails with <b>Add failed communication</b> on that step; make the edge visibly break and explain the consequence. Do not animate a successful delivery that never happened.</p><p><b>Remove from this path</b> only removes membership. <b>Delete from all paths</b> removes the event everywhere. Read the affected paths before deleting a shared step.</p>
       </section>
       <section id="hg-panels" tabindex="-1"><p class="human-guide-eyebrow">06 / VISUAL PANELS</p><h3>Show the consequence outside the arrows.</h3><p>Choose <b>Add to diagram → Panel → Browse panels</b>. The large picker shows a preview and description; select one, then explicitly add it. Pick panels that answer a question, rather than filling every slot.</p><ul><li><strong>Home</strong> shows people, rooms, cameras, doors, and physical activity.</li><li><strong>Screen and device app</strong> show video clips, notifications, battery or camera data. Data sources are optional; add them when explaining where a value comes from.</li><li><strong>Monitoring and dispatch</strong> connect an operator’s video review to an emergency response.</li><li><strong>Software and telemetry panels</strong> make queues, database delays, logs, gauges, and other state visible. Browse the picker for the available types.</li></ul><p>Set the panel’s starting values, then change only what matters in each step. Recording and scene activity are separate: a camera can start recording before a person enters the scene. A panel with no changes in the current step can still show state inherited from earlier beats.</p>
       </section>
@@ -8443,7 +8466,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       </section>
       <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Canon diagrams</b> on the home page opens the published library read-only. You can play steps, switch paths and views, and follow evidence links. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships; they do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, choose <b>File → Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, choose <b>File → Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
       </section>
-      <section id="hg-reuse" tabindex="-1"><p class="human-guide-eyebrow">10 / COPY & REUSE</p><h3>Choose whether the relationship should stay shared.</h3><p>Use <b>Copy</b>, <b>Paste…</b>, and <b>Duplicate</b> for selected nodes, panels, or sections. Multi-select nodes to copy a group; internal connections travel with them when both endpoints are included. A copied section includes its story and alternate paths. A copied panel carries its layout and starting state, not the current step’s animation.</p><p>In Home’s shared layout inspector, use <b>Copy element</b> or <b>Duplicate element</b> for its contents. For story events, use <b>Reuse steps…</b>: copying creates an independent event, while sharing deliberately keeps one event on multiple paths. Undo reverses an operation as a unit.</p><p><kbd>⌘/Ctrl C</kbd>, <kbd>⌘/Ctrl V</kbd>, and <kbd>⌘/Ctrl D</kbd> operate on diagram objects outside text fields. Inside a text field, normal text editing takes priority. If clipboard permission is unavailable, <b>Paste…</b> provides a manual text option.</p>
+      <section id="hg-reuse" tabindex="-1"><p class="human-guide-eyebrow">10 / COPY & REUSE</p><h3>Choose whether the relationship should stay shared.</h3><p>Use <b>Copy</b>, <b>Paste…</b>, and <b>Duplicate</b> for selected nodes, panels, or sections. Multi-select nodes to copy a group; internal connections travel with them when both endpoints are included. A copied section includes its story and alternate paths. A copied panel carries its layout and starting state, not the current step’s animation.</p><p>In Home’s shared layout inspector, use <b>Copy element</b> or <b>Duplicate element</b> for its contents. For story events, use <b>Reuse steps…</b>: copying creates an independent event, while sharing deliberately keeps one event on multiple paths. Consecutive shared events can form a common middle block or ending. Check <b>Destination preview</b> to see the state they receive from this path’s earlier steps. Undo reverses an operation as a unit.</p><p><kbd>⌘/Ctrl C</kbd>, <kbd>⌘/Ctrl V</kbd>, and <kbd>⌘/Ctrl D</kbd> operate on diagram objects outside text fields. Inside a text field, normal text editing takes priority. If clipboard permission is unavailable, <b>Paste…</b> provides a manual text option.</p>
       </section>
       <section id="hg-save" tabindex="-1"><p class="human-guide-eyebrow">11 / SAVE & SHARE</p><h3>Keep the source. Share the experience.</h3><dl class="human-guide-glossary"><dt>save</dt><dd>Keep the editable JSON. Open it later to continue authoring.</dd><dt>export…</dt><dd>Write the JSON and a standalone viewer HTML page to a folder. Share or host the HTML for readers.</dd><dt>Export for Confluence</dt><dd>Download the payload for the Flowview Forge integration.</dd><dt>Copy JSON for Confluence</dt><dd>Copy that payload to paste into the integration’s configuration.</dd><dt>Copy link / Copy embed link</dt><dd>Link to a viewer’s selected section, view, path, and step. Share a hosted viewer URL your readers can reach.</dd></dl><p>The browser draft is convenient recovery, not a repository commit or a backup. Save JSON before clearing browser data or moving computers. Confluence and Backstage publication depend on your company’s integration and access controls; exporting or editing here does not publish to either one.</p>
       </section>
@@ -8771,7 +8794,7 @@ body .docview .thzone.z-cold-crit{color:var(--th-freezing);border-color:var(--th
       <tr><td>diagram.primaryPanel</td><td><code>"home"</code></td><td>Optional centerpiece panel ID: show it large with playback below it and a collapsible Data flow underneath. Set Presentation → Centerpiece in the panel inspector. Homemap steps have device states, subject drag/tap placement, visibility, inheritance, and signal controls.</td></tr>
       <tr><td>diagram.panels</td><td><code>[{id, type, title?, ...}]</code></td><td>Synchronized inspector widgets beside the board. Panel types are documented in <code>contract/authoring-contract.md</code>, including static embedded <code>image</code> references, <code>table</code> for data snapshots, <code>checks</code> for authored decisions, <code>budget</code> for resource limits, and <code>replicas</code> for positions and reported lag. <code>waterfall</code> supports <code>startMs</code> offsets for overlapping trace spans; <code>trace</code> shows service internals and child-covered versus uncovered wall time.</td></tr>
       <tr><td>steps[n].id</td><td><code>"ota.3"</code></td><td>Optional unique step identifier for deep links, search and preview restoration. Duplicating a step gives its copy a new ID.</td></tr>
-      <tr><td>diagram.paths</td><td><code>[{id, label?, color?, steps:[step IDs]}]</code></td><td>Optional named outcomes sharing one step registry and board. First path is the default. Chips sit left of aligned step rows below playback controls, with clickable shared-step shadows at 35% opacity wherever step IDs are reused and blank columns after its ending. Linked badges identify shared downstream steps after divergence, even at different positions; playback and state follow the selected path and stop at its own ending. No path label unless alternates exist. Story steps can fork, rename, recolor and remove paths.</td></tr>
+      <tr><td>diagram.paths</td><td><code>[{id, label?, color?, steps:[step IDs]}]</code></td><td>Optional named outcomes sharing one step registry and board. First path is the default. Chips start paths at step 1. Shared beginnings use clickable shadows; consecutive shared IDs after divergence form a common track. Paths can split and rejoin again. Shared ending means all participating paths finish there; early endings never connect to later blocks they do not visit. Full authored sequences determine blocks, including hidden stops. Numbers, playback and state follow the selected participating path. Shared circles keep it when possible and identify the participating path otherwise. Conflicting shared orders retain separate occurrences with sharing cues. No path label unless alternates exist. Story steps can fork, rename, recolor and remove paths.</td></tr>
       <tr><td>diagram.steps</td><td><code>[{edge | edges, nodes?, panels?, lane?, text, link?}]</code></td><td>Ordered narrative. <code>edge:"from-&gt;to"</code> or <code>edges:[...]</code> for hops that happen together — their packets fire in order, staggered. A step may be <b>edgeless</b>: light <code>nodes:[...]</code> directly and/or patch panels. <code>panels</code> carries SPARSE per-panel patches; the engine folds them into complete per-step state so any jump is consistent (<code>log</code> appends; <code>enterOnce</code> applies only at its own step). Drives the numbered coins, the ambient packet schedule, AND the click-through.</td></tr>
       <tr><td>step.failures</td><td><code>{"from-&gt;to":"dropped" | "blocked"}</code></td><td>Current-step communication outcomes. Dropped packets stop at an orange break and fade; blocked communications show a stop marker without sending. Failed hops override normal packets and focus only their source unless nodes explicitly select the destination. Static markers remain with reduced motion. Edit with each hop’s Delivery selector or Add failed communication.</td></tr>
       <tr><td>icons</td><td colspan="2"><code>terminal cloud shield gear db antenna thermo pump router package key server chip phone</code></td></tr>
@@ -10359,6 +10382,136 @@ function pathStepSharing(paths){
     });
   });
   return byStep;
+}
+
+/* Geometry only: state and playback still fold each authored path separately.
+   Decide joins and block boundaries before filtering a named view. Prefix-only
+   identities keep separate occurrences, just like the legacy timeline rows. */
+function pathTimelineGraph(paths,shownPaths){
+  var joined=new Set(),pathById=new Map();
+  paths.forEach(function(path){pathById.set(path.id,path);});
+  pathStepSharing(paths).forEach(function(step){
+    var members=new Set(step.occurrences.map(function(o){return o.path.id;}));
+    if(step.downstream && members.size>1 && members.size===step.occurrences.length)joined.add(step.sourceIndex);
+  });
+  function authoredGraph(){
+    var nodes=[],byId=new Map(),sequences=new Map(),next=new Map(),previous=new Map();
+    paths.forEach(function(path){
+      var sequence=path.indices.map(function(sourceIndex,index){
+        var id=joined.has(sourceIndex)?'shared:'+sourceIndex:'path:'+JSON.stringify([path.id,index]);
+        var node=byId.get(id);
+        if(!node){
+          node={id:id,sourceIndex:sourceIndex,occurrences:[],pathIds:[],shared:joined.has(sourceIndex),blockId:null};
+          nodes.push(node);byId.set(id,node);next.set(id,new Set());previous.set(id,new Set());
+        }
+        node.occurrences.push({pathId:path.id,index:index});node.pathIds.push(path.id);
+        return node;
+      });
+      sequences.set(path.id,sequence);
+      sequence.forEach(function(node,index){
+        if(index){var prior=sequence[index-1];next.get(prior.id).add(node.id);previous.get(node.id).add(prior.id);}
+      });
+    });
+    return {nodes:nodes,byId:byId,sequences:sequences,next:next,previous:previous};
+  }
+  var full=authoredGraph();
+  /* Contracting shared identities can create cycles (x,y versus y,x), even
+     across three or more paths. Find cyclic components with iterative graph
+     walks, then keep every identity in those components as separate instances.
+     Joins outside a conflicting component, such as a later ending, survive. */
+  var visited=new Set(),finished=[];
+  full.nodes.forEach(function(node){
+    if(visited.has(node.id))return;
+    var stack=[{id:node.id,exit:false}];
+    while(stack.length){
+      var frame=stack.pop();
+      if(frame.exit){finished.push(frame.id);continue;}
+      if(visited.has(frame.id))continue;
+      visited.add(frame.id);stack.push({id:frame.id,exit:true});
+      full.next.get(frame.id).forEach(function(id){if(!visited.has(id))stack.push({id:id,exit:false});});
+    }
+  });
+  var assigned=new Set(),unsafe=new Set();
+  finished.reverse().forEach(function(id){
+    if(assigned.has(id))return;
+    var stack=[id],component=[];assigned.add(id);
+    while(stack.length){
+      var current=stack.pop();component.push(current);
+      full.previous.get(current).forEach(function(prior){if(!assigned.has(prior)){assigned.add(prior);stack.push(prior);}});
+    }
+    if(component.length>1 || full.next.get(id).has(id))component.forEach(function(member){
+      var node=full.byId.get(member);if(node.shared)unsafe.add(node.sourceIndex);
+    });
+  });
+  if(unsafe.size){unsafe.forEach(function(sourceIndex){joined.delete(sourceIndex);});full=authoredGraph();}
+
+  /* A block extends only over immediate authored successors with the same
+     membership. Hidden forks or membership changes never fuse two blocks. */
+  var blockNext=new Map(),blockPrevious=new Set(),fullBlocks=[];
+  full.nodes.forEach(function(node){
+    if(!node.shared)return;
+    var first=node.occurrences[0],next=full.sequences.get(first.pathId)[first.index+1];
+    if(next && next.shared && next.pathIds.length===node.pathIds.length &&
+      next.pathIds.every(function(id,index){return id===node.pathIds[index];}) &&
+      node.occurrences.every(function(o){return full.sequences.get(o.pathId)[o.index+1]===next;})){
+      blockNext.set(node.id,next);blockPrevious.add(next.id);
+    }
+  });
+  full.nodes.forEach(function(node){
+    if(!node.shared || blockPrevious.has(node.id))return;
+    var block={id:'block:'+node.id,nodeIds:[],pathIds:node.pathIds.slice()};
+    while(node){node.blockId=block.id;block.nodeIds.push(node.id);node=blockNext.get(node.id);}
+    fullBlocks.push(block);
+  });
+
+  var visible=new Map(),edgeMap=new Map(),edges=[];
+  (shownPaths==null?paths:shownPaths).forEach(function(shown){
+    var path=pathById.get(shown.id);if(!path)return;
+    var cursor=0,prior=null;
+    shown.indices.forEach(function(sourceIndex,visibleIndex){
+      var index=path.indices.indexOf(sourceIndex,cursor);if(index<0)return;
+      cursor=index+1;
+      var authored=full.sequences.get(path.id)[index],node=visible.get(authored.id);
+      if(!node){
+        node={id:authored.id,sourceIndex:sourceIndex,occurrences:[],pathIds:[],column:0,shared:false,blockId:null};
+        visible.set(node.id,node);
+      }
+      node.occurrences.push({pathId:path.id,index:index,visibleIndex:visibleIndex});node.pathIds.push(path.id);
+      if(prior){
+        var key=JSON.stringify([prior.id,node.id]),edge=edgeMap.get(key);
+        if(!edge){edge={from:prior.id,to:node.id,pathIds:[]};edgeMap.set(key,edge);edges.push(edge);}
+        edge.pathIds.push(path.id);
+      }
+      prior=node;
+    });
+  });
+  var nodes=full.nodes.filter(function(node){return visible.has(node.id);}).map(function(authored){
+    var node=visible.get(authored.id);node.shared=node.occurrences.length>1;
+    if(node.shared)node.blockId=authored.blockId;
+    return node;
+  });
+  var blocks=fullBlocks.map(function(block){
+    var nodeIds=block.nodeIds.filter(function(id){return visible.has(id) && visible.get(id).shared;});
+    if(!nodeIds.length)return null;
+    var last=full.byId.get(nodeIds[nodeIds.length-1]);
+    return {id:block.id,nodeIds:nodeIds,pathIds:block.pathIds.slice(),
+      ending:last.occurrences.every(function(o){return o.index===pathById.get(o.pathId).indices.length-1;})};
+  }).filter(function(block){return block!==null;});
+
+  /* Longest-path ranks align incoming routes of different lengths. Filtering
+     only shortcuts authored edges, so the projected graph remains acyclic. */
+  var incoming=new Map(),outgoing=new Map(),queue=[],columns=0;
+  nodes.forEach(function(node){incoming.set(node.id,0);outgoing.set(node.id,[]);});
+  edges.forEach(function(edge){incoming.set(edge.to,incoming.get(edge.to)+1);outgoing.get(edge.from).push(edge.to);});
+  nodes.forEach(function(node){if(!incoming.get(node.id))queue.push(node);});
+  for(var head=0;head<queue.length;head++){
+    var node=queue[head];columns=Math.max(columns,node.column+1);
+    outgoing.get(node.id).forEach(function(id){
+      var next=visible.get(id);next.column=Math.max(next.column,node.column+1);
+      incoming.set(id,incoming.get(id)-1);if(!incoming.get(id))queue.push(next);
+    });
+  }
+  return {nodes:nodes,edges:edges,blocks:blocks,hasShared:nodes.some(function(node){return node.shared;}),columns:columns};
 }
 /* ---- src/core/section-layout.js ---- */
 /* Pure section/view layout. Uses diagramPathList() and panelCapability() at
@@ -25607,6 +25760,124 @@ function contractBlocksHTML(section,reference){
     return contractCardHTML(rec.value,reference,rec);
   }).join('')+'</div></div>';
 }
+/* ---- src/viewer/path-timeline.js ---- */
+/* Presentation of a pathTimelineGraph. Positions are derived from the graph,
+   not the selected path; switching outcomes only changes paint and numbering.
+   No runtime state is combined here and no document listeners are retained. */
+function createPathTimeline(host, source, paths, shownPaths, graph, pick){
+  var retired=false, pathById=new Map(paths.map(function(p){return [p.id,p];}));
+  var order=new Map(paths.map(function(p,i){return [p.id,i];}));
+  var rowGap=94, top=44, labelWidth=150, columnWidth=94;
+  var memberships=new Map();
+  graph.blocks.forEach(function(block){
+    var key=JSON.stringify(block.pathIds);
+    if(!memberships.has(key))memberships.set(key,{key:key,ids:block.pathIds,
+      at:block.pathIds.reduce(function(n,id){return n+order.get(id);},0)/block.pathIds.length});
+  });
+  var lanePositions=new Map(paths.map(function(p,i){return [p.id,i*rowGap+top];}));
+  var sharedPositions=new Map();
+  if(paths.length<=2){memberships.forEach(function(group){sharedPositions.set(group.key,top+group.at*rowGap);});}
+  else {
+    // Dedicated bands keep subset joins away from non-participating routes.
+    var bands=paths.map(function(p,i){return {path:p.id,at:i};});
+    memberships.forEach(function(group){bands.push({group:group.key,at:group.at+.01});});
+    bands.sort(function(a,b){return a.at-b.at;});
+    bands.forEach(function(band,i){(band.path?lanePositions:sharedPositions).set(band.path || band.group,top+i*rowGap);});
+  }
+  var width=labelWidth+Math.max(1,graph.columns)*columnWidth+28;
+  var height=Math.max.apply(null,Array.from(lanePositions.values()).concat(Array.from(sharedPositions.values())))+62;
+  function element(tag,className,parent){var e=document.createElement(tag);e.className=className;if(parent)parent.appendChild(e);return e;}
+  function position(e,x,y){e.style.left=x+'px';e.style.top=y+'px';}
+  var root=element('div','path-timeline',host);
+  root.setAttribute('role','group');root.setAttribute('aria-label','Paths with shared processing');
+  root.style.width=width+'px';root.style.height=height+'px';
+  var canvas=document.createElementNS(SVGNS,'svg');canvas.setAttribute('class','path-timeline-lines');
+  canvas.setAttribute('width',width);canvas.setAttribute('height',height);canvas.setAttribute('viewBox','0 0 '+width+' '+height);
+  canvas.setAttribute('aria-hidden','true');root.appendChild(canvas);
+  var nodes=new Map(),buttons=[],choices=[],tracks=[],regions=[];
+  graph.nodes.forEach(function(node){
+    var block=graph.blocks.find(function(b){return b.id===node.blockId;});
+    nodes.set(node.id,{node:node,x:labelWidth+node.column*columnWidth+columnWidth/2,
+      y:block?sharedPositions.get(JSON.stringify(block.pathIds)):lanePositions.get(node.pathIds[0])});
+  });
+  graph.blocks.forEach(function(block){
+    var members=block.nodeIds.map(function(id){return nodes.get(id);}).filter(Boolean);
+    if(!members.length)return;
+    var first=members[0],last=members[members.length-1],region=element('div','path-shared-block',root);
+    region.setAttribute('data-shared-block',block.id);region.setAttribute('data-shared-ending',String(block.ending));
+    position(region,first.x-44,first.y-36);region.style.width=(last.x-first.x+88)+'px';
+    var heading=element('span','path-shared-heading',region);
+    heading.textContent=block.ending?'Shared ending':members.length===1?'Shared step':'Shared steps';
+    region.title=block.pathIds.map(function(id){return pathById.get(id).label;}).join(' · ');
+    regions.push({element:region,pathIds:block.pathIds});
+  });
+  paths.forEach(function(path){
+    var row=element('div','path-timeline-route',root);row.setAttribute('data-path-row',path.id);
+    var choice=element('button','path-chip',row);choice.type='button';choice.textContent=path.label;
+    choice.setAttribute('data-dv-path',path.id);choice.style.setProperty('--path-color',path.color);
+    position(choice,0,lanePositions.get(path.id)-16);
+    choice.disabled=!shownPaths.find(function(p){return p.id===path.id;}).indices.length;
+    if(choice.disabled)choice.title='No steps from this path are shown in this view.';
+    choice.addEventListener('click',function(event){event.stopPropagation();if(!retired)pick(path.id,0,true);});
+    choices.push({button:choice,row:row,path:path});
+  });
+  var sharing=pathStepSharing(paths);
+  graph.nodes.forEach(function(node){
+    var point=nodes.get(node.id),wrap=element('div','path-timeline-stop',root);
+    position(wrap,point.x-16,point.y-16);
+    var step=source.steps[node.sourceIndex],button=element('button','schip'+(step.delta===true?' dvd':'')+(node.shared?' shared-downstream-step':''),wrap);
+    button.type='button';button.setAttribute('data-step-source',node.sourceIndex);button.setAttribute('data-timeline-node',node.id);
+    applyStepCircleColor(button,step);
+    if(node.shared){
+      var name=element('span','path-shared-caption',wrap),caption=String(step.text || step.id || '').replace(/\s+/g,' ').trim();
+      name.textContent=caption.length>54?caption.slice(0,51)+'…':caption;name.title=caption;
+    }
+    var entry={button:button,node:node,occurrence:node.occurrences[0]};buttons.push(entry);
+    button.addEventListener('click',function(){if(!retired)pick(entry.occurrence.pathId,entry.occurrence.index,false);});
+  });
+  function stroke(d,pathIds){
+    var line=document.createElementNS(SVGNS,'path');line.setAttribute('d',d);line.setAttribute('fill','none');
+    line.setAttribute('stroke-width','2');line.setAttribute('stroke-linecap','round');canvas.appendChild(line);
+    tracks.push({element:line,pathIds:pathIds});
+  }
+  graph.edges.forEach(function(edge){
+    var a=nodes.get(edge.from),b=nodes.get(edge.to),middle=(a.x+b.x)/2;
+    stroke('M '+a.x+' '+a.y+' C '+middle+' '+a.y+' '+middle+' '+b.y+' '+b.x+' '+b.y,edge.pathIds);
+  });
+  // A cap belongs to an authored ending, never to the last stop of a filtered view.
+  graph.nodes.forEach(function(node){
+    var ending=node.occurrences.filter(function(o){return o.index===pathById.get(o.pathId).indices.length-1;}).map(function(o){return o.pathId;});
+    if(!ending.length)return;
+    var point=nodes.get(node.id),capX=point.x+22;
+    stroke('M '+point.x+' '+point.y+' H '+capX+' M '+capX+' '+(point.y-5)+' V '+(point.y+5),ending);
+  });
+  var owner=element('div','path-timeline-owner',host);
+  function sync(selectedId,index){
+    if(retired)return;
+    var selected=pathById.get(selectedId);owner.textContent='Following '+selected.label;
+    owner.style.setProperty('--path-color',selected.color);
+    choices.forEach(function(choice){var active=choice.path.id===selectedId;choice.button.setAttribute('aria-pressed',String(active));choice.row.setAttribute('data-selected',String(active));});
+    buttons.forEach(function(entry){
+      var node=entry.node,occurrence=node.occurrences.find(function(o){return o.pathId===selectedId;}) || node.occurrences[0];
+      entry.occurrence=occurrence;
+      var path=pathById.get(occurrence.pathId),shared=sharing.get(node.sourceIndex),shadow=!node.shared && shared && shared.owner.id!==path.id;
+      var current=occurrence.pathId===selectedId && occurrence.index===index;
+      entry.button.textContent=String(occurrence.visibleIndex+1);
+      entry.button.setAttribute('data-step-path',path.id);entry.button.setAttribute('aria-current',String(current));
+      entry.button.style.setProperty('--path-color',shadow?shared.owner.color:path.color);
+      entry.button.classList.toggle('shared-step-shadow',!!shadow);
+      var peers=node.shared?node.occurrences.map(function(o){return pathById.get(o.pathId).label+' (step '+(o.visibleIndex+1)+')';}).join(', '):'';
+      entry.button.setAttribute('aria-label','Go to step '+(occurrence.visibleIndex+1)+' on '+path.label+(peers?', shared by '+peers:''));
+      entry.button.title=peers?'Shared step — '+peers:shadow?'Shared with '+shared.owner.label:String(source.steps[node.sourceIndex].text || '');
+    });
+    tracks.forEach(function(track){
+      var active=track.pathIds.indexOf(selectedId)>=0,path=active?selected:pathById.get(track.pathIds[0]);
+      track.element.setAttribute('stroke',path.color);track.element.setAttribute('opacity',active?'.85':'.25');
+    });
+    regions.forEach(function(region){region.element.setAttribute('data-selected',String(region.pathIds.indexOf(selectedId)>=0));});
+  }
+  return {sync:sync,destroy:function(){retired=true;}};
+}
 /* ---- src/engine.js ---- */
 /* engine.js — board renderer, stepper and page renderer.
    Consumes document, navigation, path, layout, state and geometry helpers
@@ -26642,7 +26913,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
-  var chipButtons = [], pathButtons = [];
+  var chipButtons = [], pathButtons = [], pathTimeline = null;
   function paintStepCoins(){
     var visible=stops();
     svg.querySelectorAll('.coin[data-dv-step]').forEach(function(coin){
@@ -26659,6 +26930,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   }
   function paintChips(){
     paintStepCoins();
+    if(pathTimeline){pathTimeline.destroy();pathTimeline=null;}
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
     chipButtons = []; pathButtons = [];
     function appendStep(parent,path,idx,rowNumber,sharedWith,sharing){
@@ -26698,9 +26970,22 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       var only=viewPath(selectedPath);only.indices.forEach(function(unused,idx){appendStep(chipsBox,only,idx,0);});
       return;
     }
+    var shownPaths=paths.map(viewPath),timelineGraph=pathTimelineGraph(paths,shownPaths);
+    if(timelineGraph.hasShared){
+      pathTimeline=createPathTimeline(chipsBox,source,paths,shownPaths,timelineGraph,function(pathId,index,restart){
+        if(destroyed)return;
+        var changedPath=pathId!==selectedPath.id;
+        stopAuto();
+        if(restart){clearEditingPreview();selectPath(pathId,0);}
+        else if(pathId!==selectedPath.id)selectPath(pathId,index);
+        else setStep(index);
+        if(restart || changedPath)secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
+      });
+      pathTimeline.sync(selectedPath.id,cur);
+      return;
+    }
     var matrix = document.createElement('div'); matrix.className = 'path-matrix';
     matrix.setAttribute('role','group'); matrix.setAttribute('aria-label','Execution paths');
-    var shownPaths=paths.map(viewPath);
     matrix.style.setProperty('--path-step-count',Math.max(1,Math.max.apply(null,shownPaths.map(function(p){return p.indices.length;}))));
     pathStepRows(shownPaths).forEach(function(row,rowNumber){
       var path = row.path, line = document.createElement('div'); line.className = 'path-row';
@@ -26733,6 +27018,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
   }
   function syncPathControls(){
+    if(pathTimeline){pathTimeline.sync(selectedPath.id,cur);return;}
     pathButtons.forEach(function(choice){
       var active = choice.path.id === selectedPath.id;
       choice.button.setAttribute('aria-pressed',String(active));
@@ -27051,6 +27337,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     pause: stopAuto,
     destroy: function(){
       destroyed = true; stopAuto(); clearLit(); clearCaptionTween();
+      if(pathTimeline)pathTimeline.destroy();
       if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
     },
     onHide: function(){ if (!destroyed && !hidden){

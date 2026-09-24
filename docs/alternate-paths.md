@@ -70,16 +70,44 @@ shared processing IDs in both paths:
 ]
 ```
 
-Here `process` is step 3 on Button press and step 4 on Motion event. Both show a
-link badge; the Motion occurrence is a shared shadow. Playback remains on Motion
-when you click its shared step. This is a shared operation, not a merge of runtime
-state: path-specific values still carry into it independently. Do not reuse a
-success/recovery step if its meaning is false on another incoming path.
+The paths converge into one visible track for `process`, `persist`, and `notify`,
+labeled **Shared ending** because both paths finish there. `process` is still
+step 3 on Button press and step 4 on Motion event: the selected path supplies
+the numbers and panel state. Clicking a shared circle keeps that path selected
+when it participates. If it does not, the circle identifies the participating
+path it will select. A path chip always starts its path at step 1.
 
-In **Reuse steps…**, choose **Use shared steps** (not the default **Copy and
-customize**) to reference existing downstream IDs. Existing specs already using
-shared IDs gain the visual cues when rebuilt; there is no new schema field.
+In **Reuse steps…**, choose **Use shared steps** to reference existing IDs;
+**Copy and customize** creates independent bodies. Rebuilding an existing spec
+with shared IDs gives it the common track; there is no new schema field.
 See the [two-input example](../examples/shared-downstream/shared-downstream.spec.json).
+
+## Join, split, and join again
+
+A shared block can sit in the middle of the story. Reuse consecutive IDs for
+its common operations, then reference distinct IDs for the next different
+outcomes. The paths can share another block later:
+
+```json
+[
+  {"id":"normal", "label":"First attempt", "steps":["press", "record", "store", "index", "notify", "ready"]},
+  {"id":"retry", "label":"After retry", "steps":["press", "record-failed", "record-retry", "store", "index", "notify-recovery", "ready"]},
+  {"id":"offline", "label":"Device offline", "steps":["press", "offline"]}
+]
+```
+
+Here `store` and `index` form **Shared steps**. The normal and retry paths then
+split for their different notifications and rejoin at `ready`, their **Shared
+ending**. A one-step middle block is labeled **Shared step**. The offline path
+ends at `offline`; it has no connection to either later block. Different subsets
+of paths may have their own shared blocks.
+
+Sharing an operation preserves each path's incoming state. For example, a retry
+flag remains set through `store` and `index` if those steps do not change it.
+Editing either shared body updates every path referencing it. Do not reuse a
+success or recovery step whose caption or patches are false for an incoming
+path. See the [doorbell example](../examples/shared-downstream/shared-blocks.spec.json)
+for carried state and log entries through both rejoins.
 
 ## Authoring shape
 
@@ -114,27 +142,30 @@ Use distinct step bodies for retry attempts. Optional `label` defaults to
 “Happy path” for the first path and the path ID for others. Optional `color`
 accepts hex; defaults cycle cyan, orange, purple, pink and green.
 
-The longest common prefix with an earlier declared path determines where
-each row's colored branch begins: immediately after the last shared beat.
-Paths with different first steps branch in column 1. A path that ends within
-a shared prefix shows only shadows, with no invented branch. The primary row
-displays its full sequence; all rows stay visible and keep the same columns
-when selecting a path. A path diverging at 3 and ending at 5 displays shared
-shadows at 1–2, then colored steps 3–5 beneath those same numbers on the
-primary row. On narrow screens the rows scroll together.
-Later steps that reuse the same IDs also render as shared shadows on subsequent
-rows, even at different step numbers. Linked-circle badges identify shared
-downstream processing on every participating row, including the first. The
-selected caption and tooltips name the other paths and their visible step
-numbers. The badge remains when the selected shadow becomes fully opaque.
-Classification uses the full authored paths, so hiding earlier stops in a view
-does not turn a downstream join into a shared prefix. Numbers still follow each
-path's own order; the renderer does not move or insert stops to line up a join.
-Its state still comes from that path's complete preceding sequence. This models authored
-outcomes, not executable conditions or a simulation of failure probabilities.
+Paths with only a shared beginning keep the aligned rows described above.
+The longest common prefix with an earlier declared path determines where each
+row's colored branch begins. A path that ends within that prefix shows only
+shared shadows, with no invented branch. Space after an ending stays blank.
+
+When paths reuse later steps, consecutive shared IDs form common tracks with
+connections showing where the participating paths join and split. The selected
+path owns playback, numbering, captions and state throughout. A shared track
+is **Shared ending** only when every participating path actually finishes there;
+otherwise it is **Shared steps** or **Shared step**. Sharing does not add steps
+to any path or change their order.
+
+The full authored sequences determine blocks and endings. Hiding stops in a
+view does not turn a downstream join into a shared beginning, combine operations
+separated by hidden steps, or make a middle block into an ending. State still
+includes that path's preceding hidden steps. When shared IDs occur in conflicting
+orders across paths, their occurrences stay separate with individual sharing
+cues so the timeline can preserve both sequences.
+
+This models authored outcomes, not executable conditions or failure probabilities.
 A step may set `color:"#RRGGBB"` to override its numbered markers without
-creating a branch. This travels with its shared body, retains shadow opacity,
-and never changes the path chip. See [step colors](step-colors.md).
+creating a branch. This travels with its shared body and never changes the path
+chip. Shared beginning shadows retain their opacity behavior. See
+[step colors](step-colors.md).
 Nodes and edges stay in their declared layout; path colors identify choices
 while edge colors continue to identify protocols. Print uses the selected
 sequence. `ambient-only` omits the step controls; use `step` or `ambient` when

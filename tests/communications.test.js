@@ -36,7 +36,8 @@ test('failure precedence removes only failed deliveries without mutating authore
 function element(tag='div'){
   const attrs={},classes=new Set(),events={};
   const e={tag,children:[],style:{setProperty(k,v){this[k]=v;}},starts:0,
-    classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k)},
+    classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k),
+      toggle(k,force){const on=force===undefined?!classes.has(k):force;if(on)classes.add(k);else classes.delete(k);return on;}},
     setAttribute(k,v){attrs[k]=String(v);if(k==='class'){classes.clear();String(v).split(/\s+/).forEach(c=>classes.add(c));}},
     getAttribute:k=>attrs[k]??null,
     appendChild(n){this.children.push(n);n.parentNode=this;return n;},

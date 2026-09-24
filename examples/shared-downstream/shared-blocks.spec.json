@@ -1,0 +1,364 @@
+{
+  "page": {
+    "title": "Doorbell recording: join, split, and rejoin",
+    "skin": "pastel",
+    "protocols": {
+      "story": {
+        "label": "Illustrative handoff",
+        "color": "#64748b"
+      }
+    },
+    "sections": [
+      {
+        "id": "shared-blocks",
+        "heading": "One recording pipeline, three outcomes",
+        "text": [
+          "A fictional doorbell story. First attempt and After retry join for storage and indexing, split for different notifications, then finish together. Device offline ends before either shared block.",
+          "Choose After retry and walk the common track: its extra recording stop changes the step numbers, while Recording route and Event log retain the retry history. At Shared ending, Resident notice still shows the selected path’s own notification."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "recorder": {
+              "title": "Recording service",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "storage": {
+              "title": "Clip storage",
+              "icon": "db",
+              "tint": "data"
+            },
+            "catalog": {
+              "title": "Event catalog",
+              "icon": "db",
+              "tint": "data"
+            },
+            "resident": {
+              "title": "Resident app",
+              "icon": "phone",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "doorbell",
+              "recorder"
+            ],
+            [
+              "storage",
+              "catalog"
+            ],
+            [
+              "resident"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "doorbell",
+              "to": "recorder",
+              "kind": "story",
+              "label": "Request recording"
+            },
+            {
+              "from": "recorder",
+              "to": "storage",
+              "kind": "story",
+              "label": "Store clip"
+            },
+            {
+              "from": "storage",
+              "to": "catalog",
+              "kind": "story",
+              "label": "Index clip"
+            },
+            {
+              "from": "catalog",
+              "to": "resident",
+              "kind": "story",
+              "label": "Notify resident"
+            }
+          ],
+          "panels": [
+            {
+              "id": "route",
+              "type": "state",
+              "title": "Recording route · carried forward",
+              "states": [
+                "Waiting",
+                "First attempt",
+                "Retry needed",
+                "Retried",
+                "Offline"
+              ],
+              "colors": {
+                "First attempt": "#0284c7",
+                "Retry needed": "#d97706",
+                "Retried": "#ea580c",
+                "Offline": "#7c3aed"
+              },
+              "initial": {
+                "state": "Waiting"
+              }
+            },
+            {
+              "id": "notice",
+              "type": "state",
+              "title": "Resident notice · carried forward",
+              "states": [
+                "None",
+                "Doorbell alert",
+                "Recovery notice"
+              ],
+              "initial": {
+                "state": "None"
+              }
+            },
+            {
+              "id": "events",
+              "type": "log",
+              "title": "Event log · selected path",
+              "tags": {
+                "FLOW": "#64748b",
+                "OK": "#0284c7",
+                "RETRY": "#ea580c",
+                "STOP": "#7c3aed"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "press",
+              "text": "A visitor presses the doorbell. The selected outcome determines what happens next.",
+              "nodes": [
+                "doorbell"
+              ],
+              "panels": {
+                "events": {
+                  "log": [
+                    {
+                      "tag": "FLOW",
+                      "text": "Doorbell pressed"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "record",
+              "text": "The first recording attempt produces a clip. This path will retain First attempt through storage and indexing.",
+              "edge": "doorbell->recorder",
+              "panels": {
+                "route": {
+                  "state": "First attempt"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "OK",
+                      "text": "First attempt: recording captured"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "record-failed",
+              "text": "The recording service cannot produce a clip on this attempt. No clip is ready to store yet.",
+              "nodes": [
+                "recorder"
+              ],
+              "tone": {
+                "recorder": "warn"
+              },
+              "panels": {
+                "route": {
+                  "state": "Retry needed"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "RETRY",
+                      "text": "First attempt: recording failed"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "record-retry",
+              "text": "A new attempt produces the recording. Retried remains visible when this path joins the shared operations.",
+              "edge": "doorbell->recorder",
+              "tone": {
+                "recorder": "ok"
+              },
+              "panels": {
+                "route": {
+                  "state": "Retried"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "RETRY",
+                      "text": "Retry: recording captured"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "store",
+              "text": "Store the completed recording. The same operation accepts either successful attempt and preserves its history.",
+              "edge": "recorder->storage",
+              "panels": {
+                "events": {
+                  "log": [
+                    {
+                      "tag": "FLOW",
+                      "text": "Recording stored"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "index",
+              "text": "Index the stored clip in event history. The recording route and earlier log entries still belong to the selected path.",
+              "edge": "storage->catalog",
+              "panels": {
+                "events": {
+                  "log": [
+                    {
+                      "tag": "FLOW",
+                      "text": "Clip indexed in event history"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "notify",
+              "text": "The resident receives the ordinary doorbell alert with the recorded clip.",
+              "edge": "catalog->resident",
+              "panels": {
+                "notice": {
+                  "state": "Doorbell alert"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "OK",
+                      "text": "Doorbell alert received"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "notify-recovery",
+              "text": "The resident receives a recovery notice with the clip after the failed recording attempt.",
+              "edge": "catalog->resident",
+              "panels": {
+                "notice": {
+                  "state": "Recovery notice"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "RETRY",
+                      "text": "Recovery notice received"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "ready",
+              "text": "The clip is ready in event history. Both recording paths end here with their own recording route and notification intact.",
+              "nodes": [
+                "catalog"
+              ],
+              "panels": {
+                "events": {
+                  "log": [
+                    {
+                      "tag": "FLOW",
+                      "text": "Clip ready in event history"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "offline",
+              "text": "The offline doorbell cannot send a recording request. This path ends with no clip and no resident notification.",
+              "failures": {
+                "doorbell->recorder": "blocked"
+              },
+              "tone": {
+                "doorbell": "dim"
+              },
+              "panels": {
+                "route": {
+                  "state": "Offline"
+                },
+                "events": {
+                  "log": [
+                    {
+                      "tag": "STOP",
+                      "text": "Offline: recording request not sent"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "normal",
+              "label": "First attempt",
+              "color": "#0284c7",
+              "steps": [
+                "press",
+                "record",
+                "store",
+                "index",
+                "notify",
+                "ready"
+              ]
+            },
+            {
+              "id": "retry",
+              "label": "After retry",
+              "color": "#ea580c",
+              "steps": [
+                "press",
+                "record-failed",
+                "record-retry",
+                "store",
+                "index",
+                "notify-recovery",
+                "ready"
+              ]
+            },
+            {
+              "id": "offline",
+              "label": "Device offline",
+              "color": "#7c3aed",
+              "steps": [
+                "press",
+                "offline"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

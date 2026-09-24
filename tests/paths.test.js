@@ -92,18 +92,18 @@ test('story and effective-state inspection use source indices with selected-path
 });
 
 function harness(d=fixture()){
-  const intervals=new Map(),paints=[],rendered=[];let seq=0,folded;
+  const intervals=new Map(),paints=[],rendered=[],navigation=[];let seq=0,folded;
   function el(){
     const attrs={},events={},classes=new Set();
     const e={children:[],style:{setProperty(k,v){this[k]=v;}},
-      classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k)},
+      classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k),toggle(k,on){if(on)classes.add(k);else classes.delete(k);}},
       appendChild(n){this.children.push(n);n.parentNode=this;return n;},removeChild(n){this.children.splice(this.children.indexOf(n),1);},
       setAttribute(k,v){attrs[k]=String(v);},getAttribute:k=>attrs[k]??null,
       addEventListener(k,fn){(events[k]??=[]).push(fn);},fire(k){(events[k]||[]).forEach(fn=>fn({stopPropagation(){}}));},
-      dispatchEvent(){},querySelectorAll(){return [];},getBoundingClientRect(){return {left:0,top:0,width:100,height:20};},cloneNode:()=>el()};
+      dispatchEvent(event){if(event.type==='dv:pathchange')navigation.push(event.type);},querySelectorAll(){return [];},getBoundingClientRect(){return {left:0,top:0,width:100,height:20};},cloneNode:()=>el()};
     Object.defineProperty(e,'firstChild',{get(){return this.children[0];}});return e;
   }
-  const c=load({CustomEvent:function(type){this.type=type;},document:{createElement:el,getElementById:()=>null},window:{matchMedia:()=>({matches:true}),
+  const c=load({CustomEvent:function(type){this.type=type;},document:{createElement:el,createElementNS:el,getElementById:()=>null},window:{matchMedia:()=>({matches:true}),
     setInterval(fn){intervals.set(++seq,fn);return seq;},clearInterval:id=>intervals.delete(id)},
     setTimeout:()=>1,clearTimeout(){}});
   // Enable timer logic but keep geometry/animation irrelevant to the test.
@@ -116,7 +116,7 @@ function harness(d=fixture()){
     {setDiagram(d){folded=c.foldPanelStates(d);},setStep(i){paints.push(plain(folded.state[i]));}},null,
     {autoplay:false,renderPath(d){rendered.push(d.steps.map(s=>s.id));return board();}});
   sp.enterStep(false);
-  return {c,sp,term,paints,rendered,intervals,tick(){[...intervals.values()].forEach(fn=>fn());}};
+  return {c,sp,term,paints,rendered,intervals,navigation,tick(){[...intervals.values()].forEach(fn=>fn());}};
 }
 test('switching paths pauses, rebuilds the chosen sequence, and stops at its own terminal step',()=>{
   const h=harness();h.term.btnPlay.fire('click');h.tick();assert.equal(h.sp.current().n,1);
@@ -158,12 +158,12 @@ test('path references round-trip through copied hashes without changing old hash
 });
 
 test('an alternate diverging at four occupies the same columns and keeps its row on selection',()=>{
-  const d=fixture();d.paths[1].steps.push('five');const h=harness(d);
+  const d=fixture();const h=harness(d);
   const matrix=h.term.chips.children[0],happy=matrix.children[0],drop=matrix.children[1];
   assert.equal(happy.children[0].textContent,'Happy path');assert.equal(drop.children[0].textContent,'Dropped signal');
-  assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4,5]);
-  assert.deepEqual(drop.children.slice(1).map(b=>b.style.gridColumn),happy.children.slice(1).map(b=>b.style.gridColumn));
-  assert.deepEqual(drop.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,false,true]);
+  assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4]);
+  assert.deepEqual(drop.children.slice(1).map(b=>b.style.gridColumn),happy.children.slice(1,5).map(b=>b.style.gridColumn));
+  assert.deepEqual(drop.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,false]);
   assert.equal(drop.children[1].style['--path-color'],d.paths[0].color);
   assert.match(drop.children[1].getAttribute('aria-label'),/shared with Happy path/);
   assert.equal(matrix.style['--path-step-count'],5);
@@ -183,18 +183,19 @@ test('an alternate diverging at four occupies the same columns and keeps its row
   drop.children[0].fire('click');assert.equal(h.sp.current().id,'one','clicking the selected path restarts at its shared first beat');
 });
 
-test('shared shadows end with their own path and use the correct ancestor for nested forks',()=>{
-  const d=fixture();d.paths.push({id:'nested',label:'Retry',steps:['one','two','three','drop','five']},
-    {id:'separate',steps:['drop']});
-  const h=harness(d),rows=h.term.chips.children[0].children,drop=rows[1],nested=rows[2],separate=rows[3];
-  assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4],'no ghost after the failure ending');
-  assert.deepEqual(nested.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,true,true]);
+test('shared prefix shadows use the correct ancestor for nested forks without inventing a join',()=>{
+  const d=fixture();d.paths.push({id:'nested',label:'Retry',steps:['one','two','three','drop']},
+    {id:'short',steps:['one','two']});
+  const h=harness(d),rows=h.term.chips.children[0].children,drop=rows[1],nested=rows[2],short=rows[3];
+  assert.deepEqual(drop.children.slice(1).map(b=>b.textContent),[1,2,3,4]);
+  assert.deepEqual(nested.children.slice(1).map(b=>b.className.includes('shared-step-shadow')),[true,true,true,true]);
   assert.equal(nested.children[1].style['--path-color'],d.paths[0].color);
-  assert.equal(separate.children.length,2);assert.match(separate.children[1].className,/shared-step-shadow/);assert.match(separate.children[1].className,/shared-downstream-step/);
-  d.paths.push({id:'nested-again',steps:['one','two','three','drop','five','four']});
+  assert.equal(short.children.length,3);
+  d.steps.push({id:'six',text:'Try again'});
+  d.paths.push({id:'nested-again',steps:['one','two','three','drop','six']});
   const deep=harness(d).term.chips.children[0].children[4];
   assert.equal(deep.children[4].style['--path-color'],d.paths[1].color);
-  assert.match(deep.children[4].getAttribute('aria-label'),/shared step; also in Dropped signal \(step 4\)/);
+  assert.match(deep.children[4].title,/Shared with Dropped signal/);
 });
 
 test('the first colored alternate selects and edits its own caption and panel patch',()=>{
@@ -285,26 +286,28 @@ test('sharing tracks source identity across different positions without confusin
   assert.deepEqual([0,1,2].map(i=>prefix.get(i).downstream),[false,false,false]);
 });
 
-test('rejoined circles keep path-specific state, explain peer positions, and survive filtered views',()=>{
+function descendants(element){return [element,...element.children.flatMap(descendants)];}
+function circle(h,index){return descendants(h.term.chips).find(e=>e.getAttribute('data-step-source')===String(index));}
+function pathChoice(h,id){return descendants(h.term.chips).find(e=>e.getAttribute('data-dv-path')===id);}
+test('one rejoined circle keeps the active path state and its number through filtered views',()=>{
   const d=fixture();
   d.paths[0].steps=['one','four','five'];d.paths[1].steps=['two','three','drop','five'];
-  const h=harness(d),matrix=h.term.chips.children[0],happy=matrix.children[0],alt=matrix.children[1];
-  const base=happy.children[3],shared=alt.children[4];
-  assert.match(base.className,/shared-downstream-step/);assert.doesNotMatch(base.className,/shared-step-shadow/);
-  assert.match(shared.className,/shared-step-shadow/);assert.equal(shared.children[0].className,'shared-step-link');
-  assert.match(base.title,/Dropped signal \(step 4\)/);assert.match(shared.title,/Happy path \(step 3\)/);
-  shared.fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.sourceIndex(),4);assert.equal(h.paints.at(-1).state,'lost');
+  const h=harness(d),shared=circle(h,4);
+  assert.equal(descendants(h.term.chips).filter(e=>e.getAttribute('data-step-source')==='4').length,1);
+  assert.equal(shared.textContent,'3');assert.match(shared.title,/Dropped signal \(step 4\)/);
+  shared.fire('click');assert.equal(h.navigation.length,0,'same-route step selection does not cancel authoring modes');
+  pathChoice(h,'dropped').fire('click');assert.equal(h.sp.current().n,0);
+  assert.equal(h.navigation.length,1,'path chips announce explicit reader navigation');
+  assert.equal(shared.textContent,'4');shared.fire('click');
+  assert.equal(h.navigation.length,1,'shared stop retains its current route');
+  assert.equal(h.sp.path(),'dropped');assert.equal(h.sp.sourceIndex(),4);assert.equal(h.paints.at(-1).state,'lost');
   assert.equal(h.term.sharedStatus.hidden,false);assert.match(h.term.sharedStatus.textContent,/Happy path \(step 3\)/);
-  base.fire('click');assert.equal(h.paints.at(-1).state,'applied');assert.equal(h.sp.path(),'happy');
-  happy.children[1].fire('click');assert.equal(h.term.sharedStatus.hidden,true);assert.equal(h.term.sharedStatus.textContent,'');
-  h.sp.setVisibleSteps(['one','five']);
-  const filtered=h.term.chips.children[0].children,filteredAlt=filtered[1].children[1];
-  assert.equal(filteredAlt.textContent,1);assert.match(filteredAlt.className,/shared-downstream-step/);
-  assert.match(filteredAlt.title,/Happy path \(step 2\)/);
-  filteredAlt.fire('click');assert.equal(h.sp.path(),'dropped');assert.equal(h.paints.at(-1).state,'lost');
-  assert.match(h.term.sharedStatus.textContent,/Happy path \(step 2\)/);
-  assert.equal(h.term.chips.children[1].className,'path-sharing-key');
-  h.sp.setVisibleSteps(['five']);
-  assert.ok(h.term.chips.children[0].children.every(row=>row.children[1].className.includes('shared-downstream-step')),
-    'hiding both inputs must not turn convergence into an ordinary prefix');
+  pathChoice(h,'happy').fire('click');shared.fire('click');assert.equal(h.paints.at(-1).state,'applied');
+  circle(h,0).fire('click');assert.equal(h.term.sharedStatus.hidden,true);
+  h.sp.setVisibleSteps(['one','five']);pathChoice(h,'dropped').fire('click');
+  assert.equal(circle(h,4).textContent,'1');circle(h,4).fire('click');assert.equal(h.paints.at(-1).state,'lost');
+  assert.match(circle(h,4).title,/Happy path \(step 2\)/);
+  h.sp.setVisibleSteps(['five']);assert.equal(circle(h,4).textContent,'1');
+  assert.equal(descendants(h.term.chips).filter(e=>e.getAttribute('data-step-source')==='4').length,1);
+  assert.match(circle(h,4).className,/shared-downstream-step/);
 });

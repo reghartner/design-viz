@@ -44,7 +44,10 @@ Inherit**. Inherit keeps the previous choice; it does not necessarily show the c
 This adds the recording card and removes the power card. Hiding a card does not
 clear its data. It can update while hidden and show the latest value when restored.
 Use `initial.clip.visible:false` to hold the recording card back until it exists.
-The phone frame keeps its size even with zero cards; long content scrolls inside.
+Resize the panel tile to shrink the whole phone, including its text, icons and cards.
+In a named layout it fits both the tile width and height, up to its normal size.
+Changing steps or removing every card does not change the frame size; long
+content scrolls inside. The optional source explanation keeps its normal text size.
 A whole-field null reset restores default visibility and unknown data.
 
 ## A phone without the source explanation

@@ -13766,8 +13766,11 @@ function bindDeviceAppSources(host, panel, state) {
 PanelViews.register('deviceapp', function (host, panel, state, skin, states, stepIdx, animate) {
   var h = '';
   var hBaseline = null;
+  // A refolded path is a new sequence, even when its ordinal follows the old one.
+  var sameSequence = host._daStates === states;
+  if (host._daStates && !sameSequence) settlePanelPresentation(host, {});
   var daFresh =
-    animate &&
+    animate && sameSequence &&
     validRevealIndex(host._daStep) &&
     validRevealIndex(stepIdx) &&
     stepIdx === host._daStep + 1;
@@ -13775,6 +13778,7 @@ PanelViews.register('deviceapp', function (host, panel, state, skin, states, ste
   var notificationFresh=daFresh && FlowNotifications.grew(host._daNotifications,notifications.notifications);
   var screen=deviceAppModel(panel,state).screen;
   var screenFresh=daFresh && host._daScreen!==screen;
+  host._daStates=states;
   host._daScreen=screen;
   host._daNotifications=notifications.notifications;
   host._daStep = validRevealIndex(stepIdx) ? stepIdx : null;

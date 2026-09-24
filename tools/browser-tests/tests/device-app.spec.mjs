@@ -200,3 +200,19 @@ test('long card lists scroll inside the phone and removing all cards keeps its o
  const after=await shell.boundingBox();expect(Math.abs(before.height-after.height)).toBeLessThan(1);expect(Math.abs(before.width-after.width)).toBeLessThan(1);
  await expect(phone.locator('.da-home')).toBeVisible();
 });
+
+test('changing paths to an adjacent ordinal does not replay screen or notification entry',async({page,server})=>{
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ const raw=structuredClone(navigationRaw),d=diagram(raw);
+ d.steps=[{id:'start',nodes:['resident']},{id:'wait',nodes:['resident']},
+  {id:'open',nodes:['resident'],panels:{app:{phoneScreen:'app',notify:{app:'Home',title:'Other path'}}}},
+  {id:'back',nodes:['resident'],panels:{app:{phoneScreen:'home'}}}];
+ d.paths=[{id:'waiting',label:'Waiting',steps:['start','wait']},{id:'opened',label:'Opened',steps:['start','open','back']}];
+ await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));const root=page.locator('#docview');
+ await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','home');
+ await root.getByRole('button',{name:'Go to step 2 on Opened',exact:true}).click();
+ await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','app');await expect(app(root).locator('.phonetitle')).toHaveText('Other path');
+ await expect(app(root).locator('.fresh')).toHaveCount(0);
+ await root.getByRole('button',{name:'Next step',exact:true}).click();
+ await expect(app(root).locator('.da-screen-home')).toHaveClass(/fresh/);
+});

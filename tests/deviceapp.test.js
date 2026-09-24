@@ -195,3 +195,14 @@ test('navigation example validates and demonstrates cards appearing and leaving 
  assert.equal(states[4].power.visible,false);assert.equal(states[5].phoneScreen,'home');assert.equal(states[6].clip.value,'Just now');
  assert.ok(!C.buildConfluenceExport(JSON.stringify(raw)).error);
 });
+
+test('switching folded sequences settles presentation even when the new path has an adjacent ordinal',()=>{
+ const p=panel();p.initial.phoneScreen='home';
+ const first=C.foldDeviceAppStates(p,[patch({}),patch({phoneScreen:'home'})]);
+ const second=C.foldDeviceAppStates(p,[patch({}),patch({phoneScreen:'app',notify:{app:'Home',title:'New path'}}),patch({phoneScreen:'home'})]);
+ const host={querySelector:()=>null};
+ C.renderPanelBody(host,p,first[0],'pastel',first,0,false);
+ C.renderPanelBody(host,p,second[1],'pastel',second,1,true);
+ assert.match(host.innerHTML,/data-da-screen="app"/);assert.match(host.innerHTML,/New path/);assert.doesNotMatch(host.innerHTML,/ fresh/);
+ C.renderPanelBody(host,p,second[2],'pastel',second,2,true);assert.match(host.innerHTML,/da-screen-home fresh/);
+});

@@ -1,6 +1,10 @@
 import {test,expect,paste} from '../helpers/test.mjs';
 import {source,editorSpec} from '../fixtures/editor-spec.mjs';
 import {pathToFileURL} from 'node:url';
+import {mkdir,writeFile,readFile,rm} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {repo} from '../helpers/prepare.mjs';
 
 function library(){
   const spec=editorSpec();spec.page.title='Reviewed delivery';spec.page.canon={version:1,id:'delivery',kind:'canonical',owner:'group:default/home'};
@@ -79,4 +83,24 @@ test('empty or invalid company libraries do not masquerade as demos and late loa
   await page.route('**/diagrams.json',async route=>{await held;await route.fulfill({json:library()});});
   await page.reload();await expect(page.locator('#welcome-library-status')).toHaveText('Loading diagrams…');
   await page.goBack();release();await expect(page.locator('#welcome-home')).toBeVisible();await expect(page.locator('#src')).not.toHaveValue(JSON.stringify(library().diagrams[0].spec,null,2));
+});
+
+
+test('a saved canon document builds into the real served library without registration',async({page,server})=>{
+  const directory=path.join(server.root,'docs/diagrams/feature'),file=path.join(directory,'story.json'),output=path.join(server.root,'diagrams.json');
+  await mkdir(directory,{recursive:true});const spec=library().diagrams[0].spec;
+  await writeFile(file,JSON.stringify(spec));
+  const publish=()=>execFileSync(process.execPath,[path.join(repo,'tools/canon/library.mjs'),'--diagrams',path.join(server.root,'docs/diagrams'),'--out',output]);
+  try{
+    publish();await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
+    await expect(page.locator('#welcome-library-status')).toContainText('Published repository snapshot · 1 diagram');
+    await page.getByRole('button',{name:/CANONICAL.*Reviewed delivery/}).click();
+    await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
+    await page.locator('#canon-reader-edit').click();await expect(page.locator('#src')).toHaveValue(JSON.stringify(spec,null,2));
+    expect(JSON.parse(await readFile(file,'utf8'))).toEqual(spec);
+    delete spec.page.canon;await writeFile(file,JSON.stringify(spec));publish();
+    await page.goto(server.origin+'/workbench.html');await page.locator('#workspace-home').click();await page.locator('#welcome-library').click();
+    await expect(page.locator('#welcome-library-status')).toContainText('snapshot is empty');
+    await expect(page.locator('.canon-library-card')).toHaveCount(0);
+  }finally{await rm(output,{force:true});await rm(path.join(server.root,'docs'),{recursive:true,force:true});}
 });

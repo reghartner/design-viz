@@ -21,7 +21,10 @@ HLD provenance; use optional `page.canon` for design/canonical ownership. Resolv
 node service/API bindings from a supplied catalog, never invent company entities.
 Attach reviewed code references with full commit SHAs and unique literal anchors;
 require stable step IDs. Canonical status and behavioral impact require human
-review. The fictional `examples/canon/` catalog is for demonstrations only. For the
+review. For the static workbench library, save the marked spec under
+`docs/diagrams/`; the Python and nginx image builds discover it automatically.
+Do not add a manual library registry entry or edit the generated `diagrams.json`.
+The fictional `examples/canon/` catalog is for demonstrations only. For the
 central repository, drift scanner, review dispositions and company adapter, use
 `docs/canon.md`. Plain PR closure never accepts a source revision; a regression
 keeps the expected story unchanged and links its issue.

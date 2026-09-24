@@ -204,7 +204,10 @@ Keep company catalogs in the company designs repository, not the public fork.
 
 ## Editor image
 
-The reference image copies the committed catalog alongside the generated editor:
+The reference image copies the committed catalog alongside the generated editor.
+It also discovers specs with `page.canon` under `docs/diagrams/` and generates
+the canon library during the image build; no separate publishing command or
+registry entry is needed. See [canon library publishing](workbench-canon-library.md).
 
 ```sh
 docker build -f deploy/workbench/Dockerfile -t flowview-workbench .

@@ -13,3 +13,6 @@ node_modules/
 /apps/confluence/static/
 /apps/confluence/preview/
 /apps/backstage/release/
+
+# Generated from reviewed specs under docs/diagrams on each build.
+/workbench/diagrams.json

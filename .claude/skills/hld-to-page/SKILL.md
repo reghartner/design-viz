@@ -152,7 +152,9 @@ Failure marks are step-local; panel and tone patches carry forward.
 For human UI walkthroughs, use **User guide** in the workbench. Its maintained
 source is `src/workbench/human-guide.html`; keep its control names and workflows
 current when changing authoring behavior. Canon library deployment and its
-read-only/edit boundary are in `docs/workbench-canon-library.md`.
+read-only/edit boundary are in `docs/workbench-canon-library.md`. Save reviewed
+`page.canon` documents under `docs/diagrams/`; standard builds discover them
+automatically. Do not maintain a second registry for the workbench library.
 
 Keep layout stable between beats. Open guided stories paused (`view:"step"`);
 set `autoplay:true` only when requested. Before publishing, stamp the spec with

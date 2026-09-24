@@ -56,7 +56,7 @@ test('canon browsing is read-only and editing is an explicit undoable handoff wi
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await page.locator('#workspace-home').click();const draft=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text);
   await page.locator('#welcome-library').click();await expect(page.locator('#welcome-library-status')).toContainText('Published repository snapshot');
-  await page.getByRole('button',{name:/CANONICAL.*Reviewed delivery/}).click();
+  await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
   await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');await expect(page.locator('#workbench-workspace')).not.toBeVisible();
   await page.locator('#canon-reader [data-dv-node="a"]').click();await page.keyboard.press('Delete');
   await page.locator('#canon-reader .path-chip').filter({hasText:'Failure'}).click();
@@ -94,7 +94,7 @@ test('a saved canon document builds into the real served library without registr
   try{
     publish();await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
     await expect(page.locator('#welcome-library-status')).toContainText('Published repository snapshot · 1 diagram');
-    await page.getByRole('button',{name:/CANONICAL.*Reviewed delivery/}).click();
+    await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
     await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
     await page.locator('#canon-reader-edit').click();await expect(page.locator('#src')).toHaveValue(JSON.stringify(spec,null,2));
     expect(JSON.parse(await readFile(file,'utf8'))).toEqual(spec);
@@ -103,4 +103,57 @@ test('a saved canon document builds into the real served library without registr
     await expect(page.locator('#welcome-library-status')).toContainText('snapshot is empty');
     await expect(page.locator('.canon-library-card')).toHaveCount(0);
   }finally{await rm(output,{force:true});await rm(path.join(server.root,'docs'),{recursive:true,force:true});}
+});
+
+
+test('published diagram links open directly in fresh tabs, preserve drafts, and copy a stable URL',async({page,server})=>{
+  await page.context().route('**/diagrams.json',route=>route.fulfill({json:library()}));
+  await page.addInitScript(()=>{Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copiedLink=text;}}});});
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  await page.locator('#workspace-home').click();
+  const draft=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text);
+  await page.locator('#welcome-library').click();
+  const card=page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}),url=server.origin+'/workbench.html?diagram=delivery';
+  await expect(card).toHaveAttribute('href',url);
+  // This new browser tab has no workbench history entry or selected diagram state.
+  const fresh=await page.context().newPage();await fresh.goto(await card.getAttribute('href'));
+  await expect(fresh.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
+  await expect(fresh.locator('#workbench-workspace')).not.toBeVisible();
+  expect(await fresh.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text)).toBe(draft);
+  await fresh.reload();await expect(fresh.locator('#canon-reader-edit')).toBeEnabled();
+  await fresh.close();
+  await card.click();await expect(page).toHaveURL(url);
+  await page.getByRole('button',{name:'Copy link',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>window.copiedLink)).toBe(url);
+  await page.goBack();await expect(screen(page,'library')).toBeVisible();expect(new URL(page.url()).searchParams.has('diagram')).toBe(false);
+  await page.goForward();await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
+  await page.locator('#canon-reader-edit').click();expect(new URL(page.url()).searchParams.has('diagram')).toBe(false);
+  await expect(page.locator('#src')).toHaveValue(JSON.stringify(library().diagrams[0].spec,null,2));
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+});
+
+test('direct readers report missing documents and snapshots, retry, and offer a manual copy fallback',async({page,server,audit})=>{
+  let data=library(),missing=false,backendCalls=0;
+  await page.route('**/diagrams.json',route=>missing?route.fulfill({status:404,body:'No published snapshot'}):route.fulfill({json:data}));
+  await page.route('**/api/canon/**',route=>{backendCalls++;return route.fulfill({status:500});});
+  await page.addInitScript(()=>{
+    Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>Promise.reject(new Error('Denied'))}});
+    document.execCommand=()=>false;
+  });
+  await page.goto(server.origin+'/workbench.html?diagram=delivery&canon=old&review=secret');
+  await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');expect(backendCalls).toBe(0);
+  await page.getByRole('button',{name:'Copy link',exact:true}).click();
+  await expect(page.getByRole('textbox',{name:'Copy this link manually'})).toHaveValue(server.origin+'/workbench.html?diagram=delivery');
+  await page.goto(server.origin+'/workbench.html?diagram=missing');
+  await expect(page.locator('#canon-reader-error')).toContainText('no longer in the published library');
+  await expect(page.locator('#canon-reader-edit')).toBeDisabled();await expect(page.locator('#canon-reader-copy')).toBeDisabled();
+  missing=true;await page.goto(server.origin+'/workbench.html?diagram=delivery');
+  await expect(page.locator('#canon-reader-error')).toContainText('No published diagram library');
+  await expect(page.locator('#canon-reader .doc-sec')).toHaveCount(0);
+  await page.waitForLoadState('networkidle');
+  // This test intentionally exercises an actual HTTP 404. Keep every other
+  // browser/network failure subject to the shared audit.
+  const expected=['HTTP 404: '+server.origin+'/diagrams.json','console: Failed to load resource: the server responded with a status of 404 (Not Found)'];
+  for(const message of expected){expect(audit).toContain(message);audit.splice(audit.indexOf(message),1);}
+  missing=false;await page.locator('#canon-reader-retry').click();await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
 });

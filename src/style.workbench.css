@@ -1054,12 +1054,12 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .welcome-library-entry{display:flex;justify-content:space-between;align-items:center;gap:24px;width:100%;margin:20px 0 0;padding:19px 25px;border:1px solid #d6d1e5;border-radius:14px;background:linear-gradient(110deg,#f1edfa,#f3f8f5);text-align:left;color:#343c55;cursor:pointer;font:inherit}
 .welcome-library-entry>span:first-child{display:flex;align-items:baseline;gap:20px}.welcome-library-entry b{font-size:16px}.welcome-library-entry span span{font-size:13px;color:#667084}
 .canon-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;margin:28px 0 50px}
-.canon-library-card{display:flex;flex-direction:column;align-items:flex-start;gap:17px;padding:28px;text-align:left;border:1px solid #dcd7e8;border-radius:18px;background:linear-gradient(145deg,#fff,#f6f3fc);font:inherit;color:#3b4560;cursor:pointer;min-height:240px}
+.canon-library-card{text-decoration:none;display:flex;flex-direction:column;align-items:flex-start;gap:17px;padding:28px;text-align:left;border:1px solid #dcd7e8;border-radius:18px;background:linear-gradient(145deg,#fff,#f6f3fc);font:inherit;color:#3b4560;cursor:pointer;min-height:240px}
 .canon-library-card:hover{border-color:#a79acb;box-shadow:0 8px 26px #71639514}.canon-library-card strong{font-size:23px;line-height:1.4}.canon-library-card>span{font-size:13px}
 .canon-library-badge{font:10px/1.4 system-ui,sans-serif!important;font-weight:750!important;letter-spacing:1.2px;color:#6a6090;background:#eae5f4;padding:6px 9px;border-radius:6px}
 .canon-library-owner{color:#7a8194;overflow-wrap:anywhere}.canon-library-action{margin-top:auto;color:#7161a3;font-weight:650}
-.canon-reader-toolbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}.canon-reader-toolbar .welcome-back{margin:0}.canon-reader-toolbar #canon-reader-edit{margin-left:auto}
-#canon-reader{margin:28px 0 50px;max-width:none}/* History-only reader: document copy links require a hosted standalone viewer. */
+.canon-reader-toolbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}.canon-reader-toolbar .welcome-back{margin:0}.canon-reader-toolbar #canon-reader-copy{margin-left:auto;min-width:108px}.canon-reader-toolbar #canon-reader-copy svg{width:18px;height:18px}.canon-reader-toolbar .copyfallback{flex:1;min-width:140px;max-width:450px}
+#canon-reader{margin:28px 0 50px;max-width:none}/* Step and embed links still use the standalone viewer. */
 #canon-reader .copychip{display:none}#welcome-reader-screen h1{font-size:29px;letter-spacing:-.6px}
 .welcome:has(#welcome-reader-screen:not([hidden])){max-width:none}#canon-reader .doc-title{display:none}
 @media(max-width:760px){.welcome-library-entry>span:first-child{display:grid;gap:5px}.canon-reader-toolbar{flex-wrap:wrap}}

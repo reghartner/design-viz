@@ -370,7 +370,8 @@ layouts, catalogs, and sharing. **Canon diagrams** on welcome opens the
 [read-only repository library](docs/workbench-canon-library.md), with an explicit
 **Edit in Workbench** handoff. Save a spec with `page.canon` under `docs/diagrams/`;
 the normal build and nginx image build discover it automatically. No separate
-library registry entry is needed.
+library registry entry is needed. Use **Copy link** in the reader to share a
+direct `?diagram=<canon-id>` URL before Backstage is connected.
 
 Open `workbench/flowspec.html` to **Paste JSON**, **Open file**, or start a **New project**
 from a curated template or a blank diagram. The [welcome guide](docs/workbench-welcome.md)

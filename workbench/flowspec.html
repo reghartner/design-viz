@@ -1803,12 +1803,12 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .welcome-library-entry{display:flex;justify-content:space-between;align-items:center;gap:24px;width:100%;margin:20px 0 0;padding:19px 25px;border:1px solid #d6d1e5;border-radius:14px;background:linear-gradient(110deg,#f1edfa,#f3f8f5);text-align:left;color:#343c55;cursor:pointer;font:inherit}
 .welcome-library-entry>span:first-child{display:flex;align-items:baseline;gap:20px}.welcome-library-entry b{font-size:16px}.welcome-library-entry span span{font-size:13px;color:#667084}
 .canon-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;margin:28px 0 50px}
-.canon-library-card{display:flex;flex-direction:column;align-items:flex-start;gap:17px;padding:28px;text-align:left;border:1px solid #dcd7e8;border-radius:18px;background:linear-gradient(145deg,#fff,#f6f3fc);font:inherit;color:#3b4560;cursor:pointer;min-height:240px}
+.canon-library-card{text-decoration:none;display:flex;flex-direction:column;align-items:flex-start;gap:17px;padding:28px;text-align:left;border:1px solid #dcd7e8;border-radius:18px;background:linear-gradient(145deg,#fff,#f6f3fc);font:inherit;color:#3b4560;cursor:pointer;min-height:240px}
 .canon-library-card:hover{border-color:#a79acb;box-shadow:0 8px 26px #71639514}.canon-library-card strong{font-size:23px;line-height:1.4}.canon-library-card>span{font-size:13px}
 .canon-library-badge{font:10px/1.4 system-ui,sans-serif!important;font-weight:750!important;letter-spacing:1.2px;color:#6a6090;background:#eae5f4;padding:6px 9px;border-radius:6px}
 .canon-library-owner{color:#7a8194;overflow-wrap:anywhere}.canon-library-action{margin-top:auto;color:#7161a3;font-weight:650}
-.canon-reader-toolbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}.canon-reader-toolbar .welcome-back{margin:0}.canon-reader-toolbar #canon-reader-edit{margin-left:auto}
-#canon-reader{margin:28px 0 50px;max-width:none}/* History-only reader: document copy links require a hosted standalone viewer. */
+.canon-reader-toolbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}.canon-reader-toolbar .welcome-back{margin:0}.canon-reader-toolbar #canon-reader-copy{margin-left:auto;min-width:108px}.canon-reader-toolbar #canon-reader-copy svg{width:18px;height:18px}.canon-reader-toolbar .copyfallback{flex:1;min-width:140px;max-width:450px}
+#canon-reader{margin:28px 0 50px;max-width:none}/* Step and embed links still use the standalone viewer. */
 #canon-reader .copychip{display:none}#welcome-reader-screen h1{font-size:29px;letter-spacing:-.6px}
 .welcome:has(#welcome-reader-screen:not([hidden])){max-width:none}#canon-reader .doc-title{display:none}
 @media(max-width:760px){.welcome-library-entry>span:first-child{display:grid;gap:5px}.canon-reader-toolbar{flex-wrap:wrap}}
@@ -8499,7 +8499,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
       </section>
       <section id="hg-views" tabindex="-1"><p class="human-guide-eyebrow">08 / LAYOUTS & AUDIENCES</p><h3>One story. More than one useful view.</h3><p>Choose <b>Arrange section</b> to position and resize the diagram, panels, and step controls. Use <b>View name</b> for reader-facing names such as “At home” and “Service flow.” Duplicate a view, then tailor it for another audience.</p><p>Under <b>Visible elements</b>, each panel and the data diagram has its own checkbox for the selected layout. Hide Home in the engineering view or hide Data flow in the customer view. <b>Optimize layout</b> arranges the visible elements and respects the hidden set. <b>Make default</b> chooses the opening view. Property edits, Undo/Redo, and host preview changes keep your current view selected. Opening another project uses its own default; deleting the selected view falls back to the remaining default. <b>Done arranging</b> returns to ordinary use.</p><p>Attach the step controls to Home or Data flow to keep them in the same outlined frame, or detach them for independent placement. Resize attached controls with their height adjustment. Under <b>Steps shown in this view</b>, select only the stops that audience needs. <strong>Skipped steps still happen:</strong> their effects carry forward. This shortens the presentation, not the story.</p><p>Preview <b>Responsive</b>, <b>Backstage</b>, or <b>Confluence</b> to tune space for the destination. These are layout previews, not live connections to those products. Named views are the complete set of view buttons; create a view named “Data flow” if you want one alongside your other arrangements.</p>
       </section>
-      <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Canon diagrams</b> on the home page opens the published library read-only. You can play steps, switch paths and views, and follow evidence links. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process. Specs saved under <code>docs/diagrams/</code> with a <code>page.canon</code> block are discovered by the normal build and published on deployment. No separate library registry entry is needed.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships; they do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, choose <b>File → Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, choose <b>File → Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
+      <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Canon diagrams</b> on the home page opens the published library read-only. You can play steps, switch paths and views, and follow evidence links. <b>Copy link</b> shares a direct read-only URL to a published diagram, even before Backstage is connected. You can also open a library card in a new tab. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process. Specs saved under <code>docs/diagrams/</code> with a <code>page.canon</code> block are discovered by the normal build and published on deployment. No separate library registry entry is needed.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships; they do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, choose <b>File → Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, choose <b>File → Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
       </section>
       <section id="hg-reuse" tabindex="-1"><p class="human-guide-eyebrow">10 / COPY & REUSE</p><h3>Choose whether the relationship should stay shared.</h3><p>Use <b>Copy</b>, <b>Paste…</b>, and <b>Duplicate</b> for selected nodes, panels, or sections. Multi-select nodes to copy a group; internal connections travel with them when both endpoints are included. A copied section includes its story and alternate paths. A copied panel carries its layout and starting state, not the current step’s animation.</p><p>In Home’s shared layout inspector, use <b>Copy element</b> or <b>Duplicate element</b> for its contents. For story events, use <b>Reuse steps…</b>: copying creates an independent event, while sharing deliberately keeps one event on multiple paths. Consecutive shared events can form a common middle block or ending. Check <b>Destination preview</b> to see the state they receive from this path’s earlier steps. Undo reverses an operation as a unit.</p><p><kbd>⌘/Ctrl C</kbd>, <kbd>⌘/Ctrl V</kbd>, and <kbd>⌘/Ctrl D</kbd> operate on diagram objects outside text fields. Inside a text field, normal text editing takes priority. If clipboard permission is unavailable, <b>Paste…</b> provides a manual text option.</p>
       </section>
@@ -8557,7 +8557,8 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
       <div id="welcome-library-grid" class="canon-library-grid"></div>
     </div>
     <div id="welcome-reader-screen" class="welcome-screen canon-reader-screen" hidden>
-      <div class="canon-reader-toolbar"><button class="welcome-back" type="button" data-welcome-back>← Back</button><span class="canon-library-badge">READ ONLY</span><button id="canon-reader-edit" class="welcome-button welcome-button-primary" type="button" disabled>Edit in Workbench →</button></div>
+      <div class="canon-reader-toolbar"><button class="welcome-back" type="button" data-welcome-back>← Back</button><span class="canon-library-badge">READ ONLY</span><button id="canon-reader-copy" class="welcome-button" type="button" aria-label="Copy link" title="Copy a direct link to this published diagram" disabled>Copy link</button>
+      <button id="canon-reader-edit" class="welcome-button welcome-button-primary" type="button" disabled>Edit in Workbench →</button></div>
       <h1 id="canon-reader-title" tabindex="-1">Diagram</h1><p id="canon-reader-origin" class="welcome-note"></p>
       <p class="welcome-note">Editing opens a local copy. Save and submit changes through your team’s repository review process.</p>
       <p id="canon-reader-error" class="welcome-error" role="alert" hidden></p><button id="canon-reader-retry" class="welcome-button" type="button" hidden>Retry loading diagram</button>
@@ -39648,15 +39649,16 @@ function initWorkbenchLibrary(opts){
   var reader=document.getElementById('canon-reader'),error=document.getElementById('canon-reader-error');
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
-  var pending=null,entries=[],origin='',ctl=null,active=null,sequence=0,current=null;
+  var copy=document.getElementById('canon-reader-copy');
+  var pending=null,entries=[],origin='',published=false,ctl=null,active=null,sequence=0,current=null;
   function stop(){
-    sequence++;active=null;current=null;edit.disabled=true;
+    sequence++;active=null;current=null;edit.disabled=true;copy.disabled=true;removeManualCopyField(copy);
     if(ctl)ctl.destroy();ctl=null;reader.replaceChildren();
   }
   function load(){
     if(pending)return pending;
     pending=(async function(){
-      var raw=opts.builtin;
+      var raw=opts.builtin;published=false;
       origin='Fictional example · no company library configured';
       if(location.protocol!=='file:'){
         var response=await fetch('diagrams.json',{cache:'no-cache'});
@@ -39665,7 +39667,7 @@ function initWorkbenchLibrary(opts){
           if(Number(response.headers.get('content-length'))>30*1024*1024)throw new Error('Library exceeds 30 MB.');
           var text=await response.text();
           if(new TextEncoder().encode(text).length>30*1024*1024)throw new Error('Library exceeds 30 MB.');
-          raw=JSON.parse(text);origin='Published repository snapshot';
+          raw=JSON.parse(text);origin='Published repository snapshot';published=true;
         }
       }else origin='Bundled fictional example · offline';
       entries=parseCanonLibrary(raw);return entries;
@@ -39675,14 +39677,18 @@ function initWorkbenchLibrary(opts){
   function cards(){
     grid.replaceChildren();
     entries.forEach(function(entry){
-      var button=document.createElement('button');button.type='button';button.className='canon-library-card';
+      var button=document.createElement(published?'a':'button');button.className='canon-library-card';
+      if(published)button.href=canonDiagramURL(location.href,entry.id);else button.type='button';
       var badge=document.createElement('span');badge.className='canon-library-badge';badge.textContent=entry.spec.page.canon.kind==='canonical'?'CANONICAL · READ ONLY':'DESIGN · READ ONLY';
       var name=document.createElement('strong');name.textContent=entry.title;
       var detail=document.createElement('span');detail.textContent=starterCountLine(entry.spec);
       var owner=document.createElement('span');owner.className='canon-library-owner';owner.textContent=entry.spec.page.canon.owner || entry.id;
       var action=document.createElement('span');action.className='canon-library-action';action.textContent='View diagram →';
       button.append(badge,name,detail,owner,action);
-      button.addEventListener('click',function(){opts.open(entry.id);});grid.appendChild(button);
+      button.addEventListener('click',function(event){
+        if(published && (event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey))return;
+        event.preventDefault();opts.open(entry.id,published);
+      });grid.appendChild(button);
     });
   }
   async function show(screen,id){
@@ -39695,12 +39701,13 @@ function initWorkbenchLibrary(opts){
       if(screen==='library'){
         cards();status.textContent=origin+' · '+entries.length+' diagram'+(entries.length===1?'':'s')+(entries.length?'':'. Your repository snapshot is empty.');return;
       }
+      if(opts.shareable() && !published)throw new Error('No published diagram library is available at this address. Publish the site’s diagrams.json and retry.');
       current=entries.find(function(entry){return entry.id===id;});
       if(!current)throw new Error('This diagram is no longer in the published library. Return to Canon diagrams to choose another.');
       title.textContent=current.title;
       document.getElementById('canon-reader-origin').textContent=origin+' · Reading does not change your draft.';
       var spec=JSON.parse(JSON.stringify(current.spec));
-      ctl=renderPage(reader,normalize(spec),spec.page.skin,null,{autoplay:false});edit.disabled=false;
+      ctl=renderPage(reader,normalize(spec),spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
     }catch(ex){
       if(token!==sequence)return;
       current=null;edit.disabled=true;
@@ -39708,6 +39715,7 @@ function initWorkbenchLibrary(opts){
       else {title.textContent='Diagram unavailable';error.textContent=ex.message;error.hidden=false;readerRetry.hidden=false;}
     }
   }
+  bindCopyControl(window,copy,function(){return canonDiagramURL(location.href,current.id);});
   function refresh(){pending=null;show(active,opts.selected());}
   retry.addEventListener('click',refresh);readerRetry.addEventListener('click',refresh);
   edit.addEventListener('click',function(){
@@ -39758,6 +39766,11 @@ function welcomeAgentPrompt(kind, brief, audience, repository){
   ].join('\n');
 }
 
+/* Stable public links identify a document, independent of its source filename. */
+function canonDiagramURL(href,id){
+  var url=new URL(href);url.search='';url.hash='';url.searchParams.set('diagram',id);return url.href;
+}
+
 /* Screens are history entries, not project snapshots. The small visit marker
    only retires an old Canon attachment; authored text stays in the draft owner. */
 function createWelcomeNavigation(win, initial, changed){
@@ -39771,6 +39784,10 @@ function createWelcomeNavigation(win, initial, changed){
   }
   var current=read(win.history.state), retiredVisits=new Set();
   if(!current)current={v:1,screen:initial,visit:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),depth:0,canon:!!new URL(win.location.href).searchParams.get('canon')};
+  var linked=new URL(win.location.href).searchParams;
+  if(linked.has('diagram')){
+    current=Object.assign({},current,{screen:'reader',diagram:linked.get('diagram'),shareable:true,canon:false});
+  }
   function wasRetired(route){
     var retired=!!route.retired || retiredVisits.has(route.visit);
     try{retired=retired || win.sessionStorage.getItem(retiredPrefix+route.visit)==='1';}catch(ex){}
@@ -39795,16 +39812,25 @@ function createWelcomeNavigation(win, initial, changed){
     });
     win.history.replaceState(win.history.state,'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
   }
-  function write(screen,replace,diagram){
+  function write(screen,replace,diagram,shareable){
     var selected=diagram===undefined?current.diagram:diagram;
+    var published=shareable===undefined?current.shareable!==false:shareable;
     current={v:1,screen:screen,visit:current.visit,depth:current.depth+(replace?0:1),canon:!!current.canon,retired:retired};
-    if(screen==='reader' && typeof selected==='string' && selected.length<=200)current.diagram=selected;
-    win.history[replace?'replaceState':'pushState'](stateWith(current),'');
+    if(screen==='reader' && typeof selected==='string'){
+      current.diagram=selected;current.shareable=published;
+    }
+    var url=new URL(win.location.href);
+    var fields=url.search.slice(1).split('&').filter(function(field){
+      var params=new URLSearchParams(field);
+      return field && !params.has('diagram') && (screen!=='reader' || !params.has('canon') && !params.has('review'));
+    });
+    if(screen==='reader' && published && typeof selected==='string')fields.push('diagram='+encodeURIComponent(selected));
+    win.history[replace?'replaceState':'pushState'](stateWith(current),'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
     cleanCanon();
   }
-  function move(screen,replace,focus,diagram){
+  function move(screen,replace,focus,diagram,shareable){
     if(names.indexOf(screen)<0)return;
-    if(screen!==current.screen || replace || diagram!==undefined && diagram!==current.diagram)write(screen,!!replace,diagram);
+    if(screen!==current.screen || replace || diagram!==undefined && diagram!==current.diagram)write(screen,!!replace,diagram,shareable);
     changed(screen,focus);
   }
   function pop(){
@@ -39820,8 +39846,9 @@ function createWelcomeNavigation(win, initial, changed){
   return {
     screen:function(){return current.screen;},
     diagram:function(){return current.diagram;},
+    shareable:function(){return current.shareable!==false;},
     retired:function(){return retired;},
-    go:function(screen,diagram){move(screen,false,true,diagram);},
+    go:function(screen,diagram,shareable){move(screen,false,true,diagram,shareable);},
     replace:function(screen,focus){move(screen,true,focus);},
     back:function(){if(current.depth>0)win.history.back();else move('home',false,true);},
     localProject:function(){
@@ -40051,7 +40078,7 @@ function initWorkbenchWelcome(opts){
   });
   renderTemplates(); updatePrompt();
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
-  library=initWorkbenchLibrary({builtin:opts.canon,selected:navigation.diagram,open:function(id){navigation.go('reader',id);},edit:function(spec){builder.loadSpec(spec);enterEditor();}});
+  library=initWorkbenchLibrary({builtin:opts.canon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec){builder.loadSpec(spec);enterEditor();}});
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});
   return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor,

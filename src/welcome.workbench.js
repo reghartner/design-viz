@@ -36,6 +36,11 @@ function welcomeAgentPrompt(kind, brief, audience, repository){
   ].join('\n');
 }
 
+/* Stable public links identify a document, independent of its source filename. */
+function canonDiagramURL(href,id){
+  var url=new URL(href);url.search='';url.hash='';url.searchParams.set('diagram',id);return url.href;
+}
+
 /* Screens are history entries, not project snapshots. The small visit marker
    only retires an old Canon attachment; authored text stays in the draft owner. */
 function createWelcomeNavigation(win, initial, changed){
@@ -49,6 +54,10 @@ function createWelcomeNavigation(win, initial, changed){
   }
   var current=read(win.history.state), retiredVisits=new Set();
   if(!current)current={v:1,screen:initial,visit:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),depth:0,canon:!!new URL(win.location.href).searchParams.get('canon')};
+  var linked=new URL(win.location.href).searchParams;
+  if(linked.has('diagram')){
+    current=Object.assign({},current,{screen:'reader',diagram:linked.get('diagram'),shareable:true,canon:false});
+  }
   function wasRetired(route){
     var retired=!!route.retired || retiredVisits.has(route.visit);
     try{retired=retired || win.sessionStorage.getItem(retiredPrefix+route.visit)==='1';}catch(ex){}
@@ -73,16 +82,25 @@ function createWelcomeNavigation(win, initial, changed){
     });
     win.history.replaceState(win.history.state,'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
   }
-  function write(screen,replace,diagram){
+  function write(screen,replace,diagram,shareable){
     var selected=diagram===undefined?current.diagram:diagram;
+    var published=shareable===undefined?current.shareable!==false:shareable;
     current={v:1,screen:screen,visit:current.visit,depth:current.depth+(replace?0:1),canon:!!current.canon,retired:retired};
-    if(screen==='reader' && typeof selected==='string' && selected.length<=200)current.diagram=selected;
-    win.history[replace?'replaceState':'pushState'](stateWith(current),'');
+    if(screen==='reader' && typeof selected==='string'){
+      current.diagram=selected;current.shareable=published;
+    }
+    var url=new URL(win.location.href);
+    var fields=url.search.slice(1).split('&').filter(function(field){
+      var params=new URLSearchParams(field);
+      return field && !params.has('diagram') && (screen!=='reader' || !params.has('canon') && !params.has('review'));
+    });
+    if(screen==='reader' && published && typeof selected==='string')fields.push('diagram='+encodeURIComponent(selected));
+    win.history[replace?'replaceState':'pushState'](stateWith(current),'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
     cleanCanon();
   }
-  function move(screen,replace,focus,diagram){
+  function move(screen,replace,focus,diagram,shareable){
     if(names.indexOf(screen)<0)return;
-    if(screen!==current.screen || replace || diagram!==undefined && diagram!==current.diagram)write(screen,!!replace,diagram);
+    if(screen!==current.screen || replace || diagram!==undefined && diagram!==current.diagram)write(screen,!!replace,diagram,shareable);
     changed(screen,focus);
   }
   function pop(){
@@ -98,8 +116,9 @@ function createWelcomeNavigation(win, initial, changed){
   return {
     screen:function(){return current.screen;},
     diagram:function(){return current.diagram;},
+    shareable:function(){return current.shareable!==false;},
     retired:function(){return retired;},
-    go:function(screen,diagram){move(screen,false,true,diagram);},
+    go:function(screen,diagram,shareable){move(screen,false,true,diagram,shareable);},
     replace:function(screen,focus){move(screen,true,focus);},
     back:function(){if(current.depth>0)win.history.back();else move('home',false,true);},
     localProject:function(){
@@ -329,7 +348,7 @@ function initWorkbenchWelcome(opts){
   });
   renderTemplates(); updatePrompt();
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
-  library=initWorkbenchLibrary({builtin:opts.canon,selected:navigation.diagram,open:function(id){navigation.go('reader',id);},edit:function(spec){builder.loadSpec(spec);enterEditor();}});
+  library=initWorkbenchLibrary({builtin:opts.canon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec){builder.loadSpec(spec);enterEditor();}});
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});
   return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor,

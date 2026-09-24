@@ -137,3 +137,37 @@ test('canon library navigation retains only the diagram ID across Back, Forward 
   assert.equal(win.history.length,3);assert.equal(win.location.hash,'#host');
   restored.go('editor');assert.equal(restored.diagram(),undefined);
 });
+
+
+test('public canon URLs open a reader on a fresh visit and preserve navigation and host state',()=>{
+  const win=navigationWindow('https://example.test/workbench.html?host=a%20b&diagram=door%2Fbell&canon=old&review=123#part',{
+    state:{hostMarker:'kept',flowviewWorkbenchEntry:{v:1,screen:'editor',visit:'old',depth:0}}
+  });
+  const nav=context.createWelcomeNavigation(win,'editor',()=>{});
+  assert.equal(nav.screen(),'reader');assert.equal(nav.diagram(),'door/bell');assert.equal(nav.shareable(),true);
+  assert.equal(win.history.length,1);assert.equal(win.history.state.hostMarker,'kept');
+  assert.equal(win.location.href,'https://example.test/workbench.html?host=a%20b&diagram=door%2Fbell#part');
+  nav.go('editor');assert.equal(win.location.search,'?host=a%20b');
+  win.history.back();assert.equal(nav.screen(),'reader');assert.equal(nav.diagram(),'door/bell');
+  win.history.forward();assert.equal(nav.screen(),'editor');
+  const fresh=navigationWindow(context.canonDiagramURL(win.location.href,'another & door'));
+  const direct=context.createWelcomeNavigation(fresh,'home',()=>{});
+  assert.equal(direct.screen(),'reader');assert.equal(direct.diagram(),'another & door');
+  assert.equal(fresh.location.href,'https://example.test/workbench.html?diagram=another%20%26%20door');
+});
+
+test('shared links exclude review context and viewer fragments; demos retain history without a public URL',()=>{
+  assert.equal(context.canonDiagramURL('https://example.test/prefix/editor/?canon=old&review=secret&diagram=old#s=three','doorbell'),
+    'https://example.test/prefix/editor/?diagram=doorbell');
+  const win=navigationWindow(),nav=context.createWelcomeNavigation(win,'home',()=>{});
+  nav.go('library');nav.go('reader','doorbell',false);
+  assert.equal(nav.diagram(),'doorbell');assert.equal(nav.shareable(),false);
+  assert.equal(win.location.search,'?layout=backstage');
+  const restored=context.createWelcomeNavigation(win,'home',()=>{});
+  assert.equal(restored.screen(),'reader');assert.equal(restored.shareable(),false);
+  restored.go('library');restored.go('reader','published',true);
+  assert.equal(win.location.search,'?layout=backstage&diagram=published');
+  assert.equal(restored.shareable(),true);
+  const empty=context.createWelcomeNavigation(navigationWindow('https://example.test/?diagram='),'editor',()=>{});
+  assert.equal(empty.screen(),'reader');assert.equal(empty.diagram(),'');
+});

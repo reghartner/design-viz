@@ -5,6 +5,7 @@ import {test,expect,paste} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'examples/shared-downstream/shared-downstream.spec.json'),'utf8');
 const blocksSource=await readFile(path.join(repo,'examples/shared-downstream/shared-blocks.spec.json'),'utf8');
+const threeSource=await readFile(path.join(repo,'examples/shared-downstream/three-shared-tracks.spec.json'),'utf8');
 const raw=JSON.parse(source),blocksRaw=JSON.parse(blocksSource);
 const diagram=spec=>spec.page.sections[0].diagram;
 const sourceIndex=(spec,id)=>diagram(spec).steps.findIndex(step=>step.id===id);
@@ -45,7 +46,7 @@ async function checkGeometry(root){
 async function checkShared(root){
  await expect(root.locator('.path-timeline')).toHaveCount(1);await expect(root.locator('.path-matrix')).toHaveCount(0);
  await expect(root.locator('.path-shared-block,.path-shared-heading,.path-shared-caption')).toHaveCount(0);
- expect(await root.locator('.path-timeline').evaluate(el=>el.offsetHeight)).toBeLessThanOrEqual(90);
+ expect(await root.locator('.path-timeline').evaluate(el=>el.offsetHeight)).toBeLessThanOrEqual(76);
  await expect(root.locator('.shared-step-link')).toHaveCount(0);
  for(const index of [processIndex,persistIndex,notifyIndex]){
   await expect(step(root,index)).toHaveCount(1);await expect(step(root,index)).toHaveClass(/shared-downstream-step/);
@@ -134,7 +135,7 @@ test('middle shared operations split and rejoin with route state intact while of
  const readout=id=>root.locator('.pt-state[data-dv-panel="'+d.panels.findIndex(panel=>panel.id===id)+'"] .preadout');
  const log=root.locator('.pt-log'),next=root.getByRole('button',{name:'Next step',exact:true});
  await expect(root.locator('.path-timeline')).toHaveCount(1);await expect(root.locator('.path-matrix')).toHaveCount(0);
- expect(await root.locator('.path-timeline').evaluate(el=>el.offsetHeight)).toBeLessThanOrEqual(170);
+ expect(await root.locator('.path-timeline').evaluate(el=>el.offsetHeight)).toBeLessThanOrEqual(108);
  await expect(root.locator('.path-shared-block,.path-shared-heading,.path-shared-caption')).toHaveCount(0);
  for(const index of [indices.store,indices.index,indices.ready]){
   await expect(step(root,index)).toHaveCount(1);await expect(step(root,index)).toHaveClass(/shared-downstream-step/);
@@ -176,4 +177,22 @@ test('middle shared operations split and rejoin with route state intact while of
  await expect(log).toContainText('Offline: recording request not sent');await expect(log).not.toContainText('Recording stored');await expect(log).not.toContainText('Clip ready');
  await expect(root.locator('.shared-downstream-step[aria-current="true"]')).toHaveCount(0);
  await expect(root.locator('.step-shared-note')).toBeHidden();await expect(next).toBeDisabled();await expect(root.locator('.playback-status')).toHaveText('Paused · reduced motion');
+});
+
+test('three tracks converge without reserving an extra row or changing path state',async({page,server},testInfo)=>{
+ const root=await standalone(page,server,'three-tracks',threeSource);
+ await expect(root.locator('.shared-downstream-step')).toHaveCount(3);
+ const geometry=await root.locator('.path-timeline').evaluate(el=>({width:el.offsetWidth,height:el.offsetHeight}));
+ expect(geometry.height).toBeLessThanOrEqual(108);expect(geometry.width).toBeLessThanOrEqual(600);
+ await checkGeometry(root);
+ for(const [id,origin,number] of [['button','Button',3],['motion','Motion',4],['sound','Sound',5]]){
+  await route(root,id).click();
+  const shared=root.locator('.shared-downstream-step');
+  await shared.first().click();await expect(shared.first()).toHaveText(String(number));
+  await expect(root.locator('.pt-state .preadout')).toHaveText(origin);
+  await shared.last().click();await expect(root.getByRole('button',{name:'Next step',exact:true})).toBeDisabled();
+  await expect(root.locator('.pt-log')).toContainText('Notify resident');
+  await expect(root.locator('.pt-state .preadout')).toHaveText(origin);
+ }
+ await page.screenshot({path:testInfo.outputPath('three-shared-tracks-packed.png'),fullPage:true});
 });

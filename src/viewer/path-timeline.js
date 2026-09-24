@@ -1,26 +1,40 @@
+/* Pack shared tracks into existing rows where unrelated routes leave room.
+   Reserve whole track spans, not just circles, so a common track cannot appear
+   to join an unrelated path passing through the same columns. */
+function pathTimelineRows(paths,graph){
+  var lanes=new Map(paths.map(function(path,index){return [path.id,index];}));
+  var byId=new Map(graph.nodes.map(function(node){return [node.id,node];}));
+  var occupied=[],shared=new Map();
+  paths.forEach(function(path){
+    var columns=graph.nodes.filter(function(node){return node.pathIds.indexOf(path.id)>=0;}).map(function(node){return node.column;});
+    if(columns.length)occupied.push({pathId:path.id,row:lanes.get(path.id),first:Math.min.apply(null,columns),last:Math.max.apply(null,columns)});
+  });
+  graph.blocks.forEach(function(block){
+    var columns=block.nodeIds.map(function(id){return byId.get(id).column;});
+    var first=Math.min.apply(null,columns),last=Math.max.apply(null,columns);
+    var ideal=block.pathIds.reduce(function(sum,id){return sum+lanes.get(id);},0)/block.pathIds.length;
+    function clear(row){return !occupied.some(function(track){
+      if(track.pathId!==undefined && block.pathIds.indexOf(track.pathId)>=0)return false;
+      return track.first<=last && first<=track.last && Math.abs(track.row-row)<1;
+    });}
+    var candidates=[ideal];
+    for(var row=0;row<=paths.length+graph.blocks.length;row+=.5)candidates.push(row);
+    candidates.sort(function(a,b){return Math.abs(a-ideal)-Math.abs(b-ideal) || a-b;});
+    var chosen=candidates.find(clear);
+    shared.set(block.id,chosen);occupied.push({row:chosen,first:first,last:last});
+  });
+  return {lanes:lanes,shared:shared};
+}
+
 /* Presentation of a pathTimelineGraph. Positions are derived from the graph,
    not the selected path; switching outcomes only changes paint and numbering.
    No runtime state is combined here and no document listeners are retained. */
 function createPathTimeline(host, source, paths, shownPaths, graph, pick){
   var retired=false, pathById=new Map(paths.map(function(p){return [p.id,p];}));
-  var order=new Map(paths.map(function(p,i){return [p.id,i];}));
-  var rowGap=40, top=22, labelWidth=150, columnWidth=94;
-  var memberships=new Map();
-  graph.blocks.forEach(function(block){
-    var key=JSON.stringify(block.pathIds);
-    if(!memberships.has(key))memberships.set(key,{key:key,ids:block.pathIds,
-      at:block.pathIds.reduce(function(n,id){return n+order.get(id);},0)/block.pathIds.length});
-  });
-  var lanePositions=new Map(paths.map(function(p,i){return [p.id,i*rowGap+top];}));
-  var sharedPositions=new Map();
-  if(paths.length<=2){memberships.forEach(function(group){sharedPositions.set(group.key,top+group.at*rowGap);});}
-  else {
-    // Dedicated bands keep subset joins away from non-participating routes.
-    var bands=paths.map(function(p,i){return {path:p.id,at:i};});
-    memberships.forEach(function(group){bands.push({group:group.key,at:group.at+.01});});
-    bands.sort(function(a,b){return a.at-b.at;});
-    bands.forEach(function(band,i){(band.path?lanePositions:sharedPositions).set(band.path || band.group,top+i*rowGap);});
-  }
+  var rowGap=32, top=22, labelWidth=150, columnWidth=60;
+  var rows=pathTimelineRows(paths,graph);
+  var lanePositions=new Map(Array.from(rows.lanes,function(pair){return [pair[0],top+pair[1]*rowGap];}));
+  var sharedPositions=new Map(Array.from(rows.shared,function(pair){return [pair[0],top+pair[1]*rowGap];}));
   var width=labelWidth+Math.max(1,graph.columns)*columnWidth+28;
   var height=Math.max.apply(null,Array.from(lanePositions.values()).concat(Array.from(sharedPositions.values())))+22;
   function element(tag,className,parent){var e=document.createElement(tag);e.className=className;if(parent)parent.appendChild(e);return e;}
@@ -33,16 +47,15 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
   canvas.setAttribute('aria-hidden','true');root.appendChild(canvas);
   var nodes=new Map(),buttons=[],choices=[],tracks=[];
   graph.nodes.forEach(function(node){
-    var block=graph.blocks.find(function(b){return b.id===node.blockId;});
     nodes.set(node.id,{node:node,x:labelWidth+node.column*columnWidth+columnWidth/2,
-      y:block?sharedPositions.get(JSON.stringify(block.pathIds)):lanePositions.get(node.pathIds[0])});
+      y:node.blockId?sharedPositions.get(node.blockId):lanePositions.get(node.pathIds[0])});
   });
   paths.forEach(function(path){
     var row=element('div','path-timeline-route',root);row.setAttribute('data-path-row',path.id);
     var choice=element('button','path-chip',row);choice.type='button';choice.title=path.label;
     element('span','path-timeline-label',choice).textContent=path.label;
     choice.setAttribute('data-dv-path',path.id);choice.style.setProperty('--path-color',path.color);
-    position(choice,0,lanePositions.get(path.id)-16);
+    position(choice,0,lanePositions.get(path.id)-14);
     choice.disabled=!shownPaths.find(function(p){return p.id===path.id;}).indices.length;
     if(choice.disabled)choice.title='No steps from this path are shown in this view.';
     choice.addEventListener('click',function(event){event.stopPropagation();if(!retired)pick(path.id,0,true);});
@@ -51,7 +64,7 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
   var sharing=pathStepSharing(paths);
   graph.nodes.forEach(function(node){
     var point=nodes.get(node.id),wrap=element('div','path-timeline-stop',root);
-    position(wrap,point.x-16,point.y-16);
+    position(wrap,point.x-14,point.y-14);
     var step=source.steps[node.sourceIndex],button=element('button','schip'+(step.delta===true?' dvd':'')+(node.shared?' shared-downstream-step':''),wrap);
     button.type='button';button.setAttribute('data-step-source',node.sourceIndex);button.setAttribute('data-timeline-node',node.id);
     applyStepCircleColor(button,step);

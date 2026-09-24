@@ -1,0 +1,358 @@
+{
+  "page": {
+    "title": "Three triggers. One shared pipeline.",
+    "skin": "pastel",
+    "sections": [
+      {
+        "id": "three-shared-tracks",
+        "heading": "Button press, motion, or sound → the same downstream steps",
+        "text": "A fictional doorbell example. Pick any of the three tracks: each has its own lead-in, then all three converge on processing, storage, and notification. The Event origin panel keeps the selected trigger throughout.",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "button": {
+              "title": "Button event",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "motion": {
+              "title": "Motion event",
+              "icon": "antenna",
+              "tint": "dev"
+            },
+            "button-adapter": {
+              "title": "Button translator",
+              "icon": "chip",
+              "tint": "cmd"
+            },
+            "motion-adapter": {
+              "title": "Motion translator",
+              "icon": "chip",
+              "tint": "cmd"
+            },
+            "processor": {
+              "title": "Event processor",
+              "icon": "cloud",
+              "tint": "data"
+            },
+            "storage": {
+              "title": "Event storage",
+              "icon": "db",
+              "tint": "data"
+            },
+            "resident": {
+              "title": "Resident app",
+              "icon": "phone",
+              "tint": "cmd"
+            },
+            "sound": {
+              "title": "Sound event",
+              "icon": "antenna",
+              "tint": "dev"
+            },
+            "sound-adapter": {
+              "title": "Sound translator",
+              "icon": "chip",
+              "tint": "cmd"
+            }
+          },
+          "rows": [
+            [
+              "button",
+              "motion",
+              "sound"
+            ],
+            [
+              "button-adapter",
+              "motion-adapter",
+              "sound-adapter"
+            ],
+            [
+              "processor"
+            ],
+            [
+              "storage",
+              "resident"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "button",
+              "to": "button-adapter",
+              "label": "Button pressed",
+              "kind": "illustrative"
+            },
+            {
+              "from": "motion",
+              "to": "motion-adapter",
+              "label": "Confirmed motion",
+              "kind": "illustrative"
+            },
+            {
+              "from": "button-adapter",
+              "to": "processor",
+              "label": "Normalized event",
+              "kind": "illustrative"
+            },
+            {
+              "from": "motion-adapter",
+              "to": "processor",
+              "label": "Normalized event",
+              "kind": "illustrative"
+            },
+            {
+              "from": "processor",
+              "to": "storage",
+              "label": "Persist event",
+              "kind": "illustrative"
+            },
+            {
+              "from": "processor",
+              "to": "resident",
+              "label": "Notify resident",
+              "kind": "illustrative"
+            },
+            {
+              "from": "sound",
+              "to": "sound-adapter",
+              "label": "Classified sound",
+              "kind": "illustrative"
+            },
+            {
+              "from": "sound-adapter",
+              "to": "processor",
+              "label": "Normalized event",
+              "kind": "illustrative"
+            }
+          ],
+          "panels": [
+            {
+              "id": "origin",
+              "type": "state",
+              "title": "Event origin (carried forward)",
+              "states": [
+                "Waiting",
+                "Button",
+                "Motion",
+                "Sound"
+              ],
+              "initial": {
+                "state": "Waiting"
+              },
+              "colors": {
+                "Button": "#0284c7",
+                "Motion": "#f97316",
+                "Sound": "#7c3aed"
+              }
+            },
+            {
+              "id": "work",
+              "type": "log",
+              "title": "This run’s event history",
+              "tags": {
+                "BUTTON": "#0284c7",
+                "MOTION": "#f97316",
+                "SOUND": "#7c3aed"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "press",
+              "text": "A visitor presses the doorbell. This input belongs to the button path.",
+              "edge": "button->button-adapter",
+              "panels": {
+                "origin": {
+                  "state": "Button"
+                },
+                "work": {
+                  "log": [
+                    {
+                      "tag": "BUTTON",
+                      "text": "Button event received"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "translate-press",
+              "text": "Translate the button payload into a normalized event.",
+              "edge": "button-adapter->processor"
+            },
+            {
+              "id": "detect",
+              "text": "The camera detects motion. This input belongs to the motion path.",
+              "nodes": [
+                "motion"
+              ],
+              "panels": {
+                "origin": {
+                  "state": "Motion"
+                },
+                "work": {
+                  "log": [
+                    {
+                      "tag": "MOTION",
+                      "text": "Motion event detected"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "debounce",
+              "text": "Confirm motion before emitting the event. The extra stop makes this path one step longer.",
+              "edge": "motion->motion-adapter"
+            },
+            {
+              "id": "translate-motion",
+              "text": "Translate the motion payload into the same normalized event shape.",
+              "edge": "motion-adapter->processor"
+            },
+            {
+              "id": "hear",
+              "text": "The camera detects a sound. This event begins the purple track.",
+              "nodes": [
+                "sound"
+              ],
+              "panels": {
+                "origin": {
+                  "state": "Sound"
+                },
+                "work": {
+                  "log": [
+                    {
+                      "tag": "SOUND",
+                      "text": "Sound event detected"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "filter-sound",
+              "text": "Filter background noise before classifying the sound. This is an illustrative processing stage, with no measured threshold.",
+              "nodes": [
+                "sound"
+              ]
+            },
+            {
+              "id": "classify-sound",
+              "text": "Classify the remaining sound and send the event to its translator.",
+              "edge": "sound->sound-adapter"
+            },
+            {
+              "id": "translate-sound",
+              "text": "Translate the sound event into the normalized event shape accepted by the shared processor.",
+              "edge": "sound-adapter->processor"
+            },
+            {
+              "id": "process",
+              "text": "Process the normalized event through one shared operation, regardless of which trigger produced it. Event origin stays on the selected track.",
+              "nodes": [
+                "processor"
+              ],
+              "panels": {
+                "work": {
+                  "log": [
+                    {
+                      "text": "Process normalized event"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "persist",
+              "text": "Persist the event using the same operation on all three tracks.",
+              "edge": "processor->storage",
+              "panels": {
+                "work": {
+                  "log": [
+                    {
+                      "text": "Persist event"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "notify",
+              "text": "Notify the resident. All three tracks finish here, each retaining its own event origin and history.",
+              "edge": "processor->resident",
+              "panels": {
+                "work": {
+                  "log": [
+                    {
+                      "text": "Notify resident"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "button",
+              "label": "Button press",
+              "color": "#0284c7",
+              "steps": [
+                "press",
+                "translate-press",
+                "process",
+                "persist",
+                "notify"
+              ]
+            },
+            {
+              "id": "motion",
+              "label": "Motion detected",
+              "color": "#f97316",
+              "steps": [
+                "detect",
+                "debounce",
+                "translate-motion",
+                "process",
+                "persist",
+                "notify"
+              ]
+            },
+            {
+              "id": "sound",
+              "label": "Sound detected",
+              "color": "#7c3aed",
+              "steps": [
+                "hear",
+                "filter-sound",
+                "classify-sound",
+                "translate-sound",
+                "process",
+                "persist",
+                "notify"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "protocols": {
+      "illustrative": {
+        "label": "Illustrative handoff",
+        "color": "#64748b"
+      }
+    },
+    "flowview": {
+      "authoredWith": "0.1.0",
+      "minVersion": "0.1.0",
+      "features": [
+        "flow.alternates",
+        "flow.drilldown",
+        "panel.log",
+        "panel.state"
+      ]
+    },
+    "contract": "1"
+  }
+}

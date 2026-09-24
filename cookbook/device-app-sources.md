@@ -9,13 +9,13 @@ Use `phone` for a compact notification-only lock screen or two-way audio, and
 
 Set `initial.phoneScreen:"home"` on a Device app panel. Use `appName` for its
 app icon and app header. Send a notification on a step, then open the app on the
-next step:
+next step. These are step patches:
 
-```json
+```
 {"panels":{"app":{"notify":{"app":"Homestead","title":"Doorbell pressed","text":"Someone is at the door."}}}}
 ```
 
-```json
+```
 {"panels":{"app":{"phoneScreen":"app","clear":true}}}
 ```
 
@@ -37,7 +37,7 @@ state sets `visible:false`; use **Cards shown initially** in the panel inspector
 Each step’s card controls offer **Card visibility → Show card / Hide card /
 Inherit**. Inherit keeps the previous choice; it does not necessarily show the card.
 
-```json
+```
 {"panels":{"app":{"clip":{"visible":true,"value":"Just now","status":"ready"},"power":{"visible":false}}}}
 ```
 

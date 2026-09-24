@@ -12,7 +12,7 @@ only from CI; repository mode does not contact it at all.
 ## Start a graph from the catalog
 
 Choose **From service catalog** on the homepage (also available in **Start new
-project**), or **Add to diagram → Services from catalog → Choose services** in an
+project**), or **Add to diagram → Services from catalog** in an
 existing project. Search by service title, entity reference or owner. Check a
 subset, or use **Select shown** to select the current search results. Selection
 persists when you change the search. **Clear** removes the full selection.

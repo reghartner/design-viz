@@ -1,6 +1,6 @@
 # Choose a panel visually
 
-Open **Add to diagram → Panel → Browse panels** to browse the panel library. Every supported
+Open **Add to diagram → Panel** to browse the panel library. Every supported
 panel type has a thumbnail drawn by the same renderer as the diagram. Search by
 name or purpose, or choose a category to narrow the gallery.
 

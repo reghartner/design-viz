@@ -501,16 +501,17 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .diagram-add-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 .diagram-add-choices button{display:flex;align-items:center;gap:14px;min-width:0;min-height:108px;padding:18px;
   border:1px solid var(--line);border-radius:13px;background:var(--codebg);color:var(--ink);text-align:left;cursor:pointer;}
-.diagram-add-choices button:hover{border-color:var(--accent);}
-.diagram-add-choices button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--selglow);}
+.diagram-add-choices button:hover:enabled{border-color:var(--accent);background:var(--selglow);}
+.diagram-add-choices button:disabled{opacity:.5;cursor:not-allowed;}
 .diagram-add-choices button:focus-visible,.diagram-add-structure summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
 .diagram-add-symbol{display:grid;place-items:center;flex:0 0 40px;height:40px;border-radius:11px;
   background:var(--card);color:var(--accent);font:500 27px/1 'IBM Plex Mono',monospace;}
 .diagram-add-choices b{display:block;font:600 15px/1.4 'Sora',sans-serif;}
 .diagram-add-choices small{display:block;margin-top:5px;color:var(--sub);font:12px/1.5 'Sora',sans-serif;}
 .diagram-add-options{margin:22px 0;}
-.diagram-add-options label{display:flex;align-items:center;gap:16px;font:600 12px/1.5 'Sora',sans-serif;}
-.diagram-add-options select{min-height:40px;}
+.diagram-add-presets{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:16px;gap:10px;}
+.diagram-add-presets button{min-height:64px;padding:14px;gap:10px;}
+.diagram-add-presets svg{flex:0 0 24px;width:24px;height:24px;color:var(--accent);}
 .diagram-add-options p{margin:12px 0 0;color:var(--sub);font:12px/1.6 'Sora',sans-serif;}
 #diagram-add-error{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--codebg);color:var(--ink);}
 .diagram-add-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:20px;border-top:1px solid var(--line);}
@@ -521,6 +522,8 @@ body.workspace-focus .workspace-tools{margin-top:0;}
   .diagram-add-menu{padding:20px;max-height:calc(100dvh - 24px);}
   .diagram-add-choices{gap:8px;}
   .diagram-add-choices button{align-items:flex-start;flex-direction:column;gap:10px;padding:12px;}
+  .diagram-add-presets{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .diagram-add-presets button{align-items:center;flex-direction:row;}
   .diagram-add-footer{align-items:stretch;flex-direction:column-reverse;gap:10px;}
 }
 .extraction-preview{min-width:0;}

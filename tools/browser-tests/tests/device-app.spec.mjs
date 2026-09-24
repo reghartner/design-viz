@@ -50,7 +50,7 @@ test('source visibility and notifications edit independently with Undo and Redo'
 
 test('the picker demonstrates notifications but inserts a plain source-free tiled phone',async({page,server},testInfo)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
- await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();await page.locator('#add-panel').click();
+ await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();
  const card=page.locator('.panel-picker-card[data-panel-type=deviceapp]');await card.click();
  await expect(card.locator('.da-fields')).toBeVisible();await expect(card.locator('.phonetitle')).toHaveText('Doorbell pressed');await expect(card.locator('.da-provenance')).toHaveCount(0);
  await page.locator('#panel-picker-add').click();

@@ -31,7 +31,7 @@ test('builder destruction retires captured gestures and old controls across same
       await expect(src).toHaveValue(source);
     }else{
       await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();
-      await page.locator('#add-panel').click();await page.locator('#panel-picker-grid .pwidget').first().waitFor();
+      await page.locator('#panel-picker-grid .pwidget').first().waitFor();
       await page.evaluate(()=>__editorTest.builder.destroy());await expect(page.locator('#panel-picker')).toBeHidden();
     }
     // Boot/workspace/Canon/preview remain mounted: compare their actual baseline.

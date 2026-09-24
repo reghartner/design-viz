@@ -1195,16 +1195,17 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .diagram-add-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 .diagram-add-choices button{display:flex;align-items:center;gap:14px;min-width:0;min-height:108px;padding:18px;
   border:1px solid var(--line);border-radius:13px;background:var(--codebg);color:var(--ink);text-align:left;cursor:pointer;}
-.diagram-add-choices button:hover{border-color:var(--accent);}
-.diagram-add-choices button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--selglow);}
+.diagram-add-choices button:hover:enabled{border-color:var(--accent);background:var(--selglow);}
+.diagram-add-choices button:disabled{opacity:.5;cursor:not-allowed;}
 .diagram-add-choices button:focus-visible,.diagram-add-structure summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
 .diagram-add-symbol{display:grid;place-items:center;flex:0 0 40px;height:40px;border-radius:11px;
   background:var(--card);color:var(--accent);font:500 27px/1 'IBM Plex Mono',monospace;}
 .diagram-add-choices b{display:block;font:600 15px/1.4 'Sora',sans-serif;}
 .diagram-add-choices small{display:block;margin-top:5px;color:var(--sub);font:12px/1.5 'Sora',sans-serif;}
 .diagram-add-options{margin:22px 0;}
-.diagram-add-options label{display:flex;align-items:center;gap:16px;font:600 12px/1.5 'Sora',sans-serif;}
-.diagram-add-options select{min-height:40px;}
+.diagram-add-presets{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:16px;gap:10px;}
+.diagram-add-presets button{min-height:64px;padding:14px;gap:10px;}
+.diagram-add-presets svg{flex:0 0 24px;width:24px;height:24px;color:var(--accent);}
 .diagram-add-options p{margin:12px 0 0;color:var(--sub);font:12px/1.6 'Sora',sans-serif;}
 #diagram-add-error{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--codebg);color:var(--ink);}
 .diagram-add-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:20px;border-top:1px solid var(--line);}
@@ -1215,6 +1216,8 @@ body.workspace-focus .workspace-tools{margin-top:0;}
   .diagram-add-menu{padding:20px;max-height:calc(100dvh - 24px);}
   .diagram-add-choices{gap:8px;}
   .diagram-add-choices button{align-items:flex-start;flex-direction:column;gap:10px;padding:12px;}
+  .diagram-add-presets{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .diagram-add-presets button{align-items:center;flex-direction:row;}
   .diagram-add-footer{align-items:stretch;flex-direction:column-reverse;gap:10px;}
 }
 .extraction-preview{min-width:0;}
@@ -8438,7 +8441,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
     </nav>
     <article class="human-guide-content" tabindex="0" aria-label="User guide content">
       <section id="hg-first" tabindex="-1"><p class="human-guide-eyebrow">01 / YOUR FIRST DIAGRAM</p><h3>Start with a small, complete story.</h3><p>Flowview combines a system diagram with a sequence of events. The diagram shows <strong>who is involved</strong>; steps show <strong>what happens</strong>; panels show <strong>what changes for people and devices</strong>.</p>
-        <ol class="human-guide-recipe"><li><strong>Open a useful starting point.</strong> On the home page choose <b>Start new project → Simple service flow</b>. Or choose <b>Blank diagram</b> if you want to start empty.</li><li><strong>Make the actors yours.</strong> Click a node in the preview. In <b>Inspect</b>, change its <b>title</b> and <b>sub</b> (the one-line detail). Press Enter or leave the field to apply it.</li><li><strong>Add something.</strong> Choose <b>Add to diagram → Node</b>, pick a preset, then <b>Add node</b>. The <b>Into</b> selector chooses the destination section.</li><li><strong>Connect the actors.</strong> Alt/Option-click the source node, release the key, then click the destination. Give the new connection a meaningful label, such as “Request recording.”</li><li><strong>Walk through it.</strong> Open <b>Steps</b>. Select a step, then <b>Inspect selected step</b> to edit its caption. Add another with <b>Append step</b>. Use <b>ADD TO STEP</b> to choose the nodes and connections active at that moment, then finish the mode.</li><li><strong>Keep a copy.</strong> Choose <b>save</b> in the editor’s file controls to save the editable JSON. Use <b>export…</b> when you want a viewable HTML page too.</li></ol>
+        <ol class="human-guide-recipe"><li><strong>Open a useful starting point.</strong> On the home page choose <b>Start new project → Simple service flow</b>. Or choose <b>Blank diagram</b> if you want to start empty.</li><li><strong>Make the actors yours.</strong> Click a node in the preview. In <b>Inspect</b>, change its <b>title</b> and <b>sub</b> (the one-line detail). Press Enter or leave the field to apply it.</li><li><strong>Add something.</strong> Choose <b>Add to diagram → Node</b>, then click a preset to add it. The <b>Into</b> selector chooses the destination section.</li><li><strong>Connect the actors.</strong> Alt/Option-click the source node, release the key, then click the destination. Give the new connection a meaningful label, such as “Request recording.”</li><li><strong>Walk through it.</strong> Open <b>Steps</b>. Select a step, then <b>Inspect selected step</b> to edit its caption. Add another with <b>Append step</b>. Use <b>ADD TO STEP</b> to choose the nodes and connections active at that moment, then finish the mode.</li><li><strong>Keep a copy.</strong> Choose <b>save</b> in the editor’s file controls to save the editable JSON. Use <b>export…</b> when you want a viewable HTML page too.</li></ol>
         <aside class="human-guide-tip"><strong>Build one happy path first.</strong> Get the starting event, meaningful changes, and outcome right. Then add failure paths and a second view for another audience.</aside>
       </section>
       <section id="hg-workspace" tabindex="-1"><p class="human-guide-eyebrow">02 / FIND YOUR WAY</p><h3>Preview on one side. The selected thing on the other.</h3><p>Click a node, connection, panel, or step to inspect it. <b>Inspect</b> edits the selection, <b>Steps</b> manages the story, and <b>JSON</b> exposes the complete source. You can do ordinary editing without writing JSON. If you do edit JSON, choose <b>Render</b> and read any validation messages.</p>
@@ -8455,7 +8458,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
         <aside class="human-guide-tip"><strong>Shared means one editable event.</strong> Editing a shared step changes it in every path that uses it. Choose <b>Make independent here</b> before making a path-specific change. A common track shows shared downstream operations. Shared beginnings can appear as faded circles. A matching caption alone does not make two steps shared.</aside>
         <p>Clicking a path chip starts at step 1, including its shared lead-in. Clicking a shared circle keeps the selected path if it participates; otherwise the circle identifies the path it will select. Its numbers and state follow that path. A retry flag or earlier log entry carries through shared operations unless a step changes it. An early-ending path never joins a later block it does not visit. Hiding stops in a view does not change the authored joins or endings. Represent a communication that fails with <b>Add failed communication</b> on that step; make the edge visibly break and explain the consequence. Do not animate a successful delivery that never happened.</p><p><b>Remove from this path</b> only removes membership. <b>Delete from all paths</b> removes the event everywhere. Read the affected paths before deleting a shared step.</p>
       </section>
-      <section id="hg-panels" tabindex="-1"><p class="human-guide-eyebrow">06 / VISUAL PANELS</p><h3>Show the consequence outside the arrows.</h3><p>Choose <b>Add to diagram → Panel → Browse panels</b>. The large picker shows a preview and description; select one, then explicitly add it. Pick panels that answer a question, rather than filling every slot.</p><ul><li><strong>Home</strong> shows people, rooms, cameras, doors, and physical activity.</li><li><strong>Screen and device app</strong> show video clips, notifications, battery or camera data. Data sources are optional; add them when explaining where a value comes from.</li><li><strong>Monitoring and dispatch</strong> connect an operator’s video review to an emergency response.</li><li><strong>Software and telemetry panels</strong> make queues, database delays, logs, gauges, and other state visible. Browse the picker for the available types.</li></ul><p>Set the panel’s starting values, then change only what matters in each step. Recording and scene activity are separate: a camera can start recording before a person enters the scene. A panel with no changes in the current step can still show state inherited from earlier beats.</p>
+      <section id="hg-panels" tabindex="-1"><p class="human-guide-eyebrow">06 / VISUAL PANELS</p><h3>Show the consequence outside the arrows.</h3><p>Choose <b>Add to diagram → Panel</b>. The large picker shows a preview and description; select one, then explicitly add it. Pick panels that answer a question, rather than filling every slot.</p><ul><li><strong>Home</strong> shows people, rooms, cameras, doors, and physical activity.</li><li><strong>Screen and device app</strong> show video clips, notifications, battery or camera data. Data sources are optional; add them when explaining where a value comes from.</li><li><strong>Monitoring and dispatch</strong> connect an operator’s video review to an emergency response.</li><li><strong>Software and telemetry panels</strong> make queues, database delays, logs, gauges, and other state visible. Browse the picker for the available types.</li></ul><p>Set the panel’s starting values, then change only what matters in each step. Recording and scene activity are separate: a camera can start recording before a person enters the scene. A panel with no changes in the current step can still show state inherited from earlier beats.</p>
       </section>
       <section id="hg-home" tabindex="-1"><p class="human-guide-eyebrow">07 / A STORY AT HOME</p><h3>Place the house once. Animate what happens there.</h3><p>Start with <b>A connected home</b> to see rooms, actors, devices, and an outage together. Choose <b>Edit layout</b> on the Home panel to edit its shared house, rooms, devices, doors, and subjects. Expand an element’s collapsed inspector group to see its fields.</p><p>In shared layout mode, drag devices, doors, and people; use a room’s border or label to move it. The house grip moves its outline, and corner handles resize the house or rooms. Moving a room or the house outline does not move its contents. Outdoor areas can sit around the house or beside an indoor room.</p><p>Choose <b>Edit home at current step</b> to animate an event. This edits that moment instead of the shared floor plan. Use <b>Inherit</b> to remove an override and take the earlier path value. A device’s temperature and operating state are separate, so an overheated camera can remain visibly hot after shutting down.</p><p>Doors pivot at their hinge: width sets the leaf’s length, facing sets the closed direction, and swing sets its opening angle. Change the door’s state at the relevant step. Subject labels are off by default; enable them when names help. A cloud belongs under devices using the cloud icon; subjects are moving actors.</p><aside class="human-guide-tip"><strong>Keep time honest.</strong> “Recording begins,” “visitor walks away,” and “resident receives the clip” are often different steps. Give each its own visible change.</aside>
       </section>
@@ -8735,20 +8738,19 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
   <dialog id="diagram-add-menu" class="diagram-add-menu" aria-labelledby="diagram-add-title" aria-describedby="diagram-add-destination">
     <div class="diagram-add-header"><div><h2 id="diagram-add-title">Add to diagram</h2><p id="diagram-add-destination"></p></div><button type="button" class="bbtn" id="diagram-add-close" aria-label="Close add to diagram">✕</button></div>
     <div class="diagram-add-choices" role="group" aria-label="What to add">
-      <button type="button" data-add-kind="node" aria-pressed="true"><span class="diagram-add-symbol" aria-hidden="true">▣</span><span><b>Node</b><small>A service, device or actor</small></span></button>
-      <button type="button" data-add-kind="edge" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">→</span><span><b>Connection</b><small>A message between nodes</small></span></button>
-      <button type="button" data-add-kind="step" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">≡</span><span><b>Step</b><small>The next moment in the story</small></span></button>
-      <button type="button" data-add-kind="panel" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">▤</span><span><b>Panel</b><small>Browse the visual panel library</small></span></button>
-      <button type="button" data-add-kind="catalog" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">⌘</span><span><b>Services from catalog</b><small>Select services and their connections</small></span></button>
+      <button type="button" id="add-node" data-add-kind="node"><span class="diagram-add-symbol" aria-hidden="true">▣</span><span><b>Node</b><small>Choose a service, device or actor</small></span></button>
+      <button type="button" id="add-edge" data-add-kind="edge"><span class="diagram-add-symbol" aria-hidden="true">→</span><span><b>Connection</b><small>Click a source, then its target</small></span></button>
+      <button type="button" id="add-step" data-add-kind="step"><span class="diagram-add-symbol" aria-hidden="true">≡</span><span><b>Step</b><small>Add the next moment to this timeline</small></span></button>
+      <button type="button" id="add-panel" data-add-kind="panel" aria-haspopup="dialog" aria-controls="panel-picker"><span class="diagram-add-symbol" aria-hidden="true">▤</span><span><b>Panel</b><small>Browse the visual panel library</small></span></button>
+      <button type="button" id="add-catalog" data-add-kind="catalog" aria-haspopup="dialog" aria-controls="catalog-picker"><span class="diagram-add-symbol" aria-hidden="true">⌘</span><span><b>Services from catalog</b><small>Select services and their connections</small></span></button>
     </div>
-    <div class="diagram-add-options"><label id="diagram-add-preset-label" for="diagram-add-preset">Node preset<select id="diagram-add-preset" class="fctl"></select></label><p id="diagram-add-help"></p><p id="diagram-add-error" role="status" hidden></p></div>
+    <div id="diagram-add-nodes" hidden>
+      <button type="button" class="bbtn" id="diagram-add-back">← All additions</button>
+      <div id="diagram-add-presets" class="diagram-add-choices diagram-add-presets" role="group" aria-label="Node presets"></div>
+    </div>
+    <div class="diagram-add-options"><p id="diagram-add-help"></p><p id="diagram-add-error" role="status" hidden></p></div>
     <div class="diagram-add-footer">
       <details class="diagram-add-structure"><summary>Contracts &amp; page structure</summary><button type="button" class="bbtn" id="add-contract">Add contract block</button><button type="button" class="bbtn" id="add-section">Add section</button><button type="button" class="bbtn" id="add-tabs">Add tabs</button></details>
-      <button type="button" class="editor-add-button" id="add-node" data-add-action="node">Add node</button>
-      <button type="button" class="editor-add-button" id="add-edge" data-add-action="edge" hidden>Choose source and target</button>
-      <button type="button" class="editor-add-button" id="add-step" data-add-action="step" hidden>Add step</button>
-      <button type="button" class="editor-add-button" id="add-panel" data-add-action="panel" aria-haspopup="dialog" aria-controls="panel-picker" hidden>Browse panels</button>
-      <button type="button" class="editor-add-button" id="add-catalog" data-add-action="catalog" aria-haspopup="dialog" aria-controls="catalog-picker" hidden>Choose services</button>
     </div>
   </dialog>
 
@@ -36462,24 +36464,28 @@ function initDiagramAddMenu(opts){
   var doc=opts.document,dialog=doc.getElementById('diagram-add-menu'),button=doc.getElementById('diagram-add');
   if(!dialog || !button)return null;
   var life=createWorkbenchLifetime(),target=doc.getElementById('diagram-add-target');
-  var preset=doc.getElementById('diagram-add-preset'),presetLabel=doc.getElementById('diagram-add-preset-label');
+  var presets=doc.getElementById('diagram-add-presets'),nodePage=doc.getElementById('diagram-add-nodes');
+  var menu=dialog.querySelector('[aria-label="What to add"]'),footer=dialog.querySelector('.diagram-add-footer');
+  var title=doc.getElementById('diagram-add-title'),back=doc.getElementById('diagram-add-back');
   var error=doc.getElementById('diagram-add-error'),help=doc.getElementById('diagram-add-help');
-  var choices=Array.from(dialog.querySelectorAll('[data-add-kind]')),actions=Array.from(dialog.querySelectorAll('[data-add-action]'));
+  var choices=Array.from(dialog.querySelectorAll('[data-add-kind]')),presetButtons=[];
   var structure=[doc.getElementById('add-section'),doc.getElementById('add-tabs'),doc.getElementById('add-contract')];
-  var kind='node',snapshot=null,invalid=false,optionsKey='';
-  var copy={node:'Choose a preset, then edit the node in the inspector.',
-    edge:'Choose a source node, then a target node in this section. Escape cancels.',
-    step:'Append a step to the selected timeline in this section.',
-    catalog:'Choose company services and optionally connect their declared dependencies.',
-    panel:'Browse large previews, then explicitly add a panel from the library.'};
-  NODE_PRESETS.forEach(function(item,index){var option=doc.createElement('option');option.value=String(index);option.textContent=item.title;preset.appendChild(option);});
+  var choosingNode=false,snapshot=null,invalid=false,optionsKey='';
+  NODE_PRESETS.forEach(function(item,index){
+    var choice=doc.createElement('button');choice.type='button';choice.setAttribute('data-add-preset',String(index));
+    var icon=doc.createElementNS('http://www.w3.org/2000/svg','svg'),use=doc.createElementNS('http://www.w3.org/2000/svg','use');
+    icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');use.setAttribute('href','#i-'+item.icon);icon.appendChild(use);
+    var label=doc.createElement('b');label.textContent=item.title;choice.append(icon,label);presets.appendChild(choice);presetButtons.push(choice);
+    life.listen(choice,'click',function(){confirm(function(){opts.addNode(item);});});
+  });
   function showError(message){error.textContent=message || '';error.hidden=!message;}
   function same(current){return snapshot && !current.error && current.text===snapshot.text && current.section===snapshot.section;}
   function paint(current){
-    choices.forEach(function(choice){choice.setAttribute('aria-pressed',String(choice.getAttribute('data-add-kind')===kind));});
-    actions.forEach(function(action){action.hidden=action.getAttribute('data-add-action')!==kind;action.disabled=invalid || !!current.error || !current.diagram;});
+    choices.concat(presetButtons).forEach(function(action){action.disabled=invalid || !!current.error || !current.diagram;});
     structure.forEach(function(action){action.disabled=invalid || !!current.error;});
-    presetLabel.hidden=kind!=='node';help.textContent=copy[kind];
+    menu.hidden=choosingNode;footer.hidden=choosingNode;nodePage.hidden=!choosingNode;
+    title.textContent=choosingNode ? 'Add a node' : 'Add to diagram';
+    help.textContent=choosingNode ? 'Click a preset to add it, then customize the node in the inspector.' : 'Choose an item to get started.';
     showError(invalid ? 'The source or destination changed. Close this dialog and open it again before adding.' :
       current.error || (!current.diagram ? 'Choose a section with a diagram, or add a new section below.' : ''));
   }
@@ -36503,16 +36509,16 @@ function initDiagramAddMenu(opts){
     var current=opts.context();
     if(current.locked)return;
     if(opts.pause)opts.pause();
-    snapshot=current;invalid=false;kind='node';preset.value='0';
+    snapshot=current;invalid=false;choosingNode=false;
     doc.getElementById('diagram-add-destination').textContent=current.label || 'Page';
     dialog.querySelector('.diagram-add-structure').open=false;
     paint(current);dialog.showModal();button.setAttribute('aria-expanded','true');
-    choices[0].focus({preventScroll:true});
+    (choices[0].disabled ? doc.getElementById('diagram-add-close') : choices[0]).focus({preventScroll:true});
   }
   function confirm(run,pageStructure){
     if(!dialog.open)return false;
     var current=opts.context();
-    if(invalid || !same(current) || (!pageStructure && !current.diagram)){invalid=!same(current);paint(current);return false;}
+    if(invalid || !same(current) || (!pageStructure && !current.diagram)){invalid=invalid || !same(current);paint(current);return false;}
     close();run();return true;
   }
   function invalidate(){if(dialog.open){invalid=true;paint(opts.context());}}
@@ -36522,7 +36528,13 @@ function initDiagramAddMenu(opts){
     if(!current.error && (current.sections || []).some(function(entry){return entry.section===index;}))opts.chooseSection(index);
     refresh();
   });
-  choices.forEach(function(choice){life.listen(choice,'click',function(){kind=choice.getAttribute('data-add-kind');paint(opts.context());});});
+  life.listen(doc.getElementById('add-node'),'click',function(){
+    if(!dialog.open)return;
+    var current=opts.context();
+    if(invalid || !same(current) || !current.diagram){invalid=invalid || !same(current);paint(current);return;}
+    choosingNode=true;paint(current);presetButtons[0].focus({preventScroll:true});
+  });
+  life.listen(back,'click',function(){choosingNode=false;paint(opts.context());(choices[0].disabled ? doc.getElementById('diagram-add-close') : choices[0]).focus({preventScroll:true});});
   life.listen(doc.getElementById('diagram-add-close'),'click',function(){close();});
   life.listen(dialog,'cancel',function(event){event.preventDefault();close();});
   life.listen(dialog,'close',function(){if(!dialog.open){snapshot=null;button.setAttribute('aria-expanded','false');}});
@@ -36531,8 +36543,7 @@ function initDiagramAddMenu(opts){
   life.listen(opts.src,'input',refresh);
   refresh();
   return {refresh:life.guard(refresh),invalidate:life.guard(invalidate),close:life.guard(close),confirm:life.guard(confirm),
-    preset:function(){return NODE_PRESETS[Number(preset.value)] || NODE_PRESETS[0];},
-    destroy:function(){if(!life.alive())return;life.destroy();close(false);preset.replaceChildren();target.replaceChildren();}};
+    destroy:function(){if(!life.alive())return;life.destroy();close(false);presets.replaceChildren();target.replaceChildren();}};
 }
 /* ---- src/workbench/catalog-picker.js ---- */
 /* One chooser for project creation and section insertion. The builder owns the
@@ -37584,11 +37595,6 @@ function initWorkbenchBuilder(opts){
   });
 
   /* Node presets and the panel library share the persistent Add entry point. */
-  var nodeBtn = document.getElementById('add-node');
-  if (nodeBtn) life.listen(nodeBtn,'click',function(){
-    var preset=addMenu ? addMenu.preset() : NODE_PRESETS[0];
-    confirmAddition(function(){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});});
-  });
   var panelPicker = typeof initPanelPicker === 'function' ? initPanelPicker({
     src:src, pause:pausePreview, error:inspectorMessage,
     context:function(){
@@ -37629,6 +37635,7 @@ function initWorkbenchBuilder(opts){
   var catalogBtn=document.getElementById('add-catalog');
   if(catalogBtn)life.listen(catalogBtn,'click',function(){confirmAddition(function(){if(catalogPicker)catalogPicker.open();});});
   var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
+    addNode:function(preset){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});},
     chooseSection:function(index){
       var parsed=parseEditor();if(parsed.error || interactions.adding() || interactions.connecting())return;
       var rec=specSectionPaths(parsed.raw)[index];if(!rec)return;

@@ -48,13 +48,16 @@ project toolbar above the workspace. The
 Selecting a section in the preview updates this selector; choosing a destination
 here opens its tab and selects that section without switching editor tools.
 
-Choose **Node**, **Connection**, **Step**, or **Panel**, then use the explicit
-button to continue. Nodes offer presets; connections ask you to click a source and
-target in the chosen section; steps append to that section's selected timeline;
-panels open the visual library. **Page structure** inside the chooser adds a
-section or tab block. Each addition is one Undo. Escape closes the chooser and
-returns focus to **Add to diagram**. If the source or destination changes while it
-is open, reopen it before adding.
+Each card in **Add to diagram** opens its next step immediately. **Node** opens
+presets; click a preset to add it and customize it in the inspector. **All additions**
+returns to the menu without inserting anything. **Connection** starts choosing a
+source and target in the selected section. **Step** immediately appends to that
+section's selected timeline. **Panel** opens the visual library, and **Services
+from catalog** opens the service picker. Those pickers let you preview or configure
+your selection before adding. **Contracts & page structure** adds a contract,
+section or tab block directly. Each addition is one Undo. Escape closes the chooser
+and returns focus to **Add to diagram**. If the source or destination changes while
+it is open, reopen it before adding.
 
 For quick connections, **Alt/Option-click a source node**, release the modifier,
 then **click its destination**. The source and eligible targets highlight, and a

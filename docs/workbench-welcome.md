@@ -1,7 +1,7 @@
 # Start a project in Flowview Workbench
 
-Open `workbench/flowspec.html` to begin at the welcome screen. The three entry
-points all lead to the same editor:
+Open `workbench/flowspec.html` to begin at the welcome screen. The authoring entry
+points lead to the same editor:
 
 - **Paste JSON** accepts a Flowview page spec or a bare diagram. Paste JSON
   without Markdown fences. Invalid JSON or a spec validation error stays on the
@@ -10,7 +10,12 @@ points all lead to the same editor:
   opening the editor. Imports are not uploaded.
 - **Start new project** offers a curated set of editable examples and a **Blank
   diagram**. The blank has one diagram section with no nodes, edges, or steps.
-  Use the editor’s insert controls to add the first elements.
+  Use **Add to diagram** to add the first elements.
+
+**User guide** opens the bundled human walkthrough, including alternates and
+shared-step editing. **Canon diagrams** opens the [published library](workbench-canon-library.md)
+read-only; choose **Edit in Workbench** to start a local edit. Browser navigation
+also covers the library and its reader.
 
 Examples cover simple service requests, retries, traces, Backstage architecture,
 rollout decisions, a shared engineering/business story, a connected home, and

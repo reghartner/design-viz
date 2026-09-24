@@ -145,6 +145,11 @@ Use `failures` only for known non-delivery: `dropped` is an attempted send that
 does not arrive; `blocked` is not sent. HTTP 500 is a received error response.
 Failure marks are step-local; panel and tone patches carry forward.
 
+For human UI walkthroughs, use **User guide** in the workbench. Its maintained
+source is `src/workbench/human-guide.html`; keep its control names and workflows
+current when changing authoring behavior. Canon library deployment and its
+read-only/edit boundary are in `docs/workbench-canon-library.md`.
+
 Keep layout stable between beats. Open guided stories paused (`view:"step"`);
 set `autoplay:true` only when requested. Before publishing, stamp the spec with
 `node <VIZ>/tools/compatibility.js --stamp <spec.json> > <versioned.spec.json>`

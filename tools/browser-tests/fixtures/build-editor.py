@@ -32,6 +32,8 @@ html=build.fill(build.read('workbench.skel.html'),{
     'ICONS':assets['icons'].rstrip(),
     'JS':entry['source']+'\n'+facade,
     'WORKBENCH_TEMPLATES':build.workbench_templates(),
+    'WORKBENCH_CANON':build.workbench_canon(),
+    'HUMAN_GUIDE':build.read('workbench/human-guide.html'),
 })
 out.mkdir(parents=True,exist_ok=True)
 (out/'index.html').write_text(html)

@@ -48,6 +48,14 @@ def workbench_templates() -> str:
     return json.dumps(entries, ensure_ascii=True).replace("<", "\\u003c")
 
 
+def workbench_canon() -> str:
+    registry_path = ROOT / 'examples/canon/registry.json'
+    manifest = json.loads(registry_path.read_text())
+    for entry in manifest['diagrams']:
+        entry['spec'] = json.loads((registry_path.parent / entry.pop('path')).read_text())
+    return json.dumps(manifest, ensure_ascii=True).replace('<', '\\u003c')
+
+
 def read(name: str) -> str:
     return (SRC / name).read_text()
 
@@ -124,6 +132,8 @@ def main() -> int:
             mapping['DEMO_SPEC'] = read('flowview.demo.json').strip()
         else:
             mapping['WORKBENCH_TEMPLATES'] = workbench_templates()
+            mapping['WORKBENCH_CANON'] = workbench_canon()
+            mapping['HUMAN_GUIDE'] = read('workbench/human-guide.html')
         output.write_text(fill(read(skeleton), mapping))
 
     runtime = canon_runtime()

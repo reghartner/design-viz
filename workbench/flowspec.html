@@ -10826,7 +10826,7 @@ function edgePortPoint(node,other,port,selfSide){
     y:horizontal ? node.cy+(side==='bottom'?node.h/2:-node.h/2) : node.cy-node.h/2+node.h*offset,
     nx:horizontal?0:side==='right'?1:-1,ny:horizontal?(side==='bottom'?1:-1):0};
 }
-function placedEdgePath(e,L,adj){
+function placedEdgePoints(e,L,adj){
   var a=L.pos[e.from],b=L.pos[e.to],self=e.from===e.to;
   var start=edgePortPoint(a,b,e.fromPort,self?'right':null),end=edgePortPoint(b,a,e.toPort,self?'top':null);
   var reach=clamp(Math.hypot(end.x-start.x,end.y-start.y)*.4,40,180);
@@ -10836,7 +10836,29 @@ function placedEdgePath(e,L,adj){
   if(start.x===end.x && start.y===end.y){
     c1.x-=start.ny*45;c1.y+=start.nx*45;c2.x+=end.ny*45;c2.y-=end.nx*45;
   }
-  return 'M '+start.x+' '+start.y+' C '+c1.x+' '+c1.y+' '+c2.x+' '+c2.y+' '+end.x+' '+end.y;
+  return [start,c1,c2,end];
+}
+function placedEdgePath(e,L,adj){
+  var p=placedEdgePoints(e,L,adj);
+  return 'M '+p[0].x+' '+p[0].y+' C '+p[1].x+' '+p[1].y+' '+p[2].x+' '+p[2].y+' '+p[3].x+' '+p[3].y;
+}
+/* Endpoints plus derivative roots bound the whole cubic, even when an
+   authored bend makes extrema fall between the avoidance sampler's points. */
+function cubicAxisBounds(v){
+  var a=-v[0]+3*v[1]-3*v[2]+v[3],b=2*(v[0]-2*v[1]+v[2]),c=v[1]-v[0];
+  var roots=[],values=[v[0],v[3]];
+  if(a===0){if(b!==0)roots.push(-c/b);}
+  else {
+    var discriminant=b*b-4*a*c;
+    if(discriminant>=0){
+      var root=Math.sqrt(discriminant);
+      roots.push((-b+root)/(2*a),(-b-root)/(2*a));
+    }
+  }
+  roots.forEach(function(t){
+    if(t>0 && t<1){var u=1-t;values.push(u*u*u*v[0]+3*u*u*t*v[1]+3*u*t*t*v[2]+t*t*t*v[3]);}
+  });
+  return {min:Math.min.apply(null,values),max:Math.max.apply(null,values)};
 }
 
 /* Explicit routes may leave any side of an outermost card. Include their
@@ -10845,9 +10867,9 @@ function expandPlacedEdgeBounds(edges,L,adjust){
   var vb=L.vb,left=vb.x,top=vb.y,right=vb.x+vb.w,bottom=vb.y+vb.h;
   edges.forEach(function(e,i){
     if(!L.pos[e.from] || !L.pos[e.to] || !edgeHasPlacement(e,L))return;
-    samplePathD(edgePath(e,L,adjust[i])).forEach(function(p){
-      left=Math.min(left,p.x-24);top=Math.min(top,p.y-24);right=Math.max(right,p.x+24);bottom=Math.max(bottom,p.y+24);
-    });
+    var points=placedEdgePoints(e,L,adjust[i] || {});
+    var x=cubicAxisBounds(points.map(function(p){return p.x;})),y=cubicAxisBounds(points.map(function(p){return p.y;}));
+    left=Math.min(left,x.min-24);top=Math.min(top,y.min-24);right=Math.max(right,x.max+24);bottom=Math.max(bottom,y.max+24);
   });
   L.vb={x:left,y:top,w:right-left,h:bottom-top};L.H=Math.max(L.H,bottom);
 }

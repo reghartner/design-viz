@@ -65,3 +65,19 @@ test('new coordinate and port validation rejects malformed inputs and compatibil
   assert.deepEqual(plain(C.FlowviewCompatibility.detect(raw)),['layout.edge-ports','layout.free-nodes']);
   assert.ok(C.planPlaceFloat(JSON.stringify(raw),raw,0,'f',NaN,2).error);
 });
+
+
+test('canvas contains complete explicit-port curves between samples, including very large positive and negative bends',()=>{
+  for(const bend of [-100000,100000]){
+    const e={from:'a',to:'b',fromPort:{side:'top',offset:0},toPort:{side:'left',offset:1},bend};
+    const d={nodes:{a:{},b:{}},rows:[['a','b']],edges:[e]},r=route(d,e);
+    const v=r.path.match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/g).map(Number),vb=r.L.vb;
+    // Independent, much denser sampling catches extrema between the old .04 intervals.
+    for(let i=0;i<=10000;i++){
+      const t=i/10000,u=1-t;
+      const x=u*u*u*v[0]+3*u*u*t*v[2]+3*u*t*t*v[4]+t*t*t*v[6];
+      const y=u*u*u*v[1]+3*u*u*t*v[3]+3*u*t*t*v[5]+t*t*t*v[7];
+      assert.ok(x>=vb.x && x<=vb.x+vb.w && y>=vb.y && y<=vb.y+vb.h);
+    }
+  }
+});

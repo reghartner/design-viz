@@ -25,7 +25,8 @@ it('refreshes host diagram routing and reapplies the target without reloading th
   const view=render(<InlineFlowview diagram={diagram} loadSpec={load} target={target} resolveDiagramLink={first}/>);
   await waitFor(()=>expect(mount).toHaveBeenCalledTimes(1));
   expect(mount.mock.calls[0][2]?.resolveDiagramLink).toBe(first);
-  expect(owners[0].navigate).toHaveBeenCalledWith(target);
+  // Mounting triggers a state update; target navigation runs in the following effect.
+  await waitFor(()=>expect(owners[0].navigate).toHaveBeenCalledWith(target));
   view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target} resolveDiagramLink={first}/>);
   expect(mount).toHaveBeenCalledTimes(1);
   const oldWarning=mount.mock.calls[0][2]?.onWarning;
@@ -34,14 +35,14 @@ it('refreshes host diagram routing and reapplies the target without reloading th
   expect(owners[0].destroy).toHaveBeenCalledTimes(1);
   expect(mount.mock.calls[1][1]).toBe(spec);
   expect(mount.mock.calls[1][2]?.resolveDiagramLink).toBe(next);
-  expect(owners[1].navigate).toHaveBeenCalledWith(target);
+  await waitFor(()=>expect(owners[1].navigate).toHaveBeenCalledWith(target));
   act(()=>oldWarning?.('Retired router callback'));
   expect(screen.queryByRole('alert')).toBeNull();
   view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target}/>);
   await waitFor(()=>expect(mount).toHaveBeenCalledTimes(3));
   expect(mount.mock.calls[2][2]?.resolveDiagramLink).toBeUndefined();
   expect(owners[1].destroy).toHaveBeenCalledTimes(1);
-  expect(owners[2].navigate).toHaveBeenCalledWith(target);
+  await waitFor(()=>expect(owners[2].navigate).toHaveBeenCalledWith(target));
   expect(load).toHaveBeenCalledTimes(1);
 });
 it('warns before rendering a newer spec, lists unavailable features, and passes the original inert spec',async()=>{

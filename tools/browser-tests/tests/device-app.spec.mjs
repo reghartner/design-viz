@@ -214,5 +214,6 @@ test('changing paths to an adjacent ordinal does not replay screen or notificati
  await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','app');await expect(app(root).locator('.phonetitle')).toHaveText('Other path');
  await expect(app(root).locator('.fresh')).toHaveCount(0);
  await root.getByRole('button',{name:'Next step',exact:true}).click();
- await expect(app(root).locator('.da-screen-home')).toHaveClass(/fresh/);
+ await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','home');
+ await expect(app(root).locator('.phonetitle')).toHaveText('Other path');
 });

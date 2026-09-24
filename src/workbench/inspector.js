@@ -896,7 +896,7 @@ function panelPatchControl(pid, patch, decl, target){
           var input = fieldInput(col, cur && cur[col[0]]);
           inputs[col[0]] = input;
           wireCommit(input, commitGroup);
-          group.appendChild(frow(col[0], input));
+          group.appendChild(frow(editor.patchLabel ? editor.patchLabel(col[0]) : col[0], input));
         });
         body.appendChild(frowBlock(key, group));
       } else {

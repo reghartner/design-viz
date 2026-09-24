@@ -139,3 +139,70 @@ test('notification history is path-local and source-free exports remain compatib
  assert.equal(happy.notifications[0].title,'Recording ready');assert.equal(bad.notifications[0].title,'Camera unavailable');assert.equal(bad.notifications.length,1);assert.equal(bad.battery.value,70);
  assert.ok(!C.buildConfluenceExport(JSON.stringify(raw)).error);
 });
+
+test('phone screens and card visibility carry independently of notification and data history',()=>{
+ const p=panel();p.initial.phoneScreen='home';p.initial.battery.visible=false;
+ const before=JSON.stringify(p),states=C.foldDeviceAppStates(p,[patch({notify:{app:'Home',title:'Visitor'}}),
+  patch({battery:{value:71}}),patch({phoneScreen:'app',battery:{visible:true}}),
+  patch({battery:{visible:false}}),patch({phoneScreen:'home'}),patch({phoneScreen:'app',battery:{visible:true},clear:true})]);
+ assert.equal(states[1].phoneScreen,'home');assert.equal(states[1].battery.visible,false);
+ assert.equal(states[2].battery.value,71);assert.equal(states[2].battery.status,'ready');assert.equal(states[2].notifications.length,1);
+ const home=C.deviceAppPanelHTML(p,states[1],false),opened=C.deviceAppPanelHTML(p,states[2],false),hidden=C.deviceAppPanelHTML(p,states[3],false);
+ assert.match(home,/data-da-screen="home"/);assert.match(home,/Visitor/);assert.doesNotMatch(home,/data-da-field=/);
+ assert.match(opened,/data-da-screen="app"/);assert.match(opened,/71%/);assert.doesNotMatch(hidden,/data-da-field="battery"/);
+ assert.equal(states[5].battery.value,71);assert.equal(states[5].battery.visible,true);assert.equal(states[5].notifications.length,0);
+ assert.equal(JSON.stringify(p),before);states[5].battery.visible=false;assert.equal(states[2].battery.visible,true);
+ const legacy=panel();assert.equal(C.deviceAppModel(legacy,C.foldDeviceAppStates(legacy,[])[0]).screen,'app');
+ assert.ok(C.deviceAppModel(legacy,{}).fields.every(f=>f.visible));
+});
+test('invalid navigation and visibility values warn and preserve prior state; full field reset restores visibility',()=>{
+ const p=panel();p.initial.phoneScreen='home';p.initial.battery.visible=false;
+ const raw=spec(p);raw.page.blocks[0].diagram.steps=[patch({phoneScreen:'browser',battery:{visible:'yes'}})];
+ const result=C.validate(C.normalize(raw));assert.equal(result.errors.length,0);
+ assert.match(result.warnings.join(),/phoneScreen: expected home or app/);assert.match(result.warnings.join(),/visible: expected true or false/);
+ const states=C.foldDeviceAppStates(p,raw.page.blocks[0].diagram.steps);assert.equal(states[0].phoneScreen,'home');assert.equal(states[0].battery.visible,false);
+ const reset=C.foldDeviceAppStates(p,[patch({battery:null})])[0];assert.equal(C.deviceAppModel(p,reset).fields[0].visible,true);assert.equal(reset.battery.value,null);
+ p.appName='<img src=x onerror=x>';p.initial.clock='<script>x</script>';p.initial.note='<svg onload=x>';
+ const html=C.deviceAppPanelHTML(p,C.foldDeviceAppStates(p,[])[0],false);
+ assert.doesNotMatch(html,/<img|<script|<svg onload/);assert.match(html,/&lt;img/);assert.match(html,/&lt;script/);
+});
+test('home/app animation requires an adjacent screen change and stops on repeat, jump, backward and reduced motion',()=>{
+ const p=panel();p.initial.phoneScreen='home';
+ const states=C.foldDeviceAppStates(p,[patch({}),patch({phoneScreen:'app'}),patch({phoneScreen:'home'}),patch({phoneScreen:'app'})]);
+ const host={querySelector:()=>null};
+ C.renderPanelBody(host,p,states[0],'pastel',states,0,false);C.renderPanelBody(host,p,states[1],'pastel',states,1,true);
+ assert.match(host.innerHTML,/da-screen-app fresh/);C.renderPanelBody(host,p,states[1],'pastel',states,1,true);assert.doesNotMatch(host._lastHTML,/da-screen-app fresh/);
+ C.renderPanelBody(host,p,states[2],'pastel',states,2,true);assert.match(host.innerHTML,/da-screen-home fresh/);
+ C.renderPanelBody(host,p,states[0],'pastel',states,0,false);assert.doesNotMatch(host._lastHTML,/da-screen-home fresh/);
+ C.renderPanelBody(host,p,states[3],'pastel',states,3,true);assert.doesNotMatch(host.innerHTML,/da-screen-app fresh/);
+ C.renderPanelBody(host,p,states[0],'pastel',states,0,false);C.renderPanelBody(host,p,states[1],'pastel',states,1,false);assert.doesNotMatch(host.innerHTML,/da-screen-app fresh/);
+});
+test('alternate paths isolate screen choice, hidden cards, and background updates',()=>{
+ const p=panel();p.initial.phoneScreen='home';p.initial.battery.visible=false;
+ const raw=spec(p),d=raw.page.blocks[0].diagram;
+ d.steps=[{id:'start',panels:{app:{notify:{app:'Home',title:'Visitor'}}}},{id:'open',panels:{app:{phoneScreen:'app',battery:{visible:true,value:72}}}},
+  {id:'ignore',panels:{app:{power:{visible:false}}}}];
+ d.paths=[{id:'opened',steps:['start','open']},{id:'ignored',steps:['start','ignore']}];
+ const a=C.foldPanelStates(C.diagramForPath(d,'opened')).app.at(-1),b=C.foldPanelStates(C.diagramForPath(d,'ignored')).app.at(-1);
+ assert.equal(a.phoneScreen,'app');assert.equal(a.battery.visible,true);assert.equal(b.phoneScreen,'home');assert.equal(b.battery.visible,false);
+ assert.equal(b.battery.value,68);assert.equal(a.power.visible,undefined);assert.equal(b.power.visible,false);assert.equal(b.notifications.length,1);
+});
+test('navigation example validates and demonstrates cards appearing and leaving without data loss',()=>{
+ const raw=JSON.parse(fs.readFileSync(__dirname+'/../examples/device-app-navigation/device-app-navigation.spec.json','utf8'));
+ assert.deepEqual(plain(C.validate(C.normalize(raw))),{errors:[],warnings:[]});
+ const d=raw.page.sections[0].diagram,states=C.foldPanelStates(d).app;
+ assert.equal(states[0].phoneScreen,'home');assert.equal(states[2].phoneScreen,'app');assert.equal(states[3].clip.visible,true);
+ assert.equal(states[4].power.visible,false);assert.equal(states[5].phoneScreen,'home');assert.equal(states[6].clip.value,'Just now');
+ assert.ok(!C.buildConfluenceExport(JSON.stringify(raw)).error);
+});
+
+test('switching folded sequences settles presentation even when the new path has an adjacent ordinal',()=>{
+ const p=panel();p.initial.phoneScreen='home';
+ const first=C.foldDeviceAppStates(p,[patch({}),patch({phoneScreen:'home'})]);
+ const second=C.foldDeviceAppStates(p,[patch({}),patch({phoneScreen:'app',notify:{app:'Home',title:'New path'}}),patch({phoneScreen:'home'})]);
+ const host={querySelector:()=>null};
+ C.renderPanelBody(host,p,first[0],'pastel',first,0,false);
+ C.renderPanelBody(host,p,second[1],'pastel',second,1,true);
+ assert.match(host.innerHTML,/data-da-screen="app"/);assert.match(host.innerHTML,/New path/);assert.doesNotMatch(host.innerHTML,/ fresh/);
+ C.renderPanelBody(host,p,second[2],'pastel',second,2,true);assert.match(host.innerHTML,/da-screen-home fresh/);
+});

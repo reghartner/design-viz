@@ -1205,14 +1205,22 @@ perspectives" of one timeline). Types:
   Steps may then also patch `{"miss":[{"lane":"hb","at":"3h"}]}` (appends) to
   flag an expected beat that never arrived (red marker on that lane), and
   events may carry `"lane":"hb"` to sit on a lane's row.
-- `deviceapp` — tiled device-details phone with accumulating notifications and an
-  optional backend source map. Declare `device` and optional `subtitle`.
+- `deviceapp` — a portrait phone with a home screen, a device-details app,
+  accumulating notifications and an optional backend source map. Declare `device`,
+  optional `subtitle` and `appName` (default `Device app`). The frame keeps its
+  proportions as content changes; long app content scrolls inside the phone.
+  `initial.phoneScreen` and step patches accept `"home"` or `"app"`; omitted
+  means app, preserving existing diagrams. The screen choice carries forward.
+  Home shows a wallpaper, clock, notification cards and an illustrative app dock.
+  Patch `{"phoneScreen":"app"}` to enter the app or `{"phoneScreen":"home"}` to
+  return home. Story steps control navigation; the app icons are decorative.
+  Switching screens never clears notifications, tile values or visibility.
   `sources` is optional (0–6 objects) with unique
   `id`, `label`, optional hex `color`, diagram `node` ID, `endpoint` and `detail`.
   `fields` is optional (0–12 data tiles) with unique `id`, `label`, optional `source` ID,
   `kind` (`text` default or `battery`), `icon` and `unit`. IDs must begin with a
-  letter and contain only letters, digits, `_` or `-`; `clock`, `note`, `notify`,
-  `clear`, `notifications`, `constructor` and `prototype` are reserved.
+  letter and contain only letters, digits, `_` or `-`; `phoneScreen`, `clock`,
+  `note`, `notify`, `clear`, `notifications`, `constructor` and `prototype` are reserved.
   Source-free panels show only the phone, without unmapped badges or a source
   explanation block. `showSources:false` also hides that block and its badges
   while retaining authored mappings. With `showSources` omitted, a nonempty
@@ -1228,12 +1236,18 @@ perspectives" of one timeline). Types:
   does not imply freshness. Battery values are numeric 0–100; other values can
   be text, finite numbers or booleans. Missing/null values show `—`. Invalid
   battery values warn and show `—`, never a fabricated zero reading.
-  Patches MERGE each field's `value`, `status`, `detail`, and optional `source`
-  override. Thus `{"battery":{"status":"stale"}}` preserves its last value.
-  A field set to `null` resets its value/detail/status and restores its declared
-  source; `source:null` alone restores that source without clearing the value.
-  Patch `notify:{app,title?,text?}` or `notify:[...]` to add notifications above
-  the data tiles; `app` is required. This uses the same contract as `phone`: each
+  Patches MERGE each field's `value`, `status`, `detail`, optional `source`
+  override, and `visible` boolean. Thus `{"battery":{"status":"stale"}}` preserves
+  its last value. Cards are visible by default. Put `{"clip":{"visible":false}}`
+  in initial state to start without that card, then patch `{"clip":{"visible":true}}`
+  to add it on a step. Patch false to remove it again. Visibility carries forward;
+  hiding a card preserves its value and it can receive updates while hidden.
+  Declare all possible cards in `fields`; show/hide them independently per step.
+  Home hides the app cards without changing these visibility choices.
+  A field set to `null` resets its value/detail/status, restores default visibility
+  and its declared source; `source:null` alone restores that source without clearing the value.
+  Patch `notify:{app,title?,text?}` or `notify:[...]` to add notifications on the
+  home screen or above the app’s data tiles; `app` is required. This uses the same contract as `phone`: each
   step's array keeps its order, newest step first. `clear:true` dismisses only
   notifications, preserving every tile; `clear` plus `notify` clears then adds.
   Up to three cards are shown with a remaining-count indicator. Step jumps and
@@ -1241,7 +1255,8 @@ perspectives" of one timeline). Types:
   sources and can be used without data tiles.
   Optional `clock` and `note` strings carry forward. Without the source map,
   the note appears inside the app. Changed fields show an
-  Updated cue; adjacent forward transitions may animate once. Backward/jump
+  Updated cue; adjacent forward transitions may animate card changes or opening
+  and closing the app once. Backward/jump
   navigation and reduced motion render the absolute state without entry effects.
   Values, endpoints and freshness text are authored, never fetched or timed.
   Replacing field/source IDs requires updating their references and step patches.

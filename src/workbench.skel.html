@@ -287,20 +287,19 @@
   <dialog id="diagram-add-menu" class="diagram-add-menu" aria-labelledby="diagram-add-title" aria-describedby="diagram-add-destination">
     <div class="diagram-add-header"><div><h2 id="diagram-add-title">Add to diagram</h2><p id="diagram-add-destination"></p></div><button type="button" class="bbtn" id="diagram-add-close" aria-label="Close add to diagram">✕</button></div>
     <div class="diagram-add-choices" role="group" aria-label="What to add">
-      <button type="button" data-add-kind="node" aria-pressed="true"><span class="diagram-add-symbol" aria-hidden="true">▣</span><span><b>Node</b><small>A service, device or actor</small></span></button>
-      <button type="button" data-add-kind="edge" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">→</span><span><b>Connection</b><small>A message between nodes</small></span></button>
-      <button type="button" data-add-kind="step" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">≡</span><span><b>Step</b><small>The next moment in the story</small></span></button>
-      <button type="button" data-add-kind="panel" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">▤</span><span><b>Panel</b><small>Browse the visual panel library</small></span></button>
-      <button type="button" data-add-kind="catalog" aria-pressed="false"><span class="diagram-add-symbol" aria-hidden="true">⌘</span><span><b>Services from catalog</b><small>Select services and their connections</small></span></button>
+      <button type="button" id="add-node" data-add-kind="node"><span class="diagram-add-symbol" aria-hidden="true">▣</span><span><b>Node</b><small>Choose a service, device or actor</small></span></button>
+      <button type="button" id="add-edge" data-add-kind="edge"><span class="diagram-add-symbol" aria-hidden="true">→</span><span><b>Connection</b><small>Click a source, then its target</small></span></button>
+      <button type="button" id="add-step" data-add-kind="step"><span class="diagram-add-symbol" aria-hidden="true">≡</span><span><b>Step</b><small>Add the next moment to this timeline</small></span></button>
+      <button type="button" id="add-panel" data-add-kind="panel" aria-haspopup="dialog" aria-controls="panel-picker"><span class="diagram-add-symbol" aria-hidden="true">▤</span><span><b>Panel</b><small>Browse the visual panel library</small></span></button>
+      <button type="button" id="add-catalog" data-add-kind="catalog" aria-haspopup="dialog" aria-controls="catalog-picker"><span class="diagram-add-symbol" aria-hidden="true">⌘</span><span><b>Services from catalog</b><small>Select services and their connections</small></span></button>
     </div>
-    <div class="diagram-add-options"><label id="diagram-add-preset-label" for="diagram-add-preset">Node preset<select id="diagram-add-preset" class="fctl"></select></label><p id="diagram-add-help"></p><p id="diagram-add-error" role="status" hidden></p></div>
+    <div id="diagram-add-nodes" hidden>
+      <button type="button" class="bbtn" id="diagram-add-back">← All additions</button>
+      <div id="diagram-add-presets" class="diagram-add-choices diagram-add-presets" role="group" aria-label="Node presets"></div>
+    </div>
+    <div class="diagram-add-options"><p id="diagram-add-help"></p><p id="diagram-add-error" role="status" hidden></p></div>
     <div class="diagram-add-footer">
       <details class="diagram-add-structure"><summary>Contracts &amp; page structure</summary><button type="button" class="bbtn" id="add-contract">Add contract block</button><button type="button" class="bbtn" id="add-section">Add section</button><button type="button" class="bbtn" id="add-tabs">Add tabs</button></details>
-      <button type="button" class="editor-add-button" id="add-node" data-add-action="node">Add node</button>
-      <button type="button" class="editor-add-button" id="add-edge" data-add-action="edge" hidden>Choose source and target</button>
-      <button type="button" class="editor-add-button" id="add-step" data-add-action="step" hidden>Add step</button>
-      <button type="button" class="editor-add-button" id="add-panel" data-add-action="panel" aria-haspopup="dialog" aria-controls="panel-picker" hidden>Browse panels</button>
-      <button type="button" class="editor-add-button" id="add-catalog" data-add-action="catalog" aria-haspopup="dialog" aria-controls="catalog-picker" hidden>Choose services</button>
     </div>
   </dialog>
 

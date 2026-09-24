@@ -938,11 +938,6 @@ function initWorkbenchBuilder(opts){
   });
 
   /* Node presets and the panel library share the persistent Add entry point. */
-  var nodeBtn = document.getElementById('add-node');
-  if (nodeBtn) life.listen(nodeBtn,'click',function(){
-    var preset=addMenu ? addMenu.preset() : NODE_PRESETS[0];
-    confirmAddition(function(){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});});
-  });
   var panelPicker = typeof initPanelPicker === 'function' ? initPanelPicker({
     src:src, pause:pausePreview, error:inspectorMessage,
     context:function(){
@@ -983,6 +978,7 @@ function initWorkbenchBuilder(opts){
   var catalogBtn=document.getElementById('add-catalog');
   if(catalogBtn)life.listen(catalogBtn,'click',function(){confirmAddition(function(){if(catalogPicker)catalogPicker.open();});});
   var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
+    addNode:function(preset){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});},
     chooseSection:function(index){
       var parsed=parseEditor();if(parsed.error || interactions.adding() || interactions.connecting())return;
       var rec=specSectionPaths(parsed.raw)[index];if(!rec)return;

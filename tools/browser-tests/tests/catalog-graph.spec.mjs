@@ -12,7 +12,7 @@ const source=()=>JSON.stringify({page:{title:'Existing design',blocks:[{heading:
   {tabs:[{label:'Details',sections:[{heading:'Target services',diagram:{nodes:{authored:{title:'My gateway',binding:{entityRef:ref('doorbell')}}},rows:[['authored']],steps:[],panels:[{id:'q',type:'queue'}]}}]}]}]}});
 const spec=async page=>JSON.parse(await page.locator('#src').inputValue());
 const choose=async(page,name)=>page.locator('#catalog-services').getByRole('checkbox',{name:new RegExp(name)}).check();
-const openAdd=async page=>{await page.locator('#diagram-add').click();await page.locator('[data-add-kind=catalog]').click();await page.locator('#add-catalog').click();};
+const openAdd=async page=>{await page.locator('#diagram-add').click();await page.locator('[data-add-kind=catalog]').click();};
 
 test('homepage seeds selected services with catalog bindings, optional edges and searchable selection',async({page,server},testInfo)=>{
   await page.route('**/catalog.json',route=>route.fulfill({json:catalog}));

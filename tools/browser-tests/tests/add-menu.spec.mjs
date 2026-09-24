@@ -23,8 +23,15 @@ test('persistent Add entry targets tab sections and preserves one-change Undo/Re
   await expect(target.locator('option:checked')).toContainText('Operations');
   await add.focus();await page.keyboard.press('Enter');
   await expect(page.locator('#diagram-add-menu')).toBeVisible();
-  await page.locator('#diagram-add-preset').selectOption({label:'Service'});
-  await page.locator('#add-node').click();
+  await expect(page.locator('#add-node')).toBeFocused();await page.keyboard.press('Enter');
+  const presets=page.locator('#diagram-add-presets');
+  await expect(presets.getByRole('button',{name:'Console',exact:true})).toBeFocused();
+  await expect(presets.getByRole('button')).toHaveCount(14);
+  await page.locator('#diagram-add-back').click();
+  await expect(page.locator('#add-node')).toBeFocused();await expect(page.locator('#src')).toHaveValue(original);
+  await page.keyboard.press('Enter');
+  await presets.getByRole('button',{name:'Service',exact:true}).focus();await page.keyboard.press('Enter');
+  await expect(page.locator('#diagram-add-menu')).toBeHidden();
   const inserted=await spec(page),diagram=inserted.page.blocks[1].tabs[1].sections[0].diagram;
   expect(Object.values(diagram.nodes).map(n=>n.title)).toEqual(['Cloud','Service']);
   expect(inserted.page.blocks[0]).toEqual(raw.page.blocks[0]);
@@ -32,7 +39,8 @@ test('persistent Add entry targets tab sections and preserves one-change Undo/Re
   const after=await text(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
-  await target.selectOption('0');await open(page,'edge');await page.locator('#add-edge').click();
+  await target.selectOption('0');await open(page,'edge');
+  await expect(page.locator('#diagram-add-menu')).toBeHidden();
   await expect(add).toBeDisabled();await expect(target).toBeDisabled();
   // A source outside the selected section cannot silently retarget the addition.
   await page.locator('[data-dv-node=y]').click();await expect(page.locator('#btarget')).toContainText('section 1');
@@ -47,19 +55,19 @@ test('chooser adds to the selected path, opens the existing panel library, and a
   const original=JSON.stringify(raw,null,2);
   await page.goto(server.origin+'/workbench.html');await paste(page,original);
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-path').selectOption('failed');
-  await open(page,'step');await page.locator('#add-step').click();
+  await open(page,'step');await expect(page.locator('#diagram-add-menu')).toBeHidden();
   const added=await spec(page),d=added.page.blocks[0].diagram;
   expect(d.steps).toHaveLength(4);expect(d.paths[0]).toEqual(raw.page.blocks[0].diagram.paths[0]);expect(d.paths[1].steps).toHaveLength(2);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
-  await open(page,'panel');await page.locator('#add-panel').click();
+  await open(page,'panel');
   await expect(page.locator('#diagram-add-menu')).toBeHidden();await expect(page.locator('#panel-picker')).toBeVisible();
   await page.locator('.panel-picker-card[data-panel-type=screen]').click();await page.locator('#panel-picker-add').click();
   expect((await spec(page)).page.blocks[0].diagram.panels.at(-1).type).toBe('screen');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
-  await open(page,'panel');await page.locator('#add-panel').click();await page.keyboard.press('Escape');
+  await open(page,'panel');await page.keyboard.press('Escape');
   await expect(page.locator('#diagram-add')).toBeFocused();
   for(const action of ['section','tabs']){
-    await open(page,'node');await page.locator('.diagram-add-structure summary').click();await page.locator('#add-'+action).click();
+    await page.locator('#diagram-add').click();await page.locator('.diagram-add-structure summary').click();await page.locator('#add-'+action).click();
     expect((await spec(page)).page.blocks).toHaveLength(2);
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
   }
@@ -73,14 +81,17 @@ test('chooser cancels cleanly, blocks stale/invalid source, and retires on build
   await open(page,'node');
   const changed=source.replace('Browser contract','Changed while choosing');
   await page.evaluate(changed=>{const src=document.querySelector('#src');src.value=changed;src.dispatchEvent(new Event('input',{bubbles:true}));},changed);
-  await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#diagram-add-error')).toContainText('changed');
-  await page.evaluate(()=>document.querySelector('#add-node').click());await expect(page.locator('#src')).toHaveValue(changed);
+  await expect(page.locator('[data-add-preset="0"]')).toBeDisabled();await expect(page.locator('#diagram-add-error')).toContainText('changed');
+  await page.evaluate(()=>document.querySelector('[data-add-preset="0"]').dispatchEvent(new MouseEvent('click',{bubbles:true})));await expect(page.locator('#src')).toHaveValue(changed);
+  await expect(page.locator('[data-add-preset="0"]')).toBeDisabled();
+  await page.locator('#diagram-add-back').click();await expect(page.locator('#diagram-add-close')).toBeFocused();
+  await expect(page.locator('#add-step')).toBeDisabled();
   await page.keyboard.press('Escape');
   await page.evaluate(()=>{const src=document.querySelector('#src');src.value='{';src.dispatchEvent(new Event('input',{bubbles:true}));});
-  await open(page,'step');await expect(page.locator('#add-step')).toBeDisabled();await expect(page.locator('#diagram-add-error')).toBeVisible();
+  await page.locator('#diagram-add').click();await expect(page.locator('#add-step')).toBeDisabled();await expect(page.locator('#diagram-add-error')).toBeVisible();
   await page.evaluate(()=>__editorTest.builder.destroy());await expect(page.locator('#diagram-add-menu')).toBeHidden();
   await page.evaluate(source=>{document.querySelector('#src').value=source;__editorTest.remount();},source);
-  await open(page,'node');await page.locator('#add-node').click();
+  await open(page,'node');await page.locator('#diagram-add-presets').getByRole('button',{name:'Console',exact:true}).click();
   expect(Object.keys((await spec(page)).page.blocks[0].diagram.nodes)).toHaveLength(4);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
 });
@@ -94,14 +105,18 @@ test('Add UI stays within a narrow editor and its modal fits supported skins',as
   }
   for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
     await page.locator('#sk-'+skin).click();
-    await open(page,'node');
+    await page.locator('#diagram-add').click();
     const dialog=page.locator('#diagram-add-menu');
     expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
     await expect(page.locator('#add-node')).toBeInViewport();
     if(skin==='pastel')await testInfo.attach('add-chooser-pastel',{body:await page.screenshot(),contentType:'image/png'});
+    await page.locator('#add-node').click();
+    expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+    await expect(page.locator('#diagram-add-presets').getByRole('button',{name:'Phone',exact:true})).toBeInViewport();
+    if(skin==='pastel')await testInfo.attach('add-node-presets-pastel',{body:await dialog.screenshot(),contentType:'image/png'});
     await page.keyboard.press('Escape');
   }
-  await page.setViewportSize({width:720,height:800});await open(page,'panel');
+  await page.setViewportSize({width:720,height:800});await page.locator('#diagram-add').click();
   await expect(page.locator('#add-panel')).toBeInViewport();
   expect(await page.locator('#diagram-add-menu').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
 });

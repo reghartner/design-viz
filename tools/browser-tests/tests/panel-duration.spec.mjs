@@ -55,6 +55,13 @@ for(const type of ['screen','phone'])test(type+' temporary state editing preserv
   await selectStep(1);await patch.getByLabel('banner duration',{exact:true}).selectOption('once');
   await selectStep(2);await expect(root.locator('.banner')).toHaveText('BASE');
   await selectStep(1);
+  await expect(patch.getByLabel('spotlight duration',{exact:true})).toBeDisabled();
+  await patch.getByLabel('spotlight',{exact:true}).selectOption('flash');
+  await expect(patch.getByLabel('spotlight duration',{exact:true})).toBeEnabled();
+  await expect(patch.getByLabel('spotlight duration',{exact:true})).toHaveValue('carry');
+  await patch.getByLabel('spotlight duration',{exact:true}).selectOption('once');
+  expect((await diagram()).steps[1].panels.p.enterOnce.spotlight).toBe('flash');
+  expect((await diagram()).steps[1].panels.p.spotlight).toBeUndefined();
  }
  expect((await diagram()).panels[0].initial).toEqual(panel.initial);
  await patch.getByLabel('audio duration',{exact:true}).scrollIntoViewIfNeeded();

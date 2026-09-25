@@ -18,10 +18,12 @@ interaction coverage, independent review, and passing CI before merge.
 - [x] **5. Nested prose** — Select, add, indent/outdent, and reorder nested
   bullets; small formatting helpers using the existing safe text syntax.
   Merged in [PR #223](https://github.com/reghartner/design-viz/pull/223).
-- [ ] **6. Drilldown mappings** — Parent/child step selectors replace mapping
+- [x] **6. Drilldown mappings** — Parent/child step selectors replace mapping
   JSON, with missing-target feedback and a preview action.
-- [ ] **7. Temporary state** — Carry-forward / this-step-only controls for
+  Merged in [PR #224](https://github.com/reghartner/design-viz/pull/224).
+- [x] **7. Temporary state** — Carry-forward / this-step-only controls for
   supported Camera and Phone fields, with an explicit way to inherit again.
+  Completed in [PR #226](https://github.com/reghartner/design-viz/pull/226).
 
 The authoring model is: what exists, its starting state, and what changes at a
 story step. Raw JSON remains available for advanced fields. Existing paths,

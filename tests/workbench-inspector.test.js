@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['validator','workbench/source-edit','workbench/targets','workbench/commands/common',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/detail-mapping','workbench/inspector'];
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/detail-mapping','workbench/notifications','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
   function element(tag = 'div', id = ''){
@@ -87,7 +87,7 @@ function environment(){
       invalidateProject(){inspector.retire();}});
     session.target={kind:'panel',section:0,index:0};
     inspector=C.createBuilderInspector({document:doc,guide,session,
-      apply(plan,opt,snapshot){return session.accept(plan,{snapshot,afterRender(){if(opt?.after)opt.after(plan);}});},
+      apply(plan,opt,snapshot){if(plan?.error){inspector.error(plan.error);return false;}return session.accept(plan,{snapshot,afterRender(){if(opt?.after)opt.after(plan);}});},
       schedule(fn){timers.set(++next,fn);scheduled.push(fn);return next;},cancel:id=>timers.delete(id),
       surface:{show(){},reveal(){reveals++;},hideDiff(){},retire(){retireCalls++;}},
       selection:{select(){selectionCalls++;},range(){selectionCalls++;},rehighlight(){selectionCalls++;},remove(){},removeMany(){}},
@@ -95,6 +95,7 @@ function environment(){
       modes:{adding:()=>null,connecting:()=>null,toggleAdding(){},editPathStep(){}},
       clipboard:{current:()=>null,selectHome(){selectionCalls++;},clearHome(){}}});
     return {inspector,session,guide,timers,scheduled,get text(){return text;},get reveals(){return reveals;},get retireCalls(){return retireCalls;},get selectionCalls(){return selectionCalls;},
+      writeSource(value){text=value;inspector.sourceChanged();},
       flush(){const run=[...timers.values()];timers.clear();run.forEach(fn=>fn());}};
   }
   return {C,doc,element,mount};
@@ -299,4 +300,32 @@ test('a formatting URL draft survives the prose refresh without suppressing it o
   const outside=e.doc.body.appendChild(e.element('button'));outside.focus();newURL.fire('blur');h.flush();
   assert.equal(JSON.parse(h.text).sections[0].bullets[0],'After');
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
+test('temporary value controls reject stale carry/once ownership without writing or adding history',()=>{
+  for(const type of ['screen','phone'])for(const once of [false,true]){
+    const audio={microphone:'capturing'},patch=once?{enterOnce:{audio}}:{audio};
+    const spec={nodes:{},rows:[],panels:[{id:'p',type}],steps:[{panels:{p:patch}}]};
+    const e=environment(),h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+    const input=h.guide.querySelector('[aria-label="microphone"]');assert.ok(input);
+    spec.steps[0].panels.p=once?{audio}:{enterOnce:{audio}};const changed=JSON.stringify(spec,null,2);h.writeSource(changed);
+    input.value='listening';input.fire('change');
+    assert.equal(h.text,changed);assert.equal(h.session.canUndo(),false);
+    assert.match(h.guide.querySelector('.ierr').textContent,/duration changed in JSON/);
+    h.inspector.render();const fresh=h.guide.querySelector('[aria-label="microphone"]');fresh.value='listening';fresh.fire('change');
+    const result=JSON.parse(h.text).steps[0].panels.p;
+    assert.equal((once?result.audio:result.enterOnce.audio).microphone,'listening');
+    assert.equal(once?result.enterOnce:result.audio,undefined);
+    h.session.undo();assert.equal(h.text,changed);
+  }
+});
+
+test('temporary field edits use current sibling fields while ownership is unchanged',()=>{
+  const spec={nodes:{},rows:[],panels:[{id:'p',type:'screen'}],steps:[{panels:{p:{enterOnce:{audio:{microphone:'capturing'}}}}}]};
+  const e=environment(),h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  const input=h.guide.querySelector('[aria-label="microphone"]');
+  spec.steps[0].panels.p.enterOnce.audio.future={keep:true};spec.steps[0].panels.p.audio={output:'chime'};
+  const changed=JSON.stringify(spec,null,2);h.writeSource(changed);input.value='listening';input.fire('change');
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.p,{audio:{output:'chime'},enterOnce:{audio:{microphone:'listening',future:{keep:true}}}});
+  h.session.undo();assert.equal(h.text,changed);
 });

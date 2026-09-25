@@ -871,6 +871,11 @@ function panelPatchControl(pid, patch, decl, target, options){
           current=got.st.panels[pid];
         }
         if(!whole){
+          if(!initial && (panelAuthoring(decl.type).transientFields || []).indexOf(key)>=0){
+            var currentOnce=panelObject(current) && panelObject(current.enterOnce) && Object.prototype.hasOwnProperty.call(current.enterOnce,key);
+            if(!panelObject(current) || (storage==='once')!==!!currentOnce)
+              return {error:'This field’s duration changed in JSON. Click Render, then select the step again.'};
+          }
           next=Object.assign(Object.create(null),panelObject(current)?current:{});
           if(storage==='once' && Object.prototype.hasOwnProperty.call(next,'enterOnce') && !panelObject(next.enterOnce))return {error:'Repair enterOnce in raw JSON before editing a temporary field.'};
           var values=storage==='once'?Object.assign(Object.create(null),next.enterOnce || {}):next;

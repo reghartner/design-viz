@@ -135,11 +135,12 @@ test('home/app navigation and card visibility keep one phone frame in standalone
 test('workbench edits the starting screen and per-step cards with independent Undo/Redo',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,navigationSource);
  const root=page.locator('#docview'),guide=page.locator('#guide');
- await app(root).locator('.ptitle').click();await guide.getByRole('combobox',{name:'Starting phone screen',exact:true}).selectOption('Device app');
+ await app(root).locator('.ptitle').click();await guide.getByRole('combobox',{name:'Starting phone screen',exact:true}).selectOption('app');
  await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','app');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(navigationSource);
- await app(root).locator('.ptitle').click();await guide.getByText('Cards shown initially',{exact:true}).click();
- await guide.getByRole('combobox',{name:'Last recording initially',exact:true}).selectOption('Shown');
+ await app(root).locator('.ptitle').click();
+ const initialClip=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^clip$/})});
+ await initialClip.getByRole('combobox',{name:'Card visibility',exact:true}).selectOption('true');
  let updated=diagram(JSON.parse(await page.locator('#src').inputValue()));
  expect(updated.panels[0].initial.clip).toEqual({value:'Yesterday',status:'ready',visible:true});expect(updated.panels[0].initial.phoneScreen).toBe('home');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(navigationSource);
@@ -266,4 +267,31 @@ test('phone text and geometry scale together when its tile gets narrower or shor
  expect((await root.locator('.da-phone').boundingBox()).width).toBeGreaterThan(200);
  expect(await root.locator('.pt-deviceapp>.pbody').evaluate(el=>el.getBoundingClientRect().height)).toBeGreaterThan(600);
  await page.evaluate(()=>viewer.destroy());
+});
+
+
+test('starting state uses typed fields, preserves advanced data, and leaves step overrides untouched',async({page,server},testInfo)=>{
+ const spec=structuredClone(raw),d=diagram(spec);delete d.layouts;delete d.defaultLayout;
+ d.panels[0].initial.battery.custom='keep nested';d.panels[0].initial.custom='keep top';d.panels[0].initial.battery.detail=null;
+ d.panels.push({id:'camera',type:'screen',title:'Camera',scene:'person-through-door',initial:{mode:'off',banner:'Ready',custom:17}});
+ d.steps[1].panels={...d.steps[1].panels,camera:{mode:'rec'}};
+ const original=JSON.stringify(spec,null,2);
+ await page.goto(server.origin+'/workbench.html');await paste(page,original);
+ const root=page.locator('#docview'),guide=page.locator('#guide');
+ await app(root).locator('.ptitle').click();
+ const battery=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^battery$/})});
+ await battery.getByLabel('value',{exact:true}).fill('42');await battery.getByLabel('value',{exact:true}).press('Tab');
+ await expect(app(root).locator('[data-da-field=battery] .da-value')).toHaveText('42%');
+ let edited=diagram(JSON.parse(await page.locator('#src').inputValue()));
+ expect(edited.panels[0].initial.battery).toEqual({...d.panels[0].initial.battery,value:42});
+ expect(edited.panels[0].initial.custom).toBe('keep top');expect(edited.steps).toEqual(d.steps);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+ await page.locator('#redo-builder').click();await expect(app(root).locator('[data-da-field=battery] .da-value')).toHaveText('42%');
+ await root.locator('.pt-screen .ptitle').click();
+ await guide.locator('.initialedit').getByLabel('mode',{exact:true}).selectOption('live');
+ edited=diagram(JSON.parse(await page.locator('#src').inputValue()));
+ expect(edited.panels[1].initial).toEqual({mode:'live',banner:'Ready',custom:17});expect(edited.steps).toEqual(d.steps);
+ await testInfo.attach('typed-starting-state',{body:await guide.screenshot(),contentType:'image/png'});
+ await page.locator('#undo-builder').click();
+ expect(diagram(JSON.parse(await page.locator('#src').inputValue())).panels[1].initial.mode).toBe('off');
 });

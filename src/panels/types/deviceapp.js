@@ -638,6 +638,7 @@ PanelRegistry.extend('deviceapp', {
         clock: '9:41',
       },
     },
+    initialFields: true,
     setupFields: [
       ['appName', 'text'],
       ['device', 'text'],
@@ -694,38 +695,12 @@ PanelRegistry.extend('deviceapp', {
       sample.state=foldDeviceAppStates(sample.panel,[])[0];sample.states=[sample.state];return sample;
     },
     editor: function(context){
-      var initialCardsOpen=false;
-      function initialChange(update){
-        return context.transact(function(raw){
-          var path=builderTargetPath(raw,context.target()),panel=path && specValueAt(raw,path);
-          if(!panel)return {error:'Select the device app panel again.'};
-          var initial=Object.assign({},panelObject(panel.initial)?panel.initial:{});
-          update(initial);
-          return planSetField(context.source(),raw,path,'initial',JSON.stringify(initial));
-        },{after:function(){context.refresh();}});
-      }
-      return {setupRows:function(panel,diagram,target,rows){
-        var initial=panelObject(panel.initial)?panel.initial:{};
-        var screen=context.controls.select(['Device app','Home screen'],initial.phoneScreen==='home'?'Home screen':'Device app',function(next){
-          return initialChange(function(value){value.phoneScreen=next==='Home screen'?'home':'app';});
-        });
-        screen.setAttribute('aria-label','Starting phone screen');rows.push(context.controls.row('Starting phone screen',screen));
-        var cards=document.createElement('details'),summary=document.createElement('summary');
-        cards.className='rawjson';cards.open=initialCardsOpen;summary.textContent='Cards shown initially';cards.appendChild(summary);
-        context.listen(cards,'toggle',function(){initialCardsOpen=cards.open;});
-        deviceAppItems(panel,'fields').forEach(function(field){
-          var control=context.controls.select(['Shown','Hidden'],initial[field.id] && initial[field.id].visible===false?'Hidden':'Shown',function(next){
-            return initialChange(function(value){value[field.id]=Object.assign({},panelObject(value[field.id])?value[field.id]:{},{visible:next==='Shown'});});
-          });
-          control.setAttribute('aria-label',(field.label || field.id)+' initially');cards.appendChild(context.controls.row(field.label || field.id,control));
-        });
-        if(deviceAppItems(panel,'fields').length)rows.push(cards);
-      },patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key;},
-      patchField:function(field,input){
+      return {patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key;},
+      patchField:function(field,input,options){
         if(field[0]!=='phoneScreen' && field[0]!=='visible')return;
-        input.setAttribute('aria-label',field[0]==='phoneScreen'?'Phone screen':'Card visibility');
+        input.setAttribute('aria-label',field[0]==='phoneScreen'?(options && options.initial?'Starting phone screen':'Phone screen'):'Card visibility');
         Array.from(input.options).forEach(function(option){
-          option.textContent=option.value===''?'Inherit':({home:'Home screen',app:'Device app',true:'Show card',false:'Hide card'}[option.value] || option.textContent);
+          option.textContent=option.value===''?(options && options.initial?'Default':'Inherit'):({home:'Home screen',app:'Device app',true:'Show card',false:'Hide card'}[option.value] || option.textContent);
         });
       },patchIntro:function(body){
         var note=document.createElement('p');note.className='home-note';

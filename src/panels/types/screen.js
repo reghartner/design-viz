@@ -696,6 +696,7 @@ function screenScenePreview(initialScene) {
 PanelRegistry.extend('screen', {
   authoring: {
     template: { title: 'Camera', scene: 'static-noise', initial: { mode: 'off' } },
+    initialFields: true,
     setupFields: [
       ['scene', 'scene'],
       ['initial', 'json'],
@@ -754,13 +755,13 @@ PanelRegistry.extend('screen', {
           scenes.appendChild(preview.element);
           return context.controls.block(key, scenes);
         },
-        patchField: function (f, input) {
+        patchField: function (f, input, options) {
           if (f[0] !== 'scenePlayback') return;
           input.setAttribute('aria-label', 'Scene event');
           Array.prototype.forEach.call(input.options, function (option) {
             if (option.value === 'waiting') option.textContent = 'Before event';
             else if (option.value === 'playing') option.textContent = 'Play event';
-            else if (option.value === '') option.textContent = 'Inherit';
+            else if (option.value === '') option.textContent = options && options.initial ? 'Default' : 'Inherit';
           });
         },
         patchIntro: function (body) {

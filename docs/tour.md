@@ -90,7 +90,7 @@ skip.
 2. Add `page.tour` only if the default flow or copy is wrong for the page —
    the default already adapts by skipping.
 3. In an override, keep selectors to the engine's stable classes
-   (`.step-transport`, `.path-matrix`, `.presentbtn`, `.nrefs-trigger`,
+   (`.step-transport`, `.path-timeline`, `.presentbtn`, `.nrefs-trigger`,
    `.diagram-view-choice`, `.mtoggle`, `.termbar`) and point `diagramState`
    at real section/path/step ids from the spec.
 4. Use `offset` last, for small pixel corrections only.

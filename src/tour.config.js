@@ -42,7 +42,7 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'branching',
-      target: {selector: '.path-matrix', within: 'section'},
+      target: {selector: '.path-timeline', within: 'section'},
       diagramState: {mode: 'step', path: '@alt', step: '@shared'},
       copy: {
         heading: 'Flows can split',

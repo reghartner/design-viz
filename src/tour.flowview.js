@@ -169,11 +169,45 @@ function wireTour(ctl, view, win, config, request){
         rect.w + 'px;height:' + rect.h + 'px';
     } else parts.ring.hidden = true;
   }
-  function fullScrim(){ setHole({x: 0, y: 0, w: 0, h: 0}); parts.ring.hidden = true; }
+  function fullScrim(){ setHole({x: 0, y: 0, w: 0, h: 0}); parts.ring.hidden = true; placeUi(null); }
+  /* the narration card defaults to the bottom-left corner and yields to the
+     spotlight: first corner that does not overlap the hole wins */
+  function placeUi(hole){
+    if (parts.ui.classList.contains('dv-tour-ui-center')){
+      parts.ui.style.left = ''; parts.ui.style.top = '';
+      parts.ui.style.right = ''; parts.ui.style.bottom = '';
+      return;
+    }
+    var m = 44, uw = parts.ui.offsetWidth || 360, uh = parts.ui.offsetHeight || 200;
+    var vw = win.innerWidth, vh = win.innerHeight;
+    var corners = [
+      {x: m, y: vh - m - uh}, {x: vw - m - uw, y: vh - m - uh},
+      {x: m, y: m + 40}, {x: vw - m - uw, y: m + 40}
+    ];
+    var pick = corners[0];
+    if (hole && hole.w > 0){
+      for (var i = 0; i < corners.length; i++){
+        var c = corners[i];
+        var clear = c.x + uw < hole.x || c.x > hole.x + hole.w ||
+                    c.y + uh < hole.y || c.y > hole.y + hole.h;
+        if (clear){ pick = c; break; }
+      }
+    }
+    parts.ui.style.left = pick.x + 'px';
+    parts.ui.style.top = pick.y + 'px';
+    parts.ui.style.right = 'auto';
+    parts.ui.style.bottom = 'auto';
+  }
   function viewport(){ return {w: win.innerWidth, h: win.innerHeight}; }
   function rectOf(node){
     var r = node.getBoundingClientRect();
     return {x: r.left, y: r.top, w: r.width, h: r.height};
+  }
+  function recenter(spot){
+    var sr = spot.getBoundingClientRect();
+    var vh = win.innerHeight;
+    if (sr.top < 80 || sr.bottom > vh - 80)
+      win.scrollTo(0, win.scrollY + sr.top - (vh - sr.height) / 2);
   }
   function position(){
     if (!active) return;
@@ -183,19 +217,16 @@ function wireTour(ctl, view, win, config, request){
     var target = queryTarget(step, sec, step.target);
     if (!target){ fullScrim(); return; }
     var rect = rectOf(target);
-    /* the links step spotlights the whole node card, not the tiny trigger */
+    /* the links step spotlights the whole node card, not the tiny trigger;
+       the menu itself is the viewer's click — the engine popover paints in
+       the browser top layer, above this overlay */
     if (step.target.selector.indexOf('nrefs-trigger') >= 0){
       var nodeEl = target.closest ? target.closest('.node[data-dv-node]') : null;
       if (nodeEl && nodeEl.getBoundingClientRect) rect = rectOf(nodeEl);
-      var pop = doc.querySelector('.node-link-menu:not([hidden])');
-      if (pop){
-        var pr = rectOf(pop);
-        var x2 = Math.max(rect.x + rect.w, pr.x + pr.w), y2 = Math.max(rect.y + rect.h, pr.y + pr.h);
-        rect.x = Math.min(rect.x, pr.x); rect.y = Math.min(rect.y, pr.y);
-        rect.w = x2 - rect.x; rect.h = y2 - rect.y;
-      }
     }
-    setHole(tourCutoutRect(rect, step.offset, 8, viewport()));
+    var hole = tourCutoutRect(rect, step.offset, 8, viewport());
+    setHole(hole);
+    placeUi(hole);
     if (step.secondary && step.secondary.target){
       var second = queryTarget(step, sec, step.secondary.target);
       if (second){
@@ -288,7 +319,13 @@ function wireTour(ctl, view, win, config, request){
       steps = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; })
         .concat(steps.filter(function(step){ return (step.kind || 'spot') !== 'chooser'; }));
     var resolved = {};
-    steps.forEach(function(step){ resolved[step.id] = probe(step); });
+    steps.forEach(function(step){
+      resolved[step.id] = probe(step);
+      /* the skip is silent for viewers but named for config authors */
+      if (!resolved[step.id] && (step.kind || 'spot') === 'spot' && win.console)
+        console.warn('flowspec: tour step "' + step.id +
+          '" skipped — its target or diagram state did not resolve on this page');
+    });
     return tourFilterResolved(steps, resolved);
   }
   function choose(which){
@@ -308,8 +345,8 @@ function wireTour(ctl, view, win, config, request){
       fullScrim(); renderTimeline(); renderChooser(step); return;
     }
     if ((step.kind || 'spot') === 'done'){
-      fullScrim(); renderTimeline(); renderStep(step);
       parts.ui.classList.add('dv-tour-ui-center');
+      fullScrim(); renderTimeline(); renderStep(step);
       return;
     }
     parts.ui.classList.remove('dv-tour-ui-center');
@@ -323,21 +360,37 @@ function wireTour(ctl, view, win, config, request){
     }
     applyDiagramState(sec, step.diagramState);
     var target = queryTarget(step, sec, step.target);
-    if (target && target.scrollIntoView){
-      try { target.scrollIntoView({block: 'center', behavior: 'instant'}); }
-      catch (ex) { target.scrollIntoView(); }
-    }
-    /* the links step opens the node menu so its rows are really on screen;
-       the engine owns dismissal (outside pointer, Escape, scroll) */
-    var menuOpened = false;
-    if (target && step.target.selector.indexOf('nrefs-trigger') >= 0){
-      try {
-        target.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
-        menuOpened = !!doc.querySelector('.node-link-menu:not([hidden])');
+    if (target){
+      /* scrollIntoView first (it also centers inside the board's own
+         horizontal scroller), then correct the window explicitly — on SVG
+         children scrollIntoView may move only the inner scroller */
+      var spot = step.target.selector.indexOf('nrefs-trigger') >= 0 && target.closest ?
+        (target.closest('.node[data-dv-node]') || target) : target;
+      /* a target can live inside a collapsed disclosure (a Home-focused page
+         keeps its data flow in <details class="secondary-flow">): disclose it,
+         exactly as the viewer would */
+      for (var anc = spot; anc && anc !== doc.body; anc = anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
+        if (anc.tagName === 'DETAILS' && !anc.open) anc.open = true;
+      if (spot.scrollIntoView){
+        try { spot.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}); }
+        catch (ex) { spot.scrollIntoView(); }
       }
-      catch (ex) { /* menu stays closed; the node alone is spotlit */ }
+      recenter(spot);
+      /* engine step-change scrolling and freshly disclosed boards settle
+         asynchronously: keep correcting until the target rect is stable
+         inside the viewport (or give up quietly after ~0.6s) */
+      var settleTries = 8, lastTop = null;
+      (function settle(){
+        if (!active || list[at] !== step) return;
+        recenter(spot); position();
+        var top = Math.round(spot.getBoundingClientRect().top);
+        var inView = top >= 0 && top <= win.innerHeight;
+        if ((inView && top === lastTop) || --settleTries <= 0) return;
+        lastTop = top;
+        win.setTimeout(settle, 80);
+      })();
     }
-    renderTimeline(); renderStep(step, menuOpened);
+    renderTimeline(); renderStep(step);
     watch(target);
     position();
     /* boards settle async (fonts, panel layout): measure again next frame */

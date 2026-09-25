@@ -39,6 +39,18 @@ test('lint accepts a minimal valid config and rejects shape errors',()=>{
     .some(w=>w.includes('choices[0].persona')),'unknown choice persona warns');
   assert.ok(context.tourLintConfig(config([spot('a',{demo:{advance:0}})]))
     .some(w=>w.includes('demo.advance')),'bad demo.advance warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{demo:{}})]))
+    .some(w=>w.includes('exactly one')),'demo without advance or click warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{demo:{advance:2,click:{selector:'.x'}}})]))
+    .some(w=>w.includes('exactly one')),'demo with both warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{demo:{click:{}}})]))
+    .some(w=>w.includes('demo.click')),'click without selector warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{demo:{click:{selector:'.x',within:'tab'}}})]))
+    .some(w=>w.includes('demo.click.within')),'bad click scope warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{demo:{click:{selector:'.x'},intervalMs:900}})]))
+    .some(w=>w.includes('only applies')),'interval on a click demo warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{demo:{click:{selector:'.x',within:'page'}}})])).length===0,
+    'well-formed click demo is clean');
   assert.ok(context.tourLintConfig(config([spot('a',{demo:{intervalMs:50}})]))
     .some(w=>w.includes('demo.intervalMs')),'bad demo.intervalMs warns');
   assert.ok(context.tourLintConfig(config([spot('a'),{id:'w',kind:'chooser'}]))

@@ -47,21 +47,33 @@ var TOUR_DEFAULT_CONFIG = {
       ]
     },
     {
-      id: 'branching',
+      id: 'branching-split',
       target: {selector: '.path-timeline', within: 'section'},
-      diagramState: {mode: 'step', path: '@alt', step: '@shared'},
+      diagramState: {mode: 'step', path: '@alt'},
+      demo: {advance: 3, intervalMs: 1600},
       copy: {
         heading: 'Flows can split',
-        body: 'Each row is one path through the system. Paths share steps, split where behavior differs, and can rejoin later. Click any chip to jump.'
+        body: 'Each row is one path through the system. Watch the walk leave the shared steps and take the branch — paths split where behavior differs. Click any chip to jump.'
+      }
+    },
+    {
+      id: 'branching-rejoin',
+      target: {selector: '.path-timeline', within: 'section'},
+      diagramState: {mode: 'step', path: '@alt', step: '@rejoin'},
+      demo: {advance: 2, intervalMs: 1600},
+      copy: {
+        heading: 'And they come back together',
+        body: 'The branch flows back into the shared tail — the last steps are the same story on every path.'
       }
     },
     {
       id: 'links',
       personas: ['eng'],
-      target: {selector: '.nrefs-trigger', within: 'section'},
+      demo: {click: {selector: '.nrefs-trigger', within: 'section'}},
+      target: {selector: '.node-link-menu', within: 'page'},
       copy: {
         heading: 'Every box is real',
-        body: 'Open ⋯ on any node for its Backstage entry, API definition, and the code behind each step. The ↗ jumps straight to the source.'
+        body: 'The ⋯ menu is open: this node’s Backstage entry, its API definition, and the code behind each step. Every ↗ jumps straight to the source.'
       }
     },
     {

@@ -2765,10 +2765,21 @@ function tourLintConfig(config){
     if (step.demo != null){
       if (!tourIsObject(step.demo)) warn(at + '.demo', 'must be an object');
       else {
-        if (step.demo.advance != null && (typeof step.demo.advance !== 'number' || step.demo.advance < 1))
+        var hasAdvance = step.demo.advance != null, hasClick = step.demo.click != null;
+        if (hasAdvance === hasClick)
+          warn(at + '.demo', 'declare exactly one of advance (a playback demo) or click (a demonstrated action)');
+        if (hasAdvance && (typeof step.demo.advance !== 'number' || step.demo.advance < 1))
           warn(at + '.demo.advance', 'must be a positive number of steps');
+        if (step.demo.intervalMs != null && !hasAdvance)
+          warn(at + '.demo.intervalMs', 'only applies to an advance demo');
         if (step.demo.intervalMs != null && (typeof step.demo.intervalMs !== 'number' || step.demo.intervalMs < 400))
           warn(at + '.demo.intervalMs', 'must be a number ≥ 400');
+        if (hasClick){
+          if (!tourIsObject(step.demo.click) || typeof step.demo.click.selector !== 'string' || !step.demo.click.selector)
+            warn(at + '.demo.click', 'needs a selector string');
+          else if (step.demo.click.within != null && step.demo.click.within !== 'section' && step.demo.click.within !== 'page')
+            warn(at + '.demo.click.within', 'must be "section" or "page"');
+        }
       }
     }
     if (step.diagramState != null && !tourIsObject(step.diagramState))

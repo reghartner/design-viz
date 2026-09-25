@@ -18,10 +18,17 @@ test('the shipped default config lints clean and is usable',()=>{
 
 test('the default flow covers chooser, controls, branching, both personas, done',()=>{
   const ids=plain(config.steps.map(s=>s.id));
-  assert.deepEqual(ids,['welcome','controls','branching','links','story','panels','finish']);
+  assert.deepEqual(ids,['welcome','controls','branching-split','branching-rejoin','links','story','panels','finish']);
   const panels=config.steps.find(s=>s.id==='panels');
   assert.deepEqual(plain(panels.demo),{advance:3,intervalMs:1800});
   assert.deepEqual(plain(panels.personas),['ux']);
+  // Branching is demonstrated, not just pointed at: both halves advance.
+  assert.equal(config.steps.find(s=>s.id==='branching-split').demo.advance,3);
+  assert.equal(config.steps.find(s=>s.id==='branching-rejoin').diagramState.step,'@rejoin');
+  // The links step opens the menu it talks about.
+  const links=config.steps.find(s=>s.id==='links');
+  assert.equal(links.demo.click.selector,'.nrefs-trigger');
+  assert.equal(links.target.selector,'.node-link-menu');
   assert.equal(config.steps[0].kind,'chooser');
   assert.equal(config.steps[config.steps.length-1].kind,'done');
   assert.deepEqual(plain(config.steps.find(s=>s.id==='links').personas),['eng']);
@@ -38,6 +45,7 @@ test('every selector class the default config names is rendered by the engine',(
   const selectors=[];
   config.steps.forEach(step=>{
     if(step.target)selectors.push(step.target.selector);
+    if(step.demo&&step.demo.click)selectors.push(step.demo.click.selector);
     const secondaries=Array.isArray(step.secondary)?step.secondary:(step.secondary?[step.secondary]:[]);
     secondaries.forEach(item=>{if(item&&item.target)selectors.push(item.target.selector);});
   });
@@ -53,6 +61,6 @@ test('token-based diagram state stays within the documented vocabulary',()=>{
     const ds=step.diagramState;
     if(!ds)return;
     if(typeof ds.path==='string' && ds.path.startsWith('@'))assert.equal(ds.path,'@alt');
-    if(typeof ds.step==='string' && ds.step.startsWith('@'))assert.equal(ds.step,'@shared');
+    if(typeof ds.step==='string' && ds.step.startsWith('@'))assert.ok(['@shared','@rejoin'].includes(ds.step));
   });
 });

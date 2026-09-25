@@ -84,12 +84,16 @@ test('a missing target warns and passes through, keeping the authored count',asy
   await expect(page.locator('.dv-tour-ring')).toBeVisible();
   await expect(page.locator('.dv-tour-ring2')).toHaveCount(2);
   await page.locator('.dv-tour-next').click();
-  // The branching step has no .path-timeline here: it warns and passes
+  // Both branching steps have no .path-timeline here: they warn and pass
   // through to the links step (chime-radar does render node links).
   await expect(heading).toHaveText('Every box is real');
-  expect(warnings.filter(w=>w.includes('target not found')).length).toBeGreaterThanOrEqual(1);
+  expect(warnings.filter(w=>w.includes('target not found')).length).toBeGreaterThanOrEqual(2);
+  // The links step CLICKED the ⋯ trigger: the real menu is open and it is
+  // the spotlit target; leaving the step closes it.
+  await expect(page.locator('.node-link-menu:not([hidden])')).toBeVisible();
   await page.locator('.dv-tour-next').click();
   await expect(heading).toHaveText('That’s the tour');
+  await expect(page.locator('.node-link-menu:not([hidden])')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(page.locator('.dv-tour')).toBeHidden();
 });
@@ -116,6 +120,22 @@ test('entering a step applies its authored state: ambient-hidden transport; redu
 
 test.describe('with motion allowed',()=>{
   test.use({reducedMotion:'no-preference'});
+  test('the branching demo visibly steps through the split',async({page,server})=>{
+    await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+    await page.goto(server.origin+'/tour-paths.html#tour=1');
+    await page.locator('.dv-tour-choice').nth(2).click(); // Show me both
+    const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+    await expect(heading).toHaveText('Play the story');
+    await page.locator('.dv-tour-next').click();
+    await expect(heading).toHaveText('Flows can split');
+    await expect(page.locator('.dv-tour-ring')).toBeVisible();
+    const current=page.locator('.tabpanel:not([hidden]) .schip[aria-current=true], .schip[aria-current=true]');
+    const first=await current.first().textContent();
+    // one demo tick (1600ms) later the active step has moved
+    await expect.poll(async()=>current.first().textContent(),{timeout:5000}).not.toBe(first);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.dv-tour')).toBeHidden();
+  });
   test('the demo rewinds, advances on its interval, and stops on page interaction',async({page,server})=>{
     await page.goto(server.origin+'/tour-ambient.html#tour=1');
     await expect(page.locator('.dv-tour-heading')).toHaveText('Play the story');

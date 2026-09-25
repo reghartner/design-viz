@@ -60,6 +60,13 @@ export default async function prepare(){
                {edge:'c->d',text:'s2',panels:{st:{state:'Two'}}},
                {edge:'c->d',text:'s3',panels:{st:{state:'Three'}}}]}}]}
     ]}]}};
+    // A page with real branching paths, for the branching-demo contracts.
+    const pathsRaw=JSON.parse(await readFile(path.join(repo,'examples/shared-downstream/shared-blocks.spec.json'),'utf8'));
+    pause(pathsRaw);
+    const pathsSpec=path.join(output,'tour-paths.spec.json');
+    await writeFile(pathsSpec,JSON.stringify(pathsRaw));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),pathsSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-paths.html')],{stdio:'inherit'});
+    await rm(pathsSpec);
     const ambientSpec=path.join(output,'tour-ambient.spec.json');
     await writeFile(ambientSpec,JSON.stringify(ambient));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),ambientSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-ambient.html')],{stdio:'inherit'});

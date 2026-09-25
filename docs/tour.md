@@ -64,7 +64,9 @@ Per step:
   page's first diagram — entering also selects that section's tab), `view`
   (a named layout id), `mode` (`"step"` or `"ambient"`), `path` (a path id,
   or `"@alt"` = the second path), `step` (a step id, or `"@shared"` = the
-  last step shared by the first two paths). Declare what you need: a step
+  last step the first two paths share — the end of the merge zone — or
+  `"@rejoin"` = the second path's last own step before it flows back into
+  shared steps; both tokens warn when a page's paths never converge). Declare what you need: a step
   that spotlights the transport should say `"mode": "step"`, because an
   ambient diagram keeps its transport hidden until then. The tour drives
   the page's own controls; it never rewrites the URL.
@@ -77,15 +79,31 @@ Per step:
   should carry a ring** — the default controls step rings the AMBIENT/STEP
   toggle and PRESENT alongside the spotlit transport for exactly this
   reason. Keep notes short; they render beneath their ring.
-- `demo` — a playback demo: on entry the tour rewinds the section's stepper
-  to its path's first visible stop, then advances it `advance` times
-  (default 3, capped at 30), one step every `intervalMs` milliseconds
-  (default 1800, minimum 400), so the spotlit panels visibly change. Any
-  interaction stops it — the tour's controls, arrow keys, or any click on
-  the page through the hole. Under `prefers-reduced-motion` it never
-  auto-advances: the step spotlights the step transport instead, rings the
-  configured target as its secondary callout, and tells the visitor to use
-  the ‹ › step arrows (the engine disables ▶ under reduced motion).
+- `demo` — a demonstrated behavior; declare exactly one of:
+  - `advance` — a playback demo: on entry the tour advances the section's
+    stepper `advance` times (capped at 30), one step every `intervalMs`
+    milliseconds (default 1800, minimum 400), so the spotlit control
+    visibly changes. It starts from the path's first visible stop unless
+    the step's `diagramState.step` authored a starting position. Any
+    interaction stops it — the tour's controls, arrow keys, or any click
+    on the page through the hole. Under `prefers-reduced-motion` it never
+    auto-advances: the step spotlights the step transport instead, rings
+    the configured target as its secondary callout, and tells the visitor
+    to use the ‹ › step arrows (the engine disables ▶ under reduced
+    motion).
+  - `click` — a demonstrated action: `{selector, within}` names a real
+    control the tour clicks on entry, BEFORE resolving the step's own
+    `target` — the default links step clicks the node's ⋯ trigger and
+    spotlights the opened links menu. Leaving the step (Next, Back, Skip,
+    Esc, teardown) un-clicks it through the engine's own toggle, so
+    nothing stays open behind the tour. A missing click control follows
+    the warn-and-pass-through rule. Click demos run as authored under
+    reduced motion (one discrete action), and the step never scrolls (the
+    engine dismisses its menu on scroll; the menu places itself inside
+    the viewport).
+  **Authoring rule: if the copy tells the reader to open or press
+  something, the tour demonstrates it** — an advance demo for playback, a
+  click demo for menus.
 
 ## What happens when a step's control is missing
 

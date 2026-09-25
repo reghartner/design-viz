@@ -24,8 +24,13 @@ function tourLintConfig(config){
     warn('.steps', 'must be a non-empty array of steps');
     return warnings;
   }
-  var seen = {};
+  var seen = {}, choosersSeen = 0;
   config.steps.forEach(function(step, i){
+    if (tourIsObject(step) && step.kind === 'chooser'){
+      choosersSeen++;
+      if (i !== 0) warn('.steps[' + i + ']', 'a chooser must be the first step (later choosers are dropped)');
+      if (choosersSeen > 1) warn('.steps[' + i + ']', 'only one chooser step is used');
+    }
     var at = '.steps[' + i + ']';
     if (!tourIsObject(step)){ warn(at, 'must be an object'); return; }
     if (typeof step.id !== 'string' || !step.id) warn(at + '.id', 'required non-empty string');
@@ -55,6 +60,24 @@ function tourLintConfig(config){
       });
     }
     if (step.copy != null && !tourIsObject(step.copy)) warn(at + '.copy', 'must be an object');
+    if (tourIsObject(step.copy) && step.copy.choices != null){
+      if (!Array.isArray(step.copy.choices) || !step.copy.choices.length)
+        warn(at + '.copy.choices', 'must be a non-empty array of {persona, label, sub} objects');
+      else step.copy.choices.forEach(function(choice, ci){
+        if (!tourIsObject(choice)) warn(at + '.copy.choices[' + ci + ']', 'must be an object');
+        else if (choice.persona != null && TOUR_PERSONAS.indexOf(choice.persona) < 0)
+          warn(at + '.copy.choices[' + ci + '].persona', 'unknown persona "' + choice.persona + '"');
+      });
+    }
+    if (step.demo != null){
+      if (!tourIsObject(step.demo)) warn(at + '.demo', 'must be an object');
+      else {
+        if (step.demo.advance != null && (typeof step.demo.advance !== 'number' || step.demo.advance < 1))
+          warn(at + '.demo.advance', 'must be a positive number of steps');
+        if (step.demo.intervalMs != null && (typeof step.demo.intervalMs !== 'number' || step.demo.intervalMs < 400))
+          warn(at + '.demo.intervalMs', 'must be a number ≥ 400');
+      }
+    }
     if (step.diagramState != null && !tourIsObject(step.diagramState))
       warn(at + '.diagramState', 'must be an object');
     if (step.secondary != null){

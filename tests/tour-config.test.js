@@ -18,7 +18,10 @@ test('the shipped default config lints clean and is usable',()=>{
 
 test('the default flow covers chooser, controls, branching, both personas, done',()=>{
   const ids=plain(config.steps.map(s=>s.id));
-  assert.deepEqual(ids,['welcome','controls','branching','links','story','finish']);
+  assert.deepEqual(ids,['welcome','controls','branching','links','story','panels','finish']);
+  const panels=config.steps.find(s=>s.id==='panels');
+  assert.deepEqual(plain(panels.demo),{advance:3,intervalMs:1800});
+  assert.deepEqual(plain(panels.personas),['ux']);
   assert.equal(config.steps[0].kind,'chooser');
   assert.equal(config.steps[config.steps.length-1].kind,'done');
   assert.deepEqual(plain(config.steps.find(s=>s.id==='links').personas),['eng']);

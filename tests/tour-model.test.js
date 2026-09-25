@@ -33,6 +33,16 @@ test('lint accepts a minimal valid config and rejects shape errors',()=>{
     .some(w=>w.includes('offset.dx')));
   assert.ok(context.tourLintConfig(config([spot('a',{target:{selector:'.x',within:'tab'}})]))
     .some(w=>w.includes('within')));
+  assert.ok(context.tourLintConfig(config([{id:'w',kind:'chooser',copy:{choices:'nope'}}]))
+    .some(w=>w.includes('copy.choices')),'non-array choices warn');
+  assert.ok(context.tourLintConfig(config([{id:'w',kind:'chooser',copy:{choices:[{persona:'pm'}]}}]))
+    .some(w=>w.includes('choices[0].persona')),'unknown choice persona warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{demo:{advance:0}})]))
+    .some(w=>w.includes('demo.advance')),'bad demo.advance warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{demo:{intervalMs:50}})]))
+    .some(w=>w.includes('demo.intervalMs')),'bad demo.intervalMs warns');
+  assert.ok(context.tourLintConfig(config([spot('a'),{id:'w',kind:'chooser'}]))
+    .some(w=>w.includes('first step')),'late chooser warns');
 });
 
 test('usability is looser than lint: any well-formed step qualifies',()=>{

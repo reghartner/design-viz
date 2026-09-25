@@ -28,6 +28,17 @@ export default async function prepare(){
     const spec=path.join(output,'spec.json');
     await writeFile(spec,JSON.stringify(raw));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),spec,path.join(repo,'template/flowview.html'),path.join(output,'standalone.html')],{stdio:'inherit'});
+    // Same page with a malformed page.tour: the tour must fail open
+    // (tour.spec.mjs) — copy.choices is deliberately not an array.
+    const bad=structuredClone(raw);
+    bad.page.tour={version:1,steps:[
+      {id:'welcome',kind:'chooser',copy:{heading:'Broken chooser',choices:'not-an-array'}},
+      {id:'controls',target:{selector:'.step-transport',within:'section'}}
+    ]};
+    const badSpec=path.join(output,'tour-bad.spec.json');
+    await writeFile(badSpec,JSON.stringify(bad));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),badSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-bad.html')],{stdio:'inherit'});
+    await rm(badSpec);
     await rm(spec); // Offline test receives only the newly injected HTML.
     execFileSync(process.execPath,[path.join(repo,'apps/confluence/build.mjs')],{stdio:'inherit'});
     await cp(path.join(repo,'apps/confluence/static/viewer'),path.join(output,'forge'),{recursive:true});

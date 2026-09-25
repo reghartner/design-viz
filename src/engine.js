@@ -2618,7 +2618,10 @@ function wireDeepLinks(ctl, win, preservedHash){
     return '#' + preservedHash + (rest ? '&' + rest : '');
   }
   function write(){
-    if (suppress) return;
+    /* ctl.suppressFragmentWrites: the guided tour drives steppers for its
+       demos and spotlights; those moves must never clobber a shared link's
+       fragment. The tour restores the pre-tour state before clearing it. */
+    if (suppress || ctl.suppressFragmentWrites) return;
     syncChangedTarget();
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();

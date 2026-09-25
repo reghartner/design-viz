@@ -3,18 +3,24 @@
    the retargeting contract). Browser-only fragment, standalone bundle only.
 
    Design (approved "presenter cinema" mockups): dark scrim with a bright
-   ring-lit hole over the real control, subtitle narration bottom-left, a
-   segment timeline top-center, Back/Next/Skip, keyboard hints. The hole is
+   ring-lit hole over the real control, subtitle narration in a corner card,
+   a segment timeline top-center, Back/Next/Skip, keyboard hints. The hole is
    deliberately click-through — the copy invites trying the spotlit control —
-   so the dialog is non-modal (role=dialog without aria-modal). */
+   so the dialog is non-modal (role=dialog without aria-modal).
 
-function wireTour(ctl, view, win, config, request){
+   Safety posture: the tour is decoration around a working page. It never
+   auto-starts over a shared deep link, it suppresses fragment writes while
+   it drives the page and restores the pre-tour state afterwards, and any
+   internal error tears the overlay down (fail-open) rather than leaving a
+   scrim over the content. */
+
+function wireTour(ctl, view, win, config, options){
   var doc = win.document;
   if (doc.body.classList.contains('dv-embed')) return null;
   if (!tourUsableConfig(config)) return null;
-  /* the caller (boot) reads #tour= before the deep-link channel rewrites
-     the hash; fall back to a live read for non-boot embedders */
-  if (request === undefined) request = tourHashRequest(win.location.hash);
+  options = options || {};
+  var request = options.request !== undefined ? options.request :
+    tourHashRequest(win.location.hash);
 
   function storageDone(){
     try { if (win.localStorage && win.localStorage.getItem(TOUR_STORAGE_KEY) === 'done') return true; }
@@ -58,17 +64,34 @@ function wireTour(ctl, view, win, config, request){
     return null;
   }
   function queryTarget(step, sec, target){
+    /* within:"section" is strict — a selector never leaks into other
+       sections or hidden tabs (majors: a page-wide fallback here matched
+       controls the step was not about) */
     var root = (target && target.within === 'page') ? view :
-               (sec && sec.sectionEl ? sec.sectionEl : view);
-    if (!target || typeof target.selector !== 'string') return null;
-    try { return root.querySelector(target.selector) || view.querySelector(target.selector); }
+               (sec && sec.sectionEl ? sec.sectionEl : null);
+    if (!root || !target || typeof target.selector !== 'string') return null;
+    try { return root.querySelector(target.selector); }
     catch (ex) { return null; }
+  }
+  function isRendered(el){
+    try { return !!(el && el.getClientRects && el.getClientRects().length); }
+    catch (ex) { return false; }
+  }
+  function inInactiveTab(sec){
+    return !!(sec && sec.tabBlock != null && sec.tab != null &&
+      ctl.tabBlocks.some(function(tb){ return tb.index === sec.tabBlock && tb.active() !== sec.tab; }));
   }
   function probe(step){
     if ((step.kind || 'spot') !== 'spot') return true;
     var sec = sectionFor(step);
-    if (step.diagramState && step.diagramState.section != null && !sec) return false;
-    if (!queryTarget(step, sec, step.target)) return false;
+    var explicitSection = !!(step.diagramState && step.diagramState.section != null);
+    if (explicitSection && !sec) return false;
+    var el = queryTarget(step, sec, step.target);
+    if (!el) return false;
+    /* zero-size / unrendered matches are unresolved — except a target in an
+       inactive tab of an EXPLICITLY named section, whose tab the tour will
+       select on entry */
+    if (!isRendered(el) && !(explicitSection && inInactiveTab(sec))) return false;
     var ds = step.diagramState || {};
     var sp = sec && sec.stepper;
     if (ds.path != null){
@@ -77,6 +100,7 @@ function wireTour(ctl, view, win, config, request){
     if (ds.step === '@shared'){
       if (!sp || sharedSourceIndex(sp) < 0) return false;
     }
+    if (step.demo && (!sp || !isRendered(el))) return false;
     return true;
   }
   function applyDiagramState(sec, ds){
@@ -102,9 +126,57 @@ function wireTour(ctl, view, win, config, request){
     }
   }
 
+  /* ---- pre-tour state snapshot: the page must come back exactly ---- */
+  var snapshot = null, openedDetails = [];
+  function takeSnapshot(){
+    snapshot = {
+      scrollY: win.scrollY || 0,
+      tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
+      sections: ctl.sections.filter(function(sec){ return sec.stepper; }).map(function(sec){
+        var sp = sec.stepper;
+        var cur = sp.current();
+        return {number: sec.number, mode: sp.mode(), path: sp.path(),
+                step: cur ? cur.id : null, /* authored id, may be null */
+                stepIndex: cur ? cur.n : 0,
+                view: sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null};
+      })
+    };
+    openedDetails = [];
+  }
+  function restoreSnapshot(){
+    if (!snapshot) return;
+    openedDetails.forEach(function(d){ if (d && d.isConnected) d.open = false; });
+    openedDetails = [];
+    snapshot.tabs.forEach(function(saved){
+      for (var i = 0; i < ctl.tabBlocks.length; i++)
+        if (ctl.tabBlocks[i].index === saved.index && ctl.tabBlocks[i].active() !== saved.tab)
+          ctl.tabBlocks[i].select(saved.tab, false, false);
+    });
+    snapshot.sections.forEach(function(saved){
+      var sec = null;
+      for (var i = 0; i < ctl.sections.length; i++)
+        if (ctl.sections[i].number === saved.number){ sec = ctl.sections[i]; break; }
+      if (!sec || !sec.stepper) return;
+      if (saved.view != null && sec.presentation && sec.presentation.setView)
+        sec.presentation.setView(saved.view);
+      var sp = sec.stepper;
+      if (saved.path != null && sp.selectPath) sp.selectPath(saved.path);
+      if (saved.mode === 'step'){
+        if (sp.mode() !== 'step') sp.enterStep(false);
+        var idx = saved.step != null ? sp.stepIndexOf(saved.step) : -1;
+        if (idx < 0 && saved.stepIndex >= 0 && saved.stepIndex < sp.ids().length)
+          idx = saved.stepIndex; /* pages without authored step ids */
+        if (idx >= 0) sp.jump(idx);
+      } else if (saved.mode === 'ambient') sp.enterAmbient();
+    });
+    win.scrollTo(0, snapshot.scrollY);
+    snapshot = null;
+  }
+
   /* ---- overlay DOM ---- */
   var overlay = null, parts = null, active = false, raf = 0, observer = null;
-  var persona = null, list = [], at = 0, restoreFocus = null;
+  var persona = null, list = [], at = 0, restoreFocus = null, disabled = false;
+  var demoTimer = null, demoLeft = 0;
 
   function el(tag, className, text){
     var node = doc.createElement(tag);
@@ -115,8 +187,27 @@ function wireTour(ctl, view, win, config, request){
   function button(className, label, onClick){
     var b = el('button', className, label);
     b.type = 'button';
-    b.addEventListener('click', onClick);
+    b.addEventListener('click', function(){ stopDemo(); guarded(onClick); });
     return b;
+  }
+  /* fail-open: any tour error tears the overlay down and leaves the page
+     usable; the tour stays off for this load only (config authors see the
+     console warning; a fixed config works on the next load) */
+  function guarded(fn){
+    try { fn(); }
+    catch (ex){
+      if (win.console) console.warn('flowspec: tour error — ' + (ex && ex.message) + ' — tour dismissed');
+      teardown();
+    }
+  }
+  function teardown(){
+    disabled = true;
+    stopDemo();
+    detach();
+    if (snapshot){ try { restoreSnapshot(); } catch (ex) { snapshot = null; } }
+    ctl.suppressFragmentWrites = false;
+    active = false;
+    if (overlay) overlay.hidden = true;
   }
   function buildOverlay(){
     overlay = el('div', 'dv-tour');
@@ -141,7 +232,7 @@ function wireTour(ctl, view, win, config, request){
     var controls = el('div', 'dv-tour-controls');
     var back = button('dv-tour-btn dv-tour-back', 'Back', function(){ go(at - 1); });
     var next = button('dv-tour-btn dv-tour-next', 'Next', function(){ go(at + 1); });
-    var skip = button('dv-tour-skip', 'Skip tour', function(){ finish(true); });
+    var skip = button('dv-tour-skip', 'Skip tour', function(){ finish(); });
     controls.appendChild(back); controls.appendChild(next); controls.appendChild(skip);
     ui.appendChild(narration); ui.appendChild(controls);
     overlay.appendChild(ui);
@@ -163,7 +254,7 @@ function wireTour(ctl, view, win, config, request){
     s[2].style.cssText = 'left:0;top:' + (rect.y + rect.h) + 'px;width:' + vw + 'px;height:' +
       Math.max(0, vh - rect.y - rect.h) + 'px';
     s[3].style.cssText = 'left:0;top:' + rect.y + 'px;width:' + Math.max(0, rect.x) + 'px;height:' + rect.h + 'px';
-    if (rect.w > 0 && rect.h > 0){
+    if (rect.w > 4 && rect.h > 4){
       parts.ring.hidden = false;
       parts.ring.style.cssText = 'left:' + rect.x + 'px;top:' + rect.y + 'px;width:' +
         rect.w + 'px;height:' + rect.h + 'px';
@@ -209,34 +300,46 @@ function wireTour(ctl, view, win, config, request){
     if (sr.top < 80 || sr.bottom > vh - 80)
       win.scrollTo(0, win.scrollY + sr.top - (vh - sr.height) / 2);
   }
+  /* a demo step under reduced motion swaps its spotlight to the transport so
+     the visitor advances the story with the real controls */
+  function effectiveTargets(step){
+    if (step.demo && RM)
+      return {target: {selector: '.step-transport', within: 'section'},
+              secondary: {target: step.target, note: step.secondary && step.secondary.note || ''}};
+    return {target: step.target, secondary: step.secondary};
+  }
   function position(){
     if (!active) return;
     var step = list[at];
     if (!step || (step.kind || 'spot') !== 'spot'){ fullScrim(); return; }
     var sec = sectionFor(step);
-    var target = queryTarget(step, sec, step.target);
-    if (!target){ fullScrim(); return; }
+    var eff = effectiveTargets(step);
+    var target = queryTarget(step, sec, eff.target);
+    if (!target || !isRendered(target)){ fullScrim(); return; }
     var rect = rectOf(target);
     /* the links step spotlights the whole node card, not the tiny trigger;
        the menu itself is the viewer's click — the engine popover paints in
        the browser top layer, above this overlay */
-    if (step.target.selector.indexOf('nrefs-trigger') >= 0){
+    if (eff.target.selector.indexOf('nrefs-trigger') >= 0){
       var nodeEl = target.closest ? target.closest('.node[data-dv-node]') : null;
       if (nodeEl && nodeEl.getBoundingClientRect) rect = rectOf(nodeEl);
     }
     var hole = tourCutoutRect(rect, step.offset, 8, viewport());
     setHole(hole);
     placeUi(hole);
-    if (step.secondary && step.secondary.target){
-      var second = queryTarget(step, sec, step.secondary.target);
-      if (second){
+    if (eff.secondary && eff.secondary.target){
+      var second = queryTarget(step, sec, eff.secondary.target);
+      if (second && isRendered(second)){
         var r2 = tourCutoutRect(rectOf(second), null, 6, viewport());
         parts.ring2.hidden = false;
         parts.ring2.style.cssText = 'left:' + r2.x + 'px;top:' + r2.y + 'px;width:' + r2.w + 'px;height:' + r2.h + 'px';
-        parts.note.hidden = false;
-        parts.note.textContent = step.secondary.note || '';
-        var noteX = Math.max(16, Math.min(r2.x + r2.w - 260, win.innerWidth - 276));
-        parts.note.style.cssText = 'left:' + noteX + 'px;top:' + (r2.y + r2.h + 10) + 'px';
+        var noteText = eff.secondary.note || '';
+        parts.note.hidden = !noteText;
+        if (noteText){
+          parts.note.textContent = noteText;
+          var noteX = Math.max(16, Math.min(r2.x + r2.w - 260, win.innerWidth - 276));
+          parts.note.style.cssText = 'left:' + noteX + 'px;top:' + (r2.y + r2.h + 10) + 'px';
+        }
         return;
       }
     }
@@ -244,8 +347,8 @@ function wireTour(ctl, view, win, config, request){
   }
   function schedule(){
     if (raf) return;
-    raf = win.requestAnimationFrame ? win.requestAnimationFrame(function(){ raf = 0; position(); }) :
-          (position(), 0);
+    raf = win.requestAnimationFrame ? win.requestAnimationFrame(function(){ raf = 0; guarded(position); }) :
+          (guarded(position), 0);
   }
   function watch(target){
     unwatch();
@@ -255,6 +358,30 @@ function wireTour(ctl, view, win, config, request){
     }
   }
   function unwatch(){ if (observer){ observer.disconnect(); observer = null; } }
+
+  /* ---- playback demo (step.demo): the panels change while the ring holds ---- */
+  function stopDemo(){
+    if (demoTimer){ win.clearTimeout(demoTimer); demoTimer = null; }
+    demoLeft = 0;
+  }
+  function startDemo(step, sec){
+    stopDemo();
+    if (!step.demo || RM || !sec || !sec.stepper) return;
+    var advance = Math.max(1, Math.min(30, Number(step.demo.advance) || 3));
+    var interval = Math.max(400, Math.min(10000, Number(step.demo.intervalMs) || 1800));
+    demoLeft = advance;
+    var tick = function(){
+      demoTimer = null;
+      if (!active || list[at] !== step || demoLeft <= 0) return;
+      var sp = sec.stepper;
+      if (sp.mode() !== 'step') sp.enterStep(false);
+      sp.advance(sp.current().n + 1);
+      demoLeft--;
+      schedule();
+      if (demoLeft > 0) demoTimer = win.setTimeout(tick, interval);
+    };
+    demoTimer = win.setTimeout(tick, interval);
+  }
 
   /* ---- timeline + narration ---- */
   function renderTimeline(){
@@ -270,54 +397,60 @@ function wireTour(ctl, view, win, config, request){
     }
     parts.timeline.appendChild(el('span', 'dv-tour-count', tl.current + ' / ' + tl.total));
   }
+  function chooserChoices(copy){
+    var raw = Array.isArray(copy.choices) ? copy.choices : [];
+    var safe = raw.filter(function(choice){
+      return !!choice && typeof choice === 'object' && !Array.isArray(choice);
+    });
+    return safe.length ? safe : [{persona: 'both', label: 'Show me around', sub: ''}];
+  }
   function renderChooser(step){
     parts.chooser.hidden = false;
     parts.ui.hidden = true;
     parts.chooser.replaceChildren();
-    var copy = step.copy || {};
-    if (copy.eyebrow) parts.chooser.appendChild(el('div', 'dv-tour-eyebrow', copy.eyebrow));
-    parts.chooser.appendChild(el('h2', 'dv-tour-heading', copy.heading || 'Take the tour?'));
-    if (copy.body) parts.chooser.appendChild(el('p', 'dv-tour-body', copy.body));
+    var copy = (step.copy && typeof step.copy === 'object') ? step.copy : {};
+    if (copy.eyebrow) parts.chooser.appendChild(el('div', 'dv-tour-eyebrow', String(copy.eyebrow)));
+    parts.chooser.appendChild(el('h2', 'dv-tour-heading', String(copy.heading || 'Take the tour?')));
+    if (copy.body) parts.chooser.appendChild(el('p', 'dv-tour-body', String(copy.body)));
     var row = el('div', 'dv-tour-choices');
-    (copy.choices || [{persona: 'both', label: 'Show me around', sub: ''}]).forEach(function(choice){
+    chooserChoices(copy).forEach(function(choice){
       var b = button('dv-tour-choice', '', function(){ choose(choice.persona); });
-      b.appendChild(el('span', 'dv-tour-choice-label', choice.label || choice.persona));
-      if (choice.sub) b.appendChild(el('span', 'dv-tour-choice-sub', choice.sub));
+      b.appendChild(el('span', 'dv-tour-choice-label', String(choice.label || choice.persona || 'Continue')));
+      if (choice.sub) b.appendChild(el('span', 'dv-tour-choice-sub', String(choice.sub)));
       row.appendChild(b);
     });
     parts.chooser.appendChild(row);
     var foot = el('div', 'dv-tour-choice-foot');
-    if (copy.note) foot.appendChild(el('span', 'dv-tour-choice-note', copy.note));
-    foot.appendChild(button('dv-tour-skip', 'Skip', function(){ finish(true); }));
+    if (copy.note) foot.appendChild(el('span', 'dv-tour-choice-note', String(copy.note)));
+    foot.appendChild(button('dv-tour-skip', 'Skip', function(){ finish(); }));
     parts.chooser.appendChild(foot);
     var first = row.querySelector('button');
     if (first) first.focus();
   }
-  function renderStep(step, keepFocus){
+  function renderStep(step){
     parts.chooser.hidden = true;
     parts.ui.hidden = false;
-    var copy = step.copy || {};
+    var copy = (step.copy && typeof step.copy === 'object') ? step.copy : {};
     var tl = tourTimeline(list, at);
-    parts.eyebrow.textContent = copy.eyebrow ||
+    parts.eyebrow.textContent = copy.eyebrow != null ? String(copy.eyebrow) :
       ('TOUR · STEP ' + tl.current + ' OF ' + tl.total);
-    parts.heading.textContent = copy.heading || '';
-    parts.body.textContent = copy.body || '';
+    parts.heading.textContent = String(copy.heading || '');
+    parts.body.textContent = String(copy.body || '') +
+      (step.demo && RM ? ' Auto-play is off — press ▶ to walk the story yourself.' : '');
     parts.back.disabled = at === 0;
     parts.next.textContent = at >= list.length - 1 ? 'Done' : 'Next';
-    /* the node-link menu closes on focus moving outside it, so the links
-       step leaves focus where the engine put it (the menu's first link) */
-    if (!keepFocus){
-      try { parts.next.focus({preventScroll: true}); }
-      catch (ex) { parts.next.focus(); }
-    }
+    try { parts.next.focus({preventScroll: true}); }
+    catch (ex) { parts.next.focus(); }
   }
 
   /* ---- state machine ---- */
   function buildList(){
     var steps = tourStepsForPersona(config, persona || 'both');
-    if (persona == null)
-      steps = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; })
-        .concat(steps.filter(function(step){ return (step.kind || 'spot') !== 'chooser'; }));
+    /* one chooser, always first; extras are dropped (lint warns) */
+    var choosers = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; });
+    steps = choosers.slice(0, 1).concat(steps.filter(function(step){
+      return (step.kind || 'spot') !== 'chooser';
+    }));
     var resolved = {};
     steps.forEach(function(step){
       resolved[step.id] = probe(step);
@@ -336,12 +469,14 @@ function wireTour(ctl, view, win, config, request){
     go(next);
   }
   function go(index){
+    stopDemo();
     if (index < 0) index = 0;
-    if (index >= list.length){ finish(false); return; }
+    if (index >= list.length){ finish(); return; }
     at = index;
     var step = list[at];
     unwatch();
     if ((step.kind || 'spot') === 'chooser'){
+      parts.ui.classList.remove('dv-tour-ui-center');
       fullScrim(); renderTimeline(); renderChooser(step); return;
     }
     if ((step.kind || 'spot') === 'done'){
@@ -354,23 +489,25 @@ function wireTour(ctl, view, win, config, request){
     if (sec && sec.tabBlock != null && sec.tab != null){
       for (var i = 0; i < ctl.tabBlocks.length; i++)
         if (ctl.tabBlocks[i].index === sec.tabBlock){
-          ctl.tabBlocks[i].select(sec.tab, false, false);
+          if (ctl.tabBlocks[i].active() !== sec.tab)
+            ctl.tabBlocks[i].select(sec.tab, false, false);
           break;
         }
     }
     applyDiagramState(sec, step.diagramState);
-    var target = queryTarget(step, sec, step.target);
+    var eff = effectiveTargets(step);
+    var target = queryTarget(step, sec, eff.target);
     if (target){
       /* scrollIntoView first (it also centers inside the board's own
          horizontal scroller), then correct the window explicitly — on SVG
          children scrollIntoView may move only the inner scroller */
-      var spot = step.target.selector.indexOf('nrefs-trigger') >= 0 && target.closest ?
+      var spot = eff.target.selector.indexOf('nrefs-trigger') >= 0 && target.closest ?
         (target.closest('.node[data-dv-node]') || target) : target;
       /* a target can live inside a collapsed disclosure (a Home-focused page
          keeps its data flow in <details class="secondary-flow">): disclose it,
-         exactly as the viewer would */
+         exactly as the viewer would, and note it for the post-tour restore */
       for (var anc = spot; anc && anc !== doc.body; anc = anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
-        if (anc.tagName === 'DETAILS' && !anc.open) anc.open = true;
+        if (anc.tagName === 'DETAILS' && !anc.open){ anc.open = true; openedDetails.push(anc); }
       if (spot.scrollIntoView){
         try { spot.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}); }
         catch (ex) { spot.scrollIntoView(); }
@@ -382,17 +519,20 @@ function wireTour(ctl, view, win, config, request){
       var settleTries = 8, lastTop = null;
       (function settle(){
         if (!active || list[at] !== step) return;
-        recenter(spot); position();
+        recenter(spot); guarded(position);
         var top = Math.round(spot.getBoundingClientRect().top);
         var inView = top >= 0 && top <= win.innerHeight;
-        if ((inView && top === lastTop) || --settleTries <= 0) return;
+        if ((inView && top === lastTop) || --settleTries <= 0){
+          if (inView) startDemo(step, sec);
+          return;
+        }
         lastTop = top;
-        win.setTimeout(settle, 80);
+        win.setTimeout(function(){ guarded(settle); }, 80);
       })();
     }
     renderTimeline(); renderStep(step);
     watch(target);
-    position();
+    guarded(position);
     /* boards settle async (fonts, panel layout): measure again next frame */
     schedule();
   }
@@ -403,12 +543,17 @@ function wireTour(ctl, view, win, config, request){
     if (ev.key === 'Escape'){
       /* an open node-link menu owns its own Escape (engine, capture) */
       if (doc.querySelector('.node-link-menu:not([hidden])')) return;
-      finish(true); ev.preventDefault(); return;
+      stopDemo(); guarded(finish);
+      ev.preventDefault(); ev.stopPropagation(); return;
     }
     if (!parts.chooser.hidden) return; /* chooser: only Escape shortcuts apply */
-    if (ev.key === 'ArrowRight'){ go(at + 1); ev.preventDefault(); }
-    else if (ev.key === 'ArrowLeft'){ go(at - 1); ev.preventDefault(); }
-    else if (ev.key === 'Tab' && overlay.contains(ev.target)){
+    if (ev.key === 'ArrowRight'){
+      stopDemo(); guarded(function(){ go(at + 1); });
+      ev.preventDefault(); ev.stopPropagation();
+    } else if (ev.key === 'ArrowLeft'){
+      stopDemo(); guarded(function(){ go(at - 1); });
+      ev.preventDefault(); ev.stopPropagation();
+    } else if (ev.key === 'Tab' && overlay.contains(ev.target)){
       var focusable = overlay.querySelectorAll('button:not([disabled])');
       if (focusable.length){
         var first = focusable[0], last = focusable[focusable.length - 1];
@@ -417,32 +562,44 @@ function wireTour(ctl, view, win, config, request){
       }
     }
   }
-  function start(){
-    if (active) return;
-    restoreFocus = doc.activeElement;
-    if (!overlay) buildOverlay();
-    overlay.hidden = false;
-    active = true;
-    persona = null;
-    list = buildList();
-    at = 0;
-    if (!list.length){ finish(false); return; }
-    if ((list[0].kind || 'spot') !== 'chooser'){ persona = 'both'; list = buildList(); }
+  function attach(){
     doc.addEventListener('keydown', keydown, true);
     win.addEventListener('resize', schedule);
     doc.addEventListener('scroll', schedule, true);
     doc.addEventListener('fullscreenchange', schedule);
-    go(0);
   }
-  function finish(skipped){
-    if (!active) return;
-    active = false;
-    markDone();
+  function detach(){
     unwatch();
     doc.removeEventListener('keydown', keydown, true);
     win.removeEventListener('resize', schedule);
     doc.removeEventListener('scroll', schedule, true);
     doc.removeEventListener('fullscreenchange', schedule);
+  }
+  function start(){
+    if (active || disabled) return;
+    restoreFocus = doc.activeElement;
+    if (!overlay) buildOverlay();
+    overlay.hidden = false;
+    active = true;
+    persona = null;
+    takeSnapshot();
+    ctl.suppressFragmentWrites = true;
+    list = buildList();
+    at = 0;
+    if (!list.length){ finish(); return; }
+    if ((list[0].kind || 'spot') !== 'chooser'){ persona = 'both'; list = buildList(); }
+    attach();
+    go(0);
+  }
+  function finish(){
+    if (!active) return;
+    active = false;
+    stopDemo();
+    markDone();
+    detach();
+    try { restoreSnapshot(); }
+    catch (ex) { snapshot = null; }
+    ctl.suppressFragmentWrites = false;
     if (overlay) overlay.hidden = true;
     if (restoreFocus && restoreFocus.isConnected && restoreFocus.focus) restoreFocus.focus();
     else if (replay && replay.isConnected) replay.focus();
@@ -454,15 +611,15 @@ function wireTour(ctl, view, win, config, request){
   replay.className = 'tbtn dv-tour-replay';
   replay.textContent = '?';
   replay.setAttribute('aria-label', 'Replay the tour');
-  replay.addEventListener('click', function(){ start(); });
+  replay.addEventListener('click', function(){ disabled = false; guarded(start); });
   var present = view.querySelector('.presentbtn');
   if (present && present.parentNode === view) view.insertBefore(replay, present.nextSibling);
   else view.insertBefore(replay, view.firstChild);
 
-  win.dvStartTour = function(){ start(); return true; };
+  win.dvStartTour = function(){ disabled = false; guarded(start); return true; };
 
-  if (request === 'force') start();
-  else if (request !== 'suppress' && !storageDone()) start();
+  if (request === 'force') guarded(start);
+  else if (request !== 'suppress' && !options.deepLink && !storageDone()) guarded(start);
 
-  return {start: start, active: function(){ return active; }};
+  return {start: function(){ guarded(start); }, active: function(){ return active; }};
 }

@@ -68,6 +68,17 @@ var TOUR_DEFAULT_CONFIG = {
       }
     },
     {
+      id: 'panels',
+      personas: ['ux'],
+      target: {selector: '.panelcol', within: 'section'},
+      diagramState: {mode: 'step'},
+      demo: {advance: 3, intervalMs: 1800},
+      copy: {
+        heading: 'The panels tell the story',
+        body: 'Watch the home and the phone react as each step plays. Every widget follows the diagram.'
+      }
+    },
+    {
       id: 'finish',
       kind: 'done',
       copy: {

@@ -697,7 +697,11 @@ def capture_frames(
                         "deviceScaleFactor": 1 if section_reference is not None else scale,
                         "mobile": False,
                     })
-                    devtools.command("Page.navigate", {"url": base_url + fragment})
+                    # A fresh headless profile has no tour-completion flag, so
+                    # the first-run guided tour would mask every capture;
+                    # #tour=0 suppresses it (parseHash ignores the key).
+                    tour_off = fragment + ("&tour=0" if len(fragment) > 1 else "#tour=0")
+                    devtools.command("Page.navigate", {"url": base_url + tour_off})
                     _wait_for_rendered_page(devtools, process, 20)
                     # Theme and dim overrides go in before the font wait and
                     # the clip measurement: a skin swap can pull fonts the

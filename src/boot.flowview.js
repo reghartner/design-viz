@@ -57,6 +57,10 @@ function fail(msgs){
    passes them as the preserved prefix, so the request must be read
    before that first rewrite */
 var embedRequest = embedRequestFromHash(window.location.hash);
+/* same trap as embed: the deep-link channel canonicalizes the hash during
+   wiring and drops unknown keys, so #tour=1/0 must be read before boot */
+var tourRequest = (typeof tourHashRequest === 'function') ?
+  tourHashRequest(window.location.hash) : null;
 
 /* the embed flag is applied at load; a hash-only navigation (typing or
    pasting a fragment into an open page) never re-runs boot, so entering
@@ -121,6 +125,14 @@ function boot(raw){
     pendingLinkBase = null;
   }
   wirePresenter(ctl, view, window);
+  /* First-run guided tour: a page's own page.tour replaces the built-in
+     default wholesale; an unusable override falls back to the default so a
+     typo never costs the tour. wireTour itself refuses embeds and #tour=0. */
+  if (typeof wireTour === 'function'){
+    var tourConfig = tourUsableConfig(page.tour) ? page.tour :
+      (typeof TOUR_DEFAULT_CONFIG !== 'undefined' ? TOUR_DEFAULT_CONFIG : null);
+    wireTour(ctl, view, window, tourConfig, tourRequest);
+  }
 }
 
 var raw = null, parseErr = null;

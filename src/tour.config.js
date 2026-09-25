@@ -35,10 +35,16 @@ var TOUR_DEFAULT_CONFIG = {
         heading: 'Play the story',
         body: 'AMBIENT loops the whole flow. STEP walks it one move at a time — play runs a step every 3 seconds, ‹ › move by hand.'
       },
-      secondary: {
-        target: {selector: '.presentbtn', within: 'page'},
-        note: 'Presenting to a room? PRESENT goes fullscreen — arrows and Space work there.'
-      }
+      secondary: [
+        {
+          target: {selector: '.mtoggle', within: 'section'},
+          note: 'AMBIENT loops the flow · STEP walks it'
+        },
+        {
+          target: {selector: '.presentbtn', within: 'page'},
+          note: 'Presenting to a room? PRESENT goes fullscreen — arrows and Space work there.'
+        }
+      ]
     },
     {
       id: 'branching',

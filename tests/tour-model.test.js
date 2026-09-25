@@ -43,6 +43,14 @@ test('lint accepts a minimal valid config and rejects shape errors',()=>{
     .some(w=>w.includes('demo.intervalMs')),'bad demo.intervalMs warns');
   assert.ok(context.tourLintConfig(config([spot('a'),{id:'w',kind:'chooser'}]))
     .some(w=>w.includes('first step')),'late chooser warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{secondary:{target:{selector:'.y'}}})])).length===0,
+    'single secondary object is valid');
+  assert.ok(context.tourLintConfig(config([spot('a',{secondary:[{target:{selector:'.y'}},{target:{selector:'.z'}}]})])).length===0,
+    'secondary list is valid');
+  assert.ok(context.tourLintConfig(config([spot('a',{secondary:[]})]))
+    .some(w=>w.includes('empty list')),'empty secondary list warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{secondary:[{note:'x'}]})]))
+    .some(w=>w.includes('secondary[0]')),'listed secondary without target warns');
 });
 
 test('usability is looser than lint: any well-formed step qualifies',()=>{

@@ -217,8 +217,7 @@ function wireTour(ctl, view, win, config, options){
       return panel;
     });
     var ring = el('div', 'dv-tour-ring'); overlay.appendChild(ring);
-    var ring2 = el('div', 'dv-tour-ring2'); ring2.hidden = true; overlay.appendChild(ring2);
-    var note = el('div', 'dv-tour-note'); note.hidden = true; overlay.appendChild(note);
+    var extras = el('div', 'dv-tour-extras'); overlay.appendChild(extras);
     var timeline = el('div', 'dv-tour-timeline'); overlay.appendChild(timeline);
     var ui = el('div', 'dv-tour-ui');
     var eyebrow = el('div', 'dv-tour-eyebrow');
@@ -241,7 +240,7 @@ function wireTour(ctl, view, win, config, options){
     var hint = el('div', 'dv-tour-hint', '← → to move · Esc to skip');
     overlay.appendChild(hint);
     doc.body.appendChild(overlay);
-    parts = {scrim: scrim, ring: ring, ring2: ring2, note: note, timeline: timeline,
+    parts = {scrim: scrim, ring: ring, extras: extras, timeline: timeline,
              ui: ui, eyebrow: eyebrow, heading: heading, body: body,
              back: back, next: next, skip: skip, chooser: chooser, hint: hint};
   }
@@ -260,7 +259,12 @@ function wireTour(ctl, view, win, config, options){
         rect.w + 'px;height:' + rect.h + 'px';
     } else parts.ring.hidden = true;
   }
-  function fullScrim(){ setHole({x: 0, y: 0, w: 0, h: 0}); parts.ring.hidden = true; placeUi(null); }
+  function fullScrim(){
+    setHole({x: 0, y: 0, w: 0, h: 0});
+    parts.ring.hidden = true;
+    parts.extras.replaceChildren();
+    placeUi(null);
+  }
   /* the narration card defaults to the bottom-left corner and yields to the
      spotlight: first corner that does not overlap the hole wins */
   function placeUi(hole){
@@ -300,13 +304,20 @@ function wireTour(ctl, view, win, config, options){
     if (sr.top < 80 || sr.bottom > vh - 80)
       win.scrollTo(0, win.scrollY + sr.top - (vh - sr.height) / 2);
   }
+  /* `secondary` accepts one callout or a list of them */
+  function secondariesOf(value){
+    if (value == null) return [];
+    return (Array.isArray(value) ? value : [value]).filter(function(item){
+      return !!item && typeof item === 'object' && item.target;
+    });
+  }
   /* a demo step under reduced motion swaps its spotlight to the transport so
      the visitor advances the story with the real controls */
   function effectiveTargets(step){
     if (step.demo && RM)
       return {target: {selector: '.step-transport', within: 'section'},
-              secondary: {target: step.target, note: step.secondary && step.secondary.note || ''}};
-    return {target: step.target, secondary: step.secondary};
+              secondaries: [{target: step.target, note: ''}].concat(secondariesOf(step.secondary))};
+    return {target: step.target, secondaries: secondariesOf(step.secondary)};
   }
   function position(){
     if (!active) return;
@@ -327,23 +338,23 @@ function wireTour(ctl, view, win, config, options){
     var hole = tourCutoutRect(rect, step.offset, 8, viewport());
     setHole(hole);
     placeUi(hole);
-    if (eff.secondary && eff.secondary.target){
-      var second = queryTarget(step, sec, eff.secondary.target);
-      if (second && isRendered(second)){
-        var r2 = tourCutoutRect(rectOf(second), null, 6, viewport());
-        parts.ring2.hidden = false;
-        parts.ring2.style.cssText = 'left:' + r2.x + 'px;top:' + r2.y + 'px;width:' + r2.w + 'px;height:' + r2.h + 'px';
-        var noteText = eff.secondary.note || '';
-        parts.note.hidden = !noteText;
-        if (noteText){
-          parts.note.textContent = noteText;
-          var noteX = Math.max(16, Math.min(r2.x + r2.w - 260, win.innerWidth - 276));
-          parts.note.style.cssText = 'left:' + noteX + 'px;top:' + (r2.y + r2.h + 10) + 'px';
-        }
-        return;
+    /* every control the copy names carries its own thin ring */
+    parts.extras.replaceChildren();
+    eff.secondaries.forEach(function(item){
+      var second = queryTarget(step, sec, item.target);
+      if (!second || !isRendered(second)) return;
+      var r2 = tourCutoutRect(rectOf(second), null, 6, viewport());
+      var ring2 = el('div', 'dv-tour-ring2');
+      ring2.style.cssText = 'left:' + r2.x + 'px;top:' + r2.y + 'px;width:' + r2.w + 'px;height:' + r2.h + 'px';
+      parts.extras.appendChild(ring2);
+      var noteText = item.note || '';
+      if (noteText){
+        var note = el('div', 'dv-tour-note', noteText);
+        var noteX = Math.max(16, Math.min(r2.x + r2.w - 260, win.innerWidth - 276));
+        note.style.cssText = 'left:' + noteX + 'px;top:' + (r2.y + r2.h + 10) + 'px';
+        parts.extras.appendChild(note);
       }
-    }
-    parts.ring2.hidden = true; parts.note.hidden = true;
+    });
   }
   function schedule(){
     if (raf) return;

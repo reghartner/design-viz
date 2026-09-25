@@ -79,6 +79,10 @@ test('a missing target warns and passes through, keeping the authored count',asy
   await page.locator('.dv-tour-choice').nth(1).click(); // The engineering
   const heading=page.locator('.dv-tour-ui .dv-tour-heading');
   await expect(heading).toHaveText('Play the story');
+  // Every control the copy names carries a ring: transport primary, plus
+  // the AMBIENT/STEP toggle and PRESENT as secondaries.
+  await expect(page.locator('.dv-tour-ring')).toBeVisible();
+  await expect(page.locator('.dv-tour-ring2')).toHaveCount(2);
   await page.locator('.dv-tour-next').click();
   // The branching step has no .path-timeline here: it warns and passes
   // through to the links step (chime-radar does render node links).

@@ -72,8 +72,11 @@ Per step:
   `body`. On a `chooser` step, `copy.choices` is a list of
   `{persona, label, sub}` objects and `copy.note` is the small print.
   Malformed entries are ignored (fallback button, validator warning).
-- `secondary` — one extra thin-ring callout with its own `target` and
-  `note`.
+- `secondary` — extra thin-ring callouts: one `{target, note}` object or a
+  list of them. **Authoring rule: every control the step's copy names
+  should carry a ring** — the default controls step rings the AMBIENT/STEP
+  toggle and PRESENT alongside the spotlit transport for exactly this
+  reason. Keep notes short; they render beneath their ring.
 - `demo` — a playback demo: on entry the tour rewinds the section's stepper
   to its path's first visible stop, then advances it `advance` times
   (default 3, capped at 30), one step every `intervalMs` milliseconds

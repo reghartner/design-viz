@@ -2774,9 +2774,14 @@ function tourLintConfig(config){
     if (step.diagramState != null && !tourIsObject(step.diagramState))
       warn(at + '.diagramState', 'must be an object');
     if (step.secondary != null){
-      if (!tourIsObject(step.secondary) || !tourIsObject(step.secondary.target) ||
-          typeof step.secondary.target.selector !== 'string')
-        warn(at + '.secondary', 'needs target.selector when present');
+      var secondaries = Array.isArray(step.secondary) ? step.secondary : [step.secondary];
+      if (!secondaries.length) warn(at + '.secondary', 'must not be an empty list');
+      secondaries.forEach(function(item, si){
+        var here = Array.isArray(step.secondary) ? at + '.secondary[' + si + ']' : at + '.secondary';
+        if (!tourIsObject(item) || !tourIsObject(item.target) ||
+            typeof item.target.selector !== 'string')
+          warn(here, 'needs target.selector when present');
+      });
     }
   });
   return warnings;

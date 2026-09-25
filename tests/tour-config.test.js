@@ -38,7 +38,8 @@ test('every selector class the default config names is rendered by the engine',(
   const selectors=[];
   config.steps.forEach(step=>{
     if(step.target)selectors.push(step.target.selector);
-    if(step.secondary && step.secondary.target)selectors.push(step.secondary.target.selector);
+    const secondaries=Array.isArray(step.secondary)?step.secondary:(step.secondary?[step.secondary]:[]);
+    secondaries.forEach(item=>{if(item&&item.target)selectors.push(item.target.selector);});
   });
   assert.ok(selectors.length>=4,'default config names several targets');
   for(const selector of selectors)

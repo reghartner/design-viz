@@ -1,0 +1,3 @@
+.fv-brand-editor{min-width:0;}.fv-brand-editor .frow{margin-top:9px;}.fv-brand-editor input[type=file]{max-width:100%;min-width:0;width:100%;font-size:12px;}
+.fv-brand-preview{display:flex;align-items:center;min-height:64px;margin:10px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);font:600 15px/1.5 'IBM Plex Sans',sans-serif;}
+.fv-brand-preview .fv-brand-mark{width:36px;height:36px;}

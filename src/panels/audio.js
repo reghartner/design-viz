@@ -46,15 +46,7 @@ var FlowAudio = (function () {
   function isEmitting(raw) { var a = model(raw); return a.output !== 'silent' && a.playback === 'playing'; }
   function isCapturing(raw) { return model(raw).microphone === 'capturing'; }
   function icon(kind) {
-    var paths = {
-      microphone: '<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3M9 21h6"/>',
-      speaker: '<path d="M3 9h4l5-4v14l-5-4H3ZM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
-      recorded: '<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/>',
-      chime: '<path d="M6 16h12l-2-3V9a4 4 0 0 0-8 0v4ZM10 20h4M12 3v2"/>',
-      siren: '<path d="M5 19h14v3H5ZM7 19v-7a5 5 0 0 1 10 0v7M12 1v3M2 6l3 2m17-2-3 2M1 13h3m16 0h3"/>',
-      detection: '<path d="M9 19c0-4 7-4 7-10a5 5 0 0 0-10 0m4 1a2 2 0 0 1 4 0c0 3-5 3-5 6M8 21h3M3 5 1 3m19 4 3-1"/>',
-    };
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[own(paths, kind) ? kind : 'speaker'] + '</svg>';
+    return FlowIcons.render(FlowIcons.has(kind) ? kind : 'speaker');
   }
   var outputs = {silent:'Silent', speech:'Live speech', recorded:'Recorded message', chime:'Chime', siren:'Siren'};
   var microphones = {idle:'Mic idle', listening:'Listening', capturing:'Capturing sound', muted:'Mic muted', unavailable:'Mic unavailable'};

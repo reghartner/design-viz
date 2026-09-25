@@ -1,0 +1,7 @@
+.fv-brand{display:inline-flex;align-items:center;gap:.5em;min-width:0;max-width:100%;color:var(--fv-brand-fg,inherit);vertical-align:middle;}
+.fv-brand-mark{display:block;flex:none;width:1.8em;height:1.8em;object-fit:contain;}
+.fv-brand-monogram{display:grid;place-items:center;border-radius:.3em;background:var(--fv-brand-bg,var(--fv-brand-accent,#6675c4));color:var(--fv-brand-fg,#fff);font-size:.8em;font-weight:700;}
+.fv-brand-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.screen-brand{position:absolute;right:12px;bottom:12px;max-width:55%;padding:5px 8px;border-radius:7px;background:#152137bb;color:white;font:600 11px/1.3 'IBM Plex Sans',sans-serif;pointer-events:none;}
+
+.screen-brand .fv-brand-mark{width:25px;height:25px;}

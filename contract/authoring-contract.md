@@ -337,6 +337,39 @@ open paused in the current renderer. To retain their earlier automatic behavior,
 add `"autoplay": true`. No schema version flag is required; rebuild older
 self-contained HTML exports to use the updated controls.
 
+### Shared icons and company branding
+
+Icons are IDs from the shared 58-icon library. Nodes, group labels, Home
+devices/subjects, Device app cards and company marks use the same IDs. The
+workbench's **Browse icons** control supports search and category filters;
+see [the complete library and recipe](../docs/shared-icons.md) for names and
+examples. Existing icon IDs remain valid. Icon choices convey authored meaning;
+they do not create alarm, temperature, charging or availability state.
+
+`diagram.brand` is an optional shared brand object for `phone`, `deviceapp`,
+`screen` and `security` panels:
+
+```json
+{"app":"Northstar Home","icon":"house","accent":"#318585"}
+```
+
+Supported fields are `app` (text), `icon` (known library ID), `logo` (1–4
+character monogram), `logoImage` (embedded PNG/JPEG/WebP data URI, at most
+512 KiB decoded), and `accent`, `bg`, `fg` (`#RGB` or `#RRGGBB`). Uploading
+through the workbench also checks a maximum of 4096 × 4096 pixels. Remote URLs
+and authored SVG logos are unsupported. Mark precedence within an object is
+`logoImage`, then `icon`, then `logo`.
+
+Omit `panel.brand` to inherit. `panel.brand:false` suppresses the brand on that
+panel. A partial object overrides shared fields; a valid local mark replaces
+the shared mark even when its format differs. Brand configuration belongs to
+the panel/diagram declaration, not step patches. Select a supported panel and
+open **Inspect → Company branding** to choose **Shared across this diagram**,
+**Override for this panel**, or **No brand on this panel**. The shared scope
+edits the diagram's name and mark for all inheriting panels. Camera screens
+show a compact mark-only watermark; the other supported surfaces can show the
+company name. Existing Phone monograms retain their presentation.
+
 ### nodes
 
 Map of node id → card. Ids are short lowercase tokens (letters/digits), used in
@@ -346,8 +379,8 @@ with no `title` shows its id:
 - `title` — display name, ~16 characters max (the card is fixed-width).
 - `sub` — one-line detail under the title (a role, a topic, a port). Monospace;
   ~20 characters max.
-- `icon` — one of: `terminal cloud shield gear db antenna thermo pump router
-  package key server chip phone`. Default `gear`. Pick the closest metaphor
+- `icon` — a known ID from the [shared icon library](../docs/shared-icons.md#icon-ids).
+  Default `gear`. Pick the closest metaphor
   (db = storage, antenna = broker/radio, chip = embedded device, key = signing,
   shield = auth, server = backend service, terminal = console/UI).
 - `tint` — icon-chip color role, one of: `cmd auth data mqtt dev`. Default
@@ -1102,20 +1135,32 @@ perspectives" of one timeline). Types:
   10–180), `range` to 70 (clamped 20–160). Kinds and states: camera
   `scan` (default), `sleep`, `detect`, `rec` (sweep stays live and a red recording light blinks), `off`; entry `closed` (default),
   `open`, `alert`; sensor `ok` (default), `warn`, `alert`, `off`; hub
-  `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`. Sensors accept an `icon` from the shared
-  icon set (default/fallback `gear`). A device patch may be a legacy state string, or a sparse object such as
+  `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`. Cameras, hubs and sensors accept an `icon` from the shared
+  library. Omitted icons retain the defaults `camera`, `router` and `gear`,
+  respectively; invalid IDs warn and use a safe fallback. The Home **Edit
+  layout** inspector offers **Browse icons** beside each applicable icon field.
+  Changing an icon preserves the device's kind and behavior.
+  A device patch may be a legacy state string, or a sparse object such as
   `{"cam":{"state":"off","thermal":"hot"}}`. `thermal` accepts
   `normal` (default), `warm`, `hot`, `cold`, or `freezing`. Warm/hot add rising
   heat waves and a thermometer; cold/freezing add frost and a snowflake.
   The condition is independent of operation, so its overlay survives shutdown.
-  Object attributes carry independently: `{"cam":{"thermal":"normal"}}`
+  Object attributes carry independently. An initial/step `icon` may be any known
+  library ID, or `null` to restore the declaration/kind default. For example
+  `{"cam":{"icon":"camera-off"}}` changes only the marker. Omitted `icon`
+  inherits, including across scalar state patches such as `{"cam":"scan"}`.
+  Cameras, hubs and sensors expose an **icon** picker in **Starting device and
+  subject conditions** and **Home at this step**; entry doors keep their
+  geometric artwork. **Inherit previous icon** removes this step's assignment,
+  while **Restore layout icon** writes the explicit null reset.
+  `{"cam":{"thermal":"normal"}}`
   clears heat without restarting Camera; `{"cam":"scan"}` changes operation
   without clearing an inherited thermal condition. Unknown object attributes or
   values warn and are ignored. No new panel-level key is reserved. Subjects still
   use position objects, and signals still last for one step only. Initial states
   accept the same device objects. The step inspector offers separate State and
   Temperature selectors, each with Inherit; shared settings offer Starting device
-  conditions. Heat/frost are symbolic illustrations, not claims of fire or ice.
+  and subject conditions. Heat/frost are symbolic illustrations, not claims of fire or ice.
   Reduced motion and print keep the stable overlay and suppress its motion.
   Each device has a marker and label; its state is conveyed by appearance and
   animation, with name/state text in
@@ -1174,6 +1219,12 @@ perspectives" of one timeline). Types:
   or use a shared icon token (unknown icons warn and fall back to `gear`).
   `initial` and step patches address subject ids with objects:
   `{"walker":{"x":120,"y":60}}`; `{"walker":null}` hides the subject.
+  Subjects also accept an icon-only patch such as `{"walker":{"icon":"car"}}`
+  without changing position. A known `icon` carries forward; `icon:null` restores
+  the declared icon or default person avatar. A whole-subject `null` hides it
+  and clears its carried icon/audio facts. A later icon-only update stays hidden
+  until a position patch shows the subject. The editor requires showing a subject
+  before changing an icon on the same step that explicitly hides it.
   Positions and hidden state carry across steps; invalid subject patches
   warn and are ignored. Visible subjects glide from the previous position
   on animated steps, with their optional label/icon and a short fading trail. Reappearing after
@@ -1181,7 +1232,7 @@ perspectives" of one timeline). Types:
   glides. Invalid subject declarations warn and are ignored.
   The workbench's **Home at this step** editor appears for every homemap even
   without a patch. It reads the selected path's inherited state, writes only
-  the changed field, supports device state selectors, subject drag/tap placement
+  the changed field, supports device state and icon selectors, subject drag/tap placement
   and coordinates, hide/show/inherit, and device-to-device signals. Resetting
   to Inherit removes that field from this step. Shared source steps affect
   every path that references them. Dragging a device or room border/label in
@@ -1267,7 +1318,9 @@ perspectives" of one timeline). Types:
   `sources` is optional (0–6 objects) with unique
   `id`, `label`, optional hex `color`, diagram `node` ID, `endpoint` and `detail`.
   `fields` is optional (0–12 data tiles) with unique `id`, `label`, optional `source` ID,
-  `kind` (`text` default or `battery`), `icon` and `unit`. IDs must begin with a
+  `kind` (`text` default or `battery`), `icon` (shared library ID) and `unit`.
+  The declared icon is the card's default. Without one, a battery card uses
+  `battery` and a text card has no icon. IDs must begin with a
   letter and contain only letters, digits, `_` or `-`; `phoneScreen`, `clock`,
   `date`, `note`, `notify`, `clear`, `notifications`, `constructor` and `prototype` are reserved.
   Source-free panels show only the phone, without unmapped badges or a source
@@ -1286,15 +1339,23 @@ perspectives" of one timeline). Types:
   be text, finite numbers or booleans. Missing/null values show `—`. Invalid
   battery values warn and show `—`, never a fabricated zero reading.
   Patches MERGE each field's `value`, `status`, `detail`, optional `source`
-  override, and `visible` boolean. Thus `{"battery":{"status":"stale"}}` preserves
+  and `icon` overrides, and `visible` boolean. Thus `{"battery":{"status":"stale"}}` preserves
   its last value. Cards are visible by default. Put `{"clip":{"visible":false}}`
   in initial state to start without that card, then patch `{"clip":{"visible":true}}`
   to add it on a step. Patch false to remove it again. Visibility carries forward;
   hiding a card preserves its value and it can receive updates while hidden.
   Declare all possible cards in `fields`; show/hide them independently per step.
   Home hides the app cards without changing these visibility choices.
-  A field set to `null` resets its value/detail/status, restores default visibility
-  and its declared source; `source:null` alone restores that source without clearing the value.
+  An `icon` choice in initial or step state carries independently of these values;
+  for example `{"battery":{"icon":"battery-charging"}}` changes the pictogram
+  while retaining charge and freshness. Omission carries the earlier icon;
+  `icon:null` restores the declaration/default. Icons never infer hot, alarm or
+  low-battery state from a card's value. Use **fields → icon** for the declaration,
+  **Starting state → card → icon** for initial state, and the selected step's
+  **Inspect → Panel changes → card → icon** for a carried override. **Inherit**
+  removes that step's assignment; a JSON `null` is an explicit reset.
+  A field set to `null` resets its value/detail/status, restores default visibility,
+  icon and declared source; `source:null` alone restores that source without clearing the value.
   Patch `notify:{app,title?,text?}` or `notify:[...]` to add notifications on the
   home screen or above the app’s data tiles; `app` is required. This uses the same contract as `phone`: each
   step's array keeps its order, newest step first. `clear:true` dismisses only

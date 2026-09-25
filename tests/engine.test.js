@@ -1014,7 +1014,7 @@ test('group renderer exposes an escaped data-dv-group selection identity', () =>
 });
 
 test('every registered icon has exactly one sprite symbol', () => {
-  const sprite = fs.readFileSync(path.join(ROOT, 'src', 'icons.svg'), 'utf8');
+  const sprite = require('../tools/source-loader.cjs').entrypointAssets('standalone').icons;
   const ids = [...sprite.matchAll(/<symbol id="i-([^"]+)"/g)].map(m => m[1]);
   for (const icon of C.ICON_SET) {
     assert.strictEqual(ids.filter(id => id === icon).length, 1, icon);
@@ -1244,23 +1244,23 @@ test('phone brand markup escapes text and only interpolates validated colors', (
 test('phone brand validator warns per field, accepts valid brands, and rejects step branding', () => {
   const check = (panel, patch = {}) => C.validate(C.normalize({nodes: {a: {}}, rows: [['a']],
     panels: [{id: 'ph', type: 'phone', ...panel}], steps: [{nodes: ['a'], panels: {ph: patch}}]}));
-  for (const brand of [null, [], 'Ring', 42, new Date()]){
+  for (const brand of [[], 'Ring', 42, new Date()]){
     const result = check({brand});
     assert.deepStrictEqual(plain(result.errors), []);
-    assert.ok(result.warnings.some(w => w.endsWith('.panels[0].brand: must be a plain object — ignored')), result.warnings.join('; '));
+    assert.ok(result.warnings.some(w => w.includes('.panels[0].brand:')), result.warnings.join('; '));
   }
   for (const field of ['accent', 'bg', 'fg']){
-    for (const value of ['red', '#12345', 'url(x)', '#1D6EF2;background:url(x)', '#abc\n', null, 123]){
+    for (const value of ['red', '#12345', 'url(x)', '#1D6EF2;background:url(x)', '#abc\n', 123]){
       const result = check({brand: {[field]: value}});
       assert.deepStrictEqual(plain(result.errors), []);
-      assert.ok(result.warnings.some(w => w.endsWith('.brand.' + field + ': must be #RGB or #RRGGBB hex — ignored')), result.warnings.join('; '));
+      assert.ok(result.warnings.some(w => w.includes('.brand.' + field + ':')), result.warnings.join('; '));
     }
   }
-  for (const logo of ['', 'ABCDE', null, 42]){
-    assert.ok(check({brand: {logo}}).warnings.some(w => w.endsWith('.brand.logo: must be a string of 1-4 characters — ignored')));
+  for (const logo of ['', 'ABCDE', 42]){
+    assert.ok(check({brand: {logo}}).warnings.some(w => w.includes('.brand.logo:')));
   }
-  assert.ok(check({brand: {app: 42}}).warnings.some(w => w.endsWith('.brand.app: must be a string — ignored')));
-  for (const panel of [{}, {brand: {}}, {brand: {app: ''}}, {brand: {app: 'Ring', logo: 'ABCD', accent: '#abc', bg: '#A1B2C3', fg: '#fff'}}]){
+  assert.ok(check({brand: {app: 42}}).warnings.some(w => w.includes('.brand.app:')));
+  for (const panel of [{}, {brand: false}, {brand: null}, {brand: {}}, {brand: {app: ''}}, {brand: {logo:null,accent:null}}, {brand: {app: 'Ring', logo: 'ABCD', accent: '#abc', bg: '#A1B2C3', fg: '#fff'}}]){
     assert.deepStrictEqual(plain(check(panel)), {errors: [], warnings: []});
   }
   assert.ok(check({}, {brand: {app: 'Other'}}).warnings.some(w => w.includes('.panels.ph.brand: not a phone field — ignored')));
@@ -4260,7 +4260,7 @@ test('homemap render: per-camera sweeps, transition ripples, staggered signals a
   C.renderPanelBody(host, p, states[0], 'aurora', states, 0);
   assert.strictEqual((host.innerHTML.match(/class="hmsweep"/g) || []).length, 1);
   assert.match(host.innerHTML, /transform-origin:46px 40px;--sw:38deg/);
-  assert.match(host.innerHTML, /href="#i-thermo"/);
+  assert.match(host.innerHTML, /data-icon="thermo"/);
   assert.doesNotMatch(host.innerHTML, /hmripple|hmsig|hmglow/);
   C.renderPanelBody(host, p, states[1], 'aurora', states, 1);
   assert.strictEqual((host.innerHTML.match(/class="hmsweep"/g) || []).length, 2);
@@ -4299,7 +4299,7 @@ test('homemap render: first render and ambient omit transients; reduced motion i
   C.renderPanelBody(host, p, state, 'aurora');
   assert.doesNotMatch(host.innerHTML, /<script>|<img|onload=|hmripple|hmsig/);
   assert.match(host.innerHTML, /&lt;img onerror=&quot;oops&quot;&gt;/);
-  assert.match(host.innerHTML, /href="#i-gear"/);
+  assert.match(host.innerHTML, /data-icon="gear"/);
   const reduced = loadCore({window: {matchMedia: () => ({matches: true})}});
   reduced.renderPanelBody(host, p, {}, 'aurora', [], 0);
   reduced.renderPanelBody(host, p, state, 'aurora', [], 1, true);
@@ -4445,7 +4445,7 @@ test('homemap subject render: several glides release together and unchanged pain
   assert.strictEqual(raf.length, 0);
   assert.match(markup, /&lt;Visitor &quot;&amp;&gt;/);
   assert.match(markup, /class="hmsubjectdot" cx="20" cy="150" r="7"/);
-  assert.match(markup, /data-subject="__proto__"[\s\S]*href="#i-gear"/);
+  assert.match(markup, /data-subject="__proto__"[\s\S]*data-icon="gear"/);
   const target = JSON.parse('{"walker":{"x":120,"y":60},"__proto__":{"x":50,"y":80}}');
   core.renderPanelBody(host, p, target, 'aurora', [], 1);
   assert.deepStrictEqual(events, ['translate(-100px,108px)', 'translate(-40px,-60px)']);

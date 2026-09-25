@@ -110,7 +110,7 @@ var BUILDER_GUIDES = {
     fields: [
       ['key', 'rename the declaration and every member reference'],
       ['title', 'boundary label — empty falls back to the key'],
-      ['icon', 'optional icon beside the boundary label — empty removes it'],
+      ['icon', 'Browse icons to search the shared library; empty removes the boundary icon'],
       ['members', 'remove individual nodes with ×; deleting the group keeps its nodes']
     ]
   },
@@ -120,14 +120,14 @@ var BUILDER_GUIDES = {
     fields: [
       ['title', 'name on the card'],
       ['sub', 'one-line detail under the name'],
-      ['icon', 'icon on the chip (see tokens below; default gear)'],
+      ['icon', 'Browse icons to search by name or category; default gear'],
       ['tint', 'chip color (default cmd)'],
       ['group', 'containment-boundary id — members get a dashed box'],
       ['float', 'Free placement enables arbitrary dragging and Float X/Y; Auto above/below releases the pin; in rows restores row placement'],
       ['link', 'permalink URL — clickable ↗ on the card corner'],
       ['detail', 'inner flow: choose a section for a focused drilldown with an overview map; map parent beats or link an external destination in Domain detail']
     ],
-    tokens: 'icons: terminal cloud shield gear db antenna thermo pump router package key server chip phone house camera doorbell lock bulb car · tints: cmd auth data mqtt dev'
+    tokens: 'icons: use Browse icons for the shared library · tints: cmd auth data mqtt dev'
   },
   edge: {
     title: 'Edge — one hop between nodes',

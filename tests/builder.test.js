@@ -404,6 +404,8 @@ function importHarness(ctl, boardSpec, extraGlobals){
       addEventListener(type, fn){ (handlers[type] ||= []).push(fn); },
       removeEventListener(type,fn){handlers[type]=(handlers[type] || []).filter(f=>f!==fn);},
       appendChild(child){ this.children.push(child); child.parentNode = this; return child; },
+      append(...children){ children.forEach(child=>this.appendChild(child)); },
+      replaceChildren(...children){ this.children.forEach(child=>child.parentNode=null);this.children=[];this.append(...children); },
       setAttribute(k, v){ if (k === 'class') this.className = String(v); else attrs[k] = String(v); },
       removeAttribute(k){ delete attrs[k]; },
       get firstChild(){ return this.children[0] || null; },
@@ -423,6 +425,7 @@ function importHarness(ctl, boardSpec, extraGlobals){
       setSelectionRange(start,end){ this.selectionStart=start; this.selectionEnd=end; },
       contains(child){ return child === this || this.children.some(c => c.contains(child)); },
       matches(selector){
+        if (selector === ':disabled') return !!this.disabled;
         if (selector.includes(',')) return selector.split(',').some(s => this.matches(s.trim()));
         if (selector.startsWith('#')) return this.id === selector.slice(1);
         const tagMatch = selector.match(/^[a-z]+/i);
@@ -457,7 +460,8 @@ function importHarness(ctl, boardSpec, extraGlobals){
     el.classList = {
       add(...cs){ el.className += ' ' + cs.join(' '); },
       remove(...cs){ el.className = el.className.split(' ').filter(x => !cs.includes(x)).join(' '); },
-      contains(c){ return el.className.split(' ').includes(c); }
+      contains(c){ return el.className.split(' ').includes(c); },
+      toggle(c,force){const on=force===undefined?!this.contains(c):!!force;this[on?'add':'remove'](c);return on;}
     };
     Object.defineProperty(el, 'innerHTML', {set(){ el.children = []; }, get(){ return ''; }});
     if (id) elements[id] = el;

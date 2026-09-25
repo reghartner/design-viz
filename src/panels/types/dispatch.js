@@ -36,13 +36,7 @@
   }
   function text(value) { return typeof value === 'string' ? value : ''; }
   function icon(kind) {
-    var paths = {
-      police:'<path d="m12 3 8 4v6c0 5-8 9-8 9s-8-4-8-9V7Z"/><path d="m12 7 1.5 3 3.5.5-2.5 2.5.5 3.5-3-1.5-3 1.5.5-3.5L7 10.5l3.5-.5Z"/>',
-      fire:'<path d="M12 2c1 6 7 7 7 13a7 7 0 0 1-14 0c0-3 2-6 4-8 0 4 2 4 3 4 2-2 1-6 0-9Z"/><path d="M12 13c0 3 3 3 3 5a3 3 0 0 1-6 0c0-2 2-3 3-5Z"/>',
-      medical:'<path d="M8 3h8v5h5v8h-5v5H8v-5H3V8h5Z"/>',
-      security:'<path d="m12 3 8 4v6c0 5-8 9-8 9s-8-4-8-9V7Z"/><path d="m8 12 3 3 5-6"/>'
-    };
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[kinds.indexOf(kind) >= 0 ? kind : 'security'] + '</svg>';
+    return FlowIcons.render(kinds.indexOf(kind) >= 0 ? kind : 'security');
   }
   function routePosition(progress) {
     var t = progress / 100, a = 1 - t;
@@ -131,7 +125,7 @@
         (value.detail ? '<span class="dispatch-unit-detail">' + esc(value.detail) + '</span>' : '') + '</div></li>';
     }).join('');
     var hero = '<div class="dispatch-topline"><span>' + esc(text(panel.agency) || 'Emergency response') + '</span><span class="dispatch-priority dispatch-priority-' + (priority || 'unknown') + '">' + (priority ? priority + ' priority' : 'Priority not set') + '</span></div>' +
-      '<div class="dispatch-status">' + labels[status] + '</div><div class="dispatch-dispatcher"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 11V8a6 6 0 0 1 12 0v3M4 10H2v5h4v-5Zm12 0h2v5h-4v-5ZM16 15v2h-6"/></svg>' + esc(state.dispatcher || 'No dispatcher assigned') + '</div>';
+      '<div class="dispatch-status">' + labels[status] + '</div><div class="dispatch-dispatcher">' + FlowIcons.render('headset') + '' + esc(state.dispatcher || 'No dispatcher assigned') + '</div>';
     var rail = [{id:'requested',label:'Request'},{id:'assigned',label:'Assign'},{id:'enroute',label:'En route'},{id:'onscene',label:'On scene'}].map(function (stage) {
       var current = status === stage.id;
       return '<li class="dispatch-stage' + (current ? ' is-current' : '') + '"' + (current ? ' aria-current="step"' : '') + '><span class="dispatch-stage-dot" aria-hidden="true"></span><span>' + stage.label + '</span></li>';

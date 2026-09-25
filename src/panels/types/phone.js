@@ -1,40 +1,6 @@
 /* phone validation and pure state helpers. */
 function phoneBrandIsPlainObject(obj) {
-  if (!obj || Object.prototype.toString.call(obj) !== '[object Object]') return false;
-  var proto = Object.getPrototypeOf(obj);
-  return (
-    proto === null ||
-    (Object.prototype.hasOwnProperty.call(proto, 'constructor') &&
-      typeof proto.constructor === 'function' &&
-      Function.prototype.toString.call(proto.constructor) ===
-        Function.prototype.toString.call(Object))
-  );
-}
-
-function phoneBrandWarnings(panel, path, warnings) {
-  if (!Object.prototype.hasOwnProperty.call(panel, 'brand')) return;
-  var brand = panel.brand;
-  path += '.brand';
-  if (!phoneBrandIsPlainObject(brand)) {
-    warnings.push(path + ': must be a plain object — ignored');
-    return;
-  }
-  ['accent', 'bg', 'fg'].forEach(function (k) {
-    if (
-      Object.prototype.hasOwnProperty.call(brand, k) &&
-      (typeof brand[k] !== 'string' ||
-        (brand[k].length !== 4 && brand[k].length !== 7) ||
-        !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k]))
-    )
-      warnings.push(path + '.' + k + ': must be #RGB or #RRGGBB hex — ignored');
-  });
-  if (
-    Object.prototype.hasOwnProperty.call(brand, 'logo') &&
-    (typeof brand.logo !== 'string' || brand.logo.length < 1 || brand.logo.length > 4)
-  )
-    warnings.push(path + '.logo: must be a string of 1-4 characters — ignored');
-  if (Object.prototype.hasOwnProperty.call(brand, 'app') && typeof brand.app !== 'string')
-    warnings.push(path + '.app: must be a string — ignored');
+  return FlowBrand.isObject(obj);
 }
 
 /* Phone patches are operations, validated for both initial and steps. */
@@ -108,7 +74,6 @@ function foldPhoneStates(panel, steps) {
 
 PanelRegistry.extend('phone', {
   validateDeclaration: function (p, PP, warnings, errors, d) {
-    phoneBrandWarnings(p, PP, warnings);
     phonePatchWarnings(p.initial, PP + '.initial', warnings);
   },
   validatePatch: function (patch, path, panel, warnings, context) {
@@ -121,19 +86,7 @@ PanelRegistry.extend('phone', {
 function phoneBrand(panel) {
   var brand = panel && panel.brand;
   if (!phoneBrandIsPlainObject(brand)) return null;
-  var out = {};
-  if (typeof brand.app === 'string') out.app = brand.app;
-  if (typeof brand.logo === 'string' && brand.logo.length >= 1 && brand.logo.length <= 4)
-    out.logo = brand.logo;
-  /* These values enter an inline style: accept only literal hex colors. */
-  ['accent', 'bg', 'fg'].forEach(function (k) {
-    if (
-      typeof brand[k] === 'string' &&
-      (brand[k].length === 4 || brand[k].length === 7) &&
-      /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k])
-    )
-      out[k] = brand[k];
-  });
+  var out = FlowBrand.clean(brand);
   return Object.keys(out).length ? out : null;
 }
 
@@ -241,7 +194,10 @@ function phonePanelHTML(panel, state, fresh) {
     (m.date ? '<span class="phonedate" title="' + esc(m.date) + '">' + esc(m.date) + '</span>' : '') +
     '<span class="phoneglyphs" aria-hidden="true"><span class="phonesignal"><i></i><i></i><i></i></span>' +
     '<span class="phonebattery"><i></i></span></span></div>';
-  if (brand && (brand.app || brand.logo))
+  var sharedBrand = panelObject(panel.brand) && (panel.brand.icon || panel.brand.logoImage)
+    ? FlowBrand.render(panel.brand, {className:'phonebrand'}) : '';
+  if (sharedBrand) h += sharedBrand;
+  else if (brand && (brand.app || brand.logo))
     h +=
       '<div class="phonebrand">' +
       (brand.logo
@@ -616,16 +572,12 @@ body.sk-editorial .phonecallchannel{border-radius:2px;}`,
 /* phone authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('phone', {
   authoring: {
+    branding: true,
     notifications: true,
     initialFields: true,
     transientFields: ['audio'],
     template: { title: 'Phone', initial: { clock: '9:41' } },
     setupFields: [
-      [
-        'brand',
-        'objf',
-        { cols: [{ k: 'app' }, { k: 'logo' }, { k: 'accent' }, { k: 'bg' }, { k: 'fg' }] },
-      ],
       ['initial', 'json'],
     ],
     patchFields: [

@@ -109,6 +109,19 @@ plan concise; it is a reviewable artifact, not a reasoning transcript.
   show camera experience; state/table/log/check panels explain software effects.
   Measurements and computed widgets require supported inputs. Do not invent
   values to fill a widget; use an honest qualitative representation when needed.
+- Use the shared icon library for semantic pictograms; read `docs/shared-icons.md`
+  when choosing panel/card icons or company branding. Prefer supported icon IDs
+  to custom SVG or repeated local artwork. Device app `fields[].icon` sets a
+  default; initial/step field `icon` choices carry, omission inherits, and
+  `icon:null` resets to the declaration/default. Keep icon state explicit rather
+  than inferring an alarm or temperature from another field. Home device/subject
+  object patches use the same sparse icon carry/reset rules, independently of
+  device state or subject position; an icon-only patch does not show a hidden
+  subject. `diagram.brand`
+  shares a name/mark across Phone, Device app, Camera and Security panels;
+  missing `panel.brand` inherits, `false` suppresses, and a partial object
+  overrides. Use an approved company mark or a library icon/monogram; embedded
+  PNG/JPEG/WebP logos travel with the spec. Do not invent a company's identity.
 - For a physical story, plan meaningful motion as well as text: subject movement,
   door state, camera/event timing, device activity and delivery signals where
   supported. Richness means coordinated evidence across views, not more panels.
@@ -146,6 +159,7 @@ Do not copy its latency, topology, notification, or outcome without evidence.
 | Camera state versus scene event | `cookbook/camera-events.md` and screen widget docs |
 | Color-coded phases in one timeline (no alternate outcome) | `docs/step-colors.md`; author each step’s `color`, preserve semantic node tones |
 | Phone home → device app, step-controlled cards, notifications, optional backend sources and independent field freshness | `cookbook/device-app-sources.md` and `deviceapp` widget docs |
+| Shared colored icons, per-step card pictograms or company branding across panels | `docs/shared-icons.md` and `examples/shared-icons/shared-icons.spec.json` |
 | Hot/cold devices, protective shutdown or temperature recovery | `cookbook/thermal-protection.md`; Home, thermo, screen and battery widget docs |
 | Detailed engineering and business-story perspectives on one timeline | `cookbook/two-perspectives.md` and its source/ledger/spec seed |
 | Queue/buffer, retry, replicas, rollout, or other state | Matching recipe in `cookbook/README.md` and widget docs |

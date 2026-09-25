@@ -1,6 +1,7 @@
 {
   "validator.js": [
     "panels/registry.js",
+    "icons/library.js",
     "validator.js",
     "core/navigation.js",
     "core/document.js",
@@ -11,6 +12,8 @@
     "core/geometry.js",
     "core/details.js",
     "core/handoffs.js",
+    "panels/media.js",
+    "icons/brand.js",
     "panels/shared.js",
     "panels/notifications.js",
     "panels/audio.js",
@@ -53,6 +56,8 @@
     "workbench/visibility.js",
     "workbench/panel-visibility.js",
     "workbench/detail-mapping.js",
+    "workbench/icon-picker.js",
+    "workbench/brand.js",
     "workbench/inspector.js",
     "workbench/io-model.js",
     "workbench/io-browser.js",
@@ -193,6 +198,17 @@
     "fontProfiles": [
       "all",
       "forge"
-    ]
+    ],
+    "sharedStyles": {
+      "core": [
+        "icons/library.css",
+        "icons/brand.css"
+      ],
+      "workbench": [
+        "workbench/icon-picker.css",
+        "workbench/brand.css"
+      ]
+    },
+    "iconLibrary": "icons/library.js"
   }
 }

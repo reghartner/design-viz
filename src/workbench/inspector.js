@@ -204,6 +204,22 @@ function selectControl(options, current, commit, allowEmpty){
     return sel;
   }
 
+function iconPickerControl(select){
+    return createFlowIconPicker({document:document,select:select,listen:listen,onRetire:function(fn){formLife.own(fn);}});
+  }
+function brandControl(val,ctx){
+    var target=Object.assign({},session.target),source=session.text();
+    return createFlowBrandControl({document:document,shared:ctx.diagram.brand,local:val.brand,
+      controls:{row:frow,action:actionButton,text:textControl,select:selectControl},iconPicker:iconPickerControl,
+      source:function(){return session.text();},listen:listen,onRetire:function(fn){formLife.own(fn);},error:formError,
+      change:function(shared,value){return commitCascade(function(raw){
+        if(session.text()!==source)return {error:'The source changed. Reselect the panel before editing its brand.'};
+        var rec=specSectionPaths(raw)[target.section],path=shared?rec && rec.diagram:builderTargetPath(raw,target);
+        if(!path)return {error:'Panel not found.'};
+        return planSetField(session.text(),raw,path,'brand',value==null?null:JSON.stringify(value));
+      },{after:refreshFormSoon});}
+    });
+  }
 function checkboxControl(checked, commit){
     var wrap = document.createElement('span');
     wrap.className = 'fctl fchk';
@@ -293,10 +309,10 @@ function groupForm(val, ctx){
         return commitGroup(function(raw){ return planSetGroupTitle(session.text(), raw, t.section, t.id, v); },
           {after: function(){ renderInspector(); }});
       }, {list: null})),
-      frow('icon', selectControl(ICON_SET, val.icon || '', function(v){
+      frow('icon', iconPickerControl(selectControl(ICON_SET, val.icon || '', function(v){
         return commitGroup(function(raw){ return planSetGroupIcon(session.text(), raw, t.section, t.id, v); },
           {after: function(){ renderInspector(); }});
-      }, true)),
+      }, true))),
       frow('parent (nesting)', parentControl),
       memberRow
     ];
@@ -387,7 +403,7 @@ function nodeForm(val, ctx){
       frow('float', floatControl)
     ].concat(floatRows,[
       frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
-      frow('icon', selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); })),
+      frow('icon', iconPickerControl(selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); }))),
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
       frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); }))
@@ -991,17 +1007,19 @@ function panelPatchControl(pid, patch, decl, target, options){
         group.className = 'rowsedit';
         f[2].forEach(function(col){
           var input=fieldInput(col,cur && cur[col[0]]);
+          if(col[0]==='icon' && col[1]==='enum')input.setAttribute('data-icon-default-label',initial?'Use declared icon':'Inherit previous icon');
           wireCommit(input,function(){
             var values=Object.create(null);values[col[0]]=input.value;
             var out=patchFieldsCollect([col],values);
             if(out.error){formError(key+': '+out.error);return false;}
             return commitPatch(key,out.item,false,[col],storage);
           });
-          group.appendChild(frow(editor.patchLabel ? editor.patchLabel(col[0]) : col[0], input));
+          group.appendChild(frow(editor.patchLabel ? editor.patchLabel(col[0]) : col[0], col[0]==='icon' && col[1]==='enum'?iconPickerControl(input):input));
         });
         body.appendChild(frowBlock(key, group));
       } else {
         var input = fieldInput(f, cur);
+        if(key==='icon' && f[1]==='enum')input.setAttribute('data-icon-default-label',initial?'Use declared icon':'Inherit previous icon');
         wireCommit(input, function(){
           var values = Object.create(null);
           values[key] = input.value;
@@ -1009,7 +1027,7 @@ function panelPatchControl(pid, patch, decl, target, options){
           if (out.error){ formError(out.error); return false; }
           return commitPatch(key, out.item[key],false,null,storage);
         });
-        body.appendChild(frow(editor.patchLabel ? editor.patchLabel(key) : key, input));
+        body.appendChild(frow(editor.patchLabel ? editor.patchLabel(key) : key, key==='icon' && f[1]==='enum'?iconPickerControl(input):input));
       }
     });
     var rawFold = document.createElement('details');
@@ -1188,9 +1206,9 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
           cap.className = 'rowk';
           cap.textContent = col.k + (col.req ? ' *' : '');
           cell.appendChild(cap);
-          if (!options.cell || !options.cell({column:col,input:input,cell:cell,ref:ref,base:base})) cell.appendChild(input);
+          if (!options.cell || !options.cell({column:col,input:input,cell:cell,ref:ref,base:base})) cell.appendChild(col.kind==='icon'?iconPickerControl(input):input);
           line.appendChild(cell);
-        } else line.appendChild(input);
+        } else line.appendChild(col.kind==='icon'?iconPickerControl(input):input);
       });
 
       var acts = line;
@@ -1332,7 +1350,7 @@ function objFieldsControl(key, cur, shape){
       onFormRetire:function(cleanup){if(disposed)cleanup();else formLife.own(cleanup);},
       clearClipboard:function(){if(!disposed)opts.clipboard.clearHome();},
       controls:{row:frow,block:frowBlock,action:actionButton,text:textControl,
-        number:numberControl,select:selectControl,rows:rowsFieldControl}
+        number:numberControl,select:selectControl,rows:rowsFieldControl,iconPicker:iconPickerControl}
     };
     var value=factory ? factory(context) : {};
     panelEditors[type]={factory:factory,value:value};return value;
@@ -1421,6 +1439,7 @@ function panelForm(val, ctx){
     visibility.setAttribute('aria-label','Starting panel visibility');
     Array.from(visibility.options).forEach(function(o){o.textContent=o.value==='hide'?'Hidden until a step shows it':'Shown';});
     rows.push(frow('Starting visibility',visibility));
+    if(panelAuthoring(val.type).branding)rows.push(brandControl(val,ctx));
     if(editor.setupRows) editor.setupRows(val,ctx.diagram,t,rows);
     return rows.concat(panelSetupRows(val));
   }

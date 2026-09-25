@@ -81,8 +81,9 @@ PanelViews.register('battery', function (host, panel, state, skin, states, stepI
     '">' +
     (bv != null ? esc(bv) : '&#8212;') +
     '<span class="btunit">%</span>' +
-    (bm.trend === 'charging' ? '<span class="btbolt" aria-label="charging">&#9889;</span>' : '') +
-    (bm.cold ? '<span class="btcold" aria-label="cold-limited">&#10052;</span>' : '') +
+    FlowIcons.render(bm.trend === 'charging' ? 'battery-charging' : bm.zone === 'low' || bm.zone === 'crit' ? 'battery-low' : 'battery',
+      {className:'btstatus',tone:{ok:'ok',low:'warn',crit:'alert',na:'muted'}[bm.zone],label:bm.trend === 'charging' ? 'Charging' : undefined}) +
+    (bm.cold ? FlowIcons.render('snowflake',{className:'btcold',label:'Cold-limited'}) : '') +
     '</div><span class="btzone z-' +
     bm.zone +
     '">' +
@@ -218,8 +219,8 @@ PanelRegistry.extend('battery', {
       css: String.raw`.bthead{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px;}
 .btval{font:700 20px 'IBM Plex Mono',monospace;}
 .btunit{font-size:11px; font-weight:500; opacity:.6; margin-left:3px;}
-.btbolt{font-size:13px; margin-left:5px;}
-.btcold{font-size:12px; margin-left:4px; opacity:.85;}
+.btstatus,.btcold{width:20px;height:20px;vertical-align:-3px;margin-left:5px;}
+.btcold{width:17px;height:17px;margin-left:4px;}
 .sk-aurora .btval{color:#EAF2FF;}
 .sk-daylight .btval{color:#23272E;}
 .sk-aurora .btval.z-low{color:#FFB454;}

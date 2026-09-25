@@ -52,11 +52,11 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
     }
     if (v === null) return;
     if (!panelObject(v)) {
-      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?} or null — ignored');
+      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?, icon?} or null — ignored');
       return;
     }
     Object.keys(v).forEach(function (k) {
-      if (['value', 'status', 'source', 'detail', 'visible'].indexOf(k) < 0)
+      if (['value', 'status', 'source', 'detail', 'visible', 'icon'].indexOf(k) < 0)
         warnings.push(p + '.' + k + ': unknown field property — ignored');
     });
     if (
@@ -85,6 +85,8 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
       warnings.push(p + '.detail: expected text or null — ignored');
     if (panelOwn(v, 'visible') && typeof v.visible !== 'boolean')
       warnings.push(p + '.visible: expected true or false — ignored');
+    if (panelOwn(v, 'icon') && v.icon !== null && ICON_SET.indexOf(v.icon) < 0)
+      warnings.push(p + '.icon: unknown icon — ignored');
   });
 }
 function deviceAppWarnings(panel, d, path, warnings) {
@@ -178,6 +180,7 @@ function foldDeviceAppStates(panel, steps) {
           next.source = v.source;
         if (v.detail === null || typeof v.detail === 'string') next.detail = v.detail || '';
         if (typeof v.visible === 'boolean') next.visible = v.visible;
+        if (panelOwn(v, 'icon') && (v.icon === null || ICON_SET.indexOf(v.icon) >= 0)) next.icon = v.icon;
       } else return;
       if (JSON.stringify(next) !== JSON.stringify(carried[f.id] || {})) updated.push(f.id);
       carried[f.id] = next;
@@ -249,7 +252,7 @@ function deviceAppModel(panel, state) {
       label: str(f.label, f.id),
       source: source || null,
       battery: battery,
-      icon: ICON_SET.indexOf(f.icon) >= 0 ? f.icon : null,
+      icon: ICON_SET.indexOf(v.icon) >= 0 ? v.icon : ICON_SET.indexOf(f.icon) >= 0 ? f.icon : battery ? 'battery' : null,
       value: valid ? String(v.value) + (battery ? '%' : str(f.unit)) : '—',
       pct: battery && valid ? v.value : 0,
       status: DEVICEAPP_STATUSES.indexOf(v.status) >= 0 ? v.status : 'unknown',
@@ -260,7 +263,8 @@ function deviceAppModel(panel, state) {
   });
   return {
     screen: state.phoneScreen === 'home' ? 'home' : 'app',
-    appName: str(panel.appName, 'Device app'),
+    appName: str(panel.appName, str(panel.brand && panel.brand.app, 'Device app')),
+    brand: panel.brand,
     device: str(panel.device, 'Camera'),
     subtitle: str(panel.subtitle, 'Device health'),
     clock: str(state.clock, '9:41'),
@@ -287,10 +291,13 @@ function deviceAppHomeHTML(m, fresh) {
   [['camera',m.appName],['phone','Calls'],['speaker','Music'],['gear','Settings']].forEach(function(app,index){
     // Decorative phone UI: story steps own navigation, not these app icons.
     h+='<div class="da-launcher-app'+(index===0?' da-launcher-primary':'')+'"><span class="da-launcher-icon" aria-hidden="true">'+
-      '<svg viewBox="0 0 24 24"><use href="#i-'+app[0]+'"/></svg>'+
+      (index===0 && deviceAppBrand(m,true) || FlowIcons.render(app[0]))+
       (index===0 && m.notifications.count?'<i>'+m.notifications.count+'</i>':'')+'</span><span>'+esc(app[1])+'</span></div>';
   });
   return h+'</div>'+(!m.showSources && m.note?'<p class="da-app-note">'+esc(m.note)+'</p>':'');
+}
+function deviceAppBrand(m, compact) {
+  return FlowBrand.render(panelObject(m.brand) ? Object.assign({},m.brand,{app:m.appName}) : m.brand,{compact:!!compact});
 }
 function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh) {
   var m = deviceAppModel(panel, state),
@@ -317,11 +324,11 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh)
     '<div class="deviceapp'+(m.showSources?'':' da-standalone')+'"><div class="da-phone-fit"><div class="da-phone da-phone-'+m.screen+'" data-da-screen="'+m.screen+'">'+
     '<div class="da-statusbar'+(m.date?' da-has-date':'')+'"><span>'+esc(m.clock)+'</span>'+
     (m.date?'<span class="da-date" title="'+esc(m.date)+'">'+esc(m.date)+'</span>':'')+
-    '<span aria-hidden="true">▂▄▆ · ▰</span></div>'+
+    '<span class="da-system-icons" aria-hidden="true">'+FlowIcons.render('signal',{monochrome:true})+FlowIcons.render('battery-full',{monochrome:true})+'</span></div>'+
     '<div class="da-screen da-screen-'+m.screen+(screenFresh?' fresh':'')+'" tabindex="0" aria-label="'+(m.screen==='home'?'Phone home screen':'Device app screen')+'">';
   if(m.screen==='home') h+=deviceAppHomeHTML(m,notificationFresh);
   else {
-    h+='<div class="da-appbar"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg>'+esc(m.appName)+'</div>'+
+    h+='<div class="da-appbar">'+(deviceAppBrand(m,false) || FlowIcons.render('camera')+esc(m.appName))+'</div>'+
       '<div class="da-heading"><span class="da-eyebrow">CAMERA DETAILS</span><h3>'+esc(m.device)+'</h3><span>'+esc(m.subtitle)+'</span></div>'+
       deviceAppNotificationsHTML(m,notificationFresh)+'<div class="da-fields">';
     m.fields.filter(function(f){return f.visible;}).forEach(function (f) {
@@ -352,9 +359,7 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh)
         '</span>' +
         '<span class="da-value">' +
         (f.icon
-          ? '<svg class="da-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
-            f.icon +
-            '"/></svg>'
+          ? FlowIcons.render(f.icon,{className:'da-icon'})
           : '') +
         esc(f.value) +
         '</span>' +
@@ -515,6 +520,8 @@ PanelRegistry.extend('deviceapp', {
 .da-statusbar.da-has-date{gap:calc(8 * var(--da-px));padding-top:calc(10 * var(--da-px));}
 .da-date{min-width:0;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .da-statusbar>span:last-child{flex:none;}
+.da-system-icons{display:flex;align-items:center;gap:calc(4 * var(--da-px));}
+.da-system-icons .fv-icon{width:calc(14 * var(--da-px));height:calc(14 * var(--da-px));}
 .da-screen{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border-radius:calc(10 * var(--da-px));padding:calc(2 * var(--da-px)) calc(3 * var(--da-px)) calc(8 * var(--da-px));}
 .da-screen:focus-visible{outline:calc(2 * var(--da-px)) solid #6875ca;outline-offset:calc(-2 * var(--da-px));}
 .da-appbar{display:flex;align-items:center;gap:calc(7 * var(--da-px));font:600 calc(11 * var(--da-px))/1.4 'Sora',sans-serif;color:#6673c2;padding:calc(3 * var(--da-px)) calc(4 * var(--da-px)) calc(8 * var(--da-px));}
@@ -625,6 +632,7 @@ PanelRegistry.extend('deviceapp', {
 PanelRegistry.extend('deviceapp', {
   references: { nodes: ['sources.*.node'] },
   authoring: {
+    branding: true,
     notifications: true,
     template: {
       title: 'Device app',
@@ -749,6 +757,7 @@ PanelRegistry.extend('deviceapp', {
             [
               ['value', f.kind === 'battery' ? 'num' : 'text'],
               ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
+              ['icon', 'enum', ICON_SET],
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
               ['visible', 'bool'],

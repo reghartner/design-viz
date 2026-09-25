@@ -2,7 +2,7 @@
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
    IIFE. Contains no DOM access, so tests load it under Node via vm. */
 
-var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car','speaker'];
+var ICON_SET = FlowIcons.ids.slice();
 var TINT_SET = ['cmd','auth','data','mqtt','dev'];
 /* Per-step node state is semantic narrative state, never an authored color.
    `base` is the explicit clearing token; null clears too. */
@@ -353,6 +353,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       edgeKeys[ek] = true;
     }
   });
+  FlowBrand.warnings(d.brand, DP + ".brand", warnings);
   var panelIds = {};
   var panelDeclById = {};
   var panelContexts = Object.create(null);
@@ -365,6 +366,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     panelDeclById[p.id] = p;
     if (p.visible != null && typeof p.visible !== 'boolean')
       warnings.push(PP + '.visible: expected true or false — panel starts visible');
+    FlowBrand.warnings(p.brand, PP + ".brand", warnings);
     var descriptor = PanelRegistry.get(p.type);
     if (!descriptor)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PanelRegistry.types().join(' ') + ')');

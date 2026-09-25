@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Flowview</title>
+<title>One story. A shared visual language.</title>
 <!-- INJECTION CONTRACT: replace the contents of the JSON block below (the script tag with id "flowspec")
      with any JSON conforming to contract/authoring-contract.md; make no other edits. The page renders it on load.
      Scripted: tools/inject.py <spec.json> <template.html> <out.html> (anchors on the tag at line start;
@@ -7412,35 +7412,383 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 <script type="application/json" id="flowspec">
 {
   "page": {
-    "__demo": true,
-    "title": "Flowview template — demo spec",
+    "title": "One story. A shared visual language.",
+    "subtitle": "Illustrative company branding and authored device states",
     "skin": "pastel",
     "sections": [
       {
-        "heading": "Replace this spec",
-        "accent": "cyan",
-        "source": "https://example.com/hld/demo#overview",
-        "text": ["This is the built-in demo. Inject your own spec into the flowspec JSON block at the top of this file; the page renders it on load."],
+        "heading": "Cedar Home \u00b7 a doorbell story",
+        "bullets": [
+          "Illustrative behavior, not a product specification.",
+          "Icons are reusable across panels. Company branding is defined once per diagram; panels may override or opt out."
+        ],
         "diagram": {
-          "nodes": {
-            "a": {"title": "Client", "sub": "mobile app", "icon": "phone", "tint": "cmd"},
-            "b": {"title": "API", "sub": "gateway", "icon": "cloud", "tint": "cmd", "link": "https://example.com/hld/demo#api"},
-            "c": {"title": "Broker", "sub": "MQTT", "icon": "antenna", "tint": "mqtt"},
-            "d": {"title": "Device", "sub": "t/1 subscriber", "icon": "chip", "tint": "dev"}
+          "view": "step",
+          "autoplay": false,
+          "brand": {
+            "app": "Cedar Home",
+            "icon": "house",
+            "accent": "#397e70"
           },
-          "rows": [["a", "b", "c", "d"]],
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "icon": "doorbell"
+            },
+            "cloud": {
+              "title": "Cedar services",
+              "icon": "cloud"
+            },
+            "phone": {
+              "title": "Resident",
+              "icon": "phone"
+            }
+          },
+          "rows": [
+            [
+              "doorbell",
+              "cloud",
+              "phone"
+            ]
+          ],
           "edges": [
-            {"from": "a", "to": "b", "kind": "https", "label": "POST /msg"},
-            {"from": "b", "to": "c", "kind": "mqtt", "label": "PUBLISH t/1"},
-            {"from": "c", "to": "d", "kind": "mqtt", "label": "deliver"},
-            {"from": "d", "to": "c", "kind": "mqtt", "ret": true, "label": "PUBACK", "bend": 26, "labelDy": 22}
+            {
+              "from": "doorbell",
+              "to": "cloud",
+              "kind": "https"
+            },
+            {
+              "from": "cloud",
+              "to": "phone",
+              "kind": "https"
+            }
+          ],
+          "panels": [
+            {
+              "id": "app",
+              "type": "deviceapp",
+              "title": "Resident experience",
+              "device": "Porch doorbell",
+              "subtitle": "Health and monitoring",
+              "fields": [
+                {
+                  "id": "power",
+                  "label": "Battery",
+                  "kind": "battery"
+                },
+                {
+                  "id": "temp",
+                  "label": "Temperature",
+                  "icon": "temperature",
+                  "unit": " \u00b0C"
+                },
+                {
+                  "id": "alarm",
+                  "label": "Monitoring",
+                  "icon": "armed"
+                },
+                {
+                  "id": "source",
+                  "label": "Charging source",
+                  "icon": "solar"
+                }
+              ],
+              "initial": {
+                "phoneScreen": "app",
+                "power": {
+                  "value": 78,
+                  "status": "ready",
+                  "icon": "battery-full"
+                },
+                "temp": {
+                  "value": 23,
+                  "status": "ready"
+                },
+                "alarm": {
+                  "value": "Armed",
+                  "status": "ready"
+                },
+                "source": {
+                  "value": "Solar",
+                  "status": "ready"
+                }
+              }
+            },
+            {
+              "id": "camera",
+              "type": "screen",
+              "title": "Front door camera",
+              "scene": "person-through-door",
+              "initial": {
+                "mode": "active",
+                "scenePlayback": "waiting"
+              }
+            },
+            {
+              "id": "desk",
+              "type": "security",
+              "title": "Monitoring team",
+              "site": "Oak House",
+              "scene": "person-through-door",
+              "sensors": [
+                {
+                  "id": "door",
+                  "label": "Front door",
+                  "kind": "door"
+                },
+                {
+                  "id": "camera",
+                  "label": "Porch camera",
+                  "kind": "camera"
+                }
+              ],
+              "initial": {
+                "status": "armed",
+                "operator": "Alex \u00b7 Monitoring agent",
+                "video": "closed",
+                "assessment": "unverified",
+                "door": {
+                  "health": "online",
+                  "alarm": "clear"
+                },
+                "camera": {
+                  "health": "online",
+                  "alarm": "clear"
+                }
+              }
+            },
+            {
+              "id": "battery",
+              "type": "battery",
+              "title": "Power",
+              "initial": {
+                "charge": 78,
+                "source": "solar",
+                "trend": "idle"
+              },
+              "low": 20,
+              "crit": 5
+            },
+            {
+              "id": "temp",
+              "type": "thermo",
+              "title": "Temperature",
+              "min": -20,
+              "max": 80,
+              "bands": [
+                {
+                  "to": 0,
+                  "label": "Cold",
+                  "color": "#588bc4"
+                },
+                {
+                  "to": 45,
+                  "label": "Normal",
+                  "color": "#5b9d83"
+                },
+                {
+                  "to": 80,
+                  "label": "Hot",
+                  "color": "#cf6778"
+                }
+              ],
+              "initial": {
+                "value": 23
+              }
+            }
           ],
           "steps": [
-            {"edge": "a->b", "text": "Client sends the message"},
-            {"edge": "b->c", "text": "API publishes to the broker", "link": "https://example.com/hld/demo#publish"},
-            {"edge": "c->d", "text": "Broker delivers to the subscriber"},
-            {"edge": "d->c", "text": "Device acknowledges"}
-          ]
+            {
+              "id": "normal",
+              "text": "A quiet afternoon. The same Cedar brand and colored state symbols appear across the phone, camera and monitoring desk.",
+              "nodes": [
+                "doorbell",
+                "phone"
+              ]
+            },
+            {
+              "id": "charge",
+              "text": "The battery charges. The author chooses a charging icon without changing the card\u2019s data source or status.",
+              "edge": "doorbell->cloud",
+              "panels": {
+                "app": {
+                  "power": {
+                    "value": 82,
+                    "icon": "battery-charging"
+                  },
+                  "source": {
+                    "value": "Wired",
+                    "icon": "plug"
+                  }
+                },
+                "battery": {
+                  "charge": 82,
+                  "trend": "charging",
+                  "source": "wired"
+                }
+              }
+            },
+            {
+              "id": "alert",
+              "text": "An authored alarm starts the review. Red symbols distinguish an alarm from the green armed state; video review is a separate action.",
+              "edge": "cloud->phone",
+              "panels": {
+                "app": {
+                  "alarm": {
+                    "value": "Reviewing alarm",
+                    "icon": "triggered"
+                  },
+                  "notify": {
+                    "app": "Cedar Home",
+                    "title": "Front door activity",
+                    "text": "A monitoring agent is reviewing the event."
+                  }
+                },
+                "camera": {
+                  "mode": "rec",
+                  "scenePlayback": "playing"
+                },
+                "desk": {
+                  "status": "reviewing",
+                  "video": "reviewing",
+                  "scenePlayback": "playing",
+                  "door": {
+                    "alarm": "triggered"
+                  }
+                }
+              }
+            },
+            {
+              "id": "hot",
+              "text": "A separate thermal condition pauses the camera. The hot icon, value and explanation agree; this does not automatically create another security alarm.",
+              "nodes": [
+                "doorbell"
+              ],
+              "panels": {
+                "app": {
+                  "temp": {
+                    "value": 62,
+                    "icon": "hot"
+                  },
+                  "alarm": {
+                    "value": "Monitoring",
+                    "icon": "armed"
+                  }
+                },
+                "temp": {
+                  "value": 62
+                },
+                "camera": {
+                  "mode": "unavailable",
+                  "reason": "Thermal protection paused the camera."
+                },
+                "desk": {
+                  "status": "armed",
+                  "video": "unavailable",
+                  "videoReason": "Camera paused for temperature.",
+                  "door": {
+                    "alarm": "clear"
+                  }
+                }
+              }
+            },
+            {
+              "id": "recover",
+              "text": "The device cools and returns to service. Rewinding restores each earlier icon along with its values.",
+              "panels": {
+                "app": {
+                  "temp": {
+                    "value": 29,
+                    "icon": "temperature"
+                  },
+                  "power": {
+                    "value": 84,
+                    "icon": "battery-full"
+                  }
+                },
+                "camera": {
+                  "mode": "active",
+                  "scenePlayback": "waiting"
+                },
+                "temp": {
+                  "value": 29
+                },
+                "battery": {
+                  "charge": 84,
+                  "trend": "idle",
+                  "source": "wired"
+                },
+                "desk": {
+                  "video": "closed"
+                }
+              },
+              "nodes": [
+                "doorbell",
+                "phone"
+              ]
+            }
+          ],
+          "layouts": [
+            {
+              "id": "experience",
+              "name": "Customer & monitoring",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "panel": "app",
+                    "x": 0,
+                    "y": 0,
+                    "w": 4,
+                    "h": 16
+                  },
+                  {
+                    "panel": "camera",
+                    "x": 4,
+                    "y": 0,
+                    "w": 4,
+                    "h": 9
+                  },
+                  {
+                    "panel": "battery",
+                    "x": 4,
+                    "y": 9,
+                    "w": 2,
+                    "h": 7
+                  },
+                  {
+                    "panel": "temp",
+                    "x": 6,
+                    "y": 9,
+                    "w": 2,
+                    "h": 7
+                  },
+                  {
+                    "panel": "desk",
+                    "x": 8,
+                    "y": 0,
+                    "w": 4,
+                    "h": 16
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 16,
+                    "w": 12,
+                    "h": 4
+                  },
+                  {
+                    "diagram": true,
+                    "x": 0,
+                    "y": 20,
+                    "w": 12,
+                    "h": 8,
+                    "hidden": true
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "experience"
         }
       }
     ]
@@ -7451,7 +7799,22 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 <!-- DERIVED CATALOG DATA: tools/page_build.py fills this from crossref.json.
      It is deliberately separate from the authored flowspec. -->
 <script type="application/json" id="flowbacklinks">
-{"services": {}}
+{
+  "services": {
+    "Doorbell": [
+      {
+        "href": "../panel-visibility/panel-visibility.html",
+        "title": "Show the right panel at the right moment"
+      }
+    ],
+    "Resident": [
+      {
+        "href": "../panel-visibility/panel-visibility.html",
+        "title": "Show the right panel at the right moment"
+      }
+    ]
+  }
+}
 </script>
 
 <script>

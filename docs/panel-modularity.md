@@ -64,6 +64,23 @@ adds cards and `clear` removes their notification history without clearing other
 panel values. Keep notification behavior in this helper rather than duplicating
 it in each phone surface.
 
+`src/icons/library.js` owns shared colored pictograms. Use
+`FlowIcons.render(id, {className, label, tone, monochrome})` for inline SVG or
+`FlowIcons.glyph(id, {tone, monochrome})` for a group in a 24 × 24 SVG coordinate
+space. Prefer a known semantic ID to a panel-local path dictionary. The frozen
+`FlowIcons.ids` and `registry` supply validation and picker metadata; invalid IDs
+resolve safely. Decorative icons need no label; meaningful standalone icons
+need accessible text. Geometry, charts and scene artwork remain panel-owned.
+See [shared icons](shared-icons.md) for IDs, palettes and the full panel review.
+
+`src/icons/brand.js` resolves `diagram.brand` and `panel.brand`; supported panels
+opt in with `authoring.branding: true`. Panel rendering receives the resolved
+brand, including a local `false` suppression. Use `FlowBrand.render` for a
+shared name/mark or `{compact:true}` for a mark-only watermark. Existing Phone
+monograms remain supported. `src/panels/media.js` validates embedded PNG, JPEG
+and WebP assets for images, app screens and company logos; reuse it instead of
+adding remote URLs or accepting authored SVG markup.
+
 The render result supports `html`, `baseline`, `level`, `glide`, `pulse`,
 `enterBars`, `bars`, `transient`, `settle`, `patch` and `mounted`. These describe
 work for the shared lifecycle, not separate animation loops. Camera screens use
@@ -82,6 +99,11 @@ reads, shared controls, `commit` for a field and `transact` for a mutation plann
 Use those commands so a gesture is one Undo/Redo operation and selection is
 restored consistently. Do not implement another history stack or JSON writer.
 Home uses shared row controls with decorations for its draggable elements.
+Declare icon row columns with `kind:'icon'` to receive the shared visual picker;
+custom editors can wrap their select with `context.controls.iconPicker(select)`.
+The common picker preserves the owning select's change/Undo/Redo behavior and
+form lifetime. `authoring.branding` adds **Company branding** to the inspector
+with diagram-wide inheritance, per-panel overrides and raster upload support.
 
 Custom editor controls register events through `context.listen(target, type,
 callback, options)` and resource cancellation through

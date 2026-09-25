@@ -63,7 +63,7 @@ test('two-way conversations, warning playback, failure branches and reverse jump
   assert.match(host.innerHTML,/data-home-audio="cam"[\s\S]*fva-capture/);
   assert.match(host.innerHTML,/data-home-audio="visitor"[\s\S]*data-sound="speech"/);
   assert.match(host.innerHTML,/data-home-audio="speaker"[\s\S]*data-sound="recorded"/);
-  assert.match(host.innerHTML,/Kitchen speaker/);assert.match(host.innerHTML,/href="#i-speaker"/);
+  assert.match(host.innerHTML,/Kitchen speaker/);assert.match(host.innerHTML,/data-icon="speaker"/);
   render(p,offline[2],host,2);assert.match(host.innerHTML,/Wi-Fi lost/);
   assert.doesNotMatch(host.innerHTML,/data-sound=|hmspotlight|Can I help|Leave the package/);
   render(p,talk[1],host,1);assert.match(host.innerHTML,/Can I help\?/);assert.doesNotMatch(host.innerHTML,/Wi-Fi lost/);
@@ -127,7 +127,9 @@ function editorHarness(){
   const context={source:()=>source,stepper:()=>({path:()=> 'talk',sourceIndex:()=>1}),target:()=>({kind:'step',section:0,index:1}),
     controls:{row:(label,ctl)=>{const row=element();row.label=label;row.appendChild(ctl);return row;},
       action:(label,run)=>{const e=element('button');e.textContent=label;e.run=run;return e;},
-      number:(v,save)=>input('input',v,save),text:(v,save)=>input('input',v,save),select:(options,v,save)=>input('select',v,save)},
+      number:(v,save)=>input('input',v,save),text:(v,save)=>input('input',v,save),
+      select:(options,v,save,allowEmpty)=>{const e=input('select',v,save);e.options=(allowEmpty?['']:[]).concat(options).map(value=>({value,textContent:value}));return e;},
+      iconPicker:input=>input},
     editingBlocked:()=>false,error:message=>lastError=message,inspect(){},listen:(e,k,fn)=>e.events[k]=fn,
     transact(fn){const plan=fn(raw);if(plan.error){lastError=plan.error;return false;}source=plan.text;raw=JSON.parse(source);return true;},
     clipboard:()=>null,select(){},rehighlight(){}};
@@ -148,4 +150,21 @@ test('typed step and initial controls author channels and spotlight while placem
   tree=h.initial();field(tree,'Porch camera initial spotlight').save('on');assert.equal(h.raw().panels[0].initial.cam.spotlight,'on');
   tree=h.initial();const initial=field(tree,'Visitor initial audio output');initial.value='speech';initial.events.change();
   assert.deepEqual(h.raw().panels[0].initial.visitor,{x:100,y:140,audio:{output:'speech'}});assert.equal(h.error(),undefined);
+});
+
+test('Home icon controls author independent initial and step facts while movement preserves them',()=>{
+  const h=editorHarness(),field=(tree,label)=>descendants(tree).find(e=>e.attrs['aria-label']===label);
+  let tree=h.step();field(tree,'Porch camera icon').save('triggered');
+  assert.equal(h.raw().steps[1].panels.home.cam.icon,'triggered');
+  assert.equal(h.raw().steps[1].panels.home.cam.state,'rec');
+  tree=h.step();field(tree,'Visitor icon').save('car');
+  tree=h.step();field(tree,'Visitor x').save(145);
+  assert.deepEqual(h.raw().steps[1].panels.home.visitor,{x:145,y:140,audio:{output:'speech',text:'A delivery for you.'},icon:'car'});
+  tree=h.step();const visibility=field(tree,'Visitor visibility');visibility.value='inherit';visibility.events.change();
+  assert.deepEqual(h.raw().steps[1].panels.home.visitor,{audio:{output:'speech',text:'A delivery for you.'},icon:'car'});
+  tree=h.step();field(tree,'Visitor icon').save('__default__');assert.equal(h.raw().steps[1].panels.home.visitor.icon,null);
+  tree=h.step();field(tree,'Visitor icon').save(null);assert.equal(h.raw().steps[1].panels.home.visitor.icon,undefined);
+  tree=h.initial();field(tree,'Porch camera initial icon').save('battery-full');
+  assert.equal(h.raw().panels[0].initial.cam.icon,'battery-full');
+  assert.equal(h.error(),undefined);
 });

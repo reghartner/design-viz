@@ -9,12 +9,13 @@ var FlowviewCompatibility = (function(){
   var version = '0.1.0', contract = '1', baseline = '0.1.0';
   var features = Object.create(null);
   var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.appscreens":{"label":"App screens panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
+  var sharedIconIds = ["battery","battery-full","battery-low","battery-charging","plug","solar","temperature","hot","cold","snowflake","alarm","armed","disarmed","triggered","wifi","wifi-off","cloud-off","signal","microphone","microphone-muted","recorded","chime","siren","detection","headset","door","motion","smoke","water","sensor","police","fire","medical","security","monitor","camera-off","person"];
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
-    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility' };
+    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -44,6 +45,15 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if(d.brand)used['media.branding']=true;
+      function icons(value,inStep){
+        if(!value || typeof value!=='object')return;
+        Object.keys(value).forEach(function(key){
+          if(key==='icon' && typeof value[key]==='string' && (inStep || sharedIconIds.indexOf(value[key])>=0))used['media.shared-icons']=true;
+          else if(value[key] && typeof value[key]==='object')icons(value[key],inStep || key==='steps');
+        });
+      }
+      icons(d,false);
       if((Array.isArray(d.floats)?d.floats:[]).some(function(f){return f && (f.x!=null || f.y!=null);}))used['layout.free-nodes']=true;
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && (e.fromPort!=null || e.toPort!=null);}))used['layout.edge-ports']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
@@ -51,6 +61,7 @@ var FlowviewCompatibility = (function(){
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;
         used['panel.'+p.type]=true;
+        if(p.brand && (p.type!=='phone' || p.brand.logoImage || p.brand.icon))used['media.branding']=true;
         if(p.visible!=null)used['flow.panel-visibility']=true;
         if(p.type==='deviceapp'){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};

@@ -179,14 +179,11 @@ test('mapEditorCollect drops blank pairs, rejects duplicates, and empties to nul
   assert.strictEqual(B.mapEditorCollect([{key: '', value: ''}]).obj, null);
 });
 
-test('phone setup exposes brand fields and drops cleared values like timeline cadence', () => {
-  const expected = ['brand', 'objf', {cols: [{k: 'app'}, {k: 'logo'}, {k: 'accent'}, {k: 'bg'}, {k: 'fg'}]}];
-  assert.deepStrictEqual(plain(B.PANEL_SETUP_FIELDS.phone), [expected, ['initial', 'json']]);
-  const shape = B.PANEL_SETUP_FIELDS.phone[0][2];
-  const base = {app: 'Ring', logo: 'R', accent: '#1D6EF2'};
-  assert.deepStrictEqual(plain(B.objFieldsCollect(shape, base, {app: 'Ring', logo: '', accent: '', bg: '#abc', fg: ''})),
-    {obj: {app: 'Ring', bg: '#abc'}});
-  assert.strictEqual(B.objFieldsCollect(shape, base, {app: '', logo: '', accent: '', bg: '', fg: '  '}).obj, null);
+test('phone setup uses shared branding while retaining typed starting state', () => {
+  assert.equal(B.PanelRegistry.get('phone').authoring.branding,true);
+  assert.equal(B.PanelRegistry.get('phone').authoring.initialFields,true);
+  assert.deepStrictEqual(plain(B.PANEL_SETUP_FIELDS.phone), [['initial', 'json']]);
+  assert.deepStrictEqual(plain(B.panelPatchFields({type:'phone'}).find(f=>f[0]==='clock')),['clock','text']);
 });
 
 test('objFieldsCollect keeps unknown keys, removes on all-empty, and validates like a row', () => {

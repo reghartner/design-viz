@@ -15,8 +15,9 @@ interaction coverage, independent review, and passing CI before merge.
 - [x] **4. Visibility timing** — Captioned start/end controls for connections,
   bullets, and contract rows. Explain and test timing on alternate paths.
   Merged in [PR #222](https://github.com/reghartner/design-viz/pull/222).
-- [ ] **5. Nested prose** — Select, add, indent/outdent, and reorder nested
+- [x] **5. Nested prose** — Select, add, indent/outdent, and reorder nested
   bullets; small formatting helpers using the existing safe text syntax.
+  Merged in [PR #223](https://github.com/reghartner/design-viz/pull/223).
 - [ ] **6. Drilldown mappings** — Parent/child step selectors replace mapping
   JSON, with missing-target feedback and a preview action.
 - [ ] **7. Temporary state** — Carry-forward / this-step-only controls for

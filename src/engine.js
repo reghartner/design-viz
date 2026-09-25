@@ -623,7 +623,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var id = prefix + '-e' + i;
     var k = protos[e.kind] ? e.kind : 'int';
     edgeIds[e.from + '->' + e.to] = {domId:id, e:e, kind:k, idx:i};
-    if (L.routing === 'lanes') s += '<path class="lane-bridge" stroke="'+SK.bg+'" d="'+edgePath(e,L,ADJ[i])+'"/>';
+    if (L.routing === 'lanes') s += '<path class="lane-bridge" data-dv-edge="'+i+'"'+fragmentAttrs(e)+' stroke="'+SK.bg+'" d="'+edgePath(e,L,ADJ[i])+'"/>';
     s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + (e.delta === true ? ' dvd' : '') + '"' +
          ' data-dv-edge="' + i + '"' +
          fragmentAttrs(e) + ' style="' + protocolColorStyle(protos, k) +

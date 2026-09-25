@@ -37,6 +37,15 @@ WORKBENCH_TEMPLATES = [
 
 
 def workbench_templates() -> str:
+    def default_routing(page):
+        # New projects start without lanes. Only template copies change; opening
+        # authored specs or the Canon library retains their explicit routing.
+        for section in page.get("blocks", page.get("sections", [])):
+            if isinstance(section.get("diagram"), dict):
+                section["diagram"].pop("routing", None)
+            for tab in section.get("tabs", []):
+                default_routing(tab)
+
     entries = []
     for template in WORKBENCH_TEMPLATES:
         entry = {key: value for key, value in template.items() if key not in ("source", "title")}
@@ -45,6 +54,7 @@ def workbench_templates() -> str:
         if "title" in template:
             entry["spec"]["page"]["title"] = template["title"]
         entry["spec"].get("page", entry["spec"])["skin"] = "pastel"
+        default_routing(entry["spec"].get("page", entry["spec"]))
         entries.append(entry)
     return json.dumps(entries, ensure_ascii=True).replace("<", "\\u003c")
 

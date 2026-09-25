@@ -107,6 +107,28 @@ function environment(){
 const home=()=>({nodes:{},rows:[],panels:[{id:'home',type:'homemap',outline:{w:300,h:164,future:'keep'}}],steps:[{panels:{home:{}}}]});
 const named=(guide,name)=>guide.querySelectorAll('.obj-field').find(label=>label.textContent===name)?.querySelector('input');
 
+test('diagram routing edits the selected section or bare diagram with exact undo and retired controls',()=>{
+  for(const bare of [false,true]){
+    const e=environment(),diagram={nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a'],['b']],edges:[{from:'a',to:'b',bend:20}]};
+    const raw=bare?diagram:{page:{blocks:[{heading:'Unchanged',diagram:{...diagram,routing:'lanes'}},{tabs:[{label:'Details',sections:[{heading:'Target',diagram}]}]}]}};
+    const h=e.mount(raw);h.session.target={kind:'section',section:bare?0:1};h.inspector.render();
+    const control=()=>h.guide.querySelector('select[aria-label="Edge routing"]');
+    const get=()=>bare?JSON.parse(h.text):JSON.parse(h.text).page.blocks[1].tabs[0].sections[0].diagram;
+    const before=h.text;assert.equal(control().value,'curves');
+    control().value='lanes';control().fire('change');h.flush();assert.equal(get().routing,'lanes');
+    assert.deepEqual(get().edges,diagram.edges);assert.deepEqual(get().rows,diagram.rows);
+    if(!bare)assert.deepEqual(JSON.parse(h.text).page.blocks[0],raw.page.blocks[0]);
+    const on=h.text,retired=control();
+    h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+    h.session.redo();assert.equal(h.text,on);
+    h.session.target={kind:'section',section:bare?0:1};
+    h.inspector.render();retired.value='curves';retired.fire('change');assert.equal(h.text,on);
+    control().value='curves';control().fire('change');h.flush();assert.equal(get().routing,'curves');
+    h.session.undo();assert.equal(h.text,on);
+    h.inspector.destroy();
+  }
+});
+
 test('commit helper keeps blur opt-in, textarea Enter native, unchanged policy and rejected retry explicit',()=>{
   const C={};vm.runInNewContext(readSource('workbench/controls.js'),C);
   function control(tag,options){

@@ -69,7 +69,6 @@ function catalogGraphSeed(catalog, refs, connect, diagram, edgeKind){
     if(next.rows.length===1 && next.rows[0].length===0)next.rows=[];
     for(var i=0;i<ordered.length;i+=4)next.rows.push(ordered.slice(i,i+4));
   }
-  if(!diagram)next.routing='lanes';
   return {diagram:next,created:created,reused:reused,edges:addedEdges.length,placed:newIds.length};
 }
 

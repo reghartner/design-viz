@@ -15,6 +15,7 @@ test('catalog seed scopes and deduplicates declared dependencies and API provide
   const raw=catalog(),before=JSON.stringify(raw);
   const seed=plain(B.catalogGraphSeed(raw,[ref('camera'),ref('recording'),ref('notify')],true));
   assert.equal(seed.created,3);assert.equal(seed.edges,2);
+  assert.equal(seed.diagram.routing,undefined);assert.notEqual(B.layout(seed.diagram).routing,'lanes');
   assert.deepEqual(seed.diagram.edges,[{from:'camera-1',to:'recording-1',kind:'catalog',label:'depends on'},{from:'camera-1',to:'notify-1',kind:'catalog',label:'uses Notify API'}]);
   assert.deepEqual(seed.diagram.rows,[['camera-1','recording-1','notify-1']]);
   assert.equal(seed.diagram.nodes['camera-1'].binding.entityRef,ref('camera'));
@@ -62,4 +63,13 @@ test('catalog legend preserves custom protocols and works with a bare diagram',(
   assert.equal(after.protocols['catalog-1'].label,'Catalog relationship');
   const bare=B.planCatalogGraph(JSON.stringify(d),d,0,catalog(),refs,true),page=B.normalize(JSON.parse(bare.text));
   assert.equal(page.protocols.catalog.label,'Catalog relationship');assert.deepEqual(plain(B.validate(page)),{errors:[],warnings:[]});
+});
+
+test('adding catalog services retains explicitly authored routing',()=>{
+  for(const routing of ['curves','lanes']){
+    const existing={routing,nodes:{authored:{title:'Existing'}},rows:[['authored']]};
+    const before=JSON.stringify(existing);
+    const added=B.catalogGraphSeed(catalog(),[ref('camera'),ref('recording')],true,existing);
+    assert.equal(added.diagram.routing,routing);assert.equal(JSON.stringify(existing),before);
+  }
 });

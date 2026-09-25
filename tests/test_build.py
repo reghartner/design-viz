@@ -83,6 +83,13 @@ class BuildTests(unittest.TestCase):
             if "title" in info:
                 expected["page"]["title"] = info["title"]
             expected.get("page", expected)["skin"] = "pastel"
+            # Compare authored content except routing on actual section diagrams.
+            blocks = expected.get("page", expected).get("blocks", expected.get("page", expected).get("sections", []))
+            for block in blocks:
+                sections = [section for tab in block.get("tabs", []) for section in tab["sections"]] if "tabs" in block else [block]
+                for section in sections:
+                    if "diagram" in section:
+                        section["diagram"].pop("routing", None)
             self.assertEqual(entry["spec"], expected)
             self.assertEqual(entry["name"], info["name"])
             self.assertTrue(entry["desc"])

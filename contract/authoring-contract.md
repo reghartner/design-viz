@@ -455,6 +455,13 @@ bounding-box rule applies at every level.
 
 ### rows — left-to-right slots (no coordinates)
 
+Diagrams default to **no lanes** (`"curves"` or omitted `routing`), including
+catalog seeds, Honeycomb imports, and new projects from built-in templates.
+In the workbench, select the section heading (or its Outline entry), then use
+**Inspect → Edge routing → No lanes (default) / Lanes**. This diagram-level
+setting applies to every view; step story-lane labels are separate. Existing
+specs retain their explicit routing when opened or rebuilt.
+
 Optional `diagram.routing: "lanes"` routes connectors along reserved tracks
 between rows and channels around cards. It spreads ports and scores crossings
 and coincident segments; dense graphs can still cross, with visual breaks at

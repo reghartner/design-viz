@@ -483,6 +483,7 @@ function panelOrder(panels) {
 
 function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
   var folded = foldPanelStates(d);
+  var visibility = foldPanelVisibility(d);
   var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
   var hosts = {};
   panelOrder(d.panels).forEach(function (p) {
@@ -503,7 +504,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     (primaryHost && p.id === (primaryId || d.primaryPanel) ? primaryHost : asideEl).appendChild(
       card
     );
-    hosts[p.id] = { panel: p, body: body };
+    hosts[p.id] = { panel: p, body: body, card: card };
     /* Homemap ambient state precedes step zero; other widgets keep their
        established first-folded-step preview. */
     var view = PanelViews.get(p.type),
@@ -527,6 +528,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     },
     setDiagram: function (next) {
       folded = foldPanelStates(next);
+      visibility = foldPanelVisibility(next);
       traceNavigation = (next.steps || []).length && next.view !== 'ambient-only';
     },
     setStep: function (i, animate, ambient) {
@@ -537,6 +539,17 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
         var view = PanelViews.get(panel.type),
           options = view ? view.options : {};
         var homeAmbient = ambient && options.ambientInitial;
+        // Ambient is an overview of every panel. Layout-level hidden tiles
+        // remain hidden independently. Keep attached playback controls usable.
+        var shown = ambient || (visibility[pid] || [])[i] !== false;
+        var card = hosts[pid].card;
+        card.classList.toggle('panel-step-hidden', !shown);
+        Array.prototype.forEach.call(card.children, function(child){
+          if (!child.classList.contains('pbody') && !child.classList.contains('ptitle')) return;
+          child.inert = !shown;
+          if (shown) child.removeAttribute('aria-hidden');
+          else child.setAttribute('aria-hidden', 'true');
+        });
         renderPanelBody(
           hosts[pid].body,
           panel,
@@ -544,7 +557,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
           skin,
           options.historyRequiresSteps && !traceNavigation ? [] : states,
           homeAmbient ? -1 : si,
-          animate
+          animate && shown
         );
       });
     },

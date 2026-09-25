@@ -580,6 +580,30 @@ workbench editing, failure examples and the complete teaching seed. New exports
 advertise `media.audio` / `media.spotlight` so older installed renderers can warn
 about unsupported capabilities.
 
+### Whole-panel visibility
+
+Every panel accepts `visible: false` to start hidden in step mode; omission
+starts shown. Set `panelVisibility: {"<panel-id>": true|false}` on a step to
+show or hide the whole panel. Assignments carry forward along the selected
+path; omission inherits that path’s previous value. This is separate from
+`steps[].panels` content patches and Device App card visibility.
+
+```json
+{"id":"notify", "text":"The resident receives a notification",
+ "panelVisibility":{"resident-phone":true,"door-camera":false}}
+```
+
+The workbench exposes **Starting visibility** in each panel inspector and
+**Panel changes → Panel visibility → Show / Hide / Inherit** when inspecting a
+step. Every declared panel is listed, including those without a content patch.
+Inherit removes this step’s visibility assignment; use Show to reverse a
+previous Hide. Hidden panels preserve their space and continue receiving state
+updates. Attached playback controls remain usable. Layout-hidden panels stay
+hidden regardless of step assignments. Ambient shows all panels included in the
+view. Steps skipped by a view still update visibility; alternate paths fold
+independently. Shared step assignments affect every path using that step.
+Compatibility metadata advertises `flow.panel-visibility`.
+
 ### panels — synchronized inspector widgets
 
 `"panels": [...]` at the diagram level declares inspector widgets rendered in

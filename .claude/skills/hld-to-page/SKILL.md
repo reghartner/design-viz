@@ -48,6 +48,11 @@ For a small edit, update the affected story/ledger rows rather than restarting.
   and Inherit. Audio is a whole snapshot, not per-property inheritance. Imported
   carry + `enterOnce` pairs retain both assignments during ordinary value edits;
   an explicit duration choice keeps the temporary value and replaces the pair.
+  Whole panels use declaration `visible:false` and step `panelVisibility:{id:false|true}`.
+  The inspector exposes Starting visibility and per-step Show / Hide / Inherit.
+  Visibility carries along each path, including skipped stops; hidden panels keep
+  space and receive state updates. Layout-hidden panels stay hidden; ambient
+  shows all included panels. Do not confuse this with Device App card visibility.
   Local drilldowns expose parent-event → child-path/event rows and a saved-target
   preview. Mapping omissions inherit detail defaults; explicit null suppresses an
   inherited default. Imported numeric child positions retain their type until edited.

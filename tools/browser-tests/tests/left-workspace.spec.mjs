@@ -75,7 +75,7 @@ test('wide step inspectors share space with nested panel controls and retain the
   const story=await page.locator('.step-form-story').boundingBox(),panels=await page.locator('.step-form-panels').boundingBox();
   expect(panels.x).toBeGreaterThan(story.x);expect(Math.abs(panels.y-story.y)).toBeLessThan(2);
   const sourceBefore=await page.locator('#src').inputValue();
-  const fold=page.locator('.step-form-panels details').first();await fold.evaluate(e=>{e.open=true;});
+  const fold=page.locator('.step-form-panels .panel-step-group');await fold.evaluate(e=>{e.open=true;});
   await page.locator('#editor-tab-json').click();await page.locator('#editor-tab-inspect').click();await expect(fold).toHaveAttribute('open','');
   await expect(page.locator('#src')).toHaveValue(sourceBefore);
   await testInfo.attach('wide-step-editor',{body:await page.screenshot(),contentType:'image/png'});

@@ -49,3 +49,21 @@ function foldPanelStates(d){
   });
   return out;
 }
+
+/* Visibility belongs to the panel frame, not a widget's state schema. Fold
+   the selected path in full, including stops omitted by the current view. */
+function foldPanelVisibility(d){
+  var out = Object.create(null);
+  (d.panels || []).forEach(function(panel){
+    if (!panel || !panel.id) return;
+    var visible = panel.visible !== false;
+    out[panel.id] = (d.steps || []).map(function(step){
+      var patch = step && step.panelVisibility;
+      if (specObject(patch) && Object.prototype.hasOwnProperty.call(patch, panel.id) && typeof patch[panel.id] === 'boolean')
+        visible = patch[panel.id];
+      return visible;
+    });
+    if (!out[panel.id].length) out[panel.id].push(visible);
+  });
+  return out;
+}

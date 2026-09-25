@@ -153,6 +153,7 @@ var BUILDER_GUIDES = {
       ['lane', 'lane pill on the caption line — declare colors in page.lanes'],
       ['nodes', 'node ids to light directly (allows an edgeless step)'],
       ['tone', 'node-color claims: {"gateway": "alert"} — alert warn ok dim; base (or null) clears; folds forward across steps'],
+      ['panelVisibility', 'whole panels: {"<panel id>": true|false}; omission inherits the selected path'],
       ['panels', 'sparse widget patches: {"<panel id>": {..only what changed..}}'],
       ['link', 'permalink URL — source ↗ on the caption line']
     ]

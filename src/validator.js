@@ -363,6 +363,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (panelIds[p.id]) errors.push(PP + '.id: duplicate panel id "' + p.id + '"');
     panelIds[p.id] = true;
     panelDeclById[p.id] = p;
+    if (p.visible != null && typeof p.visible !== 'boolean')
+      warnings.push(PP + '.visible: expected true or false — panel starts visible');
     var descriptor = PanelRegistry.get(p.type);
     if (!descriptor)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PanelRegistry.types().join(' ') + ')');
@@ -388,6 +390,15 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     var nds = stepNodes(st);
     var patch = stepPanelPatch(st);
     var tonePatch = stepTonePatch(st);
+    var visibility = st && st.panelVisibility;
+    if (visibility != null){
+      var VP = DP + '.steps[' + ti + '].panelVisibility';
+      if (!specObject(visibility)) warnings.push(VP + ': expected an object mapping panel IDs to true or false — ignored');
+      else Object.keys(visibility).forEach(function(pid){
+        if (!Object.prototype.hasOwnProperty.call(panelDeclById, pid)) warnings.push(VP + ': unknown panel id "' + pid + '" — ignored');
+        else if (typeof visibility[pid] !== 'boolean') warnings.push(VP + '.' + pid + ': expected true or false — inheriting previous visibility');
+      });
+    }
     var hasToneField = !!(st && Object.prototype.hasOwnProperty.call(st, 'tone'));
     if (st && st.id != null){
       if (typeof st.id !== 'string')
@@ -396,8 +407,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(DP + '.steps[' + ti + '].id: duplicate step id "' + st.id + '" — deep links resolve to the first');
       else stepIds[st.id] = true;
     }
-    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch)
-      warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, or panels, or tone — give it something to show');
+    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch && !specObject(visibility))
+      warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, panels, tone, or panelVisibility — give it something to show');
     keys.forEach(function(k){
       if (!edgeKeys[k]) warnings.push(DP + '.steps[' + ti + ']: "' + k + '" matches no edge (format "from->to") — skipped');
     });

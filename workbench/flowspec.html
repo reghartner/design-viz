@@ -1826,6 +1826,8 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .vocabulary-control details{min-width:0;}
 
 .prose-editor{display:grid;gap:6px;min-width:0}.prose-toolbar{display:flex;flex-wrap:wrap;gap:4px}.prose-toolbar button{font-size:11px;padding:5px 7px}.prose-link{display:flex;gap:4px;min-width:0}.prose-link input{flex:1;min-width:0}.prose-link button{flex:none}
+
+.detail-mappings{display:grid;gap:10px;margin:10px 0}.mapping-row{min-width:0;border:1px solid var(--bdr);border-radius:8px;padding:10px}.mapping-row legend{font-size:11px;font-weight:700;padding:0 4px}.mapping-error:empty{display:none}.mapping-error{color:var(--warn,#b45309)}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -8497,7 +8499,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
         <dl class="human-guide-glossary"><dt>Page</dt><dd>The whole document, with one or more sections and optional tabs.</dd><dt>Section</dt><dd>One diagram, its panels, and its timeline.</dd><dt>Node / connection</dt><dd>An actor and a directed communication between actors.</dd><dt>Step / path</dt><dd>A moment in the story and the sequence of moments for an outcome.</dd><dt>View</dt><dd>An arrangement of the same section for an audience. It can show fewer panels and fewer stops.</dd></dl>
         <p>The left rail opens <b>Inspect</b>, <b>Steps</b>, <b>Outline</b>, <b>JSON</b>, or <b>File</b> beside it. Each fills the editor; the preview stays on the right. Drag the visible divider right for more editing room. <b>File → Workspace preferences</b> contains <b>Focus workspace</b> and <b>Reset editor width</b>. The top toolbar keeps <b>Add to diagram</b>, <b>Undo</b>, <b>Redo</b>, <b>User guide</b>, and <b>Save</b> available. Use <b>Outline</b> (<kbd>⌘/Ctrl K</kbd>) to find objects across sections and tabs. Canvas selection updates Inspect without switching away from another tool.</p><p>The Flowview wordmark and <b>← New / open</b> return home. Browser Back and Forward work between entry screens and the editor. <b>Continue</b> brings back your current project.</p>
       </section>
-      <section id="hg-connect" tabindex="-1"><p class="human-guide-eyebrow">03 / NODES & CONNECTIONS</p><h3>Arrange the actors. Make each connection explain itself.</h3><p><strong>Rows</strong> keep nodes ordered left to right. Drag a node to another row or position to reorganize the flow. For arbitrary placement, select the node and choose <b>float → Free placement</b>, then drag it anywhere or adjust <b>Float X / Y</b>. Choose an automatic float position or return it to rows when you want automatic placement again.</p><p>To draw a connection, <b>Alt/Option-click a source, then click a destination</b>. You can also use <b>Connect from this node</b> in the inspector, or <b>Add to diagram → Connection</b>. A preview arrow shows where you are connecting. <kbd>Esc</kbd> cancels. Connections stay within a section; an existing ordinary connection is not duplicated.</p><p>Select the connection to edit its label, <b>Connection type</b>, and arrow behavior. All built-in protocols are available. Use <b>New connection type…</b> for a custom name/color; creation also assigns it to this connection. <b>Edit connection type</b> updates its name/color everywhere in the document. Step inspectors provide the matching <b>Story lane</b> and <b>New lane…</b> controls. Display-name edits preserve IDs and advanced palette colors; setting a color replaces that palette. <b>Exit side</b> and <b>Entry side</b> choose its attachment edges; the position percentage moves an endpoint along that side. Use these when automatic routing obscures a relationship.</p><p>Click any bullet or subpoint to edit it directly. <b>Add sibling</b> and <b>Add subpoint</b> grow the list; <b>Indent</b>, <b>Outdent</b>, and <b>Move point up/down</b> move the whole subtree in one undoable edit. The Outline includes every nested point. Prose textareas offer <b>Bold</b>, <b>Italic</b>, <b>Code</b>, <b>Code block</b>, and a URL field with <b>Insert link</b>. Select text before formatting. Enter and Tab keep their normal text-editing behavior.</p><p>Connections, bullets, and contract fields have <b>Visibility by path position</b> in their inspector. Choose <b>Show from position</b> and <b>Hide starting at position</b>, using the full story’s captions as a guide. These one-based positions apply on every alternate path, even if a view hides some stops; they stay in place when you reorder steps. <b>Caption path</b> previews the other path’s captions. The current-position buttons use the full path position. Ambient mode shows everything.</p><p><b>Fit width</b> uses the available width; <b>Readable</b> preserves node readability and lets you pan horizontally when the board overflows. These controls change your viewing scale, not the authored node positions.</p><aside class="human-guide-tip"><strong>Give a large process its own detail.</strong> A node’s <b>Create detail flow</b> starts a drilldown into another section. Readers keep context through the overview map and breadcrumbs. A pointer to another diagram is a separate document handoff, useful for an independently maintained process.</aside>
+      <section id="hg-connect" tabindex="-1"><p class="human-guide-eyebrow">03 / NODES & CONNECTIONS</p><h3>Arrange the actors. Make each connection explain itself.</h3><p><strong>Rows</strong> keep nodes ordered left to right. Drag a node to another row or position to reorganize the flow. For arbitrary placement, select the node and choose <b>float → Free placement</b>, then drag it anywhere or adjust <b>Float X / Y</b>. Choose an automatic float position or return it to rows when you want automatic placement again.</p><p>To draw a connection, <b>Alt/Option-click a source, then click a destination</b>. You can also use <b>Connect from this node</b> in the inspector, or <b>Add to diagram → Connection</b>. A preview arrow shows where you are connecting. <kbd>Esc</kbd> cancels. Connections stay within a section; an existing ordinary connection is not duplicated.</p><p>Select the connection to edit its label, <b>Connection type</b>, and arrow behavior. All built-in protocols are available. Use <b>New connection type…</b> for a custom name/color; creation also assigns it to this connection. <b>Edit connection type</b> updates its name/color everywhere in the document. Step inspectors provide the matching <b>Story lane</b> and <b>New lane…</b> controls. Display-name edits preserve IDs and advanced palette colors; setting a color replaces that palette. <b>Exit side</b> and <b>Entry side</b> choose its attachment edges; the position percentage moves an endpoint along that side. Use these when automatic routing obscures a relationship.</p><p>Click any bullet or subpoint to edit it directly. <b>Add sibling</b> and <b>Add subpoint</b> grow the list; <b>Indent</b>, <b>Outdent</b>, and <b>Move point up/down</b> move the whole subtree in one undoable edit. The Outline includes every nested point. Prose textareas offer <b>Bold</b>, <b>Italic</b>, <b>Code</b>, <b>Code block</b>, and a URL field with <b>Insert link</b>. Select text before formatting. Enter and Tab keep their normal text-editing behavior.</p><p>Connections, bullets, and contract fields have <b>Visibility by path position</b> in their inspector. Choose <b>Show from position</b> and <b>Hide starting at position</b>, using the full story’s captions as a guide. These one-based positions apply on every alternate path, even if a view hides some stops; they stay in place when you reorder steps. <b>Caption path</b> previews the other path’s captions. The current-position buttons use the full path position. Ambient mode shows everything.</p><p><b>Fit width</b> uses the available width; <b>Readable</b> preserves node readability and lets you pan horizontally when the board overflows. These controls change your viewing scale, not the authored node positions.</p><aside class="human-guide-tip"><strong>Give a large process its own detail.</strong> A node’s <b>Create detail flow</b> starts a drilldown into another section. Readers keep context through the overview map and breadcrumbs. In <b>Domain detail</b>, apply a local child section, then map <b>When parent event</b> to a <b>Child path</b> and <b>Child event</b>. Valid row edits save directly; <b>Preview mapping</b> opens the saved child position, even when that view normally hides the stop. Unset choices inherit the detail entry defaults. Imported numeric positions and advanced fields stay intact; <b>Advanced mapping JSON</b> remains available. Apply changed entry defaults before editing mappings. Choosing another child section or target type resets its entry position, mappings, and boundary ports; unrelated metadata is retained. A pointer to another diagram is a separate document handoff, useful for an independently maintained process.</aside>
       </section>
       <section id="hg-steps" tabindex="-1"><p class="human-guide-eyebrow">04 / STEPS & PLAYBACK</p><h3>A step is a change, not a screenshot.</h3><p>Use <b>Steps</b> to select, search, append, duplicate, or move beats earlier and later. A useful caption explains what changed and why: “The recording service stores the clip before notifying the resident.” Captions and prose support backticks for inline code and triple backticks for code blocks; node labels stay plain text.</p><p><b>ADD TO STEP</b> selects the nodes, edges, and panels involved in a beat. Finish this mode before trying to edit or connect objects normally. Panel fields describe what changes at that beat. A value you do not change usually carries forward from earlier steps on the selected path. The <b>Effective state · all panels</b> inspector explains whether a value is initial, set here, inherited, or transient.</p><p>Use the numbered circles and previous/next controls to walk the story. Play starts automatic advancement; Pause holds the current beat. Under <b>Playback settings</b>, choose the opening view and whether it should autoplay. The editor starts paused even when the exported viewer is configured to autoplay. Ambient view animates the overall diagram; step view follows one path.</p><p>You can color an individual step circle to mark a phase change without making an alternate path. Use a branch only when the outcome or sequence actually differs.</p>
       </section>
@@ -11432,7 +11434,7 @@ function validateDetails(page, errors, warnings){
       function checkTarget(t,label){
         if(!specObject(t)){errors.push(label+': expected {step, path?}');return;}
         if(child){
-          var path=t.path || detail.path || diagramPathList(child)[0].id;
+          var path=t.path || diagramPathList(child)[0].id;
           var resolved=resolveSourceStep(child,path,t.step);
           if(!resolved || (t.step!=null && resolved.sourceIndex<0))errors.push(label+': unknown child step or path');
         }
@@ -11442,7 +11444,8 @@ function validateDetails(page, errors, warnings){
         if(!specObject(detail.stepMap))errors.push(where+'.stepMap: expected a map of parent step IDs to child targets');
         else Object.keys(detail.stepMap).forEach(function(key){
           if(!(s.diagram.steps || []).some(function(st){return st.id===key;}))errors.push(where+'.stepMap.'+key+': unknown parent step ID');
-          checkTarget(detail.stepMap[key],where+'.stepMap.'+key);
+          var mapped=detail.stepMap[key];
+          checkTarget(specObject(mapped)?Object.assign({path:detail.path,step:detail.step},mapped):mapped,where+'.stepMap.'+key);
         });
       }
       if(detail.ports!=null){
@@ -31160,6 +31163,40 @@ function proseFormatEdit(value,start,end,kind,url){
   }else return {error:'Unknown prose format.'};
   return {text:text.slice(0,a)+before+chosen+after+text.slice(b),start:a+before.length,end:a+before.length+chosen.length};
 }
+/* ---- src/workbench/commands/detail-mapping.js ---- */
+/* Edit one mapping without rebuilding the detail or its advanced targets. */
+function planDetailMapping(text,raw,target,edit,expected){
+  var path=builderTargetPath(raw,target),node=path && specValueAt(raw,path),detail=node && node.detail;
+  if(target.kind!=='node' || !specObject(detail))return {error:'Apply a local detail target first.'};
+  if(expected!==undefined && JSON.stringify(detail)!==expected)return {error:'The detail changed. Select the node again.'};
+  var page=normalize(raw),child=detailTarget(page,detail);
+  if(!child || !child.section.diagram)return {error:'Choose a local detail section first.'};
+  var next=builderClone(detail);
+  if(edit.action==='replace'){
+    if(edit.value==null)delete next.stepMap;else if(specObject(edit.value))next.stepMap=edit.value;
+    else return {error:'Mapping JSON must be an object of parent IDs to targets.'};
+  }else{
+    if(next.stepMap!=null && !specObject(next.stepMap))return {error:'Repair the mapping object in Advanced mapping JSON first.'};
+    var map=Object.assign(Object.create(null),next.stepMap || {});
+    if(edit.action==='remove')delete map[edit.key];
+    else if(edit.action==='write'){
+      var rec=specSectionPaths(raw)[target.section],d=specValueAt(raw,rec.diagram);
+      if(typeof edit.parent!=='string' || !(d.steps || []).some(function(s){return s.id===edit.parent;}))return {error:'Choose an existing parent step ID.'};
+      if(edit.parent!==edit.key && Object.prototype.hasOwnProperty.call(map,edit.parent))return {error:'This parent event already has a mapping.'};
+      if(edit.key!=null && !Object.prototype.hasOwnProperty.call(map,edit.key))return {error:'This mapping no longer exists.'};
+      var row=edit.key==null?{}:map[edit.key];
+      if(!specObject(row))return {error:'Repair this target in Advanced mapping JSON or remove it.'};
+      row=Object.assign({},row);
+      Object.keys(edit.changes || {}).forEach(function(k){
+        if(k!=='path' && k!=='step')return;
+        if(edit.changes[k]===undefined)delete row[k];else row[k]=edit.changes[k];
+      });
+      if(edit.key!=null)delete map[edit.key];map[edit.parent]=row;
+    }else return {error:'Unknown mapping action.'};
+    if(Object.keys(map).length)next.stepMap=map;else delete next.stepMap;
+  }
+  return planSetNodeDetail(text,raw,target.section,target.id,next);
+}
 /* ---- src/workbench/commands/contracts.js ---- */
 /* Contract-block authoring; raw addresses preserve page wrappers and tabs. */
 function planAddContract(text,raw,section,copy){
@@ -32998,6 +33035,72 @@ function createVisibilityControl(options){
   });
   return wrap;
 }
+/* ---- src/workbench/detail-mapping.js ---- */
+/* Local detail rows expose stable IDs while keeping imported null/position
+   references and presentation metadata unchanged until explicitly edited. */
+function createDetailMappingControl(options){
+  var doc=options.document,c=options.controls,detail=options.detail,parent=options.parent || {},child=options.child || {};
+  var root=doc.createElement('div');root.className='detail-mappings';
+  var map=specObject(detail.stepMap)?detail.stepMap:{},paths=diagramPathList(child),parents=(parent.steps || []).filter(function(s){return typeof s.id==='string' && s.id;});
+  var note=doc.createElement('p');note.className='fnote';note.textContent='Map a parent event to the child story. Unset fields inherit the detail’s entry defaults. Preview uses the saved mapping. Numeric imports keep their original type until edited.';root.appendChild(note);
+  function option(select,value,label){var o=doc.createElement('option');o.value=value;o.textContent=label;select.appendChild(o);}
+  function select(label,items,value,onchange,container){
+    var s=doc.createElement('select');s.className='fctl';s.setAttribute('aria-label',label);
+    items.forEach(function(p){option(s,p[0],p[1]);});
+    if(!items.some(function(p){return p[0]===value;}))option(s,value,'Missing / imported: '+value.replace(/^id:|^number:/,''));
+    s.value=value;options.listen(s,'change',onchange);container.appendChild(c.row(label,s));return s;
+  }
+  function encode(value){return value===undefined?'':value===null?'null':typeof value==='number'?'number:'+value:'id:'+value;}
+  function decode(value){return value===''?undefined:value==='null'?null:value.indexOf('number:')===0?Number(value.slice(7)):value.slice(3);}
+  function label(s){return (s.text || s.id || 'Untitled event')+(s.id?' · '+s.id:'');}
+  function row(key,original,creating){
+    var box=doc.createElement('fieldset');box.className='mapping-row';
+    var legend=doc.createElement('legend');legend.textContent=creating?'New mapping':(parents.find(function(s){return s.id===key;}) || {}).text || key;box.appendChild(legend);root.appendChild(box);
+    if(!specObject(original)){
+      var warning=doc.createElement('p');warning.className='fnote';warning.textContent='This imported target is not an object. Repair it in Advanced mapping JSON or remove it.';box.appendChild(warning);
+      box.appendChild(c.action('Remove mapping',function(){options.change({action:'remove',key:key});}));return;
+    }
+    var changes={},draft=Object.assign({},original),parentId=key || (parents.find(function(s){return !Object.prototype.hasOwnProperty.call(map,s.id);}) || {}).id || '';
+    var parentSelect=select('When parent event',parents.map(function(s){return [s.id,label(s)];}),parentId,function(){parentId=parentSelect.value;save();},box);
+    var childControls=doc.createElement('div');box.appendChild(childControls);
+    var error=doc.createElement('p');error.className='fnote mapping-error';error.setAttribute('role','status');box.appendChild(error);
+    function effective(){return Object.assign({path:detail.path,step:detail.step},draft);}
+    function valid(){
+      var target=effective(),resolved=resolveSourceStep(child,target.path || paths[0].id,target.step);
+      var reason=!parents.some(function(s){return s.id===parentId;})?'Choose an existing parent event.':!resolved || target.step!=null && resolved.sourceIndex<0?'Choose a child event in this path. Unset fields inherit the entry defaults.':'';
+      error.textContent=reason;return !reason;
+    }
+    function save(){
+      if(!valid() || creating)return;
+      options.change({action:'write',key:key,parent:parentId,changes:changes});
+    }
+    function field(key,value){changes[key]=value;if(value===undefined)delete draft[key];else draft[key]=value;}
+    function draw(){
+      childControls.innerHTML='';
+      var target=effective(),route=paths.find(function(p){return p.id===(target.path || paths[0].id);});
+      var path=select('Child path',[['','Use default — '+(detail.path || paths[0].id)],['null','First path (explicit)']].concat(paths.map(function(p){return ['id:'+p.id,p.label+' · '+p.id];})),encode(draft.path),function(){field('path',decode(path.value));draw();save();},childControls);
+      var step=select('Child event',[['','Use default'+(detail.step?' — '+detail.step:'')],['null','No event override (explicit)']].concat((route?route.indices:[]).map(function(i,n){var s=child.steps[i];return [s.id?'id:'+s.id:'number:'+(n+1),label(s)+(s.id?'':' · position '+(n+1))];})),encode(draft.step),function(){field('step',decode(step.value));save();},childControls);
+      if(draft.step!==undefined && draft.step!==null){
+        var resolved=resolveSourceStep(child,target.path || paths[0].id,draft.step),caption=doc.createElement('p');caption.className='fnote';
+        caption.textContent=resolved && resolved.sourceIndex>=0?'Resolves to '+label(child.steps[resolved.sourceIndex])+(typeof draft.step==='number'?' (imported numeric position)':''):'This imported event is unavailable in the selected path.';childControls.appendChild(caption);
+      }
+      valid();
+    }
+    draw();
+    if(creating){box.appendChild(c.action('Add mapping',function(){if(valid())options.change({action:'write',key:null,parent:parentId,changes:changes});}));}
+    else{
+      box.appendChild(c.action('Preview mapping',function(){if(valid())options.preview(key);}));
+      box.appendChild(c.action('Remove mapping',function(){options.change({action:'remove',key:key});}));
+    }
+  }
+  Object.keys(map).forEach(function(key){row(key,map[key],false);});
+  if(parents.some(function(s){return !Object.prototype.hasOwnProperty.call(map,s.id);})){row(null,{},true);}
+  else if(!parents.length){var empty=doc.createElement('p');empty.className='fnote';empty.textContent='Give parent story steps IDs to create mappings.';root.appendChild(empty);}
+  var advanced=doc.createElement('details'),summary=doc.createElement('summary');summary.textContent='Advanced mapping JSON';advanced.appendChild(summary);
+  var raw=doc.createElement('textarea');raw.className='fctl';raw.setAttribute('aria-label','Advanced mapping JSON');raw.value=detail.stepMap==null?'':JSON.stringify(detail.stepMap,null,2);advanced.appendChild(raw);
+  advanced.appendChild(c.action('Apply mapping JSON',function(){var value;try{value=raw.value.trim()?JSON.parse(raw.value):null;}catch(_){options.error('Mapping JSON must be valid JSON.');return;}options.change({action:'replace',value:value});}));root.appendChild(advanced);
+  return root;
+}
 /* ---- src/workbench/inspector.js ---- */
 /* Instance-owned form DOM, panel editor cache and deferred refresh. Commands and
    read models remain shared leaves; source/history publication belongs to session. */
@@ -33428,7 +33531,7 @@ function detailControls(val,ctx){
     var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
     fold.className='node-detail-editor';fold.open=!!val.detail;summary.textContent='Domain detail';fold.appendChild(summary);
     var note=document.createElement('p');note.className='fnote';
-    note.textContent='Open an ordinary section as this node’s inner flow, or link to an approved spec. Apply saves these fields together.';
+    note.textContent='Open an ordinary section as this node’s inner flow, or link to an approved spec. Apply saves these fields together. Changing the child section or target type resets its entry position, mappings and boundary ports.';
     fold.appendChild(note);
     if(val.handoff!=null){
       var conflict=document.createElement('p');conflict.className='fnote';
@@ -33437,7 +33540,8 @@ function detailControls(val,ctx){
     var body=document.createElement('div');fold.appendChild(body);
     var draft=val.detail?builderClone(val.detail):{mode:'focus'};
     var type=draft.spec?'Approved spec':draft.url && !draft.section?'URL':'Local section';
-    var collect=function(){return draft;};
+    var collect=function(){return draft;},pending=false;
+    function resetChildBindings(){['path','step','stepMap','ports'].forEach(function(key){delete draft[key];});}
     function input(value,placeholder,area){
       var control=document.createElement(area?'textarea':'input');control.className='fctl';
       if(!area)control.type='text';control.value=value==null?'':String(value);
@@ -33451,7 +33555,8 @@ function detailControls(val,ctx){
       body.appendChild(frow('Detail target',kind));
       listen(kind,'change',function(){
         try{draft=collect();}catch(ex){kind.value=type;formError('Step mapping must be valid JSON before changing target type.');return;}
-        type=kind.value;draw();assignControlKeys();
+        if(type!==kind.value)resetChildBindings();
+        pending=true;type=kind.value;draw();assignControlKeys();
       });
       var section,path,step,map,spec,revision,url;
       if(type==='Local section'){
@@ -33463,21 +33568,30 @@ function detailControls(val,ctx){
           var record=records.find(function(rec){return rec.reference===option.value;});
           if(record)option.textContent=(record.section.heading || 'Section '+record.number)+' · '+record.reference+(record.section.detailOnly?' (detail only)':'');
         });
-        body.appendChild(frow('Local section',section));
-        listen(section,'change',function(){draft={section:section.value,mode:'focus'};draw();assignControlKeys();});
+        section.setAttribute('aria-label','Local section');body.appendChild(frow('Local section',section));
+        listen(section,'change',function(){if(!current || current.reference!==section.value)resetChildBindings();draft=Object.assign({},draft,{section:section.value,mode:'focus'});pending=true;draw();assignControlKeys();});
         var help=document.createElement('p');help.className='fnote';
         help.textContent='Opens a focused drilldown with an overview map and a return trail.';
         body.appendChild(help);
         var chosen=records.find(function(record){return record.reference===section.value;}),d=chosen && chosen.section.diagram || {};
         path=picker((d.paths || []).map(function(p){return p.id;}),draft.path,true);
         step=picker((d.steps || []).filter(function(s){return typeof s.id==='string' && s.id;}).map(function(s){return s.id;}),draft.step,true);
+        path.setAttribute('aria-label','Initial child path');step.setAttribute('aria-label','Initial child step');
         body.appendChild(frow('Initial child path',path));body.appendChild(frow('Initial child step',step));
-        map=input(draft.stepMap?JSON.stringify(draft.stepMap,null,2):'', '{"parent-step": {"step": "child-step", "path": "child-path"}}',true);
-        body.appendChild(frow('Parent → child steps JSON',map));
-        var ids=(ctx.diagram.steps || []).filter(function(s){return s.id;}).map(function(s){return s.id;});
-        var mappingHelp=document.createElement('p');mappingHelp.className='fnote';
-        mappingHelp.textContent=ids.length?'Parent step IDs: '+ids.join(', ')+'. Map only the steps that should choose a child position.':'Give parent steps IDs in the step inspector to map them to child steps.';
-        body.appendChild(mappingHelp);
+        listen(path,'change',function(){pending=true;});listen(step,'change',function(){pending=true;});
+        if(val.detail && chosen && String(val.detail.section)===String(draft.section)){
+          var expected=JSON.stringify(val.detail);
+          function ready(){if(pending){formError('Apply the detail settings before editing or previewing mappings.');return false;}return true;}
+          body.appendChild(createDetailMappingControl({document:document,detail:val.detail,parent:ctx.diagram,child:d,listen:listen,
+            controls:{row:frow,action:actionButton},error:formError,
+            change:function(edit){if(!ready())return false;return commitCascade(function(raw){
+              return planDetailMapping(session.text(),raw,target,edit,expected);
+            },{after:refreshFormSoon});},
+            preview:function(parentId){if(!ready())return;var result=opts.preview.detail && opts.preview.detail(target,parentId);if(result && result.error)formError(result.error);}}));
+        }else{
+          var mappingHelp=document.createElement('p');mappingHelp.className='fnote';
+          mappingHelp.textContent='Apply this local detail first to map parent and child events.';body.appendChild(mappingHelp);
+        }
       }else{
         if(type==='Approved spec'){
           spec=input(draft.spec,'approved-spec-id');revision=input(draft.revision,'optional pinned revision');section=input(draft.section,'child-section-id');
@@ -33489,12 +33603,13 @@ function detailControls(val,ctx){
         body.appendChild(externalHelp);
       }
       collect=function(){
-        var detail={mode:type==='Local section'?'focus':'link'};
+        var detail=builderClone(draft);detail.mode=type==='Local section'?'focus':'link';
+        ['section','path','step','spec','revision','url'].forEach(function(key){delete detail[key];});
         function put(key,control){if(control && control.value.trim())detail[key]=control.value.trim();}
         put('section',section);
         if(type==='Local section'){
           put('path',path);put('step',step);
-          if(map.value.trim())detail.stepMap=JSON.parse(map.value);
+
         }else {put('spec',spec);put('revision',revision);put('url',url);}
         return detail;
       };
@@ -37646,7 +37761,16 @@ function initWorkbenchBuilder(opts){
     selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
       current:function(){return interactions?interactions.selection():[];},
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
-    preview:{stepper:stepperFor,targetElement:findTargetEl},
+    preview:{stepper:stepperFor,targetElement:findTargetEl,detail:function(target,parentId){
+      var parsed=session.snapshot();if(parsed.error)return {error:parsed.error};
+      if(opts.renderedText && opts.renderedText()!==parsed.text)return {error:'Render the latest valid source before previewing this mapping.'};
+      var rec=specSectionPaths(parsed.raw)[target.section],d=rec && specValueAt(parsed.raw,rec.diagram);
+      var index=d && (d.steps || []).findIndex(function(s){return s.id===parentId;}),sp=stepperFor(target.section);
+      if(!sp || index<0 || !sp.jumpSource(index))return {error:'The parent event is not on an available story path.'};
+      var node=findTargetEl(target),trigger=node && node.querySelector('[data-dv-detail]');
+      if(!trigger)return {error:'The detail node is not visible in this view.'};
+      trigger.dispatchEvent(new MouseEvent('click',{bubbles:true}));return {};
+    }},
     clipboard:{current:function(){return objectClipboard;},selectHome:homeClipboardSelect,
       clearHome:function(){if(interactions)interactions.clearHome();}},
     modes:{adding:function(){return interactions.adding();},connecting:function(){return interactions.connecting();},

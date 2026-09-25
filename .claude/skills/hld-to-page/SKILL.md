@@ -44,6 +44,9 @@ For a small edit, update the affected story/ledger rows rather than restarting.
   in the panel inspector. Set defaults there and authored changes on steps;
   keep advanced initial fields intact. Phone and Device App also offer a shared
   notification composer for initial and per-step messages; clear runs before add.
+  Local drilldowns expose parent-event → child-path/event rows and a saved-target
+  preview. Mapping omissions inherit detail defaults; explicit null suppresses an
+  inherited default. Imported numeric child positions retain their type until edited.
   Humans can click nested bullets, add siblings/subpoints, indent/outdent and
   reorder complete subtrees in the inspector. Prose formatting buttons write
   the existing safe emphasis, HTTP(S) link, inline-code and fenced-code syntax.

@@ -43,7 +43,7 @@ function validateDetails(page, errors, warnings){
       function checkTarget(t,label){
         if(!specObject(t)){errors.push(label+': expected {step, path?}');return;}
         if(child){
-          var path=t.path || detail.path || diagramPathList(child)[0].id;
+          var path=t.path || diagramPathList(child)[0].id;
           var resolved=resolveSourceStep(child,path,t.step);
           if(!resolved || (t.step!=null && resolved.sourceIndex<0))errors.push(label+': unknown child step or path');
         }
@@ -53,7 +53,8 @@ function validateDetails(page, errors, warnings){
         if(!specObject(detail.stepMap))errors.push(where+'.stepMap: expected a map of parent step IDs to child targets');
         else Object.keys(detail.stepMap).forEach(function(key){
           if(!(s.diagram.steps || []).some(function(st){return st.id===key;}))errors.push(where+'.stepMap.'+key+': unknown parent step ID');
-          checkTarget(detail.stepMap[key],where+'.stepMap.'+key);
+          var mapped=detail.stepMap[key];
+          checkTarget(specObject(mapped)?Object.assign({path:detail.path,step:detail.step},mapped):mapped,where+'.stepMap.'+key);
         });
       }
       if(detail.ports!=null){

@@ -427,7 +427,7 @@ function detailControls(val,ctx){
     var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
     fold.className='node-detail-editor';fold.open=!!val.detail;summary.textContent='Domain detail';fold.appendChild(summary);
     var note=document.createElement('p');note.className='fnote';
-    note.textContent='Open an ordinary section as this node’s inner flow, or link to an approved spec. Apply saves these fields together.';
+    note.textContent='Open an ordinary section as this node’s inner flow, or link to an approved spec. Apply saves these fields together. Changing the child section or target type resets its entry position, mappings and boundary ports.';
     fold.appendChild(note);
     if(val.handoff!=null){
       var conflict=document.createElement('p');conflict.className='fnote';
@@ -436,7 +436,8 @@ function detailControls(val,ctx){
     var body=document.createElement('div');fold.appendChild(body);
     var draft=val.detail?builderClone(val.detail):{mode:'focus'};
     var type=draft.spec?'Approved spec':draft.url && !draft.section?'URL':'Local section';
-    var collect=function(){return draft;};
+    var collect=function(){return draft;},pending=false;
+    function resetChildBindings(){['path','step','stepMap','ports'].forEach(function(key){delete draft[key];});}
     function input(value,placeholder,area){
       var control=document.createElement(area?'textarea':'input');control.className='fctl';
       if(!area)control.type='text';control.value=value==null?'':String(value);
@@ -450,7 +451,8 @@ function detailControls(val,ctx){
       body.appendChild(frow('Detail target',kind));
       listen(kind,'change',function(){
         try{draft=collect();}catch(ex){kind.value=type;formError('Step mapping must be valid JSON before changing target type.');return;}
-        type=kind.value;draw();assignControlKeys();
+        if(type!==kind.value)resetChildBindings();
+        pending=true;type=kind.value;draw();assignControlKeys();
       });
       var section,path,step,map,spec,revision,url;
       if(type==='Local section'){
@@ -462,21 +464,30 @@ function detailControls(val,ctx){
           var record=records.find(function(rec){return rec.reference===option.value;});
           if(record)option.textContent=(record.section.heading || 'Section '+record.number)+' · '+record.reference+(record.section.detailOnly?' (detail only)':'');
         });
-        body.appendChild(frow('Local section',section));
-        listen(section,'change',function(){draft={section:section.value,mode:'focus'};draw();assignControlKeys();});
+        section.setAttribute('aria-label','Local section');body.appendChild(frow('Local section',section));
+        listen(section,'change',function(){if(!current || current.reference!==section.value)resetChildBindings();draft=Object.assign({},draft,{section:section.value,mode:'focus'});pending=true;draw();assignControlKeys();});
         var help=document.createElement('p');help.className='fnote';
         help.textContent='Opens a focused drilldown with an overview map and a return trail.';
         body.appendChild(help);
         var chosen=records.find(function(record){return record.reference===section.value;}),d=chosen && chosen.section.diagram || {};
         path=picker((d.paths || []).map(function(p){return p.id;}),draft.path,true);
         step=picker((d.steps || []).filter(function(s){return typeof s.id==='string' && s.id;}).map(function(s){return s.id;}),draft.step,true);
+        path.setAttribute('aria-label','Initial child path');step.setAttribute('aria-label','Initial child step');
         body.appendChild(frow('Initial child path',path));body.appendChild(frow('Initial child step',step));
-        map=input(draft.stepMap?JSON.stringify(draft.stepMap,null,2):'', '{"parent-step": {"step": "child-step", "path": "child-path"}}',true);
-        body.appendChild(frow('Parent → child steps JSON',map));
-        var ids=(ctx.diagram.steps || []).filter(function(s){return s.id;}).map(function(s){return s.id;});
-        var mappingHelp=document.createElement('p');mappingHelp.className='fnote';
-        mappingHelp.textContent=ids.length?'Parent step IDs: '+ids.join(', ')+'. Map only the steps that should choose a child position.':'Give parent steps IDs in the step inspector to map them to child steps.';
-        body.appendChild(mappingHelp);
+        listen(path,'change',function(){pending=true;});listen(step,'change',function(){pending=true;});
+        if(val.detail && chosen && String(val.detail.section)===String(draft.section)){
+          var expected=JSON.stringify(val.detail);
+          function ready(){if(pending){formError('Apply the detail settings before editing or previewing mappings.');return false;}return true;}
+          body.appendChild(createDetailMappingControl({document:document,detail:val.detail,parent:ctx.diagram,child:d,listen:listen,
+            controls:{row:frow,action:actionButton},error:formError,
+            change:function(edit){if(!ready())return false;return commitCascade(function(raw){
+              return planDetailMapping(session.text(),raw,target,edit,expected);
+            },{after:refreshFormSoon});},
+            preview:function(parentId){if(!ready())return;var result=opts.preview.detail && opts.preview.detail(target,parentId);if(result && result.error)formError(result.error);}}));
+        }else{
+          var mappingHelp=document.createElement('p');mappingHelp.className='fnote';
+          mappingHelp.textContent='Apply this local detail first to map parent and child events.';body.appendChild(mappingHelp);
+        }
       }else{
         if(type==='Approved spec'){
           spec=input(draft.spec,'approved-spec-id');revision=input(draft.revision,'optional pinned revision');section=input(draft.section,'child-section-id');
@@ -488,12 +499,13 @@ function detailControls(val,ctx){
         body.appendChild(externalHelp);
       }
       collect=function(){
-        var detail={mode:type==='Local section'?'focus':'link'};
+        var detail=builderClone(draft);detail.mode=type==='Local section'?'focus':'link';
+        ['section','path','step','spec','revision','url'].forEach(function(key){delete detail[key];});
         function put(key,control){if(control && control.value.trim())detail[key]=control.value.trim();}
         put('section',section);
         if(type==='Local section'){
           put('path',path);put('step',step);
-          if(map.value.trim())detail.stepMap=JSON.parse(map.value);
+
         }else {put('spec',spec);put('revision',revision);put('url',url);}
         return detail;
       };

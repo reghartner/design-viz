@@ -486,7 +486,16 @@ function initWorkbenchBuilder(opts){
     selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
       current:function(){return interactions?interactions.selection():[];},
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
-    preview:{stepper:stepperFor,targetElement:findTargetEl},
+    preview:{stepper:stepperFor,targetElement:findTargetEl,detail:function(target,parentId){
+      var parsed=session.snapshot();if(parsed.error)return {error:parsed.error};
+      if(opts.renderedText && opts.renderedText()!==parsed.text)return {error:'Render the latest valid source before previewing this mapping.'};
+      var rec=specSectionPaths(parsed.raw)[target.section],d=rec && specValueAt(parsed.raw,rec.diagram);
+      var index=d && (d.steps || []).findIndex(function(s){return s.id===parentId;}),sp=stepperFor(target.section);
+      if(!sp || index<0 || !sp.jumpSource(index))return {error:'The parent event is not on an available story path.'};
+      var node=findTargetEl(target),trigger=node && node.querySelector('[data-dv-detail]');
+      if(!trigger)return {error:'The detail node is not visible in this view.'};
+      trigger.dispatchEvent(new MouseEvent('click',{bubbles:true}));return {};
+    }},
     clipboard:{current:function(){return objectClipboard;},selectHome:homeClipboardSelect,
       clearHome:function(){if(interactions)interactions.clearHome();}},
     modes:{adding:function(){return interactions.adding();},connecting:function(){return interactions.connecting();},

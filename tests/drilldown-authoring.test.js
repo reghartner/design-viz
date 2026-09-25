@@ -234,8 +234,8 @@ function ui(spec=fixture(),options={}){
   }
   Object.assign(doc,element('document'));doc.createElement=element;doc.body=doc.appendChild(element('body'));doc.createTextNode=text=>Object.assign(element('span'),{textContent:text});
   const C={document:doc,URL};vm.createContext(C);
-  for(const name of ['validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction',
-    'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/inspector','workbench/io-model','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
+  for(const name of ['validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction','workbench/commands/detail-mapping',
+    'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/detail-mapping','workbench/inspector','workbench/io-model','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
   const guide=doc.body.appendChild(element()),view=doc.body.appendChild(element()),src=element('textarea'),win=element('window');
   let text=JSON.stringify(spec,null,2),renders=0;
   const session=C.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){renders++;},persistence:{read:()=>({}),save(){},cancel(){}}});
@@ -252,9 +252,9 @@ test('node inspector stages a complete local detail and applies it with one Undo
   const h=ui(),initial=h.text;h.inspector.render();
   h.field('Local section').value='inside';h.field('Local section').fire('change');
   assert.equal(h.field('Open mode'),undefined);assert.equal(h.field('Boundary input node'),undefined);assert.equal(h.field('Boundary output node'),undefined);
-  h.field('Parent → child steps JSON').value='{"request":{"step":"accept"}}';
+  assert.equal(h.field('Parent → child steps JSON'),undefined);
   assert.equal(h.text,initial,'draft controls must not publish half a detail');h.button('Apply detail').fire('click');
-  assert.deepEqual(parent(JSON.parse(h.text)).nodes.domain.detail,{section:'inside',mode:'focus',stepMap:{request:{step:'accept'}}});
+  assert.deepEqual(parent(JSON.parse(h.text)).nodes.domain.detail,{section:'inside',mode:'focus'});
   assert.equal(h.renders,1);h.session.undo();assert.equal(h.text,initial);
 });
 
@@ -425,4 +425,22 @@ test('unannounced settings changes require reviewing the newly calculated previe
   h.button('Apply extraction').fire('click');assert.equal(h.session.text(),before);
   assert.match(h.guide.querySelector('.ierr').textContent,/Review the updated preview/);
   h.button('Apply extraction').fire('click');assert.equal(JSON.parse(h.session.text()).page.sections[0].diagram.nodes[h.session.target.id].title,'New title without an input event');
+});
+
+test('retargeting a local detail resets child bindings while retaining unrelated metadata',()=>{
+ for(const destination of ['URL','Approved spec','Local section']){
+  const raw=linked();parent(raw).nodes.domain.detail.future={keep:true};
+  raw.page.blocks.push({id:'other-child',heading:'Other child',detailOnly:true,diagram:{nodes:{z:{}},rows:[['z']],steps:[{id:'other-event',nodes:['z']}]}});
+  const h=ui(raw),before=h.text;h.inspector.render();
+  if(destination==='Local section'){h.field('Local section').value='other-child';h.field('Local section').fire('change');}
+  else{
+   h.field('Detail target').value=destination;h.field('Detail target').fire('change');
+   if(destination==='URL')h.field('Detail URL').value='https://example.org/other';
+   else{h.field('Approved spec ID').value='remote';h.field('External section').value='remote-child';}
+  }
+  assert.equal(h.text,before);h.button('Apply detail').fire('click');assert.notEqual(h.text,before);
+  const saved=parent(JSON.parse(h.text)).nodes.domain.detail;
+  for(const key of ['ports','path','step','stepMap'])assert.equal(saved[key],undefined,key);
+  assert.deepEqual(saved.future,{keep:true});h.session.undo();assert.equal(h.text,before);
+ }
 });

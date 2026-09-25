@@ -555,3 +555,8 @@ targets resolve to a top-level point. Render markers, Outline, selection,
 bulk deletion and inspectors share the full address. Moves retain complete
 subtrees and metadata. Section copying retains prose; standalone bullet
 clipboard operations remain outside the clipboard contract.
+
+`workbench/detail-mapping.js` owns local parent/child mapping rows;
+`commands/detail-mapping.js` edits one target while preserving detail defaults,
+ports and advanced row metadata. Preview uses the existing drilldown trigger
+after selecting the parent event; it never rewrites source for navigation.

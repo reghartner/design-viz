@@ -1077,3 +1077,5 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .vocabulary-control details{min-width:0;}
 
 .prose-editor{display:grid;gap:6px;min-width:0}.prose-toolbar{display:flex;flex-wrap:wrap;gap:4px}.prose-toolbar button{font-size:11px;padding:5px 7px}.prose-link{display:flex;gap:4px;min-width:0}.prose-link input{flex:1;min-width:0}.prose-link button{flex:none}
+
+.detail-mappings{display:grid;gap:10px;margin:10px 0}.mapping-row{min-width:0;border:1px solid var(--bdr);border-radius:8px;padding:10px}.mapping-row legend{font-size:11px;font-weight:700;padding:0 4px}.mapping-error:empty{display:none}.mapping-error{color:var(--warn,#b45309)}

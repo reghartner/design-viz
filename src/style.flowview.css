@@ -11,7 +11,11 @@ body.sk-daylight{background:#F4F2EC;}
   border:1px solid #5A2A22; border-radius:10px; padding:14px 16px; white-space:pre-wrap;}
 .tabbtn:focus-visible, .mbtn:focus-visible, .tbtn:focus-visible, .schip:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
 
-/* ---- first-run guided tour (tour.flowview.js) — presenter-cinema look ---- */
+/* ---- first-run guided tour (tour.flowview.js) — presenter-cinema look ----
+   These rules also ride bundles that ship this page stylesheet without the
+   tour fragment (the Backstage native viewer): inert there by design — no
+   .dv-tour DOM ever exists without wireTour — and cheaper than forking the
+   page stylesheet per entrypoint. */
 .dv-tour{position:fixed; inset:0; z-index:900; pointer-events:none; font:15px/1.5 'IBM Plex Sans',system-ui,sans-serif;}
 .dv-tour[hidden]{display:none;}
 .dv-tour-scrim{position:fixed; background:rgba(11,18,32,.82); pointer-events:auto;}

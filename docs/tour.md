@@ -73,15 +73,16 @@ Per step:
   a single "Show me around" button (and the validator warns).
 - `secondary` — one extra thin-ring callout with its own `target` and `note`
   (used by the default for the PRESENT button).
-- `demo` — a playback demo: while the step is up, the tour advances the
-  section's active stepper `advance` times (default 3, capped at 30), one
-  step every `intervalMs` milliseconds (default 1800, minimum 400), so the
-  spotlit panels visibly change. Any tour interaction (Back, Next, Skip,
-  arrow keys) stops the demo immediately. Under `prefers-reduced-motion`
-  the demo never auto-advances: the step instead spotlights the step
-  transport (so the visitor presses the real ▶ themselves), rings the
-  configured target as its secondary callout, and appends a sentence saying
-  auto-play is off.
+- `demo` — a playback demo: the tour rewinds the section's active stepper
+  to its path's first visible stop, then advances it `advance` times
+  (default 3, capped at 30), one step every `intervalMs` milliseconds
+  (default 1800, minimum 400), so the spotlit panels visibly change. Any
+  interaction stops the demo immediately — the tour's own controls (Back,
+  Next, Skip, arrow keys) and any click on the page through the hole.
+  Under `prefers-reduced-motion` the demo never auto-advances: the step
+  instead spotlights the step transport, rings the configured target as
+  its secondary callout, and appends a sentence pointing at the ‹ ›
+  step arrows (the engine disables ▶ under reduced motion).
 
 ## The skip rule (why one config fits many pages)
 
@@ -89,9 +90,14 @@ A `spot` step is silently dropped, and the timeline renumbers, when:
 
 - its `target.selector` matches nothing inside its section (or the page,
   for `within: "page"`), or
-- the match is not rendered (zero-size / display-none) — with one exception:
-  a target inside an inactive tab **of an explicitly named
-  `diagramState.section`** is kept, and the tour selects that tab on entry, or
+- the match is not rendered **in the step's own target state**. Probing is
+  state-aware: the tour applies the step's tab and `diagramState` (behind
+  the scrim, with fragment writes suppressed and the pre-tour snapshot
+  already taken) before judging visibility, so a transport hidden by
+  ambient mode still resolves for a step that asks for `mode: "step"`,
+  and a panel in another tab resolves when its section is named. Only a
+  target that stays zero-size in its own state skips (a collapsed
+  disclosure the step would open counts as visible), or
 - `diagramState.section` names a section that does not exist, or
 - `diagramState.path` names a missing path (`"@alt"` on a single-path
   diagram), or
@@ -141,8 +147,9 @@ default.
    (`.step-transport`, `.path-timeline`, `.presentbtn`, `.nrefs-trigger`,
    `.diagram-view-choice`, `.panelcol`, `.mtoggle`, `.termbar`) and point
    `diagramState` at real section/path/step ids from the spec. Name
-   `diagramState.section` explicitly for any step whose target lives in
-   another tab.
+   `diagramState.section` for any step whose target lives in another
+   section; the tour selects that section's tab both while probing and on
+   entry.
 4. Use `offset` last, for small pixel corrections only.
 5. Run `node tools/validate.js <spec>` — tour problems appear as warnings
    (`page.tour...`), never errors.
@@ -154,9 +161,15 @@ default.
   to PRESENT, or `window.dvStartTour()`.
 - `#tour=1` on the URL forces the tour; `#tour=0` suppresses it.
 - Never wired on pages loaded with an `#embed=` fragment.
-- Keyboard: ← → move, Esc skips; the spotlit control itself stays clickable
-  through the hole. The node-links step spotlights the node card; a menu the
-  viewer opens paints above the scrim (browser top layer).
+- Keyboard: ← → move, Esc skips (the hint is hidden on the chooser, where
+  arrows do nothing); while the tour is up it owns those keys — presenter
+  mode never also advances. The spotlit control itself stays clickable
+  through the hole; clicking it stops a running demo. The node-links step
+  spotlights the node card; a menu the viewer opens paints above the scrim
+  (browser top layer).
 - Under `prefers-reduced-motion` the ring's outer glow is reduced and demos
   never auto-advance.
 - Printing hides the tour overlay and the `?` pill.
+- Bundles that ship the page stylesheet without the tour fragment (the
+  Backstage native viewer) carry the tour's CSS inert: no `.dv-tour` DOM
+  exists there, and one shared stylesheet beats a per-entrypoint fork.

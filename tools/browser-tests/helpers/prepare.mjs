@@ -39,6 +39,31 @@ export default async function prepare(){
     await writeFile(badSpec,JSON.stringify(bad));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),badSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-bad.html')],{stdio:'inherit'});
     await rm(badSpec);
+    // Ambient-first two-tab page: state-aware probing must keep the
+    // transport step (ambient hides .step-transport until the step asks for
+    // mode:"step") and a demo step whose named section lives in tab 2.
+    const ambient={page:{title:'Ambient first',skin:'pastel',tour:{version:1,steps:[
+      {id:'controls',target:{selector:'.step-transport',within:'section'},diagramState:{mode:'step'},
+        copy:{heading:'Play the story',body:'Transport check.'}},
+      {id:'paneldemo',target:{selector:'.panelcol',within:'section'},
+        diagramState:{section:'second',mode:'step'},demo:{advance:2,intervalMs:500},
+        copy:{heading:'The panels tell the story',body:'Demo check.'}},
+      {id:'fin',kind:'done',copy:{heading:'Done',body:'End.'}}
+    ]},sections:[{tabs:[
+      {label:'One',sections:[{heading:'Ambient opener',diagram:{view:'ambient',
+        nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
+        steps:[{edge:'a->b',text:'hop 1'},{edge:'a->b',text:'hop 2'},{edge:'a->b',text:'hop 3'}]}}]},
+      {label:'Two',sections:[{id:'second',heading:'Second story',diagram:{view:'step',autoplay:false,
+        nodes:{c:{},d:{}},rows:[['c','d']],edges:[{from:'c',to:'d'}],
+        panels:[{id:'st',type:'state',title:'State',states:['Zero','One','Two','Three'],initial:{state:'Zero'}}],
+        steps:[{edge:'c->d',text:'s1',panels:{st:{state:'One'}}},
+               {edge:'c->d',text:'s2',panels:{st:{state:'Two'}}},
+               {edge:'c->d',text:'s3',panels:{st:{state:'Three'}}}]}}]}
+    ]}]}};
+    const ambientSpec=path.join(output,'tour-ambient.spec.json');
+    await writeFile(ambientSpec,JSON.stringify(ambient));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),ambientSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-ambient.html')],{stdio:'inherit'});
+    await rm(ambientSpec);
     await rm(spec); // Offline test receives only the newly injected HTML.
     execFileSync(process.execPath,[path.join(repo,'apps/confluence/build.mjs')],{stdio:'inherit'});
     await cp(path.join(repo,'apps/confluence/static/viewer'),path.join(output,'forge'),{recursive:true});

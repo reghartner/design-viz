@@ -65,10 +65,10 @@ var tourRequest = (typeof tourHashRequest === 'function') ?
   tourHashRequest(window.location.hash) : null;
 var tourDeferredByLink = (function(){
   try {
+    /* parseHash only copies keys it understands, so any non-null field IS a
+       deep-link target — no hand-maintained key list to drift */
     var st = parseHash(window.location.hash);
-    return ['d','s','m','p','v','t','b','c','r','q','x','e'].some(function(key){
-      return st && st[key] != null;
-    });
+    return !!st && Object.keys(st).some(function(key){ return st[key] != null; });
   } catch (ex) { return false; }
 })();
 

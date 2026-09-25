@@ -77,21 +77,26 @@ function wireTour(ctl, view, win, config, options){
     try { return !!(el && el.getClientRects && el.getClientRects().length); }
     catch (ex) { return false; }
   }
-  function inInactiveTab(sec){
-    return !!(sec && sec.tabBlock != null && sec.tab != null &&
-      ctl.tabBlocks.some(function(tb){ return tb.index === sec.tabBlock && tb.active() !== sec.tab; }));
+  function selectSectionTab(sec){
+    if (!sec || sec.tabBlock == null || sec.tab == null) return;
+    for (var i = 0; i < ctl.tabBlocks.length; i++)
+      if (ctl.tabBlocks[i].index === sec.tabBlock){
+        if (ctl.tabBlocks[i].active() !== sec.tab)
+          ctl.tabBlocks[i].select(sec.tab, false, false);
+        break;
+      }
   }
+  /* State-aware probing: a step is judged against the state it will set up,
+     not against whatever the page happens to show. The list is built behind
+     the full scrim with fragment writes suppressed and the pre-tour snapshot
+     already taken, so applying each step's tab and diagram state here is
+     invisible and fully reversible. A target that stays unrendered even in
+     its own target state (or in a collapsed disclosure the step would open)
+     is genuinely unresolvable and skips. */
   function probe(step){
     if ((step.kind || 'spot') !== 'spot') return true;
     var sec = sectionFor(step);
-    var explicitSection = !!(step.diagramState && step.diagramState.section != null);
-    if (explicitSection && !sec) return false;
-    var el = queryTarget(step, sec, step.target);
-    if (!el) return false;
-    /* zero-size / unrendered matches are unresolved — except a target in an
-       inactive tab of an EXPLICITLY named section, whose tab the tour will
-       select on entry */
-    if (!isRendered(el) && !(explicitSection && inInactiveTab(sec))) return false;
+    if (step.diagramState && step.diagramState.section != null && !sec) return false;
     var ds = step.diagramState || {};
     var sp = sec && sec.stepper;
     if (ds.path != null){
@@ -100,7 +105,18 @@ function wireTour(ctl, view, win, config, options){
     if (ds.step === '@shared'){
       if (!sp || sharedSourceIndex(sp) < 0) return false;
     }
-    if (step.demo && (!sp || !isRendered(el))) return false;
+    if (step.demo && !sp) return false;
+    selectSectionTab(sec);
+    applyDiagramState(sec, step.diagramState);
+    var el = queryTarget(step, sec, step.target);
+    if (!el) return false;
+    if (!isRendered(el)){
+      /* a collapsed <details> ancestor is openable at entry — peek inside */
+      var covered = false;
+      for (var anc = el; anc && anc !== doc.body; anc = anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
+        if (anc.tagName === 'DETAILS' && !anc.open){ covered = true; break; }
+      if (!covered) return false;
+    }
     return true;
   }
   function applyDiagramState(sec, ds){
@@ -227,7 +243,9 @@ function wireTour(ctl, view, win, config, options){
     var heading = el('h2', 'dv-tour-heading');
     var body = el('p', 'dv-tour-body');
     var narration = el('div', 'dv-tour-narration');
+    narration.id = 'dv-tour-narration';
     narration.setAttribute('aria-live', 'polite');
+    overlay.setAttribute('aria-describedby', 'dv-tour-narration');
     narration.appendChild(eyebrow); narration.appendChild(heading); narration.appendChild(body);
     var controls = el('div', 'dv-tour-controls');
     var back = button('dv-tour-btn dv-tour-back', 'Back', function(){ go(at - 1); });
@@ -369,11 +387,16 @@ function wireTour(ctl, view, win, config, options){
     if (!step.demo || RM || !sec || !sec.stepper) return;
     var advance = Math.max(1, Math.min(30, Number(step.demo.advance) || 3));
     var interval = Math.max(400, Math.min(10000, Number(step.demo.intervalMs) || 1800));
+    /* the demo is a little story: always play it from the path's first
+       visible stop, wherever the diagram sat when the step opened */
+    var sp = sec.stepper;
+    if (sp.mode() !== 'step') sp.enterStep(false);
+    sp.jump(0);
+    schedule();
     demoLeft = advance;
     var tick = function(){
       demoTimer = null;
       if (!active || list[at] !== step || demoLeft <= 0) return;
-      var sp = sec.stepper;
       if (sp.mode() !== 'step') sp.enterStep(false);
       sp.advance(sp.current().n + 1);
       demoLeft--;
@@ -436,7 +459,8 @@ function wireTour(ctl, view, win, config, options){
       ('TOUR · STEP ' + tl.current + ' OF ' + tl.total);
     parts.heading.textContent = String(copy.heading || '');
     parts.body.textContent = String(copy.body || '') +
-      (step.demo && RM ? ' Auto-play is off — press ▶ to walk the story yourself.' : '');
+      /* under reduced motion the engine disables ▶ too — the arrows remain */
+      (step.demo && RM ? ' Auto-play is off — use the ‹ › step arrows to walk the story yourself.' : '');
     parts.back.disabled = at === 0;
     parts.next.textContent = at >= list.length - 1 ? 'Done' : 'Next';
     try { parts.next.focus({preventScroll: true}); }
@@ -475,6 +499,7 @@ function wireTour(ctl, view, win, config, options){
     at = index;
     var step = list[at];
     unwatch();
+    parts.hint.hidden = (step.kind || 'spot') === 'chooser'; /* arrows do nothing there */
     if ((step.kind || 'spot') === 'chooser'){
       parts.ui.classList.remove('dv-tour-ui-center');
       fullScrim(); renderTimeline(); renderChooser(step); return;
@@ -486,14 +511,7 @@ function wireTour(ctl, view, win, config, options){
     }
     parts.ui.classList.remove('dv-tour-ui-center');
     var sec = sectionFor(step);
-    if (sec && sec.tabBlock != null && sec.tab != null){
-      for (var i = 0; i < ctl.tabBlocks.length; i++)
-        if (ctl.tabBlocks[i].index === sec.tabBlock){
-          if (ctl.tabBlocks[i].active() !== sec.tab)
-            ctl.tabBlocks[i].select(sec.tab, false, false);
-          break;
-        }
-    }
+    selectSectionTab(sec);
     applyDiagramState(sec, step.diagramState);
     var eff = effectiveTargets(step);
     var target = queryTarget(step, sec, eff.target);
@@ -544,15 +562,17 @@ function wireTour(ctl, view, win, config, options){
       /* an open node-link menu owns its own Escape (engine, capture) */
       if (doc.querySelector('.node-link-menu:not([hidden])')) return;
       stopDemo(); guarded(finish);
-      ev.preventDefault(); ev.stopPropagation(); return;
+      ev.preventDefault(); ev.stopImmediatePropagation(); return;
     }
     if (!parts.chooser.hidden) return; /* chooser: only Escape shortcuts apply */
     if (ev.key === 'ArrowRight'){
       stopDemo(); guarded(function(){ go(at + 1); });
-      ev.preventDefault(); ev.stopPropagation();
+      /* the presenter's own arrow handler must never also advance the
+         diagram while the tour owns the keys */
+      ev.preventDefault(); ev.stopImmediatePropagation();
     } else if (ev.key === 'ArrowLeft'){
       stopDemo(); guarded(function(){ go(at - 1); });
-      ev.preventDefault(); ev.stopPropagation();
+      ev.preventDefault(); ev.stopImmediatePropagation();
     } else if (ev.key === 'Tab' && overlay.contains(ev.target)){
       var focusable = overlay.querySelectorAll('button:not([disabled])');
       if (focusable.length){
@@ -562,8 +582,14 @@ function wireTour(ctl, view, win, config, options){
       }
     }
   }
+  function pagePointer(ev){
+    /* touching the page through the hole (the spotlit control) takes over
+       from a running demo, just like touching the tour's own controls */
+    if (demoTimer && overlay && !overlay.contains(ev.target)) stopDemo();
+  }
   function attach(){
     doc.addEventListener('keydown', keydown, true);
+    doc.addEventListener('pointerdown', pagePointer, true);
     win.addEventListener('resize', schedule);
     doc.addEventListener('scroll', schedule, true);
     doc.addEventListener('fullscreenchange', schedule);
@@ -571,6 +597,7 @@ function wireTour(ctl, view, win, config, options){
   function detach(){
     unwatch();
     doc.removeEventListener('keydown', keydown, true);
+    doc.removeEventListener('pointerdown', pagePointer, true);
     win.removeEventListener('resize', schedule);
     doc.removeEventListener('scroll', schedule, true);
     doc.removeEventListener('fullscreenchange', schedule);
@@ -582,6 +609,7 @@ function wireTour(ctl, view, win, config, options){
     overlay.hidden = false;
     active = true;
     persona = null;
+    fullScrim(); /* cover the page before state-aware probing touches it */
     takeSnapshot();
     ctl.suppressFragmentWrites = true;
     list = buildList();

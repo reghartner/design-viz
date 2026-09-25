@@ -62,19 +62,11 @@ test('persona filtering: absent personas means everyone, "both" sees all',()=>{
   assert.deepEqual(ids('both'),['all','eng-only','ux-only']);
 });
 
-test('unresolved spot steps drop out; chooser and done never do',()=>{
-  const steps=[{id:'w',kind:'chooser'},spot('a'),spot('b'),{id:'z',kind:'done'}];
-  const kept=context.tourFilterResolved(steps,{a:true,b:false});
-  assert.deepEqual(plain(kept.map(s=>s.id)),['w','a','z']);
-});
-
-test('timeline renumbers after skips and never counts the chooser',()=>{
+test('timeline counts the authored list and never counts the chooser',()=>{
   const steps=[{id:'w',kind:'chooser'},spot('a'),spot('b'),{id:'z',kind:'done'}];
   assert.deepEqual(timeline(steps,0),{total:3,current:0});
   assert.deepEqual(timeline(steps,1),{total:3,current:1});
   assert.deepEqual(timeline(steps,3),{total:3,current:3});
-  const skipped=steps.filter(s=>s.id!=='b');
-  assert.deepEqual(timeline(skipped,2),{total:2,current:2});
 });
 
 test('cutout rect pads, applies offsets, clamps to the viewport',()=>{

@@ -86,39 +86,6 @@ function wireTour(ctl, view, win, config, options){
         break;
       }
   }
-  /* State-aware probing: a step is judged against the state it will set up,
-     not against whatever the page happens to show. The list is built behind
-     the full scrim with fragment writes suppressed and the pre-tour snapshot
-     already taken, so applying each step's tab and diagram state here is
-     invisible and fully reversible. A target that stays unrendered even in
-     its own target state (or in a collapsed disclosure the step would open)
-     is genuinely unresolvable and skips. */
-  function probe(step){
-    if ((step.kind || 'spot') !== 'spot') return true;
-    var sec = sectionFor(step);
-    if (step.diagramState && step.diagramState.section != null && !sec) return false;
-    var ds = step.diagramState || {};
-    var sp = sec && sec.stepper;
-    if (ds.path != null){
-      if (!sp || resolvePathId(sp, ds.path) == null) return false;
-    }
-    if (ds.step === '@shared'){
-      if (!sp || sharedSourceIndex(sp) < 0) return false;
-    }
-    if (step.demo && !sp) return false;
-    selectSectionTab(sec);
-    applyDiagramState(sec, step.diagramState);
-    var el = queryTarget(step, sec, step.target);
-    if (!el) return false;
-    if (!isRendered(el)){
-      /* a collapsed <details> ancestor is openable at entry — peek inside */
-      var covered = false;
-      for (var anc = el; anc && anc !== doc.body; anc = anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
-        if (anc.tagName === 'DETAILS' && !anc.open){ covered = true; break; }
-      if (!covered) return false;
-    }
-    return true;
-  }
   function applyDiagramState(sec, ds){
     if (!sec || !ds) return;
     /* Same order as the deep-link apply: view installs its visible-stop
@@ -130,6 +97,8 @@ function wireTour(ctl, view, win, config, options){
     var sp = sec.stepper;
     if (!sp) return;
     var pathId = ds.path != null ? resolvePathId(sp, ds.path) : null;
+    if (ds.path != null && pathId == null && win.console)
+      console.warn('flowspec: tour diagramState.path "' + ds.path + '" not found — check the tour config for this diagram');
     if (pathId != null && sp.selectPath) sp.selectPath(pathId);
     if (ds.mode === 'ambient'){ sp.enterAmbient(); return; }
     if (ds.mode === 'step' && sp.mode() !== 'step') sp.enterStep(false);
@@ -154,6 +123,7 @@ function wireTour(ctl, view, win, config, options){
         return {number: sec.number, mode: sp.mode(), path: sp.path(),
                 step: cur ? cur.id : null, /* authored id, may be null */
                 stepIndex: cur ? cur.n : 0,
+                playing: sp.playing ? sp.playing() : false,
                 view: sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null};
       })
     };
@@ -173,17 +143,29 @@ function wireTour(ctl, view, win, config, options){
       for (var i = 0; i < ctl.sections.length; i++)
         if (ctl.sections[i].number === saved.number){ sec = ctl.sections[i]; break; }
       if (!sec || !sec.stepper) return;
-      if (saved.view != null && sec.presentation && sec.presentation.setView)
-        sec.presentation.setView(saved.view);
       var sp = sec.stepper;
-      if (saved.path != null && sp.selectPath) sp.selectPath(saved.path);
+      /* Restore ONLY what actually changed: driving an untouched diagram
+         through selectPath/enterAmbient is not a neutral round trip (it can
+         mark hidden chips current and stop autoplay). Field-by-field. */
+      var cur = sp.current();
+      var touched = false;
+      var liveView = sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null;
+      if (saved.view != null && liveView !== saved.view && sec.presentation && sec.presentation.setView){
+        sec.presentation.setView(saved.view); touched = true;
+      }
+      if (saved.path != null && sp.path() !== saved.path && sp.selectPath){
+        sp.selectPath(saved.path); touched = true;
+      }
       if (saved.mode === 'step'){
-        if (sp.mode() !== 'step') sp.enterStep(false);
+        if (sp.mode() !== 'step'){ sp.enterStep(false); touched = true; }
         var idx = saved.step != null ? sp.stepIndexOf(saved.step) : -1;
         if (idx < 0 && saved.stepIndex >= 0 && saved.stepIndex < sp.ids().length)
           idx = saved.stepIndex; /* pages without authored step ids */
-        if (idx >= 0) sp.jump(idx);
-      } else if (saved.mode === 'ambient') sp.enterAmbient();
+        /* cur is pre-restore: trust it only when nothing above moved */
+        if (idx >= 0 && (touched || !(cur && cur.n === idx))) sp.jump(idx);
+      } else if (saved.mode === 'ambient' && sp.mode() !== 'ambient') sp.enterAmbient();
+      /* a diagram that was auto-playing keeps (or regains) its playback */
+      if (saved.playing && sp.playing && !sp.playing() && sp.mode() === 'step') sp.toggleAuto();
     });
     win.scrollTo(0, snapshot.scrollY);
     snapshot = null;
@@ -468,22 +450,17 @@ function wireTour(ctl, view, win, config, options){
   }
 
   /* ---- state machine ---- */
+  /* The list is the authored config filtered by persona — nothing else.
+     Whether a step's control exists is settled at entry, where applying the
+     step's own tab and diagram state has already revealed it; a miss is an
+     authoring bug, surfaced as a console warning and passed through. */
   function buildList(){
     var steps = tourStepsForPersona(config, persona || 'both');
     /* one chooser, always first; extras are dropped (lint warns) */
     var choosers = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; });
-    steps = choosers.slice(0, 1).concat(steps.filter(function(step){
+    return choosers.slice(0, 1).concat(steps.filter(function(step){
       return (step.kind || 'spot') !== 'chooser';
     }));
-    var resolved = {};
-    steps.forEach(function(step){
-      resolved[step.id] = probe(step);
-      /* the skip is silent for viewers but named for config authors */
-      if (!resolved[step.id] && (step.kind || 'spot') === 'spot' && win.console)
-        console.warn('flowspec: tour step "' + step.id +
-          '" skipped — its target or diagram state did not resolve on this page');
-    });
-    return tourFilterResolved(steps, resolved);
   }
   function choose(which){
     persona = TOUR_PERSONAS.indexOf(which) >= 0 ? which : 'both';
@@ -494,10 +471,43 @@ function wireTour(ctl, view, win, config, options){
   }
   function go(index){
     stopDemo();
-    if (index < 0) index = 0;
-    if (index >= list.length){ finish(); return; }
+    var dir = index >= at ? 1 : -1;
+    var from = at;
+    var step = null, sec = null, eff = null, target = null;
+    /* Entry-time resolution: entering a step applies its authored tab and
+       diagram state, which is what reveals its control (an ambient-hidden
+       transport, a panel in another tab). A control still missing or
+       unrendered then is an authoring bug: warn and pass through in the
+       walking direction — the timeline keeps the authored numbering. */
+    for (;;){
+      if (index >= list.length){ finish(); return; }
+      if (index < 0){ index = from; dir = 1; } /* nothing enterable behind: stay */
+      step = list[index];
+      if ((step.kind || 'spot') !== 'spot') break;
+      sec = sectionFor(step);
+      if (step.diagramState && step.diagramState.section != null && !sec){
+        if (win.console) console.warn('flowspec: tour step "' + step.id +
+          '" target not found — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      selectSectionTab(sec);
+      applyDiagramState(sec, step.diagramState);
+      eff = effectiveTargets(step);
+      target = queryTarget(step, sec, eff.target);
+      if (target){
+        /* a collapsed disclosure hides its content until opened — disclose
+           before judging visibility, exactly as the viewer would */
+        for (var anc = target; anc && anc !== doc.body; anc = anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
+          if (anc.tagName === 'DETAILS' && !anc.open){ anc.open = true; openedDetails.push(anc); }
+      }
+      if (!target || !isRendered(target)){
+        if (win.console) console.warn('flowspec: tour step "' + step.id +
+          '" target not found — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      break;
+    }
     at = index;
-    var step = list[at];
     unwatch();
     parts.hint.hidden = (step.kind || 'spot') === 'chooser'; /* arrows do nothing there */
     if ((step.kind || 'spot') === 'chooser'){
@@ -510,22 +520,12 @@ function wireTour(ctl, view, win, config, options){
       return;
     }
     parts.ui.classList.remove('dv-tour-ui-center');
-    var sec = sectionFor(step);
-    selectSectionTab(sec);
-    applyDiagramState(sec, step.diagramState);
-    var eff = effectiveTargets(step);
-    var target = queryTarget(step, sec, eff.target);
     if (target){
       /* scrollIntoView first (it also centers inside the board's own
          horizontal scroller), then correct the window explicitly — on SVG
          children scrollIntoView may move only the inner scroller */
       var spot = eff.target.selector.indexOf('nrefs-trigger') >= 0 && target.closest ?
         (target.closest('.node[data-dv-node]') || target) : target;
-      /* a target can live inside a collapsed disclosure (a Home-focused page
-         keeps its data flow in <details class="secondary-flow">): disclose it,
-         exactly as the viewer would, and note it for the post-tour restore */
-      for (var anc = spot; anc && anc !== doc.body; anc = anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
-        if (anc.tagName === 'DETAILS' && !anc.open){ anc.open = true; openedDetails.push(anc); }
       if (spot.scrollIntoView){
         try { spot.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}); }
         catch (ex) { spot.scrollIntoView(); }

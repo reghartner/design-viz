@@ -1452,6 +1452,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     jump: function(n){ stopAuto(); setStep(n, undefined, false); },
     advance: advanceTo,
     toggleAuto: function(){ if (timer) stopAuto(); else startAuto(); },
+    playing: function(){ return !!timer; },
     /* Pausing must not replace panel contents: an editor may have focus there. */
     pause: stopAuto,
     destroy: function(){

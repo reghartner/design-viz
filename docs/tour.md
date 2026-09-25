@@ -1,21 +1,24 @@
-# The first-run guided tour, and how to retarget it
+# Authoring the first-run guided tour
 
 The standalone viewer ships a guided tour that runs once per browser the
 first time a person opens a Flowview page. It masks the page, ring-lights one
-real control at a time, and narrates. Everything it shows is driven by a JSON
-config — **retargeting the tour to a different diagram is a config edit, not a
-code change.** This document is the contract for the agent (or person) doing
-that edit.
+real control at a time, and narrates. **The tour is authored, not detected:**
+the config is written per diagram by someone (or some agent) who can see the
+rendered page. Each step declares the state it needs and the control it
+points at; the runtime applies that state on entry and draws the ring. The
+only automatic behaviors are persona filtering and a warning-and-pass-through
+for steps whose control is missing — an authoring bug the console surfaces,
+never something the tour silently repairs.
 
 ## Where the config lives
 
-- Built-in default: `src/tour.config.js` (`TOUR_DEFAULT_CONFIG`). It ships in
-  every built page and is written to skip gracefully, so it works on any spec.
-- Per-page override: a `"tour"` object inside the spec's page object
+- Built-in default: `src/tour.config.js` (`TOUR_DEFAULT_CONFIG`). Treat it as
+  the worked template: copy it into your page spec and edit.
+- Per-page config: a `"tour"` object inside the spec's page object
   (`page.tour`). A `"tour"` key at the spec's top level (next to `"page"`) is
   ignored, and the viewer prints a console warning saying so.
-- An override replaces the default **wholesale** — there is no merging. An
-  unusable override (wrong `version`, no well-formed step) falls back to the
+- A page config replaces the default **wholesale** — there is no merging. An
+  unusable config (wrong `version`, no well-formed step) falls back to the
   built-in default and the validator prints warnings.
 
 ## Config shape (version 1)
@@ -41,135 +44,99 @@ that edit.
 
 Per step:
 
-- `id` — required, unique.
+- `id` — required, unique. Named in every console warning about the step.
 - `kind` — `"spot"` (default: highlights a control), `"chooser"` (the persona
   question; no target), `"done"` (closing card; no target). A chooser must be
   the **first** step; later or extra choosers are dropped (the validator
   warns).
 - `personas` — who sees the step: any of `"ux"`, `"eng"`. Omitted = everyone.
-  The `"both"` choice always sees every step.
+  The `"both"` choice always sees every step. This is the ONLY filtering the
+  runtime does; author each persona's track deliberately.
 - `target.selector` — a CSS selector into the rendered page. `target.within`
-  is `"section"` (the default) or `"page"`. Section scoping is **strict**:
-  the selector is resolved only inside the step's section (see
-  `diagramState.section`); it never falls back to a page-wide search. The
-  highlight rectangle is measured from the live element at show time
-  (`getBoundingClientRect`), so ordinary layout differences need no
-  configuration at all.
-- `offset` — small pixel nudges `{dx, dy, dw, dh}` applied to the measured
-  rectangle after its standard 8px padding. This is the knob for per-company
-  pixel-layout corrections. Keep values small; the rectangle is clamped to
-  the viewport.
-- `diagramState` — what the diagram should show while the step is up:
-  `section` (a section reference; omitted = the page's first diagram),
-  `view` (a named layout id), `mode` (`"step"` or `"ambient"`), `path` (a
-  path id, or the token `"@alt"` = the second path), `step` (a step id, or
-  the token `"@shared"` = the last step shared by the first two paths — the
-  merge zone). The tour drives the page's own controls; it never rewrites
-  the URL (see "Deep links and state", below).
+  is `"section"` (resolve only inside the step's section, the default) or
+  `"page"`. The highlight rectangle is measured from the live element when
+  the step opens.
+- `offset` — small pixel nudges `{dx, dy, dw, dh}` applied after the
+  standard 8px padding: the knob for per-diagram pixel corrections. The
+  rectangle is clamped to the viewport.
+- `diagramState` — the state this step needs on screen, applied when the
+  step is entered: `section` (a section reference or id; omitted = the
+  page's first diagram — entering also selects that section's tab), `view`
+  (a named layout id), `mode` (`"step"` or `"ambient"`), `path` (a path id,
+  or `"@alt"` = the second path), `step` (a step id, or `"@shared"` = the
+  last step shared by the first two paths). Declare what you need: a step
+  that spotlights the transport should say `"mode": "step"`, because an
+  ambient diagram keeps its transport hidden until then. The tour drives
+  the page's own controls; it never rewrites the URL.
 - `copy` — `eyebrow` (omitted = automatic "TOUR · STEP n OF m"), `heading`,
   `body`. On a `chooser` step, `copy.choices` is a list of
   `{persona, label, sub}` objects and `copy.note` is the small print.
-  Malformed `choices` entries are ignored; an empty or invalid list renders
-  a single "Show me around" button (and the validator warns).
-- `secondary` — one extra thin-ring callout with its own `target` and `note`
-  (used by the default for the PRESENT button).
-- `demo` — a playback demo: the tour rewinds the section's active stepper
+  Malformed entries are ignored (fallback button, validator warning).
+- `secondary` — one extra thin-ring callout with its own `target` and
+  `note`.
+- `demo` — a playback demo: on entry the tour rewinds the section's stepper
   to its path's first visible stop, then advances it `advance` times
   (default 3, capped at 30), one step every `intervalMs` milliseconds
   (default 1800, minimum 400), so the spotlit panels visibly change. Any
-  interaction stops the demo immediately — the tour's own controls (Back,
-  Next, Skip, arrow keys) and any click on the page through the hole.
-  Under `prefers-reduced-motion` the demo never auto-advances: the step
-  instead spotlights the step transport, rings the configured target as
-  its secondary callout, and appends a sentence pointing at the ‹ ›
-  step arrows (the engine disables ▶ under reduced motion).
+  interaction stops it — the tour's controls, arrow keys, or any click on
+  the page through the hole. Under `prefers-reduced-motion` it never
+  auto-advances: the step spotlights the step transport instead, rings the
+  configured target as its secondary callout, and tells the visitor to use
+  the ‹ › step arrows (the engine disables ▶ under reduced motion).
 
-## The skip rule (why one config fits many pages)
+## What happens when a step's control is missing
 
-A `spot` step is silently dropped, and the timeline renumbers, when:
+Entering a step applies its authored state first, then resolves the
+selector. If the control is still missing or unrendered, the viewer prints
 
-- its `target.selector` matches nothing inside its section (or the page,
-  for `within: "page"`), or
-- the match is not rendered **in the step's own target state**. Probing is
-  state-aware: the tour applies the step's tab and `diagramState` (behind
-  the scrim, with fragment writes suppressed and the pre-tour snapshot
-  already taken) before judging visibility, so a transport hidden by
-  ambient mode still resolves for a step that asks for `mode: "step"`,
-  and a panel in another tab resolves when its section is named. Only a
-  target that stays zero-size in its own state skips (a collapsed
-  disclosure the step would open counts as visible), or
-- `diagramState.section` names a section that does not exist, or
-- `diagramState.path` names a missing path (`"@alt"` on a single-path
-  diagram), or
-- `diagramState.step` is `"@shared"` and the first two paths share no step, or
-- the step declares a `demo` and its section has no stepper.
+    flowspec: tour step "<id>" target not found — check the tour config for this diagram
 
-An explicit `diagramState.step` id that does not resolve is softer: the step
-still shows, the diagram just stays where it is.
+and moves on to the next step in the walking direction (backwards too).
+Viewers see a brief pass-through; the timeline keeps the authored count.
+This is deliberately NOT adaptive: fix the config, don't rely on the skip.
+An unresolvable `diagramState.path` token warns the same way and the step
+still shows. `chooser` and `done` steps always enter.
 
-Every skip is logged to the console as
-`flowspec: tour step "<id>" skipped — …` for config authors; viewers see
-nothing. So: the default tour's branching step vanishes on unbranched pages,
-its node-links step on pages without bindings, its story-view step on pages
-without a view choice, and its panels demo on pages without a panel column.
-`chooser` and `done` steps never skip.
+## Authoring checklist (per diagram)
 
-## Deep links and state
-
-- The tour never auto-starts when the page was opened through a deep link
-  (a hash that targets a tab, diagram, step, path, view, contract card or
-  collapse state). The reader came for that state; the `?` pill still offers
-  the tour.
-- While the tour runs, the page's fragment writes are suppressed; the tour's
-  own driving of steppers (including demos) never changes the URL or
-  history.
-- The tour snapshots the diagram state it found (active tabs, each
-  diagram's view, path, mode and step, scroll position) and restores it on
-  Done and on Skip — including after a playback demo. Disclosures the tour
-  opened are closed again.
-
-## Failure posture
-
-Any error inside the tour tears the overlay down, restores the page state,
-and prints `flowspec: tour error — … — tour dismissed`. The page stays fully
-usable (fail-open); the tour stays off until the next load or an explicit
-replay. A malformed config never blocks rendering: `page.tour` problems are
-validator **warnings**, and an unusable config falls back to the built-in
-default.
-
-## Retargeting checklist for a company page
-
-1. Author the page spec as usual; check which controls exist (branching?
-   bindings? named layouts? panels?).
-2. Add `page.tour` only if the default flow or copy is wrong for the page —
-   the default already adapts by skipping.
-3. In an override, keep selectors to the engine's stable classes
-   (`.step-transport`, `.path-timeline`, `.presentbtn`, `.nrefs-trigger`,
-   `.diagram-view-choice`, `.panelcol`, `.mtoggle`, `.termbar`) and point
-   `diagramState` at real section/path/step ids from the spec. Name
-   `diagramState.section` for any step whose target lives in another
-   section; the tour selects that section's tab both while probing and on
-   entry.
-4. Use `offset` last, for small pixel corrections only.
-5. Run `node tools/validate.js <spec>` — tour problems appear as warnings
-   (`page.tour...`), never errors.
+1. Build the page and open it in a browser.
+2. Copy the default config into `page.tour` and edit: one step per thing
+   worth showing, in the order a first-time reader should meet them. Write
+   each persona's track (`personas`) deliberately.
+3. For every step, note the state the control needs (`mode`, `path`,
+   `view`, `section`) — what you had to click to see it is what the step
+   must declare.
+4. Selectors: prefer the engine's stable classes (`.step-transport`,
+   `.path-timeline`, `.presentbtn`, `.nrefs-trigger`,
+   `.diagram-view-choice`, `.panelcol`, `.mtoggle`, `.termbar`).
+5. Run `node tools/validate.js <spec>` — tour problems are warnings
+   (`page.tour...`), never render blockers.
+6. Walk the tour with `#tour=1` on the URL, every persona. Watch the
+   console for `target not found` warnings and fix each one (wrong
+   selector, missing `diagramState`, wrong section reference).
+7. Use `offset` last, for small pixel corrections only.
 
 ## Runtime behavior (fixed, not configurable)
 
 - Shown once per browser: `localStorage["dv_tour_v1"]`, with a `dv_tour=1`
   cookie fallback when storage is denied. Replayable from the `?` pill next
   to PRESENT, or `window.dvStartTour()`.
-- `#tour=1` on the URL forces the tour; `#tour=0` suppresses it.
-- Never wired on pages loaded with an `#embed=` fragment.
-- Keyboard: ← → move, Esc skips (the hint is hidden on the chooser, where
-  arrows do nothing); while the tour is up it owns those keys — presenter
-  mode never also advances. The spotlit control itself stays clickable
-  through the hole; clicking it stops a running demo. The node-links step
-  spotlights the node card; a menu the viewer opens paints above the scrim
-  (browser top layer).
-- Under `prefers-reduced-motion` the ring's outer glow is reduced and demos
-  never auto-advance.
-- Printing hides the tour overlay and the `?` pill.
+- `#tour=1` forces the tour; `#tour=0` suppresses it. A page opened through
+  a deep link (any targeting fragment) never auto-starts the tour — the `?`
+  pill still offers it.
+- While the tour runs, fragment writes are suppressed; the tour snapshots
+  the diagram state it found (tabs, view, path, mode, step, playback,
+  scroll) and restores exactly what it changed on Done/Skip — untouched
+  diagrams are not driven at all, and a diagram that was auto-playing
+  resumes. Disclosures the tour opened are closed again.
+- Any internal error tears the overlay down, restores state, and logs
+  `flowspec: tour error` — the page stays usable (fail-open).
+- Never wired on pages loaded with an `#embed=` fragment. Printing hides
+  the overlay and the `?` pill.
+- Keyboard: ← → move, Esc skips (hint hidden on the chooser); the tour owns
+  those keys while up — presenter mode never double-advances. The spotlit
+  control stays clickable through the hole. The node-links step spotlights
+  the node card; a menu the viewer opens paints above the scrim.
 - Bundles that ship the page stylesheet without the tour fragment (the
   Backstage native viewer) carry the tour's CSS inert: no `.dv-tour` DOM
-  exists there, and one shared stylesheet beats a per-entrypoint fork.
+  exists there; one shared stylesheet beats a per-entrypoint fork.

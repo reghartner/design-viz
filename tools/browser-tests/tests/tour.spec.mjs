@@ -68,10 +68,33 @@ test('#tour=1 auto-starts over a fresh profile',async({page,server})=>{
   await expect(page.locator('.dv-tour')).toBeHidden();
 });
 
-test('state-aware probing keeps the ambient-hidden transport step; reduced motion demo points at the arrows',async({page,server})=>{
+test('a missing target warns and passes through, keeping the authored count',async({page,server})=>{
+  // chime-radar has no bindings, paths or view choices: for the eng track
+  // the branching and links steps are authoring misses on this page — the
+  // tour must name them in the console and walk straight past them.
+  const warnings=[];
+  page.on('console',m=>{if(m.type()==='warning')warnings.push(m.text());});
+  await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+  await page.goto(server.origin+'/standalone.html#tour=1');
+  await page.locator('.dv-tour-choice').nth(1).click(); // The engineering
+  const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+  await expect(heading).toHaveText('Play the story');
+  await page.locator('.dv-tour-next').click();
+  // The branching step has no .path-timeline here: it warns and passes
+  // through to the links step (chime-radar does render node links).
+  await expect(heading).toHaveText('Every box is real');
+  expect(warnings.filter(w=>w.includes('target not found')).length).toBeGreaterThanOrEqual(1);
+  await page.locator('.dv-tour-next').click();
+  await expect(heading).toHaveText('That’s the tour');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.dv-tour')).toBeHidden();
+});
+
+test('entering a step applies its authored state: ambient-hidden transport; reduced motion demo points at the arrows',async({page,server})=>{
   await page.goto(server.origin+'/tour-ambient.html#tour=1');
   // No chooser in this override: the tour opens straight on step 1, whose
-  // transport only renders once the step's own mode:"step" is applied.
+  // transport only renders once the step's own mode:"step" is applied — at
+  // entry, not by any pre-scan.
   await expect(page.locator('.dv-tour-heading')).toHaveText('Play the story');
   await expect(page.locator('.dv-tour-ring')).toBeVisible();
   await page.locator('.dv-tour-next').click();

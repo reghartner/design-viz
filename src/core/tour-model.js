@@ -114,18 +114,9 @@ function tourStepsForPersona(config, persona){
   });
 }
 
-/* The retargeting mechanism: a spot step whose probe failed (selector matched
-   nothing, or its diagramState did not resolve) drops out silently and the
-   timeline renumbers. `resolved` maps step id -> boolean from the DOM probe. */
-function tourFilterResolved(steps, resolved){
-  return steps.filter(function(step){
-    var kind = step.kind || 'spot';
-    if (kind !== 'spot') return true;
-    return resolved[step.id] === true;
-  });
-}
-
-/* Timeline label: chooser is a gate, not a counted stop. */
+/* Timeline label: chooser is a gate, not a counted stop. The count is the
+   authored, persona-filtered list — a step whose target is missing at entry
+   is passed through with a console warning, not renumbered away. */
 function tourTimeline(steps, index){
   var counted = steps.filter(function(step){ return (step.kind || 'spot') !== 'chooser'; });
   var current = 0;

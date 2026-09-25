@@ -302,6 +302,23 @@
       ]
     },
     {
+      "file": "panel-visibility/panel-visibility.html",
+      "spec": "panel-visibility/panel-visibility.spec.json",
+      "title": "Show the right panel at the right moment",
+      "family": "panel-visibility",
+      "description": "A doorbell notification reveals the phone and hides the camera; alternate paths keep their own visibility.",
+      "tags": [
+        "authoring",
+        "visibility",
+        "alternates",
+        "doorbell"
+      ],
+      "widgets": [
+        "phone",
+        "screen"
+      ]
+    },
+    {
       "file": "showcase/widgets.html",
       "spec": "showcase/widgets.spec.json",
       "title": "Widget Showcase — every panel type on one page",

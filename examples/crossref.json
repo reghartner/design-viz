@@ -265,6 +265,13 @@
         "title": "Cumulus Command & OTA Paths"
       }
     ],
+    "Doorbell": [
+      {
+        "file": "panel-visibility/panel-visibility.html",
+        "family": "panel-visibility",
+        "title": "Show the right panel at the right moment"
+      }
+    ],
     "Drawbridge": [
       {
         "file": "halovista-mirrorline/mirrorline.html",
@@ -511,6 +518,13 @@
         "title": "Cumulus Command & OTA Paths"
       }
     ],
+    "Notifications": [
+      {
+        "file": "panel-visibility/panel-visibility.html",
+        "family": "panel-visibility",
+        "title": "Show the right panel at the right moment"
+      }
+    ],
     "OS Push Network": [
       {
         "file": "doorbell-atlas/atlas.html",
@@ -714,6 +728,13 @@
         "file": "nestrel-warden/warden.html",
         "family": "nestrel-warden",
         "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Resident": [
+      {
+        "file": "panel-visibility/panel-visibility.html",
+        "family": "panel-visibility",
+        "title": "Show the right panel at the right moment"
       }
     ],
     "Resident App": [

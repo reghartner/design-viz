@@ -619,6 +619,7 @@ PanelRegistry.extend('deviceapp', {
 PanelRegistry.extend('deviceapp', {
   references: { nodes: ['sources.*.node'] },
   authoring: {
+    notifications: true,
     template: {
       title: 'Device app',
       appName: 'Homestead',

@@ -187,3 +187,7 @@ writes `panel.initial`, separately from step patches. `editor.patchField` receiv
 an optional third argument `{initial: true}` for context-specific labels. The
 shared inspector owns transactions, unknown-field preservation, and Undo/Redo;
 panels should not duplicate that machinery.
+
+`authoring.notifications: true` opts a panel into the shared notification
+composer for `notify` and its clear-before-add control. It reuses the inspector
+transaction/lifetime and the renderer's existing notification object contract.

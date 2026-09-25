@@ -1063,3 +1063,12 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 #canon-reader .copychip{display:none}#welcome-reader-screen h1{font-size:29px;letter-spacing:-.6px}
 .welcome:has(#welcome-reader-screen:not([hidden])){max-width:none}#canon-reader .doc-title{display:none}
 @media(max-width:760px){.welcome-library-entry>span:first-child{display:grid;gap:5px}.canon-reader-toolbar{flex-wrap:wrap}}
+
+
+.notification-composer{min-width:0;display:grid;gap:10px;}
+.notification-editor{min-width:0;margin:0;padding:10px;border:1px solid var(--wline,#d5ddef);border-radius:10px;}
+.notification-editor legend{padding:0 5px;font-size:11px;font-weight:700;}
+.notification-preview{display:grid;gap:4px;margin:8px 0;padding:12px;border:1px solid #d5ddef;border-radius:10px;background:#f6f8ff;color:#253653;overflow-wrap:anywhere;}
+.notification-preview small{font-size:10px;text-transform:uppercase;}
+.notification-preview b{font-size:12px;}
+.notification-preview span{font-size:12px;white-space:pre-wrap;}

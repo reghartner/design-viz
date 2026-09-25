@@ -2,6 +2,7 @@
 function wireBuilderCommit(input,commit,options){
   options=options || {};
   var last=input.value,listen=options.listen || function(target,type,fn){target.addEventListener(type,fn);};
+  input._flowviewHasDraft=function(){return input.value!==last;};
   function fire(){
     if(input.value===last && !options.commitUnchanged)return;
     last=input.value;

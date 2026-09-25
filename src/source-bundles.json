@@ -42,6 +42,7 @@
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
     "workbench/controls.js",
+    "workbench/notifications.js",
     "workbench/inspector.js",
     "workbench/io-model.js",
     "workbench/io-browser.js",

@@ -3,8 +3,9 @@
 Implement in this order. Each item includes its user guide update, browser
 interaction coverage, independent review, and passing CI before merge.
 
-- [ ] **1. Starting state** — Camera and Device App use their typed step controls
+- [x] **1. Starting state** — Camera and Device App use their typed step controls
   for initial values. Preserve advanced fields and keep step edits separate.
+  Merged in [PR #218](https://github.com/reghartner/design-viz/pull/218).
 - [ ] **2. Notifications** — Shared Phone / Device App composer for app, title,
   and message; add/remove/reorder, clear earlier notifications, and initial state.
 - [ ] **3. Protocols and lanes** — All built-in protocols are selectable; create

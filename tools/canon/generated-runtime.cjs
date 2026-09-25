@@ -4970,6 +4970,7 @@ PanelRegistry.extend('deviceapp', {
 PanelRegistry.extend('deviceapp', {
   references: { nodes: ['sources.*.node'] },
   authoring: {
+    notifications: true,
     template: {
       title: 'Device app',
       appName: 'Homestead',
@@ -10228,6 +10229,8 @@ body.sk-editorial .phonecallchannel{border-radius:2px;}`,
 /* phone authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('phone', {
   authoring: {
+    notifications: true,
+    initialFields: true,
     template: { title: 'Phone', initial: { clock: '9:41' } },
     setupFields: [
       [

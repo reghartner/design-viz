@@ -24,6 +24,9 @@ inspector, I/O, interaction and lifetime dependencies.
 11. `workbench/inspector-model.js`: pure position, effective-state and field-help models.
 12. `workbench/lifetime.js`: local listener, delay and cleanup ownership.
 13. `workbench/controls.js`: shared commit event policy.
+`workbench/notifications.js` supplies the shared Phone/Device App notification
+composer; the inspector supplies its transactions and form lifetime.
+
 14. `workbench/inspector.js`: forms, panel editor cache and refresh lifetime.
 15. `workbench/io-model.js`: pure Mermaid preparation, filenames and HTML injection.
 16. `workbench/io-browser.js`: bound browser resource adapters.

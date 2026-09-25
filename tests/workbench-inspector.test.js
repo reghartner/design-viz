@@ -329,3 +329,20 @@ test('temporary field edits use current sibling fields while ownership is unchan
   assert.deepEqual(JSON.parse(h.text).steps[0].panels.p,{audio:{output:'chime'},enterOnce:{audio:{microphone:'listening',future:{keep:true}}}});
   h.session.undo();assert.equal(h.text,changed);
 });
+
+test('paragraph formatting retains manual textarea size only for the same inspector target',()=>{
+  const e=environment(),h=e.mount({sections:[{text:['Paragraph','Other paragraph']}]});
+  e.C.Event=class{constructor(type){this.type=type;}};
+  h.session.target={kind:'para',section:0,index:0};h.inspector.render();
+  const before=h.text,input=h.guide.querySelector('textarea');
+  input.style.height='280px';input.style.width='310px';input.focus();input.setSelectionRange(0,input.value.length);
+  input.dispatchEvent=event=>input.fire(event.type);
+  h.guide.querySelectorAll('button').find(button=>button.textContent==='Code block').fire('click');h.flush();
+  const refreshed=h.guide.querySelector('textarea');
+  assert.notEqual(refreshed,input,'formatting rebuilds the form');
+  assert.equal(refreshed.style.height,'280px');assert.equal(refreshed.style.width,'310px');
+  assert.match(refreshed.value,/```/);assert.equal(e.doc.activeElement,refreshed);
+  h.session.undo();h.inspector.render();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+  h.session.target={kind:'para',section:0,index:1};h.inspector.render();
+  assert.ok(!h.guide.querySelector('textarea').style.height,'another paragraph starts at its default size');
+});

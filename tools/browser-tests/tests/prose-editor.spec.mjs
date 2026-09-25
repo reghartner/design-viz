@@ -27,3 +27,27 @@ test('nested prose supports direct selection, structure changes, formatting and 
  await page.locator('#outline-results button').click();await page.locator('#editor-tab-inspect').click();
  await expect(text).toHaveValue('Nested point');await expect(point('1.0')).toHaveClass(/dv-sel/);
 });
+
+test('paragraph formatting keeps the resized textarea height and remains undoable',async({page,server})=>{
+ const raw=spec();raw.page.sections[0].text=['Paragraph to format','Another paragraph'];
+ const original=JSON.stringify(raw,null,2);
+ await page.goto(server.origin+'/workbench.html');await paste(page,original);
+ const paragraphs=page.locator('#docview .sec-text');await paragraphs.first().click();
+ const guide=page.locator('#guide'),field=guide.getByLabel('Prose text',{exact:true});
+ await expect(field).toHaveValue('Paragraph to format');await field.scrollIntoViewIfNeeded();
+ const initial=await field.boundingBox();
+ await page.mouse.move(initial.x+initial.width-3,initial.y+initial.height-3);
+ await page.mouse.down();await page.mouse.move(initial.x+initial.width-3,initial.y+initial.height+117,{steps:12});await page.mouse.up();
+ await expect.poll(async()=>(await field.boundingBox()).height).toBeGreaterThan(initial.height+80);
+ const resized=(await field.boundingBox()).height;
+ await field.focus();await field.selectText();await guide.getByRole('button',{name:'Code block',exact:true}).click();
+ await expect(field).toHaveValue(/```[\s\S]*Paragraph to format[\s\S]*```/);
+ await expect(paragraphs.first().locator('pre code')).toContainText('Paragraph to format');
+ await expect.poll(async()=>(await field.boundingBox()).height).toBe(resized);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+ await expect(paragraphs.first().locator('pre')).toHaveCount(0);
+ await page.locator('#redo-builder').click();
+ await expect(paragraphs.first().locator('pre code')).toContainText('Paragraph to format');
+ await paragraphs.nth(1).click();await expect(field).toHaveValue('Another paragraph');
+ await expect.poll(async()=>(await field.boundingBox()).height).toBe(initial.height);
+});

@@ -17,13 +17,16 @@ agent handles Forge registration, installation and actual Confluence validation.
 ## Catalog, code drift, and incident evidence
 
 **Connect to company evidence when requested.** Read `docs/canon.md`. Preserve
-HLD provenance; use optional `page.canon` for design/canonical ownership. Resolve
-node service/API bindings from a supplied catalog, never invent company entities.
+HLD provenance. For maintained canon, root `canon.json` owns membership and
+ownership; providers derive `page.canon` compatibility metadata without changing
+the authored source. Resolve node service/API bindings from a supplied catalog;
+never invent company entities.
 Attach reviewed code references with full commit SHAs and unique literal anchors;
 require stable step IDs. Canonical status and behavioral impact require human
-review. For the static workbench library, save the marked spec under
-`docs/diagrams/`; the Python and nginx image builds discover it automatically.
-Do not add a manual library registry entry or edit the generated `diagrams.json`.
+review. Keep each maintained spec and generated HTML together under
+`diagrams/<name>/`, and enroll its folder and owner in root `canon.json` only when
+promotion is authorized. Python and nginx image builds publish that central list.
+Do not edit the generated `diagrams.json`; per-spec flags do not enroll a document.
 The fictional `examples/canon/` catalog is for demonstrations only. For the
 central repository, drift scanner, review dispositions and company adapter, use
 `docs/canon.md`. Plain PR closure never accepts a source revision; a regression

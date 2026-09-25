@@ -5,4 +5,6 @@ const result: plugin.EntityDiagrams = backend.diagramsForEntity(
   backend.buildEntityDiagramIndex([], { publicBaseUrl: 'https://company.test' }),
   'component:default/recording',
 );
-export { limit, result };
+const entries: backend.CanonEntry[] = backend.parseCanonManifest({version: 1, diagrams: []});
+const materialize: (raw: unknown, entry: backend.CanonEntry) => unknown = backend.materializeCanonSpec;
+export { limit, result, entries, materialize };

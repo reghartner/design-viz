@@ -72,9 +72,10 @@ The CLI provides `--entrypoint NAME`, `--entry-assets NAME`,
 `--font-css PROFILE`, `--assets` and `--styles STYLESHEET`. Structured modes emit
 JSON. `tools/build.py` retains its `entrypoint`, `entrypoint_assets`, `js_bundle`
 and source/style adapters by delegating to these commands. After writing the
-backend runtime, it discovers `page.canon` documents under `docs/diagrams/` and
-publishes the derived `workbench/diagrams.json` with that runtime. The snapshot
-is ignored by Git; invalid marked specs or duplicate IDs fail the build.
+backend runtime, it reads root `canon.json`, validates the listed `diagrams/<name>`
+folders, and publishes the derived `workbench/diagrams.json` with that runtime.
+The snapshot is ignored by Git; missing JSON/HTML, invalid specs, duplicate
+folders, and escaping paths fail publication while preserving the prior snapshot.
 
 ## Assets and distribution policies
 

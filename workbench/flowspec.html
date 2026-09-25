@@ -33695,14 +33695,30 @@ function createBuilderInspector(opts){
   }
   function beginForm(identity){
     var same=identity===inspectorScrollKey;
-    var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0};
+    var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null};
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
     revealInspector();guide.hidden=false;guide.innerHTML='';
     return previous;
   }
   function finishForm(previous){
-    assignControlKeys();restoreFocus(previous.focus);guide.scrollTop=previous.scroll;
+    assignControlKeys();restoreTextareaSizes(previous.sizes);restoreFocus(previous.focus);guide.scrollTop=previous.scroll;
+  }
+  function captureTextareaSizes(){
+    var sizes=Object.create(null);
+    Array.prototype.forEach.call(guide.querySelectorAll('textarea'),function(control){
+      var key=control.getAttribute('data-inspector-control');
+      // Native resizing writes inline dimensions. Leave CSS-sized controls fluid.
+      if(key && (control.style.height || control.style.width))sizes[key]={height:control.style.height,width:control.style.width};
+    });
+    return sizes;
+  }
+  function restoreTextareaSizes(sizes){
+    if(!sizes)return;
+    Array.prototype.forEach.call(guide.querySelectorAll('textarea'),function(control){
+      var size=sizes[control.getAttribute('data-inspector-control')];
+      if(size){control.style.height=size.height;control.style.width=size.width;}
+    });
   }
   function cancelRefresh(){
     refreshVersion++;

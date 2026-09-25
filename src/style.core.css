@@ -346,6 +346,11 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 }
 .panelcol{display:flex; flex-direction:column; gap:10px; margin-top:12px;}
 .pwidget{border-radius:12px; padding:12px 14px;}
+/* Reserve the authored space; hiding a panel never hides its docked player. */
+.pwidget.panel-step-hidden{visibility:hidden;}
+.pwidget.panel-step-hidden>.pbody,.pwidget.panel-step-hidden>.pbody *,
+.pwidget.panel-step-hidden>.ptitle{visibility:hidden !important;}
+.pwidget.panel-step-hidden>.termbar{visibility:visible;}
 .sk-aurora .pwidget{background:#0B1220; border:1px solid #25364F;}
 .sk-daylight .pwidget{background:#FFFFFF; border:1px solid #E0DCD1;}
 .ptitle{font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.12em; text-transform:uppercase; margin-bottom:8px;}

@@ -597,7 +597,7 @@ test('edgeless step with nodes/panels is legal; a step with nothing warns', () =
             {text: 'nothing at all'}]});
   const v = C.validate(page);
   assert.strictEqual(v.errors.length, 0, v.errors.join('; '));
-  const empties = v.warnings.filter(w => w.includes('no edge/edges, nodes, or panels'));
+  const empties = v.warnings.filter(w => w.includes('no edge/edges, nodes, panels'));
   assert.strictEqual(empties.length, 1);
   assert.ok(empties[0].includes('steps[2]'));
 });
@@ -4328,7 +4328,7 @@ test('homemap immediate jumps cancel transients before unchanged-markup skip', (
 });
 
 test('homemap controller uses initial states in ambient, including after leaving step mode', () => {
-  function el(){ return {children: [], setAttribute(){}, appendChild(c){this.children.push(c);}, querySelector: () => null}; }
+  function el(){ return {children: [], classList:{toggle(){},contains(){return false;}}, setAttribute(){}, removeAttribute(){}, appendChild(c){this.children.push(c);}, querySelector: () => null}; }
   const core = loadCore({document: {createElement: el}}), aside = el(), p = homePanel();
   p.initial = {cam1: 'sleep', cam2: 'scan'};
   const ctl = core.buildPanels(aside, {panels: [p], steps: [{panels: {home: {cam1: 'detect'}}}]}, 'aurora');

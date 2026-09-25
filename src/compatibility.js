@@ -12,7 +12,7 @@ var FlowviewCompatibility = (function(){
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
-    'media.spotlight':'Authored camera spotlights' };
+    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -49,6 +49,7 @@ var FlowviewCompatibility = (function(){
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;
         used['panel.'+p.type]=true;
+        if(p.visible!=null)used['flow.panel-visibility']=true;
         if(p.type==='deviceapp'){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
           var navigation=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'phoneScreen') ||
@@ -77,6 +78,7 @@ var FlowviewCompatibility = (function(){
         });
       });
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.color!=null;}))used['flow.step-colors']=true;
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.panelVisibility!=null;}))used['flow.panel-visibility']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
       if(d.sectionLayout)used['layout.arranged']=true;

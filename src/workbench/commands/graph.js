@@ -359,6 +359,11 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
       });
     });
     (d.steps || []).forEach(function(st){
+      if(st && specObject(st.panelVisibility) && Object.prototype.hasOwnProperty.call(st.panelVisibility,oldId)){
+        var visibility=Object.create(null);
+        Object.keys(st.panelVisibility).forEach(function(k){visibility[k===oldId?newId:k]=st.panelVisibility[k];});
+        st.panelVisibility=visibility;
+      }
       if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, oldId)){
         var patches = Object.create(null); /* "__proto__" — see planRenameNode */
         Object.keys(st.panels).forEach(function(k){ patches[k === oldId ? newId : k] = st.panels[k]; });
@@ -449,6 +454,10 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
     d.panels.splice(panelIdx, 1);
     if (!d.panels.length) delete d.panels;
     (d.steps || []).forEach(function(st){
+      if(st && specObject(st.panelVisibility)){
+        delete st.panelVisibility[id];
+        if(!Object.keys(st.panelVisibility).length)delete st.panelVisibility;
+      }
       if (st && st.panels && Object.prototype.hasOwnProperty.call(st.panels, id)){
         delete st.panels[id];
         if (!Object.keys(st.panels).length) delete st.panels;

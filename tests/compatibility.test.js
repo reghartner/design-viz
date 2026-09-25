@@ -126,3 +126,14 @@ test('device app phone screens and card visibility require the navigation capabi
  }
  assert.ok(!C.detect(raw).includes('content.deviceapp-navigation'));
 });
+
+
+test('whole-panel visibility advertises a capability for older installed viewers',()=>{
+  const d={nodes:{a:{}},rows:[['a']],panels:[{id:'phone',type:'phone',visible:false}],steps:[{panelVisibility:{phone:true}}]};
+  assert.ok(C.detect(d).includes('flow.panel-visibility'));
+  delete d.panels[0].visible;assert.ok(C.detect(d).includes('flow.panel-visibility'));
+  delete d.steps[0].panelVisibility;assert.ok(!C.detect(d).includes('flow.panel-visibility'));
+  d.panels[0].visible=false;
+  const old={version:'0.1.0',contract:'1',features:{'panel.phone':{since:'0.1.0'}}};
+  assert.ok(C.check(d,old).missingFeatures.includes('flow.panel-visibility'));
+});

@@ -15,7 +15,7 @@ var FlowviewCompatibility = (function(){
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
-    'media.spotlight':'Authored camera spotlights' };
+    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -52,6 +52,7 @@ var FlowviewCompatibility = (function(){
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;
         used['panel.'+p.type]=true;
+        if(p.visible!=null)used['flow.panel-visibility']=true;
         if(p.type==='deviceapp'){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
           var navigation=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'phoneScreen') ||
@@ -80,6 +81,7 @@ var FlowviewCompatibility = (function(){
         });
       });
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.color!=null;}))used['flow.step-colors']=true;
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.panelVisibility!=null;}))used['flow.panel-visibility']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
       if(d.sectionLayout)used['layout.arranged']=true;
@@ -794,6 +796,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (panelIds[p.id]) errors.push(PP + '.id: duplicate panel id "' + p.id + '"');
     panelIds[p.id] = true;
     panelDeclById[p.id] = p;
+    if (p.visible != null && typeof p.visible !== 'boolean')
+      warnings.push(PP + '.visible: expected true or false — panel starts visible');
     var descriptor = PanelRegistry.get(p.type);
     if (!descriptor)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PanelRegistry.types().join(' ') + ')');
@@ -819,6 +823,15 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     var nds = stepNodes(st);
     var patch = stepPanelPatch(st);
     var tonePatch = stepTonePatch(st);
+    var visibility = st && st.panelVisibility;
+    if (visibility != null){
+      var VP = DP + '.steps[' + ti + '].panelVisibility';
+      if (!specObject(visibility)) warnings.push(VP + ': expected an object mapping panel IDs to true or false — ignored');
+      else Object.keys(visibility).forEach(function(pid){
+        if (!Object.prototype.hasOwnProperty.call(panelDeclById, pid)) warnings.push(VP + ': unknown panel id "' + pid + '" — ignored');
+        else if (typeof visibility[pid] !== 'boolean') warnings.push(VP + '.' + pid + ': expected true or false — inheriting previous visibility');
+      });
+    }
     var hasToneField = !!(st && Object.prototype.hasOwnProperty.call(st, 'tone'));
     if (st && st.id != null){
       if (typeof st.id !== 'string')
@@ -827,8 +840,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(DP + '.steps[' + ti + '].id: duplicate step id "' + st.id + '" — deep links resolve to the first');
       else stepIds[st.id] = true;
     }
-    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch)
-      warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, or panels, or tone — give it something to show');
+    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch && !specObject(visibility))
+      warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, panels, tone, or panelVisibility — give it something to show');
     keys.forEach(function(k){
       if (!edgeKeys[k]) warnings.push(DP + '.steps[' + ti + ']: "' + k + '" matches no edge (format "from->to") — skipped');
     });
@@ -1740,6 +1753,24 @@ function foldPanelStates(d){
     var descriptor = PanelRegistry.get(panel.type);
     var fold = descriptor && descriptor.fold || foldCommonPanelStates;
     out[panel.id] = fold(panel, steps);
+  });
+  return out;
+}
+
+/* Visibility belongs to the panel frame, not a widget's state schema. Fold
+   the selected path in full, including stops omitted by the current view. */
+function foldPanelVisibility(d){
+  var out = Object.create(null);
+  (d.panels || []).forEach(function(panel){
+    if (!panel || !panel.id) return;
+    var visible = panel.visible !== false;
+    out[panel.id] = (d.steps || []).map(function(step){
+      var patch = step && step.panelVisibility;
+      if (specObject(patch) && Object.prototype.hasOwnProperty.call(patch, panel.id) && typeof patch[panel.id] === 'boolean')
+        visible = patch[panel.id];
+      return visible;
+    });
+    if (!out[panel.id].length) out[panel.id].push(visible);
   });
   return out;
 }
@@ -2983,6 +3014,7 @@ function panelOrder(panels) {
 
 function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
   var folded = foldPanelStates(d);
+  var visibility = foldPanelVisibility(d);
   var traceNavigation = (d.steps || []).length && d.view !== 'ambient-only';
   var hosts = {};
   panelOrder(d.panels).forEach(function (p) {
@@ -3003,7 +3035,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     (primaryHost && p.id === (primaryId || d.primaryPanel) ? primaryHost : asideEl).appendChild(
       card
     );
-    hosts[p.id] = { panel: p, body: body };
+    hosts[p.id] = { panel: p, body: body, card: card };
     /* Homemap ambient state precedes step zero; other widgets keep their
        established first-folded-step preview. */
     var view = PanelViews.get(p.type),
@@ -3027,6 +3059,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     },
     setDiagram: function (next) {
       folded = foldPanelStates(next);
+      visibility = foldPanelVisibility(next);
       traceNavigation = (next.steps || []).length && next.view !== 'ambient-only';
     },
     setStep: function (i, animate, ambient) {
@@ -3037,6 +3070,17 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
         var view = PanelViews.get(panel.type),
           options = view ? view.options : {};
         var homeAmbient = ambient && options.ambientInitial;
+        // Ambient is an overview of every panel. Layout-level hidden tiles
+        // remain hidden independently. Keep attached playback controls usable.
+        var shown = ambient || (visibility[pid] || [])[i] !== false;
+        var card = hosts[pid].card;
+        card.classList.toggle('panel-step-hidden', !shown);
+        Array.prototype.forEach.call(card.children, function(child){
+          if (!child.classList.contains('pbody') && !child.classList.contains('ptitle')) return;
+          child.inert = !shown;
+          if (shown) child.removeAttribute('aria-hidden');
+          else child.setAttribute('aria-hidden', 'true');
+        });
         renderPanelBody(
           hosts[pid].body,
           panel,
@@ -3044,7 +3088,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
           skin,
           options.historyRequiresSteps && !traceNavigation ? [] : states,
           homeAmbient ? -1 : si,
-          animate
+          animate && shown
         );
       });
     },

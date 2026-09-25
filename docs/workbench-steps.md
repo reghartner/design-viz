@@ -15,6 +15,15 @@ filter keeps normal text-editing behavior. Focusing this editor pauses Play.
 An `ambient-only` diagram still permits source editing but has no step preview;
 change `diagram.view` in JSON to `step` or `ambient` to show one.
 
+Under **Panel changes → Panel visibility**, every declared panel has **Show**,
+**Hide**, and **Inherit**, even if it has no content patch. Show/Hide carries
+forward along the selected path; Inherit removes only this beat’s override.
+Select a panel to set its **Starting visibility**. Hidden panels preserve their
+space and keep receiving content updates; attached playback controls stay
+available. A layout’s hidden elements remain hidden. Ambient shows all panels
+included in the view. Use Outline to select a hidden panel. Try the
+[panel visibility example](../examples/panel-visibility/panel-visibility.spec.json).
+
 For an **App screens** panel, every step inspector includes an **App screen**
 selector under **Panel changes**, even before the step has a panel patch. Choose
 a named uploaded screen, inherit the previous screen, or explicitly clear it.

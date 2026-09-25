@@ -2,8 +2,8 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['validator','workbench/source-edit','workbench/targets','workbench/commands/common',
-  'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/detail-mapping','workbench/notifications','workbench/inspector'];
+  'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
   function element(tag = 'div', id = ''){

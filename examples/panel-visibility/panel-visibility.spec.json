@@ -1,0 +1,153 @@
+{
+  "page": {
+    "title": "Show the right panel at the right moment",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "A doorbell story",
+        "bullets": [
+          "Illustrative flow: panel visibility follows the selected path.",
+          "Hidden panels keep their space; Ambient shows the complete cast."
+        ],
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "doorbell": {
+              "title": "Doorbell",
+              "icon": "camera"
+            },
+            "cloud": {
+              "title": "Notifications",
+              "icon": "cloud"
+            },
+            "resident": {
+              "title": "Resident",
+              "icon": "phone"
+            }
+          },
+          "rows": [
+            [
+              "doorbell",
+              "cloud",
+              "resident"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "doorbell",
+              "to": "cloud",
+              "kind": "https"
+            },
+            {
+              "from": "cloud",
+              "to": "resident",
+              "kind": "https"
+            }
+          ],
+          "panels": [
+            {
+              "id": "camera",
+              "type": "screen",
+              "title": "Front door",
+              "scene": "person-through-door",
+              "initial": {
+                "mode": "active"
+              }
+            },
+            {
+              "id": "phone",
+              "type": "phone",
+              "title": "Resident phone",
+              "visible": false
+            }
+          ],
+          "steps": [
+            {
+              "id": "quiet",
+              "text": "The camera watches the door. The phone has not entered the story.",
+              "nodes": [
+                "doorbell"
+              ]
+            },
+            {
+              "id": "visit",
+              "text": "A visitor arrives; the recording starts.",
+              "edge": "doorbell->cloud",
+              "panels": {
+                "camera": {
+                  "mode": "save"
+                }
+              }
+            },
+            {
+              "id": "notify",
+              "text": "The phone appears with its notification. The camera panel leaves the stage.",
+              "edge": "cloud->resident",
+              "panelVisibility": {
+                "camera": false,
+                "phone": true
+              },
+              "panels": {
+                "phone": {
+                  "notify": {
+                    "app": "Doorbell",
+                    "title": "Visitor at your door",
+                    "text": "Tap to review the recording."
+                  }
+                }
+              }
+            },
+            {
+              "id": "review",
+              "text": "The camera view returns while the phone keeps the notification.",
+              "nodes": [
+                "resident"
+              ],
+              "panelVisibility": {
+                "camera": true
+              },
+              "panels": {
+                "camera": {
+                  "mode": "live"
+                }
+              }
+            },
+            {
+              "id": "offline",
+              "text": "Delivery fails. This path never shows the phone.",
+              "failures": {
+                "doorbell->cloud": "dropped"
+              },
+              "panels": {
+                "camera": {
+                  "mode": "off"
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Notification delivered",
+              "steps": [
+                "quiet",
+                "visit",
+                "notify",
+                "review"
+              ]
+            },
+            {
+              "id": "offline",
+              "label": "Device offline",
+              "steps": [
+                "quiet",
+                "offline"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

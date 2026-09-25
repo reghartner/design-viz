@@ -751,6 +751,13 @@ function stepForm(val, ctx){
       pids.map(function(pid){ return {key: pid, label: pid}; }),
       'none', toggled(planStepTogglePanel)));
     var declarations = (ctx.diagram && ctx.diagram.panels) || [];
+    if(declarations.length)panelRows.unshift(createPanelVisibilityControl({
+      document:document,controls:{row:frow,select:selectControl},diagram:ctx.diagram,step:val,index:t.index,
+      path:stepperFor(t.section) && stepperFor(t.section).path(),
+      commit:function(pid,value){return commitCascade(function(raw){
+        return planStepPanelVisibility(session.text(),raw,t,pid,value,JSON.stringify(val));
+      },{after:refreshFormSoon});}
+    }));
     pids.forEach(function(pid){
       var decl = Array.isArray(declarations) ? declarations.filter(function(p){ return p && p.id === pid; })[0] : null;
       if (decl && panelEditor(decl.type).stepControl) return;
@@ -1400,6 +1407,12 @@ function panelForm(val, ctx){
         {after:function(){ renderInspector(); }});
     })));
     var editor=panelEditor(val.type);
+    var visibility=selectControl(['show','hide'],val.visible===false?'hide':'show',function(value){
+      return commitSimple('visible',value==='hide'?'false':null);
+    });
+    visibility.setAttribute('aria-label','Starting panel visibility');
+    Array.from(visibility.options).forEach(function(o){o.textContent=o.value==='hide'?'Hidden until a step shows it':'Shown';});
+    rows.push(frow('Starting visibility',visibility));
     if(editor.setupRows) editor.setupRows(val,ctx.diagram,t,rows);
     return rows.concat(panelSetupRows(val));
   }

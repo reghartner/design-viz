@@ -618,6 +618,7 @@ PanelRegistry.extend('phone', {
   authoring: {
     notifications: true,
     initialFields: true,
+    transientFields: ['audio'],
     template: { title: 'Phone', initial: { clock: '9:41' } },
     setupFields: [
       [

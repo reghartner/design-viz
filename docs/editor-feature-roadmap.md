@@ -15,12 +15,15 @@ interaction coverage, independent review, and passing CI before merge.
 - [x] **4. Visibility timing** — Captioned start/end controls for connections,
   bullets, and contract rows. Explain and test timing on alternate paths.
   Merged in [PR #222](https://github.com/reghartner/design-viz/pull/222).
-- [ ] **5. Nested prose** — Select, add, indent/outdent, and reorder nested
+- [x] **5. Nested prose** — Select, add, indent/outdent, and reorder nested
   bullets; small formatting helpers using the existing safe text syntax.
-- [ ] **6. Drilldown mappings** — Parent/child step selectors replace mapping
+  Merged in [PR #223](https://github.com/reghartner/design-viz/pull/223).
+- [x] **6. Drilldown mappings** — Parent/child step selectors replace mapping
   JSON, with missing-target feedback and a preview action.
-- [ ] **7. Temporary state** — Carry-forward / this-step-only controls for
+  Merged in [PR #224](https://github.com/reghartner/design-viz/pull/224).
+- [x] **7. Temporary state** — Carry-forward / this-step-only controls for
   supported Camera and Phone fields, with an explicit way to inherit again.
+  Completed in [PR #227](https://github.com/reghartner/design-viz/pull/227).
 
 The authoring model is: what exists, its starting state, and what changes at a
 story step. Raw JSON remains available for advanced fields. Existing paths,

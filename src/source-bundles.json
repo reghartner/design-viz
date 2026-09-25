@@ -36,6 +36,7 @@
     "workbench/commands/visibility.js",
     "workbench/commands/prose.js",
     "workbench/commands/detail-mapping.js",
+    "workbench/commands/panel-duration.js",
     "workbench/commands/contracts.js",
     "workbench/commands/extraction.js",
     "workbench/commands/narrative.js",

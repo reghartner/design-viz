@@ -4,7 +4,7 @@
   template/flowview.html = standalone entrypoint + skeleton + demo spec
   workbench/flowspec.html = workbench entrypoint + skeleton + curated templates
   tools/canon/generated-runtime.cjs = static DOM-free backend entrypoint
-  workbench/diagrams.json = discovered docs/diagrams specs with page.canon
+  workbench/diagrams.json = snapshot of folders listed in root canon.json
 
 The source loader owns entrypoint expansion, exports and asset inventory.
 Deterministic: same src -> byte-identical output. Run from anywhere.
@@ -143,7 +143,7 @@ def main() -> int:
     # Publish against the runtime just built, so newly added panels validate.
     subprocess.run([
         'node', str(ROOT / 'tools/canon/library.mjs'),
-        '--diagrams', str(ROOT / 'docs/diagrams'),
+        '--registry', str(ROOT / 'canon.json'),
         '--out', str(ROOT / 'workbench/diagrams.json'),
     ], check=True)
 

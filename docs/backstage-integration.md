@@ -246,3 +246,14 @@ operations. Service names alone do not generate destinations. The existing
 catalog binding workflow supplies the URLs; no additional menu/schema flag is
 needed. Forge uses its navigation bridge for these links. Company deployment
 requires the updated viewer/Forge bundle as usual.
+
+## Shared canon membership
+
+The company GitHub adapter and nginx publisher use root `canon.json` as their
+membership authority. It lists `diagrams/<name>` folders and their owners; the
+folder determines the stable ID and `<name>.spec.json` / `<name>.html` paths.
+Per-spec flags cannot enroll documents. The package's pure `/backend` helpers
+`parseCanonManifest` and `materializeCanonSpec` let the GitHub adapter use the same
+rules as the static publisher while retaining its transport and authorization.
+Read the manifest and listed files at one approved SHA, then index only authorized
+materialized specs. See [integration details](../apps/backstage/README.md#central-canon-membership).

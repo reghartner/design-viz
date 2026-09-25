@@ -7,6 +7,11 @@ in colored bounding boxes, tab groups, and animated flow diagrams that each offe
 of the same time-aware data — an ambient always-animating view and a guided step-through
 (click-through) view.
 
+Maintained diagrams belong in [`diagrams/`](diagrams/README.md), one subfolder
+per diagram page with its JSON spec and generated HTML together. The directory
+guide covers building and moving existing diagrams. Root [`canon.json`](canon.json)
+is the shared canon membership list for Backstage and the nginx workbench.
+
 ## Connected company flows
 
 For the complete reproducible integration, use the

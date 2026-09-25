@@ -4,12 +4,22 @@ Ordinary HLD specs remain valid and work offline. Connected specs add optional
 metadata. Canonical promotion is a human review, not an inference from Backstage.
 `examples/canon/` is a fictional central repository, catalog and source history.
 
+Maintained diagram pages belong in the top-level [`diagrams/`](../diagrams/README.md)
+directory, with each spec and its generated HTML in one subfolder. Root
+[`canon.json`](../canon.json) is the single authority: adding a folder promotes it;
+removing the entry removes it from canon. Backstage and the nginx workbench read
+this same list. Promotion is a reviewed edit to that file, not a flag in a spec.
+
 ## Authoring contract, version 1
 
-`page.canon` identifies a story:
+A canon entry is `{"folder":"diagrams/doorbell","owner":"group:default/home-team"}`.
+The folder supplies the ID and the `doorbell.spec.json` / `doorbell.html` filenames.
+The provider derives `page.canon` metadata for existing viewer/evidence contracts:
 `{"version":1,"id":"doorbell","kind":"canonical","owner":"group:default/home-team"}`.
-Use `kind:"design"` for proposed HLD stories. Preserve `page.generatedFrom` and
-section `source` links. Code-referenced steps must have stable IDs.
+Authored `page.canon` values cannot override membership, ID or owner. Legacy
+fictional fixtures still accept `kind:"design"` for their rehearsal workflows.
+Preserve `page.generatedFrom` and section `source` links. Code-referenced steps
+must have stable IDs. See the [folder conventions](../diagrams/README.md).
 
 Nodes may have `binding` containing `entityRef`, `label`, `owner`, `catalogUrl`,
 `telemetry:{serviceName}`, and optional `api` with `entityRef`, `title`,
@@ -96,11 +106,11 @@ adapter with fictional data and no company authentication; do not point it at
 private production data. Real deployment supplies authenticated backend routes
 and permission checks, while the browser/editor contract stays the same.
 
-The registry is version 1 with `diagrams:[{id,path,title}]`; paths are relative to
-its file, must stay beneath it, and IDs must match `page.canon.id`. Add further
-specs to the registry to include them in drift scans. Central ownership is kept
-in the spec and catalog. Local mutations are serialized and stale proposals are
-rejected instead of overwriting newer revisions.
+The legacy mock registry is version 1 with `diagrams:[{id,path,title}]`; paths
+are relative to its file, must stay beneath it, and IDs must match `page.canon.id`.
+Add further specs to that registry to include them in demo drift scans. Production
+membership and ownership come from root `canon.json`. Local mutations are
+serialized and stale proposals are rejected instead of overwriting newer revisions.
 
 ## Drift CLI and GitHub integration
 

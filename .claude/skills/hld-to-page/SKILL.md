@@ -233,3 +233,13 @@ build result and actual visual checks; material exclusions, translations,
 uncertainties and remaining limits. Keep the full audit trail in the ledger
 instead of pasting it all into chat. Do not commit, publish, modify a source
 document, or accept a company revision without authorization for that action.
+
+## Maintained diagram library
+
+Maintained pages belong in `diagrams/<name>/` with `<name>.spec.json` and generated
+`<name>.html` together. Root `canon.json` is the shared membership authority for
+Backstage and the nginx workbench; changing `page.canon` alone does not publish
+or promote a document. Use [the folder conventions](../../../diagrams/README.md)
+for file layout and the [publication guide](../../../docs/workbench-canon-library.md)
+for the reviewed membership/build workflow. Do not enroll a newly authored diagram
+unless its promotion is in the user's authorized scope.

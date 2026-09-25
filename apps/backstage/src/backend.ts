@@ -1,3 +1,4 @@
+import manifest from '../../../tools/canon/manifest.cjs';
 import {
   buildEntityDiagramIndex as buildIndex,
   diagramsForEntity as forEntity,
@@ -35,4 +36,23 @@ export function diagramsForEntity(
   entityRef: string,
 ): EntityDiagrams {
   return forEntity(index, entityRef) as EntityDiagrams;
+}
+
+/** Central canon entry resolved to repository-relative document paths. */
+export interface CanonEntry {
+  id: string;
+  folder: string;
+  owner: string;
+  path: string;
+  html: string;
+}
+
+/** Parse root canon.json before fetching the listed files at one approved SHA. */
+export function parseCanonManifest(raw: unknown): CanonEntry[] {
+  return manifest.entries(raw);
+}
+
+/** Derive viewer metadata from an enrolled entry without modifying source JSON. */
+export function materializeCanonSpec(raw: unknown, entry: CanonEntry): unknown {
+  return manifest.spec(raw, entry);
 }

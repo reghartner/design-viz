@@ -51,6 +51,13 @@ exercises the deliberately broken timeout without publishing broken sample code.
 
 ## Connect private company repositories
 
+For the maintained diagram library, set `FLOWVIEW_REGISTRY=canon.json`. This is
+the same root membership file used by Backstage and the nginx workbench; its
+folder entries replace a separate production registry. The runner accepts that
+format and derives compatibility IDs from folder names. The sample registry
+above is only a rehearsal. Enroll at least one diagram before enabling scans;
+the workflow rejects an empty registry.
+
 Copy the runner, its dependencies, workflow and a real spec registry into the
 central repository (or keep an equivalent tooling checkout there). Set
 `FLOWVIEW_REGISTRY` to that registry. Source URLs and pinned SHAs must refer to

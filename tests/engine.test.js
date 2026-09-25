@@ -3118,7 +3118,7 @@ test('fragment reveals: validator covers bad indices, empty intervals, range, an
   assert.ok(w.some(x => x.includes('bullets[0].revealAt') && x.includes('non-negative integer')), w.join('; '));
   assert.ok(w.some(x => x.includes('bullets[1].hideAt') && x.includes('greater than revealAt')), w.join('; '));
   assert.ok(w.some(x => x.includes('contract.fields[0].hideAt') && x.includes('non-negative integer')), w.join('; '));
-  assert.ok(w.some(x => x.includes('edges[0].revealAt') && x.includes('beyond the diagram step count')), w.join('; '));
+  assert.ok(w.some(x => x.includes('edges[0].revealAt') && x.includes('beyond every full path')), w.join('; '));
 
   const noSteps = C.normalize({sections: [{bullets: [{text: 'later', revealAt: 0}],
     diagram: {nodes: {a: {}}, rows: [['a']]}}]});

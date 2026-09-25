@@ -510,6 +510,16 @@ function detailControls(val,ctx){
     draw();return fold;
   }
 
+function visibilityControl(val,ctx){
+    var target=Object.assign({},session.target),expected=JSON.stringify(val);
+    return createVisibilityControl({document:document,value:val,diagram:ctx.diagram,
+      controls:{select:selectControl,row:frow,action:actionButton},error:formError,
+      current:function(){var s=stepperFor(target.section);return s?Object.assign({},s.current(),{path:s.path(),mode:s.mode()}):null;},
+      change:function(key,value){return commitCascade(function(raw){
+        return planFragmentVisibility(session.text(),raw,target,key,value,expected);
+      },{after:refreshFormSoon});}});
+  }
+
 function edgeForm(val, ctx){
     var t = session.target;
     var ids = Object.keys((ctx.diagram && ctx.diagram.nodes) || {});
@@ -556,7 +566,8 @@ function edgeForm(val, ctx){
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
       frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
       frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
-      frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
+      frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); })),
+      visibilityControl(val,ctx)
     ]);
   }
 
@@ -1409,6 +1420,7 @@ function bulletForm(val, ctx){
       note.textContent = val.sub.length + ' nested sub-bullet' + (val.sub.length > 1 ? 's' : '') + ' — edit them in the JSON';
       rows.push(frow('sub', note));
     }
+    rows.push(visibilityControl(val,ctx));
     return rows;
   }
 
@@ -1434,7 +1446,8 @@ function crowForm(val, ctx){
       frow('delta', selectControl(['added', 'removed', 'changed'], val.delta, function(v){
         return commitSimple('delta', v == null ? null : JSON.stringify(v));
       }, true)),
-      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
+      visibilityControl(val,ctx)
     ];
   }
 

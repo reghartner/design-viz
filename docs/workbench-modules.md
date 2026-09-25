@@ -543,3 +543,8 @@ Document vocabulary uses `workbench/commands/vocabulary.js` for atomic definitio
 and first-use edits. `workbench/vocabulary.js` supplies contextual protocol/lane
 controls; it shares the inspector's lifetime and history, with definitions stored
 in `page.protocols` and `page.lanes`. Display names can change without changing IDs.
+
+`workbench/visibility.js` owns captioned path-position controls for fragment
+visibility; `commands/visibility.js` preserves string bullets and advanced fields
+while writing one undoable reveal/hide change. Bounds address full path positions,
+not registry indices or compressed view stops.

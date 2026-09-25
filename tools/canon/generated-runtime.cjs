@@ -521,7 +521,7 @@ function revealFieldWarnings(obj, path, stepCount, warnings){
   });
   if (valid.revealAt && stepCount && obj.revealAt >= stepCount)
     warnings.push(path + '.revealAt: step index ' + obj.revealAt +
-      ' is beyond the diagram step count (' + stepCount + ') — fragment never reveals');
+      ' is beyond every full path (' + stepCount + ' positions at most) — fragment never reveals');
   if (valid.revealAt && valid.hideAt && obj.hideAt <= obj.revealAt)
     warnings.push(path + '.hideAt: must be greater than revealAt (' + obj.revealAt + ') — fragment has no visible step');
 }
@@ -649,7 +649,8 @@ function specStructureErrors(page){
 
 function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!sec || typeof sec !== 'object'){ errors.push(P + ': must be an object'); return; }
-  var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps) ? sec.diagram.steps.length : 0;
+  var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps)
+    ? Math.max.apply(null,[0].concat(diagramPathList(sec.diagram).map(function(p){return p.indices.length;}))) : 0;
   bulletRevealWarnings(sec.bullets, P + '.bullets', sectionStepCount, warnings);
   if (sec.accent && !ACCENTS[sec.accent] && !isHex(sec.accent))
     warnings.push(P + '.accent: unknown accent "' + sec.accent + '" — using the default cycle (valid: ' + Object.keys(ACCENTS).join(' ') + ', or "#RRGGBB")');

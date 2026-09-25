@@ -8495,7 +8495,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
         <dl class="human-guide-glossary"><dt>Page</dt><dd>The whole document, with one or more sections and optional tabs.</dd><dt>Section</dt><dd>One diagram, its panels, and its timeline.</dd><dt>Node / connection</dt><dd>An actor and a directed communication between actors.</dd><dt>Step / path</dt><dd>A moment in the story and the sequence of moments for an outcome.</dd><dt>View</dt><dd>An arrangement of the same section for an audience. It can show fewer panels and fewer stops.</dd></dl>
         <p>The left rail opens <b>Inspect</b>, <b>Steps</b>, <b>Outline</b>, <b>JSON</b>, or <b>File</b> beside it. Each fills the editor; the preview stays on the right. Drag the visible divider right for more editing room. <b>File → Workspace preferences</b> contains <b>Focus workspace</b> and <b>Reset editor width</b>. The top toolbar keeps <b>Add to diagram</b>, <b>Undo</b>, <b>Redo</b>, <b>User guide</b>, and <b>Save</b> available. Use <b>Outline</b> (<kbd>⌘/Ctrl K</kbd>) to find objects across sections and tabs. Canvas selection updates Inspect without switching away from another tool.</p><p>The Flowview wordmark and <b>← New / open</b> return home. Browser Back and Forward work between entry screens and the editor. <b>Continue</b> brings back your current project.</p>
       </section>
-      <section id="hg-connect" tabindex="-1"><p class="human-guide-eyebrow">03 / NODES & CONNECTIONS</p><h3>Arrange the actors. Make each connection explain itself.</h3><p><strong>Rows</strong> keep nodes ordered left to right. Drag a node to another row or position to reorganize the flow. For arbitrary placement, select the node and choose <b>float → Free placement</b>, then drag it anywhere or adjust <b>Float X / Y</b>. Choose an automatic float position or return it to rows when you want automatic placement again.</p><p>To draw a connection, <b>Alt/Option-click a source, then click a destination</b>. You can also use <b>Connect from this node</b> in the inspector, or <b>Add to diagram → Connection</b>. A preview arrow shows where you are connecting. <kbd>Esc</kbd> cancels. Connections stay within a section; an existing ordinary connection is not duplicated.</p><p>Select the connection to edit its label, <b>Connection type</b>, and arrow behavior. All built-in protocols are available. Use <b>New connection type…</b> for a custom name/color; creation also assigns it to this connection. <b>Edit connection type</b> updates its name/color everywhere in the document. Step inspectors provide the matching <b>Story lane</b> and <b>New lane…</b> controls. Display-name edits preserve IDs and advanced palette colors; setting a color replaces that palette. <b>Exit side</b> and <b>Entry side</b> choose its attachment edges; the position percentage moves an endpoint along that side. Use these when automatic routing obscures a relationship.</p><p><b>Fit width</b> uses the available width; <b>Readable</b> preserves node readability and lets you pan horizontally when the board overflows. These controls change your viewing scale, not the authored node positions.</p><aside class="human-guide-tip"><strong>Give a large process its own detail.</strong> A node’s <b>Create detail flow</b> starts a drilldown into another section. Readers keep context through the overview map and breadcrumbs. A pointer to another diagram is a separate document handoff, useful for an independently maintained process.</aside>
+      <section id="hg-connect" tabindex="-1"><p class="human-guide-eyebrow">03 / NODES & CONNECTIONS</p><h3>Arrange the actors. Make each connection explain itself.</h3><p><strong>Rows</strong> keep nodes ordered left to right. Drag a node to another row or position to reorganize the flow. For arbitrary placement, select the node and choose <b>float → Free placement</b>, then drag it anywhere or adjust <b>Float X / Y</b>. Choose an automatic float position or return it to rows when you want automatic placement again.</p><p>To draw a connection, <b>Alt/Option-click a source, then click a destination</b>. You can also use <b>Connect from this node</b> in the inspector, or <b>Add to diagram → Connection</b>. A preview arrow shows where you are connecting. <kbd>Esc</kbd> cancels. Connections stay within a section; an existing ordinary connection is not duplicated.</p><p>Select the connection to edit its label, <b>Connection type</b>, and arrow behavior. All built-in protocols are available. Use <b>New connection type…</b> for a custom name/color; creation also assigns it to this connection. <b>Edit connection type</b> updates its name/color everywhere in the document. Step inspectors provide the matching <b>Story lane</b> and <b>New lane…</b> controls. Display-name edits preserve IDs and advanced palette colors; setting a color replaces that palette. <b>Exit side</b> and <b>Entry side</b> choose its attachment edges; the position percentage moves an endpoint along that side. Use these when automatic routing obscures a relationship.</p><p>Connections, bullets, and contract fields have <b>Visibility by path position</b> in their inspector. Choose <b>Show from position</b> and <b>Hide starting at position</b>, using the full story’s captions as a guide. These one-based positions apply on every alternate path, even if a view hides some stops; they stay in place when you reorder steps. <b>Caption path</b> previews the other path’s captions. The current-position buttons use the full path position. Ambient mode shows everything.</p><p><b>Fit width</b> uses the available width; <b>Readable</b> preserves node readability and lets you pan horizontally when the board overflows. These controls change your viewing scale, not the authored node positions.</p><aside class="human-guide-tip"><strong>Give a large process its own detail.</strong> A node’s <b>Create detail flow</b> starts a drilldown into another section. Readers keep context through the overview map and breadcrumbs. A pointer to another diagram is a separate document handoff, useful for an independently maintained process.</aside>
       </section>
       <section id="hg-steps" tabindex="-1"><p class="human-guide-eyebrow">04 / STEPS & PLAYBACK</p><h3>A step is a change, not a screenshot.</h3><p>Use <b>Steps</b> to select, search, append, duplicate, or move beats earlier and later. A useful caption explains what changed and why: “The recording service stores the clip before notifying the resident.” Captions and prose support backticks for inline code and triple backticks for code blocks; node labels stay plain text.</p><p><b>ADD TO STEP</b> selects the nodes, edges, and panels involved in a beat. Finish this mode before trying to edit or connect objects normally. Panel fields describe what changes at that beat. A value you do not change usually carries forward from earlier steps on the selected path. The <b>Effective state · all panels</b> inspector explains whether a value is initial, set here, inherited, or transient.</p><p>Use the numbered circles and previous/next controls to walk the story. Play starts automatic advancement; Pause holds the current beat. Under <b>Playback settings</b>, choose the opening view and whether it should autoplay. The editor starts paused even when the exported viewer is configured to autoplay. Ambient view animates the overall diagram; step view follows one path.</p><p>You can color an individual step circle to mark a phase change without making an alternate path. Use a branch only when the outcome or sequence actually differs.</p>
       </section>
@@ -9504,7 +9504,7 @@ function revealFieldWarnings(obj, path, stepCount, warnings){
   });
   if (valid.revealAt && stepCount && obj.revealAt >= stepCount)
     warnings.push(path + '.revealAt: step index ' + obj.revealAt +
-      ' is beyond the diagram step count (' + stepCount + ') — fragment never reveals');
+      ' is beyond every full path (' + stepCount + ' positions at most) — fragment never reveals');
   if (valid.revealAt && valid.hideAt && obj.hideAt <= obj.revealAt)
     warnings.push(path + '.hideAt: must be greater than revealAt (' + obj.revealAt + ') — fragment has no visible step');
 }
@@ -9632,7 +9632,8 @@ function specStructureErrors(page){
 
 function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!sec || typeof sec !== 'object'){ errors.push(P + ': must be an object'); return; }
-  var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps) ? sec.diagram.steps.length : 0;
+  var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps)
+    ? Math.max.apply(null,[0].concat(diagramPathList(sec.diagram).map(function(p){return p.indices.length;}))) : 0;
   bulletRevealWarnings(sec.bullets, P + '.bullets', sectionStepCount, warnings);
   if (sec.accent && !ACCENTS[sec.accent] && !isHex(sec.accent))
     warnings.push(P + '.accent: unknown accent "' + sec.accent + '" — using the default cycle (valid: ' + Object.keys(ACCENTS).join(' ') + ', or "#RRGGBB")');
@@ -26639,7 +26640,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var id = prefix + '-e' + i;
     var k = protos[e.kind] ? e.kind : 'int';
     edgeIds[e.from + '->' + e.to] = {domId:id, e:e, kind:k, idx:i};
-    if (L.routing === 'lanes') s += '<path class="lane-bridge" stroke="'+SK.bg+'" d="'+edgePath(e,L,ADJ[i])+'"/>';
+    if (L.routing === 'lanes') s += '<path class="lane-bridge" data-dv-edge="'+i+'"'+fragmentAttrs(e)+' stroke="'+SK.bg+'" d="'+edgePath(e,L,ADJ[i])+'"/>';
     s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + (e.delta === true ? ' dvd' : '') + '"' +
          ' data-dv-edge="' + i + '"' +
          fragmentAttrs(e) + ' style="' + protocolColorStyle(protos, k) +
@@ -31050,6 +31051,23 @@ function planVocabulary(text,raw,target,kind,id,changes,create,expectedTarget){
   }
   return jsonReplaceValue(text,[],JSON.stringify(copy,null,2)) || {error:'Could not update the document.'};
 }
+/* ---- src/workbench/commands/visibility.js ---- */
+/* Reveal windows are positions in the full selected path, not registry IDs. */
+function planFragmentVisibility(text,raw,target,key,value,expected){
+  if(['edge','bullet','crow'].indexOf(target.kind)<0 || ['revealAt','hideAt'].indexOf(key)<0)
+    return {error:'Select a connection, bullet, or contract row.'};
+  if(value!==null && (!Number.isInteger(value) || value<0))return {error:'Use a whole path position of 1 or later.'};
+  var path=builderTargetPath(raw,target),item=path && specValueAt(raw,path);
+  if(item==null || (expected!==undefined && JSON.stringify(item)!==expected))
+    return {error:'The selected item changed. Select it again before editing visibility.'};
+  if(typeof item==='string' && target.kind==='bullet')item={text:item};
+  if(!specObject(item))return {error:'Correct this item in JSON before editing its visibility.'};
+  var next=Object.assign({},item);
+  if(value===null)delete next[key];else next[key]=value;
+  if(Number.isInteger(next.revealAt) && Number.isInteger(next.hideAt) && next.hideAt<=next.revealAt)
+    return {error:'Hide must start after Show from. Clear the other bound to move the whole interval.'};
+  return planReplaceValue(text,raw,path,JSON.stringify(next,null,2));
+}
 /* ---- src/workbench/commands/contracts.js ---- */
 /* Contract-block authoring; raw addresses preserve page wrappers and tabs. */
 function planAddContract(text,raw,section,copy){
@@ -32846,6 +32864,48 @@ function createVocabularyControl(options){
     return options.update(key,{label:label,color:color.value.trim()},true);
   }));wrap.appendChild(add);return wrap;
 }
+/* ---- src/workbench/visibility.js ---- */
+/* Shared reveal controls for connections, prose and contract fields. */
+function createVisibilityControl(options){
+  var doc=options.document,c=options.controls,d=options.diagram || {},paths=diagramPathList(d);
+  var max=Math.max.apply(null,[0].concat(paths.map(function(p){return p.indices.length;})));
+  var wrap=doc.createElement('details');wrap.className='rawjson visibility-control';
+  var heading=doc.createElement('summary');heading.textContent='Visibility by path position';wrap.appendChild(heading);
+  wrap.open=options.value.revealAt!=null || options.value.hideAt!=null;
+  var note=doc.createElement('p');note.className='fnote';
+  note.textContent='Applies to the same position in every path, including steps hidden in this view. Show is inclusive; Hide starts at that position. Ambient mode shows everything. Reordering steps keeps these positions.';wrap.appendChild(note);
+  if(!max){note.textContent='Add story steps to this section to preview visibility timing. Ambient mode shows everything.';}
+  var active=options.current(),route=paths.find(function(p){return active && p.id===active.path;}) || paths[0];
+  var path=c.select(paths.map(function(p){return p.id;}),route.id,function(id){route=paths.find(function(p){return p.id===id;});draw();return true;});
+  path.setAttribute('aria-label','Caption path');
+  Array.from(path.options).forEach(function(o){o.textContent=paths.find(function(p){return p.id===o.value;}).label;});
+  if(paths.length>1)wrap.appendChild(c.row('Caption path',path));
+  var bounds=doc.createElement('div');wrap.appendChild(bounds);
+  function draw(){
+    bounds.innerHTML='';
+    [['revealAt','Show from position','Beginning'],['hideAt','Hide starting at position','Never hide']].forEach(function(field){
+      var key=field[0],value=options.value[key],limit=max+(key==='hideAt'?1:0),values=[];
+      for(var n=0;n<limit;n++)values.push(String(n));
+      if(value!=null && values.indexOf(String(value))<0)values.push(String(value));
+      var select=c.select(values,value==null?'':String(value),function(v){return options.change(key,v==null || v===''?null:Number(v));},true);
+      select.setAttribute('aria-label',field[1]);
+      Array.from(select.options).forEach(function(o){
+        if(o.value===''){o.textContent=field[2];return;}
+        var index=Number(o.value),step=(d.steps || [])[route.indices[index]];
+        o.textContent='Position '+(index+1)+' — '+(step?(step.text || step.id || 'Untitled step')+(step.id?' · '+step.id:''):'This path has ended');
+      });bounds.appendChild(c.row(field[1],select));
+    });
+  }
+  draw();
+  [['revealAt','Show from current position'],['hideAt','Hide from current position']].forEach(function(field){
+    var button=c.action(field[1],function(){
+      var now=options.current();
+      if(!now || now.mode!=='step'){options.error('Select a story step in the preview first.');return false;}
+      return options.change(field[0],now.n);
+    });button.disabled=!max;wrap.appendChild(button);
+  });
+  return wrap;
+}
 /* ---- src/workbench/inspector.js ---- */
 /* Instance-owned form DOM, panel editor cache and deferred refresh. Commands and
    read models remain shared leaves; source/history publication belongs to session. */
@@ -33359,6 +33419,16 @@ function detailControls(val,ctx){
     draw();return fold;
   }
 
+function visibilityControl(val,ctx){
+    var target=Object.assign({},session.target),expected=JSON.stringify(val);
+    return createVisibilityControl({document:document,value:val,diagram:ctx.diagram,
+      controls:{select:selectControl,row:frow,action:actionButton},error:formError,
+      current:function(){var s=stepperFor(target.section);return s?Object.assign({},s.current(),{path:s.path(),mode:s.mode()}):null;},
+      change:function(key,value){return commitCascade(function(raw){
+        return planFragmentVisibility(session.text(),raw,target,key,value,expected);
+      },{after:refreshFormSoon});}});
+  }
+
 function edgeForm(val, ctx){
     var t = session.target;
     var ids = Object.keys((ctx.diagram && ctx.diagram.nodes) || {});
@@ -33405,7 +33475,8 @@ function edgeForm(val, ctx){
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
       frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
       frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
-      frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); }))
+      frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); })),
+      visibilityControl(val,ctx)
     ]);
   }
 
@@ -34258,6 +34329,7 @@ function bulletForm(val, ctx){
       note.textContent = val.sub.length + ' nested sub-bullet' + (val.sub.length > 1 ? 's' : '') + ' — edit them in the JSON';
       rows.push(frow('sub', note));
     }
+    rows.push(visibilityControl(val,ctx));
     return rows;
   }
 
@@ -34283,7 +34355,8 @@ function crowForm(val, ctx){
       frow('delta', selectControl(['added', 'removed', 'changed'], val.delta, function(v){
         return commitSimple('delta', v == null ? null : JSON.stringify(v));
       }, true)),
-      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
+      frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
+      visibilityControl(val,ctx)
     ];
   }
 

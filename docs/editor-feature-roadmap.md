@@ -9,8 +9,9 @@ interaction coverage, independent review, and passing CI before merge.
 - [x] **2. Notifications** — Shared Phone / Device App composer for app, title,
   and message; add/remove/reorder, clear earlier notifications, and initial state.
   Merged in [PR #219](https://github.com/reghartner/design-viz/pull/219).
-- [ ] **3. Protocols and lanes** — All built-in protocols are selectable; create
+- [x] **3. Protocols and lanes** — All built-in protocols are selectable; create
   and edit custom connection types and story lanes through the inspector.
+  Merged in [PR #220](https://github.com/reghartner/design-viz/pull/220).
 - [ ] **4. Visibility timing** — Captioned start/end controls for connections,
   bullets, and contract rows. Explain and test timing on alternate paths.
 - [ ] **5. Nested prose** — Select, add, indent/outdent, and reorder nested

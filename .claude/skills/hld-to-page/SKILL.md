@@ -44,6 +44,10 @@ For a small edit, update the affected story/ledger rows rather than restarting.
   in the panel inspector. Set defaults there and authored changes on steps;
   keep advanced initial fields intact. Phone and Device App also offer a shared
   notification composer for initial and per-step messages; clear runs before add.
+  Fragment inspectors expose **Visibility by path position** for edges, bullets,
+  and contract rows. The UI is one-based; `revealAt` / `hideAt` remain zero-based
+  positions in each full selected path, including stops hidden by a view.
+  Show is inclusive, Hide starts at its bound, and ambient shows all fragments.
   Connections expose all built-in protocols and custom name/color creation;
   story lanes use the same document-wide vocabulary controls. See the workbench User guide → Visual panels.
 - Ask a focused question if a contradiction or missing fact prevents an honest

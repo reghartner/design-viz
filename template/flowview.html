@@ -7917,7 +7917,7 @@ function revealFieldWarnings(obj, path, stepCount, warnings){
   });
   if (valid.revealAt && stepCount && obj.revealAt >= stepCount)
     warnings.push(path + '.revealAt: step index ' + obj.revealAt +
-      ' is beyond the diagram step count (' + stepCount + ') — fragment never reveals');
+      ' is beyond every full path (' + stepCount + ' positions at most) — fragment never reveals');
   if (valid.revealAt && valid.hideAt && obj.hideAt <= obj.revealAt)
     warnings.push(path + '.hideAt: must be greater than revealAt (' + obj.revealAt + ') — fragment has no visible step');
 }
@@ -8045,7 +8045,8 @@ function specStructureErrors(page){
 
 function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!sec || typeof sec !== 'object'){ errors.push(P + ': must be an object'); return; }
-  var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps) ? sec.diagram.steps.length : 0;
+  var sectionStepCount = sec.diagram && Array.isArray(sec.diagram.steps)
+    ? Math.max.apply(null,[0].concat(diagramPathList(sec.diagram).map(function(p){return p.indices.length;}))) : 0;
   bulletRevealWarnings(sec.bullets, P + '.bullets', sectionStepCount, warnings);
   if (sec.accent && !ACCENTS[sec.accent] && !isHex(sec.accent))
     warnings.push(P + '.accent: unknown accent "' + sec.accent + '" — using the default cycle (valid: ' + Object.keys(ACCENTS).join(' ') + ', or "#RRGGBB")');
@@ -25052,7 +25053,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var id = prefix + '-e' + i;
     var k = protos[e.kind] ? e.kind : 'int';
     edgeIds[e.from + '->' + e.to] = {domId:id, e:e, kind:k, idx:i};
-    if (L.routing === 'lanes') s += '<path class="lane-bridge" stroke="'+SK.bg+'" d="'+edgePath(e,L,ADJ[i])+'"/>';
+    if (L.routing === 'lanes') s += '<path class="lane-bridge" data-dv-edge="'+i+'"'+fragmentAttrs(e)+' stroke="'+SK.bg+'" d="'+edgePath(e,L,ADJ[i])+'"/>';
     s += '<path id="' + id + '" class="edge dv-protocol-stroke ' + (e.ret ? 'retm' : 'main') + (e.delta === true ? ' dvd' : '') + '"' +
          ' data-dv-edge="' + i + '"' +
          fragmentAttrs(e) + ' style="' + protocolColorStyle(protos, k) +

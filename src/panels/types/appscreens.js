@@ -49,7 +49,7 @@
     var status = panel.frame !== 'none' && (clock || date) ? '<div class="appscreen-statusbar">' +
       (clock ? '<span class="appscreen-clock" title="' + esc(clock) + '">' + esc(clock) + '</span>' : '') +
       (date ? '<span class="appscreen-date" title="' + esc(date) + '">' + esc(date) + '</span>' : '') +
-      '<span class="appscreen-glyphs" aria-hidden="true">▂▄▆ · ▰</span></div>' : '';
+      '<span class="appscreen-glyphs" aria-hidden="true">'+FlowIcons.render('signal',{monochrome:true})+FlowIcons.render('battery-full',{monochrome:true})+'</span></div>' : '';
     var before = '<figure class="appscreens" style="--appscreen-ratio:' + ratio.toFixed(6) + '"><div class="appscreen-stage"><div class="appscreen-viewport' +
       (panel.frame !== 'none' ? ' appscreen-phone' : '') + '">' +
       status +

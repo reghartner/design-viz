@@ -7,6 +7,7 @@ var HOMEMAP_STATES = {
 };
 var HOMEMAP_THERMAL = ['normal', 'warm', 'hot', 'cold', 'freezing'];
 var HOMEMAP_SPOTLIGHT = ['off', 'on', 'flash'];
+function homemapIconValid(value) { return value === null || ICON_SET.indexOf(value) >= 0; }
 function homemapAudioValid(value) {
   var warnings = [];
   return FlowAudio.clean(value, 'audio', warnings) !== undefined && !warnings.length;
@@ -16,7 +17,8 @@ function homemapSubjectPatchValid(value) {
   if (!panelObject(value)) return false;
   var position = Object.prototype.hasOwnProperty.call(value, 'x') || Object.prototype.hasOwnProperty.call(value, 'y');
   return (!position || homemapSubjectPosition(value)) &&
-    (position || Object.prototype.hasOwnProperty.call(value, 'audio')) &&
+    (position || Object.prototype.hasOwnProperty.call(value, 'audio') || Object.prototype.hasOwnProperty.call(value, 'icon')) &&
+    (!Object.prototype.hasOwnProperty.call(value, 'icon') || homemapIconValid(value.icon)) &&
     (!Object.prototype.hasOwnProperty.call(value, 'audio') || homemapAudioValid(value.audio));
 }
 function homemapDevicePatchValid(kind, value) {
@@ -28,6 +30,7 @@ function homemapDevicePatchValid(kind, value) {
         ? HOMEMAP_STATES[kind].indexOf(value[k]) >= 0
         : k === 'thermal' ? HOMEMAP_THERMAL.indexOf(value[k]) >= 0
         : k === 'spotlight' ? HOMEMAP_SPOTLIGHT.indexOf(value[k]) >= 0
+        : k === 'icon' ? homemapIconValid(value[k])
         : k === 'audio' && homemapAudioValid(value[k]);
     })
   );
@@ -123,12 +126,14 @@ function homemapPatchWarnings(obj, path, declaration, warnings) {
       var subPatch = obj[k];
       if (subPatch !== null && (!panelObject(subPatch) ||
           ((!homemapSubjectPosition(subPatch)) &&
-           (subPatch.x !== undefined || subPatch.y !== undefined || !Object.prototype.hasOwnProperty.call(subPatch, 'audio')))))
+           (subPatch.x !== undefined || subPatch.y !== undefined || (!Object.prototype.hasOwnProperty.call(subPatch, 'audio') && !Object.prototype.hasOwnProperty.call(subPatch, 'icon'))))))
         warnings.push(
-          path + '.' + k + ': expected an object with finite x/y or null; audio-only objects also supported — invalid subject position ignored'
+          path + '.' + k + ': expected an object with finite x/y or null; audio-only and icon-only objects also supported — invalid subject position ignored'
         );
       if (panelObject(subPatch) && Object.prototype.hasOwnProperty.call(subPatch, 'audio'))
         FlowAudio.clean(subPatch.audio, path + '.' + k + '.audio', warnings);
+      if (panelObject(subPatch) && Object.prototype.hasOwnProperty.call(subPatch, 'icon') && !homemapIconValid(subPatch.icon))
+        warnings.push(path + '.' + k + '.icon: expected a known icon or null — ignored');
     } else if (!devices[k]) {
       warnings.push(path + '.' + k + ': undeclared device or subject id — patch ignored');
     } else {
@@ -137,6 +142,10 @@ function homemapPatchWarnings(obj, path, declaration, warnings) {
         Object.keys(obj[k]).forEach(function (field) {
           if (field === 'audio') {
             FlowAudio.clean(obj[k].audio, path + '.' + k + '.audio', warnings);
+            return;
+          }
+          if (field === 'icon') {
+            if (!homemapIconValid(obj[k].icon)) warnings.push(path + '.' + k + '.icon: expected a known icon or null — ignored');
             return;
           }
           var allowed = field === 'state' ? vocab : field === 'thermal' ? HOMEMAP_THERMAL : field === 'spotlight' ? HOMEMAP_SPOTLIGHT : null;
@@ -253,7 +262,7 @@ function homemapDeclarationWarnings(panel, path, warnings) {
       )
         warnings.push(dp + '.doorSwing: use an angle from -135 to -15 or 15 to 135 — using 90');
     }
-    if (d.kind === 'sensor' && d.icon !== undefined && ICON_SET.indexOf(d.icon) < 0)
+    if (['sensor', 'camera', 'hub'].indexOf(d.kind) >= 0 && d.icon !== undefined && ICON_SET.indexOf(d.icon) < 0)
       warnings.push(dp + '.icon: unknown icon "' + d.icon + '" — using "gear"');
     if (!duplicate && homemapDeviceValid(d)) devices[d.id] = d;
   });
@@ -292,7 +301,8 @@ function foldHomemapStates(panel, steps) {
         if (!panelObject(subPatch)) return;
         var position = homemapSubjectPosition(subPatch);
         var audio = Object.prototype.hasOwnProperty.call(subPatch, 'audio') ? FlowAudio.clean(subPatch.audio) : undefined;
-        if (!position && audio === undefined) return;
+        var hasIcon = Object.prototype.hasOwnProperty.call(subPatch, 'icon') && homemapIconValid(subPatch.icon);
+        if (!position && audio === undefined && !hasIcon) return;
         var subjectNext = Object.assign({}, panelObject(carried[k]) ? carried[k] : {});
         if (position) {
           subjectNext.x = subPatch.x;
@@ -300,6 +310,7 @@ function foldHomemapStates(panel, steps) {
           delete subjectNext._homemapHidden;
         } else if (carried[k] === null) subjectNext._homemapHidden = true;
         if (audio !== undefined) subjectNext.audio = audio;
+        if (hasIcon) subjectNext.icon = subPatch.icon;
         carried[k] = subjectNext;
         return;
       }
@@ -319,6 +330,7 @@ function foldHomemapStates(panel, steps) {
           var audio = FlowAudio.clean(update.audio);
           if (audio !== undefined) next.audio = audio;
         }
+        if (Object.prototype.hasOwnProperty.call(update, 'icon') && homemapIconValid(update.icon)) next.icon = update.icon;
         /* Legacy scalar values still select the operating state; an invalid
            scalar gets the documented default in homemapModel. */
         if (!panelObject(patch[k])) next.state = patch[k];
@@ -406,7 +418,8 @@ function homemapModel(panel, state) {
           : 'normal',
       spotlight: panelObject(devicePatch) && HOMEMAP_SPOTLIGHT.indexOf(devicePatch.spotlight) >= 0 ? devicePatch.spotlight : 'off',
       audio: panelObject(devicePatch) ? FlowAudio.clean(devicePatch.audio) : undefined,
-      icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
+      icon: panelObject(devicePatch) && ICON_SET.indexOf(devicePatch.icon) >= 0 ? devicePatch.icon :
+        ICON_SET.indexOf(d.icon) >= 0 ? d.icon : d.icon === undefined && d.kind === 'camera' ? 'camera' : d.icon === undefined && d.kind === 'hub' ? 'router' : 'gear',
       facing: ((facing % 360) + 360) % 360,
       spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
       range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70,
@@ -428,7 +441,8 @@ function homemapModel(panel, state) {
     return {
       id: sub.id,
       label: String(sub.label != null ? sub.label : sub.id),
-      icon: sub.icon === undefined ? null : ICON_SET.indexOf(sub.icon) >= 0 ? sub.icon : 'gear',
+      icon: panelObject(value) && ICON_SET.indexOf(value.icon) >= 0 ? value.icon :
+        sub.icon === undefined ? null : ICON_SET.indexOf(sub.icon) >= 0 ? sub.icon : 'gear',
       x: clamp(position.x, 0, 320),
       y: clamp(position.y, 0, 180),
       hidden: value === null || !!(value && value._homemapHidden),
@@ -554,7 +568,7 @@ function homemapThermalHTML(d, scaleY, clearing) {
         i * 60 +
         ')" d="M0 -11 V-19 M-3 -16 L0 -13 L3 -16"/>';
     s +=
-      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><path d="M0 -4 V4 M-3.5 -2 L3.5 2 M-3.5 2 L3.5 -2"/></g>';
+      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><g transform="translate(-5 -5) scale(.416667)">' + FlowIcons.glyph('snowflake') + '</g></g>';
   } else {
     [-8, 0, 8].forEach(function (x, i) {
       s +=
@@ -571,7 +585,7 @@ function homemapThermalHTML(d, scaleY, clearing) {
         ' -27"/>';
     });
     s +=
-      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><use href="#i-thermo" x="-5" y="-5" width="10" height="10"/></g>';
+      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><g transform="translate(-5 -5) scale(.416667)">' + FlowIcons.glyph(thermal === 'hot' ? 'hot' : 'temperature',{tone:thermal === 'hot' ? 'alert' : 'warn'}) + '</g></g>';
   }
   return s + '</g>';
 }
@@ -997,15 +1011,12 @@ PanelViews.register(
             (d.y + 5) +
             ' h7"/>';
         } else {
-          var deviceIcon = d.kind === 'camera' ? 'camera' : d.kind === 'hub' ? 'router' : d.icon;
           s +=
-            '<use class="hmicon hmdeviceglyph" href="#i-' +
-            esc(deviceIcon) +
-            '" x="' +
+            '<g class="hmicon hmdeviceglyph" transform="translate(' +
             (d.x - 6) +
-            '" y="' +
+            ' ' +
             (d.y - 6) +
-            '" width="12" height="12"/>';
+            ') scale(.5)">' + FlowIcons.glyph(d.icon) + '</g>';
         }
         var labelY = d.y > 139 ? d.y - 25 : d.y + 20;
         var labelX = clamp(d.x, 28, 292);
@@ -1047,13 +1058,11 @@ PanelViews.register(
         s += '<circle class="hmsubjectdot" cx="' + sub.x + '" cy="' + sub.y + '" r="7"/>';
         if (sub.icon)
           s +=
-            '<use class="hmactor-icon" href="#i-' +
-            esc(sub.icon) +
-            '" x="' +
+            '<g class="hmactor-icon" transform="translate(' +
             (sub.x - 5) +
-            '" y="' +
+            ' ' +
             (sub.y - 5) +
-            '" width="10" height="10"/>';
+            ') scale(.416667)">' + FlowIcons.glyph(sub.icon) + '</g>';
         else
           s +=
             '<circle class="hmactor-icon" cx="' +
@@ -1584,7 +1593,7 @@ function builderHomemapLayoutScene(panel) {
   return { state: state, model: homemapModel(panel, state), hidden: hidden };
 }
 
-/* Change one device attribute or subject audio without capturing inherited sibling fields. */
+/* Change one device attribute or subject audio/icon without capturing inherited siblings. */
 function planHomemapDeviceAttribute(
   text,
   raw,
@@ -1595,7 +1604,7 @@ function planHomemapDeviceAttribute(
   attribute,
   value
 ) {
-  if (['state', 'thermal', 'spotlight', 'audio'].indexOf(attribute) < 0) return { error: 'Unknown device attribute.' };
+  if (['state', 'thermal', 'spotlight', 'audio', 'icon'].indexOf(attribute) < 0) return { error: 'Unknown device attribute.' };
   var got =
     stepIdx === null
       ? builderDiagram(text, raw, sectionIdx)
@@ -1610,12 +1619,14 @@ function planHomemapDeviceAttribute(
       return homemapDeviceValid(d) && d.id === key;
     });
   var subject = homemapSubjects(panel).find(function (sub) { return sub.id === key; });
-  if (!device && !(subject && attribute === 'audio')) return { error: 'Device or subject not found.' };
+  if (!device && !(subject && ['audio','icon'].indexOf(attribute) >= 0)) return { error: 'Device or subject not found.' };
   var allowed = attribute === 'state' ? HOMEMAP_STATES[device.kind] : attribute === 'thermal' ? HOMEMAP_THERMAL : HOMEMAP_SPOTLIGHT;
-  if (value !== undefined && (attribute === 'audio' ? !homemapAudioValid(value) : allowed.indexOf(value) < 0))
+  if (value !== undefined && (attribute === 'audio' ? !homemapAudioValid(value) : attribute === 'icon' ? !homemapIconValid(value) : allowed.indexOf(value) < 0))
     return { error: 'Choose a valid ' + attribute + '.' };
   var patch = stepIdx === null ? panel.initial : (stepPanelPatch(got.st) || {})[panelId];
   var current = patch && patch[key];
+  if (subject && current === null && attribute === 'icon')
+    return {error:'This subject is hidden at this step. Show it before setting its icon.'};
   var next = panelObject(current)
     ? Object.assign({}, current)
     : typeof current === 'string'
@@ -1651,7 +1662,7 @@ function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, valu
   if (!device && !subject && key !== 'signals') return { error: 'Unknown homemap field.' };
   if (value !== undefined) {
     if (device && !homemapDevicePatchValid(device.kind, value))
-      return { error: 'Choose a valid device state, temperature, spotlight, or audio snapshot.' };
+      return { error: 'Choose a valid device state, temperature, spotlight, icon, or audio snapshot.' };
     if (
       subject &&
       value !== null &&
@@ -1859,10 +1870,10 @@ PanelRegistry.extend('homemap', {
       var subject = homemapSubjects(p).some(function (s) {
         return s.id === key;
       });
-      if (subject && panelObject(snapshot[key]) && Object.prototype.hasOwnProperty.call(snapshot[key], 'audio'))
-        return history([key], true, 'Subject position and audio history');
+      if (subject && panelObject(snapshot[key]) && (Object.prototype.hasOwnProperty.call(snapshot[key], 'audio') || Object.prototype.hasOwnProperty.call(snapshot[key], 'icon')))
+        return history([key], true, 'Subject position, icon, and audio history');
       if (!subject && panelObject(snapshot[key]))
-        return history([key], true, 'Device state, spotlight, temperature, and audio history');
+        return history([key], true, 'Device state, spotlight, temperature, icon, and audio history');
       return assignment(
         key,
         subject
@@ -1878,6 +1889,18 @@ PanelRegistry.extend('homemap', {
       function listen(target,type,fn,options){
         if(context.listen)return context.listen(target,type,fn,options);
         target.addEventListener(type,fn,options);
+      }
+      function homemapIconControl(item, local, commit, initial) {
+        var authored = panelObject(local) && Object.prototype.hasOwnProperty.call(local, 'icon');
+        var input = context.controls.select(['__default__'].concat(ICON_SET),
+          authored ? local.icon === null ? '__default__' : local.icon : '', function (value) {
+            return commit(value == null ? undefined : value === '__default__' ? null : value);
+          }, true);
+        input.options[0].textContent = initial ? 'Use layout icon' : 'Inherit previous icon';
+        input.options[1].textContent = 'Restore layout icon';
+        input.setAttribute('aria-label', item.label + (initial ? ' initial' : '') + ' icon');
+        input.setAttribute('data-icon-default-label', initial ? 'Use layout icon' : 'Inherit previous icon');
+        return context.controls.row(item.label + ' · icon', context.controls.iconPicker(input));
       }
       function homemapAudioControl(item, local, commit, initial) {
         var box = document.createElement('details');
@@ -2227,8 +2250,13 @@ PanelRegistry.extend('homemap', {
                   attribute,
                   value
                 );
-              if (homemapSubjectPosition(value) && panelObject(snapshot.patch[key]) && Object.prototype.hasOwnProperty.call(snapshot.patch[key], 'audio') && !Object.prototype.hasOwnProperty.call(value, 'audio'))
-                value = Object.assign({}, value, { audio: snapshot.patch[key].audio });
+              if (homemapSubjectPosition(value) && panelObject(snapshot.patch[key])) {
+                value = Object.assign({}, value);
+                ['audio','icon'].forEach(function(field) {
+                  if (Object.prototype.hasOwnProperty.call(snapshot.patch[key], field) && !Object.prototype.hasOwnProperty.call(value, field))
+                    value[field] = snapshot.patch[key][field];
+                });
+              }
               return planStepHomemapField(
                 context.source(),
                 raw,
@@ -2278,7 +2306,7 @@ PanelRegistry.extend('homemap', {
           return select;
         }
         note(
-          'Operating state, temperature, spotlight, and audio carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.'
+          'Operating state, temperature, spotlight, icon, and audio carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.'
         );
         var body = document.createElement('div');
         body.className = 'home-edit-body';
@@ -2335,6 +2363,8 @@ PanelRegistry.extend('homemap', {
             panelObject(ownPatch) && Object.prototype.hasOwnProperty.call(ownPatch, 'spotlight') ? d.spotlight : '',
             d.label + ' spotlight', function (v) { commit(d.id, v === '' ? undefined : v, null, 'spotlight'); }
           )));
+          if (d.kind !== 'entry') fields.appendChild(homemapIconControl(d, ownPatch,
+            function (v) { return commit(d.id, v, null, 'icon'); }, false));
           fields.appendChild(homemapAudioControl(d, ownPatch, function (v) { return commit(d.id, v, null, 'audio'); }, false));
         });
         var armedSubject = null;
@@ -2355,9 +2385,13 @@ PanelRegistry.extend('homemap', {
             own(sub.id) && (snapshot.patch[sub.id] === null || homemapSubjectPosition(snapshot.patch[sub.id])) ? (sub.hidden ? 'hide' : 'show') : 'inherit',
             sub.label + ' visibility',
             function (v) {
+              var inherited = {};
+              if (panelObject(snapshot.patch[sub.id])) ['audio','icon'].forEach(function(field) {
+                if (Object.prototype.hasOwnProperty.call(snapshot.patch[sub.id], field)) inherited[field] = snapshot.patch[sub.id][field];
+              });
               commit(
                 sub.id,
-                v === 'inherit' ? (panelObject(snapshot.patch[sub.id]) && Object.prototype.hasOwnProperty.call(snapshot.patch[sub.id], 'audio') ? { audio: snapshot.patch[sub.id].audio } : undefined) : v === 'hide' ? null : { x: sub.x, y: sub.y }
+                v === 'inherit' ? (Object.keys(inherited).length ? inherited : undefined) : v === 'hide' ? null : { x: sub.x, y: sub.y }
               );
             }
           );
@@ -2395,6 +2429,8 @@ PanelRegistry.extend('homemap', {
           place.setAttribute('aria-pressed', 'false');
           subjectControls[sub.id] = place;
           group.appendChild(place);
+          group.appendChild(homemapIconControl(sub, snapshot.patch[sub.id],
+            function (v) { return commit(sub.id, v, null, 'icon'); }, false));
           group.appendChild(homemapAudioControl(sub, snapshot.patch[sub.id], function (v) { return commit(sub.id, v, null, 'audio'); }, false));
         });
         if (snapshot.model.subjects.length)
@@ -2628,9 +2664,6 @@ PanelRegistry.extend('homemap', {
             cell.classList.add('home-icon-cell');
             var choice = document.createElement('span');
             choice.className = 'home-icon-choice';
-            var preview = document.createElement('span');
-            preview.className = 'home-icon-preview';
-            preview.setAttribute('aria-hidden', 'true');
             var note = document.createElement('span');
             note.className = 'home-icon-note';
             input.setAttribute(
@@ -2639,32 +2672,26 @@ PanelRegistry.extend('homemap', {
             );
             input.options[0].textContent =
               key === 'subjects' ? 'Default (person)' : 'Default (gear)';
-            choice.appendChild(preview);
-            choice.appendChild(input);
+            choice.appendChild(context.controls.iconPicker(input));
             cell.appendChild(choice);
             cell.appendChild(note);
             ref.syncIcon = function () {
               var subject = key === 'subjects',
                 deviceKind = ref.inputs.kind && ref.inputs.kind.value;
-              var editable = subject || deviceKind === 'sensor';
+              var editable = subject || ['sensor', 'camera', 'hub'].indexOf(deviceKind) >= 0;
               input.disabled = !editable;
               choice.hidden = !editable;
+              var fallback = subject ? 'person' : deviceKind === 'camera' ? 'camera' : deviceKind === 'hub' ? 'router' : 'gear';
+              input.options[0].textContent = 'Default (' + fallback + ')';
               note.textContent = editable
                 ? subject
                   ? 'Moving actor: person by default; choose an icon for a car or another subject.'
-                  : 'Sensor also serves as a generic device marker. Choose cloud for a cloud service.'
-                : (deviceKind === 'camera'
-                    ? 'Cameras use a fixed camera icon.'
-                    : deviceKind === 'hub'
-                    ? 'Hubs use a fixed router icon.'
-                    : deviceKind === 'entry'
+                  : deviceKind === 'sensor'
+                    ? 'Sensor also serves as a generic device marker. Choose cloud for a cloud service.'
+                    : 'Choose a symbol without changing this device’s behavior.'
+                : (deviceKind === 'entry'
                     ? 'Entry devices use the entry marker or door drawing.'
                     : 'Choose a device kind first.') + ' For a custom icon, choose kind sensor.';
-              var icon = ICON_SET.indexOf(input.value) >= 0 ? input.value : 'gear';
-              preview.innerHTML =
-                subject && input.value === ''
-                  ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>'
-                  : '<svg viewBox="0 0 24 24"><use href="#i-' + icon + '"/></svg>';
             };
             listen(input,'change', ref.syncIcon);
 
@@ -2854,6 +2881,11 @@ PanelRegistry.extend('homemap', {
           });
           var initialModel = homemapModel(val, val.initial);
           initialModel.devices.concat(initialModel.subjects).forEach(function (item) {
+            if (item.kind !== 'entry') conditions.appendChild(homemapIconControl(item, (val.initial || {})[item.id], function (value) {
+              return context.transact(function (raw) {
+                return planHomemapDeviceAttribute(context.source(), raw, t.section, null, val.id, item.id, 'icon', value);
+              }, { after: function () { context.inspect(); } });
+            }, true));
             conditions.appendChild(homemapAudioControl(item, (val.initial || {})[item.id], function (value) {
               return context.transact(function (raw) {
                 return planHomemapDeviceAttribute(context.source(), raw, t.section, null, val.id, item.id, 'audio', value);

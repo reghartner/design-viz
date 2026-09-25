@@ -504,6 +504,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     (primaryHost && p.id === (primaryId || d.primaryPanel) ? primaryHost : asideEl).appendChild(
       card
     );
+    p = Object.assign({}, p, {brand: FlowBrand.resolve(d.brand, p.brand)});
     hosts[p.id] = { panel: p, body: body, card: card };
     /* Homemap ambient state precedes step zero; other widgets keep their
        established first-folded-step preview. */

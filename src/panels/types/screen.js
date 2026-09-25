@@ -353,6 +353,7 @@ function screenFramePresentation(host, panel, state) {
        two scene-showing modes can swap ONLY the overlays (surgical path
        below) and keep the scene subtree's animation state (the walker) */
   var scrOvl = '';
+  scrOvl += FlowBrand.render(panel.brand, {className:'ovl screen-brand',compact:true});
   if (mode === 'active') scrOvl += '<span class="ovl activechip">ACTIVE</span>';
   if (mode === 'live') scrOvl += '<span class="ovl livechip">LIVE</span>';
   if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
@@ -362,7 +363,7 @@ function screenFramePresentation(host, panel, state) {
   if (mode === 'unavailable')
     scrOvl +=
       '<div class="ovl screen-unavailable" role="status">' +
-      '<svg viewBox="0 0 40 32" aria-hidden="true"><rect x="6" y="9" width="24" height="17" rx="4"/><path d="M12 9 L15 5 H23 L26 9 M3 3 L36 30"/><circle cx="18" cy="17" r="5"/></svg>' +
+      FlowIcons.render('camera-off') +
       '<strong>Camera unavailable</strong><span>' +
       esc(
         typeof state.reason === 'string' && state.reason.trim()
@@ -695,6 +696,7 @@ function screenScenePreview(initialScene) {
 
 PanelRegistry.extend('screen', {
   authoring: {
+    branding: true,
     template: { title: 'Camera', scene: 'static-noise', initial: { mode: 'off' } },
     initialFields: true,
     transientFields: ['mode', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight'],

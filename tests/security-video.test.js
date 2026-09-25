@@ -24,7 +24,7 @@ function host() {
   }
   Object.defineProperty(result,'innerHTML',{get(){return markup;},set(value){
     markup = value;result.writes++;
-    elements = Object.fromEntries(['.secmon','.secmon-stage','.secmon-hero-slot','.secmon-facts','.secmon-note','.secmon-audio-slot','.secmon-feed-label','.secmon-review-caption strong','.secmon-review-clip','.secmon-sensor-details'].map(k=>[k,element()]));
+    elements = Object.fromEntries(['.secmon','.secmon-stage','.secmon-desk-brand','.secmon-hero-slot','.secmon-facts','.secmon-note','.secmon-audio-slot','.secmon-feed-label','.secmon-review-caption strong','.secmon-review-clip','.secmon-sensor-details'].map(k=>[k,element()]));
     elements['.secmon-sensor-details'].open = false;
     const video = {...element(),writes:0,audioSlot:element(),querySelector(s){return s === '.screenbox' ? this.box : s === '.screen-audio-slot' ? this.audioSlot : null;}};
     Object.defineProperty(video,'innerHTML',{get(){return this.html;},set(h){
@@ -150,6 +150,16 @@ test('clip DOM survives assessments, sensor facts, notes and playback toggles', 
   }
   assert.equal(video.box.className,'screenbox m-active');
   assert.match(h.querySelector('.secmon-hero-slot').innerHTML,/Status unknown/);
+});
+
+test('updating monitoring branding preserves the video clip and operator scene', () => {
+  const h=host(),p=panel(),state={video:'reviewing',scenePlayback:'playing'};
+  render(h,p,state);
+  const video=h.querySelector('.secmon-video'),clip=video.box.clip;
+  render(h,{...p,brand:{app:'Acme',icon:'house'}},state);
+  assert.equal(h.writes,1);assert.equal(video.writes,1);assert.equal(video.box.clip,clip);
+  assert.match(h.querySelector('.secmon-desk-brand').innerHTML,/data-icon="house"/);
+  assert.match(h.querySelector('.secmon-desk-brand').innerHTML,/Acme/);
 });
 
 test('closing, reconnecting and changing clips replace only the monitor content', () => {

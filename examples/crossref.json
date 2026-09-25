@@ -138,6 +138,13 @@
         "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
       }
     ],
+    "Cedar services": [
+      {
+        "file": "shared-icons/shared-icons.html",
+        "family": "shared-icons",
+        "title": "Shared icons & company branding"
+      }
+    ],
     "Cellular APN": [
       {
         "file": "hearthline-sentry-panel/sentry-panel.html",
@@ -270,6 +277,11 @@
         "file": "panel-visibility/panel-visibility.html",
         "family": "panel-visibility",
         "title": "Show the right panel at the right moment"
+      },
+      {
+        "file": "shared-icons/shared-icons.html",
+        "family": "shared-icons",
+        "title": "Shared icons & company branding"
       }
     ],
     "Drawbridge": [
@@ -735,6 +747,11 @@
         "file": "panel-visibility/panel-visibility.html",
         "family": "panel-visibility",
         "title": "Show the right panel at the right moment"
+      },
+      {
+        "file": "shared-icons/shared-icons.html",
+        "family": "shared-icons",
+        "title": "Shared icons & company branding"
       }
     ],
     "Resident App": [

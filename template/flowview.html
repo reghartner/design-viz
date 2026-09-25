@@ -1255,6 +1255,8 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .da-statusbar.da-has-date{gap:calc(8 * var(--da-px));padding-top:calc(10 * var(--da-px));}
 .da-date{min-width:0;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .da-statusbar>span:last-child{flex:none;}
+.da-system-icons{display:flex;align-items:center;gap:calc(4 * var(--da-px));}
+.da-system-icons .fv-icon{width:calc(14 * var(--da-px));height:calc(14 * var(--da-px));}
 .da-screen{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border-radius:calc(10 * var(--da-px));padding:calc(2 * var(--da-px)) calc(3 * var(--da-px)) calc(8 * var(--da-px));}
 .da-screen:focus-visible{outline:calc(2 * var(--da-px)) solid #6875ca;outline-offset:calc(-2 * var(--da-px));}
 .da-appbar{display:flex;align-items:center;gap:calc(7 * var(--da-px));font:600 calc(11 * var(--da-px))/1.4 'Sora',sans-serif;color:#6673c2;padding:calc(3 * var(--da-px)) calc(4 * var(--da-px)) calc(8 * var(--da-px));}
@@ -1708,6 +1710,7 @@ rect.tlfuture{opacity:.18;}
 .sk-aurora .thval.z-crit{color:#FF6B5E;}
 .sk-daylight .thval.z-crit{color:#B91C1C;}
 .thval.z-na{opacity:.4;}
+.thstatus{width:20px;height:20px;vertical-align:-3px;margin-left:5px;}
 .thzone{font:700 9.5px 'IBM Plex Mono',monospace; letter-spacing:.08em; padding:3px 8px; border-radius:6px; border:1px solid transparent; white-space:nowrap;}
 .sk-aurora .thzone.z-ok{color:#4ADE80; border-color:#1E4A33; background:#0C2418;}
 .sk-daylight .thzone.z-ok{color:#0E7A3C; border-color:#BFE3CC; background:#EAF7EF;}
@@ -1777,8 +1780,8 @@ rect.tlfuture{opacity:.18;}
 .bthead{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px;}
 .btval{font:700 20px 'IBM Plex Mono',monospace;}
 .btunit{font-size:11px; font-weight:500; opacity:.6; margin-left:3px;}
-.btbolt{font-size:13px; margin-left:5px;}
-.btcold{font-size:12px; margin-left:4px; opacity:.85;}
+.btstatus,.btcold{width:20px;height:20px;vertical-align:-3px;margin-left:5px;}
+.btcold{width:17px;height:17px;margin-left:4px;}
 .sk-aurora .btval{color:#EAF2FF;}
 .sk-daylight .btval{color:#23272E;}
 .sk-aurora .btval.z-low{color:#FFB454;}
@@ -7246,6 +7249,22 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .path-timeline-owner{position:sticky;left:0;width:max-content;max-width:100%;display:flex;align-items:center;gap:6px;font:500 10px/1.5 'IBM Plex Mono',monospace;color:var(--dtext);padding:2px 0 4px;}
 .path-timeline-owner::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--path-color);flex:none;}
 
+/* Panel icons are self-contained SVG; this sheet only provides shared sizing
+   and an accessible monochrome treatment when the platform forces colors. */
+.fv-icon{display:inline-block;width:1.25em;height:1.25em;flex:none;vertical-align:-.2em;overflow:visible;}
+.fv-icon-glyph{pointer-events:none;}
+@media (forced-colors:active){
+  .fv-icon,.fv-icon-glyph{--fv-icon-primary:CanvasText;--fv-icon-accent:CanvasText;--fv-icon-wash:Canvas;}
+}
+
+.fv-brand{display:inline-flex;align-items:center;gap:.5em;min-width:0;max-width:100%;color:var(--fv-brand-fg,inherit);vertical-align:middle;}
+.fv-brand-mark{display:block;flex:none;width:1.8em;height:1.8em;object-fit:contain;}
+.fv-brand-monogram{display:grid;place-items:center;border-radius:.3em;background:var(--fv-brand-bg,var(--fv-brand-accent,#6675c4));color:var(--fv-brand-fg,#fff);font-size:.8em;font-weight:700;}
+.fv-brand-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.screen-brand{position:absolute;right:12px;bottom:12px;max-width:55%;padding:5px 8px;border-radius:7px;background:#152137bb;color:white;font:600 11px/1.3 'IBM Plex Sans',sans-serif;pointer-events:none;}
+
+.screen-brand .fv-brand-mark{width:25px;height:25px;}
+
 
 .pt-appscreens .pbody{min-height:0;display:flex;flex-direction:column;}
 .appscreens{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:390px;flex:1;color:var(--dtext);}
@@ -7386,7 +7405,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
     <symbol id="i-car" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17H2v-5l3-1 3-5h7l4 5 3 2v4h-2M8 17h8M5 11h14M12 6v5"/><circle cx="6" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></g></symbol>
     <symbol id="i-speaker" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h4l5-4v14l-5-4H3ZM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></g></symbol>
   </defs>
-</svg>
+<symbol id="i-battery" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="battery" data-icon-tone="teal" fill="none" stroke="var(--fv-icon-primary,#318585)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="17" height="11" rx="2.5" fill="var(--fv-icon-wash,#DDF2ED)"/><path d="M22 10v4"/><g stroke="none"><rect x="5" y="9" width="4" height="6" rx="1" fill="var(--fv-icon-accent,#78C1B6)"/><rect x="10.5" y="9" width="4" height="6" rx="1" fill="var(--fv-icon-accent,#78C1B6)"/></g></g></symbol><symbol id="i-battery-full" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="battery-full" data-icon-tone="green" fill="none" stroke="var(--fv-icon-primary,#388463)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="17" height="11" rx="2.5" fill="var(--fv-icon-wash,#E0F2E6)"/><path d="M22 10v4"/><g stroke="none"><rect x="5" y="9" width="3" height="6" rx="0.8" fill="var(--fv-icon-accent,#82C49B)"/><rect x="9.5" y="9" width="3" height="6" rx="0.8" fill="var(--fv-icon-accent,#82C49B)"/><rect x="14" y="9" width="3" height="6" rx="0.8" fill="var(--fv-icon-accent,#82C49B)"/></g></g></symbol><symbol id="i-battery-low" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="battery-low" data-icon-tone="red" fill="none" stroke="var(--fv-icon-primary,#BE586B)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="17" height="11" rx="2.5" fill="var(--fv-icon-wash,#FBE3E8)"/><path d="M22 10v4"/><g stroke="none"><rect x="5" y="9" width="3" height="6" rx="0.8" fill="var(--fv-icon-accent,#EF98A2)"/></g><path d="M14 9.5v2.5M14 14.5h.01"/></g></symbol><symbol id="i-battery-charging" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="battery-charging" data-icon-tone="green" fill="none" stroke="var(--fv-icon-primary,#388463)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="17" height="11" rx="2.5" fill="var(--fv-icon-wash,#E0F2E6)"/><path d="M22 10v4"/><path d="m12.5 4-6 9h4L9.5 20l6.5-10h-4Z" fill="var(--fv-icon-accent,#82C49B)"/></g></symbol><symbol id="i-plug" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="plug" data-icon-tone="teal" fill="none" stroke="var(--fv-icon-primary,#318585)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5M12 17v4"/><path d="M6 8h12v3a6 6 0 0 1-12 0Z" fill="var(--fv-icon-wash,#DDF2ED)"/><g stroke="var(--fv-icon-accent,#78C1B6)"><path d="M9 11h6"/></g></g></symbol><symbol id="i-solar" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="solar" data-icon-tone="amber" fill="none" stroke="var(--fv-icon-primary,#A67525)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="6" r="2.5" fill="var(--fv-icon-accent,#EDBB63)"/><path d="M17 1.5v1M21.5 6h1M20.2 2.8l.7-.7M13.8 2.8l-.7-.7"/><path d="M4 11h13l3 9H2Z" fill="var(--fv-icon-wash,#FFF0D4)"/><path d="M3.5 15.5h15M8.5 11l-1 9M12.5 11l1 9"/></g></symbol><symbol id="i-temperature" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="temperature" data-icon-tone="teal" fill="none" stroke="var(--fv-icon-primary,#318585)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 14.1V5.5a2.5 2.5 0 0 1 5 0v8.6a4 4 0 1 1-5 0Z" fill="var(--fv-icon-wash,#DDF2ED)"/><g stroke="var(--fv-icon-accent,#78C1B6)"><path d="M12 10V17"/></g><g stroke="none"><circle cx="12" cy="17" r="1.8" fill="var(--fv-icon-accent,#78C1B6)"/></g><path d="M18 6h2M18 10h2"/></g></symbol><symbol id="i-hot" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="hot" data-icon-tone="red" fill="none" stroke="var(--fv-icon-primary,#BE586B)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 14.1V5.5a2.5 2.5 0 0 1 5 0v8.6a4 4 0 1 1-5 0Z" fill="var(--fv-icon-wash,#FBE3E8)"/><g stroke="var(--fv-icon-accent,#EF98A2)"><path d="M12 6V17"/></g><g stroke="none"><circle cx="12" cy="17" r="1.8" fill="var(--fv-icon-accent,#EF98A2)"/></g><path d="M18 6h2M18 10h2"/><g stroke="var(--fv-icon-accent,#EF98A2)"><path d="M4 9V4m-2 2 2-2 2 2"/></g></g></symbol><symbol id="i-cold" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="cold" data-icon-tone="blue" fill="none" stroke="var(--fv-icon-primary,#4B75B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 14.1V5.5a2.5 2.5 0 0 1 5 0v8.6a4 4 0 1 1-5 0Z" fill="var(--fv-icon-wash,#E1ECFB)"/><g stroke="var(--fv-icon-accent,#81AFE9)"><path d="M12 13V17"/></g><g stroke="none"><circle cx="12" cy="17" r="1.8" fill="var(--fv-icon-accent,#81AFE9)"/></g><path d="M18 6h2M18 10h2"/><g stroke="var(--fv-icon-accent,#81AFE9)"><path d="M4 3v6M1.5 4.5l5 3M1.5 7.5l5-3"/></g></g></symbol><symbol id="i-snowflake" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="snowflake" data-icon-tone="blue" fill="none" stroke="var(--fv-icon-primary,#4B75B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7"/><g stroke="var(--fv-icon-accent,#81AFE9)"><path d="m9 4 3 3 3-3M9 20l3-3 3 3M3.5 10.5l4.1-1.1-1.1-4.1M17.5 18.7l-1.1-4.1 4.1-1.1M3.5 13.5l4.1 1.1-1.1 4.1M17.5 5.3l-1.1 4.1 4.1 1.1"/></g></g></symbol><symbol id="i-alarm" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="alarm" data-icon-tone="red" fill="none" stroke="var(--fv-icon-primary,#BE586B)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="18" width="14" height="3" rx="1" fill="var(--fv-icon-accent,#EF98A2)"/><path d="M7 18v-6a5 5 0 0 1 10 0v6Z" fill="var(--fv-icon-wash,#FBE3E8)"/><g stroke="var(--fv-icon-accent,#EF98A2)"><path d="M12 10v4"/></g><path d="M12 2v2M3 6l2 1.5M21 6l-2 1.5M2 13h2M20 13h2"/></g></symbol><symbol id="i-armed" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="armed" data-icon-tone="green" fill="none" stroke="var(--fv-icon-primary,#388463)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19.5 6v5.3c0 4.4-3 7.5-7.5 9.7-4.5-2.2-7.5-5.3-7.5-9.7V6Z" fill="var(--fv-icon-wash,#E0F2E6)"/><path d="m8.5 11.5 2.5 2.5 4.5-5"/></g></symbol><symbol id="i-disarmed" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="disarmed" data-icon-tone="neutral" fill="none" stroke="var(--fv-icon-primary,#65788F)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19.5 6v5.3c0 4.4-3 7.5-7.5 9.7-4.5-2.2-7.5-5.3-7.5-9.7V6Z" fill="var(--fv-icon-wash,#E7EDF4)"/><path d="M8.5 11.5h7"/></g></symbol><symbol id="i-triggered" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="triggered" data-icon-tone="red" fill="none" stroke="var(--fv-icon-primary,#BE586B)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19.5 6v5.3c0 4.4-3 7.5-7.5 9.7-4.5-2.2-7.5-5.3-7.5-9.7V6Z" fill="var(--fv-icon-wash,#FBE3E8)"/><path d="M12 7v5"/><g stroke="none"><circle cx="12" cy="15.5" r="1" fill="var(--fv-icon-primary,#BE586B)"/></g></g></symbol><symbol id="i-wifi" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="wifi" data-icon-tone="teal" fill="none" stroke="var(--fv-icon-primary,#318585)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><g stroke="var(--fv-icon-accent,#78C1B6)"><path d="M2.5 8a14 14 0 0 1 19 0M6 11.5a9 9 0 0 1 12 0"/></g><path d="M9 15a4.5 4.5 0 0 1 6 0"/><g stroke="none"><circle cx="12" cy="18.5" r="1.5" fill="var(--fv-icon-primary,#318585)"/></g></g></symbol><symbol id="i-wifi-off" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="wifi-off" data-icon-tone="neutral" fill="none" stroke="var(--fv-icon-primary,#65788F)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 4.8A14 14 0 0 1 21.5 8M12 9.3a9 9 0 0 1 6 2.2M2.5 8l1-.8M6 11.5l1.2-.8M9 15a4.5 4.5 0 0 1 5.4-.4"/><g stroke="none"><circle cx="12" cy="18.5" r="1.5" fill="var(--fv-icon-primary,#65788F)"/></g><g stroke="var(--fv-icon-accent,#9BACBF)"><path d="m3 3 18 18"/></g></g></symbol><symbol id="i-cloud-off" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="cloud-off" data-icon-tone="neutral" fill="none" stroke="var(--fv-icon-primary,#65788F)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 18h10.7a3.8 3.8 0 0 0 .3-7.6 5.6 5.6 0 0 0-10.8-1.6A4.6 4.6 0 0 0 6.5 18Z" fill="var(--fv-icon-wash,#E7EDF4)"/><g stroke="var(--fv-icon-accent,#9BACBF)"><path d="m3 3 18 18"/></g></g></symbol><symbol id="i-signal" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="signal" data-icon-tone="teal" fill="none" stroke="var(--fv-icon-primary,#318585)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><g stroke="none"><rect x="3" y="15" width="3" height="6" rx="1" fill="var(--fv-icon-accent,#78C1B6)"/><rect x="8" y="11" width="3" height="10" rx="1" fill="var(--fv-icon-accent,#78C1B6)"/><rect x="13" y="7" width="3" height="14" rx="1" fill="var(--fv-icon-accent,#78C1B6)"/><rect x="18" y="3" width="3" height="18" rx="1" fill="var(--fv-icon-primary,#318585)"/></g></g></symbol><symbol id="i-microphone" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="microphone" data-icon-tone="violet" fill="none" stroke="var(--fv-icon-primary,#8063B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3" fill="var(--fv-icon-wash,#EEE7FA)"/><g stroke="var(--fv-icon-accent,#B7A0E2)"><path d="M12 6v4"/></g><path d="M6 11v1a6 6 0 0 0 12 0v-1M12 18v3M9 21h6"/></g></symbol><symbol id="i-microphone-muted" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="microphone-muted" data-icon-tone="neutral" fill="none" stroke="var(--fv-icon-primary,#65788F)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5.5a3 3 0 0 1 6 .5v5M9 10v2a3 3 0 0 0 4.5 2.6M6 11v1a6 6 0 0 0 10.2 4.3M18 11v1M12 18v3M9 21h6"/><g stroke="var(--fv-icon-accent,#9BACBF)"><path d="m3 3 18 18"/></g></g></symbol><symbol id="i-recorded" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="recorded" data-icon-tone="violet" fill="none" stroke="var(--fv-icon-primary,#8063B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" fill="var(--fv-icon-wash,#EEE7FA)"/><path d="m10 8 6 4-6 4Z" fill="var(--fv-icon-accent,#B7A0E2)"/></g></symbol><symbol id="i-chime" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="chime" data-icon-tone="amber" fill="none" stroke="var(--fv-icon-primary,#A67525)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5h12l-2-3V9a4 4 0 0 0-8 0v4.5Z" fill="var(--fv-icon-wash,#FFF0D4)"/><path d="M10 20h4M12 3v2"/><g stroke="var(--fv-icon-accent,#EDBB63)"><path d="M4 7 2.5 5.5M20 7l1.5-1.5"/></g></g></symbol><symbol id="i-siren" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="siren" data-icon-tone="red" fill="none" stroke="var(--fv-icon-primary,#BE586B)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="18" width="14" height="3" rx="1" fill="var(--fv-icon-accent,#EF98A2)"/><path d="M7 18v-6a5 5 0 0 1 10 0v6Z" fill="var(--fv-icon-wash,#FBE3E8)"/><g stroke="var(--fv-icon-accent,#EF98A2)"><path d="M12 10v4"/></g><path d="M12 2v2M3 6l2 1.5M21 6l-2 1.5M2 13h2M20 13h2"/></g></symbol><symbol id="i-detection" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="detection" data-icon-tone="amber" fill="none" stroke="var(--fv-icon-primary,#A67525)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9a5 5 0 0 1 10 0c0 5-6 5-6 9a3 3 0 0 1-6 0"/><path d="M10 9a2 2 0 0 1 4 0c0 2.5-3 2.5-3 5"/><g stroke="var(--fv-icon-accent,#EDBB63)"><path d="M20 5a8 8 0 0 1 0 8M3 7v4"/></g></g></symbol><symbol id="i-headset" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="headset" data-icon-tone="blue" fill="none" stroke="var(--fv-icon-primary,#4B75B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v-2a8 8 0 0 1 16 0v2M20 16v1a4 4 0 0 1-4 4h-3"/><rect x="3" y="10" width="4" height="8" rx="2" fill="var(--fv-icon-wash,#E1ECFB)"/><rect x="17" y="10" width="4" height="8" rx="2" fill="var(--fv-icon-wash,#E1ECFB)"/><g stroke="none"><rect x="10" y="19.5" width="4" height="2.5" rx="1" fill="var(--fv-icon-accent,#81AFE9)"/></g></g></symbol><symbol id="i-door" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="door" data-icon-tone="amber" fill="none" stroke="var(--fv-icon-primary,#A67525)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V3h14v18Z" fill="var(--fv-icon-wash,#FFF0D4)"/><path d="m8 21 8-2V5L8 3Z" fill="var(--fv-icon-accent,#EDBB63)"/><path d="M12.5 12h.01M3 21h18"/></g></symbol><symbol id="i-motion" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="motion" data-icon-tone="violet" fill="none" stroke="var(--fv-icon-primary,#8063B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="4.5" r="2" fill="var(--fv-icon-wash,#EEE7FA)"/><path d="m8 11 5-4 4 4h3M13 8l-3 7-5 5m5-5 5 2 1 4"/><g stroke="var(--fv-icon-accent,#B7A0E2)"><path d="M3 7l2-2M2 12h3"/></g></g></symbol><symbol id="i-smoke" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="smoke" data-icon-tone="neutral" fill="none" stroke="var(--fv-icon-primary,#65788F)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="15.5" width="16" height="4.5" rx="2" fill="var(--fv-icon-wash,#E7EDF4)"/><path d="M9 18h6"/><g stroke="var(--fv-icon-accent,#9BACBF)"><path d="M7 12c-4-3 4-4 0-8M12 12c-4-3 4-4 0-8M17 12c-4-3 4-4 0-8"/></g></g></symbol><symbol id="i-water" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="water" data-icon-tone="blue" fill="none" stroke="var(--fv-icon-primary,#4B75B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12.5-7-12.5Z" fill="var(--fv-icon-wash,#E1ECFB)"/><g stroke="var(--fv-icon-accent,#81AFE9)"><path d="M8.5 15a3.5 3.5 0 0 0 3.5 3.5"/></g></g></symbol><symbol id="i-sensor" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="sensor" data-icon-tone="teal" fill="none" stroke="var(--fv-icon-primary,#318585)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" fill="var(--fv-icon-wash,#DDF2ED)"/><g stroke="var(--fv-icon-accent,#78C1B6)"><path d="M8 8a5.7 5.7 0 0 0 0 8M16 8a5.7 5.7 0 0 1 0 8"/></g><path d="M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/></g></symbol><symbol id="i-police" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="police" data-icon-tone="blue" fill="none" stroke="var(--fv-icon-primary,#4B75B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19.5 6v5.3c0 4.4-3 7.5-7.5 9.7-4.5-2.2-7.5-5.3-7.5-9.7V6Z" fill="var(--fv-icon-wash,#E1ECFB)"/><path d="m12 7 1.4 2.8 3.1.4-2.3 2.2.6 3.1-2.8-1.4-2.8 1.4.6-3.1-2.3-2.2 3.1-.4Z" fill="var(--fv-icon-accent,#81AFE9)"/></g></symbol><symbol id="i-fire" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="fire" data-icon-tone="amber" fill="none" stroke="var(--fv-icon-primary,#A67525)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 5 7 7 7 13a7 7 0 0 1-14 0c0-3 2-6 4-8 0 3 2 4 3 4 2-2 1-6 0-9Z" fill="var(--fv-icon-wash,#FFF0D4)"/><path d="M12 13c0 3 3 3 3 5a3 3 0 0 1-6 0c0-2 2-3 3-5Z" fill="var(--fv-icon-accent,#EDBB63)"/></g></symbol><symbol id="i-medical" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="medical" data-icon-tone="red" fill="none" stroke="var(--fv-icon-primary,#BE586B)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 3h7v5.5H21v7h-5.5V21h-7v-5.5H3v-7h5.5Z" fill="var(--fv-icon-wash,#FBE3E8)"/><g stroke="var(--fv-icon-accent,#EF98A2)"><path d="M12 8v8M8 12h8"/></g></g></symbol><symbol id="i-security" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="security" data-icon-tone="amber" fill="none" stroke="var(--fv-icon-primary,#A67525)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19.5 6v5.3c0 4.4-3 7.5-7.5 9.7-4.5-2.2-7.5-5.3-7.5-9.7V6Z" fill="var(--fv-icon-wash,#FFF0D4)"/><path d="m8.5 11.5 2.5 2.5 4.5-5"/></g></symbol><symbol id="i-monitor" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="monitor" data-icon-tone="blue" fill="none" stroke="var(--fv-icon-primary,#4B75B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="14" rx="2.5" fill="var(--fv-icon-wash,#E1ECFB)"/><path d="M12 17.5V21M8 21h8"/><path d="m10 7 5 3.5-5 3.5Z" fill="var(--fv-icon-accent,#81AFE9)"/></g></symbol><symbol id="i-camera-off" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="camera-off" data-icon-tone="neutral" fill="none" stroke="var(--fv-icon-primary,#65788F)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="12.5" rx="3" fill="var(--fv-icon-wash,#E7EDF4)"/><circle cx="12" cy="11.75" r="3.5" fill="var(--fv-icon-accent,#9BACBF)"/><path d="M12 18v3M8 21h8"/><g stroke="var(--fv-icon-accent,#9BACBF)"><path d="m3 3 18 18"/></g></g></symbol><symbol id="i-person" viewBox="0 0 24 24"><g class="fv-icon-glyph" data-icon="person" data-icon-tone="violet" fill="none" stroke="var(--fv-icon-primary,#8063B1)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6" r="3" fill="var(--fv-icon-wash,#EEE7FA)"/><path d="M5 21v-2a7 7 0 0 1 14 0v2Z" fill="var(--fv-icon-wash,#EEE7FA)"/><g stroke="var(--fv-icon-accent,#B7A0E2)"><path d="M8.5 20v-2M15.5 20v-2"/></g></g></symbol></svg>
 
 <div class="docview sk-aurora sk-pastel" id="docview"></div>
 
@@ -7448,12 +7467,13 @@ var FlowviewCompatibility = (function(){
   var version = '0.1.0', contract = '1', baseline = '0.1.0';
   var features = Object.create(null);
   var panelFeatures = {"panel.state":{"label":"State panel","since":"0.1.0"},"panel.leds":{"label":"LEDs panel","since":"0.1.0"},"panel.gauge":{"label":"Gauge panel","since":"0.1.0"},"panel.log":{"label":"Log panel","since":"0.1.0"},"panel.screen":{"label":"Camera screen panel","since":"0.1.0"},"panel.image":{"label":"Embedded image panel","since":"0.1.0"},"panel.waterfall":{"label":"Waterfall panel","since":"0.1.0"},"panel.orbit":{"label":"Orbit panel","since":"0.1.0"},"panel.zoneframe":{"label":"Zone frame panel","since":"0.1.0"},"panel.xray":{"label":"Device internals panel","since":"0.1.0"},"panel.queue":{"label":"Queue panel","since":"0.1.0"},"panel.thermo":{"label":"Temperature panel","since":"0.1.0"},"panel.battery":{"label":"Battery panel","since":"0.1.0"},"panel.buffer":{"label":"Buffer panel","since":"0.1.0"},"panel.radar":{"label":"Radar panel","since":"0.1.0"},"panel.homemap":{"label":"Home map panel","since":"0.1.0"},"panel.signal":{"label":"Signal panel","since":"0.1.0"},"panel.tiles":{"label":"Tiles panel","since":"0.1.0"},"panel.inflight":{"label":"In-flight activity panel","since":"0.1.0"},"panel.phone":{"label":"Phone panel","since":"0.1.0"},"panel.deviceapp":{"label":"Device app panel","since":"0.1.0"},"panel.appscreens":{"label":"App screens panel","since":"0.1.0"},"panel.timeline":{"label":"Timeline panel","since":"0.1.0"},"panel.table":{"label":"Table panel","since":"0.1.0"},"panel.checks":{"label":"Checks panel","since":"0.1.0"},"panel.budget":{"label":"Budget panel","since":"0.1.0"},"panel.trace":{"label":"Trace panel","since":"0.1.0"},"panel.replicas":{"label":"Replicas panel","since":"0.1.0"},"panel.dispatch":{"label":"Emergency dispatch panel","since":"0.1.0"},"panel.security":{"label":"Security monitoring panel","since":"0.1.0"}};
+  var sharedIconIds = ["battery","battery-full","battery-low","battery-charging","plug","solar","temperature","hot","cold","snowflake","alarm","armed","disarmed","triggered","wifi","wifi-off","cloud-off","signal","microphone","microphone-muted","recorded","chime","siren","detection","headset","door","motion","smoke","water","sensor","police","fire","medical","security","monitor","camera-off","person"];
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
-    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility' };
+    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -7483,6 +7503,15 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if(d.brand)used['media.branding']=true;
+      function icons(value,inStep){
+        if(!value || typeof value!=='object')return;
+        Object.keys(value).forEach(function(key){
+          if(key==='icon' && typeof value[key]==='string' && (inStep || sharedIconIds.indexOf(value[key])>=0))used['media.shared-icons']=true;
+          else if(value[key] && typeof value[key]==='object')icons(value[key],inStep || key==='steps');
+        });
+      }
+      icons(d,false);
       if((Array.isArray(d.floats)?d.floats:[]).some(function(f){return f && (f.x!=null || f.y!=null);}))used['layout.free-nodes']=true;
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && (e.fromPort!=null || e.toPort!=null);}))used['layout.edge-ports']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
@@ -7490,6 +7519,7 @@ var FlowviewCompatibility = (function(){
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;
         used['panel.'+p.type]=true;
+        if(p.brand && (p.type!=='phone' || p.brand.logoImage || p.brand.icon))used['media.branding']=true;
         if(p.visible!=null)used['flow.panel-visibility']=true;
         if(p.type==='deviceapp'){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
@@ -7868,12 +7898,157 @@ function panelRemapReferences(panel, kind, mapping, exists) {
   });
   return panel;
 }
+/* ---- src/icons/library.js ---- */
+/* Shared 24px panel icons. Geometry is code-owned; authored values only select
+   known IDs, palettes, and escaped labels. Inline glyphs work offline and in a
+   ShadowRoot without a document-level sprite or CSS dependency. */
+var FlowIcons = (function () {
+  var palettes = {
+    neutral: {primary:'#65788F', accent:'#9BACBF', wash:'#E7EDF4'},
+    blue:    {primary:'#4B75B1', accent:'#81AFE9', wash:'#E1ECFB'},
+    teal:    {primary:'#318585', accent:'#78C1B6', wash:'#DDF2ED'},
+    green:   {primary:'#388463', accent:'#82C49B', wash:'#E0F2E6'},
+    amber:   {primary:'#A67525', accent:'#EDBB63', wash:'#FFF0D4'},
+    red:     {primary:'#BE586B', accent:'#EF98A2', wash:'#FBE3E8'},
+    violet:  {primary:'#8063B1', accent:'#B7A0E2', wash:'#EEE7FA'},
+  };
+  var toneAliases = {ok:'green', warn:'amber', alert:'red', cold:'blue', muted:'neutral'};
+  var registry = Object.create(null), artwork = Object.create(null), ids = [];
+  function own(object, key) { return Object.prototype.hasOwnProperty.call(object, key); }
+  function escape(value) {
+    return String(value).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c];
+    });
+  }
+  // $wash is a soft body fill, $accent the colored detail, $primary the outline.
+  function path(d, fill) { return '<path d="' + d + '"' + (fill ? ' fill="$' + fill + '"' : '') + '/>'; }
+  function rect(x, y, w, h, r, fill) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + r + '"' + (fill ? ' fill="$' + fill + '"' : '') + '/>'; }
+  function circle(x, y, r, fill) { return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"' + (fill ? ' fill="$' + fill + '"' : '') + '/>'; }
+  function detail(svg) { return '<g stroke="$accent">' + svg + '</g>'; }
+  function solid(svg) { return '<g stroke="none">' + svg + '</g>'; }
+  function add(id, label, category, tone, svg, legacy) {
+    var palette = palettes[tone];
+    ids.push(id);
+    registry[id] = Object.freeze({id:id, label:label, category:category, tone:tone,
+      primary:palette.primary, accent:palette.accent, legacy:!!legacy});
+    artwork[id] = svg;
+  }
+  var shield = path('M12 3 19.5 6v5.3c0 4.4-3 7.5-7.5 9.7-4.5-2.2-7.5-5.3-7.5-9.7V6Z', 'wash');
+  var cloud = path('M6.5 18h10.7a3.8 3.8 0 0 0 .3-7.6 5.6 5.6 0 0 0-10.8-1.6A4.6 4.6 0 0 0 6.5 18Z', 'wash');
+  var speaker = path('M3 9h4l5-4v14l-5-4H3Z', 'wash') + detail(path('M16 8.5a5 5 0 0 1 0 7M19 5.5a9 9 0 0 1 0 13'));
+  var bell = path('M6 16.5h12l-2-3V9a4 4 0 0 0-8 0v4.5Z', 'wash') + path('M10 20h4M12 3v2');
+  var siren = rect(5, 18, 14, 3, 1, 'accent') + path('M7 18v-6a5 5 0 0 1 10 0v6Z', 'wash') + detail(path('M12 10v4')) + path('M12 2v2M3 6l2 1.5M21 6l-2 1.5M2 13h2M20 13h2');
+  function thermometer(level) {
+    return path('M9.5 14.1V5.5a2.5 2.5 0 0 1 5 0v8.6a4 4 0 1 1-5 0Z', 'wash') +
+      detail(path('M12 ' + level + 'V17')) + solid(circle(12, 17, 1.8, 'accent')) + path('M18 6h2M18 10h2');
+  }
+  function battery(contents) {
+    return rect(2.5, 6.5, 17, 11, 2.5, 'wash') + path('M22 10v4') + contents;
+  }
+  // The existing sprite IDs stay valid. These inline versions add panel color;
+  // symbols({newOnly:true}) deliberately leaves the original sprite untouched.
+  add('terminal', 'Terminal', 'Software', 'neutral', rect(3, 4.5, 18, 15, 2.5, 'wash') + path('m7 9 3 3-3 3M13 15h4'), true);
+  add('cloud', 'Cloud', 'Connectivity', 'blue', cloud + detail(path('M8 14h8')), true);
+  add('shield', 'Shield', 'Security', 'green', shield + path('m8.5 11.5 2.5 2.5 4.5-5'), true);
+  add('gear', 'Settings', 'Software', 'neutral', path('m9 3-.6 2.3-2 .9-2.2-.6L2.7 8.2l1.6 1.7-.2 2.3L2.5 14l1.6 2.7 2.2-.5 1.9 1.3.7 2.5h3.2l.7-2.5 2-1.1 2.4.5 1.5-2.7-1.6-1.9v-2.2l1.6-1.9-1.6-2.7-2.4.6-1.9-1L12.2 3Z', 'wash') + circle(10.8, 11.5, 3, 'accent'), true);
+  add('db', 'Database', 'Software', 'violet', path('M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6', 'wash') + '<ellipse cx="12" cy="6" rx="7" ry="3" fill="$accent"/>' + path('M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3'), true);
+  add('antenna', 'Antenna', 'Connectivity', 'teal', circle(12, 10, 2, 'accent') + path('M12 12v9M9 21h6') + detail(path('M8.5 6.5a5 5 0 0 0 0 7M15.5 6.5a5 5 0 0 1 0 7M5.7 3.7a9 9 0 0 0 0 12.6M18.3 3.7a9 9 0 0 1 0 12.6')), true);
+  add('thermo', 'Thermometer', 'Temperature', 'teal', thermometer(10), true);
+  add('pump', 'Pump', 'Home', 'teal', circle(12, 12, 8, 'wash') + path('m10 8 6 4-6 4Z', 'accent'), true);
+  add('router', 'Router', 'Connectivity', 'blue', rect(3, 13, 18, 7, 2.5, 'wash') + path('M7 13 5.5 6M17 13l1.5-7') + solid(circle(7, 16.5, 1, 'accent') + circle(11, 16.5, 1, 'primary')) + path('M16 16.5h2'), true);
+  add('package', 'Package', 'Home', 'amber', path('m4 7.5 8-4 8 4V17l-8 4-8-4Z', 'wash') + path('m4 7.5 8 4 8-4M12 11.5V21') + detail(path('m8 5.5 8 4V13')), true);
+  add('key', 'Key', 'Security', 'amber', circle(7.5, 16.5, 4, 'wash') + path('m10.5 13.5 9-9M16 8l3 3M18.5 5.5l2 2') + solid(circle(6.5, 17.5, .7, 'accent')), true);
+  add('server', 'Server', 'Software', 'blue', rect(4, 4, 16, 6.5, 2, 'wash') + rect(4, 13.5, 16, 6.5, 2, 'wash') + solid(circle(8, 7.25, 1, 'accent') + circle(8, 16.75, 1, 'accent')) + path('M12 7.25h4M12 16.75h4'), true);
+  add('chip', 'Processor', 'Software', 'violet', rect(6.5, 6.5, 11, 11, 2.5, 'wash') + rect(9.5, 9.5, 5, 5, 1, 'accent') + path('M9 3v3.5M15 3v3.5M9 17.5V21M15 17.5V21M3 9h3.5M3 15h3.5M17.5 9H21M17.5 15H21'), true);
+  add('phone', 'Phone', 'Home', 'violet', rect(6.5, 2.5, 11, 19, 3, 'wash') + path('M10 5h4M10.5 18.5h3') + solid(rect(9, 8, 6, 6.5, 1.5, 'accent')), true);
+  add('house', 'Home', 'Home', 'teal', path('M5 9v11h14V9', 'wash') + path('m2.5 10 9.5-7.5 9.5 7.5') + path('M9.5 20v-6h5v6Z', 'accent'), true);
+  add('camera', 'Camera', 'Video', 'blue', rect(3, 5.5, 18, 12.5, 3, 'wash') + circle(12, 11.75, 3.5, 'accent') + solid(circle(12, 11.75, 1.25, 'primary') + circle(18, 8.5, .7, 'primary')) + path('M12 18v3M8 21h8'), true);
+  add('doorbell', 'Doorbell', 'Home', 'violet', rect(7, 2.5, 10, 19, 3.5, 'wash') + circle(12, 15.5, 2.5, 'accent') + path('M10.5 7h3'), true);
+  add('lock', 'Lock', 'Security', 'teal', rect(5, 10, 14, 11, 3, 'wash') + path('M8 10V7a4 4 0 0 1 8 0v3') + solid(circle(12, 14.5, 1.1, 'accent')) + path('M12 15v2.5'), true);
+  add('bulb', 'Light', 'Home', 'amber', path('M9 17v-1.5C9 13.5 6 12.5 6 9a6 6 0 0 1 12 0c0 3.5-3 4.5-3 6.5V17Z', 'wash') + detail(path('m9.5 9 2.5 2 2.5-2M12 11v6')) + path('M9 20h6M10.5 22h3'), true);
+  add('car', 'Car', 'Home', 'blue', path('M4 17H2.5v-5l3-1L8 6h7l4 5 2.5 2v4H20M8 17h8', 'wash') + path('M5.5 11H19M12 6v5') + circle(6, 17, 2, 'accent') + circle(18, 17, 2, 'accent'), true);
+  add('speaker', 'Speaker', 'Audio', 'violet', speaker, true);
+
+  add('battery', 'Battery', 'Power', 'teal', battery(solid(rect(5, 9, 4, 6, 1, 'accent') + rect(10.5, 9, 4, 6, 1, 'accent'))));
+  add('battery-full', 'Battery full', 'Power', 'green', battery(solid(rect(5, 9, 3, 6, .8, 'accent') + rect(9.5, 9, 3, 6, .8, 'accent') + rect(14, 9, 3, 6, .8, 'accent'))));
+  add('battery-low', 'Battery low', 'Power', 'red', battery(solid(rect(5, 9, 3, 6, .8, 'accent')) + path('M14 9.5v2.5M14 14.5h.01')));
+  add('battery-charging', 'Battery charging', 'Power', 'green', battery(path('m12.5 4-6 9h4L9.5 20l6.5-10h-4Z', 'accent')));
+  add('plug', 'Power connected', 'Power', 'teal', path('M8 3v5M16 3v5M12 17v4') + path('M6 8h12v3a6 6 0 0 1-12 0Z', 'wash') + detail(path('M9 11h6')));
+  add('solar', 'Solar power', 'Power', 'amber', circle(17, 6, 2.5, 'accent') + path('M17 1.5v1M21.5 6h1M20.2 2.8l.7-.7M13.8 2.8l-.7-.7') + path('M4 11h13l3 9H2Z', 'wash') + path('M3.5 15.5h15M8.5 11l-1 9M12.5 11l1 9'));
+  add('temperature', 'Temperature', 'Temperature', 'teal', thermometer(10));
+  add('hot', 'High temperature', 'Temperature', 'red', thermometer(6) + detail(path('M4 9V4m-2 2 2-2 2 2')));
+  add('cold', 'Low temperature', 'Temperature', 'blue', thermometer(13) + detail(path('M4 3v6M1.5 4.5l5 3M1.5 7.5l5-3')));
+  add('snowflake', 'Cold conditions', 'Temperature', 'blue', path('M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7') + detail(path('m9 4 3 3 3-3M9 20l3-3 3 3M3.5 10.5l4.1-1.1-1.1-4.1M17.5 18.7l-1.1-4.1 4.1-1.1M3.5 13.5l4.1 1.1-1.1 4.1M17.5 5.3l-1.1 4.1 4.1 1.1')));
+  add('alarm', 'Alarm', 'Security', 'red', siren);
+  add('armed', 'Armed', 'Security', 'green', shield + path('m8.5 11.5 2.5 2.5 4.5-5'));
+  add('disarmed', 'Disarmed', 'Security', 'neutral', shield + path('M8.5 11.5h7'));
+  add('triggered', 'Alarm triggered', 'Security', 'red', shield + path('M12 7v5') + solid(circle(12, 15.5, 1, 'primary')));
+  add('wifi', 'Wi-Fi', 'Connectivity', 'teal', detail(path('M2.5 8a14 14 0 0 1 19 0M6 11.5a9 9 0 0 1 12 0')) + path('M9 15a4.5 4.5 0 0 1 6 0') + solid(circle(12, 18.5, 1.5, 'primary')));
+  add('wifi-off', 'Wi-Fi unavailable', 'Connectivity', 'neutral', path('M8.5 4.8A14 14 0 0 1 21.5 8M12 9.3a9 9 0 0 1 6 2.2M2.5 8l1-.8M6 11.5l1.2-.8M9 15a4.5 4.5 0 0 1 5.4-.4') + solid(circle(12, 18.5, 1.5, 'primary')) + detail(path('m3 3 18 18')));
+  add('cloud-off', 'Cloud unavailable', 'Connectivity', 'neutral', cloud + detail(path('m3 3 18 18')));
+  add('signal', 'Mobile signal', 'Connectivity', 'teal', solid(rect(3, 15, 3, 6, 1, 'accent') + rect(8, 11, 3, 10, 1, 'accent') + rect(13, 7, 3, 14, 1, 'accent') + rect(18, 3, 3, 18, 1, 'primary')));
+  add('microphone', 'Microphone', 'Audio', 'violet', rect(9, 3, 6, 12, 3, 'wash') + detail(path('M12 6v4')) + path('M6 11v1a6 6 0 0 0 12 0v-1M12 18v3M9 21h6'));
+  add('microphone-muted', 'Microphone muted', 'Audio', 'neutral', path('M9 5.5a3 3 0 0 1 6 .5v5M9 10v2a3 3 0 0 0 4.5 2.6M6 11v1a6 6 0 0 0 10.2 4.3M18 11v1M12 18v3M9 21h6') + detail(path('m3 3 18 18')));
+  add('recorded', 'Recorded message', 'Audio', 'violet', circle(12, 12, 9, 'wash') + path('m10 8 6 4-6 4Z', 'accent'));
+  add('chime', 'Chime', 'Audio', 'amber', bell + detail(path('M4 7 2.5 5.5M20 7l1.5-1.5')));
+  add('siren', 'Siren', 'Audio', 'red', siren);
+  add('detection', 'Sound detected', 'Audio', 'amber', path('M7 9a5 5 0 0 1 10 0c0 5-6 5-6 9a3 3 0 0 1-6 0') + path('M10 9a2 2 0 0 1 4 0c0 2.5-3 2.5-3 5') + detail(path('M20 5a8 8 0 0 1 0 8M3 7v4')));
+  add('headset', 'Operator headset', 'Audio', 'blue', path('M4 13v-2a8 8 0 0 1 16 0v2M20 16v1a4 4 0 0 1-4 4h-3') + rect(3, 10, 4, 8, 2, 'wash') + rect(17, 10, 4, 8, 2, 'wash') + solid(rect(10, 19.5, 4, 2.5, 1, 'accent')));
+  add('door', 'Door sensor', 'Security', 'amber', path('M5 21V3h14v18Z', 'wash') + path('m8 21 8-2V5L8 3Z', 'accent') + path('M12.5 12h.01M3 21h18'));
+  add('motion', 'Motion sensor', 'Security', 'violet', circle(14, 4.5, 2, 'wash') + path('m8 11 5-4 4 4h3M13 8l-3 7-5 5m5-5 5 2 1 4') + detail(path('M3 7l2-2M2 12h3')));
+  add('smoke', 'Smoke sensor', 'Security', 'neutral', rect(4, 15.5, 16, 4.5, 2, 'wash') + path('M9 18h6') + detail(path('M7 12c-4-3 4-4 0-8M12 12c-4-3 4-4 0-8M17 12c-4-3 4-4 0-8')));
+  add('water', 'Water sensor', 'Security', 'blue', path('M12 2.5S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12.5-7-12.5Z', 'wash') + detail(path('M8.5 15a3.5 3.5 0 0 0 3.5 3.5')));
+  add('sensor', 'Sensor', 'Security', 'teal', circle(12, 12, 3, 'wash') + detail(path('M8 8a5.7 5.7 0 0 0 0 8M16 8a5.7 5.7 0 0 1 0 8')) + path('M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14'));
+  add('police', 'Police', 'Dispatch', 'blue', shield + path('m12 7 1.4 2.8 3.1.4-2.3 2.2.6 3.1-2.8-1.4-2.8 1.4.6-3.1-2.3-2.2 3.1-.4Z', 'accent'));
+  add('fire', 'Fire response', 'Dispatch', 'amber', path('M12 2c1 5 7 7 7 13a7 7 0 0 1-14 0c0-3 2-6 4-8 0 3 2 4 3 4 2-2 1-6 0-9Z', 'wash') + path('M12 13c0 3 3 3 3 5a3 3 0 0 1-6 0c0-2 2-3 3-5Z', 'accent'));
+  add('medical', 'Medical response', 'Dispatch', 'red', path('M8.5 3h7v5.5H21v7h-5.5V21h-7v-5.5H3v-7h5.5Z', 'wash') + detail(path('M12 8v8M8 12h8')));
+  add('security', 'Security response', 'Dispatch', 'amber', shield + path('m8.5 11.5 2.5 2.5 4.5-5'));
+  add('monitor', 'Video monitor', 'Video', 'blue', rect(2.5, 3.5, 19, 14, 2.5, 'wash') + path('M12 17.5V21M8 21h8') + path('m10 7 5 3.5-5 3.5Z', 'accent'));
+  add('camera-off', 'Camera unavailable', 'Video', 'neutral', rect(3, 5.5, 18, 12.5, 3, 'wash') + circle(12, 11.75, 3.5, 'accent') + path('M12 18v3M8 21h8') + detail(path('m3 3 18 18')));
+  add('person', 'Person', 'Home', 'violet', circle(12, 6, 3, 'wash') + path('M5 21v-2a7 7 0 0 1 14 0v2Z', 'wash') + detail(path('M8.5 20v-2M15.5 20v-2')));
+
+  function has(id) { return typeof id === 'string' && own(registry, id); }
+  function resolve(id, fallback) { return has(id) ? id : has(fallback) ? fallback : 'gear'; }
+  function toneName(value, fallback) {
+    if (typeof value !== 'string') return fallback;
+    if (own(toneAliases, value)) return toneAliases[value];
+    return own(palettes, value) ? value : fallback;
+  }
+  function glyph(id, options) {
+    id = resolve(id); options = options || {};
+    var tone = toneName(options.tone, registry[id].tone), palette = palettes[tone];
+    function paint(role) {
+      return options.monochrome ? 'currentColor' : 'var(--fv-icon-' + role + ',' + palette[role] + ')';
+    }
+    // Monochrome preserves silhouette and interior marks without solid bodies.
+    var svg = artwork[id].replace(/\$(primary|accent|wash)/g, function (_, role) {
+      return options.monochrome && role === 'wash' ? 'none' : paint(role);
+    });
+    return '<g class="fv-icon-glyph" data-icon="' + id + '" data-icon-tone="' + tone + '" fill="none" stroke="' + paint('primary') + '" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">' + svg + '</g>';
+  }
+  function render(id, options) {
+    id = resolve(id); options = options || {};
+    var label = typeof options.label === 'string' && options.label ? options.label : null;
+    var className = typeof options.className === 'string' && options.className ? ' ' + escape(options.className) : '';
+    return '<svg class="fv-icon' + (options.monochrome ? ' fv-icon--mono' : '') + className + '" data-icon="' + id + '" viewBox="0 0 24 24" width="24" height="24" focusable="false" ' +
+      (label ? 'role="img" aria-label="' + escape(label) + '"' : 'aria-hidden="true"') + '>' + glyph(id, options) + '</svg>';
+  }
+  function symbols(options) {
+    var newOnly = !options || options.newOnly !== false;
+    return ids.filter(function (id) { return !newOnly || !registry[id].legacy; }).map(function (id) {
+      return '<symbol id="i-' + id + '" viewBox="0 0 24 24">' + glyph(id) + '</symbol>';
+    }).join('');
+  }
+  Object.keys(palettes).forEach(function (key) { Object.freeze(palettes[key]); });
+  return Object.freeze({ids:Object.freeze(ids), registry:Object.freeze(registry),
+    has:has, resolve:resolve, render:render, glyph:glyph, symbols:symbols});
+})();
 /* ---- src/validator.js ---- */
 /* validator.js — shared constants, validation rules and advisory lint.
    Browser-pure fragment: build.py wraps it (with engine.js + a boot file) in one
    IIFE. Contains no DOM access, so tests load it under Node via vm. */
 
-var ICON_SET = ['terminal','cloud','shield','gear','db','antenna','thermo','pump','router','package','key','server','chip','phone','house','camera','doorbell','lock','bulb','car','speaker'];
+var ICON_SET = FlowIcons.ids.slice();
 var TINT_SET = ['cmd','auth','data','mqtt','dev'];
 /* Per-step node state is semantic narrative state, never an authored color.
    `base` is the explicit clearing token; null clears too. */
@@ -8224,6 +8399,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       edgeKeys[ek] = true;
     }
   });
+  FlowBrand.warnings(d.brand, DP + ".brand", warnings);
   var panelIds = {};
   var panelDeclById = {};
   var panelContexts = Object.create(null);
@@ -8236,6 +8412,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     panelDeclById[p.id] = p;
     if (p.visible != null && typeof p.visible !== 'boolean')
       warnings.push(PP + '.visible: expected true or false — panel starts visible');
+    FlowBrand.warnings(p.brand, PP + ".brand", warnings);
     var descriptor = PanelRegistry.get(p.type);
     if (!descriptor)
       warnings.push(PP + '.type: unknown panel type "' + p.type + '" — rendering a placeholder (valid: ' + PanelRegistry.types().join(' ') + ')');
@@ -9966,6 +10143,74 @@ function diagramHandoffURL(value, resolver){
   }
   return detailURL(value.url);
 }
+/* ---- src/panels/media.js ---- */
+/* Offline raster assets shared by image panels, app screens and company logos. */
+var EMBEDDED_IMAGE_MAX_BYTES = 512 * 1024;
+/* Raster data only: images travel with the spec and never fetch remote assets. */
+function embeddedImageSource(value) {
+  if (typeof value !== 'string' || value.length > Math.ceil(EMBEDDED_IMAGE_MAX_BYTES / 3) * 4 + 32)
+    return null;
+  var match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match || match[2].length % 4 !== 0) return null;
+  var bytes =
+    (match[2].length * 3) / 4 - (match[2].endsWith('==') ? 2 : match[2].endsWith('=') ? 1 : 0);
+  return bytes <= EMBEDDED_IMAGE_MAX_BYTES ? value : null;
+}
+/* ---- src/icons/brand.js ---- */
+/* Shared offline branding. Authored logos are raster data, never executable SVG
+   or remote fetches. Existing Phone monograms retain their original meaning. */
+var FlowBrand = (function () {
+  function object(v) {
+    if(!v || Object.prototype.toString.call(v)!=='[object Object]')return false;
+    var proto=Object.getPrototypeOf(v);
+    return proto===null || (Object.prototype.hasOwnProperty.call(proto,'constructor') && typeof proto.constructor==='function' && Function.prototype.toString.call(proto.constructor)===Function.prototype.toString.call(Object));
+  }
+  function clean(raw) {
+    if (!object(raw)) return {};
+    var out = {};
+    if (typeof raw.app === 'string') out.app = raw.app;
+    if (typeof raw.logo === 'string' && raw.logo.length >= 1 && raw.logo.length <= 4) out.logo = raw.logo;
+    if (embeddedImageSource(raw.logoImage)) out.logoImage = raw.logoImage;
+    if (FlowIcons.has(raw.icon)) out.icon = raw.icon;
+    ['accent','bg','fg'].forEach(function (key) {
+      if (typeof raw[key] === 'string' && (raw[key].length===4 || raw[key].length===7) && /^#(?:[a-f\d]{3}|[a-f\d]{6})$/i.test(raw[key])) out[key] = raw[key];
+    });
+    return out;
+  }
+  function resolve(shared, local) {
+    if (local === false) return null;
+    var own = clean(local), value = Object.assign({}, clean(shared), own);
+    // A local mark explicitly replaces the shared mark, in any supported form.
+    if (['logoImage','icon','logo'].some(function(k){return own[k];})) {
+      ['logoImage','icon','logo'].forEach(function(k){delete value[k];});
+      ['logoImage','icon','logo'].forEach(function(k){if(own[k])value[k]=own[k];});
+    }
+    return Object.keys(value).length ? value : null;
+  }
+  function warnings(raw, path, out) {
+    if (raw == null || raw === false) return;
+    if (!object(raw)) { out.push(path + ': expected a brand object or false — ignored'); return; }
+    if (raw.app != null && typeof raw.app !== 'string') out.push(path + '.app: expected text — ignored');
+    if (raw.logo != null && !(typeof raw.logo === 'string' && raw.logo.length >= 1 && raw.logo.length <= 4)) out.push(path + '.logo: use a 1–4 character monogram — ignored');
+    if (raw.logoImage != null && !embeddedImageSource(raw.logoImage)) out.push(path + '.logoImage: use an embedded PNG, JPEG or WebP up to 512 KiB — ignored');
+    if (raw.icon != null && !FlowIcons.has(raw.icon)) out.push(path + '.icon: choose an icon from the shared library — ignored');
+    ['accent','bg','fg'].forEach(function(k){if(raw[k]!=null && !clean(raw)[k])out.push(path+'.'+k+': use #RGB or #RRGGBB — ignored');});
+  }
+  function render(raw, options) {
+    var b = clean(raw), o = options || {}, mark = '', name = b.app || 'Company';
+    if (b.logoImage) mark = '<img class="fv-brand-mark" src="' + esc(b.logoImage) + '" alt="' + esc(name + ' logo') + '">';
+    else if (b.icon) mark = FlowIcons.render(b.icon, {className:'fv-brand-mark', label:o.compact ? name : undefined});
+    else if (b.logo) mark = '<span class="fv-brand-mark fv-brand-monogram" aria-label="' + esc(name + ' logo') + '">' + esc(b.logo) + '</span>';
+    if (!mark && (!b.app || o.compact)) return '';
+    var styles = [];
+    if (b.accent) styles.push('--fv-brand-accent:' + b.accent);
+    if (b.bg) styles.push('--fv-brand-bg:' + b.bg);
+    if (b.fg) styles.push('--fv-brand-fg:' + b.fg);
+    return '<span class="fv-brand' + (o.className ? ' ' + esc(o.className) : '') + '"' + (styles.length ? ' style="' + styles.join(';') + '"' : '') + '>' + mark +
+      (!o.compact && b.app ? '<span class="fv-brand-name">' + esc(b.app) + '</span>' : '') + '</span>';
+  }
+  return Object.freeze({isObject:object,clean:clean, resolve:resolve, warnings:warnings, render:render});
+})();
 /* ---- src/panels/shared.js ---- */
 /* Pure panel utilities shared by declarations, folds and render models. */
 function panelObject(v) {
@@ -10473,6 +10718,7 @@ function buildPanels(asideEl, d, skin, primaryHost, primaryId) {
     (primaryHost && p.id === (primaryId || d.primaryPanel) ? primaryHost : asideEl).appendChild(
       card
     );
+    p = Object.assign({}, p, {brand: FlowBrand.resolve(d.brand, p.brand)});
     hosts[p.id] = { panel: p, body: body, card: card };
     /* Homemap ambient state precedes step zero; other widgets keep their
        established first-folded-step preview. */
@@ -10636,15 +10882,7 @@ var FlowAudio = (function () {
   function isEmitting(raw) { var a = model(raw); return a.output !== 'silent' && a.playback === 'playing'; }
   function isCapturing(raw) { return model(raw).microphone === 'capturing'; }
   function icon(kind) {
-    var paths = {
-      microphone: '<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3M9 21h6"/>',
-      speaker: '<path d="M3 9h4l5-4v14l-5-4H3ZM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
-      recorded: '<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/>',
-      chime: '<path d="M6 16h12l-2-3V9a4 4 0 0 0-8 0v4ZM10 20h4M12 3v2"/>',
-      siren: '<path d="M5 19h14v3H5ZM7 19v-7a5 5 0 0 1 10 0v7M12 1v3M2 6l3 2m17-2-3 2M1 13h3m16 0h3"/>',
-      detection: '<path d="M9 19c0-4 7-4 7-10a5 5 0 0 0-10 0m4 1a2 2 0 0 1 4 0c0 3-5 3-5 6M8 21h3M3 5 1 3m19 4 3-1"/>',
-    };
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[own(paths, kind) ? kind : 'speaker'] + '</svg>';
+    return FlowIcons.render(FlowIcons.has(kind) ? kind : 'speaker');
   }
   var outputs = {silent:'Silent', speech:'Live speech', recorded:'Recorded message', chime:'Chime', siren:'Siren'};
   var microphones = {idle:'Mic idle', listening:'Listening', capturing:'Capturing sound', muted:'Mic muted', unavailable:'Mic unavailable'};
@@ -10732,7 +10970,7 @@ var FlowAudio = (function () {
     var status = panel.frame !== 'none' && (clock || date) ? '<div class="appscreen-statusbar">' +
       (clock ? '<span class="appscreen-clock" title="' + esc(clock) + '">' + esc(clock) + '</span>' : '') +
       (date ? '<span class="appscreen-date" title="' + esc(date) + '">' + esc(date) + '</span>' : '') +
-      '<span class="appscreen-glyphs" aria-hidden="true">▂▄▆ · ▰</span></div>' : '';
+      '<span class="appscreen-glyphs" aria-hidden="true">'+FlowIcons.render('signal',{monochrome:true})+FlowIcons.render('battery-full',{monochrome:true})+'</span></div>' : '';
     var before = '<figure class="appscreens" style="--appscreen-ratio:' + ratio.toFixed(6) + '"><div class="appscreen-stage"><div class="appscreen-viewport' +
       (panel.frame !== 'none' ? ' appscreen-phone' : '') + '">' +
       status +
@@ -11128,8 +11366,9 @@ PanelViews.register('battery', function (host, panel, state, skin, states, stepI
     '">' +
     (bv != null ? esc(bv) : '&#8212;') +
     '<span class="btunit">%</span>' +
-    (bm.trend === 'charging' ? '<span class="btbolt" aria-label="charging">&#9889;</span>' : '') +
-    (bm.cold ? '<span class="btcold" aria-label="cold-limited">&#10052;</span>' : '') +
+    FlowIcons.render(bm.trend === 'charging' ? 'battery-charging' : bm.zone === 'low' || bm.zone === 'crit' ? 'battery-low' : 'battery',
+      {className:'btstatus',tone:{ok:'ok',low:'warn',crit:'alert',na:'muted'}[bm.zone],label:bm.trend === 'charging' ? 'Charging' : undefined}) +
+    (bm.cold ? FlowIcons.render('snowflake',{className:'btcold',label:'Cold-limited'}) : '') +
     '</div><span class="btzone z-' +
     bm.zone +
     '">' +
@@ -11265,8 +11504,8 @@ PanelRegistry.extend('battery', {
       css: String.raw`.bthead{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px;}
 .btval{font:700 20px 'IBM Plex Mono',monospace;}
 .btunit{font-size:11px; font-weight:500; opacity:.6; margin-left:3px;}
-.btbolt{font-size:13px; margin-left:5px;}
-.btcold{font-size:12px; margin-left:4px; opacity:.85;}
+.btstatus,.btcold{width:20px;height:20px;vertical-align:-3px;margin-left:5px;}
+.btcold{width:17px;height:17px;margin-left:4px;}
 .sk-aurora .btval{color:#EAF2FF;}
 .sk-daylight .btval{color:#23272E;}
 .sk-aurora .btval.z-low{color:#FFB454;}
@@ -12251,11 +12490,11 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
     }
     if (v === null) return;
     if (!panelObject(v)) {
-      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?} or null — ignored');
+      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?, icon?} or null — ignored');
       return;
     }
     Object.keys(v).forEach(function (k) {
-      if (['value', 'status', 'source', 'detail', 'visible'].indexOf(k) < 0)
+      if (['value', 'status', 'source', 'detail', 'visible', 'icon'].indexOf(k) < 0)
         warnings.push(p + '.' + k + ': unknown field property — ignored');
     });
     if (
@@ -12284,6 +12523,8 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
       warnings.push(p + '.detail: expected text or null — ignored');
     if (panelOwn(v, 'visible') && typeof v.visible !== 'boolean')
       warnings.push(p + '.visible: expected true or false — ignored');
+    if (panelOwn(v, 'icon') && v.icon !== null && ICON_SET.indexOf(v.icon) < 0)
+      warnings.push(p + '.icon: unknown icon — ignored');
   });
 }
 function deviceAppWarnings(panel, d, path, warnings) {
@@ -12377,6 +12618,7 @@ function foldDeviceAppStates(panel, steps) {
           next.source = v.source;
         if (v.detail === null || typeof v.detail === 'string') next.detail = v.detail || '';
         if (typeof v.visible === 'boolean') next.visible = v.visible;
+        if (panelOwn(v, 'icon') && (v.icon === null || ICON_SET.indexOf(v.icon) >= 0)) next.icon = v.icon;
       } else return;
       if (JSON.stringify(next) !== JSON.stringify(carried[f.id] || {})) updated.push(f.id);
       carried[f.id] = next;
@@ -12448,7 +12690,7 @@ function deviceAppModel(panel, state) {
       label: str(f.label, f.id),
       source: source || null,
       battery: battery,
-      icon: ICON_SET.indexOf(f.icon) >= 0 ? f.icon : null,
+      icon: ICON_SET.indexOf(v.icon) >= 0 ? v.icon : ICON_SET.indexOf(f.icon) >= 0 ? f.icon : battery ? 'battery' : null,
       value: valid ? String(v.value) + (battery ? '%' : str(f.unit)) : '—',
       pct: battery && valid ? v.value : 0,
       status: DEVICEAPP_STATUSES.indexOf(v.status) >= 0 ? v.status : 'unknown',
@@ -12459,7 +12701,8 @@ function deviceAppModel(panel, state) {
   });
   return {
     screen: state.phoneScreen === 'home' ? 'home' : 'app',
-    appName: str(panel.appName, 'Device app'),
+    appName: str(panel.appName, str(panel.brand && panel.brand.app, 'Device app')),
+    brand: panel.brand,
     device: str(panel.device, 'Camera'),
     subtitle: str(panel.subtitle, 'Device health'),
     clock: str(state.clock, '9:41'),
@@ -12486,10 +12729,13 @@ function deviceAppHomeHTML(m, fresh) {
   [['camera',m.appName],['phone','Calls'],['speaker','Music'],['gear','Settings']].forEach(function(app,index){
     // Decorative phone UI: story steps own navigation, not these app icons.
     h+='<div class="da-launcher-app'+(index===0?' da-launcher-primary':'')+'"><span class="da-launcher-icon" aria-hidden="true">'+
-      '<svg viewBox="0 0 24 24"><use href="#i-'+app[0]+'"/></svg>'+
+      (index===0 && deviceAppBrand(m,true) || FlowIcons.render(app[0]))+
       (index===0 && m.notifications.count?'<i>'+m.notifications.count+'</i>':'')+'</span><span>'+esc(app[1])+'</span></div>';
   });
   return h+'</div>'+(!m.showSources && m.note?'<p class="da-app-note">'+esc(m.note)+'</p>':'');
+}
+function deviceAppBrand(m, compact) {
+  return FlowBrand.render(panelObject(m.brand) ? Object.assign({},m.brand,{app:m.appName}) : m.brand,{compact:!!compact});
 }
 function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh) {
   var m = deviceAppModel(panel, state),
@@ -12516,11 +12762,11 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh)
     '<div class="deviceapp'+(m.showSources?'':' da-standalone')+'"><div class="da-phone-fit"><div class="da-phone da-phone-'+m.screen+'" data-da-screen="'+m.screen+'">'+
     '<div class="da-statusbar'+(m.date?' da-has-date':'')+'"><span>'+esc(m.clock)+'</span>'+
     (m.date?'<span class="da-date" title="'+esc(m.date)+'">'+esc(m.date)+'</span>':'')+
-    '<span aria-hidden="true">▂▄▆ · ▰</span></div>'+
+    '<span class="da-system-icons" aria-hidden="true">'+FlowIcons.render('signal',{monochrome:true})+FlowIcons.render('battery-full',{monochrome:true})+'</span></div>'+
     '<div class="da-screen da-screen-'+m.screen+(screenFresh?' fresh':'')+'" tabindex="0" aria-label="'+(m.screen==='home'?'Phone home screen':'Device app screen')+'">';
   if(m.screen==='home') h+=deviceAppHomeHTML(m,notificationFresh);
   else {
-    h+='<div class="da-appbar"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg>'+esc(m.appName)+'</div>'+
+    h+='<div class="da-appbar">'+(deviceAppBrand(m,false) || FlowIcons.render('camera')+esc(m.appName))+'</div>'+
       '<div class="da-heading"><span class="da-eyebrow">CAMERA DETAILS</span><h3>'+esc(m.device)+'</h3><span>'+esc(m.subtitle)+'</span></div>'+
       deviceAppNotificationsHTML(m,notificationFresh)+'<div class="da-fields">';
     m.fields.filter(function(f){return f.visible;}).forEach(function (f) {
@@ -12551,9 +12797,7 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh)
         '</span>' +
         '<span class="da-value">' +
         (f.icon
-          ? '<svg class="da-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
-            f.icon +
-            '"/></svg>'
+          ? FlowIcons.render(f.icon,{className:'da-icon'})
           : '') +
         esc(f.value) +
         '</span>' +
@@ -12714,6 +12958,8 @@ PanelRegistry.extend('deviceapp', {
 .da-statusbar.da-has-date{gap:calc(8 * var(--da-px));padding-top:calc(10 * var(--da-px));}
 .da-date{min-width:0;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .da-statusbar>span:last-child{flex:none;}
+.da-system-icons{display:flex;align-items:center;gap:calc(4 * var(--da-px));}
+.da-system-icons .fv-icon{width:calc(14 * var(--da-px));height:calc(14 * var(--da-px));}
 .da-screen{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border-radius:calc(10 * var(--da-px));padding:calc(2 * var(--da-px)) calc(3 * var(--da-px)) calc(8 * var(--da-px));}
 .da-screen:focus-visible{outline:calc(2 * var(--da-px)) solid #6875ca;outline-offset:calc(-2 * var(--da-px));}
 .da-appbar{display:flex;align-items:center;gap:calc(7 * var(--da-px));font:600 calc(11 * var(--da-px))/1.4 'Sora',sans-serif;color:#6673c2;padding:calc(3 * var(--da-px)) calc(4 * var(--da-px)) calc(8 * var(--da-px));}
@@ -12824,6 +13070,7 @@ PanelRegistry.extend('deviceapp', {
 PanelRegistry.extend('deviceapp', {
   references: { nodes: ['sources.*.node'] },
   authoring: {
+    branding: true,
     notifications: true,
     template: {
       title: 'Device app',
@@ -12948,6 +13195,7 @@ PanelRegistry.extend('deviceapp', {
             [
               ['value', f.kind === 'battery' ? 'num' : 'text'],
               ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
+              ['icon', 'enum', ICON_SET],
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
               ['visible', 'bool'],
@@ -13018,13 +13266,7 @@ PanelRegistry.extend('deviceapp', {
   }
   function text(value) { return typeof value === 'string' ? value : ''; }
   function icon(kind) {
-    var paths = {
-      police:'<path d="m12 3 8 4v6c0 5-8 9-8 9s-8-4-8-9V7Z"/><path d="m12 7 1.5 3 3.5.5-2.5 2.5.5 3.5-3-1.5-3 1.5.5-3.5L7 10.5l3.5-.5Z"/>',
-      fire:'<path d="M12 2c1 6 7 7 7 13a7 7 0 0 1-14 0c0-3 2-6 4-8 0 4 2 4 3 4 2-2 1-6 0-9Z"/><path d="M12 13c0 3 3 3 3 5a3 3 0 0 1-6 0c0-2 2-3 3-5Z"/>',
-      medical:'<path d="M8 3h8v5h5v8h-5v5H8v-5H3V8h5Z"/>',
-      security:'<path d="m12 3 8 4v6c0 5-8 9-8 9s-8-4-8-9V7Z"/><path d="m8 12 3 3 5-6"/>'
-    };
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[kinds.indexOf(kind) >= 0 ? kind : 'security'] + '</svg>';
+    return FlowIcons.render(kinds.indexOf(kind) >= 0 ? kind : 'security');
   }
   function routePosition(progress) {
     var t = progress / 100, a = 1 - t;
@@ -13113,7 +13355,7 @@ PanelRegistry.extend('deviceapp', {
         (value.detail ? '<span class="dispatch-unit-detail">' + esc(value.detail) + '</span>' : '') + '</div></li>';
     }).join('');
     var hero = '<div class="dispatch-topline"><span>' + esc(text(panel.agency) || 'Emergency response') + '</span><span class="dispatch-priority dispatch-priority-' + (priority || 'unknown') + '">' + (priority ? priority + ' priority' : 'Priority not set') + '</span></div>' +
-      '<div class="dispatch-status">' + labels[status] + '</div><div class="dispatch-dispatcher"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 11V8a6 6 0 0 1 12 0v3M4 10H2v5h4v-5Zm12 0h2v5h-4v-5ZM16 15v2h-6"/></svg>' + esc(state.dispatcher || 'No dispatcher assigned') + '</div>';
+      '<div class="dispatch-status">' + labels[status] + '</div><div class="dispatch-dispatcher">' + FlowIcons.render('headset') + '' + esc(state.dispatcher || 'No dispatcher assigned') + '</div>';
     var rail = [{id:'requested',label:'Request'},{id:'assigned',label:'Assign'},{id:'enroute',label:'En route'},{id:'onscene',label:'On scene'}].map(function (stage) {
       var current = status === stage.id;
       return '<li class="dispatch-stage' + (current ? ' is-current' : '') + '"' + (current ? ' aria-current="step"' : '') + '><span class="dispatch-stage-dot" aria-hidden="true"></span><span>' + stage.label + '</span></li>';
@@ -13341,6 +13583,7 @@ var HOMEMAP_STATES = {
 };
 var HOMEMAP_THERMAL = ['normal', 'warm', 'hot', 'cold', 'freezing'];
 var HOMEMAP_SPOTLIGHT = ['off', 'on', 'flash'];
+function homemapIconValid(value) { return value === null || ICON_SET.indexOf(value) >= 0; }
 function homemapAudioValid(value) {
   var warnings = [];
   return FlowAudio.clean(value, 'audio', warnings) !== undefined && !warnings.length;
@@ -13350,7 +13593,8 @@ function homemapSubjectPatchValid(value) {
   if (!panelObject(value)) return false;
   var position = Object.prototype.hasOwnProperty.call(value, 'x') || Object.prototype.hasOwnProperty.call(value, 'y');
   return (!position || homemapSubjectPosition(value)) &&
-    (position || Object.prototype.hasOwnProperty.call(value, 'audio')) &&
+    (position || Object.prototype.hasOwnProperty.call(value, 'audio') || Object.prototype.hasOwnProperty.call(value, 'icon')) &&
+    (!Object.prototype.hasOwnProperty.call(value, 'icon') || homemapIconValid(value.icon)) &&
     (!Object.prototype.hasOwnProperty.call(value, 'audio') || homemapAudioValid(value.audio));
 }
 function homemapDevicePatchValid(kind, value) {
@@ -13362,6 +13606,7 @@ function homemapDevicePatchValid(kind, value) {
         ? HOMEMAP_STATES[kind].indexOf(value[k]) >= 0
         : k === 'thermal' ? HOMEMAP_THERMAL.indexOf(value[k]) >= 0
         : k === 'spotlight' ? HOMEMAP_SPOTLIGHT.indexOf(value[k]) >= 0
+        : k === 'icon' ? homemapIconValid(value[k])
         : k === 'audio' && homemapAudioValid(value[k]);
     })
   );
@@ -13457,12 +13702,14 @@ function homemapPatchWarnings(obj, path, declaration, warnings) {
       var subPatch = obj[k];
       if (subPatch !== null && (!panelObject(subPatch) ||
           ((!homemapSubjectPosition(subPatch)) &&
-           (subPatch.x !== undefined || subPatch.y !== undefined || !Object.prototype.hasOwnProperty.call(subPatch, 'audio')))))
+           (subPatch.x !== undefined || subPatch.y !== undefined || (!Object.prototype.hasOwnProperty.call(subPatch, 'audio') && !Object.prototype.hasOwnProperty.call(subPatch, 'icon'))))))
         warnings.push(
-          path + '.' + k + ': expected an object with finite x/y or null; audio-only objects also supported — invalid subject position ignored'
+          path + '.' + k + ': expected an object with finite x/y or null; audio-only and icon-only objects also supported — invalid subject position ignored'
         );
       if (panelObject(subPatch) && Object.prototype.hasOwnProperty.call(subPatch, 'audio'))
         FlowAudio.clean(subPatch.audio, path + '.' + k + '.audio', warnings);
+      if (panelObject(subPatch) && Object.prototype.hasOwnProperty.call(subPatch, 'icon') && !homemapIconValid(subPatch.icon))
+        warnings.push(path + '.' + k + '.icon: expected a known icon or null — ignored');
     } else if (!devices[k]) {
       warnings.push(path + '.' + k + ': undeclared device or subject id — patch ignored');
     } else {
@@ -13471,6 +13718,10 @@ function homemapPatchWarnings(obj, path, declaration, warnings) {
         Object.keys(obj[k]).forEach(function (field) {
           if (field === 'audio') {
             FlowAudio.clean(obj[k].audio, path + '.' + k + '.audio', warnings);
+            return;
+          }
+          if (field === 'icon') {
+            if (!homemapIconValid(obj[k].icon)) warnings.push(path + '.' + k + '.icon: expected a known icon or null — ignored');
             return;
           }
           var allowed = field === 'state' ? vocab : field === 'thermal' ? HOMEMAP_THERMAL : field === 'spotlight' ? HOMEMAP_SPOTLIGHT : null;
@@ -13587,7 +13838,7 @@ function homemapDeclarationWarnings(panel, path, warnings) {
       )
         warnings.push(dp + '.doorSwing: use an angle from -135 to -15 or 15 to 135 — using 90');
     }
-    if (d.kind === 'sensor' && d.icon !== undefined && ICON_SET.indexOf(d.icon) < 0)
+    if (['sensor', 'camera', 'hub'].indexOf(d.kind) >= 0 && d.icon !== undefined && ICON_SET.indexOf(d.icon) < 0)
       warnings.push(dp + '.icon: unknown icon "' + d.icon + '" — using "gear"');
     if (!duplicate && homemapDeviceValid(d)) devices[d.id] = d;
   });
@@ -13626,7 +13877,8 @@ function foldHomemapStates(panel, steps) {
         if (!panelObject(subPatch)) return;
         var position = homemapSubjectPosition(subPatch);
         var audio = Object.prototype.hasOwnProperty.call(subPatch, 'audio') ? FlowAudio.clean(subPatch.audio) : undefined;
-        if (!position && audio === undefined) return;
+        var hasIcon = Object.prototype.hasOwnProperty.call(subPatch, 'icon') && homemapIconValid(subPatch.icon);
+        if (!position && audio === undefined && !hasIcon) return;
         var subjectNext = Object.assign({}, panelObject(carried[k]) ? carried[k] : {});
         if (position) {
           subjectNext.x = subPatch.x;
@@ -13634,6 +13886,7 @@ function foldHomemapStates(panel, steps) {
           delete subjectNext._homemapHidden;
         } else if (carried[k] === null) subjectNext._homemapHidden = true;
         if (audio !== undefined) subjectNext.audio = audio;
+        if (hasIcon) subjectNext.icon = subPatch.icon;
         carried[k] = subjectNext;
         return;
       }
@@ -13653,6 +13906,7 @@ function foldHomemapStates(panel, steps) {
           var audio = FlowAudio.clean(update.audio);
           if (audio !== undefined) next.audio = audio;
         }
+        if (Object.prototype.hasOwnProperty.call(update, 'icon') && homemapIconValid(update.icon)) next.icon = update.icon;
         /* Legacy scalar values still select the operating state; an invalid
            scalar gets the documented default in homemapModel. */
         if (!panelObject(patch[k])) next.state = patch[k];
@@ -13740,7 +13994,8 @@ function homemapModel(panel, state) {
           : 'normal',
       spotlight: panelObject(devicePatch) && HOMEMAP_SPOTLIGHT.indexOf(devicePatch.spotlight) >= 0 ? devicePatch.spotlight : 'off',
       audio: panelObject(devicePatch) ? FlowAudio.clean(devicePatch.audio) : undefined,
-      icon: ICON_SET.indexOf(d.icon) >= 0 ? d.icon : 'gear',
+      icon: panelObject(devicePatch) && ICON_SET.indexOf(devicePatch.icon) >= 0 ? devicePatch.icon :
+        ICON_SET.indexOf(d.icon) >= 0 ? d.icon : d.icon === undefined && d.kind === 'camera' ? 'camera' : d.icon === undefined && d.kind === 'hub' ? 'router' : 'gear',
       facing: ((facing % 360) + 360) % 360,
       spread: fin(d.spread) != null ? clamp(d.spread, 10, 180) : 80,
       range: fin(d.range) != null ? clamp(d.range, 20, 160) : 70,
@@ -13762,7 +14017,8 @@ function homemapModel(panel, state) {
     return {
       id: sub.id,
       label: String(sub.label != null ? sub.label : sub.id),
-      icon: sub.icon === undefined ? null : ICON_SET.indexOf(sub.icon) >= 0 ? sub.icon : 'gear',
+      icon: panelObject(value) && ICON_SET.indexOf(value.icon) >= 0 ? value.icon :
+        sub.icon === undefined ? null : ICON_SET.indexOf(sub.icon) >= 0 ? sub.icon : 'gear',
       x: clamp(position.x, 0, 320),
       y: clamp(position.y, 0, 180),
       hidden: value === null || !!(value && value._homemapHidden),
@@ -13888,7 +14144,7 @@ function homemapThermalHTML(d, scaleY, clearing) {
         i * 60 +
         ')" d="M0 -11 V-19 M-3 -16 L0 -13 L3 -16"/>';
     s +=
-      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><path d="M0 -4 V4 M-3.5 -2 L3.5 2 M-3.5 2 L3.5 -2"/></g>';
+      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><g transform="translate(-5 -5) scale(.416667)">' + FlowIcons.glyph('snowflake') + '</g></g>';
   } else {
     [-8, 0, 8].forEach(function (x, i) {
       s +=
@@ -13905,7 +14161,7 @@ function homemapThermalHTML(d, scaleY, clearing) {
         ' -27"/>';
     });
     s +=
-      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><use href="#i-thermo" x="-5" y="-5" width="10" height="10"/></g>';
+      '<g class="thermal-badge" transform="translate(17 -17)"><circle r="7"/><g transform="translate(-5 -5) scale(.416667)">' + FlowIcons.glyph(thermal === 'hot' ? 'hot' : 'temperature',{tone:thermal === 'hot' ? 'alert' : 'warn'}) + '</g></g>';
   }
   return s + '</g>';
 }
@@ -14331,15 +14587,12 @@ PanelViews.register(
             (d.y + 5) +
             ' h7"/>';
         } else {
-          var deviceIcon = d.kind === 'camera' ? 'camera' : d.kind === 'hub' ? 'router' : d.icon;
           s +=
-            '<use class="hmicon hmdeviceglyph" href="#i-' +
-            esc(deviceIcon) +
-            '" x="' +
+            '<g class="hmicon hmdeviceglyph" transform="translate(' +
             (d.x - 6) +
-            '" y="' +
+            ' ' +
             (d.y - 6) +
-            '" width="12" height="12"/>';
+            ') scale(.5)">' + FlowIcons.glyph(d.icon) + '</g>';
         }
         var labelY = d.y > 139 ? d.y - 25 : d.y + 20;
         var labelX = clamp(d.x, 28, 292);
@@ -14381,13 +14634,11 @@ PanelViews.register(
         s += '<circle class="hmsubjectdot" cx="' + sub.x + '" cy="' + sub.y + '" r="7"/>';
         if (sub.icon)
           s +=
-            '<use class="hmactor-icon" href="#i-' +
-            esc(sub.icon) +
-            '" x="' +
+            '<g class="hmactor-icon" transform="translate(' +
             (sub.x - 5) +
-            '" y="' +
+            ' ' +
             (sub.y - 5) +
-            '" width="10" height="10"/>';
+            ') scale(.416667)">' + FlowIcons.glyph(sub.icon) + '</g>';
         else
           s +=
             '<circle class="hmactor-icon" cx="' +
@@ -14918,7 +15169,7 @@ function builderHomemapLayoutScene(panel) {
   return { state: state, model: homemapModel(panel, state), hidden: hidden };
 }
 
-/* Change one device attribute or subject audio without capturing inherited sibling fields. */
+/* Change one device attribute or subject audio/icon without capturing inherited siblings. */
 function planHomemapDeviceAttribute(
   text,
   raw,
@@ -14929,7 +15180,7 @@ function planHomemapDeviceAttribute(
   attribute,
   value
 ) {
-  if (['state', 'thermal', 'spotlight', 'audio'].indexOf(attribute) < 0) return { error: 'Unknown device attribute.' };
+  if (['state', 'thermal', 'spotlight', 'audio', 'icon'].indexOf(attribute) < 0) return { error: 'Unknown device attribute.' };
   var got =
     stepIdx === null
       ? builderDiagram(text, raw, sectionIdx)
@@ -14944,12 +15195,14 @@ function planHomemapDeviceAttribute(
       return homemapDeviceValid(d) && d.id === key;
     });
   var subject = homemapSubjects(panel).find(function (sub) { return sub.id === key; });
-  if (!device && !(subject && attribute === 'audio')) return { error: 'Device or subject not found.' };
+  if (!device && !(subject && ['audio','icon'].indexOf(attribute) >= 0)) return { error: 'Device or subject not found.' };
   var allowed = attribute === 'state' ? HOMEMAP_STATES[device.kind] : attribute === 'thermal' ? HOMEMAP_THERMAL : HOMEMAP_SPOTLIGHT;
-  if (value !== undefined && (attribute === 'audio' ? !homemapAudioValid(value) : allowed.indexOf(value) < 0))
+  if (value !== undefined && (attribute === 'audio' ? !homemapAudioValid(value) : attribute === 'icon' ? !homemapIconValid(value) : allowed.indexOf(value) < 0))
     return { error: 'Choose a valid ' + attribute + '.' };
   var patch = stepIdx === null ? panel.initial : (stepPanelPatch(got.st) || {})[panelId];
   var current = patch && patch[key];
+  if (subject && current === null && attribute === 'icon')
+    return {error:'This subject is hidden at this step. Show it before setting its icon.'};
   var next = panelObject(current)
     ? Object.assign({}, current)
     : typeof current === 'string'
@@ -14985,7 +15238,7 @@ function planStepHomemapField(text, raw, sectionIdx, stepIdx, panelId, key, valu
   if (!device && !subject && key !== 'signals') return { error: 'Unknown homemap field.' };
   if (value !== undefined) {
     if (device && !homemapDevicePatchValid(device.kind, value))
-      return { error: 'Choose a valid device state, temperature, spotlight, or audio snapshot.' };
+      return { error: 'Choose a valid device state, temperature, spotlight, icon, or audio snapshot.' };
     if (
       subject &&
       value !== null &&
@@ -15193,10 +15446,10 @@ PanelRegistry.extend('homemap', {
       var subject = homemapSubjects(p).some(function (s) {
         return s.id === key;
       });
-      if (subject && panelObject(snapshot[key]) && Object.prototype.hasOwnProperty.call(snapshot[key], 'audio'))
-        return history([key], true, 'Subject position and audio history');
+      if (subject && panelObject(snapshot[key]) && (Object.prototype.hasOwnProperty.call(snapshot[key], 'audio') || Object.prototype.hasOwnProperty.call(snapshot[key], 'icon')))
+        return history([key], true, 'Subject position, icon, and audio history');
       if (!subject && panelObject(snapshot[key]))
-        return history([key], true, 'Device state, spotlight, temperature, and audio history');
+        return history([key], true, 'Device state, spotlight, temperature, icon, and audio history');
       return assignment(
         key,
         subject
@@ -15212,6 +15465,18 @@ PanelRegistry.extend('homemap', {
       function listen(target,type,fn,options){
         if(context.listen)return context.listen(target,type,fn,options);
         target.addEventListener(type,fn,options);
+      }
+      function homemapIconControl(item, local, commit, initial) {
+        var authored = panelObject(local) && Object.prototype.hasOwnProperty.call(local, 'icon');
+        var input = context.controls.select(['__default__'].concat(ICON_SET),
+          authored ? local.icon === null ? '__default__' : local.icon : '', function (value) {
+            return commit(value == null ? undefined : value === '__default__' ? null : value);
+          }, true);
+        input.options[0].textContent = initial ? 'Use layout icon' : 'Inherit previous icon';
+        input.options[1].textContent = 'Restore layout icon';
+        input.setAttribute('aria-label', item.label + (initial ? ' initial' : '') + ' icon');
+        input.setAttribute('data-icon-default-label', initial ? 'Use layout icon' : 'Inherit previous icon');
+        return context.controls.row(item.label + ' · icon', context.controls.iconPicker(input));
       }
       function homemapAudioControl(item, local, commit, initial) {
         var box = document.createElement('details');
@@ -15561,8 +15826,13 @@ PanelRegistry.extend('homemap', {
                   attribute,
                   value
                 );
-              if (homemapSubjectPosition(value) && panelObject(snapshot.patch[key]) && Object.prototype.hasOwnProperty.call(snapshot.patch[key], 'audio') && !Object.prototype.hasOwnProperty.call(value, 'audio'))
-                value = Object.assign({}, value, { audio: snapshot.patch[key].audio });
+              if (homemapSubjectPosition(value) && panelObject(snapshot.patch[key])) {
+                value = Object.assign({}, value);
+                ['audio','icon'].forEach(function(field) {
+                  if (Object.prototype.hasOwnProperty.call(snapshot.patch[key], field) && !Object.prototype.hasOwnProperty.call(value, field))
+                    value[field] = snapshot.patch[key][field];
+                });
+              }
               return planStepHomemapField(
                 context.source(),
                 raw,
@@ -15612,7 +15882,7 @@ PanelRegistry.extend('homemap', {
           return select;
         }
         note(
-          'Operating state, temperature, spotlight, and audio carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.'
+          'Operating state, temperature, spotlight, icon, and audio carry independently. Inherit removes only that attribute at this step. Subject positions carry; signals last for this step only.'
         );
         var body = document.createElement('div');
         body.className = 'home-edit-body';
@@ -15669,6 +15939,8 @@ PanelRegistry.extend('homemap', {
             panelObject(ownPatch) && Object.prototype.hasOwnProperty.call(ownPatch, 'spotlight') ? d.spotlight : '',
             d.label + ' spotlight', function (v) { commit(d.id, v === '' ? undefined : v, null, 'spotlight'); }
           )));
+          if (d.kind !== 'entry') fields.appendChild(homemapIconControl(d, ownPatch,
+            function (v) { return commit(d.id, v, null, 'icon'); }, false));
           fields.appendChild(homemapAudioControl(d, ownPatch, function (v) { return commit(d.id, v, null, 'audio'); }, false));
         });
         var armedSubject = null;
@@ -15689,9 +15961,13 @@ PanelRegistry.extend('homemap', {
             own(sub.id) && (snapshot.patch[sub.id] === null || homemapSubjectPosition(snapshot.patch[sub.id])) ? (sub.hidden ? 'hide' : 'show') : 'inherit',
             sub.label + ' visibility',
             function (v) {
+              var inherited = {};
+              if (panelObject(snapshot.patch[sub.id])) ['audio','icon'].forEach(function(field) {
+                if (Object.prototype.hasOwnProperty.call(snapshot.patch[sub.id], field)) inherited[field] = snapshot.patch[sub.id][field];
+              });
               commit(
                 sub.id,
-                v === 'inherit' ? (panelObject(snapshot.patch[sub.id]) && Object.prototype.hasOwnProperty.call(snapshot.patch[sub.id], 'audio') ? { audio: snapshot.patch[sub.id].audio } : undefined) : v === 'hide' ? null : { x: sub.x, y: sub.y }
+                v === 'inherit' ? (Object.keys(inherited).length ? inherited : undefined) : v === 'hide' ? null : { x: sub.x, y: sub.y }
               );
             }
           );
@@ -15729,6 +16005,8 @@ PanelRegistry.extend('homemap', {
           place.setAttribute('aria-pressed', 'false');
           subjectControls[sub.id] = place;
           group.appendChild(place);
+          group.appendChild(homemapIconControl(sub, snapshot.patch[sub.id],
+            function (v) { return commit(sub.id, v, null, 'icon'); }, false));
           group.appendChild(homemapAudioControl(sub, snapshot.patch[sub.id], function (v) { return commit(sub.id, v, null, 'audio'); }, false));
         });
         if (snapshot.model.subjects.length)
@@ -15962,9 +16240,6 @@ PanelRegistry.extend('homemap', {
             cell.classList.add('home-icon-cell');
             var choice = document.createElement('span');
             choice.className = 'home-icon-choice';
-            var preview = document.createElement('span');
-            preview.className = 'home-icon-preview';
-            preview.setAttribute('aria-hidden', 'true');
             var note = document.createElement('span');
             note.className = 'home-icon-note';
             input.setAttribute(
@@ -15973,32 +16248,26 @@ PanelRegistry.extend('homemap', {
             );
             input.options[0].textContent =
               key === 'subjects' ? 'Default (person)' : 'Default (gear)';
-            choice.appendChild(preview);
-            choice.appendChild(input);
+            choice.appendChild(context.controls.iconPicker(input));
             cell.appendChild(choice);
             cell.appendChild(note);
             ref.syncIcon = function () {
               var subject = key === 'subjects',
                 deviceKind = ref.inputs.kind && ref.inputs.kind.value;
-              var editable = subject || deviceKind === 'sensor';
+              var editable = subject || ['sensor', 'camera', 'hub'].indexOf(deviceKind) >= 0;
               input.disabled = !editable;
               choice.hidden = !editable;
+              var fallback = subject ? 'person' : deviceKind === 'camera' ? 'camera' : deviceKind === 'hub' ? 'router' : 'gear';
+              input.options[0].textContent = 'Default (' + fallback + ')';
               note.textContent = editable
                 ? subject
                   ? 'Moving actor: person by default; choose an icon for a car or another subject.'
-                  : 'Sensor also serves as a generic device marker. Choose cloud for a cloud service.'
-                : (deviceKind === 'camera'
-                    ? 'Cameras use a fixed camera icon.'
-                    : deviceKind === 'hub'
-                    ? 'Hubs use a fixed router icon.'
-                    : deviceKind === 'entry'
+                  : deviceKind === 'sensor'
+                    ? 'Sensor also serves as a generic device marker. Choose cloud for a cloud service.'
+                    : 'Choose a symbol without changing this device’s behavior.'
+                : (deviceKind === 'entry'
                     ? 'Entry devices use the entry marker or door drawing.'
                     : 'Choose a device kind first.') + ' For a custom icon, choose kind sensor.';
-              var icon = ICON_SET.indexOf(input.value) >= 0 ? input.value : 'gear';
-              preview.innerHTML =
-                subject && input.value === ''
-                  ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>'
-                  : '<svg viewBox="0 0 24 24"><use href="#i-' + icon + '"/></svg>';
             };
             listen(input,'change', ref.syncIcon);
 
@@ -16188,6 +16457,11 @@ PanelRegistry.extend('homemap', {
           });
           var initialModel = homemapModel(val, val.initial);
           initialModel.devices.concat(initialModel.subjects).forEach(function (item) {
+            if (item.kind !== 'entry') conditions.appendChild(homemapIconControl(item, (val.initial || {})[item.id], function (value) {
+              return context.transact(function (raw) {
+                return planHomemapDeviceAttribute(context.source(), raw, t.section, null, val.id, item.id, 'icon', value);
+              }, { after: function () { context.inspect(); } });
+            }, true));
             conditions.appendChild(homemapAudioControl(item, (val.initial || {})[item.id], function (value) {
               return context.transact(function (raw) {
                 return planHomemapDeviceAttribute(context.source(), raw, t.section, null, val.id, item.id, 'audio', value);
@@ -16264,19 +16538,7 @@ PanelRegistry.extend('homemap', {
   },
 });
 /* ---- src/panels/types/image.js ---- */
-/* image validation and pure state helpers. */
-var EMBEDDED_IMAGE_MAX_BYTES = 512 * 1024;
-/* Raster data only: images travel with the spec and never fetch remote assets. */
-function embeddedImageSource(value) {
-  if (typeof value !== 'string' || value.length > Math.ceil(EMBEDDED_IMAGE_MAX_BYTES / 3) * 4 + 32)
-    return null;
-  var match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
-  if (!match || match[2].length % 4 !== 0) return null;
-  var bytes =
-    (match[2].length * 3) / 4 - (match[2].endsWith('==') ? 2 : match[2].endsWith('=') ? 1 : 0);
-  return bytes <= EMBEDDED_IMAGE_MAX_BYTES ? value : null;
-}
-
+/* Embedded image panel. Shared raster validation lives in ../media.js. */
 PanelRegistry.extend('image', {
   validateDeclaration: function (p, PP, warnings, errors, d) {
     if (p.src != null && p.src !== '' && !embeddedImageSource(p.src))
@@ -17481,41 +17743,7 @@ PanelRegistry.extend('orbit', {
 /* ---- src/panels/types/phone.js ---- */
 /* phone validation and pure state helpers. */
 function phoneBrandIsPlainObject(obj) {
-  if (!obj || Object.prototype.toString.call(obj) !== '[object Object]') return false;
-  var proto = Object.getPrototypeOf(obj);
-  return (
-    proto === null ||
-    (Object.prototype.hasOwnProperty.call(proto, 'constructor') &&
-      typeof proto.constructor === 'function' &&
-      Function.prototype.toString.call(proto.constructor) ===
-        Function.prototype.toString.call(Object))
-  );
-}
-
-function phoneBrandWarnings(panel, path, warnings) {
-  if (!Object.prototype.hasOwnProperty.call(panel, 'brand')) return;
-  var brand = panel.brand;
-  path += '.brand';
-  if (!phoneBrandIsPlainObject(brand)) {
-    warnings.push(path + ': must be a plain object — ignored');
-    return;
-  }
-  ['accent', 'bg', 'fg'].forEach(function (k) {
-    if (
-      Object.prototype.hasOwnProperty.call(brand, k) &&
-      (typeof brand[k] !== 'string' ||
-        (brand[k].length !== 4 && brand[k].length !== 7) ||
-        !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k]))
-    )
-      warnings.push(path + '.' + k + ': must be #RGB or #RRGGBB hex — ignored');
-  });
-  if (
-    Object.prototype.hasOwnProperty.call(brand, 'logo') &&
-    (typeof brand.logo !== 'string' || brand.logo.length < 1 || brand.logo.length > 4)
-  )
-    warnings.push(path + '.logo: must be a string of 1-4 characters — ignored');
-  if (Object.prototype.hasOwnProperty.call(brand, 'app') && typeof brand.app !== 'string')
-    warnings.push(path + '.app: must be a string — ignored');
+  return FlowBrand.isObject(obj);
 }
 
 /* Phone patches are operations, validated for both initial and steps. */
@@ -17589,7 +17817,6 @@ function foldPhoneStates(panel, steps) {
 
 PanelRegistry.extend('phone', {
   validateDeclaration: function (p, PP, warnings, errors, d) {
-    phoneBrandWarnings(p, PP, warnings);
     phonePatchWarnings(p.initial, PP + '.initial', warnings);
   },
   validatePatch: function (patch, path, panel, warnings, context) {
@@ -17602,19 +17829,7 @@ PanelRegistry.extend('phone', {
 function phoneBrand(panel) {
   var brand = panel && panel.brand;
   if (!phoneBrandIsPlainObject(brand)) return null;
-  var out = {};
-  if (typeof brand.app === 'string') out.app = brand.app;
-  if (typeof brand.logo === 'string' && brand.logo.length >= 1 && brand.logo.length <= 4)
-    out.logo = brand.logo;
-  /* These values enter an inline style: accept only literal hex colors. */
-  ['accent', 'bg', 'fg'].forEach(function (k) {
-    if (
-      typeof brand[k] === 'string' &&
-      (brand[k].length === 4 || brand[k].length === 7) &&
-      /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brand[k])
-    )
-      out[k] = brand[k];
-  });
+  var out = FlowBrand.clean(brand);
   return Object.keys(out).length ? out : null;
 }
 
@@ -17722,7 +17937,10 @@ function phonePanelHTML(panel, state, fresh) {
     (m.date ? '<span class="phonedate" title="' + esc(m.date) + '">' + esc(m.date) + '</span>' : '') +
     '<span class="phoneglyphs" aria-hidden="true"><span class="phonesignal"><i></i><i></i><i></i></span>' +
     '<span class="phonebattery"><i></i></span></span></div>';
-  if (brand && (brand.app || brand.logo))
+  var sharedBrand = panelObject(panel.brand) && (panel.brand.icon || panel.brand.logoImage)
+    ? FlowBrand.render(panel.brand, {className:'phonebrand'}) : '';
+  if (sharedBrand) h += sharedBrand;
+  else if (brand && (brand.app || brand.logo))
     h +=
       '<div class="phonebrand">' +
       (brand.logo
@@ -18097,16 +18315,12 @@ body.sk-editorial .phonecallchannel{border-radius:2px;}`,
 /* phone authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('phone', {
   authoring: {
+    branding: true,
     notifications: true,
     initialFields: true,
     transientFields: ['audio'],
     template: { title: 'Phone', initial: { clock: '9:41' } },
     setupFields: [
-      [
-        'brand',
-        'objf',
-        { cols: [{ k: 'app' }, { k: 'logo' }, { k: 'accent' }, { k: 'bg' }, { k: 'fg' }] },
-      ],
       ['initial', 'json'],
     ],
     patchFields: [
@@ -19905,6 +20119,7 @@ function screenFramePresentation(host, panel, state) {
        two scene-showing modes can swap ONLY the overlays (surgical path
        below) and keep the scene subtree's animation state (the walker) */
   var scrOvl = '';
+  scrOvl += FlowBrand.render(panel.brand, {className:'ovl screen-brand',compact:true});
   if (mode === 'active') scrOvl += '<span class="ovl activechip">ACTIVE</span>';
   if (mode === 'live') scrOvl += '<span class="ovl livechip">LIVE</span>';
   if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
@@ -19914,7 +20129,7 @@ function screenFramePresentation(host, panel, state) {
   if (mode === 'unavailable')
     scrOvl +=
       '<div class="ovl screen-unavailable" role="status">' +
-      '<svg viewBox="0 0 40 32" aria-hidden="true"><rect x="6" y="9" width="24" height="17" rx="4"/><path d="M12 9 L15 5 H23 L26 9 M3 3 L36 30"/><circle cx="18" cy="17" r="5"/></svg>' +
+      FlowIcons.render('camera-off') +
       '<strong>Camera unavailable</strong><span>' +
       esc(
         typeof state.reason === 'string' && state.reason.trim()
@@ -20247,6 +20462,7 @@ function screenScenePreview(initialScene) {
 
 PanelRegistry.extend('screen', {
   authoring: {
+    branding: true,
     template: { title: 'Camera', scene: 'static-noise', initial: { mode: 'off' } },
     initialFields: true,
     transientFields: ['mode', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight'],
@@ -20362,17 +20578,9 @@ PanelRegistry.extend('screen', {
     return out;
   }
   function text(value) { return typeof value === 'string' ? value : ''; }
-  function icon(kind) {
-    var paths = {
-      door:'<path d="M6 20V4h11v16M4 20h16M13 12h.01"/>',
-      motion:'<circle cx="14" cy="5" r="2"/><path d="m9 11 4-4 4 4h3M13 8l-3 7-5 4m5-4 5 2 1 4M3 7l2-2m-2 7h3"/>',
-      camera:'<rect x="3" y="6" width="18" height="13" rx="3"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 6l1-2h6l1 2"/>',
-      smoke:'<path d="M5 17h14M7 20h10M7 13c-5-4 5-5 1-10m4 10c-5-4 5-5 1-10m4 10c-5-4 5-5 1-10"/>',
-      water:'<path d="M12 3S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12-7-12Z"/><path d="M8 15a4 4 0 0 0 4 4"/>',
-      lock:'<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>',
-      sensor:'<circle cx="12" cy="12" r="3"/><path d="M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14M8 8a6 6 0 0 0 0 8m8-8a6 6 0 0 1 0 8"/>'
-    };
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[kinds.indexOf(kind) >= 0 ? kind : 'sensor'] + '</svg>';
+  function icon(kind, alarm) {
+    return FlowIcons.render(kinds.indexOf(kind) >= 0 ? kind : 'sensor',
+      {tone:alarm === 'triggered' ? 'alert' : alarm === 'acknowledged' ? 'warn' : undefined});
   }
   /* The same camera renderer/stock clip library serves this large monitor and
      Camera Screen panels. Video review is an explicit fact, independent of the
@@ -20435,7 +20643,7 @@ PanelRegistry.extend('screen', {
   }
   function stageHTML(panel, state, model) {
     return '<div class="secmon-stage secmon-review-' + model.video + audioClass(state.audio) + '">' +
-      '<div class="secmon-stage-top"><span>Monitoring desk</span><span class="secmon-room-signal"><i></i>SIMULATED VIDEO</span></div>' +
+      '<div class="secmon-stage-top"><span class="secmon-desk-brand">' + (FlowBrand.render(panel.brand) || 'Monitoring desk') + '</span><span class="secmon-room-signal"><i></i>SIMULATED VIDEO</span></div>' +
       '<div class="secmon-workstation"><div class="secmon-room-grid" aria-hidden="true"></div>' +
       '<div class="secmon-monitor"><div class="secmon-monitor-title"><i aria-hidden="true"></i><span class="secmon-feed-label">' + esc(text(panel.videoLabel) || 'Incident camera') + '</span></div>' +
       '<div class="secmon-video" role="img" aria-label="' + esc(videoDescription(model)) + '">' + screenFramePresentation({}, model.panel, model.state).html + '</div>' +
@@ -20465,7 +20673,7 @@ PanelRegistry.extend('screen', {
       var h = value.health || 'unknown', alarm = value.alarm || 'unknown';
       if (h === 'online') online++;
       if (alarm === 'triggered') triggered++;
-      return '<li class="secmon-sensor secmon-alarm-' + alarm + '" data-sensor-id="' + esc(sensor.id) + '"><span class="secmon-sensor-icon">' + icon(sensor.kind) +
+      return '<li class="secmon-sensor secmon-alarm-' + alarm + '" data-sensor-id="' + esc(sensor.id) + '"><span class="secmon-sensor-icon">' + icon(sensor.kind, alarm) +
         '</span><div class="secmon-sensor-body"><div class="secmon-sensor-head"><strong>' + esc(text(sensor.label) || sensor.id) +
         '</strong><span class="secmon-alarm-label">' + (alarm === 'unknown' ? 'Not assessed' : alarm === 'triggered' ? 'Alarm' : alarm === 'acknowledged' ? 'Acknowledged' : 'Clear') + '</span></div>' +
         '<div class="secmon-sensor-meta"><span class="secmon-health secmon-health-' + h + '"><i aria-hidden="true"></i>' + h + '</span>' +
@@ -20473,10 +20681,11 @@ PanelRegistry.extend('screen', {
         (value.detail ? '<div class="secmon-sensor-detail">' + esc(value.detail) + '</div>' : '') + '</div></li>';
     }).join('');
     var hero = '<div class="secmon-hero">' +
-      '<div class="secmon-emblem"><svg viewBox="0 0 56 56" fill="none" aria-hidden="true"><path class="secmon-shield" d="M28 5 46 12v14c0 12-18 24-18 24S10 38 10 26V12Z" stroke="currentColor" stroke-width="1.8"/>' +
-      (status === 'alarm' || status === 'verified' ? '<path d="M28 17v13m0 6h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' :
-        status === 'offline' || status === 'unknown' ? '<path d="m21 22 14 14m0-14L21 36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' :
-        '<path d="m20 28 6 6 12-13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>') + '</svg></div>' +
+      '<div class="secmon-emblem">' + FlowIcons.render(
+        status === 'alarm' || status === 'verified' ? 'triggered' : status === 'disarmed' ? 'disarmed' :
+          status === 'offline' ? 'cloud-off' : status === 'reviewing' || status === 'unknown' ? 'monitor' : 'armed',
+        {tone:status === 'alarm' || status === 'verified' ? 'alert' : status === 'reviewing' ? 'warn' :
+          status === 'offline' || status === 'unknown' || status === 'disarmed' ? 'muted' : 'ok'}) + '</div>' +
       '<div class="secmon-headline"><div class="secmon-eyebrow">' + esc(text(panel.site) || 'Security monitoring') + '</div><div class="secmon-status">' + labels[status] + '</div>' +
       '<div class="secmon-operator"><span class="secmon-operator-dot" aria-hidden="true"></span>' + esc(state.operator || 'No operator assigned') + '</div></div></div>';
     var facts = '<div class="secmon-metrics"><div><strong>' + online + '<small> / ' + sensorList.length + '</small></strong><span>Sensors online</span></div>' +
@@ -20505,6 +20714,7 @@ PanelRegistry.extend('screen', {
         if (!root || !stage || !videoHost || host._secmonHero == null) return false;
         root.className = 'secmon secmon-' + status;
         stage.className = 'secmon-stage secmon-review-' + model.video + audioClass(state.audio);
+        host.querySelector('.secmon-desk-brand').innerHTML = FlowBrand.render(panel.brand) || 'Monitoring desk';
         if (host._secmonAudio !== audio) host.querySelector('.secmon-audio-slot').innerHTML = audio;
         if (host._secmonHero !== hero) host.querySelector('.secmon-hero-slot').innerHTML = hero;
         if (host._secmonFacts !== facts) {
@@ -20546,6 +20756,7 @@ PanelRegistry.extend('screen', {
     validatePatch:function (patch, path, panel, warnings) { clean(panel, patch, path, warnings, true); },
     fold:function (panel, steps) { return foldSanitizedPanelStates(panel, steps, function (raw, once) { return clean(panel, raw, '', null, once); }); },
     authoring:{
+      branding:true,
       template:{title:'Security monitoring', site:'Oak House', scene:'person-through-door', videoLabel:'Front door · incident camera', sensors:[
         {id:'frontDoor',label:'Front door',kind:'door',zone:'Entrance'},
         {id:'doorbell',label:'Doorbell camera',kind:'camera',zone:'Porch'},
@@ -21565,7 +21776,8 @@ PanelViews.register('thermo', function (host, panel, state, skin, states, stepId
     (tv != null ? esc(tv) : '&#8212;') +
     '<span class="thunit">' +
     esc(tm.unit) +
-    '</span></div>' +
+    '</span>' + FlowIcons.render(tm.zone.indexOf('cold-') === 0 ? 'cold' : tm.zone === 'warn' || tm.zone === 'crit' ? 'hot' : 'temperature',
+      {className:'thstatus',tone:{ok:'ok',warn:'warn',crit:'alert','cold-warn':'cold','cold-crit':'violet',na:'muted'}[tm.zone]}) + '</div>' +
     '<span class="thzone z-' +
     tm.zone +
     '">' +
@@ -21791,6 +22003,7 @@ PanelRegistry.extend('thermo', {
 .sk-aurora .thval.z-crit{color:#FF6B5E;}
 .sk-daylight .thval.z-crit{color:#B91C1C;}
 .thval.z-na{opacity:.4;}
+.thstatus{width:20px;height:20px;vertical-align:-3px;margin-left:5px;}
 .thzone{font:700 9.5px 'IBM Plex Mono',monospace; letter-spacing:.08em; padding:3px 8px; border-radius:6px; border:1px solid transparent; white-space:nowrap;}
 .sk-aurora .thzone.z-ok{color:#4ADE80; border-color:#1E4A33; background:#0C2418;}
 .sk-daylight .thzone.z-ok{color:#0E7A3C; border-color:#BFE3CC; background:#EAF7EF;}

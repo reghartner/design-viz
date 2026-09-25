@@ -138,7 +138,8 @@ PanelViews.register('thermo', function (host, panel, state, skin, states, stepId
     (tv != null ? esc(tv) : '&#8212;') +
     '<span class="thunit">' +
     esc(tm.unit) +
-    '</span></div>' +
+    '</span>' + FlowIcons.render(tm.zone.indexOf('cold-') === 0 ? 'cold' : tm.zone === 'warn' || tm.zone === 'crit' ? 'hot' : 'temperature',
+      {className:'thstatus',tone:{ok:'ok',warn:'warn',crit:'alert','cold-warn':'cold','cold-crit':'violet',na:'muted'}[tm.zone]}) + '</div>' +
     '<span class="thzone z-' +
     tm.zone +
     '">' +
@@ -364,6 +365,7 @@ PanelRegistry.extend('thermo', {
 .sk-aurora .thval.z-crit{color:#FF6B5E;}
 .sk-daylight .thval.z-crit{color:#B91C1C;}
 .thval.z-na{opacity:.4;}
+.thstatus{width:20px;height:20px;vertical-align:-3px;margin-left:5px;}
 .thzone{font:700 9.5px 'IBM Plex Mono',monospace; letter-spacing:.08em; padding:3px 8px; border-radius:6px; border:1px solid transparent; white-space:nowrap;}
 .sk-aurora .thzone.z-ok{color:#4ADE80; border-color:#1E4A33; background:#0C2418;}
 .sk-daylight .thzone.z-ok{color:#0E7A3C; border-color:#BFE3CC; background:#EAF7EF;}

@@ -220,8 +220,10 @@ function ui(spec=fixture(),options={}){
       addEventListener(type,fn){(events[type] ||= []).push(fn);},removeEventListener(type,fn){events[type]=(events[type] || []).filter(f=>f!==fn);},
       fire(type,extra={}){const ev={target:this,preventDefault(){this.defaultPrevented=true;},stopPropagation(){this.stopped=true;},...extra};(events[type] || []).slice().forEach(fn=>fn(ev));return ev;},
       appendChild(child){child.parentNode=this;this.children.push(child);return child;},
+      append(...children){children.forEach(child=>this.appendChild(child));},
+      replaceChildren(...children){this.children.forEach(child=>child.parentNode=null);this.children=[];this.append(...children);},
       setAttribute(k,v){attrs[k]=String(v);},getAttribute(k){return attrs[k] ?? null;},hasAttribute(k){return Object.hasOwn(attrs,k);},removeAttribute(k){delete attrs[k];},
-      matches(selector){return selector.split(',').some(s=>{s=s.trim();if(s[0]==='#')return this.id===s.slice(1);const tag=s.match(/^[a-z]+/i);return (!tag || this.tagName===tag[0].toUpperCase()) &&
+      matches(selector){if(selector===':disabled')return !!this.disabled;return selector.split(',').some(s=>{s=s.trim();if(s[0]==='#')return this.id===s.slice(1);const tag=s.match(/^[a-z]+/i);return (!tag || this.tagName===tag[0].toUpperCase()) &&
         [...s.matchAll(/\.([\w-]+)/g)].every(m=>this.className.split(' ').includes(m[1])) && [...s.matchAll(/\[([^=\]]+)(?:="([^"]*)")?\]/g)].every(m=>m[2]==null?this.hasAttribute(m[1]):this.getAttribute(m[1])===m[2]);});},
       closest(selector){for(let current=this;current;current=current.parentNode)if(current.matches(selector))return current;return null;},
       querySelectorAll(selector){return this.children.flatMap(child=>[...(child.matches(selector)?[child]:[]),...child.querySelectorAll(selector)]);},
@@ -235,7 +237,7 @@ function ui(spec=fixture(),options={}){
   Object.assign(doc,element('document'));doc.createElement=element;doc.body=doc.appendChild(element('body'));doc.createTextNode=text=>Object.assign(element('span'),{textContent:text});
   const C={document:doc,URL};vm.createContext(C);
   for(const name of ['validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction','workbench/commands/detail-mapping',
-    'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/detail-mapping','workbench/inspector','workbench/io-model','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
+    'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/detail-mapping','workbench/icon-picker','workbench/brand','workbench/inspector','workbench/io-model','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
   const guide=doc.body.appendChild(element()),view=doc.body.appendChild(element()),src=element('textarea'),win=element('window');
   let text=JSON.stringify(spec,null,2),renders=0;
   const session=C.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){renders++;},persistence:{read:()=>({}),save(){},cancel(){}}});

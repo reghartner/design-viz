@@ -25,7 +25,9 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
     if (file === 'compatibility.js' && substitute) {
       const marker = '/* @panel-features */ {}';
       if (!source.includes(marker)) throw new Error('Missing panel feature marker: ' + file);
-      source = source.replace(marker, JSON.stringify(panelAssets(root).features));
+      const assets=panelAssets(root);
+      source = source.replace(marker, JSON.stringify(assets.features));
+      source = source.replace('/* @icon-ids */ []',JSON.stringify(assets.iconIds || []));
     }
     return {file, source};
   });
@@ -95,10 +97,14 @@ function panelAssets(root = sourceRoot) {
     collect(definition.styles, styles);
     collect(definition.editorStyles, editorStyles);
   }
-  return { features, styles, editorStyles };
+  return { features, styles, editorStyles, iconIds:context.FlowIcons ? Array.from(context.FlowIcons.ids).filter(id=>!context.FlowIcons.registry[id].legacy) : [] };
 }
 function readStyles(name, root = sourceRoot) {
   let source = fs.readFileSync(path.join(root, name), 'utf8');
+  const inventory = manifest(root).assets || {};
+  const key = Object.keys(inventory.styles || {}).find(key => inventory.styles[key] === name);
+  const shared = ((inventory.sharedStyles || {})[key] || []).map(file => fs.readFileSync(path.join(root,file),'utf8')).join('\n');
+  if (shared) source += '\n' + shared;
   const assets = panelAssets(root);
   const entries = name === 'style.workbench.css' ? assets.editorStyles : assets.styles;
   if (source.includes('/* @panel-style-order:')) {
@@ -137,13 +143,21 @@ function fontCss(profile, root = sourceRoot) {
     "@font-face{font-family:'" + font.family + "';font-style:normal;font-weight:" + font.weight +
     ';font-display:swap;src:url(data:font/woff2;base64,' + font.data + ") format('woff2');}")].join('\n');
 }
+function iconAssets(root = sourceRoot) {
+  const inventory = manifest(root).assets;
+  const sprite = fs.readFileSync(path.join(root,inventory.icons),'utf8');
+  if (!inventory.iconLibrary) return sprite;
+  const context = {};
+  vm.runInNewContext(fs.readFileSync(path.join(root,inventory.iconLibrary),'utf8'),context,{timeout:5000});
+  return sprite.replace('</svg>', context.FlowIcons.symbols({newOnly:true}) + '</svg>');
+}
 function entrypointAssets(name, root = sourceRoot) {
   const entry = entrypoint(name, root), inventory = manifest(root).assets;
   return {styles:entry.styles.map(key => {
     const file = inventory.styles[key];
     if (!file) throw new Error('Unknown style input: ' + key);
     return {key,file,source:key === 'core' || key === 'workbench' ? readStyles(file,root) : fs.readFileSync(path.join(root,file),'utf8')};
-  }),icons:entry.icons ? fs.readFileSync(path.join(root,inventory.icons),'utf8') : '',
+  }),icons:entry.icons ? iconAssets(root) : '',
     ...(entry.fonts ? fontAssets(entry.fonts,root) : {fonts:[],licenses:[]})};
 }
 module.exports = { sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,

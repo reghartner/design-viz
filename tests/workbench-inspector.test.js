@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['validator','workbench/source-edit','workbench/targets','workbench/commands/common',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/inspector'];
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
   function element(tag = 'div', id = ''){
@@ -13,6 +13,8 @@ function environment(){
       addEventListener(type, fn){ (handlers[type] ||= []).push(fn); },
       removeEventListener(type,fn){handlers[type]=(handlers[type] || []).filter(f=>f!==fn);},
       appendChild(child){ this.children.push(child); child.parentNode = this; return child; },
+      append(...children){ children.forEach(child=>this.appendChild(child)); },
+      replaceChildren(...children){ this.children.forEach(child=>child.parentNode=null);this.children=[];this.append(...children); },
       setAttribute(k, v){ if (k === 'class') this.className = String(v); else attrs[k] = String(v); },
       removeAttribute(k){ delete attrs[k]; },
       get firstChild(){ return this.children[0] || null; },
@@ -31,6 +33,7 @@ function environment(){
       setSelectionRange(start,end,direction){ this.selectionStart=start; this.selectionEnd=end; this.selectionDirection=direction; },
       contains(child){ return child === this || this.children.some(c => c.contains(child)); },
       matches(selector){
+        if (selector === ':disabled') return !!this.disabled;
         if (selector.includes(',')) return selector.split(',').some(s => this.matches(s.trim()));
         if (selector.startsWith('#')) return this.id === selector.slice(1);
         const tagMatch = selector.match(/^[a-z]+/i);
@@ -65,7 +68,8 @@ function environment(){
     el.classList = {
       add(...cs){ el.className += ' ' + cs.join(' '); },
       remove(...cs){ el.className = el.className.split(' ').filter(x => !cs.includes(x)).join(' '); },
-      contains(c){ return el.className.split(' ').includes(c); }
+      contains(c){ return el.className.split(' ').includes(c); },
+      toggle(c,force){const on=force===undefined?!this.contains(c):!!force;this[on?'add':'remove'](c);return on;}
     };
     Object.defineProperty(el,'innerHTML',{set(){if(el.contains(doc.activeElement))doc.activeElement=doc.body;for(const child of el.children)child.parentNode=null;el.children=[];},get(){return '';}});
     Object.defineProperty(el,'childNodes',{get(){return el.children;}});

@@ -28,17 +28,9 @@
     return out;
   }
   function text(value) { return typeof value === 'string' ? value : ''; }
-  function icon(kind) {
-    var paths = {
-      door:'<path d="M6 20V4h11v16M4 20h16M13 12h.01"/>',
-      motion:'<circle cx="14" cy="5" r="2"/><path d="m9 11 4-4 4 4h3M13 8l-3 7-5 4m5-4 5 2 1 4M3 7l2-2m-2 7h3"/>',
-      camera:'<rect x="3" y="6" width="18" height="13" rx="3"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 6l1-2h6l1 2"/>',
-      smoke:'<path d="M5 17h14M7 20h10M7 13c-5-4 5-5 1-10m4 10c-5-4 5-5 1-10m4 10c-5-4 5-5 1-10"/>',
-      water:'<path d="M12 3S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12-7-12Z"/><path d="M8 15a4 4 0 0 0 4 4"/>',
-      lock:'<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>',
-      sensor:'<circle cx="12" cy="12" r="3"/><path d="M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14M8 8a6 6 0 0 0 0 8m8-8a6 6 0 0 1 0 8"/>'
-    };
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths[kinds.indexOf(kind) >= 0 ? kind : 'sensor'] + '</svg>';
+  function icon(kind, alarm) {
+    return FlowIcons.render(kinds.indexOf(kind) >= 0 ? kind : 'sensor',
+      {tone:alarm === 'triggered' ? 'alert' : alarm === 'acknowledged' ? 'warn' : undefined});
   }
   /* The same camera renderer/stock clip library serves this large monitor and
      Camera Screen panels. Video review is an explicit fact, independent of the
@@ -101,7 +93,7 @@
   }
   function stageHTML(panel, state, model) {
     return '<div class="secmon-stage secmon-review-' + model.video + audioClass(state.audio) + '">' +
-      '<div class="secmon-stage-top"><span>Monitoring desk</span><span class="secmon-room-signal"><i></i>SIMULATED VIDEO</span></div>' +
+      '<div class="secmon-stage-top"><span class="secmon-desk-brand">' + (FlowBrand.render(panel.brand) || 'Monitoring desk') + '</span><span class="secmon-room-signal"><i></i>SIMULATED VIDEO</span></div>' +
       '<div class="secmon-workstation"><div class="secmon-room-grid" aria-hidden="true"></div>' +
       '<div class="secmon-monitor"><div class="secmon-monitor-title"><i aria-hidden="true"></i><span class="secmon-feed-label">' + esc(text(panel.videoLabel) || 'Incident camera') + '</span></div>' +
       '<div class="secmon-video" role="img" aria-label="' + esc(videoDescription(model)) + '">' + screenFramePresentation({}, model.panel, model.state).html + '</div>' +
@@ -131,7 +123,7 @@
       var h = value.health || 'unknown', alarm = value.alarm || 'unknown';
       if (h === 'online') online++;
       if (alarm === 'triggered') triggered++;
-      return '<li class="secmon-sensor secmon-alarm-' + alarm + '" data-sensor-id="' + esc(sensor.id) + '"><span class="secmon-sensor-icon">' + icon(sensor.kind) +
+      return '<li class="secmon-sensor secmon-alarm-' + alarm + '" data-sensor-id="' + esc(sensor.id) + '"><span class="secmon-sensor-icon">' + icon(sensor.kind, alarm) +
         '</span><div class="secmon-sensor-body"><div class="secmon-sensor-head"><strong>' + esc(text(sensor.label) || sensor.id) +
         '</strong><span class="secmon-alarm-label">' + (alarm === 'unknown' ? 'Not assessed' : alarm === 'triggered' ? 'Alarm' : alarm === 'acknowledged' ? 'Acknowledged' : 'Clear') + '</span></div>' +
         '<div class="secmon-sensor-meta"><span class="secmon-health secmon-health-' + h + '"><i aria-hidden="true"></i>' + h + '</span>' +
@@ -139,10 +131,11 @@
         (value.detail ? '<div class="secmon-sensor-detail">' + esc(value.detail) + '</div>' : '') + '</div></li>';
     }).join('');
     var hero = '<div class="secmon-hero">' +
-      '<div class="secmon-emblem"><svg viewBox="0 0 56 56" fill="none" aria-hidden="true"><path class="secmon-shield" d="M28 5 46 12v14c0 12-18 24-18 24S10 38 10 26V12Z" stroke="currentColor" stroke-width="1.8"/>' +
-      (status === 'alarm' || status === 'verified' ? '<path d="M28 17v13m0 6h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>' :
-        status === 'offline' || status === 'unknown' ? '<path d="m21 22 14 14m0-14L21 36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' :
-        '<path d="m20 28 6 6 12-13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>') + '</svg></div>' +
+      '<div class="secmon-emblem">' + FlowIcons.render(
+        status === 'alarm' || status === 'verified' ? 'triggered' : status === 'disarmed' ? 'disarmed' :
+          status === 'offline' ? 'cloud-off' : status === 'reviewing' || status === 'unknown' ? 'monitor' : 'armed',
+        {tone:status === 'alarm' || status === 'verified' ? 'alert' : status === 'reviewing' ? 'warn' :
+          status === 'offline' || status === 'unknown' || status === 'disarmed' ? 'muted' : 'ok'}) + '</div>' +
       '<div class="secmon-headline"><div class="secmon-eyebrow">' + esc(text(panel.site) || 'Security monitoring') + '</div><div class="secmon-status">' + labels[status] + '</div>' +
       '<div class="secmon-operator"><span class="secmon-operator-dot" aria-hidden="true"></span>' + esc(state.operator || 'No operator assigned') + '</div></div></div>';
     var facts = '<div class="secmon-metrics"><div><strong>' + online + '<small> / ' + sensorList.length + '</small></strong><span>Sensors online</span></div>' +
@@ -171,6 +164,7 @@
         if (!root || !stage || !videoHost || host._secmonHero == null) return false;
         root.className = 'secmon secmon-' + status;
         stage.className = 'secmon-stage secmon-review-' + model.video + audioClass(state.audio);
+        host.querySelector('.secmon-desk-brand').innerHTML = FlowBrand.render(panel.brand) || 'Monitoring desk';
         if (host._secmonAudio !== audio) host.querySelector('.secmon-audio-slot').innerHTML = audio;
         if (host._secmonHero !== hero) host.querySelector('.secmon-hero-slot').innerHTML = hero;
         if (host._secmonFacts !== facts) {
@@ -212,6 +206,7 @@
     validatePatch:function (patch, path, panel, warnings) { clean(panel, patch, path, warnings, true); },
     fold:function (panel, steps) { return foldSanitizedPanelStates(panel, steps, function (raw, once) { return clean(panel, raw, '', null, once); }); },
     authoring:{
+      branding:true,
       template:{title:'Security monitoring', site:'Oak House', scene:'person-through-door', videoLabel:'Front door · incident camera', sensors:[
         {id:'frontDoor',label:'Front door',kind:'door',zone:'Entrance'},
         {id:'doorbell',label:'Doorbell camera',kind:'camera',zone:'Porch'},

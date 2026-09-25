@@ -30,14 +30,14 @@ test('code renders and edits in the workbench without changing diagram labels or
   const root=page.locator('#docview');
   await checkProse(root);
   await root.locator('.sec-text').first().locator('pre').click();
-  const field=page.locator('#guide').getByLabel('text',{exact:true});await expect(field).toHaveValue(caption);
+  const field=page.locator('#guide').getByLabel('Prose text',{exact:true});await expect(field).toHaveValue(caption);
   const changed=caption.replace('button_press','motion_detected');
   await field.fill(changed);await field.press('Tab');
   await expect(root.locator('.sec-text').first()).toContainText('motion_detected');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();
-  await page.locator('#editor-tab-inspect').click();await expect(field).toHaveValue(caption);
-  await field.fill('Changed `code`.\n```js\nreturn true;\n```');await field.press('Tab');
+  await page.locator('#editor-tab-inspect').click();const stepField=page.locator('#guide').getByLabel('text',{exact:true});await expect(stepField).toHaveValue(caption);
+  await stepField.fill('Changed `code`.\n```js\nreturn true;\n```');await stepField.press('Tab');
   await expect(root.locator('.step-text pre code')).toHaveText('return true;\n');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await page.locator('#redo-builder').click();await expect(root.locator('.step-text pre code')).toHaveText('return true;\n');

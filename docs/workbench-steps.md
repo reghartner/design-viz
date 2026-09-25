@@ -15,6 +15,12 @@ filter keeps normal text-editing behavior. Focusing this editor pauses Play.
 An `ambient-only` diagram still permits source editing but has no step preview;
 change `diagram.view` in JSON to `step` or `ambient` to show one.
 
+For an **App screens** panel, every step inspector includes an **App screen**
+selector under **Panel changes**, even before the step has a panel patch. Choose
+a named uploaded screen, inherit the previous screen, or explicitly clear it.
+Upload and manage the collection by selecting the panel itself. See
+[manual Figma screens](../cookbook/app-screens.md).
+
 - **Append step** adds a beat at the end of the chosen path. It uses an
   existing hop when possible; a diagram without edges gets an edgeless beat.
 - **Duplicate** inserts a complete copy after the selected beat. An existing

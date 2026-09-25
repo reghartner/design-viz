@@ -48,6 +48,13 @@ captures inside the spec, with alt text, captions and optional reference links.
 Add an **image** panel in the workbench and upload its **Image file**; placement,
 resizing, copy/paste and Undo use the existing editor controls.
 
+[App screens](cookbook/app-screens.md) turn manually exported Figma screens into
+a reusable collection. Upload images once, choose a starting screen, and select
+screens in each step's inspector. A phone frame and cut/crossfade transitions
+keep the product experience beside its system flow in standalone and Backstage
+viewers. The [example](examples/app-screens/app-screens.spec.json) includes four
+illustrative screens with connected/offline paths.
+
 
 ## The pipeline
 

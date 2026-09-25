@@ -586,6 +586,23 @@ about unsupported capabilities.
 a column beside the board and driven by the same steps (the "different
 perspectives" of one timeline). Types:
 
+- `appscreens` — a collection of exported app screens selected by story steps.
+  Declare up to 32 `screens`, each with a unique nonempty `id`, `label`, `alt`,
+  embedded PNG/JPEG/WebP `src` (512 KiB decoded maximum), optional `caption`
+  and HTTP(S) `link`, and optional integer `width`/`height` (1–4096).
+  `frame: "phone"|"none"` defaults to phone; `transition: "cut"|"crossfade"`
+  defaults to cut. `initial: {"screen":"home"}` chooses the starting screen;
+  omitted/null `screen` starts empty. Steps patch `{"screen":"connecting"}`
+  by ID; omission carries, null clears, and unknown IDs warn and are ignored.
+  `enterOnce: {"screen":"error"}` selects a screen for that beat only.
+  Image bytes are stored in the declaration, never copied into step snapshots.
+  The first screen with valid dimensions sets a stable viewport; all images fit
+  without cropping or stretching. Crossfade follows the shared forward-step
+  animation policy; seeks and reduced motion settle immediately.
+  Workbench uploads create names and IDs, record dimensions, and select the first
+  imported screen as the start. Replacement preserves IDs; removal clears step
+  references across paths in one undoable edit. See [App screens](../cookbook/app-screens.md)
+  for the complete manual Figma workflow and the illustrative example.
 - `image` — a static embedded screenshot or illustration:
   `{"id":"ui","type":"image","title":"Backstage preview","src":"data:image/jpeg;base64,...","alt":"Service page showing its inline diagram","caption":"Local preview with fictional data","link":"https://example.com/source"}`.
   `src` accepts only base64 PNG, JPEG or WebP data URLs, up to 512 KiB decoded

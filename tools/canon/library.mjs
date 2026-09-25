@@ -3,8 +3,15 @@
 import {readdir,readFile,realpath} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
-import {registry,atomicJSON} from './registry.mjs';
+import {registry,atomicJSON,canonLibrary} from './registry.mjs';
 import C from './core.cjs';
+import {buildEntityDiagramIndex} from './entity-diagrams.mjs';
+
+export async function loadCanonDiagrams(file='canon.json',{authorize=()=>true,...options}={}){
+  const library=await canonLibrary(file),specs=[];
+  for(const entry of library.entries)if(await authorize(entry))specs.push(entry.spec);
+  return {specs,index:buildEntityDiagramIndex(specs,options)};
+}
 
 function libraryFromEntries(entries){
   const ids=new Map();
@@ -59,11 +66,17 @@ function withinDirectory(filename,directory){
   return !relative || (relative!=='..' && !relative.startsWith('..'+path.sep) && !path.isAbsolute(relative));
 }
 
-export async function publishLibrary({registryPath,diagramsDir='docs/diagrams',output='workbench/diagrams.json'}={}){
+export async function publishLibrary({registryPath,diagramsDir,output='workbench/diagrams.json'}={}){
+  if(registryPath && diagramsDir)throw new Error('Choose --diagrams or --registry, not both.');
+  if(!registryPath && !diagramsDir)registryPath='canon.json';
   const destination=path.resolve(output),physicalDestination=await physicalPath(destination);
   let library;
   if(registryPath){
     if(path.resolve(registryPath)===destination || await realpath(registryPath)===physicalDestination)throw new Error('Output must not overwrite the source registry.');
+    if(path.basename(registryPath)==='canon.json'){
+      const directory=path.join(path.dirname(path.resolve(registryPath)),'diagrams');
+      if(withinDirectory(destination,directory) || withinDirectory(physicalDestination,await physicalPath(directory)))throw new Error('Output must be outside the diagram source directory.');
+    }
     const source=await registry(registryPath);
     if((await Promise.all(source.entries.map(entry=>realpath(entry.filename)))).includes(physicalDestination))throw new Error('Output must not overwrite a source spec.');
     library=libraryFromEntries(source.entries);

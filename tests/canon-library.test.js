@@ -100,6 +100,10 @@ test('publishing follows additions, edits and removals and never replaces a good
 test('publisher CLI defaults to the company directory structure and retains explicit registry support',t=>{
   const {execFileSync,spawnSync}=require('node:child_process'),f=discoveryFixture(t);
   const cli=path.join(__dirname,'../tools/canon/library.mjs'),raw=namedSpec('company');f.write('feature/feature.spec.json',raw);
+  const folder=path.join(f.root,'diagrams/company');fs.mkdirSync(folder,{recursive:true});
+  fs.writeFileSync(path.join(folder,'company.spec.json'),JSON.stringify(raw));
+  fs.writeFileSync(path.join(folder,'company.html'),'<!doctype html>');
+  fs.writeFileSync(path.join(f.root,'canon.json'),JSON.stringify({version:1,diagrams:[{folder:'diagrams/company',owner:raw.page.canon.owner}]}));
   execFileSync(process.execPath,[cli],{cwd:f.root});
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.root,'workbench/diagrams.json'))).diagrams[0].spec,raw);
   const legacy=path.join(f.root,'legacy.json');execFileSync(process.execPath,[cli,'--registry',path.join(__dirname,'../examples/canon/registry.json'),'--out',legacy]);

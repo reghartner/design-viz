@@ -135,6 +135,42 @@ app. A route-based host can mount the same component in its entity route. Neithe
 requires modifications inside the package. Keep an empty Diagrams tab visible so
 users can discover how to associate a service.
 
+### Central canon membership
+
+Root `canon.json` in the company diagrams repository is the shared authority for
+Backstage and the nginx workbench. Its `diagrams` entries reference folders such
+as `{"folder":"diagrams/doorbell","owner":"group:default/home-team"}`.
+A spec's own `page.canon` cannot enroll it or override the central ID/owner.
+
+The company GitHub source adapter reads that manifest, then the listed JSON and
+HTML files at the **same approved Git SHA**. Use the pure `/backend` helpers:
+
+```ts
+import {parseCanonManifest, materializeCanonSpec, buildEntityDiagramIndex}
+  from '@flowview/backstage-plugin/backend';
+
+const entries = parseCanonManifest(manifestJson);
+// Read entry.path and verify entry.html exist at the pinned SHA through your
+// authenticated GitHub adapter. Authorize each entry for this requesting viewer.
+const specs = authorizedEntries.map(entry =>
+  materializeCanonSpec(specJsonByPath[entry.path], entry));
+const index = buildEntityDiagramIndex(specs, {diagramUrls});
+```
+
+The example's `authorizedEntries`, `specJsonByPath` and `diagramUrls` come from
+your company adapter. Return the same materialized spec from `loadSpec`, with
+its indexed digest; keep raw authored JSON unchanged. Existing node bindings
+still determine which service/API entity lists the diagram. Refresh manifest
+membership along with specs so removed entries disappear. Missing or invalid
+listed files must fail the snapshot, rather than publishing a partial list.
+These helpers do not fetch files or grant authorization.
+
+For a local checkout, `tools/canon/library.mjs` also exports
+`loadCanonDiagrams(file, {authorize, ...indexOptions})`. The standard nginx build
+uses the same rules to generate `workbench/diagrams.json`. Its existing
+`?diagram=<id>` URLs remain read-only; the reader offers **Edit in Workbench**.
+The legacy `?canon=<id>` backend-review route is unchanged.
+
 ### Links to another diagram
 
 A node's `handoff` opens another document through an ordinary link. Supply the

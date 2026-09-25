@@ -548,3 +548,10 @@ in `page.protocols` and `page.lanes`. Display names can change without changing 
 visibility; `commands/visibility.js` preserves string bullets and advanced fields
 while writing one undoable reveal/hide change. Bounds address full path positions,
 not registry indices or compressed view stops.
+
+`commands/prose.js` owns nested bullet operations and safe syntax insertion.
+Bullet targets use `bulletPath: [rootIndex, childIndex, ...]`; legacy `index`
+targets resolve to a top-level point. Render markers, Outline, selection,
+bulk deletion and inspectors share the full address. Moves retain complete
+subtrees and metadata. Section copying retains prose; standalone bullet
+clipboard operations remain outside the clipboard contract.

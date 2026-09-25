@@ -34,6 +34,7 @@
     "workbench/commands/document.js",
     "workbench/commands/vocabulary.js",
     "workbench/commands/visibility.js",
+    "workbench/commands/prose.js",
     "workbench/commands/contracts.js",
     "workbench/commands/extraction.js",
     "workbench/commands/narrative.js",

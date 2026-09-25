@@ -5,6 +5,7 @@ function createBuilderInspector(opts){
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
   var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
+  var proseDraft={key:null,url:''};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
@@ -21,11 +22,11 @@ function createBuilderInspector(opts){
   function clipboard(){return disposed?null:opts.clipboard.current();}
   function targetIdentity(){
     var t=session.target;
-    return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.card,t.block,t.tab,t.pathId]):null;
+    return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.bulletPath,t.card,t.block,t.tab,t.pathId]):null;
   }
   function multiIdentity(targets){
     return JSON.stringify([session.snapshot().project,targets.map(function(t){
-      return JSON.stringify([t.kind,t.section,t.id,t.index,t.card,t.block,t.tab,t.pathId]);
+      return JSON.stringify([t.kind,t.section,t.id,t.index,t.bulletPath,t.card,t.block,t.tab,t.pathId]);
     }).sort()]);
   }
   function beginForm(identity){
@@ -1383,7 +1384,7 @@ function contractForm(val,ctx){
       frow('title',textControl(val.title,function(v){return commitSimple('title',v==null?null:JSON.stringify(v));})),
       frow('Width',widthControl),
       frow('source',textControl(val.source,function(v){return commitSimple('source',v==null?null:JSON.stringify(v));},{placeholder:'permalink URL'})),
-      frow('note',textControl(val.note,function(v){return commitSimple('note',v==null?null:JSON.stringify(v));},{textarea:true})),
+      frowBlock('note',proseControl(val.note,function(v){return commitSimple('note',v==null?null:JSON.stringify(v));})),
       frowBlock('Fields',actionButton('+ Add field',function(){
         commitCascade(function(raw){return planAddContractField(session.text(),raw,t);},
           {after:function(plan){selectContract(t.section,t.card,'crow',plan.index);}});
@@ -1406,29 +1407,65 @@ function sectionForm(val, ctx){
     ];
   }
 
+function proseControl(value,commit){
+    var key=targetIdentity();if(proseDraft.key!==key)proseDraft={key:key,url:''};
+    var draft=proseDraft;
+    var wrap=document.createElement('div');wrap.className='prose-editor';
+    var input=textControl(value,function(v){var ok=commit(v);if(ok)refreshFormSoon();return ok;},{textarea:true});
+    if(draft.text===input.value && Number.isInteger(draft.start))input.setSelectionRange(draft.start,draft.end);
+    function remember(){draft.text=input.value;draft.start=input.selectionStart;draft.end=input.selectionEnd;}
+    ['select','keyup','mouseup','blur'].forEach(function(event){listen(input,event,remember);});
+    input.setAttribute('aria-label','Prose text');
+    var toolbar=document.createElement('div');toolbar.className='prose-toolbar';toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','Text formatting');
+    function insert(kind,url){
+      var edit=proseFormatEdit(input.value,input.selectionStart,input.selectionEnd,kind,url);
+      if(edit.error){formError(edit.error);return;}
+      input.value=edit.text;input.focus({preventScroll:true});input.setSelectionRange(edit.start,edit.end);
+      remember();
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    function button(label,kind,url){
+      var b=actionButton(label,function(){insert(kind,url && url.value.trim());});
+      listen(b,'mousedown',function(event){event.preventDefault();});return b;
+    }
+    [['Bold','bold'],['Italic','italic'],['Code','code'],['Code block','block']].forEach(function(pair){toolbar.appendChild(button(pair[0],pair[1]));});
+    wrap.appendChild(toolbar);wrap.appendChild(input);
+    var link=document.createElement('div');link.className='prose-link';
+    var url=document.createElement('input');url.type='url';url.className='fctl';url.placeholder='https://…';url.setAttribute('aria-label','Formatting link URL');
+    url.value=draft.url;listen(url,'input',function(){draft.url=url.value;});
+    link.appendChild(url);link.appendChild(button('Insert link','link',url));wrap.appendChild(link);
+    return wrap;
+  }
+
 function bulletForm(val, ctx){
     var isObj = val != null && typeof val === 'object';
+    var target=Object.assign({},session.target),snapshot=parseEditor(),rec=specSectionPaths(snapshot.raw)[target.section];
+    var tree=specValueAt(snapshot.raw,rec.section.concat(['bullets'])),expected=JSON.stringify(tree);
     var rows = [
-      frow('text', textControl(isObj ? val.text : val, function(v){
+      frowBlock('text', proseControl(isObj ? val.text : val, function(v){
         var s = JSON.stringify(v == null ? '' : v);
         return isObj ? commitSimple('text', s) : commitValue(s);
-      }, {textarea: true}))
+      }))
     ];
-    if (isObj && Array.isArray(val.sub) && val.sub.length){
-      var note = document.createElement('span');
-      note.className = 'fctl fnote';
-      note.textContent = val.sub.length + ' nested sub-bullet' + (val.sub.length > 1 ? 's' : '') + ' — edit them in the JSON';
-      rows.push(frow('sub', note));
-    }
+    var actions=document.createElement('div');actions.className='prose-toolbar';
+    var indices=builderBulletIndices(target),path=builderTargetPath(snapshot.raw,target),siblings=specValueAt(snapshot.raw,path.slice(0,-1)),index=indices[indices.length-1];
+    [['Add sibling','sibling'],['Add subpoint','child'],['Indent','indent'],['Outdent','outdent'],['Move point up','up'],['Move point down','down']].forEach(function(pair){
+      var button=actionButton(pair[0],function(){
+        return commitCascade(function(raw){return planBulletStructure(session.text(),raw,target,pair[1],expected);},
+          {after:function(plan){selectTarget(Object.assign({},plan.target,{el:findTargetEl(plan.target)}),false,true);}});
+      });
+      button.disabled=(pair[1]==='indent' || pair[1]==='up') && index===0 || pair[1]==='outdent' && indices.length===1 || pair[1]==='down' && index===siblings.length-1;
+      actions.appendChild(button);
+    });rows.push(actions);
     rows.push(visibilityControl(val,ctx));
     return rows;
   }
 
 function paraForm(val, ctx){
     return [
-      frow('text', textControl(val, function(v){
+      frowBlock('text', proseControl(val, function(v){
         return commitValue(JSON.stringify(v == null ? '' : v));
-      }, {textarea: true}))
+      }))
     ];
   }
 
@@ -1441,7 +1478,7 @@ function crowForm(val, ctx){
         return commitSimple('k', JSON.stringify(v));
       }, {required: 'a contract row needs k — the field name'})),
       frow('v', textControl(val.v, function(v){ return commitSimple('v', v == null ? null : JSON.stringify(v)); })),
-      frow('g', textControl(val.g, function(v){ return commitSimple('g', v == null ? null : JSON.stringify(v)); }, {textarea:true})),
+      frowBlock('g', proseControl(val.g, function(v){ return commitSimple('g', v == null ? null : JSON.stringify(v)); })),
       frow('hot', checkboxControl(val.hot, function(on){ return commitSimple('hot', on ? 'true' : null); })),
       frow('delta', selectControl(['added', 'removed', 'changed'], val.delta, function(v){
         return commitSimple('delta', v == null ? null : JSON.stringify(v));

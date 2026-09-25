@@ -192,7 +192,10 @@ function builderDeletePlan(text, raw, t){
   if (t.kind === 'panel') return planDeletePanel(text, raw, t.section, t.index);
   var rec = specSectionPaths(raw)[t.section];
   if (!rec) return {error: 'no such section'};
-  if (t.kind === 'bullet') return planDeleteListItem(text, raw, rec.section.concat(['bullets']), t.index);
+  if (t.kind === 'bullet'){
+    var bulletPath=builderTargetPath(raw,t);
+    return bulletPath?planDeleteListItem(text,raw,bulletPath.slice(0,-1),bulletPath[bulletPath.length-1]):{error:'Bullet no longer exists.'};
+  }
   if (t.kind === 'para'){
     var sec = specValueAt(raw, rec.section);
     if (sec && typeof sec.text === 'string') return planSetField(text, raw, rec.section, 'text', null);
@@ -222,8 +225,22 @@ function planBulkSetField(text, targets, key, valueTextOrNull){
 }
 
 function planBulkDelete(text, targets){
-  var list = targets.slice().sort(function(a, b){
+  if(targets.some(function(t){return t.kind==='bullet' && !builderBulletIndices(t);}))return {error:'Invalid bullet selection.'};
+  var list = targets.filter(function(t,i){
+    if(t.kind!=='bullet')return true;
+    var path=builderBulletIndices(t);
+    return !targets.some(function(other,j){
+      if(j===i || other.kind!=='bullet' || other.section!==t.section)return false;
+      var ancestor=builderBulletIndices(other);
+      return ancestor.length<=path.length && (ancestor.length<path.length || j<i) && ancestor.every(function(n,k){return path[k]===n;});
+    });
+  }).sort(function(a, b){
     if ((a.section || 0) !== (b.section || 0)) return (b.section || 0) - (a.section || 0);
+    if(a.kind==='bullet' && b.kind==='bullet'){
+      var ap=builderBulletIndices(a),bp=builderBulletIndices(b);
+      for(var i=0;i<Math.min(ap.length,bp.length);i++)if(ap[i]!==bp[i])return bp[i]-ap[i];
+      return bp.length-ap.length;
+    }
     return (typeof b.index === 'number' ? b.index : 0) - (typeof a.index === 'number' ? a.index : 0);
   });
   var cur = text;

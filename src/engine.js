@@ -915,17 +915,17 @@ function generatedFromHTML(source){
    {text, sub:[...items], revealAt?, hideAt?} whose sub-list renders as an indented child <ul>.
    Recursive so the source doc's nested bullet structure carries over. Pure
    string builder (no DOM) so node tests cover it. */
-function bulletsHTML(items, markTop){
-  /* markTop: tag top-level items with their spec index (workbench
-     click-to-definition); sub-lists stay unmarked so a click inside one
-     resolves to its top-level parent */
+function bulletsHTML(items, markTop, ancestry){
+  /* Authoring addresses follow the complete bullet subtree. */
+  ancestry=ancestry || [];
   if (!Array.isArray(items) || !items.length) return '';
   var h = '<ul class="sec-bullets">';
   items.forEach(function(b, i){
-    var mark = markTop ? ' data-dv-bullet="' + i + '"' : '';
+    var path=ancestry.concat([i]);
+    var mark = markTop ? (!ancestry.length?' data-dv-bullet="'+i+'"':'')+' data-dv-bullet-path="'+path.join('.')+'"' : '';
     if (b && typeof b === 'object' && !Array.isArray(b)){
       h += '<li' + mark + fragmentAttrs(b) + '>' + proseMarkup(b.text != null ? String(b.text) : '');
-      if (Array.isArray(b.sub) && b.sub.length) h += bulletsHTML(b.sub);
+      if (Array.isArray(b.sub) && b.sub.length) h += bulletsHTML(b.sub,markTop,path);
       h += '</li>';
     } else {
       h += '<li' + mark + '>' + proseMarkup(String(b)) + '</li>';

@@ -67,7 +67,7 @@ function createBuilderInteractions(opts){
               t.kind === 'group' ? '.grp[data-dv-group="' + cssQuote(t.id) + '"]' :
               t.kind === 'edge' ? 'path.edge[data-dv-edge="' + t.index + '"]' :
               t.kind === 'step' ? '[data-dv-step="' + t.index + '"]' :
-              t.kind === 'bullet' ? '[data-dv-bullet="' + t.index + '"]' :
+              t.kind === 'bullet' ? '[data-dv-bullet-path="' + (builderBulletIndices(t) || []).join('.') + '"]' :
               t.kind === 'para' ? '[data-dv-para="' + t.index + '"]' :
               t.kind === 'contract' ? '[data-dv-contract="'+cssQuote(t.card==null?'legacy':t.card)+'"]' :
               t.kind === 'crow' ? '[data-dv-contract="'+cssQuote(t.card==null?'legacy':t.card)+'"] [data-dv-crow="' + t.index + '"]' :
@@ -185,7 +185,7 @@ function createBuilderInteractions(opts){
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
   function multiIdent(t){
-    return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + (t.kind === 'node' ? t.id : t.index);
+    return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + (t.kind === 'node' ? t.id : t.kind==='bullet' ? (builderBulletIndices(t) || []).join('.') : t.index);
   }
   function clearMultiSelect(){
     multiSel.forEach(function(t){ if (t.el && t.el.classList) t.el.classList.remove('dv-sel'); });
@@ -238,7 +238,7 @@ function createBuilderInteractions(opts){
       var seedEl = findTargetEl(prev);
       if (seedEl){
         multiSel.push({section: prev.section, kind: prev.kind,
-                       id: prev.id, index: prev.index, card:prev.card, el: seedEl});
+                       id: prev.id, index: prev.index, card:prev.card, bulletPath:prev.bulletPath, el: seedEl});
         seedEl.classList.add('dv-sel');
       }
     }
@@ -249,7 +249,7 @@ function createBuilderInteractions(opts){
       if (gone.el && gone.el.classList) gone.el.classList.remove('dv-sel');
     } else {
       multiSel.push({section: target.section, kind: target.kind,
-                     id: target.id, index: target.index, card:target.card, el: target.el});
+                     id: target.id, index: target.index, card:target.card, bulletPath:target.bulletPath, el: target.el});
       if (target.el && target.el.classList) target.el.classList.add('dv-sel');
     }
     if (!multiSel.length){ dropMultiUI(); return; }
@@ -258,7 +258,7 @@ function createBuilderInteractions(opts){
       var only = multiSel[0];
       clearMultiSelect();
       selectTarget({section: only.section, kind: only.kind, id: only.id,
-                    index: only.index, card:only.card, el: only.el}, false, true);
+                    index: only.index, card:only.card, bulletPath:only.bulletPath, el: only.el}, false, true);
       return;
     }
     renderMultiInspector();
@@ -335,7 +335,7 @@ function createBuilderInteractions(opts){
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
     var gi = parseInt(secEl.getAttribute('data-dv-section'), 10);
     if (isNaN(gi)) return null;
-    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-para], [data-dv-crow], [data-dv-contract]');
+    var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-bullet-path], [data-dv-para], [data-dv-crow], [data-dv-contract]');
     if (el && secEl.contains(el)){
       if (el.hasAttribute('data-dv-node'))
         return {section: gi, kind: 'node', id: el.getAttribute('data-dv-node'), el: el};
@@ -343,8 +343,10 @@ function createBuilderInteractions(opts){
         return {section: gi, kind: 'step', index: parseInt(el.getAttribute('data-dv-step'), 10), el: el};
       if (el.hasAttribute('data-dv-panel'))
         return {section: gi, kind: 'panel', index: parseInt(el.getAttribute('data-dv-panel'), 10), el: el};
-      if (el.hasAttribute('data-dv-bullet'))
-        return {section: gi, kind: 'bullet', index: parseInt(el.getAttribute('data-dv-bullet'), 10), el: el};
+      if (el.hasAttribute('data-dv-bullet-path') || el.hasAttribute('data-dv-bullet')){
+        var address=(el.getAttribute('data-dv-bullet-path') || el.getAttribute('data-dv-bullet')).split('.').map(Number);
+        return {section:gi,kind:'bullet',index:address[0],bulletPath:address,el:el};
+      }
       if (el.hasAttribute('data-dv-para'))
         return {section: gi, kind: 'para', index: parseInt(el.getAttribute('data-dv-para'), 10), el: el};
       if (el.hasAttribute('data-dv-crow'))
@@ -369,7 +371,7 @@ function createBuilderInteractions(opts){
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     session.target = {section: target.section, kind: target.kind,
-                     id: target.id, index: target.index, card:target.card,
+                     id: target.id, index: target.index, card:target.card, bulletPath:target.bulletPath,
                      block: target.block, tab: target.tab};
     if (target.kind !== 'tab') session.insertSection = target.section;
     var parsed = parseEditor();

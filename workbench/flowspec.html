@@ -34143,8 +34143,9 @@ function createFlowBrandControl(options) {
   var o=options, doc=o.document, controls=o.controls, alive=true, reader=null, probe=null;
   var fold=doc.createElement('details');fold.className='rawjson fv-brand-editor';
   var heading=doc.createElement('summary');heading.textContent='Company branding';fold.appendChild(heading);
-  var scope=o.local===false?'none':o.local && typeof o.local==='object'?'panel':'diagram';
-  var value=builderClone((scope==='panel'?o.local:o.shared) || {});
+  var scope=o.local===false?'none':o.local!=null?'panel':'diagram';
+  var raw=scope==='panel'?o.local:o.shared;
+  var value=FlowBrand.isObject(raw)?builderClone(raw):{};
   var mode=controls.select(['diagram','panel','none'],scope,function(next){
     if(next==='diagram')return o.change(false,null);
     if(next==='none')return o.change(false,false);
@@ -34156,6 +34157,11 @@ function createFlowBrandControl(options) {
   note.textContent=scope==='diagram'?'Edit once: every branded panel in this diagram inherits this name and logo.':scope==='panel'?'These settings override the shared brand for this panel.':'This panel does not display the shared company brand.';
   fold.appendChild(note);
   if(scope==='none')return fold;
+  if(raw!=null && raw!==false && !FlowBrand.isObject(raw)){
+    note.textContent='This brand must be a JSON object. Repair it in JSON, or reset the invalid branding before using these controls.';
+    fold.appendChild(controls.action('Reset invalid branding',function(){return o.change(scope==='diagram',null);}));
+    return fold;
+  }
   var preview=doc.createElement('div');preview.className='fv-brand-preview';preview.innerHTML=FlowBrand.render(FlowBrand.resolve(scope==='panel'?o.shared:null,value)) || '<span>No brand set</span>';fold.appendChild(preview);
   function save(key,v) {
     var next=builderClone(value);

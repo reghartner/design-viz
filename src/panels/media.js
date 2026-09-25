@@ -10,4 +10,3 @@ function embeddedImageSource(value) {
     (match[2].length * 3) / 4 - (match[2].endsWith('==') ? 2 : match[2].endsWith('=') ? 1 : 0);
   return bytes <= EMBEDDED_IMAGE_MAX_BYTES ? value : null;
 }
-

@@ -65,3 +65,15 @@ test('step icon picker changes a device card and Inherit removes only that step 
  expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.steps[1].panels.app.heat.icon).toBeUndefined();
  await expect(page.locator('#docview .da-icon')).toHaveAttribute('data-icon','temperature');
 });
+
+for(const local of [false,true])test((local?'Panel':'Diagram')+' malformed brand is preserved until explicit repair, with exact Undo',async({page,server})=>{
+  const raw=fixture(),d=raw.page.sections[0].diagram;if(local)d.panels[0].brand=[];else d.brand=[];
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
+  await page.locator('#docview .pt-deviceapp .ptitle').click();
+  const brand=page.locator('#guide .fv-brand-editor');await brand.locator('summary').click();
+  await expect(brand).toContainText('Repair it in JSON');await expect(brand.getByLabel('Company logo file')).toHaveCount(0);
+  const before=await page.locator('#src').inputValue();await brand.getByRole('button',{name:'Reset invalid branding'}).click();
+  const changed=JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram;
+  expect(local?changed.panels[0].brand:changed.brand).toBeUndefined();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
+});

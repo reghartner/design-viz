@@ -36,24 +36,34 @@ function catalogGraphSeed(catalog, refs, connect, diagram, edgeKind){
     }
     if(!placed.has(id)){newIds.push(id);placed.add(id);}
   });
-  var pairs=new Set(next.edges.map(function(e){return e.from+'->'+e.to;})),addedEdges=[];
-  function edge(from,to,label){
+  /* Only consolidate this insertion's relationships; existing edges stay authored. */
+  var pairs=new Set(next.edges.map(function(e){return e.from+'->'+e.to;})),relationships=new Map(),addedEdges=[];
+  function relationship(from,to,api){
     var a=ids.get(from),b=ids.get(to),key=a+'->'+b;
     if(from===to || !selected.has(to) || pairs.has(key))return;
-    pairs.add(key);var item={from:a,to:b,kind:edgeKind || 'catalog',label:label};next.edges.push(item);addedEdges.push(item);
+    if(!relationships.has(key))relationships.set(key,{from:a,to:b,dependsOn:false,apis:new Map()});
+    var entry=relationships.get(key);
+    if(api)entry.apis.set(api.ref,api.title);else entry.dependsOn=true;
   }
   if(connect){
     var providers=new Map();
     services.forEach(function(s){(s.apis || []).forEach(function(api){
       var ref=api.entityRef.toLowerCase();if(!providers.has(ref))providers.set(ref,[]);
-      providers.get(ref).push({service:s.entityRef.toLowerCase(),title:api.title || api.entityRef});
+      providers.get(ref).push({service:s.entityRef.toLowerCase(),ref:ref,title:api.title || api.entityRef});
     });});
     services.forEach(function(s){
       var from=s.entityRef.toLowerCase();
-      (s.dependsOn || []).forEach(function(to){edge(from,to.toLowerCase(),'depends on');});
+      (s.dependsOn || []).forEach(function(to){relationship(from,to.toLowerCase());});
       (s.consumesApis || []).forEach(function(api){
-        (providers.get(api.toLowerCase()) || []).forEach(function(provider){edge(from,provider.service,'uses '+provider.title);});
+        (providers.get(api.toLowerCase()) || []).forEach(function(provider){relationship(from,provider.service,provider);});
       });
+    });
+    relationships.forEach(function(entry){
+      var labels=[];
+      if(entry.dependsOn)labels.push('depends on');
+      if(entry.apis.size)labels.push('uses '+Array.from(entry.apis.values()).join(', '));
+      var item={from:entry.from,to:entry.to,kind:edgeKind || 'catalog',label:labels.join('; ')};
+      next.edges.push(item);addedEdges.push(item);
     });
   }
   /* Stable dependency order, four cards per row, left to right. Cycles retain

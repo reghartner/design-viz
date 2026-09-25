@@ -6,7 +6,7 @@ import path from 'node:path';
 import {loadBackstageCatalog} from '../backstage.mjs';
 import {syncCatalog} from '../../canon/catalog-sync.mjs';
 const component={kind:'Component',metadata:{name:'recorder',namespace:'home'},spec:{owner:'team'},relations:[{type:'providesApi',targetRef:'api:home/recordings'}]};
-const api={kind:'API',metadata:{name:'recordings',namespace:'home'},spec:{type:'openapi',definition:'openapi: 3.0.3\nservers:\n  - url: https://recordings.example.test\npaths:\n  /recordings:\n    post:\n      operationId: createRecording'}};
+const api={kind:'API',metadata:{name:'recordings',namespace:'home'},spec:{type:'openapi',definition:'openapi: 3.0.3\ninfo:\n  title: Home recordings\nservers:\n  - url: https://recordings.example.test\npaths:\n  /recordings:\n    post:\n      operationId: createRecording'}};
 const options={backendUrl:'https://backstage.example.test/backend',appUrl:'https://backstage.example.test',token:'test-machine-token'};
 test('processed API pages seed YAML operations and generated service relations without repository reads',async t=>{
  const directory=await mkdtemp(path.join(os.tmpdir(),'backstage-seed-'));t.after(()=>rm(directory,{recursive:true,force:true}));
@@ -19,6 +19,7 @@ test('processed API pages seed YAML operations and generated service relations w
  }});
  const output=path.join(directory,'catalog.json');await syncCatalog({...loaded,output});
  const data=JSON.parse(await readFile(output));assert.equal(page,2);
+ assert.equal(data.services[0].apis[0].title,'Home recordings');
  assert.equal(data.services[0].apis[0].operations[0].operationId,'createRecording');
  assert.equal(data.services[0].apis[0].definitionUrl,'https://backstage.example.test/catalog/home/api/recordings');
  assert.equal((await syncCatalog({...loaded,output})).changed,false);

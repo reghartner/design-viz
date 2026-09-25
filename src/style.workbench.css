@@ -1075,3 +1075,5 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 
 .vocabulary-control{display:grid;gap:7px;min-width:0;}
 .vocabulary-control details{min-width:0;}
+
+.prose-editor{display:grid;gap:6px;min-width:0}.prose-toolbar{display:flex;flex-wrap:wrap;gap:4px}.prose-toolbar button{font-size:11px;padding:5px 7px}.prose-link{display:flex;gap:4px;min-width:0}.prose-link input{flex:1;min-width:0}.prose-link button{flex:none}

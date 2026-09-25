@@ -12,8 +12,9 @@ interaction coverage, independent review, and passing CI before merge.
 - [x] **3. Protocols and lanes** — All built-in protocols are selectable; create
   and edit custom connection types and story lanes through the inspector.
   Merged in [PR #220](https://github.com/reghartner/design-viz/pull/220).
-- [ ] **4. Visibility timing** — Captioned start/end controls for connections,
+- [x] **4. Visibility timing** — Captioned start/end controls for connections,
   bullets, and contract rows. Explain and test timing on alternate paths.
+  Merged in [PR #222](https://github.com/reghartner/design-viz/pull/222).
 - [ ] **5. Nested prose** — Select, add, indent/outdent, and reorder nested
   bullets; small formatting helpers using the existing safe text syntax.
 - [ ] **6. Drilldown mappings** — Parent/child step selectors replace mapping

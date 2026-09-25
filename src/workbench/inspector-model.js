@@ -169,11 +169,11 @@ var BUILDER_GUIDES = {
   },
   bullet: {
     title: 'Bullet — one list point',
-    how: 'Edit the text and Render. A bullet is a plain string, or an object when it needs nesting or step reveals.',
+    how: 'Edit any point directly. Add subpoints, indent/outdent, and reorder whole subtrees with the inspector.',
     fields: [
       ['text', 'the point itself (object form)'],
       ['sub', 'nested child bullets (object form)'],
-      ['revealAt, hideAt', 'zero-based step indexes binding the bullet to the diagram click-through']
+      ['revealAt, hideAt', 'zero-based positions in each full path, including stops hidden in a view']
     ]
   },
   para: {

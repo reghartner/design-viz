@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['validator','workbench/source-edit','workbench/targets','workbench/commands/common',
-  'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
+  'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
   'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
@@ -285,4 +285,18 @@ test('catalog refresh waits for the active field, and replacing that form retire
   h.inspector.render();assert.equal(old.handlers.blur.length,0);held({});assert.equal(h.timers.size,0);
   const current=h.guide.querySelector('input');current.focus();h.inspector.refreshCatalog();current.fire('blur');
   assert.equal(h.timers.size,1);h.flush();h.inspector.destroy();h.inspector.refreshCatalog();assert.equal(h.timers.size,0);
+});
+
+test('a formatting URL draft survives the prose refresh without suppressing it or adding history',()=>{
+  const e=environment(),h=e.mount({sections:[{bullets:['Before','Sibling']} ]});
+  h.session.target={kind:'bullet',section:0,index:0};h.inspector.render();const before=h.text;
+  const input=h.guide.querySelector('textarea'),url=h.guide.querySelector('[aria-label="Formatting link URL"]');
+  input.focus();input.value='After';input.setSelectionRange(0,5);input.fire('change');input.fire('blur');
+  url.focus();url.value='https://example.org';url.fire('input');h.flush();
+  assert.equal(h.guide.contains(input),false,'the committed prose must refresh');
+  const newURL=h.guide.querySelector('[aria-label="Formatting link URL"]');assert.equal(newURL.value,'https://example.org');
+  assert.equal(h.guide.querySelector('textarea').value,'After');
+  const outside=e.doc.body.appendChild(e.element('button'));outside.focus();newURL.fire('blur');h.flush();
+  assert.equal(JSON.parse(h.text).sections[0].bullets[0],'After');
+  h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
 });

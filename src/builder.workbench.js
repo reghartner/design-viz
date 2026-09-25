@@ -36,6 +36,15 @@ function builderOutline(raw, query){
         entries.push({label: label, context: context, target: target, path: path, tab: tab});
     }
     add('section', sec.heading || 'Section ' + (section + 1));
+    function bulletEntries(items,ancestry){
+      (Array.isArray(items)?items:[]).forEach(function(item,i){
+        var address=ancestry.concat([i]),label=typeof item==='string'?item:item && item.text;
+        if(item==null)return;
+        add('bullet',address.map(function(n){return n+1;}).join('.')+' · '+(label || 'Untitled point'),{index:address[0],bulletPath:address});
+        if(item && Array.isArray(item.sub))bulletEntries(item.sub,address);
+      });
+    }
+    bulletEntries(sec.bullets,[]);
     sectionContracts(sec).forEach(function(rec){
       add('contract',rec.value.title || 'On the wire',{card:rec.key});
     });

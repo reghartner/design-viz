@@ -1481,3 +1481,11 @@ test('a throwing satellite destroy does not strand other builder resources or th
   assert.equal(Object.values(h.windowListeners).flat().length,0);assert.equal(h.sandbox.BUILDER_JUMP_TO_FINDING,null);
   assert.equal(old.loadText('{}'),false);h.click('add-step');assert.equal(h.elements.src.value,before);old.destroy();
 });
+
+test('Outline finds nested prose by content and retains full source addresses',()=>{
+ const raw={sections:[{heading:'Story',bullets:[{text:'Parent',sub:['Child',{text:'Nested',sub:['Deep evidence']}]}]}]};
+ const entries=plain(B.builderOutline(raw,'deep evidence'));
+ assert.strictEqual(entries.length,1);
+ assert.deepStrictEqual(entries[0].target,{kind:'bullet',section:0,index:0,bulletPath:[0,1,0]});
+ assert.deepStrictEqual(entries[0].path,['sections',0,'bullets',0,'sub',1,'sub',0]);
+});

@@ -4562,3 +4562,9 @@ test('view links restore the presentation before path and step and canonicalize 
   view='service-flow';h.win.location.hash='#d=front-door';h.windowListeners.hashchange();
   assert.equal(view,'home-story','old links use the authored default independent of prior navigation');
 });
+
+test('inline code padding keeps quoted backticks and all-space contents literal',()=>{
+ assert.equal(C.inlineMarkup('`` `x` ``'),'<code>`x`</code>');
+ assert.equal(C.inlineMarkup('`  `'),'<code>  </code>');
+ assert.equal(C.inlineMarkup('`  x  `'),'<code> x </code>');
+});

@@ -49,8 +49,8 @@ test('prose containers use valid block markup and retain editor addresses',()=>{
   const section=C.sectionIntroHTML({heading:'Example',text:[snippet,'After'],bullets:[{text:snippet,sub:['`nested`']}]},0,'example').html;
   assert.match(section,/<div class="sec-text" data-dv-para="0">Payload\n<pre /);
   assert.match(section,/<div class="sec-text" data-dv-para="1">After<\/div>/);
-  assert.match(section,/<li data-dv-bullet="0">Payload\n<pre /);
-  assert.ok(section.includes('<li><code>nested</code></li>'));
+  assert.match(section,/<li data-dv-bullet="0" data-dv-bullet-path="0">Payload\n<pre /);
+  assert.ok(section.includes('<li data-dv-bullet-path="0.0"><code>nested</code></li>'));
   const contract=C.contractCardHTML({fields:[{k:'`literal-key`',v:'`literal-value`',g:snippet}],note:snippet},'example');
   assert.match(contract,/<td class="ctg">Payload\n<pre /);
   assert.match(contract,/<div class="ctnote">Payload\n<pre /);

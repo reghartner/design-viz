@@ -34,6 +34,22 @@ function specValueAt(raw, path){
   return v;
 }
 
+function builderBulletIndices(target){
+  var indices=target.bulletPath===undefined?[target.index]:target.bulletPath;
+  return Array.isArray(indices) && indices.length && indices.every(function(n){return Number.isInteger(n) && n>=0;})?indices.slice():null;
+}
+function builderBulletPath(raw,section,indices){
+  var rec=specSectionPaths(raw)[section];
+  if(!rec || !indices || !indices.length)return null;
+  var path=rec.section.concat(['bullets']),list=specValueAt(raw,path);
+  for(var i=0;i<indices.length;i++){
+    if(!Array.isArray(list) || indices[i]>=list.length || list[indices[i]]==null)return null;
+    path.push(indices[i]);
+    if(i<indices.length-1){path.push('sub');list=specValueAt(raw,path);}
+  }
+  return path;
+}
+
 function builderTargetPath(raw, target){
   /* target: {section:<zero-based ordinal>, kind, id?, index?} → path array
      into the raw editor JSON, or null. Tabs address by block index
@@ -52,7 +68,7 @@ function builderTargetPath(raw, target){
   if (target.kind === 'edge') return d.concat(['edges', target.index]);
   if (target.kind === 'step') return d.concat(['steps', target.index]);
   if (target.kind === 'panel') return d.concat(['panels', target.index]);
-  if (target.kind === 'bullet') return rec.section.concat(['bullets', target.index]);
+  if (target.kind === 'bullet') return builderBulletPath(raw,target.section,builderBulletIndices(target));
   if (target.kind === 'para'){
     var sec = specValueAt(raw, rec.section);
     if (sec && typeof sec.text === 'string') return rec.section.concat(['text']);

@@ -24,7 +24,11 @@ function inlineMarkup(value, links){
     if(match[1]){
       var close=proseCodeClose(source,tokens.lastIndex,match[1].length);
       if(close){
-        html+='<code>'+esc(source.slice(tokens.lastIndex,close.index).replace(/\r\n?|\n/g,' '))+'</code>';
+        var code=source.slice(tokens.lastIndex,close.index).replace(/\r\n?|\n/g,' ');
+        /* One padding space at each end separates a delimiter from quoted
+           backticks; all-space code remains literal. */
+        if(code[0]===' ' && code[code.length-1]===' ' && /[^ ]/.test(code))code=code.slice(1,-1);
+        html+='<code>'+esc(code)+'</code>';
         tokens.lastIndex=close.end;
       }else html+=esc(match[0]);
     }else if(match[2]){

@@ -74,7 +74,7 @@
   source evaluation. Rebuild and verify the isolated copy install after changes.
 
 Validate fresh builds and behavior from the reviewed head; check committed
-freshness for packaged JavaScript and the Canon index, not HTML exports. Keep
-local build output separate from authored changes until explained; don't discard somebody else's
+freshness for packaged JavaScript, not HTML exports. Keep local build output
+separate from authored changes until explained; don't discard somebody else's
 work to obtain a clean result. Check required remote CI for that same head before
 merging. Repeat only affected validation after subsequent changes.

@@ -108,9 +108,9 @@ or behavior test still fails CI. Build determinism compares two fresh builds
 from the same source, not a fresh build with an older checked-in page.
 
 Rebuild HTML before distributing a viewer or workbench so it includes the desired
-engine version. Committed backend/native JavaScript artifacts and
-`workbench/diagrams.json` still have freshness gates because they are packaged
-runtime and catalog inputs.
+engine version. Committed backend/native JavaScript artifacts still have
+freshness gates because they are packaged runtime inputs. The build regenerates
+the ignored `workbench/diagrams.json` Canon index and fails if generation fails.
 
 `tests/source-loader.test.js` covers physical alias substitution, sorted expansion,
 boot separation, CLI/API agreement, export failures, duplicate inputs, DOM-free

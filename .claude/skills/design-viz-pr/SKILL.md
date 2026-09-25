@@ -43,7 +43,7 @@ closest route; don't silently omit it.
 inputs or outputs change, review source once and run `python3 tools/build.py`
 before testing. Checked-in HTML may differ from the current build; that alone
 is not a defect or merge blocker. Rebuild pages before distributing them. Keep
-packaged JavaScript and Canon-index freshness checks from CI. If only generated
+packaged JavaScript freshness checks from CI. If only generated
 files changed, use the build route to understand their source and intended output.
 
 ## 3. Resolve and finish

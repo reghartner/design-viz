@@ -40,6 +40,9 @@ For a small edit, update the affected story/ledger rows rather than restarting.
 - Distinguish unknown from absent, failed, zero, and pending. A timeout does not
   establish non-delivery. A missing span does not establish an absent action.
   Camera activity, recording, livestreaming, and physical events are separate.
+- For human handoff, Camera and Device App have typed **Starting state** controls
+  in the panel inspector. Set defaults there and authored changes on steps;
+  keep advanced initial fields intact. See the workbench User guide → Visual panels.
 - Ask a focused question if a contradiction or missing fact prevents an honest
   depiction. Continue independent work. If the source establishes uncertainty,
   depict it explicitly instead of asking the user to manufacture certainty.

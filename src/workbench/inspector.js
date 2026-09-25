@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
-  var OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
+  var OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
@@ -809,39 +809,56 @@ function effectiveStateControl(target){
     return outer;
   }
 
-function panelPatchControl(pid, patch, decl, target){
+function panelPatchControl(pid, patch, decl, target, options){
+    options=options || {};
+    var initial=!!options.initial;
     var editor=panelEditor(decl && decl.type);
     var det = document.createElement('details');
-    det.className = 'patchedit';
-    det.open = OPEN_PATCH_EDITORS.has(pid);
+    det.className = initial ? 'initialedit patchedit' : 'patchedit';
+    det.setAttribute('data-panel-state',initial?'initial':'step');
+    det.open = initial ? OPEN_INITIAL_EDITORS.get(pid)!==false : OPEN_PATCH_EDITORS.has(pid);
     formLife.listen(det,'toggle', function(ev){
       if (ev.target !== det || !guide.contains(det)) return;
+      if(initial){OPEN_INITIAL_EDITORS.set(pid,det.open);return;}
       if (det.open) OPEN_PATCH_EDITORS.add(pid);
       else OPEN_PATCH_EDITORS.delete(pid);
     });
     var summary = document.createElement('summary');
-    summary.textContent = pid + ' · ' + patchSummaryLine(patch);
+    summary.textContent = initial ? 'Starting state' : pid + ' · ' + patchSummaryLine(patch);
     det.appendChild(summary);
     var body = document.createElement('div');
     body.className = 'rowsedit';
     det.appendChild(body);
 
-    function commitPatch(key, value, whole){
+    function commitPatch(key, value, whole, shape){
       if (modes.adding()){
         formError('finish ADD TO STEP first (DONE or Esc) — this control is paused while the mode is armed');
         return false;
       }
       var ok = commitCascade(function(raw){
-        var next = value;
-        if (!whole){
-          var got = builderStepAt(raw, target.section, target.index);
-          if (!got || !got.st.panels || !Object.prototype.hasOwnProperty.call(got.st.panels, pid))
-            return {error: 'panel "' + pid + '" is not in this step'};
-          next = Object.assign(Object.create(null), got.st.panels[pid]);
-          if (value === undefined) delete next[key];
-          else next[key] = value;
+        var next=value,path,panel,got,current;
+        if(initial){
+          path=builderTargetPath(raw,target);panel=path && specValueAt(raw,path);
+          if(!panel || panel.id!==pid || panel.type!==decl.type)return {error:'Select the panel again.'};
+          current=panel.initial;
+        }else{
+          got=builderStepAt(raw,target.section,target.index);
+          if(!got || !got.st.panels || !Object.prototype.hasOwnProperty.call(got.st.panels,pid))
+            return {error:'panel "'+pid+'" is not in this step'};
+          current=got.st.panels[pid];
         }
-        return planStepSetPanelPatch(session.text(), raw, target.section, target.index, pid, JSON.stringify(next));
+        if(!whole){
+          next=Object.assign(Object.create(null),panelObject(current)?current:{});
+          if(shape){
+            var nested=Object.assign(Object.create(null),panelObject(next[key])?next[key]:{});
+            shape.forEach(function(field){delete nested[field[0]];});
+            Object.assign(nested,value || {});
+            value=Object.keys(nested).length?nested:undefined;
+          }
+          if(value===undefined)delete next[key];else next[key]=value;
+        }
+        return initial ? planSetField(session.text(),raw,path,'initial',JSON.stringify(next)) :
+          planStepSetPanelPatch(session.text(),raw,target.section,target.index,pid,JSON.stringify(next));
       });
       if (ok) refreshFormSoon();
       return ok;
@@ -862,19 +879,22 @@ function panelPatchControl(pid, patch, decl, target){
         if (f[1] === 'num') input.className += ' fnum';
       }
       input.setAttribute('aria-label', f[0]);
-      if (editor.patchField) editor.patchField(f,input);
+      if (editor.patchField) editor.patchField(f,input,options);
       return input;
     }
     function rawControl(){
       return textControl(JSON.stringify(patch), function(v){
-        if (v == null){ formError('a patch is a JSON object — remove the panel chip instead'); return false; }
+        if (v == null){if(initial)return commitPatch(null,{},true);formError('a patch is a JSON object — remove the panel chip instead');return false;}
         var out = patchFieldsCollect([['patch', 'json']], {patch: v});
         if (out.error){ formError(out.error); return false; }
         return commitPatch(null, out.item.patch, true);
       }, {textarea: true});
     }
     var fields = panelPatchFields(decl);
-    if (editor.patchIntro) editor.patchIntro(body,decl);
+    if(initial){
+      var note=document.createElement('p');note.className='home-note';
+      note.textContent='These values start every path. Step changes stay separate; unset fields use the panel defaults.';body.appendChild(note);
+    }else if (editor.patchIntro) editor.patchIntro(body,decl);
     if (fields === null){
       body.appendChild(frow('patch ' + pid, rawControl()));
       return det;
@@ -884,18 +904,14 @@ function panelPatchControl(pid, patch, decl, target){
       if (f[1] === 'objf'){
         var group = document.createElement('div');
         group.className = 'rowsedit';
-        var inputs = Object.create(null);
-        function commitGroup(){
-          var values = Object.create(null);
-          Object.keys(inputs).forEach(function(k){ values[k] = inputs[k].value; });
-          var out = patchFieldsCollect(f[2], values);
-          if (out.error){ formError(key + ': ' + out.error); return false; }
-          return commitPatch(key, Object.keys(out.item).length ? out.item : undefined);
-        }
         f[2].forEach(function(col){
-          var input = fieldInput(col, cur && cur[col[0]]);
-          inputs[col[0]] = input;
-          wireCommit(input, commitGroup);
+          var input=fieldInput(col,cur && cur[col[0]]);
+          wireCommit(input,function(){
+            var values=Object.create(null);values[col[0]]=input.value;
+            var out=patchFieldsCollect([col],values);
+            if(out.error){formError(key+': '+out.error);return false;}
+            return commitPatch(key,out.item,false,[col]);
+          });
           group.appendChild(frow(editor.patchLabel ? editor.patchLabel(col[0]) : col[0], input));
         });
         body.appendChild(frowBlock(key, group));
@@ -1248,6 +1264,7 @@ function panelSetupRows(val){
     var fields = PANEL_SETUP_FIELDS[val.type] || [['initial', 'json']];
     return fields.map(function(f){
       var key = f[0], kind = f[1], cur = val[key], editor=panelEditor(val.type);
+      if(key==='initial' && panelAuthoring(val.type).initialFields)return panelPatchControl(val.id,val.initial || {},val,Object.assign({},session.target),{initial:true});
       var custom=editor.setupField && editor.setupField(f,val);
       if(custom) return custom;
 

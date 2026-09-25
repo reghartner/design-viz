@@ -179,3 +179,11 @@ the authoring contract, and browser-check its controls, layouts, motion and prin
 presentation. Rebuild and commit generated assets. Documentation, tests and
 output are expected additions; existing implementation files should need no new
 panel-specific branches or registration entries.
+
+
+Panels can set `authoring.initialFields: true` to reuse their typed patch fields
+(including dynamic fields) for the panel inspector's **Starting state**. This
+writes `panel.initial`, separately from step patches. `editor.patchField` receives
+an optional third argument `{initial: true}` for context-specific labels. The
+shared inspector owns transactions, unknown-field preservation, and Undo/Redo;
+panels should not duplicate that machinery.

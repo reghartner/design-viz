@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict';
-import { buildEntityDiagramIndex, diagramsForEntity } from '@flowview/backstage-plugin/backend';
+import { buildEntityDiagramIndex, diagramsForEntity, parseCanonManifest, materializeCanonSpec } from '@flowview/backstage-plugin/backend';
 
 async function main() {
   const response = await fetch(process.argv[2]);
   assert.equal(response.status, 200);
-  const spec = await response.json();
-  const before = JSON.stringify(spec);
+  const source = await response.json();
+  const before = JSON.stringify(source);
+  const [entry] = parseCanonManifest({version: 1, diagrams: [{
+    folder: 'diagrams/consumer-recording', owner: 'group:default/diagram-owners',
+  }]});
+  assert.equal(entry.path, 'diagrams/consumer-recording/consumer-recording.spec.json');
+  const spec = materializeCanonSpec(source, entry);
+  assert.deepEqual(spec.page.canon, {
+    version: 1, id: 'consumer-recording', kind: 'canonical', owner: entry.owner,
+  });
+  assert.notEqual(spec, source);
   let calls = 0;
   const index = buildEntityDiagramIndex([spec], {
     diagramUrls({ id, revision, spec: indexed }) {
@@ -41,7 +50,7 @@ async function main() {
   assert.equal(hash.get('p'), 'failed');
   assert.equal(hash.get('s'), 'failure');
   assert.equal(diagramsForEntity(index, 'component:default/unrelated').diagrams.length, 0);
-  assert.equal(JSON.stringify(spec), before);
+  assert.equal(JSON.stringify(source), before);
   assert.throws(() => buildEntityDiagramIndex([{ page: {} }]), /.+/);
   console.log('Packed backend fetched, indexed, and linked a spec with company URLs.');
 }

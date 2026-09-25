@@ -380,9 +380,10 @@ workspace toolbar. The [bundled guide](docs/workbench-user-guide.md) includes
 a first-diagram walkthrough, alternate paths, shared steps, Home animation,
 layouts, catalogs, and sharing. **Canon diagrams** on welcome opens the
 [read-only repository library](docs/workbench-canon-library.md), with an explicit
-**Edit in Workbench** handoff. Save a spec with `page.canon` under `docs/diagrams/`;
-the normal build and nginx image build discover it automatically. No separate
-library registry entry is needed. Use **Copy link** in the reader to share a
+**Edit in Workbench** handoff. Keep maintained JSON and HTML together under
+`diagrams/<name>/`, and add the folder and owner to root `canon.json` after review.
+The normal build and nginx image build publish that central list; per-spec flags
+do not enroll a document. Use **Copy link** in the reader to share a
 direct `?diagram=<canon-id>` URL before Backstage is connected.
 
 Open `workbench/flowspec.html` to **Paste JSON**, **Open file**, or start a **New project**

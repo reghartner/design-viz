@@ -98,7 +98,7 @@ async function checkDeclarations() {
   assert.doesNotMatch(declarations, /@flowview\/backstage-plugin|@backstage\//,
     'Downstream declaration bundling must expand the installed plugin without Backstage types.');
   for (const name of ['DiagramLoader', 'SpecLoader', 'EntityDiagrams', 'AssociatedDiagram',
-    'DiagramSection', 'DiagramStep', 'ViewerTarget', 'EntityDiagramIndex']) {
+    'DiagramSection', 'DiagramStep', 'ViewerTarget', 'EntityDiagramIndex', 'CanonEntry']) {
     assert.match(declarations, new RegExp('\\b' + name + '\\b'));
   }
   config.include = ['bundled-contract.d.ts'];
@@ -123,8 +123,8 @@ async function checkBackend() {
   const url = 'http://127.0.0.1:' + fixtureServer.address().port + '/approved/recording.json';
   const cjsSource = (await readFile(path.join(consumer, 'backend.mjs'), 'utf8'))
     .replace("import assert from 'node:assert/strict';", "const assert = require('node:assert/strict');")
-    .replace("import { buildEntityDiagramIndex, diagramsForEntity } from '@flowview/backstage-plugin/backend';",
-      "const { buildEntityDiagramIndex, diagramsForEntity } = require('@flowview/backstage-plugin/backend');");
+    .replace("import { buildEntityDiagramIndex, diagramsForEntity, parseCanonManifest, materializeCanonSpec } from '@flowview/backstage-plugin/backend';",
+      "const { buildEntityDiagramIndex, diagramsForEntity, parseCanonManifest, materializeCanonSpec } = require('@flowview/backstage-plugin/backend');");
   await writeFile(path.join(consumer, 'backend.cjs'), cjsSource);
   for (const format of ['esm', 'cjs']) {
     const outfile = path.join(deployed, 'backend.' + (format === 'esm' ? 'mjs' : 'cjs'));

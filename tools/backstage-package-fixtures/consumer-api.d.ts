@@ -8,8 +8,8 @@ export type {
   NativeViewerTarget, SpecLoader, ViewerTarget,
 } from '@flowview/backstage-plugin';
 export {
-  buildEntityDiagramIndex, diagramsForEntity,
+  buildEntityDiagramIndex, diagramsForEntity, parseCanonManifest, materializeCanonSpec,
 } from '@flowview/backstage-plugin/backend';
 export type {
-  EntityDiagramIndex, EntityDiagramIndexOptions,
+  EntityDiagramIndex, EntityDiagramIndexOptions, CanonEntry,
 } from '@flowview/backstage-plugin/backend';

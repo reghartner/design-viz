@@ -146,6 +146,7 @@ Do not copy its latency, topology, notification, or outcome without evidence.
 | Confluence export | [Integrations](references/integrations.md) → Confluence |
 | Named views, selected playback stops, attached/detached controls, host arrangements, view links or GIF captures | `docs/section-layouts.md`; HTML `v=<view-id>` and GIF `--view <view-id>` use stable layout IDs, distinct from the host-profile `layout` query |
 | Small screenshots or illustrations inside a diagram | `cookbook/embedded-images.md` and image widget docs |
+| Manually exported Figma screens or app screenshots that change with steps | `cookbook/app-screens.md` and `appscreens` widget docs; store images once and author screen IDs per step |
 | Free node placement, edge entry/exit ports, or other workbench field mechanics | Relevant section of [authoring details](references/authoring-details.md) |
 | Existing source changed or paired source/spec correction | [Evidence and updates](references/evidence-and-updates.md) |
 

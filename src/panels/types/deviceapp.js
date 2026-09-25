@@ -5,7 +5,7 @@ var DEVICEAPP_STATUSES = ['unknown', 'loading', 'ready', 'stale', 'error'];
 var DEVICEAPP_SCREENS = ['home', 'app'];
 function deviceAppItems(panel, key) {
   var seen = Object.create(null),
-    reserved = ['phoneScreen', 'clock', 'note', 'notify', 'clear', 'notifications', 'constructor', 'prototype'];
+    reserved = ['phoneScreen', 'clock', 'date', 'note', 'notify', 'clear', 'notifications', 'constructor', 'prototype'];
   return (Array.isArray(panel && panel[key]) ? panel[key] : [])
     .filter(function (item) {
       if (
@@ -36,7 +36,7 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
       if (DEVICEAPP_SCREENS.indexOf(obj[key]) < 0) warnings.push(path + '.phoneScreen: expected home or app — ignored');
       return;
     }
-    if (key === 'clock' || key === 'note') {
+    if (key === 'clock' || key === 'date' || key === 'note') {
       if (typeof obj[key] !== 'string')
         warnings.push(path + '.' + key + ': expected text — ignored');
       return;
@@ -105,7 +105,7 @@ function deviceAppWarnings(panel, d, path, warnings) {
           key +
           ': use unique letter-led IDs and at most ' +
           (key === 'sources' ? 6 : 12) +
-          ' entries; phoneScreen/clock/note/notify/clear/notifications/constructor/prototype are reserved — invalid entries ignored'
+          ' entries; phoneScreen/clock/date/note/notify/clear/notifications/constructor/prototype are reserved — invalid entries ignored'
       );
     items.forEach(function (item, i) {
       var p = path + '.' + key + '[' + i + ']';
@@ -150,7 +150,7 @@ function foldDeviceAppStates(panel, steps) {
     added = notifications.apply(patch);
     if (!panelObject(patch)) return updated;
     if (DEVICEAPP_SCREENS.indexOf(patch.phoneScreen) >= 0) carried.phoneScreen = patch.phoneScreen;
-    ['clock', 'note'].forEach(function (k) {
+    ['clock', 'date', 'note'].forEach(function (k) {
       if (typeof patch[k] === 'string') carried[k] = patch[k];
     });
     fields.forEach(function (f) {
@@ -264,6 +264,7 @@ function deviceAppModel(panel, state) {
     device: str(panel.device, 'Camera'),
     subtitle: str(panel.subtitle, 'Device health'),
     clock: str(state.clock, '9:41'),
+    date: str(state.date),
     note: str(state.note),
     showSources: sources.length>0 && panel.showSources!==false,
     notifications: FlowNotifications.model(state),
@@ -314,7 +315,9 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh)
   }
   var h =
     '<div class="deviceapp'+(m.showSources?'':' da-standalone')+'"><div class="da-phone-fit"><div class="da-phone da-phone-'+m.screen+'" data-da-screen="'+m.screen+'">'+
-    '<div class="da-statusbar"><span>'+esc(m.clock)+'</span><span aria-hidden="true">▂▄▆ · ▰</span></div>'+
+    '<div class="da-statusbar'+(m.date?' da-has-date':'')+'"><span>'+esc(m.clock)+'</span>'+
+    (m.date?'<span class="da-date" title="'+esc(m.date)+'">'+esc(m.date)+'</span>':'')+
+    '<span aria-hidden="true">▂▄▆ · ▰</span></div>'+
     '<div class="da-screen da-screen-'+m.screen+(screenFresh?' fresh':'')+'" tabindex="0" aria-label="'+(m.screen==='home'?'Phone home screen':'Device app screen')+'">';
   if(m.screen==='home') h+=deviceAppHomeHTML(m,notificationFresh);
   else {
@@ -509,6 +512,9 @@ PanelRegistry.extend('deviceapp', {
 .da-phone::before{content:"";position:absolute;top:calc(12 * var(--da-px));left:calc(50% - 23 * var(--da-px));width:calc(46 * var(--da-px));height:calc(9 * var(--da-px));border-radius:calc(8 * var(--da-px));background:#42506a;}
 .da-statusbar{display:flex;flex:none;justify-content:space-between;gap:calc(55 * var(--da-px));font:600 calc(10 * var(--da-px)) 'IBM Plex Mono',monospace;padding:0 calc(5 * var(--da-px)) calc(18 * var(--da-px));}
 .da-statusbar>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.da-statusbar.da-has-date{gap:calc(8 * var(--da-px));padding-top:calc(10 * var(--da-px));}
+.da-date{min-width:0;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.da-statusbar>span:last-child{flex:none;}
 .da-screen{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border-radius:calc(10 * var(--da-px));padding:calc(2 * var(--da-px)) calc(3 * var(--da-px)) calc(8 * var(--da-px));}
 .da-screen:focus-visible{outline:calc(2 * var(--da-px)) solid #6875ca;outline-offset:calc(-2 * var(--da-px));}
 .da-appbar{display:flex;align-items:center;gap:calc(7 * var(--da-px));font:600 calc(11 * var(--da-px))/1.4 'Sora',sans-serif;color:#6673c2;padding:calc(3 * var(--da-px)) calc(4 * var(--da-px)) calc(8 * var(--da-px));}
@@ -682,6 +688,7 @@ PanelRegistry.extend('deviceapp', {
       ['notify', 'jsonAny'],
       ['clear', 'bool', { trueOnly: true }],
       ['clock', 'text'],
+      ['date', 'text'],
       ['note', 'text'],
     ],
     picker: {
@@ -698,6 +705,11 @@ PanelRegistry.extend('deviceapp', {
     editor: function(context){
       return {patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key;},
       patchField:function(field,input,options){
+        if(field[0]==='date'){
+          if(options && options.initial)input.setAttribute('aria-label','Starting date');
+          input.placeholder=options && options.initial?'Optional · Thu, Sep 24':'Inherit previous date';
+          return;
+        }
         if(field[0]!=='phoneScreen' && field[0]!=='visible')return;
         input.setAttribute('aria-label',field[0]==='phoneScreen'?(options && options.initial?'Starting phone screen':'Phone screen'):'Card visibility');
         Array.from(input.options).forEach(function(option){
@@ -756,7 +768,7 @@ PanelRegistry.extend('deviceapp', {
       if (key === '_updated')
         return { kind: 'engine', label: 'Engine · fields changed at this step', inputs: [] };
       if (key === 'phoneScreen')return assignment(key,function(v){return DEVICEAPP_SCREENS.indexOf(v)>=0;},false);
-      if (key === 'clock' || key === 'note')
+      if (key === 'clock' || key === 'date' || key === 'note')
         return assignment(
           key,
           function (v) {

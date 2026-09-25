@@ -203,7 +203,7 @@ test('patchFieldsCollect: a trueOnly bool refuses false (phone clear)', () => {
   assert.strictEqual(B.patchFieldsCollect(clear, {clear: 'true'}).item.clear, true);
   assert.match(B.patchFieldsCollect(clear, {clear: 'false'}).error, /only true/);
   assert.deepStrictEqual(Object.keys(B.patchFieldsCollect(clear, {clear: ''}).item), []);
-  assert.deepStrictEqual(plain(B.PANEL_PATCH_FIELDS.phone[2]), ['clear', 'bool', {trueOnly: true}]);
+  assert.deepStrictEqual(plain(B.PANEL_PATCH_FIELDS.phone.find(field => field[0] === 'clear')), ['clear', 'bool', {trueOnly: true}]);
 });
 
 test('Home icon edits validate choices, preserve future icons and clear defaults without losing row fields', () => {

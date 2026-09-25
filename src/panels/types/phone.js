@@ -41,8 +41,8 @@ function phoneBrandWarnings(panel, path, warnings) {
 function phonePatchWarnings(obj, path, warnings, allowOnce) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
   Object.keys(obj).forEach(function (k) {
-    if (['clock', 'notify', 'clear', 'audio'].indexOf(k) < 0 && !(allowOnce && k === 'enterOnce'))
-      warnings.push(path + '.' + k + ': not a phone field — ignored (valid: clock, notify, clear, audio' + (allowOnce ? ', enterOnce' : '') + ')');
+    if (['clock', 'date', 'notify', 'clear', 'audio'].indexOf(k) < 0 && !(allowOnce && k === 'enterOnce'))
+      warnings.push(path + '.' + k + ': not a phone field — ignored (valid: clock, date, notify, clear, audio' + (allowOnce ? ', enterOnce' : '') + ')');
   });
   if (Object.prototype.hasOwnProperty.call(obj, 'audio'))
     FlowAudio.clean(obj.audio, path + '.audio', warnings);
@@ -56,6 +56,8 @@ function phonePatchWarnings(obj, path, warnings, allowOnce) {
   }
   if (Object.prototype.hasOwnProperty.call(obj, 'clock') && typeof obj.clock !== 'string')
     warnings.push(path + '.clock: must be a string — ignored');
+  if (Object.prototype.hasOwnProperty.call(obj, 'date') && typeof obj.date !== 'string')
+    warnings.push(path + '.date: must be a string — ignored');
   FlowNotifications.warnings(obj, path, warnings);
 }
 /* Fold phone operations into absolute snapshots. The complete unread stack
@@ -65,13 +67,14 @@ function phonePatchWarnings(obj, path, warnings, allowOnce) {
 function foldPhoneStates(panel, steps) {
   panel = panel || {};
   steps = Array.isArray(steps) ? steps : [];
-  var clock = '',
+  var clock = '', date,
     notifications = FlowNotifications.create(),
     audio,
     states = [];
   function apply(patch) {
     patch = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
     if (typeof patch.clock === 'string') clock = patch.clock;
+    if (typeof patch.date === 'string') date = patch.date;
     if (Object.prototype.hasOwnProperty.call(patch, 'audio')) {
       var nextAudio = FlowAudio.clean(patch.audio);
       if (nextAudio !== undefined) audio = nextAudio;
@@ -84,6 +87,7 @@ function foldPhoneStates(panel, steps) {
       notifications: notifications.snapshot(),
       _phoneAdded: added,
     };
+    if (date !== undefined) result.date = date;
     var transientAudio = phoneBrandIsPlainObject(once) && Object.prototype.hasOwnProperty.call(once, 'audio')
       ? FlowAudio.clean(once.audio) : undefined;
     var currentAudio = transientAudio === undefined ? audio : transientAudio;
@@ -153,6 +157,7 @@ function phoneModel(panelOrState, stepsOrState, currentStep) {
     state = panelOrState || {};
   }
   var model = Object.assign({clock:typeof state.clock==='string'?state.clock:''},FlowNotifications.model(state));
+  if (typeof state.date === 'string') model.date = state.date;
   if (Object.prototype.hasOwnProperty.call(state, 'audio')) {
     var audio = FlowAudio.clean(state.audio);
     if (audio !== undefined) model.audio = audio;
@@ -222,6 +227,7 @@ function phonePanelHTML(panel, state, fresh) {
     : 'Phone with no notifications';
   if (brand && brand.app) label = brand.app + ' phone' + label.slice(5);
   if (call) label += '. ' + call.description;
+  if (m.date) label += '. ' + m.date;
   var h =
     '<div class="phoneframe' + (call ? ' phonehasaudio' : '') + '"' +
     (styles.length ? ' style="' + styles.join(';') + '"' : '') +
@@ -232,6 +238,7 @@ function phonePanelHTML(panel, state, fresh) {
     '<div class="phonestatus"><span class="phoneclock">' +
     esc(m.clock) +
     '</span>' +
+    (m.date ? '<span class="phonedate" title="' + esc(m.date) + '">' + esc(m.date) + '</span>' : '') +
     '<span class="phoneglyphs" aria-hidden="true"><span class="phonesignal"><i></i><i></i><i></i></span>' +
     '<span class="phonebattery"><i></i></span></span></div>';
   if (brand && (brand.app || brand.logo))
@@ -309,7 +316,8 @@ PanelRegistry.extend('phone', {
 .phonebrandname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;
   color:var(--phfg, inherit);}
 .phoneclock{max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.phoneglyphs{display:flex;align-items:flex-end;gap:5px;}
+.phonedate{min-width:0;flex:1;margin:0 5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.phoneglyphs{display:flex;flex:none;align-items:flex-end;gap:5px;}
 .phonesignal{display:flex;align-items:flex-end;gap:1px;height:8px;}
 .phonesignal i{display:block;width:2px;border-radius:1px;}
 .phonesignal i:nth-child(1){height:3px;}
@@ -621,6 +629,7 @@ PanelRegistry.extend('phone', {
     ],
     patchFields: [
       ['clock', 'text'],
+      ['date', 'text'],
       ['notify', 'jsonAny'],
       ['clear', 'bool', { trueOnly: true }],
       ['audio', 'objf', FlowAudio.fields],
@@ -639,7 +648,7 @@ PanelRegistry.extend('phone', {
         own = context.own;
       if (key === 'notifications')
         return history(['notify', 'clear'], true, 'Computed notification history');
-      if (key === 'clock')
+      if (key === 'clock' || key === 'date')
         return assignment(
           key,
           function (v) {
@@ -653,6 +662,13 @@ PanelRegistry.extend('phone', {
           phoneBrandIsPlainObject(once) && own(once, 'audio') && FlowAudio.clean(once.audio) !== undefined);
       }
       return { kind: 'engine', label: 'Engine · presentation metadata', inputs: [] };
+    },
+    editor: function () {
+      return {patchField:function (field, input, options) {
+        if (field[0] !== 'date') return;
+        if (options && options.initial) input.setAttribute('aria-label', 'Starting date');
+        input.placeholder = options && options.initial ? 'Optional · Thu, Sep 24' : 'Inherit previous date';
+      }};
     },
     example: function (sample, context) {
       var panel = sample.panel,

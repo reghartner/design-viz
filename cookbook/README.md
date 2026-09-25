@@ -28,6 +28,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | a camera phone UX whose fields come from different backend services | [Device app sources](device-app-sources.md) — doorbell refresh and partial outage |
 | a Confluence-ready export or JSON to paste into the Flowview macro | [Confluence handoff](../docs/confluence.md) |
 | small screenshots or illustrations stored inside the spec | [embedded-images.md](embedded-images.md) |
+| manually exported Figma screens that change with story steps | [app-screens.md](app-screens.md) — upload a collection, select screens per step |
 | happy and failure outcomes on one diagram, shared steps, or a dropped/blocked communication | [alternate-paths.md](alternate-paths.md) |
 | a domain overview that opens service internals as focused drilldowns, nested flows, or mapped child outcomes | [domain-drilldowns.md](domain-drilldowns.md) — doorbell domains, boundaries and mailbox |
 | a large home map, live Home / Data flow switching, device states, or draggable placement | [home-story.md](home-story.md) |

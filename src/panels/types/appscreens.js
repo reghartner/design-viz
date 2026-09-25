@@ -15,6 +15,9 @@
         if (raw.screen === null || screens(panel).some(function (item) { return item.id === raw.screen; }))
           out.screen = raw.screen;
         else warn('.screen', 'expected a declared screen ID or null — ignored');
+      } else if (key === 'date' || key === 'clock') {
+        if (typeof raw[key] === 'string') out[key] = raw[key];
+        else warn('.' + key, 'expected text — ignored');
       } else if (key === 'enterOnce' && once) {
         if (panelObject(raw.enterOnce)) out.enterOnce = clean(panel, raw.enterOnce, false, path + '.enterOnce', warnings);
         else warn('.enterOnce', 'expected a state object — ignored');
@@ -42,9 +45,16 @@
       (current.caption ? '<span>' + esc(text(current.caption)) + '</span>' : '') + '</figcaption>' : '';
     var link = current && typeof FlowCanon !== 'undefined' && FlowCanon.http(current.link);
     if (link) caption += '<a class="appscreen-reference" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open design reference ↗</a>';
+    var clock = text(state.clock), date = text(state.date);
+    var status = panel.frame !== 'none' && (clock || date) ? '<div class="appscreen-statusbar">' +
+      (clock ? '<span class="appscreen-clock" title="' + esc(clock) + '">' + esc(clock) + '</span>' : '') +
+      (date ? '<span class="appscreen-date" title="' + esc(date) + '">' + esc(date) + '</span>' : '') +
+      '<span class="appscreen-glyphs" aria-hidden="true">▂▄▆ · ▰</span></div>' : '';
     var before = '<figure class="appscreens" style="--appscreen-ratio:' + ratio.toFixed(6) + '"><div class="appscreen-stage"><div class="appscreen-viewport' +
-      (panel.frame !== 'none' ? ' appscreen-phone' : '') + '">';
-    var after = '</div></div>' + caption + '</figure>', baseline = before + stage + after;
+      (panel.frame !== 'none' ? ' appscreen-phone' : '') + '">' +
+      status +
+      '<div class="appscreen-image">';
+    var after = '</div></div></div>' + caption + '</figure>', baseline = before + stage + after;
     return {
       html: before + stage + image(previous, true) + after,
       baseline: baseline,
@@ -190,11 +200,23 @@
             panel[field[0]] || (frame ? 'phone' : 'cut'), function (value) { context.commit(field[0], JSON.stringify(value)); });
         }
         if (field[0] === 'initial') {
-          return select('Starting screen', [['','No screen']].concat(choices(panel)), panel.initial && panel.initial.screen || '', function (value) {
+          var initialBox = document.createElement('div');
+          initialBox.appendChild(select('Starting screen', [['','No screen']].concat(choices(panel)), panel.initial && panel.initial.screen || '', function (value) {
             editPanel(function (raw, live, path) {
               return planSetField(context.source(), raw, path, 'initial', JSON.stringify(Object.assign({}, live.initial, {screen:value || null})));
             });
+          }));
+          [['clock','Starting time','9:41'],['date','Starting date','Thu, Sep 24']].forEach(function (field) {
+            var input = context.controls.text(panel.initial && panel.initial[field[0]], function (value) {
+              return editPanel(function (raw, live, path) {
+                var initial = Object.assign({}, live.initial);
+                if (value == null) delete initial[field[0]]; else initial[field[0]] = value;
+                return planSetField(context.source(), raw, path, 'initial', JSON.stringify(initial));
+              });
+            }, {placeholder:'Optional · ' + field[2]});
+            input.setAttribute('aria-label', field[1]); initialBox.appendChild(context.controls.row(field[1], input));
           });
+          return initialBox;
         }
         if (field[0] !== 'screens') return;
         var box = document.createElement('div'); box.className = 'appscreen-editor';
@@ -229,19 +251,30 @@
       stepControl: function (diagram, panel, target) {
         var step = diagram.steps[target.index], patch = (stepPanelPatch(step) || {})[panel.id] || {};
         var box = document.createElement('div'); box.className = 'rowsedit';
+        function update(key, value) {
+          if (context.editingBlocked()) { context.error('Finish ADD TO STEP before editing app screens.'); return false; }
+          return context.transact(function (raw) {
+            var got = builderStepAt(raw, target.section, target.index);
+            if (!got) return {error:'Reselect the step.'};
+            var owner = panelObject(got.st.panels) ? 'panels' : panelObject(got.st.patch) ? 'patch' : 'panels';
+            var all = Object.assign({}, got.st[owner]), next = Object.assign({}, all[panel.id]);
+            if (value === undefined) delete next[key]; else next[key] = value;
+            if (Object.keys(next).length) all[panel.id] = next; else delete all[panel.id];
+            return planSetField(context.source(), raw, builderTargetPath(raw, target), owner, Object.keys(all).length ? JSON.stringify(all) : null);
+          }, {after:function () { context.refresh(); }});
+        }
         box.appendChild(select('App screen · ' + (panel.title || panel.id), [['','Inherit previous screen'],['@blank','No screen']].concat(choices(panel).map(function (pair) { return ['id:' + pair[0], pair[1]]; })),
           panelOwn(patch, 'screen') ? patch.screen === null ? '@blank' : 'id:' + patch.screen : '', function (value) {
-            if (context.editingBlocked()) { context.error('Finish ADD TO STEP before choosing a screen.'); return; }
-            context.transact(function (raw) {
-              var got = builderStepAt(raw, target.section, target.index);
-              if (!got) return {error:'Reselect the step.'};
-              var key = panelObject(got.st.panels) ? 'panels' : panelObject(got.st.patch) ? 'patch' : 'panels';
-              var all = Object.assign({}, got.st[key]), next = Object.assign({}, all[panel.id]);
-              if (!value) delete next.screen; else next.screen = value === '@blank' ? null : value.slice(3);
-              if (Object.keys(next).length) all[panel.id] = next; else delete all[panel.id];
-              return planSetField(context.source(), raw, builderTargetPath(raw, target), key, Object.keys(all).length ? JSON.stringify(all) : null);
-            }, {after:function () { context.refresh(); }});
+            return update('screen', !value ? undefined : value === '@blank' ? null : value.slice(3));
           }));
+        var date = context.controls.text(patch.date, function (value) { return update('date', value == null ? undefined : value); },
+          {placeholder:patch.date === '' ? 'Hidden at this step' : 'Inherit previous date'});
+        date.setAttribute('aria-label', 'Date · ' + (panel.title || panel.id)); box.appendChild(context.controls.row('Date', date));
+        var clock = context.controls.text(patch.clock, function (value) { return update('clock', value == null ? undefined : value); },
+          {placeholder:patch.clock === '' ? 'Hidden at this step' : 'Inherit previous time'});
+        clock.setAttribute('aria-label', 'Time · ' + (panel.title || panel.id)); box.appendChild(context.controls.row('Time', clock));
+        box.appendChild(context.controls.action('Hide date', function () { return update('date', ''); }));
+        box.appendChild(context.controls.action('Inherit date', function () { return update('date', undefined); }));
         var help = document.createElement('p'); help.className = 'fnote'; help.textContent = 'The selected screen carries forward until another step changes it. Add or replace images by selecting the App screens panel.'; box.appendChild(help);
         return box;
       }
@@ -271,8 +304,8 @@
     authoring:{
       template:{title:'App screens', screens:[], frame:'phone', transition:'cut', initial:{screen:null}},
       setupFields:[['screens','jsonArr'],['frame','text'],['transition','text'],['initial','json']],
-      patchFields:[['screen','text']],
-      expandPatchFields:function (panel) { return [['screen','enum',screens(panel).map(function (item) { return item.id; })]]; },
+      patchFields:[['screen','text'],['date','text'],['clock','text']],
+      expandPatchFields:function (panel) { return [['screen','enum',screens(panel).map(function (item) { return item.id; })],['date','text'],['clock','text']]; },
       origin:function (panel, key, snapshot, context) { return panelSanitizedOrigin(key, context, function (raw) { return clean(panel, raw, false); }); },
       picker:{order:26, name:'App screens', category:'Devices & interfaces', tagline:'Your product screens, in step',
         description:'Upload exported Figma screens or screenshots, then change the displayed screen alongside the flow. Choose a phone frame and cut or crossfade transitions.'},
@@ -289,8 +322,13 @@
 .pt-appscreens .pbody{min-height:0;display:flex;flex-direction:column;}
 .appscreens{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:390px;flex:1;color:var(--dtext);}
 .appscreen-stage{container-type:size;display:flex;align-items:center;justify-content:center;flex:none;height:340px;min-height:280px;}
-.appscreen-viewport{position:relative;box-sizing:border-box;overflow:hidden;background:var(--dfaint);width:min(100cqw,calc(100cqh * var(--appscreen-ratio)));height:min(100cqh,calc(100cqw / var(--appscreen-ratio)));}
+.appscreen-viewport{position:relative;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;container-type:inline-size;background:var(--dfaint);width:min(100cqw,calc(100cqh * var(--appscreen-ratio)));height:min(100cqh,calc(100cqw / var(--appscreen-ratio)));}
 .appscreen-phone{border:6px solid #343b49;border-radius:24px;background:#161d2a;box-shadow:0 5px 16px #10182822;}
+.appscreen-statusbar{--appscreen-ui-px:min(1px,calc(100cqi / 230));display:flex;align-items:center;justify-content:space-between;gap:calc(8 * var(--appscreen-ui-px));flex:none;padding:calc(6 * var(--appscreen-ui-px)) calc(10 * var(--appscreen-ui-px));color:#fff;background:#161d2a;font:600 calc(10 * var(--appscreen-ui-px))/1.3 'IBM Plex Mono',monospace;}
+.appscreen-clock{flex:none;max-width:30%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.appscreen-date{min-width:0;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.appscreen-glyphs{flex:none;font-size:calc(8 * var(--appscreen-ui-px));}
+.appscreen-image{position:relative;min-height:0;flex:1;}
 .appscreen-current,.appscreen-previous{display:block;width:100%;height:100%;object-fit:contain;}
 .appscreen-previous{position:absolute;inset:0;pointer-events:none;}
 .appscreen-fade{animation:appscreen-crossfade .24s ease-out forwards;}

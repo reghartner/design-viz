@@ -20,6 +20,12 @@ Backstage viewer without a Figma login or image requests during playback.
 6. Select a story step. Under **Panel changes**, choose **App screen**.
    **Inherit previous screen** leaves the previous selection in place;
    **No screen** explicitly clears the display until another step selects one.
+7. Optionally set **Starting time** and **Starting date**, such as “9:41” and
+   “Thu, Sep 24”. They share one status-bar line inside the Phone frame. Export
+   app content without its status bar to avoid duplicating a time baked into an
+   image. The sample images follow this pattern. Each step
+   offers **Date**, **Hide date**, and **Inherit date**. Frame **None** hides
+   the date strip. Dates are authored text, not the viewer's current date.
 
 Each upload batch, replacement, removal and field edit uses one Undo entry.
 Removing a screen clears its selections from all step bodies, including alternate
@@ -65,7 +71,7 @@ The authoring shape (fragment, not a complete spec) is:
 {"id":"product","type":"appscreens","title":"Product experience",
  "screens":[{"id":"home","label":"Home","alt":"Home with the camera list",
              "src":"data:image/png;base64,...","width":390,"height":844}],
- "frame":"phone","transition":"crossfade","initial":{"screen":"home"}}
+ "frame":"phone","transition":"crossfade","initial":{"screen":"home","clock":"9:41","date":"Thu, Sep 24"}}
 
 {"text":"Open Home","panels":{"product":{"screen":"home"}}}
 ```
@@ -74,3 +80,10 @@ Encode actual image bytes; never invent base64. For a temporary selection use
 `enterOnce: {screen: "home"}` in the panel's step patch. Unknown IDs warn and
 leave the carried selection intact. The effective-state inspector links valid
 screen selections back to their source.
+
+The existing **Phone** and **Device app** panels also offer **Starting date**
+in their inspectors and `date` in their step patches. On all three panels,
+omitting `date` carries the previous value; `"date": ""` explicitly hides it.
+In the standard Phone/Device app patch editor, a blank text field inherits;
+use the raw JSON patch to author an empty string. See the
+[three-panel date example](../examples/app-screens/phone-dates.spec.json).

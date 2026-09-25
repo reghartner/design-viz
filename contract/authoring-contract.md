@@ -595,6 +595,12 @@ perspectives" of one timeline). Types:
   omitted/null `screen` starts empty. Steps patch `{"screen":"connecting"}`
   by ID; omission carries, null clears, and unknown IDs warn and are ignored.
   `enterOnce: {"screen":"error"}` selects a screen for that beat only.
+  Optional `initial.clock`/`initial.date` and step `clock`/`date` strings show
+  authored time and date together on one status-bar line inside the phone frame.
+  Omission inherits; an empty string hides that field. `frame: "none"` hides the bar.
+  Export app content without a baked-in status bar when using this native header;
+  imported images are preserved and their pixels cannot be edited as text.
+  Dates are text (for example `"Thu, Sep 24"`), never the viewer's system date.
   Image bytes are stored in the declaration, never copied into step snapshots.
   The first screen with valid dimensions sets a stable viewport; all images fit
   without cropping or stretching. Crossfade follows the shared forward-step
@@ -1239,7 +1245,7 @@ perspectives" of one timeline). Types:
   `fields` is optional (0–12 data tiles) with unique `id`, `label`, optional `source` ID,
   `kind` (`text` default or `battery`), `icon` and `unit`. IDs must begin with a
   letter and contain only letters, digits, `_` or `-`; `phoneScreen`, `clock`,
-  `note`, `notify`, `clear`, `notifications`, `constructor` and `prototype` are reserved.
+  `date`, `note`, `notify`, `clear`, `notifications`, `constructor` and `prototype` are reserved.
   Source-free panels show only the phone, without unmapped badges or a source
   explanation block. `showSources:false` also hides that block and its badges
   while retaining authored mappings. With `showSources` omitted, a nonempty
@@ -1272,7 +1278,9 @@ perspectives" of one timeline). Types:
   Up to three cards are shown with a remaining-count indicator. Step jumps and
   alternate paths recompute the stack from initial state. Notifications need no
   sources and can be used without data tiles.
-  Optional `clock` and `note` strings carry forward. Without the source map,
+  Optional `clock`, `date` and `note` strings carry forward. `initial.date`
+  or step `date` shows authored date text in the status bar on both Home and App
+  screens. Omission inherits; `date: ""` hides it. Without the source map,
   the note appears inside the app. Changed fields show an
   Updated cue; adjacent forward transitions may animate card changes or opening
   and closing the app once. Backward/jump
@@ -1285,7 +1293,9 @@ perspectives" of one timeline). Types:
 - `phone` — a small generic smartphone frame for flows that end by notifying
   a resident's phone: `{"id":"resident","type":"phone","title":"Resident
   phone","initial":{"clock":"9:41"}}`. `clock` is optional status-bar time
-  text; it must be a string and is rendered verbatim. Patch with `{"notify":
+  text; it must be a string and is rendered verbatim. Optional `initial.date`
+  and step `date` strings add a status-bar date (for example `"Thu, Sep 24"`).
+  Omission inherits; `date: ""` hides it. Patch with `{"notify":
   {"app":"Homestead","title":"Front entry","text":"A visitor was
   detected."}}` to push ONE notification, or make `notify` an array of those
   objects to push several in one step. `app` is required; `title` and `text`
@@ -1301,7 +1311,7 @@ perspectives" of one timeline). Types:
   render the complete result immediately. On an adjacent step, only the newest
   card may enter once; unchanged markup uses the steady baseline and does not
   replay it. Reduced motion disables the entry, and print shows the folded
-  frame statically. Bad notification shapes, non-string `clock`, `clear` values
+  frame statically. Bad notification shapes, non-string `clock` or `date`, `clear` values
   other than `true`, and unknown phone fields warn and are ignored.
 - `xray` — nested encryption envelopes for who-can-read-what arguments:
   `{"id":"who","type":"xray","layers":[{"id":"tls","label":"TLS 1.3",

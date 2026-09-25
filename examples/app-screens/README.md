@@ -20,3 +20,8 @@ node tools/validate.js examples/app-screens/app-screens.spec.json
 
 The generated JSON stores each screenshot once. Browser contracts import those
 same bytes through the workbench and exercise the standalone and native viewers.
+
+[phone-dates.spec.json](phone-dates.spec.json) compares optional dates in App
+screens, Phone and Device app. Its steps change, hide and restore the date;
+Device app also switches between its Home and App screens. The same build
+script regenerates both examples.

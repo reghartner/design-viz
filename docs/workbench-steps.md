@@ -18,6 +18,9 @@ change `diagram.view` in JSON to `step` or `ambient` to show one.
 For an **App screens** panel, every step inspector includes an **App screen**
 selector under **Panel changes**, even before the step has a panel patch. Choose
 a named uploaded screen, inherit the previous screen, or explicitly clear it.
+The optional **Date** field carries forward too; **Hide date** and **Inherit date**
+make the override explicit. All three phone panels (App screens, Phone and
+Device app) have a **Starting date** in their panel inspector.
 Upload and manage the collection by selecting the panel itself. See
 [manual Figma screens](../cookbook/app-screens.md).
 

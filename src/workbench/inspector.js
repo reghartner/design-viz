@@ -853,7 +853,7 @@ function panelPatchControl(pid, patch, decl, target, options){
     body.className = 'rowsedit';
     det.appendChild(body);
 
-    function commitPatch(key, value, whole, shape){
+    function commitPatch(key, value, whole, shape, storage){
       if (modes.adding()){
         formError('finish ADD TO STEP first (DONE or Esc) — this control is paused while the mode is armed');
         return false;
@@ -872,14 +872,17 @@ function panelPatchControl(pid, patch, decl, target, options){
         }
         if(!whole){
           next=Object.assign(Object.create(null),panelObject(current)?current:{});
-          if(typeof value==='function')value=value(next[key]);
+          if(storage==='once' && Object.prototype.hasOwnProperty.call(next,'enterOnce') && !panelObject(next.enterOnce))return {error:'Repair enterOnce in raw JSON before editing a temporary field.'};
+          var values=storage==='once'?Object.assign(Object.create(null),next.enterOnce || {}):next;
+          if(typeof value==='function')value=value(values[key]);
           if(shape){
-            var nested=Object.assign(Object.create(null),panelObject(next[key])?next[key]:{});
+            var nested=Object.assign(Object.create(null),panelObject(values[key])?values[key]:{});
             shape.forEach(function(field){delete nested[field[0]];});
             Object.assign(nested,value || {});
             value=Object.keys(nested).length?nested:undefined;
           }
-          if(value===undefined)delete next[key];else next[key]=value;
+          if(value===undefined)delete values[key];else values[key]=value;
+          if(storage==='once'){if(Object.keys(values).length)next.enterOnce=values;else delete next.enterOnce;}
         }
         return initial ? planSetField(session.text(),raw,path,'initial',JSON.stringify(next)) :
           planStepSetPanelPatch(session.text(),raw,target.section,target.index,pid,JSON.stringify(next));
@@ -923,8 +926,34 @@ function panelPatchControl(pid, patch, decl, target, options){
       body.appendChild(frow('patch ' + pid, rawControl()));
       return det;
     }
+    if(!initial && (panelAuthoring(decl.type).transientFields || []).length){
+      var durationNote=document.createElement('p');durationNote.className='fnote';
+      durationNote.textContent='Set a value, then choose Carry forward or This step only. Inherit removes this step’s assignment. One-step values resume the carried state at the next stop.';
+      body.appendChild(durationNote);
+    }
     fields.forEach(function(f){
       var key = f[0], cur = patch && patch[key];
+      var temporary=!initial && (panelAuthoring(decl.type).transientFields || []).indexOf(key)>=0;
+      var once=temporary && patch && panelObject(patch.enterOnce)?patch.enterOnce:null;
+      var hasOnce=once && Object.prototype.hasOwnProperty.call(once,key),hasCarry=patch && Object.prototype.hasOwnProperty.call(patch,key);
+      var storage=hasOnce?'once':'carry';if(hasOnce)cur=once[key];
+      if(temporary){
+        var state=hasOnce?(hasCarry?'both':'once'):(hasCarry?'carry':'inherit');
+        var duration=selectControl(['inherit','carry','once'].concat(state==='both'?['both']:[]),state,function(value){
+          if(value==='both')return true;
+          return commitCascade(function(raw){return planPanelFieldDuration(session.text(),raw,target,pid,key,value,JSON.stringify(patch));},{after:refreshFormSoon});
+        });
+        var labels={inherit:'Inherit previous state',carry:'Carry forward',once:'This step only',both:'This step + carried value (advanced)'};
+        Array.from(duration.options).forEach(function(o){o.textContent=labels[o.value];});duration.setAttribute('aria-label',key+' duration');
+        duration.disabled=state==='inherit';body.appendChild(frow((editor.patchLabel?editor.patchLabel(key):key)+' duration',duration));
+        var hint=document.createElement('p');hint.className='fnote';
+        hint.textContent=state==='both'?'Editing the current temporary value; a separate carried value resumes afterwards. Choosing a duration keeps the current value and replaces those two assignments.':state==='inherit'?'Enter a value below, then choose its duration.':state==='once'?'This value applies only at this stop. Later steps resume the carried state. Choose Inherit to remove this override.':'Later steps keep this value. Choose Inherit to remove this step’s assignment.';
+        if(key==='audio')hint.textContent+=' Audio is one complete snapshot; its individual fields do not inherit separately.';
+        if(state==='both')hint.textContent+=' Saved for later: '+JSON.stringify(patch[key]).slice(0,180);
+        duration.title=hint.textContent;
+        if(state==='both')body.appendChild(hint);
+        else if(key==='audio'){hint.textContent='Audio replaces the whole snapshot; individual fields do not inherit separately.';body.appendChild(hint);}
+      }
       if(panelAuthoring(decl.type).notifications){
         if(key==='notify'){
           body.appendChild(frowBlock('Notifications',createNotificationComposer({
@@ -946,7 +975,7 @@ function panelPatchControl(pid, patch, decl, target, options){
             var values=Object.create(null);values[col[0]]=input.value;
             var out=patchFieldsCollect([col],values);
             if(out.error){formError(key+': '+out.error);return false;}
-            return commitPatch(key,out.item,false,[col]);
+            return commitPatch(key,out.item,false,[col],storage);
           });
           group.appendChild(frow(editor.patchLabel ? editor.patchLabel(col[0]) : col[0], input));
         });
@@ -958,7 +987,7 @@ function panelPatchControl(pid, patch, decl, target, options){
           values[key] = input.value;
           var out = patchFieldsCollect([f], values);
           if (out.error){ formError(out.error); return false; }
-          return commitPatch(key, out.item[key]);
+          return commitPatch(key, out.item[key],false,null,storage);
         });
         body.appendChild(frow(editor.patchLabel ? editor.patchLabel(key) : key, input));
       }

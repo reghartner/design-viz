@@ -560,3 +560,7 @@ clipboard operations remain outside the clipboard contract.
 `commands/detail-mapping.js` edits one target while preserving detail defaults,
 ports and advanced row metadata. Preview uses the existing drilldown trigger
 after selecting the parent event; it never rewrites source for navigation.
+
+`commands/panel-duration.js` moves one authoring-declared transient field between
+carried and `enterOnce` storage, or removes both to inherit. Shared patch controls
+edit the selected storage in place without duplicating panel field editors.

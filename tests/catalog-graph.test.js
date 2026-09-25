@@ -16,13 +16,53 @@ test('catalog seed scopes and deduplicates declared dependencies and API provide
   const seed=plain(B.catalogGraphSeed(raw,[ref('camera'),ref('recording'),ref('notify')],true));
   assert.equal(seed.created,3);assert.equal(seed.edges,2);
   assert.equal(seed.diagram.routing,undefined);assert.notEqual(B.layout(seed.diagram).routing,'lanes');
-  assert.deepEqual(seed.diagram.edges,[{from:'camera-1',to:'recording-1',kind:'catalog',label:'depends on'},{from:'camera-1',to:'notify-1',kind:'catalog',label:'uses Notify API'}]);
+  assert.deepEqual(seed.diagram.edges,[{from:'camera-1',to:'recording-1',kind:'catalog',label:'depends on; uses Recording API'},{from:'camera-1',to:'notify-1',kind:'catalog',label:'uses Notify API'}]);
   assert.deepEqual(seed.diagram.rows,[['camera-1','recording-1','notify-1']]);
   assert.equal(seed.diagram.nodes['camera-1'].binding.entityRef,ref('camera'));
   assert.equal(seed.diagram.nodes['outside-1'],undefined);assert.deepEqual(seed.diagram.steps,[]);
   assert.deepEqual(plain(B.validate(B.normalize({page:{title:'Catalog',blocks:[{heading:'Services',diagram:seed.diagram}]}}))).errors,[]);
   assert.equal(JSON.stringify(raw),before);
   assert.equal(B.catalogGraphSeed(raw,[ref('camera'),ref('recording')],false).edges,0);
+});
+
+test('one connection retains every consumed API and dependency without repeating API references',()=>{
+  const raw=catalog(),consumer=raw.services[0],provider=raw.services[1];
+  provider.apis.push({entityRef:'api:default/recording-v2',title:'Recording API v2'});
+  consumer.consumesApis.push('api:default/recording-v2','API:DEFAULT/RECORDING');
+  consumer.dependsOn.push(ref('recording').toUpperCase(),ref('camera'));
+  consumer.consumesApis.push('api:default/unknown');
+  const before=JSON.stringify(raw),refs=[ref('camera'),ref('recording')];
+  const seeded=plain(B.catalogGraphSeed(raw,refs,true));
+  assert.equal(seeded.edges,1);assert.equal(seeded.diagram.edges[0].label,'depends on; uses Recording API, Recording API v2');
+  assert.equal(JSON.stringify(raw),before);
+  delete consumer.dependsOn;
+  assert.equal(B.catalogGraphSeed(raw,refs,true).diagram.edges[0].label,'uses Recording API, Recording API v2');
+  provider.apis[1].title=provider.apis[0].title;
+  assert.equal(B.catalogGraphSeed(raw,refs,true).diagram.edges[0].label,'uses Recording API, Recording API','distinct APIs with identical titles are retained');
+});
+
+test('catalog connections preserve existing authored edges and remain directional',()=>{
+  const raw=catalog();raw.services[1].dependsOn=[ref('camera')];
+  const existing={nodes:{a:{binding:{entityRef:ref('camera')}},b:{binding:{entityRef:ref('recording')}}},rows:[['a','b']],
+    edges:[{id:'keep',from:'a',to:'b',kind:'http',label:'Authored call',bends:[{x:100,y:80}]}]};
+  const before=JSON.stringify(existing),seeded=plain(B.catalogGraphSeed(raw,[ref('camera'),ref('recording')],true,existing));
+  assert.equal(seeded.edges,1);assert.deepEqual(seeded.diagram.edges[0],existing.edges[0]);
+  assert.deepEqual(seeded.diagram.edges[1],{from:'b',to:'a',kind:'catalog',label:'depends on'});
+  assert.equal(JSON.stringify(existing),before);
+  assert.equal(B.catalogGraphSeed(raw,[ref('camera'),ref('recording')],true,seeded.diagram).edges,0);
+});
+
+test('exported OpenAPI titles flow through to a consolidated seeded connection',async()=>{
+  const {catalogFromEntities}=await import('../tools/canon/backstage.mjs');
+  const entities=[
+    {kind:'Component',metadata:{name:'camera'},spec:{consumesApis:['recording-v1','recording-v2']}},
+    {kind:'Component',metadata:{name:'recording'},spec:{providesApis:['recording-v1','recording-v2']}},
+    ...[1,2].map(v=>({kind:'API',metadata:{name:'recording-v'+v},spec:{type:'openapi',definition:{info:{title:'Recording v'+v},paths:{}}}}))
+  ];
+  const exported=catalogFromEntities(entities,'https://backstage.example.test');
+  assert.deepEqual(exported.warnings,[]);
+  const seeded=B.catalogGraphSeed(exported.catalog,[ref('camera'),ref('recording')],true);
+  assert.equal(seeded.edges,1);assert.equal(seeded.diagram.edges[0].label,'uses Recording v1, Recording v2');
 });
 
 test('add reuses service identity, preserves authored data and formats only the target diagram',()=>{

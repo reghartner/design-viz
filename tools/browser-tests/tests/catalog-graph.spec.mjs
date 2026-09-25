@@ -1,8 +1,8 @@
 import {test,expect,paste} from '../helpers/test.mjs';
 const ref=name=>'component:default/'+name;
 const catalog={version:1,source:'Example company · approved catalog',services:[
-  {entityRef:ref('doorbell'),title:'Doorbell gateway',owner:'group:default/devices',dependsOn:[ref('recording')],consumesApis:['api:default/notification']},
-  {entityRef:ref('recording'),title:'Recording service',owner:'group:default/video',apis:[]},
+  {entityRef:ref('doorbell'),title:'Doorbell gateway',owner:'group:default/devices',dependsOn:[ref('recording')],consumesApis:['api:default/recording-v1','api:default/recording-v2','api:default/notification']},
+  {entityRef:ref('recording'),title:'Recording service',owner:'group:default/video',apis:[{entityRef:'api:default/recording-v1',title:'Recording v1'},{entityRef:'api:default/recording-v2',title:'Recording v2'}]},
   {entityRef:ref('notifications'),title:'Resident notifications',owner:'group:default/experience',apis:[{entityRef:'api:default/notification',title:'Notification API'}]},
   {entityRef:ref('identity'),title:'Identity service',owner:'group:default/platform',apis:[]},
   {entityRef:ref('media'),title:'Media library',owner:'group:default/video',apis:[]},
@@ -29,6 +29,7 @@ test('homepage seeds selected services with catalog bindings, optional edges and
   const created=await spec(page),d=created.page.blocks[0].diagram;
   expect(d.routing).toBeUndefined();await expect(page.locator('#docview .lane-bridge')).toHaveCount(0);
   expect(created.page.title).toBe('Doorbell platform');expect(d.edges).toHaveLength(2);expect(d.steps).toEqual([]);
+  expect(d.edges[0].label).toBe('depends on; uses Recording v1, Recording v2');
   expect(Object.values(d.nodes).map(n=>n.binding.entityRef)).toEqual([ref('doorbell'),ref('recording'),ref('notifications')]);
   await expect(page.locator('#docview [data-dv-node]')).toHaveCount(3);
   await expect(page.locator('#docview')).toContainText('Catalog relationship');
@@ -51,6 +52,7 @@ test('Add seeds only the destination, reuses nodes and supports one-action undo 
   const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[1].tabs[0].sections[0].diagram;
   expect(raw.page.blocks[0]).toEqual(JSON.parse(before).page.blocks[0]);expect(d.nodes.authored.title).toBe('My gateway');expect(d.panels).toEqual([{id:'q',type:'queue'}]);
   expect(d.rows).toEqual([['authored'],['recording-1']]);expect(d.edges[0].from).toBe('authored');
+  expect(d.edges[0].label).toBe('depends on; uses Recording v1, Recording v2');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
   await openAdd(page);await choose(page,'Doorbell gateway');await choose(page,'Recording service');

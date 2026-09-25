@@ -30,8 +30,11 @@ repository or survive a reload. Bad imports preserve the current catalog.
   joined to selected providers' `apis[].entityRef`. Arrows point from dependent
   to dependency, or API consumer to provider. Only selected endpoints participate;
   unselected dependencies and resource entities are not automatically added.
-- One edge per directed pair: an explicit dependency takes precedence over an
-  API-use label. Self-relations and existing edges are skipped. Catalog relations
+- One edge per directed pair combines consumed API titles, for example
+  `uses Recording v1, Recording v2`. An explicit dependency is retained as
+  `depends on; uses Recording v1, Recording v2`. Repeated references to the same
+  API appear once. Self-relations are skipped; existing edges and their authored
+  labels are preserved. Catalog relations
   describe structure, including build-time dependencies; they are not proof of a
   runtime call, protocol, timing, or execution sequence. No steps are synthesized.
   Generated connections have their own **Catalog relationship** legend; existing
@@ -82,6 +85,10 @@ exports the final entity identities and `providesApi`, `dependsOn`, and
 `consumesApi` relationships. OpenAPI
 JSON and YAML definitions are normalized for operation pickers. It does not fetch
 API server URLs, follow arbitrary definition references, or execute service code.
+API display titles use the first nonempty string from `metadata.title` and the
+resolved OpenAPI `info.title`, falling back to `metadata.name`. This also applies
+to repository-source sync. Rerun sync to refresh an older snapshot; saved diagram
+labels do not change automatically.
 
 Set `FLOWVIEW_CATALOG_SOURCE=backstage`, `FLOWVIEW_BACKSTAGE_BACKEND_URL` (backend
 base URL), `FLOWVIEW_BACKSTAGE_APP_URL` (public UI base URL), and secret

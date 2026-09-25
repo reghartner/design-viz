@@ -159,6 +159,8 @@ Components, ownership, provided APIs, resolved OpenAPI JSON operations and serve
 URLs. `backendUrl` is the Backstage backend origin/base; `appUrl` is the frontend
 base. The token stays on the server. Cache the result as appropriate and surface
 adapter warnings; a failed refresh must not silently erase saved bindings.
+API titles prefer nonempty `metadata.title`, then resolved OpenAPI `info.title`,
+then `metadata.name`. Catalog sync uses the same converter for repository inputs.
 
 The optional component annotation `flowview.io/telemetry-service` overrides the
 trace service name. Namespaces and explicit step selectors resolve collisions.

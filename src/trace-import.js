@@ -276,7 +276,7 @@ function traceToSpec(input, options){
     'Imported trace ' + selected + ': ' + spans.length + ' spans across ' + services.size + ' services; observed extent ' + elapsed + ' ms.',
     'Inspect spans in start-time order. Overlapping bars retain their original offsets; parent spans include child time. The total is elapsed extent, not a sum of durations. Arrows mean span parent relationships, not a verified network protocol.',
     'This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success.'],
-    bullets: warnings.slice(), diagram: {view: 'step', routing: 'lanes', nodes: nodes, rows: rows, edges: edges, panels: [timing, internal, details], steps: steps}};
+    bullets: warnings.slice(), diagram: {view: 'step', nodes: nodes, rows: rows, edges: edges, panels: [timing, internal, details], steps: steps}};
   if (source) section.source = source;
   var result={spec: {page: {title: options.title || 'Trace → design · ' + (roots[0] || spans[0]).name, skin: 'pastel',
     protocols: edges.length ? {trace: {label: 'Span parent relationship', color: '#38BDF8'}} : {}, blocks: [section]}},

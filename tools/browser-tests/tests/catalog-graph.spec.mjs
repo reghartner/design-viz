@@ -27,6 +27,7 @@ test('homepage seeds selected services with catalog bindings, optional edges and
   await testInfo.attach('catalog-picker',{body:await dialog.screenshot(),contentType:'image/png'});
   await page.locator('#catalog-add').click();await expect(dialog).toBeHidden();await expect(page.locator('#workbench-workspace')).toBeVisible();
   const created=await spec(page),d=created.page.blocks[0].diagram;
+  expect(d.routing).toBeUndefined();await expect(page.locator('#docview .lane-bridge')).toHaveCount(0);
   expect(created.page.title).toBe('Doorbell platform');expect(d.edges).toHaveLength(2);expect(d.steps).toEqual([]);
   expect(Object.values(d.nodes).map(n=>n.binding.entityRef)).toEqual([ref('doorbell'),ref('recording'),ref('notifications')]);
   await expect(page.locator('#docview [data-dv-node]')).toHaveCount(3);

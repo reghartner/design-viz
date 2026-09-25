@@ -1482,15 +1482,35 @@ function sectionForm(val, ctx){
     ensureAccentDatalist();
     var target=session.target;
     function identity(key,value){return commitCascade(function(raw){return planSetSectionIdentity(session.text(),raw,target.section,key,value);});}
+    var routingRows=[];
+    if(ctx.diagram){
+      var routing=selectControl(['curves','lanes'],ctx.diagram.routing == null?'curves':ctx.diagram.routing,function(value){
+        return commitCascade(function(raw){
+          var got=builderDiagram(session.text(),raw,target.section);
+          return got.error?got:planSetField(session.text(),raw,got.path,'routing',JSON.stringify(value));
+        },{after:refreshFormSoon});
+      });
+      routing.setAttribute('aria-label','Edge routing');
+      Array.prototype.forEach.call(routing.options,function(option){
+        if(option.value==='curves')option.textContent='No lanes (default)';
+        if(option.value==='lanes')option.textContent='Lanes';
+      });
+      var help=document.createElement('p');help.className='fnote';
+      help.textContent='Lanes reserve tracks for connections between rows. Requires 1–5 unstacked nodes per row, no floats or self-loops. Applies to every view of this diagram; story lane labels are separate.';
+      help.textContent+=' Unsupported layouts use curves.';
+      routingRows.push(frow('Edge routing',routing),help);
+    }
+    if(builderTargetPath(parseEditor().raw,target).length===0)return routingRows;
     return [
       frow('heading', textControl(val.heading, function(v){ return identity('heading',v); })),
+    ].concat(routingRows,[
       frowBlock('Contract blocks',contractManager(target.section,val)),
       frow('Stable section ID',textControl(val.id,function(v){return identity('id',v);},{placeholder:'optional stable-section-id'})),
       frow('Detail only',checkboxControl(val.detailOnly,function(on){return commitSimple('detailOnly',on?'true':null);})),
       frow('accent', textControl(val.accent, function(v){ return commitSimple('accent', v == null ? null : JSON.stringify(v)); },
         {list: accentListId, placeholder: 'token or #hex'})),
       frow('source', textControl(val.source, function(v){ return commitSimple('source', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'}))
-    ];
+    ]);
   }
 
 function proseControl(value,commit){
@@ -1858,8 +1878,6 @@ function renderInspector(){
       formError(parsed.error + ' — fix it to edit this element');
     } else if (!loc && !(t.kind === 'group' && !builderDiagram(session.text(), parsed.raw, t.section).error)){
       formError('definition not found in the editor text — the render and the editor may be out of sync (click Render)');
-    } else if (t.kind === 'section' && path.length === 0){
-      formError('bare diagram — wrap it as {"page": {"blocks": [ ... ]}} to edit heading and accent');
     } else {
       var val = path ? specValueAt(parsed.raw, path) : {};
       if (val == null) val = {};

@@ -43,7 +43,9 @@ For a small edit, update the affected story/ledger rows rather than restarting.
 - For human handoff, Camera and Device App have typed **Starting state** controls
   in the panel inspector. Set defaults there and authored changes on steps;
   keep advanced initial fields intact. Phone and Device App also offer a shared
-  notification composer for initial and per-step messages; clear runs before add. See the workbench User guide → Visual panels.
+  notification composer for initial and per-step messages; clear runs before add.
+  Connections expose all built-in protocols and custom name/color creation;
+  story lanes use the same document-wide vocabulary controls. See the workbench User guide → Visual panels.
 - Ask a focused question if a contradiction or missing fact prevents an honest
   depiction. Continue independent work. If the source establishes uncertainty,
   depict it explicitly instead of asking the user to manufacture certainty.

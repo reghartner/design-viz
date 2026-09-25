@@ -407,6 +407,7 @@ function importHarness(ctl, boardSpec, extraGlobals){
       setAttribute(k, v){ if (k === 'class') this.className = String(v); else attrs[k] = String(v); },
       removeAttribute(k){ delete attrs[k]; },
       get firstChild(){ return this.children[0] || null; },
+      get options(){ return this.children; },
       removeChild(child){ child.remove(); child.parentNode = null; },
       cloneNode(deep){
         const clone = element(tag);

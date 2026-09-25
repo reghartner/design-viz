@@ -538,3 +538,8 @@ wait for the old control to disconnect before asserting replacement focus, caret
 scroll and the Tab destination; an immediate assertion can race the refresh. Also verify path reuse,
 occurrence independence/removal, layout gestures and clipboard actions each
 restore the exact prior source with one Undo.
+
+Document vocabulary uses `workbench/commands/vocabulary.js` for atomic definition
+and first-use edits. `workbench/vocabulary.js` supplies contextual protocol/lane
+controls; it shares the inspector's lifetime and history, with definitions stored
+in `page.protocols` and `page.lanes`. Display names can change without changing IDs.

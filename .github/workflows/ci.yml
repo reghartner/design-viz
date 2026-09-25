@@ -23,11 +23,12 @@ jobs:
       - run: npm ci --prefix apps/confluence --no-fund --no-audit
       - name: Install the pinned Playwright Chromium and Linux dependencies
         run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
-      - name: Verify committed production artifacts
+      # Test HTML rebuilt from this revision; checked-in pages may use an older engine.
+      - name: Rebuild HTML and verify packaged JavaScript
         run: |
           python3 tools/build.py
           npm run check:viewer --prefix apps/backstage
-          git diff --exit-code -- template/ workbench/ tools/canon/generated-runtime.cjs apps/backstage/src/generated/
+          git diff --exit-code -- tools/canon/generated-runtime.cjs apps/backstage/src/generated/
       - name: Required browser contracts (no retries or missing-browser skips)
         run: npm test --prefix tools/browser-tests
       - uses: actions/upload-artifact@v4
@@ -115,6 +116,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Rebuild HTML before tests
+        run: python3 tools/build.py
       - run: python3 -m unittest discover -s tests -v
 
   node-tests:
@@ -124,6 +127,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Rebuild HTML before tests
+        run: python3 tools/build.py
       # *.test.js glob keeps local (any node >=20) and CI invocations identical;
       # a bare directory arg behaves differently across node majors.
       - run: node --test tests/*.test.js
@@ -135,10 +140,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: committed pages and Node runtime match src (build is fresh + deterministic)
+      - name: Rebuild HTML and verify packaged Node runtime
         run: |
           python3 tools/build.py
-          git diff --exit-code template/ workbench/ tools/canon/generated-runtime.cjs
+          git diff --exit-code -- tools/canon/generated-runtime.cjs
       - name: example pages inject cleanly
         run: |
           python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json template/flowview.html /tmp/cumulus.html

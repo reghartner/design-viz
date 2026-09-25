@@ -1,6 +1,6 @@
 # Editor
 
-- The required browser suite in `tools/browser-tests` exercises committed HTML
+- The required browser suite in `tools/browser-tests` exercises freshly built HTML
   for source/focus/history/hidden paths and a production named-assembly fixture
   for builder destroy/remount. Keep test-only lifecycle access in that fixture,
   never production globals; compare resources with separately mounted owners.

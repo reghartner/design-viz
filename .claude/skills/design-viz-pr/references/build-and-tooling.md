@@ -2,7 +2,8 @@
 
 - Use `.github/workflows/ci.yml` for current runtimes and required commands;
   don't freeze version numbers or test counts in review policy. Shared runtime
-  source is in `src/`; `tools/build.py` builds both committed HTML entry points.
+  source is in `src/`; `tools/build.py` builds both HTML entry points before CI
+  tests. Checked-in HTML does not have to match the current engine byte for byte.
   Generated-only edits need a source explanation or correction, not acceptance
   of a hand patch that the next build erases.
 - Named `standalone`, `workbench`, `backend`, `native`, `forge` and
@@ -72,7 +73,8 @@
   native adapters. Do not hand-edit generated code or restore runtime
   source evaluation. Rebuild and verify the isolated copy install after changes.
 
-Validate generated freshness from the reviewed head. Keep local build output
+Validate fresh builds and behavior from the reviewed head; check committed
+freshness for packaged JavaScript, not HTML exports. Keep local build output
 separate from authored changes until explained; don't discard somebody else's
 work to obtain a clean result. Check required remote CI for that same head before
 merging. Repeat only affected validation after subsequent changes.

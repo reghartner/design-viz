@@ -100,6 +100,18 @@ when changing a wrapper; identical input should produce identical output.
 
 ## Verification
 
+CI rebuilds `template/flowview.html` and `workbench/flowspec.html` before the
+HTML-consuming Python, Node and browser suites and example injection checks.
+It does not compare those pages with their checked-in bytes or require older
+authored HTML exports to be regenerated when the engine changes. A failed build
+or behavior test still fails CI. Build determinism compares two fresh builds
+from the same source, not a fresh build with an older checked-in page.
+
+Rebuild HTML before distributing a viewer or workbench so it includes the desired
+engine version. Committed backend/native JavaScript artifacts still have
+freshness gates because they are packaged runtime inputs. The build regenerates
+the ignored `workbench/diagrams.json` Canon index and fails if generation fails.
+
 `tests/source-loader.test.js` covers physical alias substitution, sorted expansion,
 boot separation, CLI/API agreement, export failures, duplicate inputs, DOM-free
 backend parity and the asset profiles. `tests/test_build.py` checks complete
@@ -116,5 +128,5 @@ backend and isolated plugin-copy checks verify source-unavailable distribution.
 Keep emitted-content assertions alongside source-level tests. The required
 [browser contracts](../tools/browser-tests/README.md) use a pinned downloaded
 Chromium across offline HTML, workbench/lifetime, native React and copied Forge
-resources. Its CI job must pass alongside freshness and pure checks. These
+resources. Its CI job must pass alongside package freshness and pure checks. These
 fixtures do not establish company host or CSP acceptance.

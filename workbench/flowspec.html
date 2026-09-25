@@ -1812,6 +1812,15 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 #canon-reader .copychip{display:none}#welcome-reader-screen h1{font-size:29px;letter-spacing:-.6px}
 .welcome:has(#welcome-reader-screen:not([hidden])){max-width:none}#canon-reader .doc-title{display:none}
 @media(max-width:760px){.welcome-library-entry>span:first-child{display:grid;gap:5px}.canon-reader-toolbar{flex-wrap:wrap}}
+
+
+.notification-composer{min-width:0;display:grid;gap:10px;}
+.notification-editor{min-width:0;margin:0;padding:10px;border:1px solid var(--wline,#d5ddef);border-radius:10px;}
+.notification-editor legend{padding:0 5px;font-size:11px;font-weight:700;}
+.notification-preview{display:grid;gap:4px;margin:8px 0;padding:12px;border:1px solid #d5ddef;border-radius:10px;background:#f6f8ff;color:#253653;overflow-wrap:anywhere;}
+.notification-preview small{font-size:10px;text-transform:uppercase;}
+.notification-preview b{font-size:12px;}
+.notification-preview span{font-size:12px;white-space:pre-wrap;}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -8493,7 +8502,7 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
         <aside class="human-guide-tip"><strong>Shared means one editable event.</strong> Editing a shared step changes it in every path that uses it. Choose <b>Make independent here</b> before making a path-specific change. A common track shows shared downstream operations. Shared beginnings can appear as faded circles. A matching caption alone does not make two steps shared.</aside>
         <p>Clicking a path chip starts at step 1, including its shared lead-in. Clicking a shared circle keeps the selected path if it participates; otherwise the circle identifies the path it will select. Its numbers and state follow that path. A retry flag or earlier log entry carries through shared operations unless a step changes it. An early-ending path never joins a later block it does not visit. Hiding stops in a view does not change the authored joins or endings. Represent a communication that fails with <b>Add failed communication</b> on that step; make the edge visibly break and explain the consequence. Do not animate a successful delivery that never happened.</p><p><b>Remove from this path</b> only removes membership. <b>Delete from all paths</b> removes the event everywhere. Read the affected paths before deleting a shared step.</p>
       </section>
-      <section id="hg-panels" tabindex="-1"><p class="human-guide-eyebrow">06 / VISUAL PANELS</p><h3>Show the consequence outside the arrows.</h3><p>Choose <b>Add to diagram → Panel</b>. The large picker shows a preview and description; select one, then explicitly add it. Pick panels that answer a question, rather than filling every slot.</p><ul><li><strong>Home</strong> shows people, rooms, cameras, doors, and physical activity.</li><li><strong>Screen and device app</strong> show video clips, notifications, battery or camera data. Resize its layout tile to scale the phone, text, and cards together. Device app stays in a phone frame: choose its <b>Starting phone screen</b>, then use each step’s <b>Phone screen</b> control to move between Home screen and Device app. Under <b>Starting state</b>, set each card’s value, status, detail, and <b>Card visibility</b>. Hide cards that appear later. Each step’s <b>Card visibility</b> control shows or hides a card while keeping its data. Notifications and card values carry independently of screen changes. Data sources are optional; add them when explaining where a value comes from.</li><li><strong>Monitoring and dispatch</strong> connect an operator’s video review to an emergency response.</li><li><strong>Software and telemetry panels</strong> make queues, database delays, logs, gauges, and other state visible. Browse the picker for the available types.</li></ul><p>Select a Camera or Device app panel and open <b>Starting state</b> to set its initial mode or values using the same controls as a step. These values begin every path; edits here preserve step overrides. Unset fields use panel defaults. Set the panel’s starting values, then change only what matters in each step. Recording and scene activity are separate: a camera can start recording before a person enters the scene. A panel with no changes in the current step can still show state inherited from earlier beats.</p>
+      <section id="hg-panels" tabindex="-1"><p class="human-guide-eyebrow">06 / VISUAL PANELS</p><h3>Show the consequence outside the arrows.</h3><p>Choose <b>Add to diagram → Panel</b>. The large picker shows a preview and description; select one, then explicitly add it. Pick panels that answer a question, rather than filling every slot.</p><ul><li><strong>Home</strong> shows people, rooms, cameras, doors, and physical activity.</li><li><strong>Screen and device app</strong> show video clips, notifications, battery or camera data. Resize its layout tile to scale the phone, text, and cards together. Device app stays in a phone frame: choose its <b>Starting phone screen</b>, then use each step’s <b>Phone screen</b> control to move between Home screen and Device app. Under <b>Starting state</b>, set each card’s value, status, detail, and <b>Card visibility</b>. Hide cards that appear later. Each step’s <b>Card visibility</b> control shows or hides a card while keeping its data. Use <b>Notifications → Add notification</b> to write its App, Title, and Message. Reorder or remove cards in the composer; its preview shows your text. <b>Clear earlier notifications</b> clears the old stack before adding this step’s cards. Starting state supports the same composer for Phone and Device app. Notifications and card values carry independently of screen changes. Data sources are optional; add them when explaining where a value comes from.</li><li><strong>Monitoring and dispatch</strong> connect an operator’s video review to an emergency response.</li><li><strong>Software and telemetry panels</strong> make queues, database delays, logs, gauges, and other state visible. Browse the picker for the available types.</li></ul><p>Select a Camera or Device app panel and open <b>Starting state</b> to set its initial mode or values using the same controls as a step. These values begin every path; edits here preserve step overrides. Unset fields use panel defaults. Set the panel’s starting values, then change only what matters in each step. Recording and scene activity are separate: a camera can start recording before a person enters the scene. A panel with no changes in the current step can still show state inherited from earlier beats.</p>
       </section>
       <section id="hg-home" tabindex="-1"><p class="human-guide-eyebrow">07 / A STORY AT HOME</p><h3>Place the house once. Animate what happens there.</h3><p>Start with <b>A connected home</b> to see rooms, actors, devices, and an outage together. Choose <b>Edit layout</b> on the Home panel to edit its shared house, rooms, devices, doors, and subjects. Expand an element’s collapsed inspector group to see its fields.</p><p>In shared layout mode, drag devices, doors, and people; use a room’s border or label to move it. The house grip moves its outline, and corner handles resize the house or rooms. Moving a room or the house outline does not move its contents. Outdoor areas can sit around the house or beside an indoor room.</p><p>Choose <b>Edit home at current step</b> to animate an event. This edits that moment instead of the shared floor plan. Use <b>Inherit</b> to remove an override and take the earlier path value. A device’s temperature and operating state are separate, so an overheated camera can remain visibly hot after shutting down.</p><p>Doors pivot at their hinge: width sets the leaf’s length, facing sets the closed direction, and swing sets its opening angle. Change the door’s state at the relevant step. Subject labels are off by default; enable them when names help. A cloud belongs under devices using the cloud icon; subjects are moving actors.</p><aside class="human-guide-tip"><strong>Keep time honest.</strong> “Recording begins,” “visitor walks away,” and “resident receives the clip” are often different steps. Give each its own visible change.</aside>
       </section>
@@ -13941,6 +13950,7 @@ PanelRegistry.extend('deviceapp', {
 PanelRegistry.extend('deviceapp', {
   references: { nodes: ['sources.*.node'] },
   authoring: {
+    notifications: true,
     template: {
       title: 'Device app',
       appName: 'Homestead',
@@ -19199,6 +19209,8 @@ body.sk-editorial .phonecallchannel{border-radius:2px;}`,
 /* phone authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('phone', {
   authoring: {
+    notifications: true,
+    initialFields: true,
     template: { title: 'Phone', initial: { clock: '9:41' } },
     setupFields: [
       [
@@ -32693,6 +32705,7 @@ function createWorkbenchLifetime(){
 function wireBuilderCommit(input,commit,options){
   options=options || {};
   var last=input.value,listen=options.listen || function(target,type,fn){target.addEventListener(type,fn);};
+  input._flowviewHasDraft=function(){return input.value!==last;};
   function fire(){
     if(input.value===last && !options.commitUnchanged)return;
     last=input.value;
@@ -32703,6 +32716,57 @@ function wireBuilderCommit(input,commit,options){
   listen(input,'keydown',function(ev){
     if(ev.key==='Enter' && input.tagName!=='TEXTAREA'){ev.preventDefault();fire();}
   });
+}
+/* ---- src/workbench/notifications.js ---- */
+/* Shared authoring surface for both phone panels. The inspector owns the
+   transaction and form lifetime; this owns only notification-list controls. */
+function createNotificationComposer(options){
+  var doc=options.document,controls=options.controls;
+  var list=Array.isArray(options.value)?options.value.slice():options.value===undefined?[]:[options.value];
+  var wrap=doc.createElement('div');wrap.className='notification-composer';
+  var note=doc.createElement('p');note.className='fnote';
+  note.textContent=options.initial?'Notifications shown when the story begins.':'These cards are added at this step, above earlier notifications. Top card is shown first.';
+  wrap.appendChild(note);
+  function update(edit){
+    return options.commit(function(current){
+      var items=edit(Array.isArray(current)?current.slice():current===undefined?[]:[current]);
+      return !items.length?undefined:items.length===1 && !Array.isArray(current)?items[0]:items;
+    });
+  }
+  list.forEach(function(entry,index){
+    var card=doc.createElement('fieldset');card.className='notification-editor';
+    var title=doc.createElement('legend');title.textContent='Notification '+(index+1);card.appendChild(title);
+    if(!panelObject(entry)){
+      var warning=doc.createElement('p');warning.className='fnote';
+      warning.textContent='This entry is not a notification object. Edit raw JSON or remove it.';card.appendChild(warning);
+    }else{
+      var preview=doc.createElement('div');preview.className='notification-preview';
+      [['app','App'],['title','Title'],['text','Message']].forEach(function(field){
+        var key=field[0],label=field[1];
+        var input=controls.text(entry[key],function(value){
+          return update(function(items){
+            if(!panelObject(items[index]))return items;
+            var updated=Object.assign(Object.create(null),items[index]);
+            if(value===null)delete updated[key];else updated[key]=value;
+            items[index]=updated;return items;
+          });
+        },{required:key==='app'?'An app name is required.':undefined,textarea:key==='text'});
+        input.setAttribute('aria-label',label);card.appendChild(controls.row(label,input));
+        var line=doc.createElement(key==='app'?'small':key==='title'?'b':'span');
+        line.textContent=typeof entry[key]==='string'?entry[key]:'';preview.appendChild(line);
+        options.listen(input,'input',function(){line.textContent=input.value;});
+      });
+      card.appendChild(preview);
+    }
+    var actions=doc.createElement('div');actions.className='story-actions';
+    function move(delta){return update(function(items){var other=index+delta;if(index>=items.length || other<0 || other>=items.length)return items;var current=items[index];items[index]=items[other];items[other]=current;return items;});}
+    var up=controls.action('Move up',function(){return move(-1);});up.disabled=index===0;
+    var down=controls.action('Move down',function(){return move(1);});down.disabled=index===list.length-1;
+    actions.append(up,down,controls.action('Remove notification',function(){return update(function(items){return items.filter(function(_,i){return i!==index;});});}));
+    card.appendChild(actions);wrap.appendChild(card);
+  });
+  wrap.appendChild(controls.action('Add notification',function(){return update(function(items){return items.concat([{app:typeof options.app==='string' && options.app.trim()?options.app:'App'}]);});}));
+  return wrap;
 }
 /* ---- src/workbench/inspector.js ---- */
 /* Instance-owned form DOM, panel editor cache and deferred refresh. Commands and
@@ -33556,6 +33620,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         }
         if(!whole){
           next=Object.assign(Object.create(null),panelObject(current)?current:{});
+          if(typeof value==='function')value=value(next[key]);
           if(shape){
             var nested=Object.assign(Object.create(null),panelObject(next[key])?next[key]:{});
             shape.forEach(function(field){delete nested[field[0]];});
@@ -33608,6 +33673,18 @@ function panelPatchControl(pid, patch, decl, target, options){
     }
     fields.forEach(function(f){
       var key = f[0], cur = patch && patch[key];
+      if(panelAuthoring(decl.type).notifications){
+        if(key==='notify'){
+          body.appendChild(frowBlock('Notifications',createNotificationComposer({
+            document:document,value:cur,initial:initial,app:decl.appName || decl.brand && decl.brand.app,
+            controls:{row:frow,text:textControl,action:actionButton},listen:listen,
+            commit:function(value){return commitPatch('notify',value);}
+          })));return;
+        }
+        if(key==='clear'){
+          if(!initial)body.appendChild(frow('Clear earlier notifications',checkboxControl(cur===true,function(value){return commitPatch('clear',value?true:undefined);})));return;
+        }
+      }
       if (f[1] === 'objf'){
         var group = document.createElement('div');
         group.className = 'rowsedit';
@@ -33691,6 +33768,13 @@ function jsonFieldControl(key, value, kind, after){
     refreshTimer=opts.schedule(function(){
       if(disposed || version!==refreshVersion || identity!==targetIdentity())return;
       refreshTimer=null;
+      // A preceding field's change can schedule this while the next field is
+      // already being typed. Let that field commit before replacing its DOM.
+      var active=document.activeElement;
+      if(active && guide.contains(active) && active._flowviewHasDraft && active._flowviewHasDraft()){
+        // A draft can be reverted without committing; still refresh on exit.
+        formLife.listen(active,'blur',function(){if(!active._flowviewHasDraft())refreshFormSoon();},{once:true});return;
+      }
       if(session.target && !guide.hidden)renderInspector();
     },0);
   }

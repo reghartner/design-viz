@@ -849,6 +849,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         }
         if(!whole){
           next=Object.assign(Object.create(null),panelObject(current)?current:{});
+          if(typeof value==='function')value=value(next[key]);
           if(shape){
             var nested=Object.assign(Object.create(null),panelObject(next[key])?next[key]:{});
             shape.forEach(function(field){delete nested[field[0]];});
@@ -901,6 +902,18 @@ function panelPatchControl(pid, patch, decl, target, options){
     }
     fields.forEach(function(f){
       var key = f[0], cur = patch && patch[key];
+      if(panelAuthoring(decl.type).notifications){
+        if(key==='notify'){
+          body.appendChild(frowBlock('Notifications',createNotificationComposer({
+            document:document,value:cur,initial:initial,app:decl.appName || decl.brand && decl.brand.app,
+            controls:{row:frow,text:textControl,action:actionButton},listen:listen,
+            commit:function(value){return commitPatch('notify',value);}
+          })));return;
+        }
+        if(key==='clear'){
+          if(!initial)body.appendChild(frow('Clear earlier notifications',checkboxControl(cur===true,function(value){return commitPatch('clear',value?true:undefined);})));return;
+        }
+      }
       if (f[1] === 'objf'){
         var group = document.createElement('div');
         group.className = 'rowsedit';
@@ -984,6 +997,13 @@ function jsonFieldControl(key, value, kind, after){
     refreshTimer=opts.schedule(function(){
       if(disposed || version!==refreshVersion || identity!==targetIdentity())return;
       refreshTimer=null;
+      // A preceding field's change can schedule this while the next field is
+      // already being typed. Let that field commit before replacing its DOM.
+      var active=document.activeElement;
+      if(active && guide.contains(active) && active._flowviewHasDraft && active._flowviewHasDraft()){
+        // A draft can be reverted without committing; still refresh on exit.
+        formLife.listen(active,'blur',function(){if(!active._flowviewHasDraft())refreshFormSoon();},{once:true});return;
+      }
       if(session.target && !guide.hidden)renderInspector();
     },0);
   }

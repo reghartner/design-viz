@@ -43,7 +43,7 @@ test('source visibility and notifications edit independently with Undo and Redo'
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="2"]').click();await page.locator('#editor-tab-inspect').click();
  const patch=guide.locator('.patchedit').filter({has:page.locator('summary').filter({hasText:/^app ·/})});
  if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();
- const notify=patch.getByLabel('notify',{exact:true});await notify.fill('{"app":"Homestead","title":"Visitor detected","text":"Check the door."}');await notify.press('Tab');
+ const notify=patch.getByLabel('Title',{exact:true});await notify.fill('Visitor detected');await notify.press('Tab');
  await expect(app(root).locator('.phonetitle')).toHaveText(['Visitor detected']);
  expect(diagram(JSON.parse(await page.locator('#src').inputValue())).steps[3]).toEqual(diagram(raw).steps[3]);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(hidden);

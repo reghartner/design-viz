@@ -143,6 +143,45 @@ test('deferred Home refresh preserves Enter caret/scroll and the latest Tab dest
   }
 });
 
+test('a deferred field refresh does not erase a draft already typed into the next field',()=>{
+  const e=environment(),h=e.mount(home());h.inspector.render();
+  const width=named(h.guide,'Width'),height=named(h.guide,'Height');
+  width.focus();width.value='280';width.fire('keydown',{key:'Enter'});
+  height.focus();height.value='180';h.flush();
+  assert.equal(h.guide.contains(height),true);assert.equal(height.value,'180');
+  assert.equal(JSON.parse(h.text).panels[0].outline.h,164);
+  height.fire('blur');h.flush();
+  assert.equal(JSON.parse(h.text).panels[0].outline.h,180);
+  assert.equal(named(h.guide,'Height').value,'180');
+  h.session.undo();assert.equal(JSON.parse(h.text).panels[0].outline.h,164);
+  assert.equal(JSON.parse(h.text).panels[0].outline.w,280);
+});
+
+test('reverting a draft still completes the preceding field refresh on blur',()=>{
+  const e=environment(),h=e.mount(home());h.inspector.render();
+  const width=named(h.guide,'Width'),height=named(h.guide,'Height');
+  width.focus();width.value='280';width.fire('keydown',{key:'Enter'});
+  height.focus();height.value='180';h.flush();
+  height.value='164';height.fire('blur');h.flush();
+  assert.equal(h.guide.contains(width),false);
+  assert.equal(named(h.guide,'Width').value,'280');
+  assert.equal(JSON.parse(h.text).panels[0].outline.h,164);
+  h.session.undo();assert.equal(JSON.parse(h.text).panels[0].outline.w,300);
+  assert.equal(h.session.canUndo(),false);
+});
+
+test('a rejected next-field draft stays visible until corrected',()=>{
+  const e=environment(),h=e.mount(home());h.inspector.render();
+  const width=named(h.guide,'Width'),height=named(h.guide,'Height');
+  width.focus();width.value='280';width.fire('keydown',{key:'Enter'});
+  height.focus();height.value='invalid';h.flush();height.fire('blur');h.flush();
+  assert.equal(h.guide.contains(height),true);assert.equal(height.value,'invalid');
+  assert.equal(JSON.parse(h.text).panels[0].outline.h,164);
+  height.value='180';height.fire('blur');h.flush();
+  assert.equal(named(h.guide,'Height').value,'180');
+  assert.equal(JSON.parse(h.text).panels[0].outline.h,180);
+});
+
 test('queued refreshes retire on target, route, project, source, explicit retirement and destroy',()=>{
   for(const reason of ['target','route','project','source','retire','destroy']){
     const e=environment(),h=e.mount(home());h.inspector.render();h.inspector.refresh();

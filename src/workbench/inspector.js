@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
-  var OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
@@ -301,12 +301,14 @@ function groupForm(val, ctx){
     ];
   }
 
-function protocolKinds(page){
-    var kinds = ['https', 'int', 'mqtt'];
-    Object.keys((page && page.protocols) || {}).forEach(function(k){
-      if (kinds.indexOf(k) < 0) kinds.push(k);
+function vocabularyControl(kind,page,value,target){
+    var raw=parseEditor().raw,path=builderTargetPath(raw,target),expected=JSON.stringify(path && specValueAt(raw,path));
+    return createVocabularyControl({document:document,kind:kind,value:value,open:OPEN_VOCABULARY,listen:listen,
+      definitions:kind==='protocols'?resolveProtocols(page || {}):resolveLanes(page || {}),
+      controls:{select:selectControl,text:textControl,row:frow,action:actionButton},
+      select:function(next){var ok=commitSimple(kind==='protocols'?'kind':'lane',next==null?null:JSON.stringify(next));if(ok)refreshFormSoon();return ok;},
+      update:function(id,changes,create){return commitCascade(function(raw){return planVocabulary(session.text(),raw,target,kind,id,changes,create,expected);},{after:refreshFormSoon});}
     });
-    return kinds;
   }
 
 /* ---- per-kind form builders; each returns an array of DOM rows ---- */
@@ -548,7 +550,7 @@ function edgeForm(val, ctx){
       frow('from', endpoint('from')),
       frow('to', endpoint('to'))
     ].concat(portRows('fromPort','Exit'),portRows('toPort','Entry'),[portHint,
-      frow('kind', selectControl(protocolKinds(ctx.page), val.kind || 'int', function(v){ return commitSimple('kind', JSON.stringify(v || 'int')); })),
+      frowBlock('Connection type',vocabularyControl('protocols',ctx.page,val.kind || 'int',t)),
       frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
@@ -635,10 +637,7 @@ function stepForm(val, ctx){
         panelRows.push(fold);
       }
     });
-    var laneNames = Object.keys((ctx.page && ctx.page.lanes) || {});
-    rows.push(frow('lane', selectControl(laneNames, val.lane, function(v){
-      return commitSimple('lane', v == null ? null : JSON.stringify(v));
-    }, true)));
+    rows.push(frowBlock('Story lane',vocabularyControl('lanes',ctx.page,val.lane,t)));
     rows.push(frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})));
     rows.push(frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })));
 

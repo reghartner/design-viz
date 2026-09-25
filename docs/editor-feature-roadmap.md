@@ -6,8 +6,9 @@ interaction coverage, independent review, and passing CI before merge.
 - [x] **1. Starting state** — Camera and Device App use their typed step controls
   for initial values. Preserve advanced fields and keep step edits separate.
   Merged in [PR #218](https://github.com/reghartner/design-viz/pull/218).
-- [ ] **2. Notifications** — Shared Phone / Device App composer for app, title,
+- [x] **2. Notifications** — Shared Phone / Device App composer for app, title,
   and message; add/remove/reorder, clear earlier notifications, and initial state.
+  Merged in [PR #219](https://github.com/reghartner/design-viz/pull/219).
 - [ ] **3. Protocols and lanes** — All built-in protocols are selectable; create
   and edit custom connection types and story lanes through the inspector.
 - [ ] **4. Visibility timing** — Captioned start/end controls for connections,

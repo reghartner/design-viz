@@ -697,6 +697,7 @@ PanelRegistry.extend('screen', {
   authoring: {
     template: { title: 'Camera', scene: 'static-noise', initial: { mode: 'off' } },
     initialFields: true,
+    transientFields: ['mode', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight'],
     setupFields: [
       ['scene', 'scene'],
       ['initial', 'json'],

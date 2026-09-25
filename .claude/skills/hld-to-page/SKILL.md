@@ -44,6 +44,10 @@ For a small edit, update the affected story/ledger rows rather than restarting.
   in the panel inspector. Set defaults there and authored changes on steps;
   keep advanced initial fields intact. Phone and Device App also offer a shared
   notification composer for initial and per-step messages; clear runs before add.
+  Camera fields and Phone audio expose carry-forward / this-step-only duration
+  and Inherit. Audio is a whole snapshot, not per-property inheritance. Imported
+  carry + `enterOnce` pairs retain both assignments during ordinary value edits;
+  an explicit duration choice keeps the temporary value and replaces the pair.
   Local drilldowns expose parent-event → child-path/event rows and a saved-target
   preview. Mapping omissions inherit detail defaults; explicit null suppresses an
   inherited default. Imported numeric child positions retain their type until edited.

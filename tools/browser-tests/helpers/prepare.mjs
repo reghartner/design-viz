@@ -97,6 +97,23 @@ export default async function prepare(){
     await writeFile(nestSpec,JSON.stringify(nest));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),nestSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-nest.html')],{stdio:'inherit'});
     await rm(nestSpec);
+    // Disjoint-paths fixture (reviewer repro): the first two paths share NO
+    // step, so there is no split — the split step must skip.
+    const disjoint=structuredClone(pathsRaw);
+    (function setPaths(value){
+      if(!value||typeof value!=='object')return;
+      if(Array.isArray(value.paths)&&value.paths.length){
+        value.paths=[
+          {id:'normal',label:'First attempt',color:'#0284c7',steps:['press','record','store','index','notify','ready']},
+          {id:'off',label:'Offline only',color:'#7c3aed',steps:['offline','notify-recovery']}];
+        return;
+      }
+      Object.values(value).forEach(setPaths);
+    })(disjoint);
+    const disjointSpec=path.join(output,'tour-disjoint.spec.json');
+    await writeFile(disjointSpec,JSON.stringify(disjoint));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),disjointSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-disjoint.html')],{stdio:'inherit'});
+    await rm(disjointSpec);
     // Drill-down fixture: the shipped domain-drilldown starter (overview
     // with ⊞ detail nodes, two-level nest), paused for determinism.
     const drillRaw=JSON.parse(await readFile(path.join(repo,'src/starters/domain-drilldown.json'),'utf8'));

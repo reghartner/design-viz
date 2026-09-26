@@ -57,6 +57,16 @@ function wireTour(ctl, view, win, config, options){
     for (var i = 0; i < b.length; i++) if (a.indexOf(b[i]) >= 0) last = b[i];
     return last;
   }
+  function forkSourceIndex(sp){
+    /* The last step of the first two paths' COMMON PREFIX — where they
+       split. -1 when they share no opening step (disjoint paths, or a path
+       that merges in without ever forking): then there is no split. */
+    var paths = sp.paths();
+    if (paths.length < 2) return -1;
+    var a = paths[0].indices, b = paths[1].indices, last = -1;
+    for (var i = 0; i < Math.min(a.length, b.length) && a[i] === b[i]; i++) last = a[i];
+    return last;
+  }
   function rejoinSourceIndex(sp){
     /* The alt path's FIRST own step whose successor is shared again — the
        earliest place a branch flows back, leaving the longest shared tail
@@ -111,8 +121,9 @@ function wireTour(ctl, view, win, config, options){
     if (pathId != null && sp.selectPath) sp.selectPath(pathId);
     if (ds.mode === 'ambient'){ sp.enterAmbient(); return; }
     if (ds.mode === 'step' && sp.mode() !== 'step') sp.enterStep(false);
-    if (ds.step === '@shared' || ds.step === '@rejoin'){
-      var src = ds.step === '@shared' ? sharedSourceIndex(sp) : rejoinSourceIndex(sp);
+    if (ds.step === '@shared' || ds.step === '@rejoin' || ds.step === '@fork'){
+      var src = ds.step === '@shared' ? sharedSourceIndex(sp) :
+        ds.step === '@fork' ? forkSourceIndex(sp) : rejoinSourceIndex(sp);
       if (src >= 0) sp.jumpSource(src, pathId || undefined);
       /* unresolved tokens are entry failures, judged before this runs */
     } else if (ds.step != null){
@@ -130,6 +141,7 @@ function wireTour(ctl, view, win, config, options){
     if (drill){ ctl.details.close(true); ctl.detailHistoryPush = false; }
     snapshot = {
       drill: drill,
+      activeTarget: ctl.activeTarget ? JSON.parse(JSON.stringify(ctl.activeTarget)) : null,
       scrollY: win.scrollY || 0,
       tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
       sections: ctl.sections.filter(function(sec){ return sec.stepper; }).map(function(sec){
@@ -191,6 +203,9 @@ function wireTour(ctl, view, win, config, options){
       if (drill){ try { ctl.details.restore(drill); } catch (ex) { /* stays at overview */ } }
     }
     ctl.detailHistoryPush = false;
+    /* the tour's own drill set activeTarget; the next user-driven fragment
+       write must name the section the reader actually had */
+    if (snapshot.activeTarget) ctl.activeTarget = snapshot.activeTarget;
     win.scrollTo(0, snapshot.scrollY);
     snapshot = null;
   }
@@ -278,6 +293,11 @@ function wireTour(ctl, view, win, config, options){
     var scrim = el('div', 'dv-tour-scrim');
     overlay.appendChild(scrim);
     var extras = el('div', 'dv-tour-extras'); overlay.appendChild(extras);
+    /* a mouse way out that never waits for the card: fixed top-right from
+       the first frame, above the click blockers, never moved */
+    var exit = button('dv-tour-exit', 'Skip tour \u2715', function(){ finish(); });
+    exit.setAttribute('aria-label', 'Skip the tour');
+    overlay.appendChild(exit);
     var timeline = el('div', 'dv-tour-timeline'); overlay.appendChild(timeline);
     var ui = el('div', 'dv-tour-ui');
     var eyebrow = el('div', 'dv-tour-eyebrow');
@@ -343,6 +363,17 @@ function wireTour(ctl, view, win, config, options){
     while (parts.mask.lastChild && parts.mask.lastChild !== base) parts.mask.removeChild(parts.mask.lastChild);
     parts.rings.replaceChildren();
     parts.extras.replaceChildren();
+    /* a ringed hole touching a viewport edge is inset 1px (half the 2px
+       stroke) on THAT edge only, so the centered stroke stays fully on
+       screen. The inset is applied to the highlight itself, before the
+       shape is built, so hole, ring and blockers all keep one geometry;
+       the cost is at most a 1px strip of target at a screen edge. */
+    visible.forEach(function(h){
+      if (h.kind === 'reveal') return;
+      var x2 = Math.min(h.x + h.w, vw - 1), y2 = Math.min(h.y + h.h, vh - 1);
+      h.x = Math.max(h.x, 1); h.y = Math.max(h.y, 1);
+      h.w = x2 - h.x; h.h = y2 - h.y;
+    });
     visible.forEach(function(h){
       var s = shapeOf(h);
       var hole = svgRect(null);
@@ -762,7 +793,8 @@ function wireTour(ctl, view, win, config, options){
       var tokenMiss =
         (dsCheck.path != null && (!spCheck || resolvePathId(spCheck, dsCheck.path) == null)) ||
         (dsCheck.step === '@shared' && (!spCheck || sharedSourceIndex(spCheck) < 0)) ||
-        (dsCheck.step === '@rejoin' && (!spCheck || rejoinSourceIndex(spCheck) < 0));
+        (dsCheck.step === '@rejoin' && (!spCheck || rejoinSourceIndex(spCheck) < 0)) ||
+        (dsCheck.step === '@fork' && (!spCheck || forkSourceIndex(spCheck) < 0));
       if (tokenMiss){
         var pathMiss = dsCheck.path != null && (!spCheck || resolvePathId(spCheck, dsCheck.path) == null);
         if (win.console) console.warn('flowspec: tour step "' + step.id + '" diagramState ' +

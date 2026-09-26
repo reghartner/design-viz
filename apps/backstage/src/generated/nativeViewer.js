@@ -53,6 +53,10 @@ flowview-root.sk-daylight{background:#F4F2EC;}
 .dv-tour-next{background:#38E1FF; color:#0B1220; border:1px solid #38E1FF;}
 .dv-tour-skip{background:none; border:none; font:500 13px 'Flowview Native IBM Plex Sans',system-ui,sans-serif;
   color:rgba(255,255,255,.6); cursor:pointer; margin-left:6px; text-decoration:underline;}
+.dv-tour-exit{position:fixed; top:10px; right:16px; pointer-events:auto; background:rgba(11,18,32,.92);
+  border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:4px 12px; cursor:pointer;
+  font:600 12px 'Flowview Native IBM Plex Sans',system-ui,sans-serif; color:rgba(242,247,255,.85);}
+.dv-tour-exit:hover, .dv-tour-exit:focus-visible{border-color:#38E1FF; color:#F2F7FF;}
 .dv-tour-hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
   font:500 12px 'Flowview Native IBM Plex Mono',monospace; color:rgba(255,255,255,.55); pointer-events:none;}
 .dv-tour-card{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);

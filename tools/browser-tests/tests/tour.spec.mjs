@@ -361,14 +361,57 @@ async function walkToDrill(page,server){
   const hashBefore=new URL(page.url()).hash;
   await page.locator('.dv-tour-choice').nth(1).click(); // The engineering
   const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+  const seen=[];
   for(let i=0;i<10;i++){
     await expect(heading).not.toHaveText('');
-    if((await heading.textContent())==='Zoom into a part of the system')break;
+    const h=await heading.textContent();seen.push(h);
+    if(h==='Zoom into a part of the system')break;
     await page.locator('.dv-tour-next').click();
   }
   await expect(heading).toHaveText('Zoom into a part of the system');
+  // this starter's paths fork and never rejoin: the split still shows
+  expect(seen).toContain('Flows can split');
   return {heading,hashBefore};
 }
+
+test('disjoint paths never show the split step (no fork to narrate)',async({page,server})=>{
+  const warnings=[];
+  page.on('console',m=>{if(m.type()==='warning')warnings.push(m.text());});
+  await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+  await page.goto(server.origin+'/tour-disjoint.html#tour=1');
+  await page.locator('.dv-tour-choice').nth(2).click(); // Show me both
+  const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+  const seen=[];
+  for(let i=0;i<10;i++){
+    await expect(heading).not.toHaveText('');
+    const h=await heading.textContent();seen.push(h);
+    if(h==='Now try it')break;
+    await page.locator('.dv-tour-next').click();
+  }
+  expect(seen).not.toContain('Flows can split');
+  expect(warnings.some(w=>w.includes('branching-split')&&w.includes('@fork'))).toBe(true);
+  await page.keyboard.press('Escape');
+});
+
+test('a click step\'s hold always offers a mouse exit, fixed from the first frame',async({page,server})=>{
+  await page.goto(server.origin+'/standalone.html#tour=1');
+  const exit=page.locator('.dv-tour-exit');
+  await expect(exit).toBeVisible();
+  const at=await exit.boundingBox();
+  await page.locator('.dv-tour-choice').nth(1).click();
+  const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+  for(let i=0;i<10;i++){
+    const h=await heading.textContent();
+    if(h==='Nodes link to the real system')break;
+    await page.locator('.dv-tour-next').click();
+  }
+  // during the hold the card is still held, but the exit is there, unmoved
+  await expect(exit).toBeVisible();
+  expect(await exit.boundingBox()).toEqual(at);
+  await exit.click();
+  await expect(page.locator('.dv-tour')).toBeHidden();
+  await expect(page.locator('.node-link-menu:not([hidden])')).toHaveCount(0);
+});
 
 test('the drill step opens a detail flow and Next returns to the overview',async({page,server})=>{
   const {heading,hashBefore}=await walkToDrill(page,server);

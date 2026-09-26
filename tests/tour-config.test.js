@@ -26,6 +26,8 @@ test('the default flow covers chooser, controls, branching, both personas, done'
   // and both reveal the diagram so the cause is visible, not just the chips.
   assert.equal(config.steps.find(s=>s.id==='branching-split').demo.advance,3);
   assert.equal(config.steps.find(s=>s.id==='branching-rejoin').diagramState.step,'@rejoin');
+  // the split only shows when the paths really fork: @fork gates entry
+  assert.equal(config.steps.find(s=>s.id==='branching-split').diagramState.step,'@fork');
   for(const id of ['mode-ambient','mode-step','branching-split','branching-rejoin','panels'])
     assert.equal(config.steps.find(s=>s.id===id).reveal[0].selector,'.board',id+' reveals the diagram');
   // The links step opens the menu it talks about and rings the trigger.
@@ -87,6 +89,6 @@ test('token-based diagram state stays within the documented vocabulary',()=>{
     const ds=step.diagramState;
     if(!ds)return;
     if(typeof ds.path==='string' && ds.path.startsWith('@'))assert.equal(ds.path,'@alt');
-    if(typeof ds.step==='string' && ds.step.startsWith('@'))assert.ok(['@shared','@rejoin'].includes(ds.step));
+    if(typeof ds.step==='string' && ds.step.startsWith('@'))assert.ok(['@shared','@rejoin','@fork'].includes(ds.step));
   });
 });

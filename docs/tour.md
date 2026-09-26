@@ -101,9 +101,10 @@ Per step:
 - `offset` — small pixel nudges `{dx, dy, dw, dh}` on the primary hole+ring.
 - `diagramState` — the state this step needs, applied on entry: `section`,
   `view`, `mode` (`"step"`/`"ambient"`), `path` (id or `"@alt"` = second
-  path), `step` (id, `"@shared"` = the last step the first two paths share,
-  or `"@rejoin"` = the second path's first own step that flows back into
-  shared steps). **An unresolvable path/step token skips the step at entry**
+  path), `step` (id; `"@fork"` = the last step of the first two paths'
+  common opening — where they split; `"@shared"` = the last step the first
+  two paths share anywhere; `"@rejoin"` = the second path's first own step
+  that flows back into shared steps). **An unresolvable path/step token skips the step at entry**
   — same warning and pass-through as a missing target — so rejoin copy can
   never show over a path that does not rejoin. An explicit step id that
   does not resolve is softer: the step shows, the diagram stays put.
@@ -157,6 +158,16 @@ Per step:
   keystroke away; Skip and Esc instead return focus to wherever the reader
   was. Page-authored configs should name their real chips/paths here.
 
+## Known limitations
+
+- A drill-down into an EXTERNAL spec (host `loadDetail`) that was open
+  before the tour is restored asynchronously; when it resolves, the engine
+  rewrites the fragment once with the same state. Harmless and rare; local
+  drill-downs restore synchronously.
+- At a viewport edge, a ringed hole is inset 1px so its centered stroke
+  stays fully visible — at most a 1px strip of the target at the screen
+  edge stays dimmed. Hole and ring still share one geometry.
+
 ## What happens when a step cannot resolve
 
 Entering a step applies its authored state first, then resolves its
@@ -177,8 +188,9 @@ the authored count. Fix the config; don't rely on the skip. `chooser` and
 3. For every step, declare the state the control needs (`mode`, `path`,
    `view`, `section`) — what you clicked to see it is what the step declares.
 4. Selectors: prefer the engine's stable classes (`.step-transport`,
-   `.path-timeline` (paths that rejoin) or `.path-matrix` (paths that
-   never rejoin), `.presentbtn`, `.nrefs-trigger`, `.node-link-menu`,
+   `.path-timeline` (paths drawn as one packed timeline, because they
+   rejoin) or `.path-matrix` (paths drawn as separate rows — they never
+   rejoin, or never share a step at all; gate a split step with `@fork`), `.presentbtn`, `.nrefs-trigger`, `.node-link-menu`,
    `.detail-trigger`, `.detail-breadcrumb`,
    `.diagram-view-choice`, `.panelcol`, `.mtoggle`, `.board`, `.termbar`).
 5. Run `node tools/validate.js <spec>` — tour problems are warnings, never
@@ -200,6 +212,8 @@ the authored count. Fix the config; don't rely on the skip. `chooser` and
   so the tour walks the overview, then re-opened exactly on finish.
 - Any internal error tears the overlay down, restores state, logs
   `flowspec: tour error` — fail-open, always.
+- A small **Skip tour ✕** control sits fixed at the top right for the
+  whole tour — a mouse way out even while a click step holds its card.
 - Keyboard: ← → move, Esc skips (hint hidden on the chooser); the tour owns
   those keys; presenter mode never double-advances.
 - Bundles that ship the page stylesheet without the tour fragment (the

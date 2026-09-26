@@ -78,7 +78,10 @@ var TOUR_DEFAULT_CONFIG = {
          rejoin, or as a plain path matrix when they never rejoin — the
          split is real on both, so the authored target names both */
       target: {selector: '.path-timeline, .path-matrix', within: 'section'},
-      diagramState: {mode: 'step', path: '@alt'},
+      /* '@fork' is the entry condition AND the demo's start: the step only
+         shows when the first two paths share an opening, and walks from
+         the fork into the branch (disjoint paths warn and skip) */
+      diagramState: {mode: 'step', path: '@alt', step: '@fork'},
       demo: {advance: 3, intervalMs: 1600},
       reveal: [{selector: '.board', within: 'section'}],
       copy: {

@@ -729,11 +729,15 @@ body.sk-daylight{background:#F4F2EC;}
 .dv-tour-note{position:fixed; max-width:260px; font:500 12px/1.5 'IBM Plex Sans',system-ui,sans-serif;
   color:#F2F7FF; background:rgba(11,18,32,.92); border:1px solid rgba(56,225,255,.4);
   border-radius:10px; padding:8px 12px; pointer-events:auto;}
-.dv-tour-timeline{position:fixed; top:14px; left:50%; transform:translateX(-50%);
-  display:flex; gap:6px; align-items:center; pointer-events:none;}
+.dv-tour-timeline{position:fixed; top:10px; left:50%; transform:translateX(-50%);
+  display:flex; gap:6px; align-items:center; pointer-events:none;
+  /* its own dark pill: legible even over a revealed (bright) region */
+  background:rgba(11,18,32,.92); border:1px solid rgba(255,255,255,.18);
+  border-radius:999px; padding:7px 12px;}
+.dv-tour-timeline[hidden]{display:none;}
 .dv-tour-seg{width:34px; height:3px; border-radius:2px; background:rgba(255,255,255,.18);}
 .dv-tour-seg.on{background:#38E1FF; box-shadow:0 0 8px rgba(56,225,255,.6);}
-.dv-tour-count{font:600 11px 'IBM Plex Mono',monospace; color:rgba(242,247,255,.75); margin-left:8px;}
+.dv-tour-count{white-space:nowrap; font:600 11px 'IBM Plex Mono',monospace; color:rgba(242,247,255,.75); margin-left:8px;}
 .dv-tour-ui{position:fixed; left:44px; bottom:44px; max-width:360px; pointer-events:auto;
   background:rgba(11,18,32,.94); border:1px solid rgba(56,225,255,.25); border-radius:14px; padding:18px 20px;}
 .dv-tour-ui[hidden]{display:none;}
@@ -750,10 +754,13 @@ body.sk-daylight{background:#F4F2EC;}
 .dv-tour-next{background:#38E1FF; color:#0B1220; border:1px solid #38E1FF;}
 .dv-tour-skip{background:none; border:none; font:500 13px 'IBM Plex Sans',system-ui,sans-serif;
   color:rgba(255,255,255,.6); cursor:pointer; margin-left:6px; text-decoration:underline;}
-.dv-tour-exit{position:fixed; top:10px; right:16px; pointer-events:auto; background:rgba(11,18,32,.92);
+.dv-tour-exit{position:fixed; top:10px; left:16px; pointer-events:auto; background:rgba(11,18,32,.92);
   border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:4px 12px; cursor:pointer;
   font:600 12px 'IBM Plex Sans',system-ui,sans-serif; color:rgba(242,247,255,.85);}
 .dv-tour-exit:hover, .dv-tour-exit:focus-visible{border-color:#38E1FF; color:#F2F7FF;}
+/* narrow screens: the centered step counter would run under the exit —
+   stack it on its own row below */
+@media (max-width: 720px){ .dv-tour-timeline{top:46px; gap:4px;} .dv-tour-seg{width:20px;} }
 .dv-tour-hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
   font:500 12px 'IBM Plex Mono',monospace; color:rgba(255,255,255,.55); pointer-events:none;}
 .dv-tour-card{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -28774,9 +28781,11 @@ function wireTour(ctl, view, win, config, options){
        that merges in without ever forking): then there is no split. */
     var paths = sp.paths();
     if (paths.length < 2) return -1;
-    var a = paths[0].indices, b = paths[1].indices, last = -1;
-    for (var i = 0; i < Math.min(a.length, b.length) && a[i] === b[i]; i++) last = a[i];
-    return last;
+    var a = paths[0].indices, b = paths[1].indices, last = -1, i = 0;
+    for (; i < Math.min(a.length, b.length) && a[i] === b[i]; i++) last = a[i];
+    /* a fork only if the walk stopped at a real difference — a path that is
+       a strict prefix of the other, or identical to it, never splits */
+    return (i < a.length && i < b.length) ? last : -1;
   }
   function rejoinSourceIndex(sp){
     /* The alt path's FIRST own step whose successor is shared again — the
@@ -29638,6 +29647,23 @@ function wireTour(ctl, view, win, config, options){
       stopDemo(); guarded(finish);
       ev.preventDefault(); ev.stopImmediatePropagation(); return;
     }
+    if (ev.key === 'Tab'){
+      /* keep keyboard focus inside the tour: wrap over the buttons that are
+         actually rendered and visible now (the held card and the hidden
+         chooser/card don't count; the fixed Skip control does) */
+      var focusable = Array.prototype.filter.call(overlay.querySelectorAll('button:not([disabled])'), function(b){
+        if (!b.getClientRects().length) return false;
+        try { return win.getComputedStyle(b).visibility !== 'hidden'; } catch (ex) { return true; }
+      });
+      if (focusable.length){
+        var first = focusable[0], last = focusable[focusable.length - 1];
+        var inside = focusable.indexOf(doc.activeElement) >= 0;
+        if (!inside){ (ev.shiftKey ? last : first).focus(); ev.preventDefault(); }
+        else if (ev.shiftKey && doc.activeElement === first){ last.focus(); ev.preventDefault(); }
+        else if (!ev.shiftKey && doc.activeElement === last){ first.focus(); ev.preventDefault(); }
+      }
+      return;
+    }
     if (!parts.chooser.hidden) return; /* chooser: only Escape shortcuts apply */
     if (ev.key === 'ArrowRight'){
       stopDemo(); guarded(function(){ go(at + 1); });
@@ -29647,13 +29673,6 @@ function wireTour(ctl, view, win, config, options){
     } else if (ev.key === 'ArrowLeft'){
       stopDemo(); guarded(function(){ go(at - 1); });
       ev.preventDefault(); ev.stopImmediatePropagation();
-    } else if (ev.key === 'Tab' && overlay.contains(ev.target)){
-      var focusable = overlay.querySelectorAll('button:not([disabled])');
-      if (focusable.length){
-        var first = focusable[0], last = focusable[focusable.length - 1];
-        if (ev.shiftKey && ev.target === first){ last.focus(); ev.preventDefault(); }
-        else if (!ev.shiftKey && ev.target === last){ first.focus(); ev.preventDefault(); }
-      }
     }
   }
   function pagePointer(ev){

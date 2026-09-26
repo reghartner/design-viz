@@ -114,6 +114,22 @@ export default async function prepare(){
     await writeFile(disjointSpec,JSON.stringify(disjoint));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),disjointSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-disjoint.html')],{stdio:'inherit'});
     await rm(disjointSpec);
+    // Non-diverging fixtures (reviewer repro): path 2 a strict prefix of
+    // path 1, and path 2 identical to path 1 — neither ever splits.
+    for(const [name,second] of [
+      ['tour-prefix',steps=>({id:'pre',label:'Stops early',color:'#7c3aed',steps:steps.slice(0,3)})],
+      ['tour-identical',steps=>({id:'same',label:'Same route',color:'#7c3aed',steps:steps.slice()})]]){
+      const spec=structuredClone(pathsRaw);
+      (function setPaths(value){
+        if(!value||typeof value!=='object')return;
+        if(Array.isArray(value.paths)&&value.paths.length){value.paths=[value.paths[0],second(value.paths[0].steps)];return;}
+        Object.values(value).forEach(setPaths);
+      })(spec);
+      const file=path.join(output,name+'.spec.json');
+      await writeFile(file,JSON.stringify(spec));
+      execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),path.join(output,name+'.html')],{stdio:'inherit'});
+      await rm(file);
+    }
     // Drill-down fixture: the shipped domain-drilldown starter (overview
     // with ⊞ detail nodes, two-level nest), paused for determinism.
     const drillRaw=JSON.parse(await readFile(path.join(repo,'src/starters/domain-drilldown.json'),'utf8'));

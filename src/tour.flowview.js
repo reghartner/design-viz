@@ -63,9 +63,11 @@ function wireTour(ctl, view, win, config, options){
        that merges in without ever forking): then there is no split. */
     var paths = sp.paths();
     if (paths.length < 2) return -1;
-    var a = paths[0].indices, b = paths[1].indices, last = -1;
-    for (var i = 0; i < Math.min(a.length, b.length) && a[i] === b[i]; i++) last = a[i];
-    return last;
+    var a = paths[0].indices, b = paths[1].indices, last = -1, i = 0;
+    for (; i < Math.min(a.length, b.length) && a[i] === b[i]; i++) last = a[i];
+    /* a fork only if the walk stopped at a real difference — a path that is
+       a strict prefix of the other, or identical to it, never splits */
+    return (i < a.length && i < b.length) ? last : -1;
   }
   function rejoinSourceIndex(sp){
     /* The alt path's FIRST own step whose successor is shared again — the
@@ -927,6 +929,23 @@ function wireTour(ctl, view, win, config, options){
       stopDemo(); guarded(finish);
       ev.preventDefault(); ev.stopImmediatePropagation(); return;
     }
+    if (ev.key === 'Tab'){
+      /* keep keyboard focus inside the tour: wrap over the buttons that are
+         actually rendered and visible now (the held card and the hidden
+         chooser/card don't count; the fixed Skip control does) */
+      var focusable = Array.prototype.filter.call(overlay.querySelectorAll('button:not([disabled])'), function(b){
+        if (!b.getClientRects().length) return false;
+        try { return win.getComputedStyle(b).visibility !== 'hidden'; } catch (ex) { return true; }
+      });
+      if (focusable.length){
+        var first = focusable[0], last = focusable[focusable.length - 1];
+        var inside = focusable.indexOf(doc.activeElement) >= 0;
+        if (!inside){ (ev.shiftKey ? last : first).focus(); ev.preventDefault(); }
+        else if (ev.shiftKey && doc.activeElement === first){ last.focus(); ev.preventDefault(); }
+        else if (!ev.shiftKey && doc.activeElement === last){ first.focus(); ev.preventDefault(); }
+      }
+      return;
+    }
     if (!parts.chooser.hidden) return; /* chooser: only Escape shortcuts apply */
     if (ev.key === 'ArrowRight'){
       stopDemo(); guarded(function(){ go(at + 1); });
@@ -936,13 +955,6 @@ function wireTour(ctl, view, win, config, options){
     } else if (ev.key === 'ArrowLeft'){
       stopDemo(); guarded(function(){ go(at - 1); });
       ev.preventDefault(); ev.stopImmediatePropagation();
-    } else if (ev.key === 'Tab' && overlay.contains(ev.target)){
-      var focusable = overlay.querySelectorAll('button:not([disabled])');
-      if (focusable.length){
-        var first = focusable[0], last = focusable[focusable.length - 1];
-        if (ev.shiftKey && ev.target === first){ last.focus(); ev.preventDefault(); }
-        else if (!ev.shiftKey && ev.target === last){ first.focus(); ev.preventDefault(); }
-      }
     }
   }
   function pagePointer(ev){

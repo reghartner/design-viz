@@ -393,6 +393,51 @@ test('disjoint paths never show the split step (no fork to narrate)',async({page
   await page.keyboard.press('Escape');
 });
 
+for(const [file,shape] of [['tour-prefix','a strict prefix'],['tour-identical','identical']])
+  test('paths where one is '+shape+' of the other never show the split step',async({page,server})=>{
+    await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+    await page.goto(server.origin+'/'+file+'.html#tour=1');
+    await page.locator('.dv-tour-choice').nth(2).click(); // Show me both
+    const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+    const seen=[];
+    for(let i=0;i<10;i++){
+      await expect(heading).not.toHaveText('');
+      const h=await heading.textContent();seen.push(h);
+      if(h==='Now try it')break;
+      await page.locator('.dv-tour-next').click();
+    }
+    expect(seen).toContain('Now try it');
+    expect(seen).not.toContain('Flows can split');
+    await page.keyboard.press('Escape');
+  });
+
+test('Tab and Shift+Tab never leave the tour, on the chooser and on a step',async({page,server})=>{
+  await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+  await page.goto(server.origin+'/standalone.html#tour=1');
+  await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+  const insideTour=()=>page.evaluate(()=>!!(document.activeElement&&document.activeElement.closest('.dv-tour')));
+  const cycle=async()=>{
+    for(const key of ['Tab','Shift+Tab'])
+      for(let i=0;i<8;i++){await page.keyboard.press(key);expect(await insideTour(),key+' #'+i).toBe(true);}
+  };
+  await cycle(); // chooser: 3 choices + Skip + the fixed exit
+  await page.locator('.dv-tour-choice').nth(1).click();
+  await expect(page.locator('.dv-tour-ui')).toBeVisible();
+  await cycle(); // a step: Back/Next/Skip + the fixed exit
+  await page.keyboard.press('Escape');
+});
+
+test('the Skip control clears the step counter at 400px wide',async({page,server})=>{
+  await page.setViewportSize({width:400,height:800});
+  await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+  await page.goto(server.origin+'/standalone.html#tour=1');
+  const overlap=(a,b)=>a&&b&&a.x<b.x+b.width&&b.x<a.x+a.width&&a.y<b.y+b.height&&b.y<a.y+a.height;
+  await page.locator('.dv-tour-choice').nth(1).click();
+  await expect(page.locator('.dv-tour-timeline')).toBeVisible();
+  expect(overlap(await page.locator('.dv-tour-exit').boundingBox(),await page.locator('.dv-tour-timeline').boundingBox())).toBe(false);
+  await page.keyboard.press('Escape');
+});
+
 test('a click step\'s hold always offers a mouse exit, fixed from the first frame',async({page,server})=>{
   await page.goto(server.origin+'/standalone.html#tour=1');
   const exit=page.locator('.dv-tour-exit');
@@ -400,9 +445,22 @@ test('a click step\'s hold always offers a mouse exit, fixed from the first fram
   const at=await exit.boundingBox();
   await page.locator('.dv-tour-choice').nth(1).click();
   const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+  const clearOfRings=async()=>{
+    const e=await exit.boundingBox();
+    for(const r of await page.locator('.dv-tour-ring, .dv-tour-ring2').evaluateAll(els=>els.map(el=>{const b=el.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height};})))
+      expect(e.x<r.x+r.width&&r.x<e.x+e.width&&e.y<r.y+r.height&&r.y<e.y+e.height,'exit overlaps a ring').toBe(false);
+  };
+  let sawPresentRing=false;
   for(let i=0;i<10;i++){
     const h=await heading.textContent();
     if(h==='Nodes link to the real system')break;
+    // the exit never sits on a ring — PRESENT's ring on the step-mode step included
+    if(h==='One call at a time'){
+      await expect.poll(()=>page.locator('.dv-tour-ring2').count()).toBeGreaterThanOrEqual(0);
+      sawPresentRing=(await page.locator('.dv-tour-ring2').count())>0||sawPresentRing;
+    }
+    await page.waitForTimeout(700);
+    await clearOfRings();
     await page.locator('.dv-tour-next').click();
   }
   // during the hold the card is still held, but the exit is there, unmoved

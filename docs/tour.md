@@ -102,7 +102,8 @@ Per step:
 - `diagramState` — the state this step needs, applied on entry: `section`,
   `view`, `mode` (`"step"`/`"ambient"`), `path` (id or `"@alt"` = second
   path), `step` (id; `"@fork"` = the last step of the first two paths'
-  common opening — where they split; `"@shared"` = the last step the first
+  common opening, only when they then genuinely diverge (not when one is
+  a prefix of, or identical to, the other); `"@shared"` = the last step the first
   two paths share anywhere; `"@rejoin"` = the second path's first own step
   that flows back into shared steps). **An unresolvable path/step token skips the step at entry**
   — same warning and pass-through as a missing target — so rejoin copy can
@@ -212,8 +213,11 @@ the authored count. Fix the config; don't rely on the skip. `chooser` and
   so the tour walks the overview, then re-opened exactly on finish.
 - Any internal error tears the overlay down, restores state, logs
   `flowspec: tour error` — fail-open, always.
-- A small **Skip tour ✕** control sits fixed at the top right for the
-  whole tour — a mouse way out even while a click step holds its card.
+- A small **Skip tour ✕** control sits fixed at the top LEFT for the
+  whole tour (clear of PRESENT, which lives top right) — a mouse way out
+  even while a click step holds its card. On narrow screens the step
+  counter drops to its own row below it. Tab and Shift+Tab cycle only the
+  tour's visible buttons, this control included.
 - Keyboard: ← → move, Esc skips (hint hidden on the chooser); the tour owns
   those keys; presenter mode never double-advances.
 - Bundles that ship the page stylesheet without the tour fragment (the

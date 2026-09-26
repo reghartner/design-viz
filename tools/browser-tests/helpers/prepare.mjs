@@ -66,6 +66,22 @@ export default async function prepare(){
     const pathsSpec=path.join(output,'tour-paths.spec.json');
     await writeFile(pathsSpec,JSON.stringify(pathsRaw));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),pathsSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-paths.html')],{stdio:'inherit'});
+    // Same page with paths reordered so @alt = the early-exit path that
+    // never rejoins: the rejoin step must SKIP, not show wrong copy.
+    const reordered=structuredClone(pathsRaw);
+    (function reorder(value){
+      if(!value||typeof value!=='object')return;
+      if(Array.isArray(value.paths)&&value.paths.length>2){
+        const offline=value.paths.findIndex(p=>p&&!value.paths.some(q=>q!==p&&q.steps&&p.steps&&p.steps[p.steps.length-1]===q.steps[q.steps.length-1]));
+        // deterministic: put the shortest path second (shared-blocks: Device offline)
+        value.paths.sort((a,b)=>0); // keep order, then swap [1] with shortest
+        let shortest=0;for(let i=1;i<value.paths.length;i++)if(value.paths[i].steps.length<value.paths[shortest].steps.length)shortest=i;
+        if(shortest!==1){const tmp=value.paths[1];value.paths[1]=value.paths[shortest];value.paths[shortest]=tmp;}
+      }
+      Object.values(value).forEach(reorder);
+    })(reordered);
+    await writeFile(pathsSpec,JSON.stringify(reordered));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),pathsSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-paths-reordered.html')],{stdio:'inherit'});
     await rm(pathsSpec);
     const ambientSpec=path.join(output,'tour-ambient.spec.json');
     await writeFile(ambientSpec,JSON.stringify(ambient));

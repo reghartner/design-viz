@@ -1,12 +1,12 @@
 /* Built-in default tour config. A page overrides it wholesale with page.tour
-   (no deep-merge). The shape and the retargeting contract are documented in
+   (no deep-merge). The shape and the authoring contract are documented in
    docs/tour.md; tourLintConfig (core/tour-model.js) is the source of truth
    for what validates. Selectors here name controls the engine always renders
    with these exact class names — tests/tour-config.test.js guards the pairing.
 
    Portable by design: steps whose selector or diagram state cannot resolve on
-   a page (no branching, no node links, no view choice) skip silently, so this
-   one default works on every page the viewer can render. */
+   a page warn and pass through, and this shipped copy never names
+   page-specific widgets — a page-authored config may (docs/tour.md). */
 
 var TOUR_DEFAULT_CONFIG = {
   version: 1,
@@ -28,18 +28,42 @@ var TOUR_DEFAULT_CONFIG = {
       }
     },
     {
+      id: 'mode-ambient',
+      personas: ['eng', 'both'],
+      target: {selector: '.mtoggle', within: 'section'},
+      diagramState: {mode: 'ambient'},
+      copy: {
+        heading: 'The big picture',
+        body: 'AMBIENT: every box and call in this flow, lit at once and looping.'
+      }
+    },
+    {
+      id: 'mode-step',
+      personas: ['eng', 'both'],
+      target: {selector: '.step-transport', within: 'section'},
+      diagramState: {mode: 'step'},
+      demo: {advance: 2, intervalMs: 1600},
+      copy: {
+        heading: 'One call at a time',
+        body: 'STEP: the same diagram, one call at a time, in order — watch it walk; ‹ › move by hand.'
+      },
+      secondary: [
+        {
+          target: {selector: '.presentbtn', within: 'page'},
+          note: 'Presenting to a room? PRESENT goes fullscreen — arrows and Space work there.'
+        }
+      ]
+    },
+    {
       id: 'controls',
+      personas: ['ux'],
       target: {selector: '.step-transport', within: 'section'},
       diagramState: {mode: 'step'},
       copy: {
         heading: 'Play the story',
-        body: 'AMBIENT loops the whole flow. STEP walks it one move at a time — play runs a step every 3 seconds, ‹ › move by hand.'
+        body: '▶ plays the flow one step every 3 seconds; ‹ › move by hand.'
       },
       secondary: [
-        {
-          target: {selector: '.mtoggle', within: 'section'},
-          note: 'AMBIENT loops the flow · STEP walks it'
-        },
         {
           target: {selector: '.presentbtn', within: 'page'},
           note: 'Presenting to a room? PRESENT goes fullscreen — arrows and Space work there.'
@@ -51,9 +75,10 @@ var TOUR_DEFAULT_CONFIG = {
       target: {selector: '.path-timeline', within: 'section'},
       diagramState: {mode: 'step', path: '@alt'},
       demo: {advance: 3, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'Flows can split',
-        body: 'Each row is one path through the system. Watch the walk leave the shared steps and take the branch — paths split where behavior differs. Click any chip to jump.'
+        body: 'Each row is one scenario — its label names the path. Watch the walk leave the shared steps and take the branch where behavior differs. Click any chip to jump.'
       }
     },
     {
@@ -61,24 +86,28 @@ var TOUR_DEFAULT_CONFIG = {
       target: {selector: '.path-timeline', within: 'section'},
       diagramState: {mode: 'step', path: '@alt', step: '@rejoin'},
       demo: {advance: 2, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'And they come back together',
-        body: 'The branch flows back into the shared tail — the last steps are the same story on every path.'
+        body: 'The branch flows back — the last steps are shared by every path.'
       }
     },
     {
       id: 'links',
-      personas: ['eng'],
+      personas: ['eng', 'both'],
       demo: {click: {selector: '.nrefs-trigger', within: 'section'}},
-      target: {selector: '.node-link-menu', within: 'page'},
+      target: {selector: '.node-link-menu', within: 'section'},
+      secondary: [
+        {target: {selector: '.nrefs-trigger', within: 'section'}}
+      ],
       copy: {
-        heading: 'Every box is real',
-        body: 'The ⋯ menu is open: this node’s Backstage entry, its API definition, and the code behind each step. Every ↗ jumps straight to the source.'
+        heading: 'Nodes link to the real system',
+        body: 'The tour just opened this node’s ⋯ menu — every node with links has one: its Backstage entry, API definition, and code references, where available. Every ↗ jumps to the source.'
       }
     },
     {
       id: 'story',
-      personas: ['ux'],
+      personas: ['ux', 'both'],
       target: {selector: '.diagram-view-choice', within: 'section'},
       copy: {
         heading: 'Two ways to read it',
@@ -87,21 +116,32 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'panels',
-      personas: ['ux'],
+      personas: ['ux', 'both'],
       target: {selector: '.panelcol', within: 'section'},
       diagramState: {mode: 'step'},
       demo: {advance: 3, intervalMs: 1800},
+      reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'The panels tell the story',
-        body: 'Watch the home and the phone react as each step plays. Every widget follows the diagram.'
+        body: 'Watch the side panels follow the diagram — every widget updates as each step plays.'
       }
     },
     {
-      id: 'finish',
+      id: 'finish-ux',
+      personas: ['ux'],
       kind: 'done',
       copy: {
-        heading: 'That’s the tour',
-        body: 'Replay it anytime from the ? button next to PRESENT.'
+        heading: 'Now try it',
+        body: 'Click any numbered chip to jump to that step, then press ▶. Replay this tour anytime from the ? button.'
+      }
+    },
+    {
+      id: 'finish-eng',
+      personas: ['eng', 'both'],
+      kind: 'done',
+      copy: {
+        heading: 'Now try it',
+        body: 'Click any numbered chip to jump to that step, then press ▶ — then open ⋯ on any node. Replay this tour anytime from the ? button.'
       }
     }
   ]

@@ -58,14 +58,15 @@ function wireTour(ctl, view, win, config, options){
     return last;
   }
   function rejoinSourceIndex(sp){
-    /* The alt path's last OWN step before it comes back to shared steps —
-       the natural place to watch a branch flow back into the common tail. */
+    /* The alt path's FIRST own step whose successor is shared again — the
+       earliest place a branch flows back, leaving the longest shared tail
+       for the demo to walk. */
     var paths = sp.paths();
     if (paths.length < 2) return -1;
-    var a = paths[0].indices, b = paths[1].indices, candidate = -1;
+    var a = paths[0].indices, b = paths[1].indices;
     for (var i = 0; i < b.length - 1; i++)
-      if (a.indexOf(b[i]) < 0 && a.indexOf(b[i + 1]) >= 0) candidate = b[i];
-    return candidate;
+      if (a.indexOf(b[i]) < 0 && a.indexOf(b[i + 1]) >= 0) return b[i];
+    return -1;
   }
   function resolvePathId(sp, token){
     var paths = sp.paths();
@@ -107,16 +108,13 @@ function wireTour(ctl, view, win, config, options){
     var sp = sec.stepper;
     if (!sp) return;
     var pathId = ds.path != null ? resolvePathId(sp, ds.path) : null;
-    if (ds.path != null && pathId == null && win.console)
-      console.warn('flowspec: tour diagramState.path "' + ds.path + '" not found — check the tour config for this diagram');
     if (pathId != null && sp.selectPath) sp.selectPath(pathId);
     if (ds.mode === 'ambient'){ sp.enterAmbient(); return; }
     if (ds.mode === 'step' && sp.mode() !== 'step') sp.enterStep(false);
     if (ds.step === '@shared' || ds.step === '@rejoin'){
       var src = ds.step === '@shared' ? sharedSourceIndex(sp) : rejoinSourceIndex(sp);
       if (src >= 0) sp.jumpSource(src, pathId || undefined);
-      else if (win.console)
-        console.warn('flowspec: tour diagramState.step "' + ds.step + '" did not resolve — check the tour config for this diagram');
+      /* unresolved tokens are entry failures, judged before this runs */
     } else if (ds.step != null){
       var idx = sp.stepIndexOf(ds.step);
       if (idx >= 0) sp.jump(idx); /* unresolved explicit step: stay in place */
@@ -184,7 +182,7 @@ function wireTour(ctl, view, win, config, options){
   }
 
   /* ---- overlay DOM ---- */
-  var overlay = null, parts = null, active = false, raf = 0, observer = null;
+  var overlay = null, parts = null, active = false, raf = 0, observer = null, settling = false, gen = 0;
   var persona = null, list = [], at = 0, restoreFocus = null, disabled = false;
   var demoTimer = null, demoLeft = 0;
 
@@ -212,6 +210,7 @@ function wireTour(ctl, view, win, config, options){
   }
   function teardown(){
     disabled = true;
+    settling = false;
     stopDemo();
     closeDemoClick();
     detach();
@@ -224,11 +223,8 @@ function wireTour(ctl, view, win, config, options){
     overlay = el('div', 'dv-tour');
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-label', 'Guided tour');
-    var scrim = ['t', 'r', 'b', 'l'].map(function(side){
-      var panel = el('div', 'dv-tour-scrim dv-tour-scrim-' + side);
-      overlay.appendChild(panel);
-      return panel;
-    });
+    var scrim = el('div', 'dv-tour-scrim');
+    overlay.appendChild(scrim);
     var ring = el('div', 'dv-tour-ring'); overlay.appendChild(ring);
     var extras = el('div', 'dv-tour-extras'); overlay.appendChild(extras);
     var timeline = el('div', 'dv-tour-timeline'); overlay.appendChild(timeline);
@@ -257,15 +253,30 @@ function wireTour(ctl, view, win, config, options){
              ui: ui, eyebrow: eyebrow, heading: heading, body: body,
              back: back, next: next, skip: skip, chooser: chooser, hint: hint};
   }
-  function setHole(rect){
+  /* One scrim, holes cut with an evenodd clip-path: each hole is the SAME
+     rect and corner radius as its ring, so hole and ring read as one shape —
+     and clip-path holes are pointer-transparent, so the spotlit controls
+     stay genuinely clickable. */
+  function roundedRectPath(r){
+    var rad = Math.min(r.r, r.w / 2, r.h / 2);
+    var x = r.x, y = r.y, w = r.w, h = r.h;
+    return 'M' + (x + rad) + ' ' + y +
+      'H' + (x + w - rad) + 'A' + rad + ' ' + rad + ' 0 0 1 ' + (x + w) + ' ' + (y + rad) +
+      'V' + (y + h - rad) + 'A' + rad + ' ' + rad + ' 0 0 1 ' + (x + w - rad) + ' ' + (y + h) +
+      'H' + (x + rad) + 'A' + rad + ' ' + rad + ' 0 0 1 ' + x + ' ' + (y + h - rad) +
+      'V' + (y + rad) + 'A' + rad + ' ' + rad + ' 0 0 1 ' + (x + rad) + ' ' + y + 'Z';
+  }
+  function applyScrim(holes){
     var vw = win.innerWidth, vh = win.innerHeight;
-    var s = parts.scrim;
-    s[0].style.cssText = 'left:0;top:0;width:' + vw + 'px;height:' + Math.max(0, rect.y) + 'px';
-    s[1].style.cssText = 'left:' + (rect.x + rect.w) + 'px;top:' + rect.y + 'px;width:' +
-      Math.max(0, vw - rect.x - rect.w) + 'px;height:' + rect.h + 'px';
-    s[2].style.cssText = 'left:0;top:' + (rect.y + rect.h) + 'px;width:' + vw + 'px;height:' +
-      Math.max(0, vh - rect.y - rect.h) + 'px';
-    s[3].style.cssText = 'left:0;top:' + rect.y + 'px;width:' + Math.max(0, rect.x) + 'px;height:' + rect.h + 'px';
+    var visible = holes.filter(function(r){ return r.w > 4 && r.h > 4; });
+    if (!visible.length){
+      parts.scrim.style.clipPath = 'none';
+      return;
+    }
+    var d = 'M0 0H' + vw + 'V' + vh + 'H0Z' + visible.map(roundedRectPath).join('');
+    parts.scrim.style.clipPath = 'path(evenodd, "' + d + '")';
+  }
+  function setHole(rect){
     if (rect.w > 4 && rect.h > 4){
       parts.ring.hidden = false;
       parts.ring.style.cssText = 'left:' + rect.x + 'px;top:' + rect.y + 'px;width:' +
@@ -273,6 +284,7 @@ function wireTour(ctl, view, win, config, options){
     } else parts.ring.hidden = true;
   }
   function fullScrim(){
+    applyScrim([]);
     setHole({x: 0, y: 0, w: 0, h: 0});
     parts.ring.hidden = true;
     parts.extras.replaceChildren();
@@ -328,9 +340,12 @@ function wireTour(ctl, view, win, config, options){
      transport so the visitor walks the story with the real controls; a
      click demo is one discrete action and runs as authored */
   function effectiveTargets(step){
-    if (step.demo && step.demo.advance != null && RM)
+    if (step.demo && step.demo.advance != null && RM){
+      var swapped = (step.target && step.target.selector !== '.step-transport') ?
+        [{target: step.target, note: ''}] : [];
       return {target: {selector: '.step-transport', within: 'section'},
-              secondaries: [{target: step.target, note: ''}].concat(secondariesOf(step.secondary))};
+              secondaries: swapped.concat(secondariesOf(step.secondary))};
+    }
     return {target: step.target, secondaries: secondariesOf(step.secondary)};
   }
   /* demo.click bookkeeping: the tour clicked a real control (the node-links
@@ -343,7 +358,7 @@ function wireTour(ctl, view, win, config, options){
     var trigger = clickedTrigger;
     clickedTrigger = null;
     try {
-      if (doc.querySelector('.node-link-menu:not([hidden])') && trigger.isConnected)
+      if (trigger.isConnected && trigger.getAttribute && trigger.getAttribute('aria-expanded') === 'true')
         trigger.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
     } catch (ex) { /* nothing to close */ }
   }
@@ -358,12 +373,15 @@ function wireTour(ctl, view, win, config, options){
     try {
       el.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
       clickedTrigger = el;
-    } catch (ex) { return; }
+    } catch (ex) { settling = false; return; }
+    settling = false;
     guarded(position);
     watch(queryTarget(step, sec, eff.target) || el);
   }
   function position(){
     if (!active) return;
+    if (settling) return; /* the move happens under the full dim; the new
+                             spotlight is revealed once the layout is stable */
     var step = list[at];
     if (!step || (step.kind || 'spot') !== 'spot'){ fullScrim(); return; }
     var sec = sectionFor(step);
@@ -376,21 +394,27 @@ function wireTour(ctl, view, win, config, options){
     /* the links step spotlights the whole node card, not the tiny trigger;
        the menu itself is the viewer's click — the engine popover paints in
        the browser top layer, above this overlay */
-    if (eff.target.selector.indexOf('nrefs-trigger') >= 0){
+    if (eff.target && eff.target.selector && eff.target.selector.indexOf('nrefs-trigger') >= 0){
       var nodeEl = target.closest ? target.closest('.node[data-dv-node]') : null;
       if (nodeEl && nodeEl.getBoundingClientRect) rect = rectOf(nodeEl);
     }
     var hole = tourCutoutRect(rect, step.offset, 8, viewport());
+    hole.r = 12; /* ring border-radius — the hole matches it exactly */
+    var holes = [hole];
     setHole(hole);
     placeUi(hole);
-    /* every control the copy names carries its own thin ring */
+    /* every control the copy names is genuinely un-dimmed AND ringed */
     parts.extras.replaceChildren();
     eff.secondaries.forEach(function(item){
       var second = queryTarget(step, sec, item.target);
       if (!second || !isRendered(second)) return;
       var r2 = tourCutoutRect(rectOf(second), null, 6, viewport());
+      if (r2.w <= 4 || r2.h <= 4) return; /* off-viewport: no ring without a hole */
+      r2.r = Math.min(999, r2.h / 2); /* the secondary ring is a pill */
+      holes.push(r2);
       var ring2 = el('div', 'dv-tour-ring2');
-      ring2.style.cssText = 'left:' + r2.x + 'px;top:' + r2.y + 'px;width:' + r2.w + 'px;height:' + r2.h + 'px';
+      ring2.style.cssText = 'left:' + r2.x + 'px;top:' + r2.y + 'px;width:' + r2.w + 'px;height:' + r2.h +
+        'px;border-radius:' + r2.r + 'px';
       parts.extras.appendChild(ring2);
       var noteText = item.note || '';
       if (noteText){
@@ -400,6 +424,17 @@ function wireTour(ctl, view, win, config, options){
         parts.extras.appendChild(note);
       }
     });
+    /* reveal-only cutouts: un-dimmed, no ring — a demo step shows the
+       diagram reacting, not just the ringed control */
+    (Array.isArray(step.reveal) ? step.reveal : []).forEach(function(item){
+      if (!item || typeof item !== 'object') return;
+      var shown = queryTarget(step, sec, item);
+      if (!shown || !isRendered(shown)) return;
+      var r3 = tourCutoutRect(rectOf(shown), null, 6, viewport());
+      r3.r = 12;
+      holes.push(r3);
+    });
+    applyScrim(holes);
   }
   function schedule(){
     if (raf) return;
@@ -408,6 +443,7 @@ function wireTour(ctl, view, win, config, options){
   }
   function watch(target){
     unwatch();
+    if (!active) return;
     if (win.ResizeObserver && target){
       observer = new win.ResizeObserver(schedule);
       observer.observe(target);
@@ -425,9 +461,9 @@ function wireTour(ctl, view, win, config, options){
     if (!step.demo || step.demo.advance == null || RM || !sec || !sec.stepper) return;
     var advance = Math.max(1, Math.min(30, Number(step.demo.advance) || 3));
     var interval = Math.max(400, Math.min(10000, Number(step.demo.intervalMs) || 1800));
-    /* the demo is a little story: play it from the path's first visible
-       stop — unless the step AUTHORED a starting position (its diagramState
-       names a step), in which case the walk starts there */
+    /* the demo is a little story: play it from the selected path's first
+       stop (jump(0) — the current view's own step list) unless the step
+       AUTHORED a starting position via diagramState.step */
     var sp = sec.stepper;
     if (sp.mode() !== 'step') sp.enterStep(false);
     if (!(step.diagramState && step.diagramState.step != null)) sp.jump(0);
@@ -532,6 +568,7 @@ function wireTour(ctl, view, win, config, options){
   function go(index){
     stopDemo();
     closeDemoClick();
+    var myGen = ++gen; /* a newer entry invalidates every pending timer */
     var dir = index >= at ? 1 : -1;
     var from = at;
     var step = null, sec = null, eff = null, target = null;
@@ -553,12 +590,34 @@ function wireTour(ctl, view, win, config, options){
       }
       selectSectionTab(sec);
       applyDiagramState(sec, step.diagramState);
-      /* a click step's validity rests on its click control: the click is
-         what puts the step's target (the node-links menu) on screen, and it
-         fires only after the settle loop steadies the layout */
+      /* an unresolved path/step token is an entry failure exactly like a
+         missing target: the step's authored state cannot exist on this
+         page, so it must never show over the wrong one (a non-rejoining
+         path under rejoin copy) */
+      var dsCheck = step.diagramState || {};
+      var spCheck = sec && sec.stepper;
+      var tokenMiss =
+        (dsCheck.path != null && (!spCheck || resolvePathId(spCheck, dsCheck.path) == null)) ||
+        (dsCheck.step === '@shared' && (!spCheck || sharedSourceIndex(spCheck) < 0)) ||
+        (dsCheck.step === '@rejoin' && (!spCheck || rejoinSourceIndex(spCheck) < 0));
+      if (tokenMiss){
+        if (win.console) console.warn('flowspec: tour step "' + step.id +
+          '" target not found — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      /* a click step's validity rests on its click control (which must have
+         a target to spotlight afterwards): the click is what puts the menu
+         on screen, and it fires only after the settle loop steadies layout */
       pendingClick = null;
       if (step.demo && step.demo.click){
-        var clickEl = queryTarget(step, sec, step.demo.click);
+        var clickEl = (step.target && typeof step.target.selector === 'string') ?
+          queryTarget(step, sec, step.demo.click) : null;
+        if (clickEl){
+          /* the control may sit inside a collapsed disclosure: open it
+             before judging visibility, exactly as the viewer would */
+          for (var canc = clickEl; canc && canc !== doc.body; canc = canc.parentElement || (canc.getRootNode && canc.getRootNode().host))
+            if (canc.tagName === 'DETAILS' && !canc.open){ canc.open = true; openedDetails.push(canc); }
+        }
         if (!clickEl || !isRendered(clickEl)){
           if (win.console) console.warn('flowspec: tour step "' + step.id +
             '" target not found — check the tour config for this diagram');
@@ -591,6 +650,7 @@ function wireTour(ctl, view, win, config, options){
     }
     at = index;
     unwatch();
+    settling = false;
     parts.hint.hidden = (step.kind || 'spot') === 'chooser'; /* arrows do nothing there */
     if ((step.kind || 'spot') === 'chooser'){
       parts.ui.classList.remove('dv-tour-ui-center');
@@ -603,12 +663,17 @@ function wireTour(ctl, view, win, config, options){
     }
     parts.ui.classList.remove('dv-tour-ui-center');
     var clickStep = !!(step.demo && step.demo.click);
+    /* one movement per step change: full dim first, move under it, reveal */
+    settling = true;
+    applyScrim([]);
+    parts.ring.hidden = true;
+    parts.extras.replaceChildren();
     if (target){
       /* scrollIntoView first (it also centers inside the board's own
          horizontal scroller), then correct the window explicitly — on SVG
          children scrollIntoView may move only the inner scroller */
       var spot = clickStep && pendingClick ? pendingClick.node :
-        (eff.target.selector.indexOf('nrefs-trigger') >= 0 && target.closest ?
+        (eff.target && eff.target.selector && eff.target.selector.indexOf('nrefs-trigger') >= 0 && target.closest ?
           (target.closest('.node[data-dv-node]') || target) : target);
       if (spot.scrollIntoView){
         try { spot.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}); }
@@ -616,31 +681,40 @@ function wireTour(ctl, view, win, config, options){
       }
       recenter(spot);
       /* engine step-change scrolling and freshly disclosed boards settle
-         asynchronously: keep correcting until the target rect is stable
-         inside the viewport (or give up quietly after ~0.6s) */
+         asynchronously: keep correcting under the full dim until the target
+         rect is stable, then reveal the new spotlight in ONE movement */
       var settleTries = 8, lastTop = null;
       (function settle(){
-        if (!active || list[at] !== step) return;
-        recenter(spot); guarded(position);
+        if (!active || gen !== myGen) return;
+        recenter(spot);
         var top = Math.round(spot.getBoundingClientRect().top);
         var inView = top >= 0 && top <= win.innerHeight;
         if ((inView && top === lastTop) || --settleTries <= 0){
-          if (inView){
-            if (clickStep) firePendingClick(step, sec, eff);
-            else startDemo(step, sec);
+          settling = false;
+          if (inView && clickStep){
+            /* cause before effect: reveal the ringed trigger, hold a beat,
+               then let the viewer watch the click land */
+            guarded(position);
+            win.setTimeout(function(){ guarded(function(){
+              if (gen === myGen) firePendingClick(step, sec, eff);
+            }); }, 600);
+          }
+          else {
+            guarded(position);
+            watch(target);
+            if (inView) startDemo(step, sec);
           }
           return;
         }
         lastTop = top;
         win.setTimeout(function(){ guarded(settle); }, 80);
       })();
-    }
+    } else { settling = false; }
     /* the engine closes its menu when focus leaves it: a click step leaves
        focus where the engine put it (the menu's first link) */
     renderTimeline(); renderStep(step, clickStep);
-    watch(target);
-    guarded(position);
-    /* boards settle async (fonts, panel layout): measure again next frame */
+    /* watch + position happen at reveal (settle completion); resize/scroll
+       reschedules stay armed for the revealed state */
     schedule();
   }
   function keydown(ev){
@@ -698,7 +772,7 @@ function wireTour(ctl, view, win, config, options){
     overlay.hidden = false;
     active = true;
     persona = null;
-    fullScrim(); /* cover the page before state-aware probing touches it */
+    fullScrim(); /* the overlay opens on a fully dimmed page */
     takeSnapshot();
     ctl.suppressFragmentWrites = true;
     list = buildList();
@@ -711,6 +785,7 @@ function wireTour(ctl, view, win, config, options){
   function finish(){
     if (!active) return;
     active = false;
+    settling = false;
     stopDemo();
     closeDemoClick();
     markDone();
@@ -719,7 +794,15 @@ function wireTour(ctl, view, win, config, options){
     catch (ex) { snapshot = null; }
     ctl.suppressFragmentWrites = false;
     if (overlay) overlay.hidden = true;
-    if (restoreFocus && restoreFocus.isConnected && restoreFocus.focus) restoreFocus.focus();
+    /* hand over control: the recap invites pressing ▶, so put focus there —
+       under reduced motion the engine disables ▶, so the step arrow takes
+       the handoff instead */
+    var handoff = view.querySelector('.playback-button:not([disabled])') ||
+      view.querySelector('.step-transport button:not([disabled])');
+    if (handoff && handoff.getClientRects().length){
+      try { handoff.focus({preventScroll: true}); } catch (ex) { handoff.focus(); }
+    }
+    else if (restoreFocus && restoreFocus.isConnected && restoreFocus.focus) restoreFocus.focus();
     else if (replay && replay.isConnected) replay.focus();
   }
 

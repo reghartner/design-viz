@@ -2784,6 +2784,16 @@ function tourLintConfig(config){
     }
     if (step.diagramState != null && !tourIsObject(step.diagramState))
       warn(at + '.diagramState', 'must be an object');
+    if (step.reveal != null){
+      if (!Array.isArray(step.reveal) || !step.reveal.length)
+        warn(at + '.reveal', 'must be a non-empty array of {selector, within} targets');
+      else step.reveal.forEach(function(item, ri){
+        if (!tourIsObject(item) || typeof item.selector !== 'string' || !item.selector)
+          warn(at + '.reveal[' + ri + ']', 'needs a selector string');
+        else if (item.within != null && item.within !== 'section' && item.within !== 'page')
+          warn(at + '.reveal[' + ri + '].within', 'must be "section" or "page"');
+      });
+    }
     if (step.secondary != null){
       var secondaries = Array.isArray(step.secondary) ? step.secondary : [step.secondary];
       if (!secondaries.length) warn(at + '.secondary', 'must not be an empty list');
@@ -2808,11 +2818,12 @@ function tourUsableConfig(config){
   });
 }
 
-/* Persona visibility: a step without personas is for everyone; the "both"
-   persona sees every step; otherwise the list must name the persona. */
+/* Persona visibility is EXPLICIT: a step without personas is for everyone;
+   otherwise the list must name the persona — "both" is its own track and
+   sees only steps that list it (or list nobody). The author decides which
+   steps each track gets; nothing is inferred. */
 function tourStepVisible(step, persona){
   if (!step.personas || !step.personas.length) return true;
-  if (persona === 'both') return true;
   return step.personas.indexOf(persona) >= 0;
 }
 

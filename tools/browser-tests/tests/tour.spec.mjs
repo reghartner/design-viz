@@ -78,22 +78,40 @@ test('a missing target warns and passes through, keeping the authored count',asy
   await page.goto(server.origin+'/standalone.html#tour=1');
   await page.locator('.dv-tour-choice').nth(1).click(); // The engineering
   const heading=page.locator('.dv-tour-ui .dv-tour-heading');
-  await expect(heading).toHaveText('Play the story');
-  // Every control the copy names carries a ring: transport primary, plus
-  // the AMBIENT/STEP toggle and PRESENT as secondaries.
-  await expect(page.locator('.dv-tour-ring')).toBeVisible();
-  await expect(page.locator('.dv-tour-ring2')).toHaveCount(2);
+  // eng track opens on the mode pair: the map (AMBIENT really on) ...
+  await expect(heading).toHaveText('The big picture');
+  await expect(page.locator('.mtoggle .mbtn[aria-pressed=true]').first()).toHaveText('AMBIENT');
+  // hole+ring share one clip-path shape: outer rect + one hole subpath
+  const clip=()=>page.evaluate(()=>document.querySelector('.dv-tour-scrim').style.clipPath);
+  await expect.poll(clip).toContain('evenodd'); // reveal lands after settle
+  await page.locator('.dv-tour-next').click();
+  // ... then the sequence, with PRESENT as its one ringed secondary — and
+  // the secondary sits on its own un-dimmed hole (a third subpath).
+  await expect(heading).toHaveText('One call at a time');
+  // every visible secondary ring sits on its own un-dimmed hole: subpaths =
+  // outer + primary + one per ring (PRESENT may be off-viewport here, in
+  // which case neither its ring nor its hole renders)
+  await expect.poll(async()=>{
+    const holes=((await clip()).match(/M/g)||[]).length;
+    const rings=await page.locator('.dv-tour-ring2').count();
+    return holes-2-rings;
+  }).toBe(0);
   await page.locator('.dv-tour-next').click();
   // Both branching steps have no .path-timeline here: they warn and pass
   // through to the links step (chime-radar does render node links).
-  await expect(heading).toHaveText('Every box is real');
+  await expect(heading).toHaveText('Nodes link to the real system');
   expect(warnings.filter(w=>w.includes('target not found')).length).toBeGreaterThanOrEqual(2);
-  // The links step CLICKED the ⋯ trigger: the real menu is open and it is
-  // the spotlit target; leaving the step closes it.
+  // The links step CLICKED the ⋯ trigger (after its cause-before-effect
+  // hold): the real menu opens and is the spotlit target; leaving closes it.
   await expect(page.locator('.node-link-menu:not([hidden])')).toBeVisible();
   await page.locator('.dv-tour-next').click();
-  await expect(heading).toHaveText('That’s the tour');
+  await expect(heading).toHaveText('Now try it');
   await expect(page.locator('.node-link-menu:not([hidden])')).toHaveCount(0);
+  // The done card hands over: Done focuses the ▶ transport button.
+  await page.locator('.dv-tour-next').click();
+  await expect(page.locator('.dv-tour')).toBeHidden();
+  // focus lands in the transport (▶, or a step arrow under reduced motion)
+  expect(await page.evaluate(()=>!!(document.activeElement&&document.activeElement.closest('.step-transport, .termbar')))).toBe(true);
   await page.keyboard.press('Escape');
   await expect(page.locator('.dv-tour')).toBeHidden();
 });
@@ -120,19 +138,50 @@ test('entering a step applies its authored state: ambient-hidden transport; redu
 
 test.describe('with motion allowed',()=>{
   test.use({reducedMotion:'no-preference'});
-  test('the branching demo visibly steps through the split',async({page,server})=>{
+  test('the branching demos step through the split AND the rejoin, revealing the diagram',async({page,server})=>{
     await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
     await page.goto(server.origin+'/tour-paths.html#tour=1');
     await page.locator('.dv-tour-choice').nth(2).click(); // Show me both
     const heading=page.locator('.dv-tour-ui .dv-tour-heading');
-    await expect(heading).toHaveText('Play the story');
+    await expect(heading).toHaveText('The big picture');
+    await page.locator('.dv-tour-next').click();
+    await expect(heading).toHaveText('One call at a time');
     await page.locator('.dv-tour-next').click();
     await expect(heading).toHaveText('Flows can split');
     await expect(page.locator('.dv-tour-ring')).toBeVisible();
-    const current=page.locator('.tabpanel:not([hidden]) .schip[aria-current=true], .schip[aria-current=true]');
+    // the diagram is revealed too: outer + timeline hole + board hole
+    await expect.poll(async()=>((await page.evaluate(()=>document.querySelector('.dv-tour-scrim').style.clipPath)).match(/M/g)||[]).length).toBeGreaterThanOrEqual(3);
+    const current=page.locator('.schip[aria-current=true]');
     const first=await current.first().textContent();
     // one demo tick (1600ms) later the active step has moved
     await expect.poll(async()=>current.first().textContent(),{timeout:5000}).not.toBe(first);
+    await page.locator('.dv-tour-next').click();
+    // the rejoin half starts at the branch's own last step and walks into
+    // the shared tail
+    await expect(heading).toHaveText('And they come back together');
+    const atRejoin=await current.first().textContent();
+    await expect.poll(async()=>current.first().textContent(),{timeout:5000}).not.toBe(atRejoin);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.dv-tour')).toBeHidden();
+  });
+
+  test('an unresolvable @rejoin token SKIPS the step instead of mis-narrating',async({page,server})=>{
+    const warnings=[];
+    page.on('console',m=>{if(m.type()==='warning')warnings.push(m.text());});
+    await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+    await page.goto(server.origin+'/tour-paths-reordered.html#tour=1');
+    await page.locator('.dv-tour-choice').nth(2).click(); // Show me both
+    const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+    await expect(heading).toHaveText('The big picture');
+    await page.locator('.dv-tour-next').click();
+    await expect(heading).toHaveText('One call at a time');
+    await page.locator('.dv-tour-next').click();
+    await expect(heading).toHaveText('Flows can split'); // @alt resolves
+    await page.locator('.dv-tour-next').click();
+    // @alt never rejoins here: the rejoin step must pass through, never
+    // showing its copy over a non-rejoining path.
+    await expect(heading).not.toHaveText('And they come back together');
+    expect(warnings.some(w=>w.includes('branching-rejoin'))).toBe(true);
     await page.keyboard.press('Escape');
     await expect(page.locator('.dv-tour')).toBeHidden();
   });

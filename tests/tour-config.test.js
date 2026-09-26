@@ -18,26 +18,44 @@ test('the shipped default config lints clean and is usable',()=>{
 
 test('the default flow covers chooser, controls, branching, both personas, done',()=>{
   const ids=plain(config.steps.map(s=>s.id));
-  assert.deepEqual(ids,['welcome','controls','branching-split','branching-rejoin','links','story','panels','finish']);
+  assert.deepEqual(ids,['welcome','mode-ambient','mode-step','controls','branching-split','branching-rejoin','links','story','panels','finish-ux','finish-eng']);
   const panels=config.steps.find(s=>s.id==='panels');
   assert.deepEqual(plain(panels.demo),{advance:3,intervalMs:1800});
-  assert.deepEqual(plain(panels.personas),['ux']);
-  // Branching is demonstrated, not just pointed at: both halves advance.
+  assert.deepEqual(plain(panels.personas),['ux','both']);
+  // Branching is demonstrated, not just pointed at: both halves advance,
+  // and both reveal the diagram so the cause is visible, not just the chips.
   assert.equal(config.steps.find(s=>s.id==='branching-split').demo.advance,3);
   assert.equal(config.steps.find(s=>s.id==='branching-rejoin').diagramState.step,'@rejoin');
-  // The links step opens the menu it talks about.
+  for(const id of ['branching-split','branching-rejoin','panels'])
+    assert.equal(config.steps.find(s=>s.id===id).reveal[0].selector,'.board',id+' reveals the diagram');
+  // The links step opens the menu it talks about and rings the trigger.
   const links=config.steps.find(s=>s.id==='links');
   assert.equal(links.demo.click.selector,'.nrefs-trigger');
   assert.equal(links.target.selector,'.node-link-menu');
+  assert.equal(links.secondary[0].target.selector,'.nrefs-trigger');
+  // Shipped default copy stays generic: no page-specific widget names.
+  config.steps.forEach(s=>{
+    const text=((s.copy&&(s.copy.heading+' '+s.copy.body))||'').toLowerCase();
+    for(const word of ['home','phone','doorbell','camera','hub'])
+      assert.ok(!text.includes(word),'default copy must not name page widgets: '+s.id+' / '+word);
+  });
   assert.equal(config.steps[0].kind,'chooser');
   assert.equal(config.steps[config.steps.length-1].kind,'done');
-  assert.deepEqual(plain(config.steps.find(s=>s.id==='links').personas),['eng']);
-  assert.deepEqual(plain(config.steps.find(s=>s.id==='story').personas),['ux']);
-  const eng=context.tourStepsForPersona(config,'eng').map(s=>s.id);
-  const ux=context.tourStepsForPersona(config,'ux').map(s=>s.id);
-  assert.ok(eng.includes('links') && !eng.includes('story'));
-  assert.ok(ux.includes('story') && !ux.includes('links'));
-  assert.equal(context.tourStepsForPersona(config,'both').length,config.steps.length);
+  const eng=plain(context.tourStepsForPersona(config,'eng').map(s=>s.id));
+  const ux=plain(context.tourStepsForPersona(config,'ux').map(s=>s.id));
+  const both=plain(context.tourStepsForPersona(config,'both').map(s=>s.id));
+  // eng: the mode pair (map, then sequence), branching, links, its recap
+  assert.deepEqual(eng,['welcome','mode-ambient','mode-step','branching-split','branching-rejoin','links','finish-eng']);
+  // ux: one simple controls step, no AMBIENT anywhere in its copy
+  assert.deepEqual(ux,['welcome','controls','branching-split','branching-rejoin','story','panels','finish-ux']);
+  context.tourStepsForPersona(config,'ux').forEach(s=>{
+    const text=(s.copy&&(s.copy.heading+' '+s.copy.body))||'';
+    assert.ok(!text.includes('AMBIENT'),'ux copy never mentions AMBIENT: '+s.id);
+  });
+  // both: the eng mode pair plus the ux story/panels — an authored union
+  assert.deepEqual(both,['welcome','mode-ambient','mode-step','branching-split','branching-rejoin','links','story','panels','finish-eng']);
+  // the mode pair is adjacent: the map, then the sequence
+  assert.equal(eng.indexOf('mode-step'),eng.indexOf('mode-ambient')+1);
 });
 
 test('every selector class the default config names is rendered by the engine',()=>{
@@ -46,6 +64,7 @@ test('every selector class the default config names is rendered by the engine',(
   config.steps.forEach(step=>{
     if(step.target)selectors.push(step.target.selector);
     if(step.demo&&step.demo.click)selectors.push(step.demo.click.selector);
+    (Array.isArray(step.reveal)?step.reveal:[]).forEach(item=>selectors.push(item.selector));
     const secondaries=Array.isArray(step.secondary)?step.secondary:(step.secondary?[step.secondary]:[]);
     secondaries.forEach(item=>{if(item&&item.target)selectors.push(item.target.selector);});
   });

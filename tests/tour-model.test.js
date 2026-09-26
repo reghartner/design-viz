@@ -51,6 +51,14 @@ test('lint accepts a minimal valid config and rejects shape errors',()=>{
     .some(w=>w.includes('only applies')),'interval on a click demo warns');
   assert.ok(context.tourLintConfig(config([spot('a',{demo:{click:{selector:'.x',within:'page'}}})])).length===0,
     'well-formed click demo is clean');
+  assert.ok(context.tourLintConfig(config([spot('a',{reveal:[{selector:'.board'}]})])).length===0,
+    'well-formed reveal list is clean');
+  assert.ok(context.tourLintConfig(config([spot('a',{reveal:[]})]))
+    .some(w=>w.includes('.reveal')),'empty reveal warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{reveal:[{within:'section'}]})]))
+    .some(w=>w.includes('reveal[0]')),'reveal without selector warns');
+  assert.ok(context.tourLintConfig(config([spot('a',{reveal:[{selector:'.x',within:'tab'}]})]))
+    .some(w=>w.includes('reveal[0].within')),'bad reveal scope warns');
   assert.ok(context.tourLintConfig(config([spot('a',{demo:{intervalMs:50}})]))
     .some(w=>w.includes('demo.intervalMs')),'bad demo.intervalMs warns');
   assert.ok(context.tourLintConfig(config([spot('a'),{id:'w',kind:'chooser'}]))
@@ -74,12 +82,13 @@ test('usability is looser than lint: any well-formed step qualifies',()=>{
   assert.equal(context.tourUsableConfig({version:1,steps:'x'}),false);
 });
 
-test('persona filtering: absent personas means everyone, "both" sees all',()=>{
-  const steps=[spot('all'),spot('eng-only',{personas:['eng']}),spot('ux-only',{personas:['ux']})];
+test('persona filtering is explicit: absent list means everyone, "both" is its own track',()=>{
+  const steps=[spot('all'),spot('eng-only',{personas:['eng']}),
+    spot('ux-only',{personas:['ux']}),spot('shared',{personas:['eng','both']})];
   const ids=(persona)=>plain(context.tourStepsForPersona(config(steps),persona).map(s=>s.id));
-  assert.deepEqual(ids('eng'),['all','eng-only']);
+  assert.deepEqual(ids('eng'),['all','eng-only','shared']);
   assert.deepEqual(ids('ux'),['all','ux-only']);
-  assert.deepEqual(ids('both'),['all','eng-only','ux-only']);
+  assert.deepEqual(ids('both'),['all','shared']);
 });
 
 test('timeline counts the authored list and never counts the chooser',()=>{

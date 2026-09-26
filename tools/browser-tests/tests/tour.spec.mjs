@@ -1,5 +1,15 @@
 import {test,expect} from '../helpers/test.mjs';
 
+// One geometry: every ring rect must carry EXACTLY the attributes of a mask
+// hole rect (x, y, width, height, rx, ry) — hole and ring drawn from one
+// shape object, so they cannot drift apart.
+const ringsMatchHoles=page=>page.evaluate(()=>{
+  const key=e=>['x','y','width','height','rx','ry'].map(a=>e.getAttribute(a)).join('|');
+  const holes=new Set([...document.querySelectorAll('.dv-tour-dim mask rect[fill="#000"]')].map(key));
+  const rings=[...document.querySelectorAll('.dv-tour-ring, .dv-tour-ring2')];
+  return rings.length>0&&rings.every(r=>holes.has(key(r)));
+});
+
 // The guided tour's own contracts: start gating, fail-open scrim behavior,
 // and deep-link preservation. The harness seeds dv_tour_v1=done for every
 // context, so the quiet cases below also prove the seed works; #tour=1
@@ -81,8 +91,8 @@ test('a missing target warns and passes through, keeping the authored count',asy
   // eng track opens on the mode pair: the map (AMBIENT really on) ...
   await expect(heading).toHaveText('The big picture');
   await expect(page.locator('.mtoggle .mbtn[aria-pressed=true]').first()).toHaveText('AMBIENT');
-  // hole+ring share one clip-path shape: outer rect + one hole subpath
-  // the reveal lands after settle: the mask gains its hole rects
+  // the reveal lands after settle: the SVG dim mask gains one black rounded
+  // rect per hole (same rect and radius as its ring)
   await expect.poll(()=>page.evaluate(()=>document.querySelectorAll('.dv-tour-dim mask rect[fill="#000"]').length)).toBeGreaterThanOrEqual(1);
   // the map is SHOWN: points inside the revealed board AND inside the
   // ringed toggle (a hole nested in the board hole) hit the page, not the
@@ -107,10 +117,27 @@ test('a missing target warns and passes through, keeping the authored count',asy
       return !document.elementFromPoint(r.x+r.width/2,y).closest('.dv-tour-scrim');
     });
   })).toBe(true);
+  await expect.poll(()=>ringsMatchHoles(page)).toBe(true);
   // a secondary not fully in view renders neither ring, hole nor note
   expect(await page.locator('.dv-tour-note').count()).toBeLessThanOrEqual(await page.locator('.dv-tour-ring2').count());
   for(const box of await page.locator('.dv-tour-ring2').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return [r.top,r.bottom,innerHeight];})))
     expect(box[0]>=0&&box[1]<=box[2]).toBe(true);
+  // sample the narration card every frame from this Next click through the
+  // links step's pre-click hold and the menu opening
+  await page.evaluate(()=>{
+    window.__cardSamples=[];
+    const tick=()=>{
+      if(window.__cardSamples===null)return; // sampling stopped
+      const u=document.querySelector('.dv-tour-ui');
+      const cs=u&&getComputedStyle(u);
+      const h=(document.querySelector('.dv-tour-ui .dv-tour-heading')||{}).textContent||'';
+      if(u&&!u.hidden&&cs.visibility!=='hidden'&&h.startsWith('Nodes link')){
+        const r=u.getBoundingClientRect();window.__cardSamples.push(Math.round(r.x)+','+Math.round(r.y));
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   await page.locator('.dv-tour-next').click();
   // Both branching steps have no .path-timeline here: they warn and pass
   // through to the links step (chime-radar does render node links).
@@ -120,6 +147,20 @@ test('a missing target warns and passes through, keeping the authored count',asy
   // The links step CLICKED the ⋯ trigger (after its cause-before-effect
   // hold): the real menu opens and is the spotlit target; leaving closes it.
   await expect(page.locator('.node-link-menu:not([hidden])')).toBeVisible();
+  // the card appears ONCE, in its final place: hidden through the pre-click
+  // hold, then shown beside the menu, and it never moves for the step
+  const card=page.locator('.dv-tour-ui');
+  await expect(card).toBeVisible();
+  await page.waitForTimeout(200);
+  const early=await card.boundingBox();
+  await page.waitForTimeout(1300);
+  expect(await card.boundingBox()).toEqual(early);
+  // and across every frame since Next, the visible card had ONE position
+  // (the old code showed it beside the node during the hold, then jumped)
+  const seen=await page.evaluate(()=>{const s=[...new Set(window.__cardSamples)];window.__cardSamples=null;return s;});
+  expect(seen.length).toBe(1);
+  // the menu ring and the ⋯ trigger ring each sit exactly on their holes
+  expect(await ringsMatchHoles(page)).toBe(true);
   // exact union, no bounding-rect strip: a point inside the old bounding
   // rect of (trigger ring ∪ menu ring) but inside NEITHER ring is dimmed
   // and click-blocked
@@ -127,16 +168,19 @@ test('a missing target warns and passes through, keeping the authored count',asy
   const probe=await page.evaluate(()=>{
     const a=document.querySelector('.dv-tour-ring').getBoundingClientRect();
     const b=document.querySelector('.dv-tour-ring2').getBoundingClientRect();
-    const inside=(r,x,y)=>x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;
+    // 'inside' with a 2px margin: sample only points clearly outside both
+    // rings — edge pixels are ambiguous (anti-aliasing, layout-unit snapping)
+    const inside=(r,x,y)=>x>=r.left-2&&x<=r.right+2&&y>=r.top-2&&y<=r.bottom+2;
     const L=Math.min(a.left,b.left),T=Math.min(a.top,b.top),R=Math.max(a.right,b.right),B=Math.max(a.bottom,b.bottom);
     for(let y=T+2;y<B;y+=3)for(let x=L+2;x<R;x+=3)
       if(!inside(a,x,y)&&!inside(b,x,y)){
         const hit=document.elementFromPoint(x,y);
-        return {found:true,blocked:!!(hit&&hit.closest('.dv-tour-scrim'))};
+        return {found:true,blocked:!!(hit&&hit.closest('.dv-tour-scrim')),x:Math.round(x),y:Math.round(y)};
       }
     return {found:false};
   });
-  if(probe.found)expect(probe.blocked).toBe(true);
+  expect(probe.found,'a sample point between the two rings must exist').toBe(true);
+  expect(probe.blocked,JSON.stringify(probe)).toBe(true);
   await page.locator('.dv-tour-next').click();
   await expect(heading).toHaveText('Now try it');
   await expect(page.locator('.node-link-menu:not([hidden])')).toHaveCount(0);
@@ -291,6 +335,7 @@ test('overlapping cutouts never cancel: nested ring and target-inside-reveal sta
   },sel);
   // primary .step-transport + secondary play button nested inside it
   await expect(heading).toHaveText('Nested ring');
+  await expect.poll(()=>ringsMatchHoles(page)).toBe(true);
   await expect.poll(()=>hitsPage('.playback-button')).toBe(true);
   await expect.poll(()=>hitsPage('.step-transport')).toBe(true);
   await page.locator('.dv-tour-next').click();

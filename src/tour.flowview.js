@@ -242,14 +242,27 @@ function wireTour(ctl, view, win, config, options){
     maskBase.setAttribute('fill', '#fff');
     mask.appendChild(maskBase);
     defs.appendChild(mask); dim.appendChild(defs);
+    /* glow: a blur filter on a rect with the SAME shape as the ring */
+    var glowId = 'dv-tour-glow-' + Math.random().toString(36).slice(2, 8);
+    var glow = doc.createElementNS(SVG_NS, 'filter');
+    glow.setAttribute('id', glowId);
+    glow.setAttribute('x', '-50%'); glow.setAttribute('y', '-50%');
+    glow.setAttribute('width', '200%'); glow.setAttribute('height', '200%');
+    var blur = doc.createElementNS(SVG_NS, 'feGaussianBlur');
+    blur.setAttribute('stdDeviation', '6');
+    glow.appendChild(blur); defs.appendChild(glow);
     var dimRect = doc.createElementNS(SVG_NS, 'rect');
     dimRect.setAttribute('class', 'dv-tour-dim-fill');
     dimRect.setAttribute('mask', 'url(#' + maskId + ')');
     dim.appendChild(dimRect);
+    /* rings are drawn in the SAME svg, from the SAME shape objects as the
+       mask holes (one geometry, one render path) */
+    var rings = doc.createElementNS(SVG_NS, 'g');
+    rings.setAttribute('class', 'dv-tour-rings');
+    dim.appendChild(rings);
     overlay.appendChild(dim);
     var scrim = el('div', 'dv-tour-scrim');
     overlay.appendChild(scrim);
-    var ring = el('div', 'dv-tour-ring'); overlay.appendChild(ring);
     var extras = el('div', 'dv-tour-extras'); overlay.appendChild(extras);
     var timeline = el('div', 'dv-tour-timeline'); overlay.appendChild(timeline);
     var ui = el('div', 'dv-tour-ui');
@@ -274,39 +287,69 @@ function wireTour(ctl, view, win, config, options){
     overlay.appendChild(hint);
     doc.body.appendChild(overlay);
     parts = {scrim: scrim, dim: dim, mask: mask, maskBase: maskBase, dimRect: dimRect,
-             ring: ring, extras: extras, timeline: timeline,
+             rings: rings, glowId: glowId, extras: extras, timeline: timeline,
              ui: ui, eyebrow: eyebrow, heading: heading, body: body,
              back: back, next: next, skip: skip, chooser: chooser, hint: hint};
   }
-  /* The cutout contract, exactly: the un-dimmed region is the UNION of the
-     per-target rounded rects (hole rect == ring rect, same radius).
-       - visual: SVG mask, one black rounded rect per hole on a white base —
-         overlaps simply stay black, so nested/intersecting holes union
-         exactly with their real corners;
-       - clicks: the complement of the union, decomposed on the grid of
-         distinct hole edges into axis-aligned blocker cells (a cell blocks
-         iff its centre lies in no hole). Rounded corners resolve to the
-         bounding rect for CLICKS only — the visual stays exact. */
+  /* One geometry, one render path. Every highlight is a single shape
+     object {x, y, width, height, rx}; that object writes the mask hole AND
+     (for ringed highlights) the ring rect — identical attributes, so hole
+     and ring cannot drift. The ring's 2px stroke is CENTERED on the hole
+     edge (1px inside, 1px outside); its glow is a blurred wider stroke on
+     a third rect with the same shape. The same list, in the same pass,
+     produces the click-blocker cells, so no layer lags another.
+       - visual: overlapping holes stay black in the mask, so the un-dimmed
+         region is exactly the union of the rounded rects;
+       - clicks: the complement of the union on the grid of distinct hole
+         edges (a cell blocks iff its centre lies in no hole). Rounded
+         corners resolve to the bounding rect for CLICKS only. */
   var SVGNS_DIM = 'http://www.w3.org/2000/svg';
-  function applyScrim(holes){
+  function shapeOf(h){
+    var rx = Math.min(h.r || 0, h.w / 2, h.h / 2);
+    return {x: h.x, y: h.y, width: h.w, height: h.h, rx: rx};
+  }
+  function setShape(node, s){
+    node.setAttribute('x', s.x); node.setAttribute('y', s.y);
+    node.setAttribute('width', s.width); node.setAttribute('height', s.height);
+    node.setAttribute('rx', s.rx); node.setAttribute('ry', s.rx);
+  }
+  function svgRect(cls){
+    var node = doc.createElementNS(SVGNS_DIM, 'rect');
+    if (cls) node.setAttribute('class', cls);
+    return node;
+  }
+  function render(highlights){
     var vw = win.innerWidth, vh = win.innerHeight;
-    var visible = holes.filter(function(r){ return r.w > 4 && r.h > 4; });
+    var visible = highlights.filter(function(h){ return h.w > 4 && h.h > 4; });
     var base = parts.maskBase;
-    base.setAttribute('x', 0); base.setAttribute('y', 0);
-    base.setAttribute('width', vw); base.setAttribute('height', vh);
-    parts.dimRect.setAttribute('x', 0); parts.dimRect.setAttribute('y', 0);
-    parts.dimRect.setAttribute('width', vw); parts.dimRect.setAttribute('height', vh);
+    setShape(base, {x: 0, y: 0, width: vw, height: vh, rx: 0});
+    setShape(parts.dimRect, {x: 0, y: 0, width: vw, height: vh, rx: 0});
     parts.dim.setAttribute('width', vw); parts.dim.setAttribute('height', vh);
     parts.dim.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
     while (parts.mask.lastChild && parts.mask.lastChild !== base) parts.mask.removeChild(parts.mask.lastChild);
-    visible.forEach(function(r){
-      var h = doc.createElementNS(SVGNS_DIM, 'rect');
-      var rad = Math.min(r.r || 0, r.w / 2, r.h / 2);
-      h.setAttribute('x', r.x); h.setAttribute('y', r.y);
-      h.setAttribute('width', r.w); h.setAttribute('height', r.h);
-      h.setAttribute('rx', rad); h.setAttribute('ry', rad);
-      h.setAttribute('fill', '#000');
-      parts.mask.appendChild(h);
+    parts.rings.replaceChildren();
+    parts.extras.replaceChildren();
+    visible.forEach(function(h){
+      var s = shapeOf(h);
+      var hole = svgRect(null);
+      setShape(hole, s); hole.setAttribute('fill', '#000');
+      hole.setAttribute('data-kind', h.kind);
+      parts.mask.appendChild(hole);
+      if (h.kind === 'reveal') return;
+      if (h.kind === 'primary'){
+        var halo = svgRect('dv-tour-glow');
+        setShape(halo, s); halo.setAttribute('filter', 'url(#' + parts.glowId + ')');
+        parts.rings.appendChild(halo);
+      }
+      var ring = svgRect(h.kind === 'primary' ? 'dv-tour-ring' : 'dv-tour-ring2');
+      setShape(ring, s);
+      parts.rings.appendChild(ring);
+      if (h.note){
+        var note = el('div', 'dv-tour-note', h.note);
+        var noteX = Math.max(16, Math.min(s.x + s.width - 260, vw - 276));
+        note.style.cssText = 'left:' + noteX + 'px;top:' + (s.y + s.height + 10) + 'px';
+        parts.extras.appendChild(note);
+      }
     });
     /* hit-blocking: complement of the union on the edge grid */
     parts.scrim.replaceChildren();
@@ -335,18 +378,20 @@ function wireTour(ctl, view, win, config, options){
       }
     }
   }
-  function setHole(rect){
-    if (rect.w > 4 && rect.h > 4){
-      parts.ring.hidden = false;
-      parts.ring.style.cssText = 'left:' + rect.x + 'px;top:' + rect.y + 'px;width:' +
-        rect.w + 'px;height:' + rect.h + 'px';
-    } else parts.ring.hidden = true;
+  /* The narration card appears ONCE, in its final position: on every spot
+     step it stays hidden (visibility only — still measurable) from entry
+     until the step's final target is resolved and placed, then it is shown
+     together with the rings. A click step's card waits through the
+     cause-before-effect hold and appears beside the opened menu. */
+  var focusOnShow = false;
+  function holdCard(){ parts.ui.classList.add('dv-tour-ui-pending'); }
+  function showCard(){
+    if (!parts.ui.classList.contains('dv-tour-ui-pending')) return;
+    parts.ui.classList.remove('dv-tour-ui-pending');
+    if (focusOnShow && active) focusNext();
   }
   function fullScrim(){
-    applyScrim([]);
-    setHole({x: 0, y: 0, w: 0, h: 0});
-    parts.ring.hidden = true;
-    parts.extras.replaceChildren();
+    render([]);
     placeUi(null);
   }
   /* the narration card defaults to the bottom-left corner and yields to the
@@ -434,6 +479,7 @@ function wireTour(ctl, view, win, config, options){
     if (el.getAttribute && el.getAttribute('aria-expanded') === 'true'){
       settling = false;
       guarded(position);
+      showCard();
       watch(queryTarget(step, sec, eff.target) || el);
       return;
     }
@@ -441,6 +487,7 @@ function wireTour(ctl, view, win, config, options){
     clickedTrigger = el;
     settling = false;
     guarded(position);
+    showCard(); /* first and only appearance: already beside the menu */
     watch(queryTarget(step, sec, eff.target) || el);
   }
   function position(){
@@ -464,12 +511,10 @@ function wireTour(ctl, view, win, config, options){
       if (nodeEl && nodeEl.getBoundingClientRect) rect = rectOf(nodeEl);
     }
     var hole = tourCutoutRect(rect, step.offset, 8, viewport());
-    hole.r = 12; /* ring border-radius — the hole matches it exactly */
+    hole.r = 12; hole.kind = 'primary';
     var holes = [hole];
-    setHole(hole);
     placeUi(hole);
     /* every control the copy names is genuinely un-dimmed AND ringed */
-    parts.extras.replaceChildren();
     eff.secondaries.forEach(function(item){
       var second = queryTarget(step, sec, item.target);
       if (!second || !isRendered(second)) return;
@@ -478,19 +523,9 @@ function wireTour(ctl, view, win, config, options){
          with a note floating beside it points at nothing */
       var r2 = tourCutoutRect(rectOf(second), null, 6, null);
       if (r2.x < 0 || r2.y < 0 || r2.x + r2.w > win.innerWidth || r2.y + r2.h > win.innerHeight) return;
-      r2.r = Math.min(999, r2.h / 2); /* the secondary ring is a pill */
+      r2.r = r2.h / 2; /* a pill: shapeOf clamps rx to half the height */
+      r2.kind = 'secondary'; r2.note = item.note || '';
       holes.push(r2);
-      var ring2 = el('div', 'dv-tour-ring2');
-      ring2.style.cssText = 'left:' + r2.x + 'px;top:' + r2.y + 'px;width:' + r2.w + 'px;height:' + r2.h +
-        'px;border-radius:' + r2.r + 'px';
-      parts.extras.appendChild(ring2);
-      var noteText = item.note || '';
-      if (noteText){
-        var note = el('div', 'dv-tour-note', noteText);
-        var noteX = Math.max(16, Math.min(r2.x + r2.w - 260, win.innerWidth - 276));
-        note.style.cssText = 'left:' + noteX + 'px;top:' + (r2.y + r2.h + 10) + 'px';
-        parts.extras.appendChild(note);
-      }
     });
     /* reveal-only cutouts: un-dimmed, no ring — a demo step shows the
        diagram reacting, not just the ringed control */
@@ -499,10 +534,10 @@ function wireTour(ctl, view, win, config, options){
       var shown = queryTarget(step, sec, item);
       if (!shown || !isRendered(shown)) return;
       var r3 = tourCutoutRect(rectOf(shown), null, 6, viewport());
-      r3.r = 12;
+      r3.r = 12; r3.kind = 'reveal';
       holes.push(r3);
     });
-    applyScrim(holes);
+    render(holes);
   }
   function schedule(){
     if (raf) return;
@@ -607,10 +642,15 @@ function wireTour(ctl, view, win, config, options){
         ' Auto-play is off — use the ‹ › step arrows to walk the story yourself.' : '');
     parts.back.disabled = at === 0;
     parts.next.textContent = at >= list.length - 1 ? 'Done' : 'Next';
-    if (!keepFocus){
-      try { parts.next.focus({preventScroll: true}); }
-      catch (ex) { parts.next.focus(); }
-    }
+    /* a held card cannot take focus yet (visibility:hidden): focus Next when
+       the card is shown instead */
+    focusOnShow = !keepFocus;
+    if (focusOnShow && !parts.ui.classList.contains('dv-tour-ui-pending')) focusNext();
+  }
+  function focusNext(){
+    focusOnShow = false;
+    try { parts.next.focus({preventScroll: true}); }
+    catch (ex) { parts.next.focus(); }
   }
 
   /* ---- state machine ---- */
@@ -722,6 +762,7 @@ function wireTour(ctl, view, win, config, options){
     at = index;
     unwatch();
     settling = false;
+    showCard(); /* chooser/done cards are static; spot steps re-hold below */
     parts.hint.hidden = (step.kind || 'spot') === 'chooser'; /* arrows do nothing there */
     if ((step.kind || 'spot') === 'chooser'){
       parts.ui.classList.remove('dv-tour-ui-center');
@@ -736,9 +777,8 @@ function wireTour(ctl, view, win, config, options){
     var clickStep = !!(step.demo && step.demo.click);
     /* one movement per step change: full dim first, move under it, reveal */
     settling = true;
-    applyScrim([]);
-    parts.ring.hidden = true;
-    parts.extras.replaceChildren();
+    holdCard();
+    render([]);
     if (target){
       /* scrollIntoView first (it also centers inside the board's own
          horizontal scroller), then correct the window explicitly — on SVG
@@ -764,7 +804,8 @@ function wireTour(ctl, view, win, config, options){
           settling = false;
           if (inView && clickStep){
             /* cause before effect: reveal the ringed trigger, hold a beat,
-               then let the viewer watch the click land */
+               then let the viewer watch the click land — the card waits and
+               appears once, beside the opened menu */
             guarded(position);
             win.setTimeout(function(){ guarded(function(){
               if (gen === myGen) firePendingClick(step, sec, eff);
@@ -772,6 +813,7 @@ function wireTour(ctl, view, win, config, options){
           }
           else {
             guarded(position);
+            showCard();
             watch(target);
             if (inView) startDemo(step, sec);
           }
@@ -780,7 +822,7 @@ function wireTour(ctl, view, win, config, options){
         lastTop = top;
         win.setTimeout(function(){ guarded(settle); }, 80);
       })();
-    } else { settling = false; }
+    } else { settling = false; showCard(); }
     /* the engine closes its menu when focus leaves it: a click step leaves
        focus where the engine put it (the menu's first link) */
     renderTimeline(); renderStep(step, clickStep);

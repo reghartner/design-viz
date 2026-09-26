@@ -25,9 +25,13 @@ silently repairs.
 
 The dim is an SVG mask: one black rounded rect per hole on a white base.
 
-- Every hole is the SAME rectangle, padding and corner radius as its ring —
-  hole and ring read as one shape. Primary holes use the ring's 12px radius;
-  secondary holes are pills, matching their pill rings.
+- One geometry, one render path: each highlight is a single shape object
+  `{x, y, width, height, rx}` that writes BOTH its mask hole and its ring
+  rect (in the same SVG), so hole and ring are identical by construction.
+  The ring's 2px stroke is centered on the hole edge (1px inside, 1px
+  outside); the primary ring's glow is a blurred wider stroke on a third
+  rect with the same shape. Primary holes use a 12px radius; secondary
+  holes are pills (radius = half their height).
 - The un-dimmed region is exactly the UNION of those rounded rects:
   overlapping or nested holes (▶ inside a ringed transport, a ringed toggle
   inside a revealed board, a trigger ring overlapping its menu) simply
@@ -36,6 +40,12 @@ The dim is an SVG mask: one black rounded rect per hole on a white base.
   union, decomposed into axis-aligned cells; every point inside a hole is
   clickable exactly once. For CLICKS ONLY, a hole's rounded corners count
   as its bounding rect — the visual is exact.
+- Mask holes, rings, notes and click-blocker cells are all produced from
+  that one highlight list in one pass, so no layer lags another.
+- The narration card appears ONCE, in its final place: on every spot step
+  it stays hidden from entry until the step's final target is placed, then
+  appears with the rings. A click step's card waits through the ~600ms
+  pre-click hold (the ⋯ ring shows) and appears beside the opened menu.
 - Step changes are ONE movement: the page dims fully, the state is applied
   and the scroll settles under the dim, then the new spotlight is revealed.
   Nothing hops twice.
@@ -44,6 +54,12 @@ The dim is an SVG mask: one black rounded rect per hole on a white base.
   inside the viewport gets no ring, no hole and no note. Deterministic and
   never a clipped sliver — if a secondary matters, author the page so it
   shares the screen with the primary, or give it its own step.
+- Mask holes, rings, notes and click-blocker cells are all produced from
+  that one highlight list in one pass, so no layer lags another.
+- The narration card appears ONCE, in its final place: on every spot step
+  it stays hidden from entry until the step's final target is placed, then
+  appears with the rings. A click step's card waits through the ~600ms
+  pre-click hold (the ⋯ ring shows) and appears beside the opened menu.
 - Step changes are ONE movement: the page dims fully, the state is applied
   and the scroll settles under the dim, then the new spotlight is revealed.
   Nothing hops twice.

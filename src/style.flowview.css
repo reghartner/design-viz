@@ -22,9 +22,11 @@ body.sk-daylight{background:#F4F2EC;}
 .dv-tour-dim-fill{fill:rgba(11,18,32,.82);}
 .dv-tour-scrim{position:fixed; inset:0; pointer-events:none;}
 .dv-tour-block{position:fixed; pointer-events:auto;}
-.dv-tour-ring{position:fixed; border:2px solid #38E1FF; border-radius:12px; pointer-events:none;
-  box-shadow:0 0 0 4px rgba(56,225,255,.25), 0 0 40px rgba(56,225,255,.35);}
-.dv-tour-ring2{position:fixed; border:2px solid rgba(56,225,255,.85); border-radius:999px; pointer-events:none;}
+/* rings: SVG rects sharing their hole's exact shape; stroke centered on the edge */
+.dv-tour-rings rect{fill:none; pointer-events:none;}
+.dv-tour-ring{stroke:#38E1FF; stroke-width:2;}
+.dv-tour-ring2{stroke:rgba(56,225,255,.85); stroke-width:2;}
+.dv-tour-glow{stroke:rgba(56,225,255,.45); stroke-width:8;}
 .dv-tour-note{position:fixed; max-width:260px; font:500 12px/1.5 'IBM Plex Sans',system-ui,sans-serif;
   color:#F2F7FF; background:rgba(11,18,32,.92); border:1px solid rgba(56,225,255,.4);
   border-radius:10px; padding:8px 12px; pointer-events:auto;}
@@ -36,6 +38,7 @@ body.sk-daylight{background:#F4F2EC;}
 .dv-tour-ui{position:fixed; left:44px; bottom:44px; max-width:360px; pointer-events:auto;
   background:rgba(11,18,32,.94); border:1px solid rgba(56,225,255,.25); border-radius:14px; padding:18px 20px;}
 .dv-tour-ui[hidden]{display:none;}
+.dv-tour-ui-pending{visibility:hidden;} /* measured, placed, not yet shown */
 .dv-tour-ui-center{left:50%; bottom:auto; top:50%; transform:translate(-50%,-50%); text-align:center; max-width:460px;}
 .dv-tour-eyebrow{font:700 11px 'IBM Plex Mono',monospace; letter-spacing:2px; color:#38E1FF; text-transform:uppercase;}
 .dv-tour-heading{margin:8px 0 6px; font-family:'Sora',sans-serif; font-weight:700; font-size:28px; line-height:1.2; color:#F2F7FF;}
@@ -64,6 +67,5 @@ body.sk-daylight{background:#F4F2EC;}
 .dv-tour-replay{float:right; margin-left:8px;}
 .dv-tour-btn:focus-visible, .dv-tour-skip:focus-visible, .dv-tour-choice:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
 @media (prefers-reduced-motion: reduce){
-  .dv-tour-ring{box-shadow:0 0 0 4px rgba(56,225,255,.25);}
-  .dv-tour-seg.on{box-shadow:none;}
+    .dv-tour-seg.on{box-shadow:none;}
 }

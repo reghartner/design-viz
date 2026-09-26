@@ -74,7 +74,10 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'branching-split',
-      target: {selector: '.path-timeline', within: 'section'},
+      /* the engine draws paths as a packed timeline when they share and
+         rejoin, or as a plain path matrix when they never rejoin — the
+         split is real on both, so the authored target names both */
+      target: {selector: '.path-timeline, .path-matrix', within: 'section'},
       diagramState: {mode: 'step', path: '@alt'},
       demo: {advance: 3, intervalMs: 1600},
       reveal: [{selector: '.board', within: 'section'}],
@@ -105,6 +108,19 @@ var TOUR_DEFAULT_CONFIG = {
       copy: {
         heading: 'Nodes link to the real system',
         body: 'The tour just opened this node’s ⋯ menu — every node with links has one: its Backstage entry, API definition, and code references, where available. Every ↗ jumps to the source.'
+      }
+    },
+    {
+      id: 'drill',
+      personas: ['eng', 'both'],
+      demo: {click: {selector: '.detail-trigger', within: 'section'}},
+      target: {selector: '.doc-sec[data-dv-detail-preview] .board', within: 'page'},
+      secondary: [
+        {target: {selector: '.doc-sec[data-dv-detail-preview] .detail-breadcrumb', within: 'page'}}
+      ],
+      copy: {
+        heading: 'Zoom into a part of the system',
+        body: 'The tour just pressed \u229e on a node: that part of the system opens as its own flow, with its own steps and paths. The breadcrumb takes you back.'
       }
     },
     {

@@ -97,6 +97,14 @@ export default async function prepare(){
     await writeFile(nestSpec,JSON.stringify(nest));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),nestSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-nest.html')],{stdio:'inherit'});
     await rm(nestSpec);
+    // Drill-down fixture: the shipped domain-drilldown starter (overview
+    // with ⊞ detail nodes, two-level nest), paused for determinism.
+    const drillRaw=JSON.parse(await readFile(path.join(repo,'src/starters/domain-drilldown.json'),'utf8'));
+    pause(drillRaw);
+    const drillSpec=path.join(output,'tour-drill.spec.json');
+    await writeFile(drillSpec,JSON.stringify(drillRaw));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),drillSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-drill.html')],{stdio:'inherit'});
+    await rm(drillSpec);
     const ambientSpec=path.join(output,'tour-ambient.spec.json');
     await writeFile(ambientSpec,JSON.stringify(ambient));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),ambientSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-ambient.html')],{stdio:'inherit'});

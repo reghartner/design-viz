@@ -131,6 +131,11 @@ Per step:
     host). Leaving the step un-clicks via the control's own toggle, checked
     against THAT control's expanded state. Runs as authored under reduced
     motion. A click step must declare both `demo.click` and `target`.
+    A drill-down trigger (`.detail-trigger`, the ⊞ button) works the same
+    way: the tour presses it, the engine opens the focused detail flow, the
+    tour scrolls that flow into view under the dim and rings its board and
+    breadcrumb. Leaving the step returns to the parent level through the
+    engine's own silent close — no history entry, no URL change.
   **Authoring rule: if the copy tells the reader to open or press
   something, the tour demonstrates it.**
 
@@ -172,7 +177,9 @@ the authored count. Fix the config; don't rely on the skip. `chooser` and
 3. For every step, declare the state the control needs (`mode`, `path`,
    `view`, `section`) — what you clicked to see it is what the step declares.
 4. Selectors: prefer the engine's stable classes (`.step-transport`,
-   `.path-timeline`, `.presentbtn`, `.nrefs-trigger`, `.node-link-menu`,
+   `.path-timeline` (paths that rejoin) or `.path-matrix` (paths that
+   never rejoin), `.presentbtn`, `.nrefs-trigger`, `.node-link-menu`,
+   `.detail-trigger`, `.detail-breadcrumb`,
    `.diagram-view-choice`, `.panelcol`, `.mtoggle`, `.board`, `.termbar`).
 5. Run `node tools/validate.js <spec>` — tour problems are warnings, never
    render blockers.
@@ -187,8 +194,10 @@ the authored count. Fix the config; don't rely on the skip. `chooser` and
   `#tour=0` suppresses; deep-linked opens never auto-start; never wired on
   `#embed=` pages; printing hides it.
 - Fragment writes are suppressed while the tour runs; the pre-tour snapshot
-  (tabs, view, path, mode, step, playback, scroll, disclosures) is restored
-  field-by-field on Done/Skip — untouched diagrams are not driven at all.
+  (tabs, view, path, mode, step, playback, scroll, disclosures, and an open
+  drill-down) is restored field-by-field on Done/Skip — untouched diagrams
+  are not driven at all. A drill-down open when the tour starts is closed
+  so the tour walks the overview, then re-opened exactly on finish.
 - Any internal error tears the overlay down, restores state, logs
   `flowspec: tour error` — fail-open, always.
 - Keyboard: ← → move, Esc skips (hint hidden on the chooser); the tour owns

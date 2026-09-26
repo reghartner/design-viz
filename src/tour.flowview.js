@@ -124,7 +124,12 @@ function wireTour(ctl, view, win, config, options){
   /* ---- pre-tour state snapshot: the page must come back exactly ---- */
   var snapshot = null, openedDetails = [];
   function takeSnapshot(){
+    /* an open drill-down: save it and return to the overview so the tour
+       walks the page from the top; it is restored exactly on finish */
+    var drill = ctl.details ? ctl.details.snapshot() : null;
+    if (drill){ ctl.details.close(true); ctl.detailHistoryPush = false; }
     snapshot = {
+      drill: drill,
       scrollY: win.scrollY || 0,
       tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
       sections: ctl.sections.filter(function(sec){ return sec.stepper; }).map(function(sec){
@@ -177,6 +182,15 @@ function wireTour(ctl, view, win, config, options){
       /* a diagram that was auto-playing keeps (or regains) its playback */
       if (saved.playing && sp.playing && !sp.playing() && sp.mode() === 'step') sp.toggleAuto();
     });
+    /* drill state last: the tour always leaves the overview showing, so
+       only a pre-tour drill needs re-opening (async, via the engine's own
+       restore path; fragment writes stay suppressed until finish) */
+    var drill = snapshot.drill;
+    if (ctl.details){
+      if (ctl.details.snapshot()) ctl.details.close(true);
+      if (drill){ try { ctl.details.restore(drill); } catch (ex) { /* stays at overview */ } }
+    }
+    ctl.detailHistoryPush = false;
     win.scrollTo(0, snapshot.scrollY);
     snapshot = null;
   }
@@ -462,6 +476,15 @@ function wireTour(ctl, view, win, config, options){
     var trigger = clickedTrigger;
     clickedTrigger = null;
     try {
+      /* a drill-down trigger: return to the parent level through the
+         engine's own silent close (no history entry, no fragment write) */
+      if (trigger.getAttribute && trigger.hasAttribute('data-dv-detail')){
+        if (ctl.details && ctl.details.snapshot()) ctl.details.close(true);
+        ctl.detailHistoryPush = false;
+        return;
+      }
+      /* a menu trigger: un-click through its own toggle, only if it is the
+         one expanded */
       if (trigger.isConnected && trigger.getAttribute && trigger.getAttribute('aria-expanded') === 'true')
         trigger.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
     } catch (ex) { /* nothing to close */ }
@@ -476,6 +499,17 @@ function wireTour(ctl, view, win, config, options){
     pendingClick = null;
     /* the viewer may have clicked ⋯ themselves during the hold: clicking
        again would toggle the menu shut. Leave it open; it is theirs. */
+    var drill = !!(el.hasAttribute && el.hasAttribute('data-dv-detail'));
+    if (drill && ctl.details && ctl.details.snapshot()){
+      /* the viewer opened the detail during the hold: keep it, but it is
+         still closed when the step is left */
+      clickedTrigger = el;
+      settling = false;
+      guarded(position);
+      showCard();
+      watch(queryTarget(step, sec, eff.target) || el);
+      return;
+    }
     if (el.getAttribute && el.getAttribute('aria-expanded') === 'true'){
       settling = false;
       guarded(position);
@@ -485,6 +519,27 @@ function wireTour(ctl, view, win, config, options){
     }
     el.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
     clickedTrigger = el;
+    if (drill){
+      /* a drill replaces the parent section with the detail: bring the new
+         flow to the top of the viewport (unlike a menu, which the engine
+         dismisses on scroll), let layout settle a frame, then place rings
+         and card once */
+      settling = true; /* nothing repaints mid-move (scroll events reschedule) */
+      render([]);
+      var host = doc.querySelector('.doc-sec[data-dv-detail-preview]');
+      if (host && host.scrollIntoView){
+        try { host.scrollIntoView({block: 'start', behavior: 'instant'}); } catch (ex) { host.scrollIntoView(); }
+        win.scrollBy(0, -16);
+      }
+      win.setTimeout(function(){ guarded(function(){
+        if (!active || list[at] !== step) return;
+        settling = false;
+        position();
+        showCard();
+        watch(queryTarget(step, sec, eff.target) || el);
+      }); }, 120);
+      return;
+    }
     settling = false;
     guarded(position);
     showCard(); /* first and only appearance: already beside the menu */

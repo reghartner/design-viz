@@ -18,7 +18,7 @@ test('the shipped default config lints clean and is usable',()=>{
 
 test('the default flow covers chooser, controls, branching, both personas, done',()=>{
   const ids=plain(config.steps.map(s=>s.id));
-  assert.deepEqual(ids,['welcome','mode-ambient','mode-step','controls','branching-split','branching-rejoin','links','story','panels','finish-ux','finish-eng']);
+  assert.deepEqual(ids,['welcome','mode-ambient','mode-step','controls','branching-split','branching-rejoin','links','drill','story','panels','finish-ux','finish-eng']);
   const panels=config.steps.find(s=>s.id==='panels');
   assert.deepEqual(plain(panels.demo),{advance:3,intervalMs:1800});
   assert.deepEqual(plain(panels.personas),['ux','both']);
@@ -33,6 +33,13 @@ test('the default flow covers chooser, controls, branching, both personas, done'
   assert.equal(links.demo.click.selector,'.nrefs-trigger');
   assert.equal(links.target.selector,'.node-link-menu');
   assert.equal(links.secondary[0].target.selector,'.nrefs-trigger');
+  // The drill step presses ⊞ and spotlights the opened detail flow, with
+  // the breadcrumb (the way back) ringed; engineering tracks only.
+  const drill=config.steps.find(s=>s.id==='drill');
+  assert.equal(drill.demo.click.selector,'.detail-trigger');
+  assert.ok(drill.target.selector.includes('[data-dv-detail-preview]'));
+  assert.ok(drill.secondary[0].target.selector.includes('.detail-breadcrumb'));
+  assert.deepEqual(plain(drill.personas),['eng','both']);
   // Shipped default copy stays generic: no page-specific widget names.
   config.steps.forEach(s=>{
     const text=((s.copy&&(s.copy.heading+' '+s.copy.body))||'').toLowerCase();
@@ -45,7 +52,7 @@ test('the default flow covers chooser, controls, branching, both personas, done'
   const ux=plain(context.tourStepsForPersona(config,'ux').map(s=>s.id));
   const both=plain(context.tourStepsForPersona(config,'both').map(s=>s.id));
   // eng: the mode pair (map, then sequence), branching, links, its recap
-  assert.deepEqual(eng,['welcome','mode-ambient','mode-step','branching-split','branching-rejoin','links','finish-eng']);
+  assert.deepEqual(eng,['welcome','mode-ambient','mode-step','branching-split','branching-rejoin','links','drill','finish-eng']);
   // ux: one simple controls step, no AMBIENT anywhere in its copy
   assert.deepEqual(ux,['welcome','controls','branching-split','branching-rejoin','story','panels','finish-ux']);
   context.tourStepsForPersona(config,'ux').forEach(s=>{
@@ -53,7 +60,7 @@ test('the default flow covers chooser, controls, branching, both personas, done'
     assert.ok(!text.includes('AMBIENT'),'ux copy never mentions AMBIENT: '+s.id);
   });
   // both: the eng mode pair plus the ux story/panels — an authored union
-  assert.deepEqual(both,['welcome','mode-ambient','mode-step','branching-split','branching-rejoin','links','story','panels','finish-eng']);
+  assert.deepEqual(both,['welcome','mode-ambient','mode-step','branching-split','branching-rejoin','links','drill','story','panels','finish-eng']);
   // the mode pair is adjacent: the map, then the sequence
   assert.equal(eng.indexOf('mode-step'),eng.indexOf('mode-ambient')+1);
 });

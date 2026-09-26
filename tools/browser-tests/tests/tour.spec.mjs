@@ -355,6 +355,49 @@ test('Skip returns focus to where the reader was',async({page,server})=>{
   await expect(page.locator('.dv-tour-replay')).toBeFocused();
 });
 
+async function walkToDrill(page,server){
+  await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
+  await page.goto(server.origin+'/tour-drill.html#tour=1');
+  const hashBefore=new URL(page.url()).hash;
+  await page.locator('.dv-tour-choice').nth(1).click(); // The engineering
+  const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+  for(let i=0;i<10;i++){
+    await expect(heading).not.toHaveText('');
+    if((await heading.textContent())==='Zoom into a part of the system')break;
+    await page.locator('.dv-tour-next').click();
+  }
+  await expect(heading).toHaveText('Zoom into a part of the system');
+  return {heading,hashBefore};
+}
+
+test('the drill step opens a detail flow and Next returns to the overview',async({page,server})=>{
+  const {heading,hashBefore}=await walkToDrill(page,server);
+  // the tour pressed ⊞: the focused detail is open, its board and the
+  // breadcrumb ringed, the card shown once beside it
+  const detail=page.locator('.doc-sec[data-dv-detail-preview]');
+  await expect(detail).toBeVisible();
+  await expect(page.locator('.dv-tour-ui')).toBeVisible();
+  await expect.poll(()=>ringsMatchHoles(page)).toBe(true);
+  await expect(page.locator('.dv-tour-ring2')).toHaveCount(1);
+  // the tour never writes the drill trail into the URL
+  expect(new URL(page.url()).hash).toBe(hashBefore);
+  await page.locator('.dv-tour-next').click();
+  await expect(heading).toHaveText('Now try it');
+  await expect(detail).toHaveCount(0);
+  await expect(page.locator('#section-doorbell-domains, .doc-sec').first()).toBeVisible();
+  expect(new URL(page.url()).hash).toBe(hashBefore);
+});
+
+test('Esc on the drill step returns the page to the overview, fragment untouched',async({page,server})=>{
+  const {hashBefore}=await walkToDrill(page,server);
+  await expect(page.locator('.doc-sec[data-dv-detail-preview]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.dv-tour')).toBeHidden();
+  await expect(page.locator('.doc-sec[data-dv-detail-preview]')).toHaveCount(0);
+  await expect(page.locator('.detail-trigger').first()).toBeVisible();
+  expect(new URL(page.url()).hash).toBe(hashBefore);
+});
+
 test('a malformed page.tour fails open: page renders, no stuck scrim',async({page,server})=>{
   // copy.choices as a string used to throw during render and leave the
   // scrim over the page with no buttons. The lint warns; the renderer must

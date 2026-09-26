@@ -443,27 +443,71 @@ function wireTour(ctl, view, win, config, options){
   }
   /* the narration card defaults to the bottom-left corner and yields to the
      spotlight: first corner that does not overlap the hole wins */
-  function placeUi(hole){
+  /* Card placement, from the FINAL layout (rings and notes already drawn,
+     card still held): candidates in a fixed order — bottom-left,
+     bottom-right, top-left, top-right, bottom-centre, top-centre.
+       1. the first candidate that covers no ring and no note;
+       2. else the first candidate clear of the PRIMARY ring that covers the
+          fewest secondary rings/notes;
+       3. else (the primary spans every candidate) the candidate covering
+          the least primary area.
+     The rule that applied is written to data-placement (clear | partial |
+     covers-primary) so it can be asserted; it never moves once shown. */
+  function placeUi(primary){
     if (parts.ui.classList.contains('dv-tour-ui-center')){
       parts.ui.style.left = ''; parts.ui.style.top = '';
       parts.ui.style.right = ''; parts.ui.style.bottom = '';
+      parts.ui.removeAttribute('data-placement');
       return;
     }
     var m = 44, uw = parts.ui.offsetWidth || 360, uh = parts.ui.offsetHeight || 200;
     var vw = win.innerWidth, vh = win.innerHeight;
-    var corners = [
-      {x: m, y: vh - m - uh}, {x: vw - m - uw, y: vh - m - uh},
-      {x: m, y: m + 40}, {x: vw - m - uw, y: m + 40}
-    ];
-    var pick = corners[0];
-    if (hole && hole.w > 0){
-      for (var i = 0; i < corners.length; i++){
-        var c = corners[i];
-        var clear = c.x + uw < hole.x || c.x > hole.x + hole.w ||
-                    c.y + uh < hole.y || c.y > hole.y + hole.h;
-        if (clear){ pick = c; break; }
-      }
+    var cx = Math.max(m, (vw - uw) / 2);
+    function spots(mg){
+      return [
+        {x: mg, y: vh - mg - uh}, {x: vw - mg - uw, y: vh - mg - uh},
+        {x: mg, y: mg + 40}, {x: vw - mg - uw, y: mg + 40},
+        {x: cx, y: vh - mg - uh}, {x: cx, y: mg + 40}
+      ];
     }
+    /* the comfortable 44px margin first, then the same six spots at 16px
+       — a hair of extra room often clears a ring outright */
+    var candidates = spots(m).concat(spots(16));
+    function area(c, r){
+      var w = Math.min(c.x + uw, r.x + r.w) - Math.max(c.x, r.x);
+      var h = Math.min(c.y + uh, r.y + r.h) - Math.max(c.y, r.y);
+      return (w > 0 && h > 0) ? w * h : 0;
+    }
+    var others = [];
+    Array.prototype.forEach.call(parts.rings.querySelectorAll('.dv-tour-ring2'), function(n){
+      var b = n.getBoundingClientRect(); others.push({x: b.left, y: b.top, w: b.width, h: b.height});
+    });
+    Array.prototype.forEach.call(parts.extras.querySelectorAll('.dv-tour-note'), function(n){
+      var b = n.getBoundingClientRect(); others.push({x: b.left, y: b.top, w: b.width, h: b.height});
+    });
+    var pick = null, mode = 'clear';
+    if (!primary || primary.w <= 0){ pick = candidates[0]; }
+    for (var i = 0; !pick && i < candidates.length; i++){
+      var c = candidates[i];
+      if (!area(c, primary) && others.every(function(r){ return !area(c, r); })) pick = c;
+    }
+    if (!pick){
+      /* least total AREA over secondary rings/notes (not the count): a
+         3px graze beats covering a whole breadcrumb */
+      var best = null, bestArea = Infinity;
+      candidates.forEach(function(c){
+        if (area(c, primary)) return;
+        var covered = others.reduce(function(sum, r){ return sum + area(c, r); }, 0);
+        if (covered < bestArea){ best = c; bestArea = covered; }
+      });
+      if (best){ pick = best; mode = 'partial'; }
+    }
+    if (!pick){
+      var least = Infinity;
+      candidates.forEach(function(c){ var a = area(c, primary); if (a < least){ least = a; pick = c; } });
+      mode = 'covers-primary';
+    }
+    parts.ui.setAttribute('data-placement', mode);
     parts.ui.style.left = pick.x + 'px';
     parts.ui.style.top = pick.y + 'px';
     parts.ui.style.right = 'auto';
@@ -601,7 +645,6 @@ function wireTour(ctl, view, win, config, options){
     var hole = tourCutoutRect(rect, step.offset, 8, viewport());
     hole.r = 12; hole.kind = 'primary';
     var holes = [hole];
-    placeUi(hole);
     /* every control the copy names is genuinely un-dimmed AND ringed */
     eff.secondaries.forEach(function(item){
       var second = queryTarget(step, sec, item.target);
@@ -626,6 +669,21 @@ function wireTour(ctl, view, win, config, options){
       holes.push(r3);
     });
     render(holes);
+    placeUi(hole); /* against every ring and note just drawn */
+    yieldCounter();
+  }
+  /* the step counter never sits on a ring: if it would, it steps aside for
+     this step (the card's eyebrow already carries "STEP n OF m") */
+  function yieldCounter(){
+    parts.timeline.classList.remove('dv-tour-timeline-yield');
+    if (parts.timeline.hidden) return;
+    var c = parts.timeline.getBoundingClientRect();
+    if (!c.width) return;
+    var clash = Array.prototype.some.call(parts.rings.querySelectorAll('.dv-tour-ring, .dv-tour-ring2'), function(n){
+      var r = n.getBoundingClientRect();
+      return c.left < r.right + 4 && r.left - 4 < c.right && c.top < r.bottom + 4 && r.top - 4 < c.bottom;
+    });
+    if (clash) parts.timeline.classList.add('dv-tour-timeline-yield');
   }
   function schedule(){
     if (raf) return;
@@ -957,6 +1015,17 @@ function wireTour(ctl, view, win, config, options){
       ev.preventDefault(); ev.stopImmediatePropagation();
     }
   }
+  /* While the tour's ⋯ menu is open, focus moving onto the tour's own
+     controls (Tab, a click on the card) must not close it: the engine
+     closes its menu on any focusin outside it. A window-level capture
+     listener runs before the engine's document-level one and stops those
+     events — only for targets inside the overlay, only while the menu the
+     tour opened is still open. */
+  function guardFocus(ev){
+    if (clickedTrigger && clickedTrigger.getAttribute &&
+        clickedTrigger.getAttribute('aria-expanded') === 'true' &&
+        overlay && overlay.contains(ev.target)) ev.stopImmediatePropagation();
+  }
   function pagePointer(ev){
     /* touching the page through the hole (the spotlit control) takes over
        from a running demo, just like touching the tour's own controls */
@@ -965,6 +1034,7 @@ function wireTour(ctl, view, win, config, options){
   function attach(){
     doc.addEventListener('keydown', keydown, true);
     doc.addEventListener('pointerdown', pagePointer, true);
+    win.addEventListener('focusin', guardFocus, true);
     win.addEventListener('resize', schedule);
     doc.addEventListener('scroll', schedule, true);
     doc.addEventListener('fullscreenchange', schedule);
@@ -973,6 +1043,7 @@ function wireTour(ctl, view, win, config, options){
     unwatch();
     doc.removeEventListener('keydown', keydown, true);
     doc.removeEventListener('pointerdown', pagePointer, true);
+    win.removeEventListener('focusin', guardFocus, true);
     win.removeEventListener('resize', schedule);
     doc.removeEventListener('scroll', schedule, true);
     doc.removeEventListener('fullscreenchange', schedule);

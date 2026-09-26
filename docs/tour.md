@@ -42,6 +42,15 @@ The dim is an SVG mask: one black rounded rect per hole on a white base.
   as its bounding rect — the visual is exact.
 - Mask holes, rings, notes and click-blocker cells are all produced from
   that one highlight list in one pass, so no layer lags another.
+- Card placement avoids EVERY ring and note, computed from the final
+  layout before the card shows. Candidates, in order: bottom-left,
+  bottom-right, top-left, top-right, bottom-centre, top-centre at a 44px
+  margin, then the same six at 16px. First choice: the first candidate
+  covering no ring and no note. Fallback: the candidate clear of the
+  primary ring covering the least total area of secondary rings and notes
+  (earliest wins a tie). Last resort (the primary spans every candidate): the one
+  covering the least of it. The rule used is exposed as the card's
+  `data-placement` (`clear` | `partial` | `covers-primary`).
 - The narration card appears ONCE, in its final place: on every spot step
   it stays hidden from entry until the step's final target is placed, then
   appears with the rings. A click step's card waits through the ~600ms
@@ -56,6 +65,15 @@ The dim is an SVG mask: one black rounded rect per hole on a white base.
   shares the screen with the primary, or give it its own step.
 - Mask holes, rings, notes and click-blocker cells are all produced from
   that one highlight list in one pass, so no layer lags another.
+- Card placement avoids EVERY ring and note, computed from the final
+  layout before the card shows. Candidates, in order: bottom-left,
+  bottom-right, top-left, top-right, bottom-centre, top-centre at a 44px
+  margin, then the same six at 16px. First choice: the first candidate
+  covering no ring and no note. Fallback: the candidate clear of the
+  primary ring covering the least total area of secondary rings and notes
+  (earliest wins a tie). Last resort (the primary spans every candidate): the one
+  covering the least of it. The rule used is exposed as the card's
+  `data-placement` (`clear` | `partial` | `covers-primary`).
 - The narration card appears ONCE, in its final place: on every spot step
   it stays hidden from entry until the step's final target is placed, then
   appears with the rings. A click step's card waits through the ~600ms
@@ -216,9 +234,14 @@ the authored count. Fix the config; don't rely on the skip. `chooser` and
 - A small **Skip tour ✕** control sits fixed at the top LEFT for the
   whole tour (clear of PRESENT, which lives top right) — a mouse way out
   even while a click step holds its card. On narrow screens the step
-  counter drops to its own row below it. Tab and Shift+Tab cycle only the
+  counter row is hidden (the card's eyebrow already carries the count); at
+  any width, on a step where the counter would sit on a ring, it steps
+  aside for that step. Tab and Shift+Tab cycle only the
   tour's visible buttons, this control included.
 - Keyboard: ← → move, Esc skips (hint hidden on the chooser); the tour owns
-  those keys; presenter mode never double-advances.
+  those keys; presenter mode never double-advances. While the tour's own ⋯
+  menu is open, moving focus onto the card (Tab, Shift+Tab, a click) keeps
+  the menu open; its links stay mouse targets and are not in the tour's
+  Tab cycle.
 - Bundles that ship the page stylesheet without the tour fragment (the
   Backstage native viewer) carry the tour's CSS inert by design.

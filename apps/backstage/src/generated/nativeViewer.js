@@ -38,6 +38,7 @@ flowview-root.sk-daylight{background:#F4F2EC;}
   background:rgba(11,18,32,.92); border:1px solid rgba(255,255,255,.18);
   border-radius:999px; padding:7px 12px;}
 .dv-tour-timeline[hidden]{display:none;}
+.dv-tour-timeline-yield{visibility:hidden;} /* would sit on a ring this step */
 .dv-tour-seg{width:34px; height:3px; border-radius:2px; background:rgba(255,255,255,.18);}
 .dv-tour-seg.on{background:#38E1FF; box-shadow:0 0 8px rgba(56,225,255,.6);}
 .dv-tour-count{white-space:nowrap; font:600 11px 'Flowview Native IBM Plex Mono',monospace; color:rgba(242,247,255,.75); margin-left:8px;}
@@ -63,7 +64,9 @@ flowview-root.sk-daylight{background:#F4F2EC;}
 .dv-tour-exit:hover, .dv-tour-exit:focus-visible{border-color:#38E1FF; color:#F2F7FF;}
 /* narrow screens: the centered step counter would run under the exit \u2014
    stack it on its own row below */
-@media (max-width: 720px){ .dv-tour-timeline{top:46px; gap:4px;} .dv-tour-seg{width:20px;} }
+/* narrow screens: no counter row at all \u2014 the card's eyebrow already
+   reads "TOUR \xB7 STEP n OF m", and a second row would sit over rings */
+@media (max-width: 720px){ .dv-tour-timeline{display:none !important;} }
 .dv-tour-hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
   font:500 12px 'Flowview Native IBM Plex Mono',monospace; color:rgba(255,255,255,.55); pointer-events:none;}
 .dv-tour-card{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);

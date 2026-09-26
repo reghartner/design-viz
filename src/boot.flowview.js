@@ -57,6 +57,20 @@ function fail(msgs){
    passes them as the preserved prefix, so the request must be read
    before that first rewrite */
 var embedRequest = embedRequestFromHash(window.location.hash);
+/* same trap as embed: the deep-link channel canonicalizes the hash during
+   wiring and drops unknown keys, so #tour=1/0 must be read before boot.
+   A hash that already targets something (a diagram, step, tab, card) means
+   the reader followed a shared link — the tour must not auto-start over it. */
+var tourRequest = (typeof tourHashRequest === 'function') ?
+  tourHashRequest(window.location.hash) : null;
+var tourDeferredByLink = (function(){
+  try {
+    /* parseHash only copies keys it understands, so any non-null field IS a
+       deep-link target — no hand-maintained key list to drift */
+    var st = parseHash(window.location.hash);
+    return !!st && Object.keys(st).some(function(key){ return st[key] != null; });
+  } catch (ex) { return false; }
+})();
 
 /* the embed flag is applied at load; a hash-only navigation (typing or
    pasting a fragment into an open page) never re-runs boot, so entering
@@ -89,6 +103,8 @@ function applyEmbedMode(ctl){
 
 function boot(raw){
   var page = normalize(raw);
+  if (raw && raw.tour && page && !page.tour && window.console)
+    console.warn('flowspec: top-level "tour" is ignored — the tour config belongs inside "page" (page.tour)');
   var v = validate(page);
   var lint = v.errors.length ? [] : lintPage(page);
   v.warnings.concat(lint).forEach(function(w){ if (window.console) console.warn('flowspec: ' + w); });
@@ -121,6 +137,15 @@ function boot(raw){
     pendingLinkBase = null;
   }
   wirePresenter(ctl, view, window);
+  /* First-run guided tour: a page's own page.tour replaces the built-in
+     default wholesale; an unusable override falls back to the default so a
+     typo never costs the tour. wireTour itself refuses embeds and #tour=0. */
+  if (typeof wireTour === 'function' && !embedRequest){
+    var tourConfig = tourUsableConfig(page.tour) ? page.tour :
+      (typeof TOUR_DEFAULT_CONFIG !== 'undefined' ? TOUR_DEFAULT_CONFIG : null);
+    wireTour(ctl, view, window, tourConfig,
+             {request: tourRequest, deepLink: tourDeferredByLink});
+  }
 }
 
 var raw = null, parseErr = null;

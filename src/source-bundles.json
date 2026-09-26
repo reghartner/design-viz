@@ -12,6 +12,7 @@
     "core/geometry.js",
     "core/details.js",
     "core/handoffs.js",
+    "core/tour-model.js",
     "panels/media.js",
     "icons/brand.js",
     "panels/shared.js",
@@ -85,7 +86,9 @@
         "compatibility.js",
         "canon.js",
         "validator.js",
-        "engine.js"
+        "engine.js",
+        "tour.config.js",
+        "tour.flowview.js"
       ],
       "boot": "boot.flowview.js",
       "styles": [

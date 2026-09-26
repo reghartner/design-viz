@@ -10,3 +10,76 @@ body.sk-daylight{background:#F4F2EC;}
 .errbox{font:500 12px/1.6 'IBM Plex Mono',monospace; color:#FF8B7A; background:#1A0F12;
   border:1px solid #5A2A22; border-radius:10px; padding:14px 16px; white-space:pre-wrap;}
 .tabbtn:focus-visible, .mbtn:focus-visible, .tbtn:focus-visible, .schip:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
+
+/* ---- first-run guided tour (tour.flowview.js) — presenter-cinema look ----
+   These rules also ride bundles that ship this page stylesheet without the
+   tour fragment (the Backstage native viewer): inert there by design — no
+   .dv-tour DOM ever exists without wireTour — and cheaper than forking the
+   page stylesheet per entrypoint. */
+.dv-tour{position:fixed; inset:0; z-index:900; pointer-events:none; font:15px/1.5 'IBM Plex Sans',system-ui,sans-serif;}
+.dv-tour[hidden]{display:none;}
+.dv-tour-dim{position:fixed; left:0; top:0; pointer-events:none;}
+.dv-tour-dim-fill{fill:rgba(11,18,32,.82);}
+.dv-tour-scrim{position:fixed; inset:0; pointer-events:none;}
+.dv-tour-block{position:fixed; pointer-events:auto;}
+/* rings: SVG rects sharing their hole's exact shape; stroke centered on the edge */
+.dv-tour-rings rect{fill:none; pointer-events:none;}
+.dv-tour-ring{stroke:#38E1FF; stroke-width:2;}
+.dv-tour-ring2{stroke:rgba(56,225,255,.85); stroke-width:2;}
+.dv-tour-glow{stroke:rgba(56,225,255,.45); stroke-width:8;}
+.dv-tour-note{position:fixed; max-width:260px; font:500 12px/1.5 'IBM Plex Sans',system-ui,sans-serif;
+  color:#F2F7FF; background:rgba(11,18,32,.92); border:1px solid rgba(56,225,255,.4);
+  border-radius:10px; padding:8px 12px; pointer-events:auto;}
+.dv-tour-timeline{position:fixed; top:10px; left:50%; transform:translateX(-50%);
+  display:flex; gap:6px; align-items:center; pointer-events:none;
+  /* its own dark pill: legible even over a revealed (bright) region */
+  background:rgba(11,18,32,.92); border:1px solid rgba(255,255,255,.18);
+  border-radius:999px; padding:7px 12px;}
+.dv-tour-timeline[hidden]{display:none;}
+.dv-tour-timeline-yield{visibility:hidden;} /* would sit on a ring this step */
+.dv-tour-seg{width:34px; height:3px; border-radius:2px; background:rgba(255,255,255,.18);}
+.dv-tour-seg.on{background:#38E1FF; box-shadow:0 0 8px rgba(56,225,255,.6);}
+.dv-tour-count{white-space:nowrap; font:600 11px 'IBM Plex Mono',monospace; color:rgba(242,247,255,.75); margin-left:8px;}
+.dv-tour-ui{position:fixed; left:44px; bottom:44px; max-width:360px; pointer-events:auto;
+  background:rgba(11,18,32,.94); border:1px solid rgba(56,225,255,.25); border-radius:14px; padding:18px 20px;}
+.dv-tour-ui[hidden]{display:none;}
+.dv-tour-ui-pending{visibility:hidden;} /* measured, placed, not yet shown */
+.dv-tour-ui-center{left:50%; bottom:auto; top:50%; transform:translate(-50%,-50%); text-align:center; max-width:460px;}
+.dv-tour-eyebrow{font:700 11px 'IBM Plex Mono',monospace; letter-spacing:2px; color:#38E1FF; text-transform:uppercase;}
+.dv-tour-heading{margin:8px 0 6px; font-family:'Sora',sans-serif; font-weight:700; font-size:28px; line-height:1.2; color:#F2F7FF;}
+.dv-tour-body{margin:0 0 16px; font-size:15px; line-height:1.55; color:rgba(242,247,255,.78);}
+.dv-tour-controls{display:flex; gap:10px; align-items:center;}
+.dv-tour-ui-center .dv-tour-controls{justify-content:center;}
+.dv-tour-btn{font:600 13px 'IBM Plex Sans',system-ui,sans-serif; border-radius:999px; padding:8px 20px; cursor:pointer;}
+.dv-tour-back{background:transparent; color:#F2F7FF; border:1px solid rgba(255,255,255,.5);}
+.dv-tour-back:disabled{opacity:.35; cursor:default;}
+.dv-tour-next{background:#38E1FF; color:#0B1220; border:1px solid #38E1FF;}
+.dv-tour-skip{background:none; border:none; font:500 13px 'IBM Plex Sans',system-ui,sans-serif;
+  color:rgba(255,255,255,.6); cursor:pointer; margin-left:6px; text-decoration:underline;}
+.dv-tour-exit{position:fixed; top:10px; left:16px; pointer-events:auto; background:rgba(11,18,32,.92);
+  border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:4px 12px; cursor:pointer;
+  font:600 12px 'IBM Plex Sans',system-ui,sans-serif; color:rgba(242,247,255,.85);}
+.dv-tour-exit:hover, .dv-tour-exit:focus-visible{border-color:#38E1FF; color:#F2F7FF;}
+/* narrow screens: the centered step counter would run under the exit —
+   stack it on its own row below */
+/* narrow screens: no counter row at all — the card's eyebrow already
+   reads "TOUR · STEP n OF m", and a second row would sit over rings */
+@media (max-width: 720px){ .dv-tour-timeline{display:none !important;} }
+.dv-tour-hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+  font:500 12px 'IBM Plex Mono',monospace; color:rgba(255,255,255,.55); pointer-events:none;}
+.dv-tour-card{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(720px, calc(100vw - 64px)); pointer-events:auto; text-align:center;}
+.dv-tour-card[hidden]{display:none;}
+.dv-tour-choices{display:flex; gap:14px; justify-content:center; margin:22px 0 18px; flex-wrap:wrap;}
+.dv-tour-choice{flex:1 1 180px; max-width:220px; background:#121C30; border:1px solid rgba(255,255,255,.14);
+  border-radius:16px; padding:18px 16px; cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:6px;}
+.dv-tour-choice:hover, .dv-tour-choice:focus-visible{border-color:#38E1FF; box-shadow:0 0 0 2px rgba(56,225,255,.35);}
+.dv-tour-choice-label{font:700 15px 'IBM Plex Sans',system-ui,sans-serif; color:#F2F7FF;}
+.dv-tour-choice-sub{font-size:12.5px; line-height:1.45; color:rgba(242,247,255,.7);}
+.dv-tour-choice-foot{display:flex; gap:14px; justify-content:center; align-items:center;}
+.dv-tour-choice-note{font-size:12px; color:rgba(242,247,255,.6);}
+.dv-tour-replay{float:right; margin-left:8px;}
+.dv-tour-btn:focus-visible, .dv-tour-skip:focus-visible, .dv-tour-choice:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){
+    .dv-tour-seg.on{box-shadow:none;}
+}

@@ -596,5 +596,9 @@ function lintPage(page){
     if (!usedKinds[k])
       warnings.push('page.protocols.' + k + ': declared but no edge uses kind "' + k + '" — remove it or use it');
   });
+  /* page.tour is advisory-only: a malformed tour config warns and the viewer
+     falls back to the built-in default; it never blocks a render. */
+  if (page.tour != null && typeof tourLintConfig === 'function')
+    warnings.push.apply(warnings, tourLintConfig(page.tour));
   return warnings;
 }

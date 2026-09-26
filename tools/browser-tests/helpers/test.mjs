@@ -5,6 +5,14 @@ import path from 'node:path';
 import {trackResources} from './resources.mjs';
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.woff':'font/woff'};
 export const test=base.extend({
+  // Fresh profiles would auto-start the first-run guided tour and its scrim
+  // would swallow every click. Seed the completion flag for all contract
+  // pages; tour behavior itself is tested explicitly via #tour=1 (which
+  // overrides the flag) in tour.spec.mjs.
+  context:async({context},use)=>{
+    await context.addInitScript(()=>{try{localStorage.setItem('dv_tour_v1','done');}catch(e){}});
+    await use(context);
+  },
   server:[async({},use)=>{
     const root=process.env.FLOWVIEW_BROWSER_ROOT;
     const server=createServer(async(req,res)=>{

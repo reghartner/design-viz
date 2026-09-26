@@ -32,6 +32,7 @@ var TOUR_DEFAULT_CONFIG = {
       personas: ['eng', 'both'],
       target: {selector: '.mtoggle', within: 'section'},
       diagramState: {mode: 'ambient'},
+      reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'The big picture',
         body: 'AMBIENT: every box and call in this flow, lit at once and looping.'
@@ -43,6 +44,7 @@ var TOUR_DEFAULT_CONFIG = {
       target: {selector: '.step-transport', within: 'section'},
       diagramState: {mode: 'step'},
       demo: {advance: 2, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'One call at a time',
         body: 'STEP: the same diagram, one call at a time, in order — watch it walk; ‹ › move by hand.'

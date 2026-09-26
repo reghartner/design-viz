@@ -84,23 +84,39 @@ test('a missing target warns and passes through, keeping the authored count',asy
   // hole+ring share one clip-path shape: outer rect + one hole subpath
   const clip=()=>page.evaluate(()=>document.querySelector('.dv-tour-scrim').style.clipPath);
   await expect.poll(clip).toContain('evenodd'); // reveal lands after settle
+  // the map is SHOWN: points inside the revealed board AND inside the
+  // ringed toggle (a hole nested in the board hole) hit the page, not the
+  // scrim — nested holes must not cancel under even-odd filling
+  const centers=await page.evaluate(()=>['.board','.mtoggle'].map(s=>{
+    const r=document.querySelector('.doc-sec '+s).getBoundingClientRect();
+    return {x:r.x+r.width/2,y:r.y+Math.min(r.height/2,60)};}));
+  await expect.poll(()=>page.evaluate(pts=>pts.every(({x,y})=>!document.elementFromPoint(x,y).closest('.dv-tour-scrim')),centers)).toBe(true);
   await page.locator('.dv-tour-next').click();
   // ... then the sequence, with PRESENT as its one ringed secondary — and
   // the secondary sits on its own un-dimmed hole (a third subpath).
   await expect(heading).toHaveText('One call at a time');
-  // every visible secondary ring sits on its own un-dimmed hole: subpaths =
-  // outer + primary + one per ring (PRESENT may be off-viewport here, in
-  // which case neither its ring nor its hole renders)
-  await expect.poll(async()=>{
-    const holes=((await clip()).match(/M/g)||[]).length;
-    const rings=await page.locator('.dv-tour-ring2').count();
-    return holes-2-rings;
-  }).toBe(0);
+  // every ring — primary and each visible secondary — sits on an un-dimmed
+  // hole, and so does the revealed board: their centres hit the page, not
+  // the scrim (holes may merge, so hit-testing is the contract, not counts)
+  await expect.poll(()=>page.evaluate(()=>{
+    const pts=[...document.querySelectorAll('.dv-tour-ring, .dv-tour-ring2')]
+      .filter(e=>!e.hidden).map(e=>e.getBoundingClientRect());
+    pts.push(document.querySelector('.doc-sec .board').getBoundingClientRect());
+    return pts.every(r=>{
+      const y=Math.min(r.y+r.height/2,innerHeight-2);
+      return !document.elementFromPoint(r.x+r.width/2,y).closest('.dv-tour-scrim');
+    });
+  })).toBe(true);
+  // a secondary not fully in view renders neither ring, hole nor note
+  expect(await page.locator('.dv-tour-note').count()).toBeLessThanOrEqual(await page.locator('.dv-tour-ring2').count());
+  for(const box of await page.locator('.dv-tour-ring2').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return [r.top,r.bottom,innerHeight];})))
+    expect(box[0]>=0&&box[1]<=box[2]).toBe(true);
   await page.locator('.dv-tour-next').click();
   // Both branching steps have no .path-timeline here: they warn and pass
   // through to the links step (chime-radar does render node links).
   await expect(heading).toHaveText('Nodes link to the real system');
-  expect(warnings.filter(w=>w.includes('target not found')).length).toBeGreaterThanOrEqual(2);
+  // pathless page: both branching steps name the unresolved @alt token
+  expect(warnings.filter(w=>w.includes('branching')&&w.includes('path "@alt" did not resolve')).length).toBeGreaterThanOrEqual(2);
   // The links step CLICKED the ⋯ trigger (after its cause-before-effect
   // hold): the real menu opens and is the spotlit target; leaving closes it.
   await expect(page.locator('.node-link-menu:not([hidden])')).toBeVisible();
@@ -244,6 +260,34 @@ test('an internal render error tears the tour down and leaves the page usable',a
   const chip=page.locator('.tabpanel:not([hidden]) .schip').first();
   await chip.click();
   await expect(chip).toHaveAttribute('aria-current','true');
+});
+
+test('overlapping cutouts never cancel: nested ring and target-inside-reveal stay un-dimmed',async({page,server})=>{
+  await page.goto(server.origin+'/tour-nest.html#tour=1');
+  const heading=page.locator('.dv-tour-ui .dv-tour-heading');
+  const hitsPage=sel=>page.evaluate(sel=>{
+    const r=document.querySelector('.doc-sec '+sel).getBoundingClientRect();
+    return !document.elementFromPoint(r.x+r.width/2,r.y+r.height/2).closest('.dv-tour-scrim');
+  },sel);
+  // primary .step-transport + secondary play button nested inside it
+  await expect(heading).toHaveText('Nested ring');
+  await expect.poll(()=>hitsPage('.playback-button')).toBe(true);
+  await expect.poll(()=>hitsPage('.step-transport')).toBe(true);
+  await page.locator('.dv-tour-next').click();
+  // target .board that is ALSO a reveal region
+  await expect(heading).toHaveText('Target inside reveal');
+  await expect.poll(()=>hitsPage('.board')).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.dv-tour')).toBeHidden();
+});
+
+test('Skip returns focus to where the reader was',async({page,server})=>{
+  await page.goto(server.origin+'/standalone.html');
+  await page.locator('.dv-tour-replay').click();
+  await expect(page.locator('.dv-tour')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.dv-tour')).toBeHidden();
+  await expect(page.locator('.dv-tour-replay')).toBeFocused();
 });
 
 test('a malformed page.tour fails open: page renders, no stuck scrim',async({page,server})=>{

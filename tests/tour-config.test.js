@@ -26,7 +26,7 @@ test('the default flow covers chooser, controls, branching, both personas, done'
   // and both reveal the diagram so the cause is visible, not just the chips.
   assert.equal(config.steps.find(s=>s.id==='branching-split').demo.advance,3);
   assert.equal(config.steps.find(s=>s.id==='branching-rejoin').diagramState.step,'@rejoin');
-  for(const id of ['branching-split','branching-rejoin','panels'])
+  for(const id of ['mode-ambient','mode-step','branching-split','branching-rejoin','panels'])
     assert.equal(config.steps.find(s=>s.id===id).reveal[0].selector,'.board',id+' reveals the diagram');
   // The links step opens the menu it talks about and rings the trigger.
   const links=config.steps.find(s=>s.id==='links');

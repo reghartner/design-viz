@@ -30,6 +30,16 @@ The scrim is one element whose holes are cut with an even-odd `clip-path`:
   secondary holes are pills, matching their pill rings.
 - Holes are genuinely un-dimmed AND pointer-transparent: the spotlit
   controls are clickable for real (chips in a spotlit timeline included).
+- Overlapping or nested holes (▶ inside a ringed transport, a ringed
+  toggle inside a revealed board, a target that is also revealed) merge
+  into one hole — their bounding rect — before the scrim is cut, so every
+  covered point is un-dimmed and clickable exactly once. Rings still draw
+  per target.
+- Secondaries are all-or-nothing: after the step's scroll settles (which
+  centers the PRIMARY target), a secondary whose padded rect is not fully
+  inside the viewport gets no ring, no hole and no note. Deterministic and
+  never a clipped sliver — if a secondary matters, author the page so it
+  shares the screen with the primary, or give it its own step.
 - Step changes are ONE movement: the page dims fully, the state is applied
   and the scroll settles under the dim, then the new spotlight is revealed.
   Nothing hops twice.
@@ -85,7 +95,7 @@ Per step:
 - `reveal` — extra ring-less cutouts (`[{selector, within}]`): regions the
   step un-dims without pointing at them. Demo steps reveal the diagram so
   the viewer sees the cause react, not just the ringed control — the
-  shipped split, rejoin and panels steps all reveal `.board`.
+  shipped mode pair, split, rejoin and panels steps all reveal `.board`.
 - `demo` — a demonstrated behavior; exactly one of:
   - `advance` — playback: advances the stepper `advance` times (cap 30) on
     `intervalMs` (default 1800, min 400), starting from the path's first
@@ -117,9 +127,10 @@ Per step:
   AMBIENT entirely — its controls step is play/pause/arrows only.
 - The done card is a recap WITH a task, chip-click first ("click any
   numbered chip…, then press ▶"; eng/both add "then open ⋯ on any node"),
-  plus the ?-replay line. On close, focus lands on the ▶ transport button so
-  trying it is one keystroke away. Page-authored configs should name their
-  real chips/paths here.
+  plus the ?-replay line. Pressing Done focuses the ▶ button (a step arrow
+  under reduced motion) of the section the tour ran in, so trying it is one
+  keystroke away; Skip and Esc instead return focus to wherever the reader
+  was. Page-authored configs should name their real chips/paths here.
 
 ## What happens when a step cannot resolve
 

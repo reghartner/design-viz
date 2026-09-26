@@ -72,9 +72,7 @@ export default async function prepare(){
     (function reorder(value){
       if(!value||typeof value!=='object')return;
       if(Array.isArray(value.paths)&&value.paths.length>2){
-        const offline=value.paths.findIndex(p=>p&&!value.paths.some(q=>q!==p&&q.steps&&p.steps&&p.steps[p.steps.length-1]===q.steps[q.steps.length-1]));
         // deterministic: put the shortest path second (shared-blocks: Device offline)
-        value.paths.sort((a,b)=>0); // keep order, then swap [1] with shortest
         let shortest=0;for(let i=1;i<value.paths.length;i++)if(value.paths[i].steps.length<value.paths[shortest].steps.length)shortest=i;
         if(shortest!==1){const tmp=value.paths[1];value.paths[1]=value.paths[shortest];value.paths[shortest]=tmp;}
       }
@@ -83,6 +81,22 @@ export default async function prepare(){
     await writeFile(pathsSpec,JSON.stringify(reordered));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),pathsSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-paths-reordered.html')],{stdio:'inherit'});
     await rm(pathsSpec);
+    // Overlapping-cutout fixture: a secondary nested inside the primary, and
+    // a target that is also a reveal region (even-odd must never re-dim).
+    const nest=structuredClone(raw);
+    nest.page.tour={version:1,steps:[
+      {id:'nested',target:{selector:'.step-transport',within:'section'},diagramState:{mode:'step'},
+        secondary:[{target:{selector:'.playback-button',within:'section'}}],
+        copy:{heading:'Nested ring',body:'Transport with the play button ringed inside it.'}},
+      {id:'reveal-self',target:{selector:'.board',within:'section'},diagramState:{mode:'step'},
+        reveal:[{selector:'.board',within:'section'}],
+        copy:{heading:'Target inside reveal',body:'Board is both target and reveal.'}},
+      {id:'fin',kind:'done',copy:{heading:'Done',body:'End.'}}
+    ]};
+    const nestSpec=path.join(output,'tour-nest.spec.json');
+    await writeFile(nestSpec,JSON.stringify(nest));
+    execFileSync('python3',[path.join(repo,'tools/inject.py'),nestSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-nest.html')],{stdio:'inherit'});
+    await rm(nestSpec);
     const ambientSpec=path.join(output,'tour-ambient.spec.json');
     await writeFile(ambientSpec,JSON.stringify(ambient));
     execFileSync('python3',[path.join(repo,'tools/inject.py'),ambientSpec,path.join(repo,'template/flowview.html'),path.join(output,'tour-ambient.html')],{stdio:'inherit'});

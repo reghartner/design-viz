@@ -82,8 +82,8 @@ test('a missing target warns and passes through, keeping the authored count',asy
   await expect(heading).toHaveText('The big picture');
   await expect(page.locator('.mtoggle .mbtn[aria-pressed=true]').first()).toHaveText('AMBIENT');
   // hole+ring share one clip-path shape: outer rect + one hole subpath
-  const clip=()=>page.evaluate(()=>document.querySelector('.dv-tour-scrim').style.clipPath);
-  await expect.poll(clip).toContain('evenodd'); // reveal lands after settle
+  // the reveal lands after settle: the mask gains its hole rects
+  await expect.poll(()=>page.evaluate(()=>document.querySelectorAll('.dv-tour-dim mask rect[fill="#000"]').length)).toBeGreaterThanOrEqual(1);
   // the map is SHOWN: points inside the revealed board AND inside the
   // ringed toggle (a hole nested in the board hole) hit the page, not the
   // scrim — nested holes must not cancel under even-odd filling
@@ -120,6 +120,23 @@ test('a missing target warns and passes through, keeping the authored count',asy
   // The links step CLICKED the ⋯ trigger (after its cause-before-effect
   // hold): the real menu opens and is the spotlit target; leaving closes it.
   await expect(page.locator('.node-link-menu:not([hidden])')).toBeVisible();
+  // exact union, no bounding-rect strip: a point inside the old bounding
+  // rect of (trigger ring ∪ menu ring) but inside NEITHER ring is dimmed
+  // and click-blocked
+  await expect.poll(async()=>(await page.locator('.dv-tour-ring2').count())).toBeGreaterThanOrEqual(1);
+  const probe=await page.evaluate(()=>{
+    const a=document.querySelector('.dv-tour-ring').getBoundingClientRect();
+    const b=document.querySelector('.dv-tour-ring2').getBoundingClientRect();
+    const inside=(r,x,y)=>x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;
+    const L=Math.min(a.left,b.left),T=Math.min(a.top,b.top),R=Math.max(a.right,b.right),B=Math.max(a.bottom,b.bottom);
+    for(let y=T+2;y<B;y+=3)for(let x=L+2;x<R;x+=3)
+      if(!inside(a,x,y)&&!inside(b,x,y)){
+        const hit=document.elementFromPoint(x,y);
+        return {found:true,blocked:!!(hit&&hit.closest('.dv-tour-scrim'))};
+      }
+    return {found:false};
+  });
+  if(probe.found)expect(probe.blocked).toBe(true);
   await page.locator('.dv-tour-next').click();
   await expect(heading).toHaveText('Now try it');
   await expect(page.locator('.node-link-menu:not([hidden])')).toHaveCount(0);
@@ -166,7 +183,10 @@ test.describe('with motion allowed',()=>{
     await expect(heading).toHaveText('Flows can split');
     await expect(page.locator('.dv-tour-ring')).toBeVisible();
     // the diagram is revealed too: outer + timeline hole + board hole
-    await expect.poll(async()=>((await page.evaluate(()=>document.querySelector('.dv-tour-scrim').style.clipPath)).match(/M/g)||[]).length).toBeGreaterThanOrEqual(3);
+    await expect.poll(()=>page.evaluate(()=>{
+      const r=document.querySelector('.doc-sec .board').getBoundingClientRect();
+      return !document.elementFromPoint(r.x+r.width/2,r.y+Math.min(r.height/2,60)).closest('.dv-tour-scrim');
+    })).toBe(true);
     const current=page.locator('.schip[aria-current=true]');
     const first=await current.first().textContent();
     // one demo tick (1600ms) later the active step has moved

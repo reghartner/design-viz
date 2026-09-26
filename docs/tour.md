@@ -23,18 +23,22 @@ silently repairs.
 
 ## The cutout contract
 
-The scrim is one element whose holes are cut with an even-odd `clip-path`:
+The dim is an SVG mask: one black rounded rect per hole on a white base.
 
 - Every hole is the SAME rectangle, padding and corner radius as its ring —
   hole and ring read as one shape. Primary holes use the ring's 12px radius;
   secondary holes are pills, matching their pill rings.
-- Holes are genuinely un-dimmed AND pointer-transparent: the spotlit
-  controls are clickable for real (chips in a spotlit timeline included).
-- Overlapping or nested holes (▶ inside a ringed transport, a ringed
-  toggle inside a revealed board, a target that is also revealed) merge
-  into one hole — their bounding rect — before the scrim is cut, so every
-  covered point is un-dimmed and clickable exactly once. Rings still draw
-  per target.
+- The un-dimmed region is exactly the UNION of those rounded rects:
+  overlapping or nested holes (▶ inside a ringed transport, a ringed toggle
+  inside a revealed board, a trigger ring overlapping its menu) simply
+  overlap in the mask. No pixel outside some ring's shape is un-dimmed.
+- Clicks are blocked by a separate layer covering the complement of the
+  union, decomposed into axis-aligned cells; every point inside a hole is
+  clickable exactly once. For CLICKS ONLY, a hole's rounded corners count
+  as its bounding rect — the visual is exact.
+- Step changes are ONE movement: the page dims fully, the state is applied
+  and the scroll settles under the dim, then the new spotlight is revealed.
+  Nothing hops twice.
 - Secondaries are all-or-nothing: after the step's scroll settles (which
   centers the PRIMARY target), a secondary whose padded rect is not fully
   inside the viewport gets no ring, no hole and no note. Deterministic and

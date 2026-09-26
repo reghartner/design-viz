@@ -224,6 +224,29 @@ function wireTour(ctl, view, win, config, options){
     overlay = el('div', 'dv-tour');
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-label', 'Guided tour');
+    /* The dim is an SVG mask: a white full rect with one black rounded rect
+       per hole. Overlapping holes stay black, so the un-dimmed region is
+       exactly the union of the rounded rects — no merging, no squared-off
+       strips. It never takes pointer events; click-blocking lives in a
+       separate layer of axis-aligned rects covering the complement. */
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var maskId = 'dv-tour-mask-' + Math.random().toString(36).slice(2, 8);
+    var dim = doc.createElementNS(SVG_NS, 'svg');
+    dim.setAttribute('class', 'dv-tour-dim');
+    dim.setAttribute('aria-hidden', 'true');
+    var defs = doc.createElementNS(SVG_NS, 'defs');
+    var mask = doc.createElementNS(SVG_NS, 'mask');
+    mask.setAttribute('id', maskId);
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    var maskBase = doc.createElementNS(SVG_NS, 'rect');
+    maskBase.setAttribute('fill', '#fff');
+    mask.appendChild(maskBase);
+    defs.appendChild(mask); dim.appendChild(defs);
+    var dimRect = doc.createElementNS(SVG_NS, 'rect');
+    dimRect.setAttribute('class', 'dv-tour-dim-fill');
+    dimRect.setAttribute('mask', 'url(#' + maskId + ')');
+    dim.appendChild(dimRect);
+    overlay.appendChild(dim);
     var scrim = el('div', 'dv-tour-scrim');
     overlay.appendChild(scrim);
     var ring = el('div', 'dv-tour-ring'); overlay.appendChild(ring);
@@ -250,61 +273,67 @@ function wireTour(ctl, view, win, config, options){
     var hint = el('div', 'dv-tour-hint', '← → to move · Esc to skip');
     overlay.appendChild(hint);
     doc.body.appendChild(overlay);
-    parts = {scrim: scrim, ring: ring, extras: extras, timeline: timeline,
+    parts = {scrim: scrim, dim: dim, mask: mask, maskBase: maskBase, dimRect: dimRect,
+             ring: ring, extras: extras, timeline: timeline,
              ui: ui, eyebrow: eyebrow, heading: heading, body: body,
              back: back, next: next, skip: skip, chooser: chooser, hint: hint};
   }
-  /* One scrim, holes cut with an evenodd clip-path: each hole is the SAME
-     rect and corner radius as its ring, so hole and ring read as one shape —
-     and clip-path holes are pointer-transparent, so the spotlit controls
-     stay genuinely clickable. */
-  function roundedRectPath(r){
-    var rad = Math.min(r.r, r.w / 2, r.h / 2);
-    var x = r.x, y = r.y, w = r.w, h = r.h;
-    return 'M' + (x + rad) + ' ' + y +
-      'H' + (x + w - rad) + 'A' + rad + ' ' + rad + ' 0 0 1 ' + (x + w) + ' ' + (y + rad) +
-      'V' + (y + h - rad) + 'A' + rad + ' ' + rad + ' 0 0 1 ' + (x + w - rad) + ' ' + (y + h) +
-      'H' + (x + rad) + 'A' + rad + ' ' + rad + ' 0 0 1 ' + x + ' ' + (y + h - rad) +
-      'V' + (y + rad) + 'A' + rad + ' ' + rad + ' 0 0 1 ' + (x + rad) + ' ' + y + 'Z';
-  }
-  /* Even-odd filling re-dims any point covered by TWO holes (a ringed
-     toggle inside a revealed board, ▶ inside a ringed transport, a target
-     that is also revealed) — dimmed and click-blocking. Normalise first:
-     intersecting or nested holes merge into their bounding rect until no
-     two overlap, so every point is inside at most one hole. Rings still
-     draw per target; only the scrim geometry merges. */
-  function normalizeHoles(holes){
-    var out = holes.map(function(r){ return {x: r.x, y: r.y, w: r.w, h: r.h, r: r.r}; });
-    var merged = true;
-    while (merged){
-      merged = false;
-      for (var i = 0; i < out.length && !merged; i++){
-        for (var j = i + 1; j < out.length; j++){
-          var a = out[i], b = out[j];
-          if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h){
-            var x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
-            var x2 = Math.max(a.x + a.w, b.x + b.w), y2 = Math.max(a.y + a.h, b.y + b.h);
-            /* the larger hole keeps its own shape (corner radius) */
-            var keep = (a.w * a.h >= b.w * b.h) ? a : b;
-            out[i] = {x: x, y: y, w: x2 - x, h: y2 - y, r: keep.r};
-            out.splice(j, 1);
-            merged = true;
-            break;
-          }
+  /* The cutout contract, exactly: the un-dimmed region is the UNION of the
+     per-target rounded rects (hole rect == ring rect, same radius).
+       - visual: SVG mask, one black rounded rect per hole on a white base —
+         overlaps simply stay black, so nested/intersecting holes union
+         exactly with their real corners;
+       - clicks: the complement of the union, decomposed on the grid of
+         distinct hole edges into axis-aligned blocker cells (a cell blocks
+         iff its centre lies in no hole). Rounded corners resolve to the
+         bounding rect for CLICKS only — the visual stays exact. */
+  var SVGNS_DIM = 'http://www.w3.org/2000/svg';
+  function applyScrim(holes){
+    var vw = win.innerWidth, vh = win.innerHeight;
+    var visible = holes.filter(function(r){ return r.w > 4 && r.h > 4; });
+    var base = parts.maskBase;
+    base.setAttribute('x', 0); base.setAttribute('y', 0);
+    base.setAttribute('width', vw); base.setAttribute('height', vh);
+    parts.dimRect.setAttribute('x', 0); parts.dimRect.setAttribute('y', 0);
+    parts.dimRect.setAttribute('width', vw); parts.dimRect.setAttribute('height', vh);
+    parts.dim.setAttribute('width', vw); parts.dim.setAttribute('height', vh);
+    parts.dim.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
+    while (parts.mask.lastChild && parts.mask.lastChild !== base) parts.mask.removeChild(parts.mask.lastChild);
+    visible.forEach(function(r){
+      var h = doc.createElementNS(SVGNS_DIM, 'rect');
+      var rad = Math.min(r.r || 0, r.w / 2, r.h / 2);
+      h.setAttribute('x', r.x); h.setAttribute('y', r.y);
+      h.setAttribute('width', r.w); h.setAttribute('height', r.h);
+      h.setAttribute('rx', rad); h.setAttribute('ry', rad);
+      h.setAttribute('fill', '#000');
+      parts.mask.appendChild(h);
+    });
+    /* hit-blocking: complement of the union on the edge grid */
+    parts.scrim.replaceChildren();
+    var xs = [0, vw], ys = [0, vh];
+    visible.forEach(function(r){
+      xs.push(Math.max(0, Math.min(vw, r.x)), Math.max(0, Math.min(vw, r.x + r.w)));
+      ys.push(Math.max(0, Math.min(vh, r.y)), Math.max(0, Math.min(vh, r.y + r.h)));
+    });
+    function uniq(a){ return a.sort(function(p, q){ return p - q; }).filter(function(v, i, arr){ return i === 0 || v !== arr[i - 1]; }); }
+    xs = uniq(xs); ys = uniq(ys);
+    function covered(cx, cy){
+      return visible.some(function(r){ return cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.h; });
+    }
+    for (var yi = 0; yi < ys.length - 1; yi++){
+      var y0 = ys[yi], y1 = ys[yi + 1], runStart = null;
+      for (var xi = 0; xi <= xs.length - 1; xi++){
+        var blocked = xi < xs.length - 1 && !covered((xs[xi] + xs[xi + 1]) / 2, (y0 + y1) / 2);
+        if (blocked && runStart === null) runStart = xs[xi];
+        if (!blocked && runStart !== null){
+          var cell = el('div', 'dv-tour-block');
+          cell.style.cssText = 'left:' + runStart + 'px;top:' + y0 + 'px;width:' +
+            (xs[xi] - runStart) + 'px;height:' + (y1 - y0) + 'px';
+          parts.scrim.appendChild(cell);
+          runStart = null;
         }
       }
     }
-    return out;
-  }
-  function applyScrim(holes){
-    var vw = win.innerWidth, vh = win.innerHeight;
-    var visible = normalizeHoles(holes.filter(function(r){ return r.w > 4 && r.h > 4; }));
-    if (!visible.length){
-      parts.scrim.style.clipPath = 'none';
-      return;
-    }
-    var d = 'M0 0H' + vw + 'V' + vh + 'H0Z' + visible.map(roundedRectPath).join('');
-    parts.scrim.style.clipPath = 'path(evenodd, "' + d + '")';
   }
   function setHole(rect){
     if (rect.w > 4 && rect.h > 4){

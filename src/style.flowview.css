@@ -18,7 +18,10 @@ body.sk-daylight{background:#F4F2EC;}
    page stylesheet per entrypoint. */
 .dv-tour{position:fixed; inset:0; z-index:900; pointer-events:none; font:15px/1.5 'IBM Plex Sans',system-ui,sans-serif;}
 .dv-tour[hidden]{display:none;}
-.dv-tour-scrim{position:fixed; inset:0; background:rgba(11,18,32,.82); pointer-events:auto;}
+.dv-tour-dim{position:fixed; left:0; top:0; pointer-events:none;}
+.dv-tour-dim-fill{fill:rgba(11,18,32,.82);}
+.dv-tour-scrim{position:fixed; inset:0; pointer-events:none;}
+.dv-tour-block{position:fixed; pointer-events:auto;}
 .dv-tour-ring{position:fixed; border:2px solid #38E1FF; border-radius:12px; pointer-events:none;
   box-shadow:0 0 0 4px rgba(56,225,255,.25), 0 0 40px rgba(56,225,255,.35);}
 .dv-tour-ring2{position:fixed; border:2px solid rgba(56,225,255,.85); border-radius:999px; pointer-events:none;}

@@ -1340,7 +1340,8 @@ perspectives" of one timeline). Types:
   `sources` is optional (0–6 objects) with unique
   `id`, `label`, optional hex `color`, diagram `node` ID, `endpoint` and `detail`.
   `fields` is optional (0–12 data tiles) with unique `id`, `label`, optional `source` ID,
-  `kind` (`text` default or `battery`), `icon` (shared library ID) and `unit`.
+  `kind` (`text` default or `battery`), `icon` (shared library ID), `unit` and
+  `freshness` (`relative` default, `absolute` or `off`; see report times below).
   The declared icon is the card's default. Without one, a battery card uses
   `battery` and a text card has no icon. IDs must begin with a
   letter and contain only letters, digits, `_` or `-`; `phoneScreen`, `clock`,
@@ -1354,14 +1355,14 @@ perspectives" of one timeline). Types:
   markers as well as colors. Selecting a source or field highlights all fields
   using that source and its optional diagram node. Selection is viewer state.
   Initial and step state use field IDs directly, e.g. `{"battery":{"value":68,
-  "status":"ready","detail":"Reported just now"},"power":{"value":"Solar
+  "status":"ready","reportedAt":"now"},"power":{"value":"Solar
   panel","status":"ready"}}`. Status is explicit: `unknown` (default, No data),
   `loading`, `ready` (Current), `stale` (Cached), `error` (Unavailable). A value
   does not imply freshness. Battery values are numeric 0–100; other values can
   be text, finite numbers or booleans. Missing/null values show `—`. Invalid
   battery values warn and show `—`, never a fabricated zero reading.
   Patches MERGE each field's `value`, `status`, `detail`, optional `source`
-  and `icon` overrides, and `visible` boolean. Thus `{"battery":{"status":"stale"}}` preserves
+  and `icon` overrides, `visible` boolean and `reportedAt` report time. Thus `{"battery":{"status":"stale"}}` preserves
   its last value. Cards are visible by default. Put `{"clip":{"visible":false}}`
   in initial state to start without that card, then patch `{"clip":{"visible":true}}`
   to add it on a step. Patch false to remove it again. Visibility carries forward;
@@ -1393,7 +1394,27 @@ perspectives" of one timeline). Types:
   Updated cue; adjacent forward transitions may animate card changes or opening
   and closing the app once. Backward/jump
   navigation and reduced motion render the absolute state without entry effects.
-  Values, endpoints and freshness text are authored, never fetched or timed.
+  Values and endpoints are authored, never fetched. **Report times:** with the
+  diagram's `storyTime`, put `reportedAt` on a field in the patch of the step
+  that delivers a report (`{"battery":{"value":41,"status":"ready","reportedAt":"now"}}`);
+  never hand-write "Updated … ago" in `detail`. It carries forward, and every
+  later step shows the card's freshness from the story clock: under 1 minute
+  "Updated just now", under 1 hour "Updated N min ago", under 24 hours
+  "Updated N h ago", otherwise "Last report Thu, Sep 24, 6:05 PM" (elapsed time
+  is rounded down; the clock follows `storyTime.clock`). A field declared with
+  `"freshness":"absolute"` always shows "Last report 6:05 PM" (the date is added
+  for another day); `"off"` keeps authored detail. `reportedAt` accepts `"now"`
+  (this step's time), `"-15m"` (before this step), `"+5m"` (after the previous
+  step's time, like step `time`), `"06:05"` (the latest 06:05 at or before this
+  step) or an absolute `"2026-09-25T06:05"`; `null` clears it; a `null` field
+  resets it. An explicit non-empty `detail` wins over the computed text until a
+  later step delivers a newer report without `detail` (`detail: null` or `""`
+  restores the computed text sooner). A step whose report time is new marks the
+  card Updated even when the value is unchanged. `status` stays explicit
+  (`stale` is never inferred). Without `storyTime`, `reportedAt` warns and is
+  ignored, so cards render exactly as before. Unparsable report times and
+  reports later than the step's story time warn. Diagrams using report times or
+  `freshness` declare the `content.deviceapp-freshness` compatibility feature.
   Replacing field/source IDs requires updating their references and step patches.
   Use a wide named-layout tile for the phone and source map side by side; narrow
   tiles stack the map below the phone. See `cookbook/device-app-sources.md` and
@@ -1561,7 +1582,9 @@ lasts).** Then ask for each battery device's drain and charge rates.
   applies); existing specs render unchanged. Diagrams using story time or
   `drain` declare the `flow.story-time` compatibility feature.
 - `deviceapp` battery cards are what the app *reports*; patch them explicitly
-  at the step the app receives a report.
+  at the step the app receives a report, with `"reportedAt":"now"`: the card
+  then computes "Updated 5 min ago" etc. on every later step (see
+  `deviceapp`).
 
 See [story time](../docs/step-time.md) for the full rules and
 `examples/story-time/story-time.spec.json` for an overnight battery camera.
@@ -1772,7 +1795,8 @@ contract stays the authority; a recipe shows the working subset for one task.
 8. The story happens at a time (a phone clock, an overnight drain) → ask for
    the story's span (start date and time, and end or duration), declare
    `storyTime`, and give steps a `time` instead of patching clocks and dates
-   per panel. Take battery drain/charge rates from the source or the user; if
+   per panel. Mark device-app reports with `reportedAt` instead of writing
+   freshness text. Take battery drain/charge rates from the source or the user; if
    none are given, label the built-in placeholder rates as an illustrative
    estimate in the ledger and on the page.
 

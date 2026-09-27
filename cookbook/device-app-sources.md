@@ -133,12 +133,36 @@ a cache as the live source without explaining it. `source` inside a field patch
 can name a fallback source; `source:null` restores the declared source. A whole
 field set to `null` clears it to unknown. Never author computed `_updated` data.
 
+### Report times instead of freshness text
+
+A hand-written "Last report: 2 minutes ago" is wrong as soon as the story moves
+on. When the diagram declares `storyTime` (see [story time](../docs/step-time.md)),
+mark the step that delivers a report with `reportedAt` and let the card compute
+its freshness:
+
+```
+"panels": {"camera-app": {
+  "battery": {"value": 64, "status": "ready", "reportedAt": "now"}
+}}
+```
+
+Every later step shows "Updated just now" (under a minute), "Updated 5 min
+ago", "Updated 3 h ago", and "Last report Thu, Sep 24, 6:05 PM" after a day,
+from that step's story time. `reportedAt` also takes `"-2m"` (two minutes
+before this step), `"06:05"` (the latest 6:05 at or before it) or a date-time.
+Declare a field with `"freshness": "absolute"` to show "Last report 6:05 PM"
+instead, or `"off"` to keep your own text. An explicit `detail` still wins until
+the next report; a cached value still needs `"status": "stale"` from you.
+Without `storyTime`, keep authoring `detail` as above.
+
 ## Edit and view
 
 - Add a **deviceapp** panel, then edit its app name, device, starting screen,
   initially shown cards, sources and fields in the panel inspector. Keep IDs stable; changing them requires updating references/patches.
 - Select a step and expand the panel patch. Every declared field has value,
-  status, source, detail and visibility controls. Blank controls mean no override in that
+  status, source, detail, visibility and **Report time** controls; **Reported
+  at this step** sets `reportedAt: "now"` and **Clear report time** removes it.
+  Effective state shows the computed text as *Story time · derived freshness*. Blank controls mean no override in that
   patch; use raw JSON for an explicit null reset.
 - Use a wide named-layout tile for phone + source map. The example's **App +
   sources** view emphasizes the UI; **End-to-end** also includes the backend

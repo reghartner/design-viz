@@ -1,5 +1,24 @@
 # Changelog
 
+## Device-app freshness from story time (2026-09-27)
+
+- A Device app field can record when its value was reported: `reportedAt`
+  accepts `"now"` (this step), `"-15m"`, `"+5m"` (after the previous step),
+  `"06:05"` (latest at or before this step) or a date-time, and carries
+  forward. With `storyTime`, the card's detail line then reads "Updated just
+  now", "Updated 5 min ago", "Updated 3 h ago" or "Last report Thu, Sep 24,
+  6:05 PM" on every step, computed from the story clock. A field's
+  `freshness` can be `absolute` ("Last report 6:05 PM") or `off`.
+- An explicit `detail` still wins until a newer report; `status` stays
+  explicit. Specs without `storyTime` and fields without a report time render
+  exactly as before. The validator warns about unparsable report times,
+  reports from the future and report times without story time; diagrams using
+  the feature declare `content.deviceapp-freshness`.
+- The workbench adds **Report time**, **Reported at this step** and **Clear
+  report time** to each Device app card and a **freshness** column to its
+  fields; Effective state labels the computed text as derived. See
+  [story time](docs/step-time.md#device-app-report-times-and-freshness).
+
 ## Story time, step clocks and battery drain (2026-09-27)
 
 - A diagram can declare `storyTime` (start, optional end or span, 12/24-hour

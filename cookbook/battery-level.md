@@ -103,7 +103,10 @@ declare the diagram's `storyTime` and give steps a `time`. The battery then
 drains by elapsed hours × `drainPerHour`, charges by × `chargePerHour` while
 its trend is `charging`, and each `drain` patch subtracts a one-time cost.
 Phone, device-app and app-screens clocks follow the same step time. Type a
-`charge` only to anchor a known reading. See [story time](../docs/step-time.md).
+`charge` only to anchor a known reading. A device app's battery card is a
+*report*: patch its value on the step that delivers the report with
+`"reportedAt": "now"`, and the card shows "Updated just now", "Updated 10 h
+ago" and so on by itself on every later step. See [story time](../docs/step-time.md).
 
 Ask for the story's span first (start, and end or duration), then the
 device's drain and charge rates. Rates must come from the source or the user.
@@ -134,14 +137,17 @@ Complete working spec:
           "panels": [
             {"id": "batt", "type": "battery", "title": "Camera battery", "low": 20, "crit": 10,
              "initial": {"charge": 72, "source": "cells", "trend": "idle"}},
-            {"id": "phone", "type": "phone", "title": "Phone"}
+            {"id": "phone", "type": "phone", "title": "Phone"},
+            {"id": "app", "type": "deviceapp", "title": "Home app", "device": "Driveway camera",
+             "fields": [{"id": "battery", "label": "Battery", "kind": "battery"}],
+             "initial": {"battery": {"value": 72, "status": "ready", "reportedAt": "now"}}}
           ],
           "steps": [
             {"nodes": ["cam"], "text": "Friday 6 PM: the house is empty."},
             {"time": "+14h", "edge": "cam->phone", "text": "Saturday 8 AM: a delivery; the clip costs 2 percent.",
-             "panels": {"batt": {"drain": 2}}},
+             "panels": {"batt": {"drain": 2}, "app": {"battery": {"value": 62, "status": "ready", "reportedAt": "now"}}}},
             {"time": "+1d", "nodes": ["cam"], "text": "Sunday 8 AM: the fuel gauge reports 49 percent.",
-             "panels": {"batt": {"charge": 49, "note": "gauge reading"}}},
+             "panels": {"batt": {"charge": 49, "note": "gauge reading"}, "app": {"battery": {"value": 49, "status": "ready", "reportedAt": "now"}}}},
             {"time": "18:00", "nodes": ["cam"], "text": "Sunday 6 PM: the owners return."}
           ]
         }
@@ -155,4 +161,8 @@ Complete working spec:
   Sat · 8:00, Sun · 8:00 and Sun · 6:00 from the step times.
 - Charge: 72 → 72 − 14 × 0.6 − 2 = 61.6 (shows 62%) → anchored 49 → 49 − 10 ×
   0.6 = 43.
+- The app's battery card is patched only where a report arrives. It reads
+  72% · Updated just now on Friday, 62% · Updated just now on Saturday, 49% ·
+  Updated just now on Sunday morning and 49% · Updated 10 h ago on Sunday
+  evening. No step types that text.
 - `drainPerHour: 0` on a panel (for wired or PoE power) keeps it flat.

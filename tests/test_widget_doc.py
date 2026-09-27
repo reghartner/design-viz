@@ -32,6 +32,13 @@ class WidgetDocTest(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(sorted(p.stdout.split()), sorted(PANEL_TYPES))
 
+    def test_deviceapp_doc_teaches_report_times(self):
+        p = run("deviceapp")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        for text in ('"reportedAt":"now"', "Updated N min ago", '"freshness":"absolute"',
+                     "content.deviceapp-freshness", "never hand-write"):
+            self.assertIn(text, p.stdout, text)
+
     def test_each_type_extracts_its_own_block(self):
         contract = CONTRACT.read_text()
         for t in PANEL_TYPES:

@@ -16,7 +16,7 @@ var FlowviewCompatibility = (function(){
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
-    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain' };
+    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain', 'content.deviceapp-freshness':'Device app report times and freshness from story time' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -68,6 +68,9 @@ var FlowviewCompatibility = (function(){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
           var navigation=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'phoneScreen') ||
             (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && object(v[f.id]) && Object.prototype.hasOwnProperty.call(v[f.id],'visible');}));};
+          var reported=function(v){return object(v) && (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && object(v[f.id]) && Object.prototype.hasOwnProperty.call(v[f.id],'reportedAt');});};
+          if((Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && f.freshness!=null;}) || reported(p.initial) ||
+            (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && reported(patches[p.id]);}))used['content.deviceapp-freshness']=true;
           if(navigation(p.initial) || (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && navigation(patches[p.id]);}))used['content.deviceapp-navigation']=true;
           if(p.showSources!=null || !Array.isArray(p.sources) || !p.sources.length || notify(p.initial) ||
             (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && notify(patches[p.id]);}))used['content.deviceapp']=true;
@@ -1882,6 +1885,65 @@ function storyTimeLabel(ms, config){
   config = config || {};
   var date = storyTimeDate(ms, config.date === 'none' || config.date == null ? 'short' : config.date);
   return date + ' · ' + storyTimeClock(ms, config.clock || '12h') + (config.clock === '24h' ? '' : (storyTimeParts(ms).h < 12 ? ' AM' : ' PM'));
+}
+
+/* Report times: when a device-app field's value was last reported, in story
+   time. "now" is this step's time; "-15m" is before it; "+5m" is after the
+   previous step's time (like step.time); "06:05" is the latest 06:05 at or
+   before this step's time; an absolute date-time is exact. Returns null for
+   unrecognized or out-of-range values. See docs/step-time.md. */
+var STORY_FRESHNESS_MODES = ['relative', 'absolute', 'off'];
+function storyTimeReportParsable(value){
+  if (typeof value !== 'string') return false;
+  var text = value.trim();
+  if (text === 'now') return true;
+  if (text.charAt(0) === '-') return storyTimeDuration('+' + text.slice(1), true) != null;
+  return storyTimeParsable(text);
+}
+function storyTimeReportResolve(value, now, previous){
+  if (typeof value !== 'string' || !storyTimeInRange(now)) return null;
+  var text = value.trim(), out = null;
+  if (text === 'now') return now;
+  if (text.charAt(0) === '-'){
+    var back = storyTimeDuration('+' + text.slice(1), true);
+    out = back == null ? null : now - back;
+  } else if (text.charAt(0) === '+'){
+    out = storyTimeResolve(text, storyTimeInRange(previous) ? previous : now);
+  } else {
+    out = storyTimeAbsolute(text);
+    if (out == null){
+      var m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+      if (!m || +m[1] > 23 || +m[2] > 59 || (m[3] != null && +m[3] > 59)) return null;
+      var day = 86400000, of = ((+m[1] * 60 + +m[2]) * 60 + +(m[3] || 0)) * 1000;
+      var base = Math.floor(now / day) * day + of;
+      out = base <= now ? base : base - day;
+    }
+  }
+  return storyTimeInRange(out) ? out : null;
+}
+/* Normalized absolute form for folded state, e.g. "2026-09-25T06:05". */
+function storyTimeIso(ms){
+  var p = storyTimeParts(ms), s = new Date(ms).getUTCSeconds();
+  var y = String(p.y); while (y.length < 4) y = '0' + y;
+  return y + '-' + storyTimePad(p.mo + 1) + '-' + storyTimePad(p.d) + 'T' + storyTimePad(p.h) + ':' + storyTimePad(p.mi) + (s ? ':' + storyTimePad(s) : '');
+}
+/* Freshness text for a report at `reported` seen at story time `now`.
+   relative: under 1 min "Updated just now", under 1 h "Updated N min ago",
+   under 24 h "Updated N h ago", otherwise the absolute form. absolute:
+   "Last report 6:05 PM", with the short date when the report is from another
+   calendar day. Elapsed time is floored; a report from the future reads as
+   just now (the validator warns). */
+function storyTimeFreshness(reported, now, config, mode){
+  config = config || {};
+  var elapsed = Math.max(0, now - reported), minute = 60000, hour = 3600000;
+  if (mode !== 'absolute' && elapsed < 24 * hour){
+    if (elapsed < minute) return 'Updated just now';
+    if (elapsed < hour) return 'Updated ' + Math.floor(elapsed / minute) + ' min ago';
+    return 'Updated ' + Math.floor(elapsed / hour) + ' h ago';
+  }
+  var clock = storyTimeClock(reported, config.clock || '12h') + (config.clock === '24h' ? '' : (storyTimeParts(reported).h < 12 ? ' AM' : ' PM'));
+  var sameDay = Math.floor(reported / 86400000) === Math.floor(now / 86400000);
+  return 'Last report ' + (sameDay ? '' : storyTimeDate(reported, 'short') + ', ') + clock;
 }
 
 /* Derived-field provenance for inspectors. Snapshots are fresh per fold, so a
@@ -5693,7 +5755,7 @@ function deviceAppItems(panel, key) {
     })
     .slice(0, key === 'sources' ? 6 : 12);
 }
-function deviceAppPatchWarnings(obj, path, panel, warnings) {
+function deviceAppPatchWarnings(obj, path, panel, warnings, context) {
   if (obj == null) return;
   if (!panelObject(obj)) {
     warnings.push(path + ': expected an object — ignored');
@@ -5724,13 +5786,19 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
     }
     if (v === null) return;
     if (!panelObject(v)) {
-      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?, icon?} or null — ignored');
+      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?, icon?, reportedAt?} or null — ignored');
       return;
     }
     Object.keys(v).forEach(function (k) {
-      if (['value', 'status', 'source', 'detail', 'visible', 'icon'].indexOf(k) < 0)
+      if (['value', 'status', 'source', 'detail', 'visible', 'icon', 'reportedAt'].indexOf(k) < 0)
         warnings.push(p + '.' + k + ': unknown field property — ignored');
     });
+    if (panelOwn(v, 'reportedAt') && v.reportedAt !== null) {
+      if (!storyTimeReportParsable(v.reportedAt))
+        warnings.push(p + '.reportedAt: "' + String(v.reportedAt).slice(0, 80) + '" is not a report time — use "now", "-15m", "+5m", "06:05" or "2026-09-25T06:05" (years 100–9999); ignored');
+      else if (!(context && context.story))
+        warnings.push(p + '.reportedAt: ignored — declare diagram.storyTime.start to compute report freshness');
+    }
     if (
       panelOwn(v, 'value') &&
       v.value !== null &&
@@ -5798,6 +5866,8 @@ function deviceAppWarnings(panel, d, path, warnings) {
       } else {
         if (item.kind != null && ['text', 'battery'].indexOf(item.kind) < 0)
           warnings.push(p + '.kind: expected text or battery — using text');
+        if (item.freshness != null && STORY_FRESHNESS_MODES.indexOf(item.freshness) < 0)
+          warnings.push(p + '.freshness: expected ' + STORY_FRESHNESS_MODES.join(', ') + ' — using relative');
         if (item.icon != null && ICON_SET.indexOf(item.icon) < 0)
           warnings.push(p + '.icon: unknown icon — ignored');
         if (
@@ -5810,7 +5880,85 @@ function deviceAppWarnings(panel, d, path, warnings) {
       }
     });
   });
-  deviceAppPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+  var story = storyTimeConfig(d);
+  deviceAppPatchWarnings(panel.initial, path + '.initial', panel, warnings, {story: !!story});
+  if (story) deviceAppReportWarnings(panel, d, path, story, warnings);
+  return {story: !!story};
+}
+/* Walk one path's report times per field. Explicit detail pins its text
+   until a later step delivers a newer report without detail; a null field
+   patch resets the field. visit(fieldId, reportedMs, nowMs, stepIndex) runs
+   for every accepted report time (stepIndex -1 is initial). */
+function deviceAppReportWalk(panel, steps, story, each, visit) {
+  var fields = deviceAppItems(panel, 'fields'),
+    carried = Object.create(null);
+  function apply(patch, now, previous, index) {
+    if (!panelObject(patch)) return;
+    fields.forEach(function (f) {
+      if (!panelOwn(patch, f.id)) return;
+      var v = patch[f.id];
+      if (v === null) { carried[f.id] = { reported: null, pinned: false, at: null }; return; }
+      if (!panelObject(v)) return;
+      var c = carried[f.id] || (carried[f.id] = { reported: null, pinned: false, at: null }),
+        hasDetail = v.detail === null || typeof v.detail === 'string';
+      if (hasDetail) c.pinned = typeof v.detail === 'string' && v.detail !== '';
+      if (!panelOwn(v, 'reportedAt')) return;
+      if (v.reportedAt === null) { c.reported = null; c.at = null; return; }
+      var ms = storyTimeReportResolve(v.reportedAt, now, previous);
+      if (ms == null) return;
+      c.reported = ms;
+      c.at = index;
+      if (!hasDetail) c.pinned = false;
+      if (visit) visit(f.id, ms, now, index);
+    });
+  }
+  apply(panel.initial, story.config.start, story.config.start, -1);
+  var count = Math.max(steps.length, 1);
+  for (var i = 0; i < count; i++) {
+    var at = storyTimeAt(story, i);
+    if (i < steps.length) apply((stepPanelPatch(steps[i]) || {})[panel.id], at.time, at.previous, i);
+    if (each) each(i, at.time, carried, fields);
+  }
+}
+/* A report later than the step's own story time is a report from the future. */
+function deviceAppReportWarnings(panel, d, path, config, warnings) {
+  var DP = path.replace(/\.panels\[\d+\]$/, ''),
+    steps = Array.isArray(d.steps) ? d.steps : [],
+    paths = diagramPathList(d),
+    reported = Object.create(null);
+  paths.forEach(function (route) {
+    var projected = route.indices.map(function (i) { return steps[i]; }),
+      story = storyTimeSequence({ steps: projected }, config),
+      label = paths.length > 1 ? ' on path "' + route.id + '"' : '';
+    deviceAppReportWalk(panel, projected, story, null, function (fieldId, ms, now, n) {
+      if (ms <= now) return;
+      var where = n < 0 ? path + '.initial.' + fieldId : DP + '.steps[' + route.indices[n] + '].panels.' + panel.id + '.' + fieldId,
+        key = where + label;
+      if (reported[key] || (n < 0 && reported[where])) return;
+      reported[key] = reported[where] = true;
+      warnings.push(where + '.reportedAt: ' + storyTimeLabel(ms, config) + ' is later than the step’s story time' + (n < 0 ? '' : label) + ' (' + storyTimeLabel(now, config) + ') — freshness treats it as just reported');
+    });
+  });
+}
+/* Freshness text from story time (docs/step-time.md). Only fields with an
+   accepted report time change; without story time nothing changes. */
+function deviceAppFreshnessStates(panel, states, steps, story) {
+  if (!story) return states;
+  deviceAppReportWalk(panel, steps, story, function (i, now, carried, fields) {
+    var state = states[i];
+    if (!state) return;
+    fields.forEach(function (f) {
+      var c = carried[f.id], field = state[f.id];
+      if (!c || c.reported == null || !panelObject(field)) return;
+      field.reportedAt = storyTimeIso(c.reported);
+      if (c.at === i && Array.isArray(state._updated) && state._updated.indexOf(f.id) < 0) state._updated.push(f.id);
+      var mode = STORY_FRESHNESS_MODES.indexOf(f.freshness) >= 0 ? f.freshness : 'relative';
+      if (c.pinned || mode === 'off') return;
+      field.detail = storyTimeFreshness(c.reported, now, story.config, mode);
+      storyTimeMark(state, f.id, 'freshness');
+    });
+  });
+  return states;
 }
 function foldDeviceAppStates(panel, steps) {
   var fields = deviceAppItems(panel, 'fields'),
@@ -5879,14 +6027,14 @@ function foldDeviceAppStates(panel, steps) {
 
 PanelRegistry.extend('deviceapp', {
   validateDeclaration: function (p, PP, warnings, errors, d) {
-    deviceAppWarnings(p, d, PP, warnings);
+    return deviceAppWarnings(p, d, PP, warnings);
   },
   validatePatch: function (patch, path, panel, warnings, context) {
-    deviceAppPatchWarnings(patch, path, panel, warnings);
+    deviceAppPatchWarnings(patch, path, panel, warnings, context);
   },
   fold: foldDeviceAppStates,
   storyTime: function (panel, states, steps, story) {
-    return story ? storyTimeClockOverlay(panel, states, steps, story) : states;
+    return story ? deviceAppFreshnessStates(panel, storyTimeClockOverlay(panel, states, steps, story), steps, story) : states;
   },
 });
 
@@ -6365,6 +6513,7 @@ PanelRegistry.extend('deviceapp', {
             { k: 'source' },
             { k: 'icon', kind: 'icon' },
             { k: 'unit' },
+            { k: 'freshness', kind: 'enum', options: STORY_FRESHNESS_MODES },
           ],
           max: 12,
         },
@@ -6391,7 +6540,29 @@ PanelRegistry.extend('deviceapp', {
       sample.state=foldDeviceAppStates(sample.panel,[])[0];sample.states=[sample.state];return sample;
     },
     editor: function(context){
-      return {patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key;},
+      return {patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key==='reportedAt'?'Report time':key;},
+      validateSubfield:function(key,col,value){
+        return col[0]==='reportedAt' && value!=null && !storyTimeReportParsable(value)?'use now, -15m, +5m, 06:05 or 2026-09-25T06:05 for the report time':null;
+      },
+      /* Report time: when this card's value last arrived, in story time. */
+      patchSubfield:function(key,col,input,options){
+        if(col[0]!=='reportedAt')return null;
+        var initial=options && options.initial;
+        input.setAttribute('aria-label',key+' report time');
+        input.placeholder=initial?'Optional · now = story start':'Inherit · now, -15m or 06:05';
+        var box=document.createElement('div');box.className='da-report-actions';
+        var mark=context.controls.action(initial?'Reported at story start':'Reported at this step',function(){return options.commit('now');});
+        mark.setAttribute('aria-label',key+': '+(initial?'reported at story start':'reported at this step'));
+        box.appendChild(mark);
+        if(options.value!==undefined){
+          var clear=context.controls.action('Clear report time',function(){return options.commit(undefined);});
+          clear.setAttribute('aria-label',key+': clear report time');box.appendChild(clear);
+        }
+        var note=document.createElement('p');note.className='fnote';
+        note.textContent='With story time the card shows “Updated 5 min ago” from this report time on every later step. Detail text overrides it until a newer report.';
+        box.appendChild(note);
+        return box;
+      },
       patchField:function(field,input,options){
         if(field[0]==='date'){
           if(options && options.initial)input.setAttribute('aria-label','Starting date');
@@ -6441,6 +6612,7 @@ PanelRegistry.extend('deviceapp', {
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
               ['visible', 'bool'],
+              ['reportedAt', 'text'],
             ],
           ];
         });

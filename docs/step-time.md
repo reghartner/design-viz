@@ -173,20 +173,104 @@ A `deviceapp` field with `"kind": "battery"` shows what the app *reports*, not
 the physical battery: reports arrive late, are cached, or go stale. They do
 not follow a battery panel. Patch them explicitly at the steps where the app
 receives a report, typically with the rounded value the battery panel shows at
-that step.
+that step, and mark the report time (next section).
+
+## Device-app report times and freshness
+
+Device-app cards often say how old their value is: "Updated just now",
+"Updated 3 h ago". With story time the engine knows the time at every step, so
+**record when the value was reported and let the card compute the text**. Never
+hand-write freshness in `detail`: it goes stale as soon as the story moves on.
+
+```json
+{"id": "app", "type": "deviceapp",
+ "fields": [{"id": "battery", "label": "Battery", "kind": "battery"},
+            {"id": "clip", "label": "Last recording", "freshness": "absolute"}],
+ "initial": {"battery": {"value": 38, "status": "ready", "reportedAt": "now"}}}
+```
+
+```json
+{"id": "status", "time": "08:21",
+ "panels": {"app": {"battery": {"value": 41, "status": "ready", "reportedAt": "now"}}}}
+```
+
+### `reportedAt`
+
+A field patch (initial or step) may set `reportedAt`. It carries forward like
+the field's other values.
+
+| Form | Example | Meaning |
+| --- | --- | --- |
+| Now | `"now"` | This step's story time (`initial`: the story start). The usual form: put it on the step that delivers the report. |
+| Before this step | `"-15m"`, `"-2h"`, `"-1d"` | This step's time minus the duration. |
+| After the previous step | `"+5m"` | The previous step's time on this path plus the duration, exactly like `step.time`. |
+| Time of day | `"06:05"` | The latest 06:05 at or before this step's time (rolls back over midnight). |
+| Absolute | `"2026-09-25T06:05"` | The exact date-time. |
+| Clear | `null` | No report time; the card shows its authored `detail`. |
+
+A `null` field patch (`{"battery": null}`) resets the field, including its
+report time. The folded state shows the resolved report time as
+`reportedAt: "2026-09-25T06:05"` (with `:SS` when seconds are set).
+
+### Freshness text
+
+On every step, a field with a report time shows freshness in its detail line,
+computed from *this step's story time − report time*, rounded down:
+
+| Elapsed | Text (default `"freshness": "relative"`) |
+| --- | --- |
+| under 1 minute | `Updated just now` |
+| under 1 hour | `Updated 5 min ago` |
+| under 24 hours | `Updated 3 h ago` |
+| 24 hours or more | `Last report Thu, Sep 24, 6:05 PM` |
+
+A field declared with `"freshness": "absolute"` always shows the report time:
+`Last report 6:05 PM`, adding the short date (`Thu, Sep 24, 6:05 PM`) when the
+report is from another calendar day. The time follows `storyTime.clock`
+(`12h`: `6:05 PM`, `24h`: `18:05`). `"freshness": "off"` records the report
+time but never writes text.
+
+- **Explicit `detail` wins.** A non-empty `detail` in a patch (or `initial`)
+  replaces the computed text from its step until a later step delivers a newer
+  report without `detail`. Put `detail` in the same patch as `reportedAt` to
+  keep your own text for that report; `detail: null` or `""` restores the
+  computed text.
+- **A new report is an update.** A step whose report time is new marks the card
+  *Updated* even when the value did not change.
+- **Status stays explicit.** Freshness never changes `status`; set `stale`
+  yourself when the app shows a cached value.
+- **Paths fold separately.** A relative or time-of-day report time on a shared
+  step resolves against each path's times.
+- A report later than the step's own time (a report from the future) warns and
+  reads as just reported.
+
+### Validation (report times, all warnings)
+
+- `reportedAt` that is not one of the forms above, or lands outside years
+  100–9999 → ignored.
+- `reportedAt` without `diagram.storyTime` → ignored; the card shows its
+  authored detail exactly as before.
+- A report time later than its step's story time → "is later than the step's
+  story time", once per step, field and path.
+- An unknown field `freshness` → `relative`.
 
 ## Backward compatibility
 
-- **No `storyTime`**: panel clocks, dates and battery charges fold exactly as
-  before. `step.time` warns and is ignored. The only active new behavior is an
+- **No `storyTime`**: panel clocks, dates, battery charges and device-app
+  cards fold exactly as before. `step.time` and `reportedAt` warn and are
+  ignored. The only active new behavior is an
   explicit `drain` patch, a new key that earlier specs never used.
 - **With `storyTime`**: existing per-panel `clock`/`date` patches still win at
   their steps (see the override order) and `charge` patches still set the value
   exactly. Automatic drift runs only between steps whose story time differs,
   so a diagram whose steps never move the clock also keeps its authored values.
+  Device-app fields without `reportedAt` keep their authored `detail`.
 - The compatibility feature `flow.story-time` is detected whenever a diagram
   declares `storyTime` or a battery step uses `drain`, so older renderers show
-  an upgrade notice rather than silently frozen clocks.
+  an upgrade notice rather than silently frozen clocks. A device app that uses
+  `reportedAt` or a field `freshness` declares `content.deviceapp-freshness`,
+  so an older renderer asks for an upgrade instead of showing cards without
+  their freshness text.
 
 ## Workbench
 
@@ -205,3 +289,11 @@ that step.
   use).
 - New battery panels start with the diagram's authored rates; new phone and
   device app panels omit the starting clock when a story time exists.
+- **Device app field → Report time**: each card in *Starting state* and in a
+  step's *Panel changes* has a **Report time** box (`now`, `-15m`, `06:05` or a
+  date-time), a **Reported at this step** button (*Reported at story start* in
+  Starting state) that sets `"now"`, and **Clear report time**. The panel's
+  *fields* table has a **freshness** column (relative, absolute, off).
+- **Effective state** labels a computed detail as *Story time · derived
+  freshness "Updated 5 min ago"*, with the field history and the step time as
+  inputs.

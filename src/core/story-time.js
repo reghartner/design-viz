@@ -128,6 +128,65 @@ function storyTimeLabel(ms, config){
   return date + ' · ' + storyTimeClock(ms, config.clock || '12h') + (config.clock === '24h' ? '' : (storyTimeParts(ms).h < 12 ? ' AM' : ' PM'));
 }
 
+/* Report times: when a device-app field's value was last reported, in story
+   time. "now" is this step's time; "-15m" is before it; "+5m" is after the
+   previous step's time (like step.time); "06:05" is the latest 06:05 at or
+   before this step's time; an absolute date-time is exact. Returns null for
+   unrecognized or out-of-range values. See docs/step-time.md. */
+var STORY_FRESHNESS_MODES = ['relative', 'absolute', 'off'];
+function storyTimeReportParsable(value){
+  if (typeof value !== 'string') return false;
+  var text = value.trim();
+  if (text === 'now') return true;
+  if (text.charAt(0) === '-') return storyTimeDuration('+' + text.slice(1), true) != null;
+  return storyTimeParsable(text);
+}
+function storyTimeReportResolve(value, now, previous){
+  if (typeof value !== 'string' || !storyTimeInRange(now)) return null;
+  var text = value.trim(), out = null;
+  if (text === 'now') return now;
+  if (text.charAt(0) === '-'){
+    var back = storyTimeDuration('+' + text.slice(1), true);
+    out = back == null ? null : now - back;
+  } else if (text.charAt(0) === '+'){
+    out = storyTimeResolve(text, storyTimeInRange(previous) ? previous : now);
+  } else {
+    out = storyTimeAbsolute(text);
+    if (out == null){
+      var m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+      if (!m || +m[1] > 23 || +m[2] > 59 || (m[3] != null && +m[3] > 59)) return null;
+      var day = 86400000, of = ((+m[1] * 60 + +m[2]) * 60 + +(m[3] || 0)) * 1000;
+      var base = Math.floor(now / day) * day + of;
+      out = base <= now ? base : base - day;
+    }
+  }
+  return storyTimeInRange(out) ? out : null;
+}
+/* Normalized absolute form for folded state, e.g. "2026-09-25T06:05". */
+function storyTimeIso(ms){
+  var p = storyTimeParts(ms), s = new Date(ms).getUTCSeconds();
+  var y = String(p.y); while (y.length < 4) y = '0' + y;
+  return y + '-' + storyTimePad(p.mo + 1) + '-' + storyTimePad(p.d) + 'T' + storyTimePad(p.h) + ':' + storyTimePad(p.mi) + (s ? ':' + storyTimePad(s) : '');
+}
+/* Freshness text for a report at `reported` seen at story time `now`.
+   relative: under 1 min "Updated just now", under 1 h "Updated N min ago",
+   under 24 h "Updated N h ago", otherwise the absolute form. absolute:
+   "Last report 6:05 PM", with the short date when the report is from another
+   calendar day. Elapsed time is floored; a report from the future reads as
+   just now (the validator warns). */
+function storyTimeFreshness(reported, now, config, mode){
+  config = config || {};
+  var elapsed = Math.max(0, now - reported), minute = 60000, hour = 3600000;
+  if (mode !== 'absolute' && elapsed < 24 * hour){
+    if (elapsed < minute) return 'Updated just now';
+    if (elapsed < hour) return 'Updated ' + Math.floor(elapsed / minute) + ' min ago';
+    return 'Updated ' + Math.floor(elapsed / hour) + ' h ago';
+  }
+  var clock = storyTimeClock(reported, config.clock || '12h') + (config.clock === '24h' ? '' : (storyTimeParts(reported).h < 12 ? ' AM' : ' PM'));
+  var sameDay = Math.floor(reported / 86400000) === Math.floor(now / 86400000);
+  return 'Last report ' + (sameDay ? '' : storyTimeDate(reported, 'short') + ', ') + clock;
+}
+
 /* Derived-field provenance for inspectors. Snapshots are fresh per fold, so a
    WeakMap attaches metadata without changing any snapshot's shape. */
 var STORY_TIME_DERIVED = typeof WeakMap === 'function' ? new WeakMap() : null;

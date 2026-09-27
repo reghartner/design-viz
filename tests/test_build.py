@@ -1,6 +1,9 @@
 """Tests for tools/build.py: deterministic page and backend runtime assembly.
 Run: python3 -m unittest discover -s tests"""
 import json
+import base64
+import gzip
+import hashlib
 import pathlib
 import re
 import runpy
@@ -76,6 +79,20 @@ class BuildTests(unittest.TestCase):
         blocks = BLOCK_RE.findall(self.texts["flowview.html"])
         self.assertEqual(len(blocks), 1)
         json.loads(blocks[0][1])  # embedded demo spec parses
+
+    def test_folder_authoring_kit_matches_current_skill_and_runtime(self):
+        match = re.search(r'<script type="application/json" id="flowview-folder-kit">(.*?)</script>',
+                          self.texts["flowspec.html"], re.S)
+        self.assertIsNotNone(match)
+        packed = json.loads(match.group(1))
+        raw = gzip.decompress(base64.b64decode(packed['gzip']))
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), packed['sha256'])
+        files = json.loads(raw)['files']
+        for name in ['.claude/skills/hld-to-page/SKILL.md', 'docs/folder-agent-session.md',
+                     'tools/canon/generated-runtime.cjs']:
+            self.assertEqual(files[name], (ROOT / name).read_text())
+        self.assertEqual(packed['watcher'], (ROOT / 'tools/folder-agent.py').read_text())
+        self.assertFalse(any('node_modules/' in name or '/agents/' in name or '/research/' in name for name in files))
 
     def test_workbench_has_no_spec_block(self):
         self.assertEqual(len(BLOCK_RE.findall(self.texts["flowspec.html"])), 0)

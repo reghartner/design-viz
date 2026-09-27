@@ -13,6 +13,10 @@ import json
 import pathlib
 import sys
 import subprocess
+try:
+    from folder_agent_kit import folder_agent_kit
+except ModuleNotFoundError:
+    from tools.folder_agent_kit import folder_agent_kit
 from functools import lru_cache
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -126,6 +130,7 @@ def fill(skel: str, mapping: dict) -> str:
 
 
 def main() -> int:
+    runtime = canon_runtime()
     for name, skeleton, output in [
         ('standalone', 'flowview.skel.html', ROOT / 'template/flowview.html'),
         ('workbench', 'workbench.skel.html', ROOT / 'workbench/flowspec.html'),
@@ -146,9 +151,9 @@ def main() -> int:
             mapping['WORKBENCH_TEMPLATES'] = workbench_templates()
             mapping['WORKBENCH_CANON'] = workbench_canon()
             mapping['HUMAN_GUIDE'] = read('workbench/human-guide.html')
+            mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)
         output.write_text(fill(read(skeleton), mapping))
 
-    runtime = canon_runtime()
     (ROOT / "tools" / "canon" / "generated-runtime.cjs").write_text(runtime)
 
     # Publish against the runtime just built, so newly added panels validate.

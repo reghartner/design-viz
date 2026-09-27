@@ -258,6 +258,25 @@ body.workspace-dragging,body.workspace-dragging *{user-select:none!important;cur
 .workspace-rail #editor-tab-file{margin-top:auto;}
 .workwrap .specbox{display:flex;flex-direction:column;border-left:0;border-radius:0 12px 12px 0;overflow:hidden;}
 .editor-pane{min-width:0;flex:1 1 0;min-height:0;overflow:auto;}
+.folder-agent-shell{padding:20px 16px;display:flex;flex-direction:column;gap:12px;font-size:14px;line-height:1.5;}
+.folder-agent-shell h2{font-size:19px;margin:0;}
+.folder-agent-shell p{margin:0;}
+.folder-agent-shell label{display:block;font-weight:500;}
+.folder-agent-shell textarea{width:100%;box-sizing:border-box;resize:vertical;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:10px;font:inherit;}
+.folder-agent-actions{display:flex;flex-wrap:wrap;gap:8px;}
+.folder-agent-folder{overflow-wrap:anywhere;color:var(--sub);}
+#folder-agent-connection{font-weight:600;}
+#folder-agent-setup{border-block:1px solid var(--line);padding:12px 0;}
+#folder-agent-setup summary{cursor:pointer;font-weight:500;}
+#folder-agent-setup p{margin:10px 0;}
+#folder-agent-instructions{font-size:12px;}
+.folder-agent-messages{display:flex;flex-direction:column;gap:14px;}
+.folder-agent-message{padding:12px 0;border-bottom:1px solid var(--line);}
+.folder-agent-message b{display:block;margin-bottom:6px;}
+.folder-agent-message div,#folder-agent-progress{white-space:pre-wrap;overflow-wrap:anywhere;}
+.folder-agent-hint{font-size:12px;color:var(--sub);}
+#folder-agent-form textarea{margin:8px 0;}
+#folder-agent-form button{margin-right:10px;}
 .editor-pane:not(#editor-file)>.ssec>summary{display:none;}
 .editor-pane-heading{padding:18px 16px 12px;}
 .editor-pane-heading h2{font-size:17px;}
@@ -1080,3 +1099,5 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .prose-editor{display:grid;gap:6px;min-width:0}.prose-toolbar{display:flex;flex-wrap:wrap;gap:4px}.prose-toolbar button{font-size:11px;padding:5px 7px}.prose-link{display:flex;gap:4px;min-width:0}.prose-link input{flex:1;min-width:0}.prose-link button{flex:none}
 
 .detail-mappings{display:grid;gap:10px;margin:10px 0}.mapping-row{min-width:0;border:1px solid var(--bdr);border-radius:8px;padding:10px}.mapping-row legend{font-size:11px;font-weight:700;padding:0 4px}.mapping-error:empty{display:none}.mapping-error{color:var(--warn,#b45309)}
+
+.folder-agent-command{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;padding:10px;border:1px solid var(--line);border-radius:8px}

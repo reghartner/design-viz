@@ -54,6 +54,8 @@
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
     "workbench/agent-session.js",
+    "workbench/folder-agent.js",
+    "workbench/agent-chat.js",
     "workbench/controls.js",
     "workbench/notifications.js",
     "workbench/vocabulary.js",

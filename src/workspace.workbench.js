@@ -4,7 +4,7 @@ function workspacePrefs(raw){
   try { value = JSON.parse(raw); } catch (ex){ return prefs; }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return prefs;
   if (typeof value.editor === 'number' && Number.isFinite(value.editor)) prefs.editor = Math.max(320, Math.min(1100, value.editor));
-  if (['inspect','steps','outline','json','file'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
+  if (['inspect','steps','outline','json','file','agent'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
   return prefs;
 }
 function workspaceEditorBounds(contentWidth){
@@ -21,6 +21,7 @@ function initWorkbenchWorkspace(){
   var guide = document.getElementById('guide');
   if (!wrap || !cols || !editor || !focus || !reset || !toolbar || !src) return null;
   var names = ['inspect','steps','outline','json','file'], tabs = {}, panes = {}, scrolls = {};
+  if(document.getElementById('editor-tab-agent') && document.getElementById('editor-agent'))names.unshift('agent');
   names.forEach(function(name){
     tabs[name] = document.getElementById('editor-tab-' + name);
     panes[name] = document.getElementById('editor-' + name);

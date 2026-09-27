@@ -234,6 +234,11 @@ function initWorkbenchWelcome(opts){
   });
   ['welcome-agent', 'welcome-new-agent'].forEach(function(id){ el(id).addEventListener('click', function(){ navigation.go('agent'); }); });
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
+  if(el('welcome-agent-live'))el('welcome-agent-live').addEventListener('click',function(){
+    if(!builder.isProjectOpen())builder.loadSpec(welcomeBlankSpec('My story'));
+    enterEditor();
+    var agentTab=document.getElementById('editor-tab-agent');if(agentTab)agentTab.click();
+  });
   root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });
   ['welcome-open', 'welcome-paste-file'].forEach(function(id){ el(id).addEventListener('click', function(){ file.value = ''; file.click(); }); });
   el('welcome-paste-form').addEventListener('submit', function(ev){

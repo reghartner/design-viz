@@ -589,8 +589,12 @@ function initWorkbenchBuilder(opts){
   }
   /* Session owns history and persistence; controls retain DOM/focus policy. */
   var redoBtn = document.getElementById('redo-builder');
-  function doUndo(){return session.undo();}
-  function doRedo(){return session.redo();}
+  function agentHistory(action){
+    var keepChat=opts.workspace && opts.workspace.tool()==='agent',result=action();
+    if(keepChat)opts.workspace.showTool('agent');return result;
+  }
+  function doUndo(){return agentHistory(function(){return session.undo();});}
+  function doRedo(){return agentHistory(function(){return session.redo();});}
   if (undoBtn) life.listen(undoBtn,'click', doUndo);
   if (redoBtn) life.listen(redoBtn,'click', doRedo);
   life.listen(src,'input', function(){
@@ -1074,7 +1078,7 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(catalogPicker)catalogPicker.destroy();});
   life.own(function(){interactions.destroy();});
   life.own(function(){hideDiff();if(guide)guide.hidden=true;});
-  var agentSession=typeof initWorkbenchAgentSession==='function' ? initWorkbenchAgentSession({document:document,
+  var agentOptions={document:document,
     snapshot:function(){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
       var previewCurrent=snap.renderedText===snap.text;
@@ -1095,7 +1099,7 @@ function initWorkbenchBuilder(opts){
     busy:function(){
       var active=document.activeElement;
       return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
-        !!(active && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
+        !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
     apply:function(text,expected){
       var snapshot=session.snapshot();
@@ -1112,8 +1116,11 @@ function initWorkbenchBuilder(opts){
       }});
       return {ok:accepted,rendered:!!(outcome && outcome.ok)};
     }
-  }) : null;
+  };
+  var agentSession=typeof initWorkbenchAgentSession==='function'?initWorkbenchAgentSession(agentOptions):null;
+  var agentChat=typeof initWorkbenchAgentChat==='function'?initWorkbenchAgentChat(agentOptions):null;
   if(agentSession)life.own(function(){agentSession.destroy();});
+  if(agentChat)life.own(function(){agentChat.destroy();});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },

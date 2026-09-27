@@ -21,8 +21,18 @@ test('briefs preserve user sources and audience and route each task to the autho
     assert.ok(prompt.includes(repo.skill));assert.match(prompt,/My brief: Explain recording failure/);
     assert.match(prompt,/Audience: Engineers/);assert.match(prompt,/tools\/validate\.js/);
     assert.match(prompt,/coverage ledger/);assert.match(prompt,/cannot access the skill/);
+    assert.match(prompt,/ask me your questions in one short batch/);assert.match(prompt,/Do not ask again about what I already stated/);
+    assert.match(prompt,/small, fully specified edit, ask only about what blocks it/);assert.match(prompt,/storyboard worksheet/);
+    assert.match(prompt,/Backstage catalog/);assert.match(prompt,/full commit SHAs/);assert.match(prompt,/walk script/);
   }
   assert.match(context.welcomeAgentPrompt('code','','Engineers',repo),/cite the implementation/);
+  assert.match(context.welcomeAgentPrompt('design','','Business readers',repo,'business'),/Technical level: story\. .*Do not ask me technical questions.*Decisions I made/);
+  assert.doesNotMatch(context.welcomeAgentPrompt('design','','Business readers',repo,'business'),/ask where they are|where my Backstage catalog/);
+  assert.match(context.welcomeAgentPrompt('design','','Engineers',repo,'engineering'),/Backstage catalog or code and I have not provided them, ask where they are/);
+  assert.match(context.welcomeAgentPrompt('design','','Mixed',repo,'mixed'),/Technical level: mixed\./);
+  assert.doesNotMatch(context.welcomeAgentPrompt('design','','Mixed',repo,'mixed'),/ask where they are|where my Backstage catalog/);
+  assert.match(context.welcomeAgentPrompt('design','','Engineers',repo,'engineering'),/Technical level: engineering\. Show every service hop/);
+  assert.match(context.welcomeAgentPrompt('design','','Someone',repo),/Technical level: not chosen\. Ask me first/);
   assert.match(context.welcomeAgentPrompt('improve','','Engineers',repo),/Preserve existing supported behavior/);
 });
 test('blank project is empty, valid, pastel, and independently allocated for each opening',()=>{

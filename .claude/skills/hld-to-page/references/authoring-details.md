@@ -229,3 +229,40 @@ Inspect the rendered result and use bends/label nudges if needed. Workbench
 controls are **float → Free placement**, **Float X/Y**, and **Exit / Entry side**
 with **position (%)**. See `docs/free-node-placement.md` and the executable
 `examples/free-placement/free-placement.spec.json` example.
+
+## Human handoff in the workbench
+
+Camera and Device App have typed **Starting state** controls in the panel
+inspector. Set defaults there and authored changes on steps; keep advanced
+initial fields intact. Phone and Device App also offer a shared notification
+composer for initial and per-step messages; clear runs before add.
+
+Camera fields and Phone audio expose carry-forward / this-step-only duration
+and Inherit. Audio is a whole snapshot, not per-property inheritance. Imported
+carry + `enterOnce` pairs retain both assignments during ordinary value edits;
+an explicit duration choice keeps the temporary value and replaces the pair.
+
+Whole panels use declaration `visible:false` and step
+`panelVisibility:{id:false|true}`. The inspector exposes Starting visibility and
+per-step Show / Hide / Inherit. Visibility carries along each path, including
+skipped stops; hidden panels keep space and receive state updates.
+Layout-hidden panels stay hidden; ambient shows all included panels. Do not
+confuse this with Device App card visibility.
+
+Local drilldowns expose parent-event → child-path/event rows and a saved-target
+preview. Mapping omissions inherit detail defaults; explicit null suppresses an
+inherited default. Imported numeric child positions retain their type until
+edited.
+
+Humans can click nested bullets, add siblings/subpoints, indent/outdent and
+reorder complete subtrees in the inspector. Prose formatting buttons write the
+existing safe emphasis, HTTP(S) link, inline-code and fenced-code syntax.
+
+Fragment inspectors expose **Visibility by path position** for edges, bullets,
+and contract rows. The UI is one-based; `revealAt` / `hideAt` remain zero-based
+positions in each full selected path, including stops hidden by a view. Show is
+inclusive, Hide starts at its bound, and ambient shows all fragments.
+
+Connections expose all built-in protocols and custom name/color creation; story
+lanes use the same document-wide vocabulary controls. See the workbench User
+guide → Visual panels.

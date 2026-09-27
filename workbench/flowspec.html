@@ -10353,21 +10353,8 @@ function lintDiagram(d, DP, usedKinds, warnings){
         (Number(g) + 1) + ' and ' + (Number(g) + 2) +
         ' — expect crowding; consider fewer return edges or a second section');
   });
-
-  var reportedPairs = new Set();
-  diagramPathList(d).forEach(function(path){
-    var firstEdgeAt = new Map();
-    path.indices.forEach(function(ti){
-      var k = stepDeliveredKeys(d.steps[ti])[0];
-      if (!k) return;
-      if (firstEdgeAt.has(k)){
-        var earlier=firstEdgeAt.get(k), pair=earlier+':'+ti;
-        if(!reportedPairs.has(pair))warnings.push(DP + '.steps[' + ti + ']: shares first edge "' + k + '" with steps[' +
-          earlier + '] — both step coins land on the same midpoint; reorder the edges list of one step');
-        reportedPairs.add(pair);
-      }else firstEdgeAt.set(k,ti);
-    });
-  });
+  /* Steps may share a first edge: the renderer gives each one its own coin
+     in a row along that edge, so there is nothing to lint. */
 }
 
 function lintPage(page){
@@ -27993,7 +27980,7 @@ function showCommunicationFailures(board,failures,animate){
       svgEl('circle',{r:8},marker);
       svgEl('path',{d:'M-5 0H5'},marker);
     } else svgEl('path',{d:'M-6 -6L6 6M-6 6L6 -6'},marker);
-    var hidden = [path,info.haloEl,info.coinEl].filter(Boolean);
+    var hidden = [path,info.haloEl].concat(info.coinEls || [info.coinEl]).filter(Boolean);
     hidden.forEach(function(el){el.classList.add('comm-hidden');});
     if (info.labelEl) info.labelEl.classList.add('comm-label');
     var effect = {group:group,hidden:hidden,label:info.labelEl,packet:null};
@@ -28019,6 +28006,50 @@ function destroyBoardLinks(el){
     el[key] = null;
     if (controller) controller.destroy();
   });
+}
+/* Coin slots for n steps that share one edge. One coin sits on the midpoint;
+   several spread along the path, COIN_STEP apart in step order (lowest number
+   nearest the source) and centred on the midpoint, shifted inward if the row
+   would run into the edge's ends. When the path is too short or bends too
+   tightly for that to keep the coins apart, they fall back to a straight row
+   along the tangent at the midpoint. */
+var COIN_STEP = 26, COIN_CLEAR = 22, COIN_END = 12;
+function coinSlots(path, len, mid, n){
+  if (n <= 1) return [{x: mid.x, y: mid.y}];
+  var span = (n - 1) * COIN_STEP, lo = COIN_END + span / 2, hi = len - COIN_END - span / 2, pts = null;
+  if (lo <= hi){
+    var centre = Math.min(hi, Math.max(lo, len / 2));
+    pts = [];
+    for (var i = 0; i < n; i++){
+      var p = path.getPointAtLength(centre + (i - (n - 1) / 2) * COIN_STEP);
+      pts.push({x: p.x, y: p.y});
+    }
+    for (var a = 0; pts && a < n; a++) for (var b = a + 1; b < n; b++){
+      if (Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y) < COIN_CLEAR){ pts = null; break; }
+    }
+  }
+  if (pts) return pts;
+  var p0 = path.getPointAtLength(Math.max(0, len / 2 - 2)), p1 = path.getPointAtLength(Math.min(len, len / 2 + 2));
+  var dx = p1.x - p0.x, dy = p1.y - p0.y, dl = Math.hypot(dx, dy);
+  if (!(dl > 0)){ dx = 1; dy = 0; dl = 1; }
+  dx /= dl; dy /= dl;
+  var row = [];
+  for (var j = 0; j < n; j++){
+    var off = (j - (n - 1) / 2) * COIN_STEP;
+    row.push({x: mid.x + dx * off, y: mid.y + dy * off});
+  }
+  return row;
+}
+/* place the visible coins of one shared edge; hidden coins keep no slot */
+function layoutCoinGroup(group){
+  var shown = group.coins.filter(function(g){ return !g.classList.contains('view-step-hidden'); });
+  var pts = coinSlots(group.path, group.len, group.mid, shown.length);
+  shown.forEach(function(g, i){
+    var dx = pts[i].x - group.mid.x, dy = pts[i].y - group.mid.y;
+    if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) g.removeAttribute('transform');
+    else g.setAttribute('transform', 'translate(' + dx.toFixed(2) + ' ' + dy.toFixed(2) + ')');
+  });
+  return pts;
 }
 function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
@@ -28131,13 +28162,15 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   el._nodeLinks=wireNodeReferences(el,svg,d,prefix);
 
   /* measured pass: labels, coins, ambient loop dots, manual step dots */
-  var stepByEdge = {};
+  /* every edge-bearing step owns one coin on its first delivered edge; steps
+     that share a first edge share that edge's coin row (see coinSlots) */
+  var stepsByEdge = {};
   (d.steps || []).forEach(function(st, i){
     var keys = stepDeliveredKeys(st);
-    if (keys.length && !(keys[0] in stepByEdge) && edgeIds[keys[0]]) stepByEdge[keys[0]] = i + 1;
+    if (keys.length && edgeIds[keys[0]]) (stepsByEdge[keys[0]] || (stepsByEdge[keys[0]] = [])).push(i + 1);
   });
 
-  var coinRects = [], deltaRects = [], labelEls = [], pendingLabelBadges = [];
+  var coinRects = [], deltaRects = [], labelEls = [], pendingLabelBadges = [], coinGroups = [];
   function deltaBadge(parent, x, y, w, h){
     var badge = document.createElementNS(SVGNS, 'polygon');
     badge.setAttribute('class', 'dvdelta');
@@ -28154,24 +28187,39 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     info.haloEl = svg.querySelector('path.halo[data-dv-edge=\"' + info.idx + '\"]');
     var len = path.getTotalLength();
     var mid = path.getPointAtLength(len * 0.5);
-    var stepN = stepByEdge[e.from + '->' + e.to];
+    var edgeSteps = stepsByEdge[e.from + '->' + e.to] || [];
+    var stepN = edgeSteps.length ? edgeSteps[0] : 0;
+    var coinLeft = mid.x, coinLeftY = mid.y;
 
-    if (stepN){
-      var g = document.createElementNS(SVGNS, 'g');
-      var stepDelta = d.steps[stepN - 1].delta === true;
-      g.setAttribute('class', 'coin' + (stepDelta ? ' dvd' : ''));
-      applyStepCircleColor(g,d.steps[stepN-1]);
-      g.setAttribute('id', prefix + '-coin-' + stepN);
-      g.setAttribute('data-dv-step', String(d._sourceIndices ? d._sourceIndices[stepN - 1] : stepN - 1));
-      markFragmentElement(g, e);
-      var c = document.createElementNS(SVGNS, 'circle');
-      c.setAttribute('cx', mid.x); c.setAttribute('cy', mid.y); c.setAttribute('r', 10);
-      var t = document.createElementNS(SVGNS, 'text');
-      t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 3.5); t.setAttribute('text-anchor', 'middle');
-      t.textContent = stepN;
-      g.appendChild(c); g.appendChild(t); svg.appendChild(g); info.coinEl = g;
-      if (stepDelta) deltaBadge(g, mid.x + 5, mid.y - 14, 8, 7);
-      coinRects.push({x: mid.x - 11, y: mid.y - 11, w: 22, h: 22});
+    if (edgeSteps.length && !info.coinEls){ /* a duplicate from->to declaration shares the first one's coins */
+      var group = {path: path, len: len, mid: mid, coins: []};
+      info.coinEls = group.coins;
+      edgeSteps.forEach(function(n){
+        /* each coin is drawn at the midpoint and moved to its slot by a
+           transform, so a path/view filter can re-pack the visible coins */
+        var g = document.createElementNS(SVGNS, 'g');
+        var stepDelta = d.steps[n - 1].delta === true;
+        g.setAttribute('class', 'coin' + (stepDelta ? ' dvd' : ''));
+        applyStepCircleColor(g,d.steps[n-1]);
+        g.setAttribute('id', prefix + '-coin-' + n);
+        g.setAttribute('data-dv-step', String(d._sourceIndices ? d._sourceIndices[n - 1] : n - 1));
+        g.setAttribute('data-dv-coin-edge', String(info.idx));
+        markFragmentElement(g, e);
+        var c = document.createElementNS(SVGNS, 'circle');
+        c.setAttribute('cx', mid.x); c.setAttribute('cy', mid.y); c.setAttribute('r', 10);
+        var t = document.createElementNS(SVGNS, 'text');
+        t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 3.5); t.setAttribute('text-anchor', 'middle');
+        t.textContent = n;
+        g.appendChild(c); g.appendChild(t); svg.appendChild(g);
+        if (stepDelta) deltaBadge(g, mid.x + 5, mid.y - 14, 8, 7);
+        group.coins.push(g);
+      });
+      info.coinEl = group.coins[0];
+      coinGroups.push(group);
+      layoutCoinGroup(group).forEach(function(pt){
+        coinRects.push({x: pt.x - 11, y: pt.y - 11, w: 22, h: 22});
+        if (pt.x < coinLeft){ coinLeft = pt.x; coinLeftY = pt.y; }
+      });
     }
     if (e.label){
       var lx = mid.x + (e.labelDx || 0), ly = mid.y - (stepN ? 16 : 9) + (e.labelDy || 0);
@@ -28195,7 +28243,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         pendingLabelBadges.push({e: e, lbl: lt});
       } else {
         /* no label: left of the coin, near the midpoint */
-        var badge = deltaBadge(svg, mid.x - (stepN ? 25 : 16), mid.y - 6, 11, 9);
+        var badge = stepN ? deltaBadge(svg, coinLeft - 25, coinLeftY - 6, 11, 9) :
+          deltaBadge(svg, mid.x - 16, mid.y - 6, 11, 9);
         markFragmentElement(badge, e);
       }
     }
@@ -28309,7 +28358,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   });
 
   return {kindsUsed: Object.keys(kindsUsed), anyRet: anyRet, edgeIds: edgeIds,
-    nodeEls: nodeEls, svg: svg};
+    nodeEls: nodeEls, svg: svg,
+    /* re-pack each shared-edge coin row around the coins still visible */
+    layoutCoins: function(){ coinGroups.forEach(layoutCoinGroup); }};
 }
 
 function legendHTML(kinds, anyRet, skin, protos){
@@ -28487,6 +28538,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       coin.classList.toggle('view-step-hidden',position<0);
       var text=coin.querySelector('text');if(text && position>=0)text.textContent=String(position+1);
     });
+    if (board && board.layoutCoins) board.layoutCoins();
   }
   function sharedPeers(shared,path){
     return shared.occurrences.filter(function(o){return o.path.id!==path.id;}).map(function(o){
@@ -33055,8 +33107,9 @@ function planAddStep(text, raw, sectionIdx, pathId){
   if (got.error) return got;
   if (got.d.paths) return planPathStepEdit(text,raw,sectionIdx,pathId,-1,'add');
   var edges = Array.isArray(got.d.edges) ? got.d.edges : [];
-  /* prefer an edge no step uses as its FIRST hop, so the new numbered coin
-     gets its own midpoint (two steps sharing a first hop stack coins) */
+  /* prefer an edge no step uses as its FIRST hop, so the new placeholder
+     step shows a fresh hop (shared first hops are fine: their coins sit side
+     by side along the edge) */
   var used = {};
   (got.d.steps || []).forEach(function(st){
     var k = st && (st.edge || (Array.isArray(st.edges) && st.edges[0]));
@@ -37757,8 +37810,8 @@ function createBuilderInteractions(opts){
     if (!secEl) return null;
     if (t.kind === 'section') return secEl;
     if (t.kind === 'step'){
-      /* prefer the numbered coin; steps sharing a first hop (or
-         edgeless steps) have no coin — fall back to their chip */
+      /* prefer the numbered coin; edgeless steps (or steps hidden by
+         the current path/view) have no coin — fall back to their chip */
       var coin = secEl.querySelector('[data-dv-step="' + t.index + '"]');
       if (coin) return coin;
       var chipsBox = secEl.querySelector('.schips');

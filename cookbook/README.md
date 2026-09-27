@@ -75,9 +75,9 @@ and [effective panel state](../docs/workbench-state-inspector.md).
   compute from sourced values and limits. `checks` outcomes, `table` change
   badges and `zoneframe.verdict` are authored; they do not run system rules or
   prove a real-world decision.
-- Every step needs content (an edge, nodes, a panel patch, or `failures`), and each
-  edge-bearing step needs a DISTINCT first edge or its number coin lands on
-  another step's coin (the validator lint names both steps when this happens).
+- Every step needs content (an edge, nodes, a panel patch, or `failures`). Each
+  edge-bearing step's number coin sits on its first edge; steps that share a
+  first edge get coins side by side along it, so keep the real hops.
 
 - [Canonical flows and incident traces](canonical-incidents.md): connect real
   catalog/code identities, approve a reference, and derive evidence-aware alternates.

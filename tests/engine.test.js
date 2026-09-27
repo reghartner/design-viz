@@ -624,7 +624,7 @@ test('undeclared lane warns; declared lane does not', () => {
 
 /* ---------------- lint + contract version ---------------- */
 
-test('lint: crowded fixture fires corridor, label-length, coin-collision, and unused-protocol warnings', () => {
+test('lint: crowded fixture fires corridor, label-length, and unused-protocol warnings (a shared first edge is not a finding)', () => {
   const raw = readSpec('tests/fixtures/lint-crowded.json');
   const page = C.normalize(raw);
   const v = C.validate(page);
@@ -632,7 +632,7 @@ test('lint: crowded fixture fires corridor, label-length, coin-collision, and un
   const lint = C.lintPage(page);
   assert.ok(lint.some(w => w.includes('cross the corridor between rows 1 and 2')), lint.join('; '));
   assert.ok(lint.some(w => w.includes('edges[0].label') && w.includes('longer than its edge')), lint.join('; '));
-  assert.ok(lint.some(w => w.includes('steps[1]') && w.includes('shares first edge "a->g"') && w.includes('steps[0]')), lint.join('; '));
+  assert.ok(!lint.some(w => w.includes('shares first edge')), lint.join('; '));
   assert.ok(!lint.some(w => w.includes('rows —')),
     'row count alone is not a lint finding (operator ruling: three rows is often the best shape): ' + lint.join('; '));
   assert.ok(lint.some(w => w.includes('page.protocols.unusedproto') && w.includes('no edge uses')), lint.join('; '));
@@ -4539,10 +4539,55 @@ test('homemap subject validator: initial and step patches warn; valid subjects a
     {walker: null}, JSON.parse('{"__proto__":{"x":50,"y":80}}')
   ])), {errors: [], warnings: []});
 });
-test('coin lint compares steps within each path, not mutually exclusive alternate steps',()=>{
-  const d={nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{id:'base',edge:'a->b'},{id:'incident',edge:'a->b'},{id:'repeat',edge:'a->b'}],paths:[{id:'happy',steps:['base']},{id:'incident',steps:['incident']}]};
-  assert.equal(C.lintPage(C.normalize(d)).filter(w=>w.includes('shares first edge')).length,0);
-  d.paths[1].steps.push('repeat');assert.equal(C.lintPage(C.normalize(d)).filter(w=>w.includes('shares first edge')).length,1);
+test('steps that share a first edge are not a lint finding, with or without paths',()=>{
+  const d={nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{id:'base',edge:'a->b'},{id:'incident',edge:'a->b'},{id:'repeat',edge:'a->b'}],paths:[{id:'happy',steps:['base']},{id:'incident',steps:['incident','repeat']}]};
+  assert.equal(C.lintPage(C.normalize(d)).filter(w=>w.includes('shares first edge') || w.includes('coin')).length,0);
+  delete d.paths;
+  assert.equal(C.lintPage(C.normalize(d)).filter(w=>w.includes('shares first edge') || w.includes('coin')).length,0);
+});
+
+/* ---------------- shared-edge coin rows ---------------- */
+function linePath(points){
+  /* polyline stand-in for SVGPathElement.getPointAtLength */
+  const segs=[];let total=0;
+  for(let i=1;i<points.length;i++){const [a,b]=[points[i-1],points[i]],l=Math.hypot(b.x-a.x,b.y-a.y);segs.push({a,b,l,start:total});total+=l;}
+  return {len:total,getPointAtLength(t){t=Math.max(0,Math.min(total,t));const s=segs.find(s=>t<=s.start+s.l)||segs[segs.length-1],f=s.l?(t-s.start)/s.l:0;return {x:s.a.x+(s.b.x-s.a.x)*f,y:s.a.y+(s.b.y-s.a.y)*f};}};
+}
+function minGap(pts){let m=Infinity;for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++)m=Math.min(m,Math.hypot(pts[i].x-pts[j].x,pts[i].y-pts[j].y));return m;}
+test('coinSlots keeps one coin on the midpoint and spreads shared-edge coins along the path in step order',()=>{
+  const p=linePath([{x:0,y:50},{x:200,y:50}]),mid=p.getPointAtLength(100);
+  assert.deepStrictEqual(plain(C.coinSlots(p,p.len,mid,1)),[{x:100,y:50}]);
+  const three=plain(C.coinSlots(p,p.len,mid,3));
+  assert.deepStrictEqual(three,[{x:74,y:50},{x:100,y:50},{x:126,y:50}]);
+  for(let n=2;n<=5;n++){
+    const pts=C.coinSlots(p,p.len,mid,n);
+    assert.strictEqual(pts.length,n);
+    assert.ok(minGap(pts)>=22,'coins must not overlap for n='+n);
+    assert.ok(pts.every(pt=>pt.x>=12 && pt.x<=188),'coins stay on the edge away from its ends');
+    const cx=pts.reduce((s,pt)=>s+pt.x,0)/n;assert.ok(Math.abs(cx-100)<1e-9,'row is centred on the midpoint');
+  }
+});
+test('coinSlots falls back to a tangent row when the edge is too short or bends too tightly',()=>{
+  const short=linePath([{x:0,y:0},{x:0,y:50}]),smid=short.getPointAtLength(25);
+  const pts=plain(C.coinSlots(short,short.len,smid,3));
+  assert.deepStrictEqual(pts.map(p=>p.x),[0,0,0]);
+  assert.deepStrictEqual(pts.map(p=>p.y),[-1,25,51]);
+  /* a hairpin: along-path neighbours would sit on top of each other */
+  const hair=linePath([{x:0,y:0},{x:60,y:0},{x:60,y:8},{x:0,y:8}]),hmid=hair.getPointAtLength(hair.len/2);
+  assert.ok(minGap(C.coinSlots(hair,hair.len,hmid,4))>=22);
+});
+test('layoutCoinGroup re-packs only the visible coins of a shared edge',()=>{
+  const p=linePath([{x:0,y:50},{x:200,y:50}]),mid=p.getPointAtLength(100);
+  const coin=hidden=>{const attrs={};return {attrs,classList:{contains:c=>hidden && c==='view-step-hidden'},setAttribute(k,v){attrs[k]=v;},removeAttribute(k){delete attrs[k];}};};
+  const coins=[coin(false),coin(true),coin(false)];
+  const pts=C.layoutCoinGroup({path:p,len:p.len,mid,coins});
+  assert.deepStrictEqual(plain(pts).map(p=>[Math.round(p.x),p.y]),[[87,50],[113,50]]);
+  assert.strictEqual(coins[0].attrs.transform,'translate(-13.00 0.00)');
+  assert.strictEqual(coins[1].attrs.transform,undefined);
+  assert.strictEqual(coins[2].attrs.transform,'translate(13.00 0.00)');
+  coins[1].classList.contains=()=>false;coins[0].classList.contains=c=>c==='view-step-hidden';coins[2].classList.contains=c=>c==='view-step-hidden';
+  C.layoutCoinGroup({path:p,len:p.len,mid,coins});
+  assert.strictEqual(coins[1].attrs.transform,undefined,'a lone visible coin returns to the midpoint');
 });
 
 test('view links restore the presentation before path and step and canonicalize stale IDs',()=>{

@@ -1153,21 +1153,8 @@ function lintDiagram(d, DP, usedKinds, warnings){
         (Number(g) + 1) + ' and ' + (Number(g) + 2) +
         ' — expect crowding; consider fewer return edges or a second section');
   });
-
-  var reportedPairs = new Set();
-  diagramPathList(d).forEach(function(path){
-    var firstEdgeAt = new Map();
-    path.indices.forEach(function(ti){
-      var k = stepDeliveredKeys(d.steps[ti])[0];
-      if (!k) return;
-      if (firstEdgeAt.has(k)){
-        var earlier=firstEdgeAt.get(k), pair=earlier+':'+ti;
-        if(!reportedPairs.has(pair))warnings.push(DP + '.steps[' + ti + ']: shares first edge "' + k + '" with steps[' +
-          earlier + '] — both step coins land on the same midpoint; reorder the edges list of one step');
-        reportedPairs.add(pair);
-      }else firstEdgeAt.set(k,ti);
-    });
-  });
+  /* Steps may share a first edge: the renderer gives each one its own coin
+     in a row along that edge, so there is nothing to lint. */
 }
 
 function lintPage(page){

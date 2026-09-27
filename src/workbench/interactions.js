@@ -54,8 +54,8 @@ function createBuilderInteractions(opts){
     if (!secEl) return null;
     if (t.kind === 'section') return secEl;
     if (t.kind === 'step'){
-      /* prefer the numbered coin; steps sharing a first hop (or
-         edgeless steps) have no coin — fall back to their chip */
+      /* prefer the numbered coin; edgeless steps (or steps hidden by
+         the current path/view) have no coin — fall back to their chip */
       var coin = secEl.querySelector('[data-dv-step="' + t.index + '"]');
       if (coin) return coin;
       var chipsBox = secEl.querySelector('.schips');

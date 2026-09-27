@@ -1,5 +1,13 @@
 # Changelog
 
+## Every step keeps its number on shared edges (2026-09-27)
+
+- Steps that start on the same edge (repeated heartbeats, retries, daily
+  reports) each get their own numbered coin. The coins sit side by side along
+  that edge in step order, and re-pack when a path or view hides some steps.
+- The "shares first edge" lint is gone. Keep each step's real hops; do not
+  reorder `edges` or delete hops to give a step its own edge.
+
 ## Radar sensing panels and manual alarms (2026-09-19)
 
 - Radar is the supported sensing panel; the old `pir` panel is retired from

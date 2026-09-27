@@ -66,8 +66,9 @@ function planAddStep(text, raw, sectionIdx, pathId){
   if (got.error) return got;
   if (got.d.paths) return planPathStepEdit(text,raw,sectionIdx,pathId,-1,'add');
   var edges = Array.isArray(got.d.edges) ? got.d.edges : [];
-  /* prefer an edge no step uses as its FIRST hop, so the new numbered coin
-     gets its own midpoint (two steps sharing a first hop stack coins) */
+  /* prefer an edge no step uses as its FIRST hop, so the new placeholder
+     step shows a fresh hop (shared first hops are fine: their coins sit side
+     by side along the edge) */
   var used = {};
   (got.d.steps || []).forEach(function(st){
     var k = st && (st.edge || (Array.isArray(st.edges) && st.edges[0]));

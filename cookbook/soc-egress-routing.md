@@ -77,12 +77,10 @@ Complete working spec:
 Adaptation notes:
 
 - The fallback beat is ONE step with a three-packet chain — a relay, not three
-  events. The coin lands on `soc->lp` (first in `edges`), which no other step
-  uses.
+  events. The coin lands on `soc->lp` (first in `edges`).
 - `cloud` sits alone on row 2, so the socket edge and the broker's delivery
   edge cross one row gap — well under the corridor-crowding lint (fires at 5
   crossings per gap).
 - Retry-after-reconnect story: add a step where `pwr` returns to AWAKE and the
-  socket carries traffic again — make it edgeless (`"nodes": ["soc", "cloud"]`)
-  rather than re-listing `soc->cloud`, or the two step coins share that edge's
-  midpoint and the lint names the step pair.
+  socket carries traffic again — re-list `soc->cloud`; its coin sits beside the
+  earlier step's coin on that edge.

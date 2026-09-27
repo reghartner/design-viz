@@ -2593,6 +2593,11 @@ function resolveLabelCollisions(labels, obstacles){
   [0, -9, 9, -18, 18, -27, 27, -40, 40, -54, 54].forEach(function(dy){
     [0, -14, 14, -28, 28].forEach(function(dx){ CAND.push({dx: dx, dy: dy}); });
   });
+  /* wider sideways moves, tried only when nothing nearer is clean — e.g. a
+     label beside a row of shared-edge step coins in a narrow gap */
+  [0, -9, 9, -18, 18].forEach(function(dy){
+    [-56, 56, -70, 70, -84, 84].forEach(function(dx){ CAND.push({dx: dx, dy: dy}); });
+  });
   labels.forEach(function(lb){
     if (lb.fixed){
       placed.push({x: lb.x, y: lb.y, w: lb.w, h: lb.h});

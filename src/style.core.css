@@ -197,6 +197,13 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .t2{font:500 10.5px 'IBM Plex Mono',monospace;}
 .lbl{font:500 11.5px 'IBM Plex Mono',monospace;}
 .coin text{font:700 11px 'IBM Plex Mono',monospace;}
+/* masks the edge line under each coin, so a dimmed coin's number never has a
+   dashed line running through it */
+.coin-base{fill:var(--dv-board-ground);pointer-events:none;}
+.coin-base.view-step-hidden{display:none;}
+/* a step-colored coin keeps its number readable when dimmed: its ink is
+   chosen against the full color, so it fades less than a plain coin */
+.stepmode .coin.step-colored:not(.lit){opacity:max(var(--dv-dim, .4), .75) !important;}
 .icbg{fill:currentColor; opacity:.13;}
 /* containment groups (a device boundary drawn around member nodes) */
 .grpbox{fill:none; stroke-dasharray:7 6; stroke-width:1.4; rx:14;}

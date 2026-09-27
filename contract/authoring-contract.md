@@ -1583,7 +1583,9 @@ A `page.contract` declaring a major version other than 1 also warns.
 Every edge-bearing step gets its own numbered coin on its FIRST delivered
 edge. Several steps may share a first edge — repeated heartbeats, retries,
 daily reports: their coins sit side by side along that edge in step order,
-centred on its midpoint. Do not reorder `edges` or drop real hops to give a
+centred on its midpoint and clear of the cards and arrowhead. An edge too
+short or too sharply bent for that row gets a compact grid across the edge
+instead. Do not reorder `edges` or drop real hops to give a
 step its own edge.
 
 ## Viewer features you get for free

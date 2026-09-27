@@ -86,7 +86,7 @@ source: docs/hlds/thermal-doorbell.md | version: 1 | updated: 09-17-2026 09:55
 - Heat: amber waves → stronger hot halo → camera off with heat still visible → cooled state → boot → active.
 - Cold: frost while charging pauses → critical frost with Camera off → nominal gauge while still gated → restart.
 - The thermal overlay is authored explicitly from source state, not automatically linked to the gauge. Both must agree with this policy.
-- Step-local Home signals show real supported telemetry/notice hops. Cold report/delivery beats use node focus and captions on the same topology, avoiding duplicate step coins.
+- Step-local Home signals show real supported telemetry/notice hops. Cold report/delivery beats use node focus and captions on the same topology. A later revision may re-list a real hop instead: steps that share a first edge each keep their own coin.
 - Alternate paths keep the door closed and the resident inside; Camera unavailable hides the visitor scene.
 - No Ring push-notification, threshold, firmware or recovery guarantee is asserted. No code/API URLs or measured timing supplied.
 

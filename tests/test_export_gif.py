@@ -363,11 +363,16 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual(export_gif.gif_frame_count(gif.read_bytes()), 5)
 
     def test_view_capture_rejects_old_html_even_when_its_default_matches(self):
-        # This committed page predates view-aware links. Accepting its default
-        # Data flow would falsely imply --view works on all existing exports.
-        page = ROOT / "examples/basecraft-keep/keep.html"
-        target = export_gif.choose_target(export_gif.read_embedded_spec(page), view="flow")
+        # A page built before view-aware links never stamps data-view-id.
+        # Accepting its default Data flow would falsely imply --view works on
+        # all existing exports. Simulate that older runtime from a current page
+        # (committed pages are rebuilt, so none is guaranteed to stay old).
+        current = (ROOT / "examples/basecraft-keep/keep.html").read_text()
+        self.assertIn("data-view-id", current)
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            page = pathlib.Path(temp) / "keep-before-view-links.html"
+            page.write_text(current.replace("data-view-id", "data-pre-view-links"))
+            target = export_gif.choose_target(export_gif.read_embedded_spec(page), view="flow")
             with self.assertRaisesRegex(RuntimeError, "does not support view links; rebuild"):
                 export_gif.capture_frames(
                     page, target.fragments[:1], CHROME, 900, pathlib.Path(temp),

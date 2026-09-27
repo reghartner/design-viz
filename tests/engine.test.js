@@ -4558,36 +4558,59 @@ test('coinSlots keeps one coin on the midpoint and spreads shared-edge coins alo
   const p=linePath([{x:0,y:50},{x:200,y:50}]),mid=p.getPointAtLength(100);
   assert.deepStrictEqual(plain(C.coinSlots(p,p.len,mid,1)),[{x:100,y:50}]);
   const three=plain(C.coinSlots(p,p.len,mid,3));
-  assert.deepStrictEqual(three,[{x:74,y:50},{x:100,y:50},{x:126,y:50}]);
+  assert.deepStrictEqual(three,[{x:70,y:50},{x:100,y:50},{x:130,y:50}]);
   for(let n=2;n<=5;n++){
     const pts=C.coinSlots(p,p.len,mid,n);
     assert.strictEqual(pts.length,n);
-    assert.ok(minGap(pts)>=22,'coins must not overlap for n='+n);
-    assert.ok(pts.every(pt=>pt.x>=12 && pt.x<=188),'coins stay on the edge away from its ends');
+    assert.ok(minGap(pts)>=C.COIN_CLEAR,'coins must not overlap for n='+n);
+    assert.ok(pts.every(pt=>pt.y===50 && pt.x>=C.COIN_END && pt.x<=200-C.COIN_END),'coins stay on the edge, clear of both ends');
     const cx=pts.reduce((s,pt)=>s+pt.x,0)/n;assert.ok(Math.abs(cx-100)<1e-9,'row is centred on the midpoint');
   }
 });
-test('coinSlots falls back to a tangent row when the edge is too short or bends too tightly',()=>{
+test('coinSlots packs a bounded grid when the edge is too short or bends too tightly',()=>{
+  /* a 50px vertical edge: no room along it, so the coins stack across it, left to right */
   const short=linePath([{x:0,y:0},{x:0,y:50}]),smid=short.getPointAtLength(25);
   const pts=plain(C.coinSlots(short,short.len,smid,3));
-  assert.deepStrictEqual(pts.map(p=>p.x),[0,0,0]);
-  assert.deepStrictEqual(pts.map(p=>p.y),[-1,25,51]);
+  assert.deepStrictEqual(pts,[{x:-30,y:25},{x:0,y:25},{x:30,y:25}]);
+  /* a 50px horizontal edge: rows stack top to bottom, never past its ends */
+  const flat=linePath([{x:0,y:0},{x:50,y:0}]),fmid=flat.getPointAtLength(25);
+  const rows=plain(C.coinSlots(flat,flat.len,fmid,3));
+  assert.deepStrictEqual(rows,[{x:25,y:-30},{x:25,y:0},{x:25,y:30}]);
+  /* a 110px edge fits two columns within COIN_END of both ends */
+  const mid2=linePath([{x:0,y:0},{x:110,y:0}]),m2=mid2.getPointAtLength(55);
+  const five=C.coinSlots(mid2,mid2.len,m2,5);
+  assert.ok(minGap(five)>=C.COIN_CLEAR);
+  assert.ok(five.every(pt=>pt.x>=C.COIN_END && pt.x<=110-C.COIN_END),'grid columns stay clear of the ends');
   /* a hairpin: along-path neighbours would sit on top of each other */
   const hair=linePath([{x:0,y:0},{x:60,y:0},{x:60,y:8},{x:0,y:8}]),hmid=hair.getPointAtLength(hair.len/2);
-  assert.ok(minGap(C.coinSlots(hair,hair.len,hmid,4))>=22);
+  const bent=C.coinSlots(hair,hair.len,hmid,4);
+  assert.strictEqual(bent.length,4);assert.ok(minGap(bent)>=C.COIN_CLEAR);
 });
-test('layoutCoinGroup re-packs only the visible coins of a shared edge',()=>{
+test('coinsApart is exact and near-linear for large coin sets',()=>{
+  const row=Array.from({length:3000},(_,i)=>({x:i*30,y:(i%7)*3}));
+  const start=process.hrtime.bigint();
+  assert.strictEqual(C.coinsApart(row,26),true);
+  assert.ok(Number(process.hrtime.bigint()-start)/1e6<200,'3000 coins check quickly');
+  row.push({x:1500+20,y:0});
+  assert.strictEqual(C.coinsApart(row,26),false);
+  assert.strictEqual(C.coinsApart([{x:0,y:0},{x:25.9,y:0}],26),false);
+  assert.strictEqual(C.coinsApart([{x:0,y:0},{x:26,y:0}],26),true);
+});
+test('layoutCoinGroup re-packs only the visible coins of a shared edge and moves their backing discs with them',()=>{
   const p=linePath([{x:0,y:50},{x:200,y:50}]),mid=p.getPointAtLength(100);
-  const coin=hidden=>{const attrs={};return {attrs,classList:{contains:c=>hidden && c==='view-step-hidden'},setAttribute(k,v){attrs[k]=v;},removeAttribute(k){delete attrs[k];}};};
-  const coins=[coin(false),coin(true),coin(false)];
-  const pts=C.layoutCoinGroup({path:p,len:p.len,mid,coins});
-  assert.deepStrictEqual(plain(pts).map(p=>[Math.round(p.x),p.y]),[[87,50],[113,50]]);
-  assert.strictEqual(coins[0].attrs.transform,'translate(-13.00 0.00)');
+  const el=hidden=>{const attrs={},cls=new Set(hidden?['view-step-hidden']:[]);return {attrs,cls,classList:{contains:c=>cls.has(c),toggle:(c,on)=>on?cls.add(c):cls.delete(c)},setAttribute(k,v){attrs[k]=v;},removeAttribute(k){delete attrs[k];}};};
+  const coins=[el(false),el(true),el(false)],bases=[el(false),el(false),el(false)];
+  const pts=C.layoutCoinGroup({path:p,len:p.len,mid,coins,bases});
+  assert.deepStrictEqual(plain(pts).map(p=>[Math.round(p.x),p.y]),[[85,50],[115,50]]);
+  assert.strictEqual(coins[0].attrs.transform,'translate(-15.00 0.00)');
+  assert.strictEqual(bases[0].attrs.transform,'translate(-15.00 0.00)');
   assert.strictEqual(coins[1].attrs.transform,undefined);
-  assert.strictEqual(coins[2].attrs.transform,'translate(13.00 0.00)');
-  coins[1].classList.contains=()=>false;coins[0].classList.contains=c=>c==='view-step-hidden';coins[2].classList.contains=c=>c==='view-step-hidden';
-  C.layoutCoinGroup({path:p,len:p.len,mid,coins});
+  assert.ok(bases[1].cls.has('view-step-hidden'),'a hidden coin hides its backing disc');
+  assert.strictEqual(coins[2].attrs.transform,'translate(15.00 0.00)');
+  coins[1].cls.clear();coins[0].cls.add('view-step-hidden');coins[2].cls.add('view-step-hidden');
+  C.layoutCoinGroup({path:p,len:p.len,mid,coins,bases});
   assert.strictEqual(coins[1].attrs.transform,undefined,'a lone visible coin returns to the midpoint');
+  assert.ok(!bases[1].cls.has('view-step-hidden') && bases[0].cls.has('view-step-hidden'));
 });
 
 test('view links restore the presentation before path and step and canonicalize stale IDs',()=>{

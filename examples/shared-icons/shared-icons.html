@@ -709,6 +709,82 @@ body.sk-daylight{background:#F4F2EC;}
 .errbox{font:500 12px/1.6 'IBM Plex Mono',monospace; color:#FF8B7A; background:#1A0F12;
   border:1px solid #5A2A22; border-radius:10px; padding:14px 16px; white-space:pre-wrap;}
 .tabbtn:focus-visible, .mbtn:focus-visible, .tbtn:focus-visible, .schip:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
+
+/* ---- first-run guided tour (tour.flowview.js) — presenter-cinema look ----
+   These rules also ride bundles that ship this page stylesheet without the
+   tour fragment (the Backstage native viewer): inert there by design — no
+   .dv-tour DOM ever exists without wireTour — and cheaper than forking the
+   page stylesheet per entrypoint. */
+.dv-tour{position:fixed; inset:0; z-index:900; pointer-events:none; font:15px/1.5 'IBM Plex Sans',system-ui,sans-serif;}
+.dv-tour[hidden]{display:none;}
+.dv-tour-dim{position:fixed; left:0; top:0; pointer-events:none;}
+.dv-tour-dim-fill{fill:rgba(11,18,32,.82);}
+.dv-tour-scrim{position:fixed; inset:0; pointer-events:none;}
+.dv-tour-block{position:fixed; pointer-events:auto;}
+/* rings: SVG rects sharing their hole's exact shape; stroke centered on the edge */
+.dv-tour-rings rect{fill:none; pointer-events:none;}
+.dv-tour-ring{stroke:#38E1FF; stroke-width:2;}
+.dv-tour-ring2{stroke:rgba(56,225,255,.85); stroke-width:2;}
+.dv-tour-glow{stroke:rgba(56,225,255,.45); stroke-width:8;}
+.dv-tour-note{position:fixed; max-width:260px; font:500 12px/1.5 'IBM Plex Sans',system-ui,sans-serif;
+  color:#F2F7FF; background:rgba(11,18,32,.92); border:1px solid rgba(56,225,255,.4);
+  border-radius:10px; padding:8px 12px; pointer-events:auto;}
+.dv-tour-timeline{position:fixed; top:10px; left:50%; transform:translateX(-50%);
+  display:flex; gap:6px; align-items:center; pointer-events:none;
+  /* its own dark pill: legible even over a revealed (bright) region */
+  background:rgba(11,18,32,.92); border:1px solid rgba(255,255,255,.18);
+  border-radius:999px; padding:7px 12px;}
+.dv-tour-timeline[hidden]{display:none;}
+.dv-tour-timeline-yield{visibility:hidden;} /* would sit on a ring this step */
+.dv-tour-seg{width:34px; height:3px; border-radius:2px; background:rgba(255,255,255,.18);}
+.dv-tour-seg.on{background:#38E1FF; box-shadow:0 0 8px rgba(56,225,255,.6);}
+.dv-tour-count{white-space:nowrap; font:600 11px 'IBM Plex Mono',monospace; color:rgba(242,247,255,.75); margin-left:8px;}
+.dv-tour-ui{position:fixed; left:44px; bottom:44px; max-width:360px; pointer-events:auto;
+  background:rgba(11,18,32,.94); border:1px solid rgba(56,225,255,.25); border-radius:14px; padding:18px 20px;}
+.dv-tour-ui[hidden]{display:none;}
+.dv-tour-ui-pending{visibility:hidden;} /* measured, placed, not yet shown */
+.dv-tour-ui-center{left:50%; bottom:auto; top:50%; transform:translate(-50%,-50%); text-align:center; max-width:460px;}
+.dv-tour-eyebrow{font:700 11px 'IBM Plex Mono',monospace; letter-spacing:2px; color:#38E1FF; text-transform:uppercase;}
+.dv-tour-heading{margin:8px 0 6px; font-family:'Sora',sans-serif; font-weight:700; font-size:28px; line-height:1.2; color:#F2F7FF;}
+.dv-tour-body{margin:0 0 16px; font-size:15px; line-height:1.55; color:rgba(242,247,255,.78);}
+.dv-tour-controls{display:flex; gap:10px; align-items:center;}
+.dv-tour-ui-center .dv-tour-controls{justify-content:center;}
+.dv-tour-btn{font:600 13px 'IBM Plex Sans',system-ui,sans-serif; border-radius:999px; padding:8px 20px; cursor:pointer;}
+.dv-tour-back{background:transparent; color:#F2F7FF; border:1px solid rgba(255,255,255,.5);}
+.dv-tour-back:disabled{opacity:.35; cursor:default;}
+.dv-tour-next{background:#38E1FF; color:#0B1220; border:1px solid #38E1FF;}
+.dv-tour-skip{background:none; border:none; font:500 13px 'IBM Plex Sans',system-ui,sans-serif;
+  color:rgba(255,255,255,.6); cursor:pointer; margin-left:6px; text-decoration:underline;}
+.dv-tour-exit{position:fixed; top:10px; left:16px; pointer-events:auto; background:rgba(11,18,32,.92);
+  border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:4px 12px; cursor:pointer;
+  font:600 12px 'IBM Plex Sans',system-ui,sans-serif; color:rgba(242,247,255,.85);}
+.dv-tour-exit:hover, .dv-tour-exit:focus-visible{border-color:#38E1FF; color:#F2F7FF;}
+/* narrow screens: the centered step counter would run under the exit —
+   stack it on its own row below */
+/* narrow screens: no counter row at all — the card's eyebrow already
+   reads "TOUR · STEP n OF m", and a second row would sit over rings */
+@media (max-width: 720px){ .dv-tour-timeline{display:none !important;} }
+.dv-tour-hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+  font:500 12px 'IBM Plex Mono',monospace; color:rgba(255,255,255,.55); pointer-events:none;}
+.dv-tour-card{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(720px, calc(100vw - 64px)); pointer-events:auto; text-align:center;}
+.dv-tour-card[hidden]{display:none;}
+.dv-tour-choices{display:flex; gap:14px; justify-content:center; margin:22px 0 18px; flex-wrap:wrap;}
+.dv-tour-choice{flex:1 1 180px; max-width:220px; background:#121C30; border:1px solid rgba(255,255,255,.14);
+  border-radius:16px; padding:18px 16px; cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:6px;}
+.dv-tour-choice:hover, .dv-tour-choice:focus-visible{border-color:#38E1FF; box-shadow:0 0 0 2px rgba(56,225,255,.35);}
+.dv-tour-choice-label{font:700 15px 'IBM Plex Sans',system-ui,sans-serif; color:#F2F7FF;}
+.dv-tour-choice-sub{font-size:12.5px; line-height:1.45; color:rgba(242,247,255,.7);}
+.dv-tour-choice-foot{display:flex; gap:14px; justify-content:center; align-items:center;}
+.dv-tour-choice-note{font-size:12px; color:rgba(242,247,255,.6);}
+.dv-tour-replay{float:right; margin-left:8px;}
+.dv-tour-btn:focus-visible, .dv-tour-skip:focus-visible, .dv-tour-choice:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){
+    .dv-tour-seg.on{box-shadow:none;}
+}
+
+.dv-tour-practice{display:flex;flex-wrap:wrap;gap:16px;margin:14px 0;}
+.dv-tour-practice:has(> [hidden]):not(:has(> :not([hidden]))){display:none;}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -934,6 +1010,13 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .t2{font:500 10.5px 'IBM Plex Mono',monospace;}
 .lbl{font:500 11.5px 'IBM Plex Mono',monospace;}
 .coin text{font:700 11px 'IBM Plex Mono',monospace;}
+/* masks the edge line under each coin, so a dimmed coin's number never has a
+   dashed line running through it */
+.coin-base{fill:var(--dv-board-ground);pointer-events:none;}
+.coin-base.view-step-hidden{display:none;}
+/* a step-colored coin keeps its number readable when dimmed: its ink is
+   chosen against the full color, so it fades less than a plain coin */
+.stepmode .coin.step-colored:not(.lit){opacity:max(var(--dv-dim, .4), .75) !important;}
 .icbg{fill:currentColor; opacity:.13;}
 /* containment groups (a device boundary drawn around member nodes) */
 .grpbox{fill:none; stroke-dasharray:7 6; stroke-width:1.4; rx:14;}
@@ -2416,7 +2499,7 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
   .sec-eyebrow{color:#555555;}
 }
 @media print{
-  .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink{display:none !important;}
+  .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink, .dv-tour, .dv-tour-replay{display:none !important;}
 }
 @media print{
   .sec-prose[hidden]{display:block !important;}
@@ -7249,6 +7332,78 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .path-timeline-owner{position:sticky;left:0;width:max-content;max-width:100%;display:flex;align-items:center;gap:6px;font:500 10px/1.5 'IBM Plex Mono',monospace;color:var(--dtext);padding:2px 0 4px;}
 .path-timeline-owner::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--path-color);flex:none;}
 
+/* Section-local viewing chrome; floating defaults belong to each named view. */
+.section-viewport{position:relative;min-width:0;isolation:isolate;}
+.viewport-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-left:auto;flex-wrap:wrap;}
+.viewport-status{font:11px/1.4 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.viewport-status:empty{display:none;}
+.section-viewport[hidden],.explore-stage[hidden],.explore-window[hidden],.explore-player[hidden],.viewport-actions [hidden]{display:none!important;}
+.explore-stage{position:relative;height:calc(100dvh - 76px);min-width:0;overflow:hidden;border:1px solid color-mix(in srgb,var(--acc) 30%,transparent);border-radius:14px;background:var(--dv-board-ground,#fbfbfe);}
+.explore-canvas{position:absolute;inset:0;}
+.docview .section-viewport .explore-canvas>.explore-board{position:absolute;inset:0;width:auto;height:auto;min-height:0;margin:0;border:0;border-radius:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:auto;}
+.docview .explore-board .boardcanvas{min-width:0;min-height:var(--explore-canvas-height);width:var(--explore-canvas-width);padding:var(--explore-margin-y) var(--explore-margin-x);box-sizing:border-box;display:block;}
+.docview .explore-board .boardcanvas>svg{width:var(--explore-width,100%);min-width:0;max-width:none;height:auto;display:block;}
+.explore-tools{position:absolute;z-index:10;top:10px;left:12px;right:260px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;pointer-events:none;}
+.explore-tools>*{pointer-events:auto;}
+.explore-tools .lg{position:static;display:flex;align-items:center;gap:4px;padding:4px;border:1px solid color-mix(in srgb,var(--acc) 25%,transparent);border-radius:9px;background:var(--explore-bg,#fff);max-width:100%;box-sizing:border-box;box-shadow:0 2px 10px #1728480b;}
+.explore-tools .lg>.li{display:none;}
+.explore-tools .board-size{flex-basis:auto;font-size:10px;gap:3px;}
+.explore-tools .board-size>span:first-child,.explore-tools .board-pan{display:none;}
+.explore-tools .mbtn{padding:5px 9px;}
+.explore-zoom{font:600 11px 'IBM Plex Mono',monospace;color:var(--dtext);background:var(--explore-bg,#fff);border-radius:6px;padding:6px;}
+.section-viewport{--explore-bg:#fff;--explore-border:#dce1f1;}
+.sk-aurora .section-viewport{--explore-bg:#101a2c;--explore-border:#294658;}
+.sk-pastel .section-viewport,.sk-daylight .section-viewport{--explore-bg:#fff;--explore-border:#dce1f1;}
+.explore-window{position:absolute;z-index:2;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);min-width:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid var(--explore-border);border-radius:12px;background:var(--explore-bg);box-shadow:0 6px 22px #1424421c;}
+.explore-window-header{height:32px;min-height:32px;display:flex;align-items:center;border-bottom:1px solid var(--explore-border);padding:0 5px 0 8px;gap:3px;}
+.explore-window-grip{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;padding:6px 0;border:0;background:none;color:var(--dtext);font:600 10px 'IBM Plex Mono',monospace;cursor:grab;touch-action:none;}
+.explore-window-grip::before{content:'⠿';padding-right:6px;opacity:.6;}
+.explore-window-hide{flex:none;width:24px;height:24px;border:0;background:none;color:var(--dtext);border-radius:6px;font-size:18px;cursor:pointer;}
+.explore-window-hide:hover{background:color-mix(in srgb,var(--acc) 12%,transparent);}
+.explore-window-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;container-type:inline-size;}
+body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-box;width:100%;max-width:none;min-width:0;min-height:100%;margin:0;border:0;border-radius:0;padding:8px;box-shadow:none;}
+.explore-window-body>.pwidget>.ptitle{display:none;}
+.explore-window-body .pbody{min-width:0;}
+.explore-window-body svg{max-width:100%;}
+.explore-window-resize{position:absolute;right:0;bottom:0;z-index:2;width:23px;height:23px;border:0;border-radius:6px 0 0;background:var(--explore-bg);color:var(--dtext);font-size:14px;cursor:nwse-resize;touch-action:none;}
+.explore-stacked .explore-window-resize{right:auto;left:0;transform:scaleX(-1);cursor:nesw-resize;}
+.explore-window :focus-visible,.explore-panel-menu summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
+.explore-player{position:absolute;z-index:20;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);box-sizing:border-box;overflow:hidden;overscroll-behavior:contain;border:1px solid var(--explore-border);border-radius:12px;box-shadow:0 6px 22px #14244224;background:var(--explore-bg);}
+body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;display:grid;grid-template-columns:max-content minmax(0,1fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px)) minmax(0,1fr);gap:6px 12px;min-height:0;max-height:none;height:100%;margin:0;border:0;border-radius:0;box-shadow:none;background:var(--explore-bg);padding:12px 14px 10px 20px;align-items:start;align-content:start;}
+.explore-player .step-transport{grid-column:1;grid-row:1;align-self:start;flex-wrap:nowrap;}
+.explore-player .schips{grid-column:2;grid-row:1;min-width:0;min-height:0;height:100%;overflow:auto;box-sizing:border-box;flex-wrap:nowrap;align-content:start;}
+.explore-player .schips>.schip{flex-shrink:0;}
+.explore-player .stepline{grid-column:1/span 2;grid-row:2;min-width:0;height:100%;max-height:100%;overflow:auto;margin:0;}
+.explore-player-grip{position:absolute;z-index:2;left:0;top:10px;width:18px;height:34px;padding:0;border:0;background:transparent;color:var(--dfaint);cursor:grab;touch-action:none;}
+.explore-player :focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
+.explore-panel-menu{position:relative;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);z-index:40;}
+.explore-panel-menu summary{cursor:pointer;border:1px solid var(--explore-border);border-radius:8px;padding:7px 10px;background:var(--explore-bg);}
+.explore-panel-choices{position:absolute;right:0;top:100%;margin-top:5px;min-width:220px;max-width:min(300px,80vw);max-height:350px;overflow:auto;padding:10px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 8px 24px #14244225;}
+.explore-panel-choices label{display:grid;grid-template-columns:20px 1fr;gap:3px;padding:7px 0;cursor:pointer;}
+.explore-panel-choices small{grid-column:2;color:var(--dfaint);}
+.explore-panel-choices small:empty{display:none;}
+.viewport-gesturing{user-select:none;}
+.section-viewport:fullscreen{box-sizing:border-box;width:100%;height:100%;padding:12px;background:var(--explore-bg);display:flex;flex-direction:column;overflow:auto;}
+.section-viewport:fullscreen>.diagram-views{flex:none;margin:0 0 10px;}
+.section-viewport:fullscreen>.explore-stage{flex:1;height:auto!important;min-height:0;}
+.section-viewport.viewport-expanded:not(:fullscreen)>.explore-stage{height:var(--explore-expanded-height,max(520px,calc(100dvh - 90px)))!important;}
+.section-viewport.viewport-expanded:not(:fullscreen)>.standard-view-surface,
+.section-viewport.viewport-expanded:not(:fullscreen)>.section-layout-grid{height:var(--explore-expanded-height,max(520px,calc(100dvh - 120px)));overflow:auto;border:1px solid var(--explore-border);border-radius:12px;}
+.section-viewport:fullscreen>.section-layout-grid{flex:1;overflow:auto;}
+.section-viewport:fullscreen>.standard-view-surface{flex:1;overflow:auto;min-height:0;}
+@container diagram-section (max-width:640px){
+ .explore-stage{height:600px;}
+ .explore-tools{right:12px;}
+ .explore-tools .lg{max-width:220px;}
+}
+@media print{
+ .viewport-actions,.explore-tools,.explore-window-header,.explore-window-resize{display:none!important;}
+ .explore-stage,.explore-canvas,.docview .explore-board,.explore-window,.explore-player{position:static;height:auto;width:auto;overflow:visible;max-height:none;}
+ .explore-window{break-inside:avoid;margin-top:12px;}
+ .docview .explore-board .boardcanvas{padding:0;min-height:0;width:auto;}
+ .docview .explore-board .boardcanvas>svg{width:100%;}
+}
+
 /* Panel icons are self-contained SVG; this sheet only provides shared sizing
    and an accessible monochrome treatment when the platform forces colors. */
 .fv-icon{display:inline-block;width:1.25em;height:1.25em;flex:none;vertical-align:-.2em;overflow:visible;}
@@ -7835,7 +7990,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
+    'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
@@ -7919,6 +8074,8 @@ var FlowviewCompatibility = (function(){
       if(Array.isArray(d.layouts) && d.layouts.length){
         used['layout.named']=true;
         if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;
+        if(d.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore']=true;
+        if(d.layouts.some(function(v){return v && v.exploreLayout!=null;}))used['layout.explore-defaults']=true;
       }
     }
     function contracts(s){if(object(s) && (Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null))used['content.contracts']=true;}
@@ -8568,8 +8725,10 @@ function sectionLayoutWarnings(d, path, warnings){
         if(typeof v.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v.id) || used[v.id])warnings.push(p+'.id: use a unique ID starting with a letter, followed by letters, digits, _ or - (up to 64 characters)');
         if(typeof v.id==='string')used[v.id]=true;
         if(typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40)warnings.push(p+'.name: use a nonempty name of up to 40 characters');
+        if(v.presentation!==undefined && v.presentation!=='standard' && v.presentation!=='explore')warnings.push(p+'.presentation: use "standard" or "explore"; omit for standard');
         if(!v.sectionLayout || !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))warnings.push(p+'.sectionLayout: declare at least one host profile');
         sectionLayoutProfileWarnings(d,v.sectionLayout,p,warnings);
+        sectionExploreLayout(d,v.exploreLayout,warnings,p+'.exploreLayout');
         if(v.steps!=null){
           var ids=(d.steps || []).map(function(st){return st && st.id;});
           if(!Array.isArray(v.steps) || !v.steps.length || v.steps.some(function(id,i){return typeof id!=='string' || ids.filter(function(s){return s===id;}).length!==1 || v.steps.indexOf(id)!==i;}))warnings.push(p+'.steps: use a nonempty list of unique existing step IDs; omit for all steps');
@@ -8969,21 +9128,8 @@ function lintDiagram(d, DP, usedKinds, warnings){
         (Number(g) + 1) + ' and ' + (Number(g) + 2) +
         ' — expect crowding; consider fewer return edges or a second section');
   });
-
-  var reportedPairs = new Set();
-  diagramPathList(d).forEach(function(path){
-    var firstEdgeAt = new Map();
-    path.indices.forEach(function(ti){
-      var k = stepDeliveredKeys(d.steps[ti])[0];
-      if (!k) return;
-      if (firstEdgeAt.has(k)){
-        var earlier=firstEdgeAt.get(k), pair=earlier+':'+ti;
-        if(!reportedPairs.has(pair))warnings.push(DP + '.steps[' + ti + ']: shares first edge "' + k + '" with steps[' +
-          earlier + '] — both step coins land on the same midpoint; reorder the edges list of one step');
-        reportedPairs.add(pair);
-      }else firstEdgeAt.set(k,ti);
-    });
-  });
+  /* Steps may share a first edge: the renderer gives each one its own coin
+     in a row along that edge, so there is nothing to lint. */
 }
 
 function lintPage(page){
@@ -9005,6 +9151,10 @@ function lintPage(page){
     if (!usedKinds[k])
       warnings.push('page.protocols.' + k + ': declared but no edge uses kind "' + k + '" — remove it or use it');
   });
+  /* page.tour is advisory-only: a malformed tour config warns and the viewer
+     falls back to the built-in default; it never blocks a render. */
+  if (page.tour != null && typeof tourLintConfig === 'function')
+    warnings.push.apply(warnings, tourLintConfig(page.tour));
   return warnings;
 }
 /* ---- src/core/navigation.js ---- */
@@ -9634,6 +9784,36 @@ function sectionLayoutPreset(d, target, excludedKeys){
   });
   return items;
 }
+/* Explore defaults are viewport fractions; camera center is in SVG coordinates.
+   Recover malformed optional entries independently without modifying source. */
+function sectionExploreLayout(d,value,warnings,path){
+  var out={},used=Object.create(null);path=path || 'exploreLayout';
+  function warn(at,message){if(warnings)warnings.push(at+': '+message);}
+  function object(v){return v && typeof v==='object' && !Array.isArray(v);}
+  function rect(v,at){
+    if(!object(v) || !['x','y','w','h'].every(function(k){return Number.isFinite(v[k]) && v[k]>=0 && v[k]<=1;}) || v.w===0 || v.h===0){warn(at,'use x/y/w/h viewport fractions from 0 to 1, with positive width and height');return null;}
+    return {x:v.x,y:v.y,w:v.w,h:v.h};
+  }
+  if(value===undefined)return out;
+  if(!object(value)){warn(path,'expected an object');return out;}
+  if(value.panels!==undefined){
+    if(!Array.isArray(value.panels))warn(path+'.panels','expected an array');
+    else out.panels=value.panels.reduce(function(list,v,i){
+      var at=path+'.panels['+i+']',r=rect(v,at);
+      if(!v || typeof v.panel!=='string' || !(d.panels || []).some(function(p){return p.id===v.panel;}) || used[v.panel]){warn(at+'.panel','use a unique existing panel ID');return list;}
+      used[v.panel]=true;
+      if(v.stacked!==undefined && typeof v.stacked!=='boolean'){warn(at+'.stacked','expected a boolean');return list;}
+      if(r)list.push(Object.assign({panel:v.panel},r,{stacked:v.stacked===true}));return list;
+    },[]);
+  }
+  if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
+  if(value.camera!==undefined){
+    var c=value.camera;
+    if(!object(c) || !Number.isFinite(c.zoom) || c.zoom<.15 || c.zoom>4 || !['x','y'].every(function(k){return Number.isFinite(c[k]) && Math.abs(c[k])<=100;}))warn(path+'.camera','use zoom 0.15–4 and finite x/y SVG center coordinates between -100 and 100');
+    else out.camera={zoom:c.zoom,x:c.x,y:c.y};
+  }
+  return out;
+}
 function diagramLayoutViews(d){
   var used=Object.create(null), views=[];
   (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
@@ -9641,11 +9821,11 @@ function diagramLayoutViews(d){
       typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
       !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
       !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
   if(views.length)return views;
   return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
-    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',sectionLayout:d.sectionLayout,legacy:true}] : [];
+    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',presentation:'standard',sectionLayout:d.sectionLayout,legacy:true}] : [];
 }
 function sectionLayoutDefinition(d, id){
   var views=diagramLayoutViews(d);
@@ -10388,6 +10568,11 @@ function resolveLabelCollisions(labels, obstacles){
   [0, -9, 9, -18, 18, -27, 27, -40, 40, -54, 54].forEach(function(dy){
     [0, -14, 14, -28, 28].forEach(function(dx){ CAND.push({dx: dx, dy: dy}); });
   });
+  /* wider sideways moves, tried only when nothing nearer is clean — e.g. a
+     label beside a row of shared-edge step coins in a narrow gap */
+  [0, -9, 9, -18, 18].forEach(function(dy){
+    [-56, 56, -70, 70, -84, 84].forEach(function(dx){ CAND.push({dx: dx, dy: dy}); });
+  });
   labels.forEach(function(lb){
     if (lb.fixed){
       placed.push({x: lb.x, y: lb.y, w: lb.w, h: lb.h});
@@ -10505,6 +10690,203 @@ function diagramHandoffURL(value, resolver){
     try{var resolved=detailURL(resolver(reference));if(resolved)return resolved;}catch(_){/* use the portable fallback */}
   }
   return detailURL(value.url);
+}
+/* ---- src/core/tour-model.js ---- */
+/* Pure model for the first-run guided tour: config shape, persona filtering,
+   skip/renumber logic, cutout-rect math and completion-flag parsing. No DOM —
+   the browser fragment (tour.flowview.js) feeds it probe results and rects.
+   The config contract for retargeting agents is documented in docs/tour.md. */
+
+var TOUR_STORAGE_KEY = 'dv_tour_v1';
+var TOUR_COOKIE_NAME = 'dv_tour';
+var TOUR_PERSONAS = ['ux', 'eng', 'both'];
+var TOUR_STEP_KINDS = ['chooser', 'spot', 'done'];
+
+function tourIsObject(value){
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+/* Warnings only, never errors: a malformed tour must not stop a page from
+   rendering — the viewer just skips the tour (boot treats [] as clean). */
+function tourLintConfig(config){
+  var warnings = [];
+  function warn(path, message){ warnings.push('page.tour' + path + ': ' + message); }
+  if (config == null) return warnings;
+  if (!tourIsObject(config)){ warn('', 'must be an object'); return warnings; }
+  if (config.version !== 1) warn('.version', 'unknown version — this viewer implements version 1');
+  if (!Array.isArray(config.steps) || !config.steps.length){
+    warn('.steps', 'must be a non-empty array of steps');
+    return warnings;
+  }
+  var seen = Object.create(null), choosersSeen = 0;
+  config.steps.forEach(function(step, i){
+    if (tourIsObject(step) && step.kind === 'chooser'){
+      choosersSeen++;
+      if (i !== 0) warn('.steps[' + i + ']', 'a chooser must be the first step (later choosers are dropped)');
+      if (choosersSeen > 1) warn('.steps[' + i + ']', 'only one chooser step is used');
+    }
+    var at = '.steps[' + i + ']';
+    if (!tourIsObject(step)){ warn(at, 'must be an object'); return; }
+    if (typeof step.id !== 'string' || !step.id) warn(at + '.id', 'required non-empty string');
+    else if (seen[step.id]) warn(at + '.id', 'duplicate id "' + step.id + '"');
+    else seen[step.id] = true;
+    if (step.kind != null && TOUR_STEP_KINDS.indexOf(step.kind) < 0)
+      warn(at + '.kind', 'unknown kind "' + step.kind + '" (chooser | spot | done)');
+    if (step.personas != null){
+      if (!Array.isArray(step.personas) || !step.personas.length)
+        warn(at + '.personas', 'must be a non-empty array when present');
+      else step.personas.forEach(function(p){
+        if (TOUR_PERSONAS.indexOf(p) < 0) warn(at + '.personas', 'unknown persona "' + p + '"');
+      });
+    }
+    var kind = step.kind || 'spot';
+    if (kind === 'spot'){
+      if (!tourIsObject(step.target) || typeof step.target.selector !== 'string' || !step.target.selector)
+        warn(at + '.target.selector', 'spot steps need a CSS selector string');
+      else if (step.target.within != null && step.target.within !== 'section' && step.target.within !== 'page')
+        warn(at + '.target.within', 'must be "section" or "page"');
+    }
+    if (step.offset != null){
+      if (!tourIsObject(step.offset)) warn(at + '.offset', 'must be an object of numbers');
+      else ['dx', 'dy', 'dw', 'dh'].forEach(function(key){
+        if (step.offset[key] != null && typeof step.offset[key] !== 'number')
+          warn(at + '.offset.' + key, 'must be a number');
+      });
+    }
+    if (step.copy != null && !tourIsObject(step.copy)) warn(at + '.copy', 'must be an object');
+    if (tourIsObject(step.copy) && step.copy.choices != null){
+      if (!Array.isArray(step.copy.choices) || !step.copy.choices.length)
+        warn(at + '.copy.choices', 'must be a non-empty array of {persona, label, sub} objects');
+      else step.copy.choices.forEach(function(choice, ci){
+        if (!tourIsObject(choice)) warn(at + '.copy.choices[' + ci + ']', 'must be an object');
+        else if (choice.persona != null && TOUR_PERSONAS.indexOf(choice.persona) < 0)
+          warn(at + '.copy.choices[' + ci + '].persona', 'unknown persona "' + choice.persona + '"');
+      });
+    }
+    if (step.demo != null){
+      if (!tourIsObject(step.demo)) warn(at + '.demo', 'must be an object');
+      else {
+        var hasAdvance = step.demo.advance != null, hasClick = step.demo.click != null;
+        if (hasAdvance === hasClick)
+          warn(at + '.demo', 'declare exactly one of advance (a playback demo) or click (a demonstrated action)');
+        if (hasAdvance && (typeof step.demo.advance !== 'number' || step.demo.advance < 1))
+          warn(at + '.demo.advance', 'must be a positive number of steps');
+        if (step.demo.intervalMs != null && !hasAdvance)
+          warn(at + '.demo.intervalMs', 'only applies to an advance demo');
+        if (step.demo.intervalMs != null && (typeof step.demo.intervalMs !== 'number' || step.demo.intervalMs < 400))
+          warn(at + '.demo.intervalMs', 'must be a number ≥ 400');
+        if (hasClick){
+          if (!tourIsObject(step.demo.click) || typeof step.demo.click.selector !== 'string' || !step.demo.click.selector)
+            warn(at + '.demo.click', 'needs a selector string');
+          else if (step.demo.click.within != null && step.demo.click.within !== 'section' && step.demo.click.within !== 'page')
+            warn(at + '.demo.click.within', 'must be "section" or "page"');
+        }
+      }
+    }
+    if (step.diagramState != null && !tourIsObject(step.diagramState))
+      warn(at + '.diagramState', 'must be an object');
+    if(tourIsObject(step.diagramState) && step.diagramState.presentation != null &&
+       ['standard','explore'].indexOf(step.diagramState.presentation)<0)
+      warn(at+'.diagramState.presentation','must be "standard" or "explore"');
+    if(tourIsObject(step.diagramState) && step.diagramState.diagramVisible != null && typeof step.diagramState.diagramVisible!=='boolean')
+      warn(at+'.diagramState.diagramVisible','must be a boolean');
+    if(tourIsObject(step.copy) && step.copy.reducedMotionBody != null && typeof step.copy.reducedMotionBody!=='string')
+      warn(at+'.copy.reducedMotionBody','must be a string');
+    if (step.reveal != null){
+      if (!Array.isArray(step.reveal) || !step.reveal.length)
+        warn(at + '.reveal', 'must be a non-empty array of {selector, within} targets');
+      else step.reveal.forEach(function(item, ri){
+        if (!tourIsObject(item) || typeof item.selector !== 'string' || !item.selector)
+          warn(at + '.reveal[' + ri + ']', 'needs a selector string');
+        else if (item.within != null && item.within !== 'section' && item.within !== 'page')
+          warn(at + '.reveal[' + ri + '].within', 'must be "section" or "page"');
+      });
+    }
+    if (step.secondary != null){
+      var secondaries = Array.isArray(step.secondary) ? step.secondary : [step.secondary];
+      if (!secondaries.length) warn(at + '.secondary', 'must not be an empty list');
+      secondaries.forEach(function(item, si){
+        var here = Array.isArray(step.secondary) ? at + '.secondary[' + si + ']' : at + '.secondary';
+        if (!tourIsObject(item) || !tourIsObject(item.target) ||
+            typeof item.target.selector !== 'string')
+          warn(here, 'needs target.selector when present');
+      });
+    }
+  });
+  return warnings;
+}
+
+/* A config is usable when it lints clean enough to walk: object, version 1,
+   at least one well-formed step. Boot falls back to the built-in default. */
+function tourUsableConfig(config){
+  if (!tourIsObject(config) || config.version !== 1) return false;
+  if (!Array.isArray(config.steps)) return false;
+  return config.steps.some(function(step){
+    return tourIsObject(step) && typeof step.id === 'string' && !!step.id;
+  });
+}
+
+/* Persona visibility is EXPLICIT: a step without personas is for everyone;
+   otherwise the list must name the persona — "both" is its own track and
+   sees only steps that list it (or list nobody). The author decides which
+   steps each track gets; nothing is inferred. */
+function tourStepVisible(step, persona){
+  if (!step.personas || !step.personas.length) return true;
+  return step.personas.indexOf(persona) >= 0;
+}
+
+function tourStepsForPersona(config, persona){
+  return config.steps.filter(function(step){
+    return tourIsObject(step) && typeof step.id === 'string' && !!step.id &&
+           tourStepVisible(step, persona);
+  });
+}
+
+/* Timeline label: chooser is a gate, not a counted stop. The count is the
+   authored, persona-filtered list — a step whose target is missing at entry
+   is passed through with a console warning, not renumbered away. */
+function tourTimeline(steps, index){
+  var counted = steps.filter(function(step){ return (step.kind || 'spot') !== 'chooser'; });
+  var current = 0;
+  for (var i = 0; i <= index && i < steps.length; i++)
+    if ((steps[i].kind || 'spot') !== 'chooser') current++;
+  return {total: counted.length, current: current};
+}
+
+/* Cutout rect: pad the target's viewport rect, apply the config's small
+   nudge offsets, clamp to the viewport so rings never paint off-screen. */
+function tourCutoutRect(rect, offset, pad, viewport){
+  pad = pad == null ? 8 : pad;
+  offset = tourIsObject(offset) ? offset : {};
+  var dx = typeof offset.dx === 'number' ? offset.dx : 0;
+  var dy = typeof offset.dy === 'number' ? offset.dy : 0;
+  var dw = typeof offset.dw === 'number' ? offset.dw : 0;
+  var dh = typeof offset.dh === 'number' ? offset.dh : 0;
+  var x = rect.x - pad + dx, y = rect.y - pad + dy;
+  var w = rect.w + pad * 2 + dw, h = rect.h + pad * 2 + dh;
+  if (viewport){
+    if (x < 0){ w += x; x = 0; }
+    if (y < 0){ h += y; y = 0; }
+    if (x + w > viewport.w) w = viewport.w - x;
+    if (y + h > viewport.h) h = viewport.h - y;
+  }
+  return {x: x, y: y, w: Math.max(0, w), h: Math.max(0, h)};
+}
+
+/* Completion flag fallback for storage-denied contexts (sandboxed iframes). */
+function tourDoneFromCookie(cookieText){
+  if (typeof cookieText !== 'string') return false;
+  return cookieText.split(';').some(function(part){
+    var eq = part.indexOf('=');
+    return eq >= 0 && part.slice(0, eq).trim() === TOUR_COOKIE_NAME &&
+           part.slice(eq + 1).trim() === '1';
+  });
+}
+
+/* #tour=1 forces the tour, #tour=0 suppresses it; parseHash ignores the key. */
+function tourHashRequest(hash){
+  var m = /(?:^#|[#&])tour=([01])(?:&|$)/.exec(String(hash || ''));
+  return m ? (m[1] === '1' ? 'force' : 'suppress') : null;
 }
 /* ---- src/panels/media.js ---- */
 /* Offline raster assets shared by image panels, app screens and company logos. */
@@ -25488,6 +25870,347 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
   }
   return {sync:sync,destroy:function(){retired=true;}};
 }
+/* ---- src/viewer/explore.js ---- */
+/* One section owns its viewing surface. Existing panels and playback DOM move
+   into it. Readers keep session overrides; the workbench supplies an explicit
+   commit seam for undoable authored defaults. */
+function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
+  var retired=false, active=false, expanded=false, pendingFullscreen=0;
+  var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
+  var definition=null, items=[], memories=Object.create(null), memory=null;
+  var moved=[], windows=[], gesture=null, z=1, zoom=null, lastWidth=0, lastHeight=0;
+  var shell=document.createElement('div');shell.className='section-viewport';
+  toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
+  var stage=document.createElement('div');stage.className='explore-stage';stage.hidden=true;shell.appendChild(stage);
+  var canvas=document.createElement('div');canvas.className='explore-canvas';stage.appendChild(canvas);
+  var tools=document.createElement('div');tools.className='explore-tools';stage.appendChild(tools);
+  var player=document.createElement('div');player.className='explore-player';stage.appendChild(player);
+  var actions=document.createElement('div');actions.className='viewport-actions';toolbar.appendChild(actions);
+  function button(text,action,host,cls){var b=document.createElement('button');b.type='button';b.className=cls || 'mbtn';b.textContent=text;b.addEventListener('click',action);(host || actions).appendChild(b);return b;}
+  var menu=document.createElement('details');menu.className='explore-panel-menu';menu.hidden=true;
+  var summary=document.createElement('summary');summary.textContent='Panels';menu.appendChild(summary);
+  var choices=document.createElement('div');choices.className='explore-panel-choices';menu.appendChild(choices);actions.appendChild(menu);
+  var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
+  var stack=button('Stack at edge',function(){var token=beginEdit();if(token===false)return;windows.forEach(function(w){w.state.stacked=true;w.state.hidden=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
+  var expand=button('Expand',toggleExpanded);expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
+  var status=document.createElement('span');status.className='viewport-status';status.setAttribute('role','status');actions.appendChild(status);
+  var zoomOut=button('−',function(){changeZoom(.8);},tools);zoomOut.setAttribute('aria-label','Zoom out');
+  var zoomLabel=document.createElement('span');zoomLabel.className='explore-zoom';tools.appendChild(zoomLabel);
+  var zoomIn=button('+',function(){changeZoom(1.25);},tools);zoomIn.setAttribute('aria-label','Zoom in');
+  var playerGrip=button('⠿',function(){},player,'explore-player-grip');
+  playerGrip.setAttribute('aria-label','Move step controls; use arrow keys');playerGrip.title='Drag to move step controls; arrow keys also move';
+  var playerResize=button('◢',function(){},player,'explore-window-resize');
+  var playerWindow={el:player,panel:{type:'controls'},label:'step controls',resize:playerResize};
+  playerGrip.addEventListener('pointerdown',function(ev){begin(ev,playerWindow,'move',playerGrip);});
+  playerResize.addEventListener('pointerdown',function(ev){begin(ev,playerWindow,'resize',playerResize);});
+  playerGrip.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'move');});
+  playerResize.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'resize');});
+  var legend=board.querySelector('.lg');
+  function copy(value){return JSON.parse(JSON.stringify(value));}
+  function beginEdit(){
+    if(!active || retired)return false;
+    var token=author?author.begin(definition.id):null;if(token===false)return false;
+    return {token:token,layout:copy(memory.layout),camera:camera(),zoom:zoom};
+  }
+  function publish(token){
+    if(retired || !active || token===false)return false;
+    var ok=!author || author.commit(definition.id,copy(memory.layout),token.token)!==false;
+    if(!ok){memory.layout=token.layout;zoom=token.zoom;sizeGraph(false);positionCamera(token.camera);}
+    return ok;
+  }
+  function relative(r){var b=bounds(),out={};['x','y','w','h'].forEach(function(k){out[k]=Math.round(clamp(r[k]/(k==='x'||k==='w'?b.w:b.h),0,1)*1000000)/1000000;});return out;}
+  function absolute(r){var b=bounds();return {x:r.x*b.w,y:r.y*b.h,w:r.w*b.w,h:r.h*b.h};}
+  function rememberRect(w){
+    var r=relative(w.state);
+    if(w===playerWindow)memory.layout.controls=r;
+    else{
+      var panels=memory.layout.panels || (memory.layout.panels=[]),i=panels.findIndex(function(p){return p.panel===w.panel.id;});
+      var value=Object.assign({panel:w.panel.id},r,{stacked:w.state.stacked===true});
+      if(i<0)panels.push(value);else panels[i]=value;
+    }
+  }
+  function camera(){
+    var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
+    return {zoom:clamp(graphPixels/graphWidth(),.15,4),x:(board.scrollLeft+board.clientWidth/2-marginX)/(graphPixels || 1),y:(board.scrollTop+board.clientHeight/2-marginY)/((graphPixels || 1)*ratio)};
+  }
+  function positionCamera(c){
+    var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
+    board.scrollLeft=marginX+c.x*graphPixels-board.clientWidth/2;
+    board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
+  }
+  function saveCamera(token){if(!active || retired)return;memory.layout.camera=camera();publish(token);}
+  function clearScrollEdit(){if(scrollTimer!==null)window.clearTimeout(scrollTimer);scrollTimer=null;scrollEdit=null;}
+  function scrollIntent(){
+    if(!active || !author || gesture)return;
+    if(!scrollEdit){var token=beginEdit();if(token===false)return;scrollEdit={token:token};}
+    if(scrollTimer!==null)window.clearTimeout(scrollTimer);
+    scrollTimer=window.setTimeout(function(){var edit=scrollEdit;clearScrollEdit();if(active && edit && JSON.stringify(memory.layout.camera)!==JSON.stringify(camera()))saveCamera(edit.token);},250);
+  }
+
+  function move(node,host){
+    if(!node || !node.parentNode)return;
+    var anchor=document.createComment('explore position');node.parentNode.insertBefore(anchor,node);
+    moved.push({node:node,anchor:anchor});host.appendChild(node);
+  }
+  function available(w){return !w.authoredHidden && !w.card.classList.contains('panel-step-hidden');}
+  function visible(w){return available(w) && !w.state.hidden && !memory.focus;}
+  function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
+  function bounds(){return {w:stage.clientWidth,h:stage.clientHeight};}
+  function fitHeight(){
+    if(!active || retired)return;
+    /* Stable across page scroll and refresh; no document-position feedback. */
+    var styles=getComputedStyle(shell),inset=parseFloat(styles.getPropertyValue('--workspace-toolbar')) || 0;
+    var fixed=parseFloat(styles.getPropertyValue('--explore-height'));
+    stage.style.height=Math.max(340,Number.isFinite(fixed) && fixed>0?fixed:window.innerHeight-inset-toolbar.getBoundingClientRect().height-36)+'px';
+  }
+  function minimum(w){
+    /* Portrait screens can become much narrower than charts and maps. */
+    return w===playerWindow?300:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
+  }
+  function constrain(w,r){
+    var b=bounds(),minW=Math.min(minimum(w),Math.max(80,b.w-24));
+    var minH=w===playerWindow?(parseFloat(player.style.getPropertyValue('--explore-tracks-height')) || 34)+58:72;
+    var width=clamp(r.w,minW,Math.max(minW,b.w-24)),height=clamp(r.h,minH,Math.max(minH,b.h-24));
+    return {x:clamp(r.x,12,Math.max(12,b.w-width-12)),y:clamp(r.y,12,Math.max(12,b.h-height-12)),w:width,h:height};
+  }
+  function apply(w,r){
+    w.rect=r;Object.keys(r).forEach(function(k){w.el.style.setProperty('--float-'+k,r[k]+'px');});
+    w.el.classList.toggle('explore-stacked',w.state.stacked);
+    w.resize.setAttribute('aria-label','Resize '+w.label+'; use arrow keys');
+  }
+  function paint(){
+    if(!active || retired)return;
+    var b=bounds();if(!b.w || !b.h)return;
+    var stacked=windows.filter(function(w){return visible(w) && w.state.stacked;}),gap=8;
+    var total=stacked.reduce(function(n,w){return n+w.state.h;},0),room=Math.max(0,b.h-24-gap*Math.max(0,stacked.length-1));
+    var scale=Math.min(1,room/(total || 1)),y=12,maxWidth=0;
+    windows.forEach(function(w){
+      var can=available(w),shown=visible(w);w.el.hidden=!shown;w.check.disabled=!can;w.check.checked=shown;
+      w.note.textContent=w.authoredHidden?'Hidden in this view':!can?'Hidden at this step':'';
+      if(!shown)return;
+      var r=constrain(w,w.state);
+      if(w.state.stacked){r.x=b.w-r.w-12;r.y=y;r.h=Math.max(1,w.state.h*scale);y+=r.h+gap;maxWidth=Math.max(maxWidth,r.w);}
+      apply(w,r);
+    });
+    var chips=bar && bar.querySelector('.schips'),timeline=chips && chips.querySelector('.path-timeline,.path-matrix');
+    var padding=chips?getComputedStyle(chips):null;
+    var tracks=timeline?Math.min(180,Math.max(34,timeline.offsetHeight+(parseFloat(padding.paddingTop)||0)+(parseFloat(padding.paddingBottom)||0))):34;
+    player.style.setProperty('--explore-tracks-height',tracks+'px');
+    var controls=memory.controls;
+    if(!controls){
+      var height=Math.min(b.h-24,tracks+76),right=maxWidth && b.w-maxWidth>420?maxWidth+28:12;
+      controls={x:12,y:b.h-height-12,w:b.w-right-12,h:height};
+    }
+    playerWindow.state=memory.controls || Object.assign({},controls);
+    apply(playerWindow,constrain(playerWindow,controls));
+    player.hidden=!bar || bar.hidden;
+    focus.textContent=memory.focus?'Restore panels':'Hide panels';focus.setAttribute('aria-pressed',String(memory.focus));
+    summary.textContent='Panels · '+windows.filter(visible).length;
+    if(b.w!==lastWidth || b.h!==lastHeight){lastWidth=b.w;lastHeight=b.h;sizeGraph(true);}
+  }
+  function graphWidth(){var svg=board.querySelector('.boardcanvas>svg');return svg && svg.viewBox && svg.viewBox.baseVal.width || 1180;}
+  function sizeGraph(preserve){
+    if(!active || retired)return;
+    var prior=graphPixels?camera():null,natural=graphWidth();
+    var width=zoom!==null?natural*zoom:boardSize && boardSize.mode()==='readable'?natural:board.clientWidth;
+    graphPixels=clamp(width,natural*.15,natural*4);
+    marginX=board.clientWidth*.25;marginY=board.clientHeight*.25;
+    board.style.setProperty('--explore-width',graphPixels+'px');
+    board.style.setProperty('--explore-margin-x',marginX+'px');board.style.setProperty('--explore-margin-y',marginY+'px');
+    board.style.setProperty('--explore-canvas-height',(board.clientHeight+2*marginY)+'px');
+    board.style.setProperty('--explore-canvas-width',(Math.max(board.clientWidth,graphPixels)+2*marginX)+'px');
+    zoomLabel.textContent=Math.round(graphPixels/natural*100)+'%';
+    if(preserve && prior)positionCamera(prior);
+  }
+  function changeZoom(factor){
+    if(!active || retired)return;clearScrollEdit();var token=beginEdit();if(token===false)return;
+    zoom=clamp((graphPixels || graphWidth())/graphWidth()*factor,.15,4);sizeGraph(true);saveCamera(token);
+  }
+  function onLegendClick(ev){if(!active || retired)return;if(ev.target.closest('.board-size>.mbtn:not(.board-pan-button)')){var token=beginEdit();if(token===false)return;zoom=null;sizeGraph(true);saveCamera(token);}}
+  if(legend)legend.addEventListener('click',onLegendClick);
+  function raise(w){w.el.style.zIndex=String(++z);}
+  function finish(cancel){
+    if(!gesture)return;var g=gesture;gesture=null;
+    if(g.kind==='pan'){
+      if(cancel){board.scrollLeft=g.left;board.scrollTop=g.top;}
+    }else{
+      if(cancel || !g.changed){Object.assign(g.w.state,g.before);if(g.w===playerWindow && g.automatic)memory.controls=null;}
+      else if(g.kind==='move' && g.w!==playerWindow)g.w.state.stacked=g.w.rect.x+g.w.rect.w>=stage.clientWidth-36;
+      paint();
+    }
+    if(g.handle.hasPointerCapture && g.handle.hasPointerCapture(g.id))g.handle.releasePointerCapture(g.id);
+    shell.classList.remove('viewport-gesturing');
+    if(!cancel && g.changed){
+      if(g.kind==='pan')saveCamera(g.token);
+      else{rememberRect(g.w);if(!publish(g.token)){Object.assign(g.w.state,g.before);if(g.w===playerWindow && g.automatic)memory.controls=null;paint();}}
+    }
+  }
+  function begin(ev,w,kind,handle){
+    if(!active || ev.button!==0 || gesture)return;
+    clearScrollEdit();var token=beginEdit();if(token===false)return;
+    ev.preventDefault();ev.stopPropagation();raise(w);
+    var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
+    if(w===playerWindow)memory.controls=w.state=Object.assign({},r);
+    gesture={w:w,kind:kind,handle:handle,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,rect:r,before:before,token:token,automatic:automatic};
+    handle.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
+  }
+  function pointerMove(ev){
+    var g=gesture;if(!g || ev.pointerId!==g.id)return;
+    var dx=ev.clientX-g.startX,dy=ev.clientY-g.startY;g.changed=g.changed || Math.abs(dx)+Math.abs(dy)>2;
+    if(g.kind==='pan'){board.scrollLeft=g.left-dx;board.scrollTop=g.top-dy;return;}
+    if(g.kind==='move')Object.assign(g.w.state,constrain(g.w,{x:g.rect.x+dx,y:g.rect.y+dy,w:g.rect.w,h:g.rect.h}),{stacked:false});
+    else Object.assign(g.w.state,constrain(g.w,{x:g.rect.x,y:g.rect.y,w:g.rect.w+(g.before.stacked?-dx:dx),h:g.rect.h+dy}));
+    paint();
+  }
+  function keyboard(ev,w,kind){
+    var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
+    var token=beginEdit();if(token===false)return;
+    ev.preventDefault();ev.stopPropagation();raise(w);
+    if(w===playerWindow)memory.controls=w.state=Object.assign({},w.rect);
+    var n=ev.shiftKey?24:8,r=w.rect;
+    if(kind==='resize')Object.assign(w.state,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}));
+    else Object.assign(w.state,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),{stacked:false});
+    paint();rememberRect(w);publish(token);
+  }
+  function panelWindow(card,panel,it,index){
+    var label=panel.title || panel.id;
+    var saved=(memory.layout.panels || []).find(function(p){return p.panel===panel.id;});
+    var state=memory.panels[panel.id] || (memory.panels[panel.id]=saved?Object.assign(absolute(saved),{stacked:saved.stacked,hidden:false}):{x:12,y:12,w:220,h:panel.type==='homemap'?250:220,stacked:true,hidden:false});
+    var el=document.createElement('article');el.className='explore-window';el.setAttribute('data-explore-panel',panel.id);el.setAttribute('aria-label',label);
+    var header=document.createElement('div');header.className='explore-window-header';el.appendChild(header);
+    var grip=button(label,function(){},header,'explore-window-grip');grip.title='Drag to move; arrow keys to move; drop at the right edge to stack';grip.setAttribute('aria-label','Move '+label+'; use arrow keys');
+    var hide=button('×',function(){state.hidden=true;paint();summary.focus();},header,'explore-window-hide');hide.setAttribute('aria-label','Hide '+label);
+    var body=document.createElement('div');body.className='explore-window-body';el.appendChild(body);move(card,body);
+    var resize=button('◢',function(){},el,'explore-window-resize');resize.title='Drag to resize; arrow keys to resize';stage.appendChild(el);
+    var choice=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span'),note=document.createElement('small');
+    check.type='checkbox';text.textContent=label;choice.appendChild(check);choice.appendChild(text);choice.appendChild(note);choices.appendChild(choice);
+    var w={el:el,card:card,panel:panel,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden};
+    check.addEventListener('change',function(){state.hidden=!check.checked;if(check.checked)memory.focus=false;paint();});
+    grip.addEventListener('pointerdown',function(ev){begin(ev,w,'move',grip);});resize.addEventListener('pointerdown',function(ev){begin(ev,w,'resize',resize);});
+    grip.addEventListener('keydown',function(ev){keyboard(ev,w,'move');});resize.addEventListener('keydown',function(ev){keyboard(ev,w,'resize');});
+    el.addEventListener('pointerdown',function(){raise(w);});el.addEventListener('focusin',function(){raise(w);});
+    windows.push(w);
+  }
+  var observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){if(gesture)finish(true);paint();}):null;
+  if(observer)observer.observe(stage);
+  var visibilityObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
+  var graphObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){sizeGraph(true);}):null;
+  var tracksObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
+  function enter(){
+    if(active || !definition || definition.presentation!=='explore')return;
+    active=true;memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
+    zoom=memory.zoom!==null?memory.zoom:memory.layout.camera?memory.layout.camera.zoom:null;
+    stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
+    var cards=Array.prototype.slice.call(grid.querySelectorAll('.pwidget[data-dv-panel]'));
+    if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);
+    board.classList.add('explore-board');fitHeight();
+    cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};panelWindow(card,panel,it,index);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
+    if(visibilityObserver && bar)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
+    if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
+    if(tracksObserver && bar)tracksObserver.observe(bar.querySelector('.schips'),{childList:true,subtree:true});
+    fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
+    lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);
+    if(memory.scroll){board.scrollLeft=memory.scroll.x;board.scrollTop=memory.scroll.y;}
+    else if(memory.layout.camera)positionCamera(memory.layout.camera);
+    else{board.scrollLeft=marginX;board.scrollTop=marginY;}
+  }
+  function leave(){
+    if(!active)return;clearScrollEdit();finish(true);
+    memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;active=false;
+    if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
+    moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
+    windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;
+    stage.hidden=true;grid.hidden=false;board.classList.remove('explore-board');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
+    shell.classList.remove('viewport-explore');menu.hidden=focus.hidden=stack.hidden=true;
+  }
+  function isFullscreen(){return document.fullscreenElement===shell;}
+  function setExpanded(value){expanded=value;shell.classList.toggle('viewport-expanded',value);expand.textContent=value?'Exit expanded view':'Expand';expand.setAttribute('aria-label',value?'Exit expanded diagram view':'Expand diagram view');expand.setAttribute('aria-pressed',String(value));paint();}
+  function exitExpanded(){
+    pendingFullscreen++;setExpanded(false);status.textContent='';
+    if(isFullscreen() && document.exitFullscreen){var result=document.exitFullscreen();if(result && result.catch)result.catch(function(){});}
+    if(!retired)expand.focus({preventScroll:true});
+  }
+  function toggleExpanded(){if(expanded)exitExpanded();else enterExpanded();}
+  function enterExpanded(){
+    setExpanded(true);
+    var token=++pendingFullscreen;
+    function failed(){if(retired || token!==pendingFullscreen)return;status.textContent='Expanded in this page. Browser fullscreen is unavailable.';}
+    try{
+      if(!shell.requestFullscreen){failed();return;}
+      var promise=shell.requestFullscreen();if(promise && promise.then)promise.then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)document.exitFullscreen().catch(function(){});}},failed);
+    }catch(_){failed();}
+  }
+  function fullscreenChanged(){if(!isFullscreen() && expanded){setExpanded(false);status.textContent='';}}
+  function keydown(ev){
+    if(ev.key!=='Escape')return;
+    if(gesture){ev.preventDefault();ev.stopPropagation();finish(true);}
+    else if(menu.open){ev.preventDefault();ev.stopPropagation();menu.open=false;summary.focus();}
+    else if(expanded){ev.preventDefault();ev.stopPropagation();exitExpanded();}
+  }
+  function scrollKey(ev){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].indexOf(ev.key)>=0 && ev.target===board)scrollIntent();}
+  function cancel(){finish(true);}
+  function pointerEnd(ev){if(gesture && ev.pointerId===gesture.id && (ev.buttons&1)===0)finish(false);}
+  function pointerCancel(ev){if(gesture && ev.pointerId===gesture.id)finish(true);}
+  function captureLost(ev){
+    if(!gesture || ev.pointerId!==gesture.id)return;
+    // A host can consume pointerup or release capture outside the viewport.
+    // Primary button released means the drag completed. Pointercancel/blur/
+    // Escape still cancel first; losing capture while held also cancels.
+    finish((ev.buttons&1)!==0);
+  }
+  function resized(){cancel();fitHeight();paint();}
+  function panStart(ev){
+    if(!active || ev.button!==0 || gesture || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step]'))return;
+    clearScrollEdit();var token=beginEdit();if(token===false)return;
+    ev.preventDefault();gesture={token:token,kind:'pan',handle:board,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,left:board.scrollLeft,top:board.scrollTop};board.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
+  }
+  shell.addEventListener('pointermove',pointerMove);shell.addEventListener('pointerup',pointerEnd);shell.addEventListener('pointercancel',pointerCancel);shell.addEventListener('lostpointercapture',captureLost);shell.addEventListener('keydown',keydown);
+  window.addEventListener('pointerup',pointerEnd,true);
+  board.addEventListener('wheel',scrollIntent,{passive:true});board.addEventListener('keydown',scrollKey);
+  board.addEventListener('pointerdown',panStart);window.addEventListener('blur',cancel);window.addEventListener('resize',resized);document.addEventListener('fullscreenchange',fullscreenChanged);
+  return {
+    setView:function(view,tiles){leave();definition=view;items=tiles || [];enter();},
+    setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
+    setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
+    adoptLayout:function(id,value){
+      if(retired || !active || !author || definition.id!==id)return false;
+      var normalized=sectionExploreLayout(d,value);
+      if(JSON.stringify(normalized)!==JSON.stringify(sectionExploreLayout(d,memory.layout)))return false;
+      definition.exploreLayout=copy(normalized);return true;
+    },
+    reset:function(){
+      if(!active)return;var token=beginEdit();if(token===false)return;
+      var id=definition.id;leave();delete memories[id];
+      var previous=definition;definition=Object.assign({},definition,{exploreLayout:{}});enter();definition=previous;publish(token);
+    },
+    scrollTarget:function(){return active?stage:grid;},
+    refresh:resized,
+    snapshotReaderState:function(){
+      if(active){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}
+      return {memories:JSON.parse(JSON.stringify(memories)),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open};
+    },
+    restoreReaderState:function(saved){
+      if(!saved || retired)return;
+      leave();
+      memories=Object.assign(Object.create(null),JSON.parse(JSON.stringify(saved.memories)));
+      Object.keys(memories).forEach(function(id){memories[id].panels=Object.assign(Object.create(null),memories[id].panels);});
+      enter();
+      if(!saved.expanded){if(expanded)exitExpanded();}
+      else if(saved.fullscreen){if(!isFullscreen())enterExpanded();else setExpanded(true);}
+      else {
+        var token=++pendingFullscreen;setExpanded(true);
+        if(isFullscreen() && document.exitFullscreen){
+          var result=document.exitFullscreen();
+          if(result && result.then)result.then(function(){if(!retired && pendingFullscreen===token)setExpanded(true);},function(){});
+        }
+      }
+      stage.style.height=saved.stageHeight;paint();
+      menu.open=saved.menuOpen;
+    },
+    suspend:leave,
+    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',scrollIntent);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);}
+  };
+}
 /* ---- src/engine.js ---- */
 /* engine.js — board renderer, stepper and page renderer.
    Consumes document, navigation, path, layout, state and geometry helpers
@@ -26037,7 +26760,7 @@ function showCommunicationFailures(board,failures,animate){
       svgEl('circle',{r:8},marker);
       svgEl('path',{d:'M-5 0H5'},marker);
     } else svgEl('path',{d:'M-6 -6L6 6M-6 6L6 -6'},marker);
-    var hidden = [path,info.haloEl,info.coinEl].filter(Boolean);
+    var hidden = [path,info.haloEl].concat(info.coinEls || [info.coinEl], info.coinBaseEls || []).filter(Boolean);
     hidden.forEach(function(el){el.classList.add('comm-hidden');});
     if (info.labelEl) info.labelEl.classList.add('comm-label');
     var effect = {group:group,hidden:hidden,label:info.labelEl,packet:null};
@@ -26063,6 +26786,91 @@ function destroyBoardLinks(el){
     el[key] = null;
     if (controller) controller.destroy();
   });
+}
+/* Coin slots for n steps that share one edge. One coin sits on the midpoint.
+   Several spread along the path, COIN_STEP apart in step order (lowest number
+   nearest the source), centred on the midpoint and kept COIN_END clear of both
+   ends so they stay off the cards and the arrowhead. When the path is too
+   short, or bends so tightly that path neighbours would touch, the coins form
+   a compact grid centred on the midpoint instead: columns along the straight
+   run through the midpoint (bounded the same way), extra rows stacked
+   perpendicular to the edge, away from the cards it joins. */
+var COIN_STEP = 30, COIN_CLEAR = 26, COIN_END = 22, COIN_R = 10;
+/* true when no two points are closer than clear (grid bucketing: near-linear) */
+function coinsApart(pts, clear){
+  var cells = {};
+  for (var i = 0; i < pts.length; i++){
+    var cx = Math.floor(pts[i].x / clear), cy = Math.floor(pts[i].y / clear);
+    for (var gx = cx - 1; gx <= cx + 1; gx++) for (var gy = cy - 1; gy <= cy + 1; gy++){
+      var bucket = cells[gx + ',' + gy];
+      if (bucket) for (var j = 0; j < bucket.length; j++){
+        if (Math.hypot(pts[i].x - bucket[j].x, pts[i].y - bucket[j].y) < clear) return false;
+      }
+    }
+    (cells[cx + ',' + cy] || (cells[cx + ',' + cy] = [])).push(pts[i]);
+  }
+  return true;
+}
+function coinSlots(path, len, mid, n){
+  if (n <= 1) return [{x: mid.x, y: mid.y}];
+  var span = (n - 1) * COIN_STEP, lo = COIN_END + span / 2, hi = len - COIN_END - span / 2;
+  if (lo <= hi){
+    var centre = Math.min(hi, Math.max(lo, len / 2)), pts = [];
+    for (var i = 0; i < n; i++){
+      var p = path.getPointAtLength(centre + (i - (n - 1) / 2) * COIN_STEP);
+      pts.push({x: p.x, y: p.y});
+    }
+    if (coinsApart(pts, COIN_CLEAR)) return pts;
+  }
+  /* compact grid: tangent at the midpoint, and how far the path runs straight
+     along it (never closer than COIN_END to either end) */
+  var p0 = path.getPointAtLength(Math.max(0, len / 2 - 2)), p1 = path.getPointAtLength(Math.min(len, len / 2 + 2));
+  var dx = p1.x - p0.x, dy = p1.y - p0.y, dl = Math.hypot(dx, dy);
+  if (!(dl > 0)){ dx = 1; dy = 0; dl = 1; }
+  dx /= dl; dy /= dl;
+  var reach = Infinity;
+  [-1, 1].forEach(function(dir){
+    var run = 0, limit = len / 2 - COIN_END;
+    while (run + 2 <= limit){
+      var q = path.getPointAtLength(len / 2 + dir * (run + 2));
+      if (Math.abs((q.x - mid.x) * dy - (q.y - mid.y) * dx) > 1.5) break;
+      run += 2;
+    }
+    reach = Math.min(reach, run);
+  });
+  /* rows stack along the normal, first row on top (or left for a vertical edge) */
+  var nx = -dy, ny = dx;
+  if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx < 0)){ nx = -nx; ny = -ny; }
+  var cols = Math.max(1, Math.min(n, Math.floor(2 * reach / COIN_STEP) + 1)), rows = Math.ceil(n / cols), grid = [];
+  for (var r = 0; r < rows; r++){
+    var inRow = Math.min(cols, n - r * cols), across = (r - (rows - 1) / 2) * COIN_STEP;
+    for (var c = 0; c < inRow; c++){
+      var along = (c - (inRow - 1) / 2) * COIN_STEP;
+      grid.push({x: mid.x + dx * along + nx * across, y: mid.y + dy * along + ny * across});
+    }
+  }
+  return grid;
+}
+/* Place the visible coins of one shared edge; hidden coins keep no slot.
+   Each coin's backing disc (which masks the edge line under a dimmed coin)
+   follows its coin's slot and visibility. */
+function layoutCoinGroup(group){
+  var shown = [];
+  group.coins.forEach(function(g, i){
+    var hide = g.classList.contains('view-step-hidden'), base = group.bases && group.bases[i];
+    if (base) base.classList.toggle('view-step-hidden', hide);
+    if (!hide) shown.push(i);
+  });
+  var pts = coinSlots(group.path, group.len, group.mid, shown.length);
+  shown.forEach(function(ci, i){
+    var dx = pts[i].x - group.mid.x, dy = pts[i].y - group.mid.y;
+    [group.coins[ci], group.bases && group.bases[ci]].forEach(function(el){
+      if (!el) return;
+      if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) el.removeAttribute('transform');
+      else el.setAttribute('transform', 'translate(' + dx.toFixed(2) + ' ' + dy.toFixed(2) + ')');
+    });
+  });
+  return pts;
 }
 function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
@@ -26175,20 +26983,22 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   el._nodeLinks=wireNodeReferences(el,svg,d,prefix);
 
   /* measured pass: labels, coins, ambient loop dots, manual step dots */
-  var stepByEdge = {};
+  /* every edge-bearing step owns one coin on its first delivered edge; steps
+     that share a first edge share that edge's coin row (see coinSlots) */
+  var stepsByEdge = {};
   (d.steps || []).forEach(function(st, i){
     var keys = stepDeliveredKeys(st);
-    if (keys.length && !(keys[0] in stepByEdge) && edgeIds[keys[0]]) stepByEdge[keys[0]] = i + 1;
+    if (keys.length && edgeIds[keys[0]]) (stepsByEdge[keys[0]] || (stepsByEdge[keys[0]] = [])).push(i + 1);
   });
 
-  var coinRects = [], deltaRects = [], labelEls = [], pendingLabelBadges = [];
-  function deltaBadge(parent, x, y, w, h){
+  var coinRects = [], deltaRects = [], labelEls = [], pendingLabelBadges = [], coinGroups = [];
+  function deltaBadge(parent, x, y, w, h, unrecorded){
     var badge = document.createElementNS(SVGNS, 'polygon');
     badge.setAttribute('class', 'dvdelta');
     badge.setAttribute('aria-hidden', 'true');
     badge.setAttribute('points', x + ',' + (y + h) + ' ' + (x + w) + ',' + (y + h) + ' ' + (x + w/2) + ',' + y);
     parent.appendChild(badge);
-    deltaRects.push({x:x - 1, y:y - 1, w:w + 2, h:h + 2});
+    if (!unrecorded) deltaRects.push({x:x - 1, y:y - 1, w:w + 2, h:h + 2});
     return badge;
   }
   (d.edges || []).forEach(function(e){
@@ -26198,24 +27008,46 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     info.haloEl = svg.querySelector('path.halo[data-dv-edge=\"' + info.idx + '\"]');
     var len = path.getTotalLength();
     var mid = path.getPointAtLength(len * 0.5);
-    var stepN = stepByEdge[e.from + '->' + e.to];
+    var edgeSteps = stepsByEdge[e.from + '->' + e.to] || [];
+    var stepN = edgeSteps.length ? edgeSteps[0] : 0;
+    var coinLeft = mid.x, coinLeftY = mid.y;
 
-    if (stepN){
-      var g = document.createElementNS(SVGNS, 'g');
-      var stepDelta = d.steps[stepN - 1].delta === true;
-      g.setAttribute('class', 'coin' + (stepDelta ? ' dvd' : ''));
-      applyStepCircleColor(g,d.steps[stepN-1]);
-      g.setAttribute('id', prefix + '-coin-' + stepN);
-      g.setAttribute('data-dv-step', String(d._sourceIndices ? d._sourceIndices[stepN - 1] : stepN - 1));
-      markFragmentElement(g, e);
-      var c = document.createElementNS(SVGNS, 'circle');
-      c.setAttribute('cx', mid.x); c.setAttribute('cy', mid.y); c.setAttribute('r', 10);
-      var t = document.createElementNS(SVGNS, 'text');
-      t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 3.5); t.setAttribute('text-anchor', 'middle');
-      t.textContent = stepN;
-      g.appendChild(c); g.appendChild(t); svg.appendChild(g); info.coinEl = g;
-      if (stepDelta) deltaBadge(g, mid.x + 5, mid.y - 14, 8, 7);
-      coinRects.push({x: mid.x - 11, y: mid.y - 11, w: 22, h: 22});
+    if (edgeSteps.length && !info.coinEls){ /* a duplicate from->to declaration shares the first one's coins */
+      var group = {path: path, len: len, mid: mid, coins: [], bases: [], deltas: []};
+      info.coinEls = group.coins; info.coinBaseEls = group.bases;
+      edgeSteps.forEach(function(n){
+        /* each coin is drawn at the midpoint and moved to its slot by a
+           transform, so a path/view filter can re-pack the visible coins */
+        var base = document.createElementNS(SVGNS, 'circle');
+        base.setAttribute('class', 'coin-base'); base.setAttribute('aria-hidden', 'true');
+        base.setAttribute('cx', mid.x); base.setAttribute('cy', mid.y); base.setAttribute('r', COIN_R + 1);
+        markFragmentElement(base, e);
+        svg.appendChild(base);
+        var g = document.createElementNS(SVGNS, 'g');
+        var stepDelta = d.steps[n - 1].delta === true;
+        g.setAttribute('class', 'coin' + (stepDelta ? ' dvd' : ''));
+        applyStepCircleColor(g,d.steps[n-1]);
+        g.setAttribute('id', prefix + '-coin-' + n);
+        g.setAttribute('data-dv-step', String(d._sourceIndices ? d._sourceIndices[n - 1] : n - 1));
+        g.setAttribute('data-dv-coin-edge', String(info.idx));
+        markFragmentElement(g, e);
+        var c = document.createElementNS(SVGNS, 'circle');
+        c.setAttribute('cx', mid.x); c.setAttribute('cy', mid.y); c.setAttribute('r', COIN_R);
+        var t = document.createElementNS(SVGNS, 'text');
+        t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 3.5); t.setAttribute('text-anchor', 'middle');
+        t.textContent = n;
+        g.appendChild(c); g.appendChild(t); svg.appendChild(g);
+        if (stepDelta) deltaBadge(g, mid.x + 5, mid.y - 14, 8, 7, true);
+        group.coins.push(g); group.bases.push(base); group.deltas.push(stepDelta);
+      });
+      info.coinEl = group.coins[0];
+      coinGroups.push(group);
+      layoutCoinGroup(group).forEach(function(pt, i){
+        coinRects.push({x: pt.x - 11, y: pt.y - 11, w: 22, h: 22});
+        /* coin badges travel with their coin: record them at the final slot */
+        if (group.deltas[i]) deltaRects.push({x: pt.x + 4, y: pt.y - 15, w: 10, h: 9});
+        if (pt.x < coinLeft){ coinLeft = pt.x; coinLeftY = pt.y; }
+      });
     }
     if (e.label){
       var lx = mid.x + (e.labelDx || 0), ly = mid.y - (stepN ? 16 : 9) + (e.labelDy || 0);
@@ -26239,11 +27071,29 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         pendingLabelBadges.push({e: e, lbl: lt});
       } else {
         /* no label: left of the coin, near the midpoint */
-        var badge = deltaBadge(svg, mid.x - (stepN ? 25 : 16), mid.y - 6, 11, 9);
+        var badge = stepN ? deltaBadge(svg, coinLeft - 25, coinLeftY - 6, 11, 9) :
+          deltaBadge(svg, mid.x - 16, mid.y - 6, 11, 9);
         markFragmentElement(badge, e);
       }
     }
   });
+
+  /* a compact coin grid on a short edge can reach past the layout's canvas;
+     grow the viewBox (and its ground) so no coin or badge is clipped */
+  (function(){
+    if (!coinRects.length) return;
+    var x1 = vb.x, y1 = vb.y, x2 = vb.x + vb.w, y2 = vb.y + vb.h;
+    coinRects.concat(deltaRects).forEach(function(r){
+      x1 = Math.min(x1, r.x - 4); y1 = Math.min(y1, r.y - 4);
+      x2 = Math.max(x2, r.x + r.w + 4); y2 = Math.max(y2, r.y + r.h + 4);
+    });
+    if (x1 === vb.x && y1 === vb.y && x2 === vb.x + vb.w && y2 === vb.y + vb.h) return;
+    vb = {x: x1, y: y1, w: x2 - x1, h: y2 - y1};
+    svg.setAttribute('viewBox', vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h);
+    svg.querySelectorAll('rect.dv-board-ground, rect.dv-board-grid').forEach(function(r){
+      r.setAttribute('x', vb.x); r.setAttribute('y', vb.y); r.setAttribute('width', vb.w); r.setAttribute('height', vb.h);
+    });
+  })();
 
   /* B1: measured label collision pass — nudge labels off nodes, coins, paths,
      and each other. Author-nudged labels are fixed obstacles. */
@@ -26353,7 +27203,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   });
 
   return {kindsUsed: Object.keys(kindsUsed), anyRet: anyRet, edgeIds: edgeIds,
-    nodeEls: nodeEls, svg: svg};
+    nodeEls: nodeEls, svg: svg,
+    /* re-pack each shared-edge coin row around the coins still visible */
+    layoutCoins: function(){ coinGroups.forEach(layoutCoinGroup); }};
 }
 
 function legendHTML(kinds, anyRet, skin, protos){
@@ -26531,6 +27383,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       coin.classList.toggle('view-step-hidden',position<0);
       var text=coin.querySelector('text');if(text && position>=0)text.textContent=String(position+1);
     });
+    if (board && board.layoutCoins) board.layoutCoins();
   }
   function sharedPeers(shared,path){
     return shared.occurrences.filter(function(o){return o.path.id!==path.id;}).map(function(o){
@@ -26943,6 +27796,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     jump: function(n){ stopAuto(); setStep(n, undefined, false); },
     advance: advanceTo,
     toggleAuto: function(){ if (timer) stopAuto(); else startAuto(); },
+    playing: function(){ return !!timer; },
     /* Pausing must not replace panel contents: an editor may have focus there. */
     pause: stopAuto,
     destroy: function(){
@@ -27061,7 +27915,7 @@ function sectionLayoutWithoutFlow(items,controlsRows){
   kept.forEach(function(it){it.y-=empty.filter(function(row){return row<it.y;}).length;});
   return kept;
 }
-function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper){
+function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
   var items=sectionLayoutItems(d,target || 'default',layoutId);
   if(!items)return null;
@@ -27091,6 +27945,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
   grid.id=box.id+'-layout';flowToggle.setAttribute('aria-controls',grid.id);
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
+  var viewport=createSectionViewport(box,group.parentNode,grid,board,bar,d,boardSize);
   var active=false, saved=[], oldHidden, flowHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden,visibility=Object.create(null);
   function paintFlow(){
     flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
@@ -27115,15 +27970,16 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     var anchor=document.createComment('layout position');node.parentNode.insertBefore(anchor,node);
     saved.push({node:node,anchor:anchor});host.appendChild(node);
   }
-  function restore(){
+  function restore(quiet){
     if(!active)return;
+    viewport.suspend();
     saved.forEach(function(rec){rec.node.classList.remove('layout-docked-card');if(rec.anchor.parentNode){rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);}});
     saved=[];grid.replaceChildren();grid.hidden=true;layout.grid.hidden=oldHidden;
     if(layout.flowDisclosure)layout.flowDisclosure.hidden=flowHidden;
     active=false;Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed','false');});
     paintFlow();
     if(standard)standard.setAttribute('aria-pressed','true');
-    if(changed)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
+    if(changed && !quiet)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
     if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
   }
   function activate(){
@@ -27165,7 +28021,8 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     if(stepper)stepper.setVisibleSteps(sectionLayoutDefinition(d,layoutId).steps);
     Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed',String(id===layoutId));});
     paintFlow();
-    if(changed)changed(grid);
+    viewport.setView(sectionLayoutDefinition(d,layoutId),items);
+    if(changed)changed(viewport.scrollTarget());
     if(standard)standard.setAttribute('aria-pressed','false');
     group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed','false');});
   }
@@ -27173,7 +28030,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   function setLayout(id){
     if(!views.some(function(v){return v.id===id;}))return;
     if(id!==layoutId){
-      restore();layoutId=id;items=sectionLayoutItems(d,target || 'default',id);
+      restore(true);layoutId=id;items=sectionLayoutItems(d,target || 'default',id);
       dock=sectionLayoutDock(items);separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
       showDiagram=Object.prototype.hasOwnProperty.call(visibility,id)?visibility[id]:!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
     }
@@ -27185,6 +28042,9 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
     layoutId:function(){return layoutId;},setLayout:setLayout,
+    views:function(){return views.map(function(v){return {id:v.legacy?'layout':v.id,presentation:v.presentation};});},
+    snapshotReaderState:function(){return {visibility:Object.assign({},visibility),showDiagram:showDiagram,viewport:viewport.snapshotReaderState()};},
+    restoreReaderState:function(saved){if(saved){visibility=Object.assign(Object.create(null),saved.visibility);showDiagram=saved.showDiagram;paintFlow();viewport.restoreReaderState(saved.viewport);}},
     viewId:function(){return active?(named?layoutId:'layout'):'flow';},
     defaultView:function(){return defaultView;},
     setView:function(id){
@@ -27194,7 +28054,8 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       return false;
     },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
-    destroy:function(){if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
+    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
+    destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 
 function sectionHasProse(sec){
@@ -27365,7 +28226,7 @@ function createBoardSizeControl(board, legend, label){
   function syncOverflow(){
     if (destroyed || !board.clientWidth) return;
     var scrollable = board.scrollWidth > board.clientWidth + 1;
-    if (scrollable && !wasScrollable) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
+    if (scrollable && !wasScrollable && !board.classList.contains('explore-board')) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
     board.classList.toggle('board-overflow', scrollable);
     pan.hidden = !scrollable; syncPan();
     wasScrollable = scrollable;
@@ -27467,7 +28328,8 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var lg = document.createElement('div'); lg.className = 'lg';
   var bwrap = document.createElement('div');
   bwrap.className = 'boardcanvas';
-  result.destroy=function(){if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
+  var standardViewport=null;
+  result.destroy=function(){if(standardViewport)standardViewport.destroy();if(panelCtl)panelCtl.destroy();destroyBoardLinks(bwrap);};
   boardDiv.appendChild(lg); boardDiv.appendChild(bwrap);
   boardLayout.diagramHost.appendChild(boardDiv);
 
@@ -27498,8 +28360,19 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     }
     if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
       d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged);
-    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper);
+    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize);
     if(composition)result.presentation=composition;
+    else {
+      /* Expansion also belongs to ordinary diagrams without authored views. */
+      var surface=document.createElement('div');surface.className='standard-view-surface';
+      box.insertBefore(surface,boardLayout.grid);surface.appendChild(boardLayout.grid);
+      if(boardLayout.flowDisclosure)surface.appendChild(boardLayout.flowDisclosure);
+      if(bar && bar.parentNode===box)surface.appendChild(bar);
+      var toolbar=boardLayout.viewChoicesHost && boardLayout.viewChoicesHost.parentNode;
+      if(!toolbar){toolbar=document.createElement('div');toolbar.className='diagram-views';box.insertBefore(toolbar,surface);}
+      standardViewport=createSectionViewport(box,toolbar,surface,boardDiv,bar,d,result.boardSize);
+      result.viewport=standardViewport;
+    }
     ready=true;
     box.setAttribute('data-view-id',result.presentation?result.presentation.viewId():'flow');
   }
@@ -27673,7 +28546,7 @@ function renderPage(view, page, skin, backlinks, options){
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
-               flowDisclosure:built.flowDisclosure, presentation:built.presentation,
+               flowDisclosure:built.flowDisclosure, presentation:built.presentation, viewport:built.viewport,
                contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);
@@ -28109,7 +28982,10 @@ function wireDeepLinks(ctl, win, preservedHash){
     return '#' + preservedHash + (rest ? '&' + rest : '');
   }
   function write(){
-    if (suppress) return;
+    /* ctl.suppressFragmentWrites: the guided tour drives steppers for its
+       demos and spotlights; those moves must never clobber a shared link's
+       fragment. The tour restores the pre-tour state before clearing it. */
+    if (suppress || ctl.suppressFragmentWrites) return;
     syncChangedTarget();
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();
@@ -28477,14 +29353,21 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     var sp=frame.rec.stepper,presentation=frame.rec.presentation;
     var state=sp?{path:sp.path(),step:sp.current().id || String(sp.current().n+1),mode:sp.mode()}:{};
     if(frame.rec.boardSize)state.size=frame.rec.boardSize.mode();
-    if(presentation){state.focus=presentation.mode();if(presentation.layoutId)state.layout=presentation.layoutId();if(presentation.diagramVisible)state.diagramVisible=presentation.diagramVisible();}
+    if(presentation){if(presentation.viewId)state.view=presentation.viewId();state.focus=presentation.mode();if(presentation.layoutId)state.layout=presentation.layoutId();if(presentation.diagramVisible)state.diagramVisible=presentation.diagramVisible();}
+    else if(frame.section.diagram)state.view='flow';
     return state;
   }
   function applyStep(frame,target){
     var presentation=frame.rec.presentation;
+    if(target && target.view!=null && (presentation ? !presentation.setView : target.view!=='flow' || !frame.section.diagram))
+      throw new Error('The requested detail view is unavailable in this revision.');
     if(target && presentation){
-      if(target.layout && presentation.setLayout)presentation.setLayout(target.layout);
-      if(target.focus)presentation.setMode(target.focus);
+      if(target.view!=null && presentation.setView){
+        if(!presentation.setView(target.view))throw new Error('The requested detail view is unavailable in this revision.');
+      }else{
+        if(target.layout && presentation.setLayout)presentation.setLayout(target.layout);
+        if(target.focus)presentation.setMode(target.focus);
+      }
       if(typeof target.diagramVisible==='boolean' && presentation.setDiagramVisible)presentation.setDiagramVisible(target.diagramVisible);
     }
     if(target && target.size && frame.rec.boardSize)frame.rec.boardSize.setMode(target.size);
@@ -28640,6 +29523,1468 @@ function handoffNodeContent(node, position, id, prefix, options){
   if(options.authoring)return '<title>'+tooltip+'</title>'+body+'<a'+attrs+'><title>'+esc(hint)+'</title><path class="handoff-hit" d="M'+(w-tip-7)+' 0H'+(w-tip)+'L'+w+' '+h/2+'L'+(w-tip)+' '+h+'H'+(w-tip-7)+'Z"/></a>';
   return '<a'+attrs+'><title>'+tooltip+'</title>'+body+'</a>';
 }
+/* ---- src/tour.config.js ---- */
+/* Built-in default tour config. A page overrides it wholesale with page.tour
+   (no deep-merge). The shape and the authoring contract are documented in
+   docs/tour.md; tourLintConfig (core/tour-model.js) is the source of truth
+   for what validates. Selectors here name the viewer's stable controls;
+   tests/tour-config.test.js guards the pairing with their renderers.
+
+   Portable by design: the viewer selects suitable sections/views and omits
+   unavailable lessons before numbering this walkthrough. This shipped copy
+   never names page-specific widgets — a page-authored config may (docs/tour.md). */
+
+var TOUR_DEFAULT_CONFIG = {
+  version: 1,
+  personas: ['ux', 'eng', 'both'],
+  steps: [
+    {
+      id: 'welcome',
+      kind: 'chooser',
+      copy: {
+        eyebrow: 'WELCOME · FIRST VISIT',
+        heading: 'First time in a Flowview diagram?',
+        body: 'Pick a walkthrough. You can try the highlighted controls as you go.',
+        choices: [
+          {persona: 'ux', label: 'The user experience', sub: 'Reading views, story steps, and live panels.'},
+          {persona: 'eng', label: 'The engineering', sub: 'Calls, branching paths, source links, and room to explore.'},
+          {persona: 'both', label: 'Show me both', sub: 'The full walkthrough, at your pace.'}
+        ],
+        note: 'This walkthrough covers the controls available on this page. Replay anytime from ?.'
+      }
+    },
+    {
+      id: 'views',
+      target: {selector: '.diagram-view-choice', within: 'section'},
+      copy: {
+        heading: 'Choose your reading view',
+        body: 'Use these buttons to choose a view of this story. Each view can emphasize a different part of the same flow. Your steps and their effects stay connected as you switch.'
+      }
+    },
+    {
+      id: 'mode-ambient',
+      personas: ['eng', 'both'],
+      target: {selector: '.mtoggle', within: 'section'},
+      diagramState: {mode: 'ambient', diagramVisible: true},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'The big picture',
+        body: 'AMBIENT shows the calls together, with activity looping across the diagram.',
+        reducedMotionBody: 'AMBIENT shows the calls together. Animation stays off with reduced motion.'
+      }
+    },
+    {
+      id: 'mode-step',
+      personas: ['eng', 'both'],
+      target: {selector: '.step-transport', within: 'section'},
+      diagramState: {mode: 'step'},
+      demo: {advance: 2, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'One call at a time',
+        body: 'STEP follows the sequence one call at a time. Watch this example, replay it, or use ‹ › to move by hand.',
+        reducedMotionBody: 'STEP follows the sequence one call at a time. Choose Try controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
+      },
+      secondary: [
+        {
+          target: {selector: '.presentbtn', within: 'page'},
+          note: 'PRESENT gives a room the full-page presentation.'
+        }
+      ]
+    },
+    {
+      id: 'controls',
+      personas: ['ux'],
+      target: {selector: '.step-transport', within: 'section'},
+      diagramState: {mode: 'step'},
+      copy: {
+        heading: 'Play the story',
+        body: '▶ plays the flow one step every 3 seconds; ‹ › move by hand.',
+        reducedMotionBody: 'Use the ‹ › buttons to walk through the story at your own pace. Choose Try controls to reach them with the keyboard. Automatic playback is off.'
+      },
+      secondary: [
+        {
+          target: {selector: '.presentbtn', within: 'page'},
+          note: 'PRESENT gives a room the full-page presentation.'
+        }
+      ]
+    },
+    {
+      id: 'branching-split',
+      /* the engine draws paths as a packed timeline when they share and
+         rejoin, or as a plain path matrix when they never rejoin — the
+         split is real on both, so the authored target names both */
+      target: {selector: '.path-timeline, .path-matrix', within: 'section'},
+      /* '@fork' is the entry condition AND the demo's start: the step only
+         shows when the first two paths share an opening, and walks from
+         the fork into the branch (disjoint paths warn and skip) */
+      diagramState: {mode: 'step', path: '@alt', step: '@fork'},
+      demo: {advance: 3, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'Flows can split',
+        body: 'Each row is one scenario — its label names the path. Watch the walk leave the shared steps and take a different branch. Choose any chip to jump.',
+        reducedMotionBody: 'Each row is one scenario — its label names the path. Use the ‹ › buttons to leave the shared steps and follow this branch, or choose a chip to jump.'
+      }
+    },
+    {
+      id: 'branching-rejoin',
+      target: {selector: '.path-timeline', within: 'section'},
+      diagramState: {mode: 'step', path: '@alt', step: '@rejoin'},
+      demo: {advance: 2, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'And they come back together',
+        body: 'These paths meet again at shared steps. Watch this branch return to the common sequence.',
+        reducedMotionBody: 'These paths meet again at shared steps. Use the ‹ › buttons to follow this branch back into the common sequence.'
+      }
+    },
+    {
+      id: 'links',
+      diagramState: {diagramVisible: true},
+      personas: ['eng', 'both'],
+      demo: {click: {selector: '.nrefs-trigger', within: 'section'}},
+      target: {selector: '.node-link-menu', within: 'section'},
+      secondary: [
+        {target: {selector: '.nrefs-trigger', within: 'section'}}
+      ],
+      copy: {
+        heading: 'Nodes link to the real system',
+        body: 'The tour just opened this node’s ⋯ menu — every node with links has one: its Backstage entry, API definition, and code references, where available. Every ↗ jumps to the source.'
+      }
+    },
+    {
+      id: 'drill',
+      diagramState: {diagramVisible: true},
+      personas: ['eng', 'both'],
+      demo: {click: {selector: '.detail-trigger', within: 'section'}},
+      target: {selector: '.doc-sec[data-dv-detail-preview] .board', within: 'page'},
+      secondary: [
+        {target: {selector: '.doc-sec[data-dv-detail-preview] .detail-breadcrumb', within: 'page'}}
+      ],
+      copy: {
+        heading: 'Zoom into a part of the system',
+        body: 'The tour just pressed \u229e on a node: that part of the system opens as its own flow, with its own steps and paths. The breadcrumb takes you back.'
+      }
+    },
+    {
+      id: 'panels',
+      personas: ['ux', 'both'],
+      target: {selector: '.pwidget[data-dv-panel]', within: 'section'},
+      diagramState: {mode: 'step'},
+      demo: {advance: 3, intervalMs: 1800},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'The panels tell the story',
+        body: 'The panels show what this moment means: a screen, a device state, or another part of the story. Watch for changes as the steps advance.',
+        reducedMotionBody: 'The panels show what this moment means: a screen, a device state, or another part of the story. Use the ‹ › buttons and look for changes between steps.'
+      }
+    },
+    {
+      id: 'explore-panels',
+      personas: ['eng', 'both'],
+      diagramState: {presentation: 'explore', mode: 'step'},
+      /* The menu is a fallback only when the reader has hidden every
+         panel. A plain selector union would pick it first in DOM order. */
+      target: {selector: '.explore-window:not([hidden]), .viewport-explore:not(:has(.explore-window:not([hidden]))) .explore-panel-menu', within: 'section'},
+      secondary: [
+        {target: {selector: '.explore-player', within: 'section'}, note: 'The step controls stay pinned while you inspect the graph.'}
+      ],
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'Make room to explore',
+        body: 'In Explore, panels float above the graph. Move one by its header, resize its corner, or hide it with ×. Try controls lets you use the header and resize handle with arrow keys. The next lesson shows how to bring hidden panels back.'
+      }
+    },
+    {
+      id: 'explore-recovery',
+      personas: ['eng', 'both'],
+      diagramState: {presentation: 'explore', mode: 'step'},
+      target: {selector: '.explore-panel-choices', within: 'section'},
+      secondary: [
+        {target: {selector: '.explore-stack', within: 'section'}, note: 'Stack at edge gathers available panels on the right.'}
+      ],
+      copy: {
+        heading: 'Bring a panel back',
+        body: 'Panels lists what this view can show. Tick an available panel to bring it back, or use Stack at edge to tidy up. Panels unavailable in this view or step are explained here. These changes affect your reading space; they do not edit the diagram.'
+      }
+    },
+    {
+      id: 'expand',
+      target: {selector: '[aria-label="Expand diagram view"], [aria-label="Exit expanded diagram view"]', within: 'section'},
+      copy: {
+        heading: 'Give this section more room',
+        body: 'Expand enlarges this section, using fullscreen when available. Your selected step stays put. Exit expanded view brings you back to the page.'
+      }
+    },
+    {
+      id: 'finish-ux',
+      personas: ['ux'],
+      kind: 'done',
+      copy: {
+        heading: 'Now try it',
+        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the ? button.',
+        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the ? button.'
+      }
+    },
+    {
+      id: 'finish-eng',
+      personas: ['eng', 'both'],
+      kind: 'done',
+      copy: {
+        heading: 'Now try it',
+        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.',
+        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.'
+      }
+    }
+  ]
+};
+/* ---- src/tour.flowview.js ---- */
+/* tour.flowview.js — first-run guided tour overlay for the standalone page.
+   Config-driven (core/tour-model.js owns the pure logic; docs/tour.md owns
+   the retargeting contract). Browser-only fragment, standalone bundle only.
+
+   Design (approved "presenter cinema" mockups): dark scrim with a bright
+   ring-lit hole over the real control, subtitle narration in a corner card,
+   a segment timeline top-center, Back/Next/Skip, keyboard hints. The hole is
+   deliberately click-through — the copy invites trying the spotlit control —
+   so the dialog is non-modal (role=dialog without aria-modal).
+
+   Safety posture: the tour is decoration around a working page. It never
+   auto-starts over a shared deep link, it suppresses fragment writes while
+   it drives the page and restores the pre-tour state afterwards, and any
+   internal error tears the overlay down (fail-open) rather than leaving a
+   scrim over the content. */
+
+function wireTour(ctl, view, win, config, options){
+  var doc = win.document;
+  if (doc.body.classList.contains('dv-embed')) return null;
+  if (!tourUsableConfig(config)) return null;
+  options = options || {};
+  var request = options.request !== undefined ? options.request :
+    tourHashRequest(win.location.hash);
+
+  function storageDone(){
+    try { if (win.localStorage && win.localStorage.getItem(TOUR_STORAGE_KEY) === 'done') return true; }
+    catch (ex) { /* storage denied: fall through to the cookie */ }
+    try { return tourDoneFromCookie(doc.cookie); }
+    catch (ex) { return false; }
+  }
+  function markDone(){
+    try { if (win.localStorage) win.localStorage.setItem(TOUR_STORAGE_KEY, 'done'); }
+    catch (ex) { /* storage denied */ }
+    try { doc.cookie = TOUR_COOKIE_NAME + '=1;path=/;max-age=31536000;samesite=lax'; }
+    catch (ex) { /* cookie denied: in-memory only, the tour re-offers next load */ }
+  }
+
+  /* ---- section + state resolution ---- */
+  function sectionFor(step){
+    var ds = step.diagramState;
+    if (ds && ds.section != null){
+      var key = String(ds.section);
+      for (var i = 0; i < ctl.sections.length; i++){
+        var sec = ctl.sections[i];
+        if (String(sec.reference) === key ||
+            (sec.aliases && sec.aliases.indexOf(key) >= 0)) return sec;
+      }
+      return null; /* named section missing: the step cannot resolve */
+    }
+    return ctl.steppers.length ? ctl.steppers[0] : (ctl.sections[0] || null);
+  }
+  function sharedSourceIndex(sp){
+    /* Last source step shared by the first two paths — the merge zone. */
+    var paths = sp.paths();
+    if (paths.length < 2) return -1;
+    var a = paths[0].indices, b = paths[1].indices, last = -1;
+    for (var i = 0; i < b.length; i++) if (a.indexOf(b[i]) >= 0) last = b[i];
+    return last;
+  }
+  function forkSourceIndex(sp){
+    /* The last step of the first two paths' COMMON PREFIX — where they
+       split. -1 when they share no opening step (disjoint paths, or a path
+       that merges in without ever forking): then there is no split. */
+    var paths = sp.paths();
+    if (paths.length < 2) return -1;
+    var a = paths[0].indices, b = paths[1].indices, last = -1, i = 0;
+    for (; i < Math.min(a.length, b.length) && a[i] === b[i]; i++) last = a[i];
+    /* a fork only if the walk stopped at a real difference — a path that is
+       a strict prefix of the other, or identical to it, never splits */
+    return (i < a.length && i < b.length) ? last : -1;
+  }
+  function rejoinSourceIndex(sp){
+    /* The alt path's FIRST own step whose successor is shared again — the
+       earliest place a branch flows back, leaving the longest shared tail
+       for the demo to walk. */
+    var paths = sp.paths();
+    if (paths.length < 2) return -1;
+    var a = paths[0].indices, b = paths[1].indices;
+    for (var i = 0; i < b.length - 1; i++)
+      if (a.indexOf(b[i]) < 0 && a.indexOf(b[i + 1]) >= 0) return b[i];
+    return -1;
+  }
+  function resolvePathId(sp, token){
+    var paths = sp.paths();
+    if (token === '@alt') return paths.length > 1 ? paths[1].id : null;
+    for (var i = 0; i < paths.length; i++) if (paths[i].id === token) return token;
+    return null;
+  }
+  function queryTarget(step, sec, target){
+    /* within:"section" is strict — a selector never leaks into other
+       sections or hidden tabs (majors: a page-wide fallback here matched
+       controls the step was not about) */
+    var root = (target && target.within === 'page') ? view :
+               (sec && sec.sectionEl ? sec.sectionEl : null);
+    if (!root || !target || typeof target.selector !== 'string') return null;
+    try { var matches=Array.prototype.slice.call(root.querySelectorAll(target.selector));
+      return matches.find(isRendered) || matches[0] || null; }
+    catch (ex) { return null; }
+  }
+  function isRendered(el){
+    try { return !!(el && el.getClientRects && el.getClientRects().length && win.getComputedStyle(el).visibility !== 'hidden'); }
+    catch (ex) { return false; }
+  }
+  function selectSectionTab(sec){
+    if (!sec || sec.tabBlock == null || sec.tab == null) return;
+    for (var i = 0; i < ctl.tabBlocks.length; i++)
+      if (ctl.tabBlocks[i].index === sec.tabBlock){
+        if (ctl.tabBlocks[i].active() !== sec.tab)
+          ctl.tabBlocks[i].select(sec.tab, false, false);
+        break;
+      }
+  }
+  function applyDiagramState(sec, ds){
+    if (!sec || !ds) return true;
+    var pres=sec.presentation, requested=ds.view;
+    if(requested == null && ds.presentation != null){
+      var choices=pres && pres.views ? pres.views() : [];
+      var match=choices.find(function(v){return v.presentation===ds.presentation;});
+      if(match)requested=match.id;
+      else if(ds.presentation!=='standard' || choices.length)return false;
+    }
+    /* Same order as the deep-link apply: view installs its visible-stop
+       filter before the path, the path before the step. */
+    if(requested != null && (!pres || !pres.setView || !pres.setView(requested)))return false;
+    if(ds.diagramVisible === true){
+      if(pres && pres.setDiagramVisible)pres.setDiagramVisible(true);
+      var board=sec.sectionEl.querySelector('.board');
+      for(var parent=board;parent && parent!==sec.sectionEl;parent=parent.parentElement){
+        if(parent.tagName==='DETAILS' && !parent.open){parent.open=true;openedDetails.push(parent);}
+      }
+    }
+    var sp = sec.stepper;
+    if (!sp) return ds.path == null && ds.step == null;
+    sp.pause();
+    var pathId = ds.path != null ? resolvePathId(sp, ds.path) : null;
+    if (pathId != null && sp.selectPath && sp.selectPath(pathId) === false)return false;
+    if (ds.mode === 'ambient'){ sp.enterAmbient(); return true; }
+    if (ds.mode === 'step' && sp.mode() !== 'step') sp.enterStep(false);
+    if (ds.step === '@shared' || ds.step === '@rejoin' || ds.step === '@fork'){
+      var src = ds.step === '@shared' ? sharedSourceIndex(sp) :
+        ds.step === '@fork' ? forkSourceIndex(sp) : rejoinSourceIndex(sp);
+      if (src >= 0) sp.jumpSource(src, pathId || undefined);
+      /* unresolved tokens are entry failures, judged before this runs */
+    } else if (ds.step != null){
+      var idx = sp.stepIndexOf(ds.step);
+      if (idx >= 0) sp.jump(idx);
+      else return false;
+    }
+    return true;
+  }
+
+  /* ---- pre-tour state snapshot: the page must come back exactly ---- */
+  var snapshot = null, openedDetails = [];
+  function sectionSnapshot(sec){
+    var sp=sec.stepper, board=sec.sectionEl.querySelector('.board'), cur=sp && sp.current();
+    var reader=sec.presentation && sec.presentation.snapshotReaderState ? sec.presentation : sec.viewport;
+    return {number:sec.number, mode:sp && sp.mode(), path:sp && sp.path(),
+      sourceIndex:sp && sp.sourceIndex(), reader:reader && reader.snapshotReaderState(),
+      size:sec.boardSize && sec.boardSize.mode(), scroll:board && {x:board.scrollLeft,y:board.scrollTop},
+      stepIndex:cur ? cur.n : 0, playing:!!(sp && sp.playing()),
+      view:sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null};
+  }
+  function restoreSection(sec,saved,resume){
+    var pres=sec.presentation, sp=sec.stepper;
+    if(pres && saved.view != null && pres.viewId()!==saved.view)pres.setView(saved.view);
+    if(sp){
+      sp.pause();
+      var cur=sp.current();
+      if(sp.path()!==saved.path || !cur || cur.n!==saved.stepIndex ||
+          (saved.mode==='step' && sp.mode()!=='step'))sp.jumpSource(saved.sourceIndex,saved.path);
+      if(saved.mode==='ambient' && sp.mode()!=='ambient')sp.enterAmbient();
+      if(resume && saved.playing && sp.mode()==='step')sp.toggleAuto();
+    }
+    if(sec.boardSize && saved.size)sec.boardSize.setMode(saved.size);
+    var reader=pres && pres.restoreReaderState ? pres : sec.viewport;
+    if(reader && saved.reader)reader.restoreReaderState(saved.reader);
+    var board=sec.sectionEl.querySelector('.board');
+    if(board && saved.scroll){board.scrollLeft=saved.scroll.x;board.scrollTop=saved.scroll.y;}
+  }
+  function takeSnapshot(){
+    /* an open drill-down: save it and return to the overview so the tour
+       walks the page from the top; it is restored exactly on finish */
+    var drill = ctl.details ? ctl.details.snapshot() : null;
+    snapshot = {
+      drill: drill,
+      activeTarget: ctl.activeTarget ? JSON.parse(JSON.stringify(ctl.activeTarget)) : null,
+      scrollX: win.scrollX || 0, scrollY: win.scrollY || 0,
+      tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
+      sections: ctl.sections.map(sectionSnapshot)
+    };
+    if (drill){ ctl.details.close(true); ctl.detailHistoryPush = false; }
+    ctl.steppers.forEach(function(sec){sec.stepper.pause();});
+    openedDetails = [];
+  }
+  function restoreSnapshot(){
+    if (!snapshot) return;
+    openedDetails.forEach(function(d){ if (d && d.isConnected) d.open = false; });
+    openedDetails = [];
+    snapshot.tabs.forEach(function(saved){
+      for (var i = 0; i < ctl.tabBlocks.length; i++)
+        if (ctl.tabBlocks[i].index === saved.index && ctl.tabBlocks[i].active() !== saved.tab)
+          ctl.tabBlocks[i].select(saved.tab, false, false);
+    });
+    var savedPage=snapshot;snapshot=null;
+    savedPage.sections.forEach(function(saved){
+      var sec=ctl.sections.find(function(s){return s.number===saved.number;});
+      if(!sec)return;
+      restoreSection(sec,saved,true);
+    });
+    var restoration;
+    if(ctl.details){
+      if(ctl.details.snapshot())ctl.details.close(true);
+      if(savedPage.drill)restoration=ctl.details.restore(savedPage.drill);
+    }
+    ctl.detailHistoryPush=false;
+    ctl.activeTarget=savedPage.activeTarget;
+    win.scrollTo(savedPage.scrollX,savedPage.scrollY);
+    return Promise.resolve(restoration).then(function(){
+      ctl.detailHistoryPush=false;
+      ctl.activeTarget=savedPage.activeTarget;
+      win.scrollTo(savedPage.scrollX,savedPage.scrollY);
+    });
+  }
+  var restoring=false;
+  function restoreReader(){
+    restoring=true;
+    var result;
+    try{result=restoreSnapshot();}catch(ex){snapshot=null;}
+    Promise.resolve(result).catch(function(){}).then(function(){
+      ctl.suppressFragmentWrites=false;restoring=false;
+    });
+  }
+
+  /* ---- overlay DOM ---- */
+  var overlay = null, parts = null, active = false, raf = 0, observer = null, settling = false, gen = 0;
+  var lastSection = null;
+  var persona = null, list = [], at = 0, restoreFocus = null, disabled = false;
+  var demoTimer = null, demoLeft = 0;
+
+  function el(tag, className, text){
+    var node = doc.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  function button(className, label, onClick){
+    var b = el('button', className, label);
+    b.type = 'button';
+    b.addEventListener('click', function(){ stopDemo(); guarded(onClick); });
+    return b;
+  }
+  /* fail-open: any tour error tears the overlay down and leaves the page
+     usable; the tour stays off for this load only (config authors see the
+     console warning; a fixed config works on the next load) */
+  function guarded(fn){
+    try { fn(); }
+    catch (ex){
+      if (win.console) console.warn('flowspec: tour error — ' + (ex && ex.message) + ' — tour dismissed');
+      teardown();
+    }
+  }
+  function teardown(){
+    disabled = true;
+    settling = false;
+    stopDemo();
+    closeDemoClick();
+    detach();
+    restoreReader();
+    active = false;
+    if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
+  }
+  function buildOverlay(){
+    overlay = el('div', 'dv-tour');
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-label', 'Guided tour');
+    /* The dim is an SVG mask: a white full rect with one black rounded rect
+       per hole. Overlapping holes stay black, so the un-dimmed region is
+       exactly the union of the rounded rects — no merging, no squared-off
+       strips. It never takes pointer events; click-blocking lives in a
+       separate layer of axis-aligned rects covering the complement. */
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var maskId = 'dv-tour-mask-' + Math.random().toString(36).slice(2, 8);
+    var dim = doc.createElementNS(SVG_NS, 'svg');
+    dim.setAttribute('class', 'dv-tour-dim');
+    dim.setAttribute('aria-hidden', 'true');
+    var defs = doc.createElementNS(SVG_NS, 'defs');
+    var mask = doc.createElementNS(SVG_NS, 'mask');
+    mask.setAttribute('id', maskId);
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    var maskBase = doc.createElementNS(SVG_NS, 'rect');
+    maskBase.setAttribute('fill', '#fff');
+    mask.appendChild(maskBase);
+    defs.appendChild(mask); dim.appendChild(defs);
+    /* glow: a blur filter on a rect with the SAME shape as the ring */
+    var glowId = 'dv-tour-glow-' + Math.random().toString(36).slice(2, 8);
+    var glow = doc.createElementNS(SVG_NS, 'filter');
+    glow.setAttribute('id', glowId);
+    glow.setAttribute('x', '-50%'); glow.setAttribute('y', '-50%');
+    glow.setAttribute('width', '200%'); glow.setAttribute('height', '200%');
+    var blur = doc.createElementNS(SVG_NS, 'feGaussianBlur');
+    blur.setAttribute('stdDeviation', '6');
+    glow.appendChild(blur); defs.appendChild(glow);
+    var dimRect = doc.createElementNS(SVG_NS, 'rect');
+    dimRect.setAttribute('class', 'dv-tour-dim-fill');
+    dimRect.setAttribute('mask', 'url(#' + maskId + ')');
+    dim.appendChild(dimRect);
+    /* rings are drawn in the SAME svg, from the SAME shape objects as the
+       mask holes (one geometry, one render path) */
+    var rings = doc.createElementNS(SVG_NS, 'g');
+    rings.setAttribute('class', 'dv-tour-rings');
+    dim.appendChild(rings);
+    overlay.appendChild(dim);
+    var scrim = el('div', 'dv-tour-scrim');
+    overlay.appendChild(scrim);
+    var extras = el('div', 'dv-tour-extras'); overlay.appendChild(extras);
+    /* a mouse way out that never waits for the card: fixed top-right from
+       the first frame, above the click blockers, never moved */
+    var exit = button('dv-tour-exit', 'Skip tour \u2715', function(){ finish(); });
+    exit.setAttribute('aria-label', 'Skip the tour');
+    overlay.appendChild(exit);
+    var timeline = el('div', 'dv-tour-timeline'); overlay.appendChild(timeline);
+    var ui = el('div', 'dv-tour-ui');
+    var eyebrow = el('div', 'dv-tour-eyebrow');
+    var heading = el('h2', 'dv-tour-heading');
+    var body = el('p', 'dv-tour-body');
+    var narration = el('div', 'dv-tour-narration');
+    narration.id = 'dv-tour-narration';
+    narration.setAttribute('aria-live', 'polite');
+    overlay.setAttribute('aria-describedby', 'dv-tour-narration');
+    narration.appendChild(eyebrow); narration.appendChild(heading); narration.appendChild(body);
+    var controls = el('div', 'dv-tour-controls');
+    var back = button('dv-tour-btn dv-tour-back', 'Back', function(){ go(at - 1); });
+    var next = button('dv-tour-btn dv-tour-next', 'Next', function(){ go(at + 1); });
+    var skip = button('dv-tour-skip', 'Skip tour', function(){ finish(); });
+    controls.appendChild(back); controls.appendChild(next); controls.appendChild(skip);
+    var practice=el('div','dv-tour-practice');
+    var replayExample=button('dv-tour-skip dv-tour-replay-example','Replay example',function(){go(at);});
+    var tryControls=button('dv-tour-skip dv-tour-try','Try the controls',function(){
+      var controls=spotControls();if(controls.length)controls[0].focus({preventScroll:true});
+    });
+    practice.appendChild(replayExample);practice.appendChild(tryControls);
+    ui.appendChild(narration);ui.appendChild(practice); ui.appendChild(controls);
+    overlay.appendChild(ui);
+    var chooser = el('div', 'dv-tour-card dv-tour-chooser'); chooser.hidden = true;
+    overlay.appendChild(chooser);
+    var hint = el('div', 'dv-tour-hint', '← → to move · Esc to skip');
+    overlay.appendChild(hint);
+    doc.body.appendChild(overlay);
+    parts = {scrim: scrim, dim: dim, mask: mask, maskBase: maskBase, dimRect: dimRect,
+             rings: rings, glowId: glowId, extras: extras, timeline: timeline,
+             ui: ui, eyebrow: eyebrow, heading: heading, body: body,
+             back: back, next: next, skip: skip, chooser: chooser, hint: hint, replayExample:replayExample, tryControls:tryControls};
+  }
+  /* One geometry, one render path. Every highlight is a single shape
+     object {x, y, width, height, rx}; that object writes the mask hole AND
+     (for ringed highlights) the ring rect — identical attributes, so hole
+     and ring cannot drift. The ring's 2px stroke is CENTERED on the hole
+     edge (1px inside, 1px outside); its glow is a blurred wider stroke on
+     a third rect with the same shape. The same list, in the same pass,
+     produces the click-blocker cells, so no layer lags another.
+       - visual: overlapping holes stay black in the mask, so the un-dimmed
+         region is exactly the union of the rounded rects;
+       - clicks: the complement of the union on the grid of distinct hole
+         edges (a cell blocks iff its centre lies in no hole). Rounded
+         corners resolve to the bounding rect for CLICKS only. */
+  var SVGNS_DIM = 'http://www.w3.org/2000/svg';
+  function shapeOf(h){
+    var rx = Math.min(h.r || 0, h.w / 2, h.h / 2);
+    return {x: h.x, y: h.y, width: h.w, height: h.h, rx: rx};
+  }
+  function setShape(node, s){
+    node.setAttribute('x', s.x); node.setAttribute('y', s.y);
+    node.setAttribute('width', s.width); node.setAttribute('height', s.height);
+    node.setAttribute('rx', s.rx); node.setAttribute('ry', s.rx);
+  }
+  function svgRect(cls){
+    var node = doc.createElementNS(SVGNS_DIM, 'rect');
+    if (cls) node.setAttribute('class', cls);
+    return node;
+  }
+  function render(highlights){
+    var vw = win.innerWidth, vh = win.innerHeight;
+    var visible = highlights.filter(function(h){ return h.w > 4 && h.h > 4; });
+    var base = parts.maskBase;
+    setShape(base, {x: 0, y: 0, width: vw, height: vh, rx: 0});
+    setShape(parts.dimRect, {x: 0, y: 0, width: vw, height: vh, rx: 0});
+    parts.dim.setAttribute('width', vw); parts.dim.setAttribute('height', vh);
+    parts.dim.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
+    while (parts.mask.lastChild && parts.mask.lastChild !== base) parts.mask.removeChild(parts.mask.lastChild);
+    parts.rings.replaceChildren();
+    parts.extras.replaceChildren();
+    /* a ringed hole touching a viewport edge is inset 1px (half the 2px
+       stroke) on THAT edge only, so the centered stroke stays fully on
+       screen. The inset is applied to the highlight itself, before the
+       shape is built, so hole, ring and blockers all keep one geometry;
+       the cost is at most a 1px strip of target at a screen edge. */
+    visible.forEach(function(h){
+      if (h.kind === 'reveal') return;
+      var x2 = Math.min(h.x + h.w, vw - 1), y2 = Math.min(h.y + h.h, vh - 1);
+      h.x = Math.max(h.x, 1); h.y = Math.max(h.y, 1);
+      h.w = x2 - h.x; h.h = y2 - h.y;
+    });
+    visible.forEach(function(h){
+      var s = shapeOf(h);
+      var hole = svgRect(null);
+      setShape(hole, s); hole.setAttribute('fill', '#000');
+      hole.setAttribute('data-kind', h.kind);
+      parts.mask.appendChild(hole);
+      if (h.kind === 'reveal') return;
+      if (h.kind === 'primary'){
+        var halo = svgRect('dv-tour-glow');
+        setShape(halo, s); halo.setAttribute('filter', 'url(#' + parts.glowId + ')');
+        parts.rings.appendChild(halo);
+      }
+      var ring = svgRect(h.kind === 'primary' ? 'dv-tour-ring' : 'dv-tour-ring2');
+      setShape(ring, s);
+      parts.rings.appendChild(ring);
+      if (h.note){
+        var note = el('div', 'dv-tour-note', h.note);
+        var noteX = Math.max(16, Math.min(s.x + s.width - 260, vw - 276));
+        note.style.cssText = 'left:' + noteX + 'px;top:' + (s.y + s.height + 10) + 'px';
+        parts.extras.appendChild(note);
+        var noteRect=note.getBoundingClientRect();
+        note.style.left=Math.max(16,Math.min(s.x+s.width-noteRect.width,vw-noteRect.width-16))+'px';
+        if(noteRect.bottom>vh-16)
+          note.style.top=Math.max(16,s.y-noteRect.height-10)+'px';
+      }
+    });
+    /* hit-blocking: complement of the union on the edge grid */
+    parts.scrim.replaceChildren();
+    var xs = [0, vw], ys = [0, vh];
+    visible.forEach(function(r){
+      xs.push(Math.max(0, Math.min(vw, r.x)), Math.max(0, Math.min(vw, r.x + r.w)));
+      ys.push(Math.max(0, Math.min(vh, r.y)), Math.max(0, Math.min(vh, r.y + r.h)));
+    });
+    function uniq(a){ return a.sort(function(p, q){ return p - q; }).filter(function(v, i, arr){ return i === 0 || v !== arr[i - 1]; }); }
+    xs = uniq(xs); ys = uniq(ys);
+    function covered(cx, cy){
+      return visible.some(function(r){ return cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.h; });
+    }
+    for (var yi = 0; yi < ys.length - 1; yi++){
+      var y0 = ys[yi], y1 = ys[yi + 1], runStart = null;
+      for (var xi = 0; xi <= xs.length - 1; xi++){
+        var blocked = xi < xs.length - 1 && !covered((xs[xi] + xs[xi + 1]) / 2, (y0 + y1) / 2);
+        if (blocked && runStart === null) runStart = xs[xi];
+        if (!blocked && runStart !== null){
+          var cell = el('div', 'dv-tour-block');
+          cell.style.cssText = 'left:' + runStart + 'px;top:' + y0 + 'px;width:' +
+            (xs[xi] - runStart) + 'px;height:' + (y1 - y0) + 'px';
+          parts.scrim.appendChild(cell);
+          runStart = null;
+        }
+      }
+    }
+  }
+  /* The narration card appears ONCE, in its final position: on every spot
+     step it stays hidden (visibility only — still measurable) from entry
+     until the step's final target is resolved and placed, then it is shown
+     together with the rings. A click step's card waits through the
+     cause-before-effect hold and appears beside the opened menu. */
+  var focusOnShow = false;
+  function holdCard(){ parts.ui.classList.add('dv-tour-ui-pending'); }
+  function showCard(){
+    if (!parts.ui.classList.contains('dv-tour-ui-pending')) return;
+    parts.ui.classList.remove('dv-tour-ui-pending');
+    if (focusOnShow && active) focusNext();
+  }
+  function fullScrim(){
+    render([]);
+    placeUi(null);
+  }
+  /* the narration card defaults to the bottom-left corner and yields to the
+     spotlight: first corner that does not overlap the hole wins */
+  /* Card placement, from the FINAL layout (rings and notes already drawn,
+     card still held): candidates in a fixed order — bottom-left,
+     bottom-right, top-left, top-right, bottom-centre, top-centre.
+       1. the first candidate that covers no ring and no note;
+       2. else the first candidate clear of the PRIMARY ring that covers the
+          fewest secondary rings/notes;
+       3. else (the primary spans every candidate) the candidate covering
+          the least primary area.
+     The rule that applied is written to data-placement (clear | partial |
+     covers-primary) so it can be asserted; it never moves once shown. */
+  function placeUi(primary){
+    if (parts.ui.classList.contains('dv-tour-ui-center')){
+      parts.ui.style.left = ''; parts.ui.style.top = '';
+      parts.ui.style.right = ''; parts.ui.style.bottom = '';
+      parts.ui.removeAttribute('data-placement');
+      return;
+    }
+    var m = 44, uw = parts.ui.offsetWidth || 360, uh = parts.ui.offsetHeight || 200;
+    var vw = win.innerWidth, vh = win.innerHeight;
+    var cx = Math.max(m, (vw - uw) / 2);
+    function spots(mg){
+      return [
+        {x: mg, y: vh - mg - uh}, {x: vw - mg - uw, y: vh - mg - uh},
+        {x: mg, y: mg + 40}, {x: vw - mg - uw, y: mg + 40},
+        {x: cx, y: vh - mg - uh}, {x: cx, y: mg + 40}
+      ];
+    }
+    /* the comfortable 44px margin first, then the same six spots at 16px
+       — a hair of extra room often clears a ring outright */
+    var candidates = spots(m).concat(spots(16));
+    function area(c, r){
+      var w = Math.min(c.x + uw, r.x + r.w) - Math.max(c.x, r.x);
+      var h = Math.min(c.y + uh, r.y + r.h) - Math.max(c.y, r.y);
+      return (w > 0 && h > 0) ? w * h : 0;
+    }
+    var others = [];
+    Array.prototype.forEach.call(parts.rings.querySelectorAll('.dv-tour-ring2'), function(n){
+      var b = n.getBoundingClientRect(); others.push({x: b.left, y: b.top, w: b.width, h: b.height});
+    });
+    Array.prototype.forEach.call(parts.extras.querySelectorAll('.dv-tour-note'), function(n){
+      var b = n.getBoundingClientRect(); others.push({x: b.left, y: b.top, w: b.width, h: b.height});
+    });
+    var pick = null, mode = 'clear';
+    if (!primary || primary.w <= 0){ pick = candidates[0]; }
+    for (var i = 0; !pick && i < candidates.length; i++){
+      var c = candidates[i];
+      if (!area(c, primary) && others.every(function(r){ return !area(c, r); })) pick = c;
+    }
+    if (!pick){
+      /* least total AREA over secondary rings/notes (not the count): a
+         3px graze beats covering a whole breadcrumb */
+      var best = null, bestArea = Infinity;
+      candidates.forEach(function(c){
+        if (area(c, primary)) return;
+        var covered = others.reduce(function(sum, r){ return sum + area(c, r); }, 0);
+        if (covered < bestArea){ best = c; bestArea = covered; }
+      });
+      if (best){ pick = best; mode = 'partial'; }
+    }
+    if (!pick){
+      var least = Infinity;
+      candidates.forEach(function(c){ var a = area(c, primary); if (a < least){ least = a; pick = c; } });
+      mode = 'covers-primary';
+    }
+    parts.ui.setAttribute('data-placement', mode);
+    parts.ui.style.left = pick.x + 'px';
+    parts.ui.style.top = pick.y + 'px';
+    parts.ui.style.right = 'auto';
+    parts.ui.style.bottom = 'auto';
+  }
+  function viewport(){ return {w: win.innerWidth, h: win.innerHeight}; }
+  function rectOf(node){
+    var r = node.getBoundingClientRect();
+    return {x: r.left, y: r.top, w: r.width, h: r.height};
+  }
+  function recenter(spot){
+    /* Explore is one viewport-sized workspace: keep its transport and panels
+       together when spotlighting any floating child. */
+    var workspace=spot.closest && spot.closest('.explore-stage');
+    var sr = (workspace || spot).getBoundingClientRect();
+    var vh = win.innerHeight;
+    if (sr.top < 80 || sr.bottom > vh - 80)
+      win.scrollTo(0, win.scrollY + sr.top - (vh - sr.height) / 2);
+  }
+  /* `secondary` accepts one callout or a list of them */
+  function secondariesOf(value){
+    if (value == null) return [];
+    return (Array.isArray(value) ? value : [value]).filter(function(item){
+      return !!item && typeof item === 'object' && item.target;
+    });
+  }
+  /* an advancing demo under reduced motion swaps its spotlight to the
+     transport so the visitor walks the story with the real controls; a
+     click demo is one discrete action and runs as authored */
+  function effectiveTargets(step){
+    if (step.demo && step.demo.advance != null && RM){
+      var swapped = (step.target && step.target.selector !== '.step-transport') ?
+        [{target: step.target, note: ''}] : [];
+      return {target: {selector: '.step-transport', within: 'section'},
+              secondaries: swapped.concat(secondariesOf(step.secondary))};
+    }
+    return {target: step.target, secondaries: secondariesOf(step.secondary)};
+  }
+  /* demo.click bookkeeping: the tour clicked a real control (the node-links
+     trigger) to put something on screen; leaving the step un-clicks it via
+     the engine's own toggle so nothing stays open behind the tour's back */
+  var clickedTrigger = null, pendingClick = null;
+  function closeDemoClick(){
+    pendingClick = null;
+    if (!clickedTrigger) return;
+    var trigger = clickedTrigger;
+    clickedTrigger = null;
+    try {
+      /* a drill-down trigger: return to the parent level through the
+         engine's own silent close (no history entry, no fragment write) */
+      if (trigger.getAttribute && trigger.hasAttribute('data-dv-detail')){
+        if (ctl.details && ctl.details.snapshot()) ctl.details.close(true);
+        ctl.detailHistoryPush = false;
+        return;
+      }
+      /* a menu trigger: un-click through its own toggle, only if it is the
+         one expanded */
+      if (trigger.isConnected && trigger.getAttribute && trigger.getAttribute('aria-expanded') === 'true')
+        trigger.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
+    } catch (ex) { /* nothing to close */ }
+  }
+  /* the click fires only after the settle loop has centered its control on
+     stable layout: the engine's menu places itself near the trigger and
+     dismisses itself on any later scroll, so the order is scroll → settle →
+     click → ring the menu, never click-then-scroll */
+  function firePendingClick(step, sec, eff){
+    if (!pendingClick || !active || list[at] !== step) return;
+    var el = pendingClick.el;
+    pendingClick = null;
+    /* the viewer may have clicked ⋯ themselves during the hold: clicking
+       again would toggle the menu shut. Leave it open; it is theirs. */
+    var drill = !!(el.hasAttribute && el.hasAttribute('data-dv-detail'));
+    if (drill && ctl.details && ctl.details.snapshot()){
+      /* the viewer opened the detail during the hold: keep it, but it is
+         still closed when the step is left */
+      clickedTrigger = el;
+      settling = false;
+      guarded(position);
+      showCard();
+      watch(queryTarget(step, sec, eff.target) || el);
+      return;
+    }
+    if (el.getAttribute && el.getAttribute('aria-expanded') === 'true'){
+      settling = false;
+      guarded(position);
+      showCard();
+      watch(queryTarget(step, sec, eff.target) || el);
+      return;
+    }
+    el.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
+    clickedTrigger = el;
+    if (drill){
+      /* a drill replaces the parent section with the detail: bring the new
+         flow to the top of the viewport (unlike a menu, which the engine
+         dismisses on scroll), let layout settle a frame, then place rings
+         and card once */
+      settling = true; /* nothing repaints mid-move (scroll events reschedule) */
+      render([]);
+      var host = doc.querySelector('.doc-sec[data-dv-detail-preview]');
+      if (host && host.scrollIntoView){
+        try { host.scrollIntoView({block: 'start', behavior: 'instant'}); } catch (ex) { host.scrollIntoView(); }
+        win.scrollBy(0, -16);
+      }
+      win.setTimeout(function(){ guarded(function(){
+        if (!active || list[at] !== step) return;
+        settling = false;
+        position();
+        showCard();
+        watch(queryTarget(step, sec, eff.target) || el);
+      }); }, 120);
+      return;
+    }
+    settling = false;
+    guarded(position);
+    showCard(); /* first and only appearance: already beside the menu */
+    watch(queryTarget(step, sec, eff.target) || el);
+  }
+  function position(){
+    if (!active) return;
+    if (settling) return; /* the move happens under the full dim; the new
+                             spotlight is revealed once the layout is stable */
+    var step = list[at];
+    if (!step || (step.kind || 'spot') !== 'spot'){ fullScrim(); return; }
+    var sec = sectionFor(step);
+    var eff = effectiveTargets(step);
+    var target = queryTarget(step, sec, eff.target);
+    if ((!target || !isRendered(target)) && step.demo && step.demo.click && pendingClick)
+      target = pendingClick.node; /* pre-click: ring the node the click will use */
+    if (!target || !isRendered(target)){ fullScrim(); return; }
+    var rect = rectOf(target);
+    /* the links step spotlights the whole node card, not the tiny trigger;
+       the menu itself is the viewer's click — the engine popover paints in
+       the browser top layer, above this overlay */
+    if (eff.target && eff.target.selector && eff.target.selector.indexOf('nrefs-trigger') >= 0){
+      var nodeEl = target.closest ? target.closest('.node[data-dv-node]') : null;
+      if (nodeEl && nodeEl.getBoundingClientRect) rect = rectOf(nodeEl);
+    }
+    var hole = tourCutoutRect(rect, step.offset, 8, viewport());
+    hole.r = 12; hole.kind = 'primary';
+    var holes = [hole];
+    /* every control the copy names is genuinely un-dimmed AND ringed */
+    eff.secondaries.forEach(function(item){
+      var second = queryTarget(step, sec, item.target);
+      if (!second || !isRendered(second)) return;
+      /* all or nothing: a secondary whose padded rect is not FULLY inside
+         the viewport gets no ring, no hole and no note — a clipped sliver
+         with a note floating beside it points at nothing */
+      var r2 = tourCutoutRect(rectOf(second), null, 6, null);
+      if (r2.x < 0 || r2.y < 0 || r2.x + r2.w > win.innerWidth || r2.y + r2.h > win.innerHeight) return;
+      r2.r = r2.h / 2; /* a pill: shapeOf clamps rx to half the height */
+      r2.kind = 'secondary'; r2.note = item.note || '';
+      holes.push(r2);
+    });
+    /* reveal-only cutouts: un-dimmed, no ring — a demo step shows the
+       diagram reacting, not just the ringed control */
+    (Array.isArray(step.reveal) ? step.reveal : []).forEach(function(item){
+      if (!item || typeof item !== 'object') return;
+      var shown = queryTarget(step, sec, item);
+      if (!shown || !isRendered(shown)) return;
+      var r3 = tourCutoutRect(rectOf(shown), null, 6, viewport());
+      r3.r = 12; r3.kind = 'reveal';
+      holes.push(r3);
+    });
+    render(holes);
+    parts.tryControls.hidden=!spotControls().length;
+    placeUi(hole); /* against every ring and note just drawn */
+    yieldCounter();
+  }
+  /* the step counter never sits on a ring: if it would, it steps aside for
+     this step (the card's eyebrow already carries "STEP n OF m") */
+  function yieldCounter(){
+    parts.timeline.classList.remove('dv-tour-timeline-yield');
+    if (parts.timeline.hidden) return;
+    var c = parts.timeline.getBoundingClientRect();
+    if (!c.width) return;
+    var clash = Array.prototype.some.call(parts.rings.querySelectorAll('.dv-tour-ring, .dv-tour-ring2'), function(n){
+      var r = n.getBoundingClientRect();
+      return c.left < r.right + 4 && r.left - 4 < c.right && c.top < r.bottom + 4 && r.top - 4 < c.bottom;
+    });
+    if (clash) parts.timeline.classList.add('dv-tour-timeline-yield');
+  }
+  function schedule(){
+    if (raf) return;
+    raf = win.requestAnimationFrame ? win.requestAnimationFrame(function(){ raf = 0; guarded(position); }) :
+          (guarded(position), 0);
+  }
+  function watch(target){
+    unwatch();
+    if (!active) return;
+    if (win.ResizeObserver && target){
+      observer = new win.ResizeObserver(schedule);
+      observer.observe(target);
+    }
+  }
+  function unwatch(){ if (observer){ observer.disconnect(); observer = null; } }
+
+  /* ---- playback demo (step.demo): the panels change while the ring holds ---- */
+  function stopDemo(){
+    if (demoTimer){ win.clearTimeout(demoTimer); demoTimer = null; }
+    demoLeft = 0;
+  }
+  function startDemo(step, sec){
+    stopDemo();
+    if (!step.demo || step.demo.advance == null || RM || !sec || !sec.stepper) return;
+    var advance = Math.max(1, Math.min(30, Number(step.demo.advance) || 3));
+    var interval = Math.max(400, Math.min(10000, Number(step.demo.intervalMs) || 1800));
+    /* the demo is a little story: play it from the selected path's first
+       stop (jump(0) — the current view's own step list) unless the step
+       AUTHORED a starting position via diagramState.step */
+    var sp = sec.stepper;
+    if (sp.mode() !== 'step') sp.enterStep(false);
+    if (!(step.diagramState && step.diagramState.step != null)) sp.jump(0);
+    schedule();
+    demoLeft = advance;
+    var tick = function(){
+      demoTimer = null;
+      if (!active || list[at] !== step || demoLeft <= 0) return;
+      if (sp.mode() !== 'step') sp.enterStep(false);
+      sp.advance(sp.current().n + 1);
+      demoLeft--;
+      schedule();
+      if (demoLeft > 0) demoTimer = win.setTimeout(tick, interval);
+    };
+    demoTimer = win.setTimeout(tick, interval);
+  }
+
+  /* ---- timeline + narration ---- */
+  function renderTimeline(){
+    var tl = tourTimeline(list, at);
+    parts.timeline.replaceChildren();
+    if (!tl.total || (list[at] && (list[at].kind || 'spot') === 'chooser')){
+      parts.timeline.hidden = true; return;
+    }
+    parts.timeline.hidden = false;
+    for (var i = 1; i <= tl.total; i++){
+      var seg = el('span', 'dv-tour-seg' + (i <= tl.current ? ' on' : ''));
+      parts.timeline.appendChild(seg);
+    }
+    parts.timeline.appendChild(el('span', 'dv-tour-count', tl.current + ' / ' + tl.total));
+  }
+  function chooserChoices(copy){
+    var raw = Array.isArray(copy.choices) ? copy.choices : [];
+    var safe = raw.filter(function(choice){
+      return !!choice && typeof choice === 'object' && !Array.isArray(choice);
+    });
+    return safe.length ? safe : [{persona: 'both', label: 'Show me around', sub: ''}];
+  }
+  function renderChooser(step){
+    parts.chooser.hidden = false;
+    parts.ui.hidden = true;
+    parts.chooser.replaceChildren();
+    var copy = (step.copy && typeof step.copy === 'object') ? step.copy : {};
+    if (copy.eyebrow) parts.chooser.appendChild(el('div', 'dv-tour-eyebrow', String(copy.eyebrow)));
+    parts.chooser.appendChild(el('h2', 'dv-tour-heading', String(copy.heading || 'Take the tour?')));
+    if (copy.body) parts.chooser.appendChild(el('p', 'dv-tour-body', String(copy.body)));
+    var row = el('div', 'dv-tour-choices');
+    chooserChoices(copy).forEach(function(choice){
+      var b = button('dv-tour-choice', '', function(){ choose(choice.persona); });
+      b.appendChild(el('span', 'dv-tour-choice-label', String(choice.label || choice.persona || 'Continue')));
+      if (choice.sub) b.appendChild(el('span', 'dv-tour-choice-sub', String(choice.sub)));
+      row.appendChild(b);
+    });
+    parts.chooser.appendChild(row);
+    var foot = el('div', 'dv-tour-choice-foot');
+    if (copy.note) foot.appendChild(el('span', 'dv-tour-choice-note', String(copy.note)));
+    foot.appendChild(button('dv-tour-skip', 'Skip', function(){ finish(); }));
+    parts.chooser.appendChild(foot);
+    var first = row.querySelector('button');
+    if (first) first.focus();
+  }
+  function renderStep(step, keepFocus){
+    parts.chooser.hidden = true;
+    parts.ui.hidden = false;
+    var copy = (step.copy && typeof step.copy === 'object') ? step.copy : {};
+    var tl = tourTimeline(list, at);
+    parts.eyebrow.textContent = copy.eyebrow != null ? String(copy.eyebrow) :
+      ('TOUR · STEP ' + tl.current + ' OF ' + tl.total);
+    parts.heading.textContent = String(copy.heading || '');
+    parts.body.textContent = String(RM && copy.reducedMotionBody != null ? copy.reducedMotionBody : copy.body || '') +
+      /* under reduced motion the engine disables ▶ too — the arrows remain */
+      (step.demo && step.demo.advance != null && RM && copy.reducedMotionBody == null ?
+        ' Auto-play is off — use the ‹ › step arrows to walk the story yourself.' : '');
+    parts.replayExample.hidden=RM || !step.demo || step.demo.advance == null;
+    parts.tryControls.hidden=(step.kind || 'spot') !== 'spot';
+    parts.back.disabled = at === 0;
+    parts.next.textContent = at >= list.length - 1 ? 'Done' : 'Next';
+    /* a held card cannot take focus yet (visibility:hidden): focus Next when
+       the card is shown instead */
+    focusOnShow = !keepFocus;
+    if (focusOnShow && !parts.ui.classList.contains('dv-tour-ui-pending')) focusNext();
+  }
+  function focusNext(){
+    focusOnShow = false;
+    try { parts.next.focus({preventScroll: true}); }
+    catch (ex) { parts.next.focus(); }
+  }
+
+  /* The portable tour teaches only features this page can demonstrate. Probe
+     real section/view states before showing its counter; never click a link or
+     fetch a drill-down while planning. Page-authored tours remain exact. */
+  var plannedConfig=config;
+  function disclose(node){
+    for(var anc=node;anc && anc!==doc.body;anc=anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
+      if(anc.tagName==='DETAILS' && !anc.open){anc.open=true;openedDetails.push(anc);}
+  }
+  function stateTokenMiss(sec,ds){
+    var sp=sec && sec.stepper;
+    if(ds.path != null && (!sp || resolvePathId(sp,ds.path)==null))return 'path "'+ds.path+'"';
+    var tokens={'@shared':sharedSourceIndex,'@rejoin':rejoinSourceIndex,'@fork':forkSourceIndex};
+    if(Object.prototype.hasOwnProperty.call(tokens,ds.step) && (!sp || tokens[ds.step](sp)<0))return 'step "'+ds.step+'"';
+    return null;
+  }
+  function stageAdvance(step,sec){
+    if(step.demo && step.demo.advance!=null && sec && sec.stepper &&
+       !(step.diagramState && step.diagramState.step!=null)){
+      if(sec.stepper.mode()!=='step')sec.stepper.enterStep(false);
+      sec.stepper.jump(0);
+    }
+  }
+  function branchIsVisible(sec,ds){
+    if(ds.step!=='@fork' && ds.step!=='@rejoin')return true;
+    var paths=sec.stepper.paths(), a=paths[0].indices,b=paths[1].indices;
+    var start=ds.step==='@fork'?forkSourceIndex(sec.stepper):rejoinSourceIndex(sec.stepper);
+    var needed=[start,b[b.indexOf(start)+1]];
+    if(ds.step==='@fork')needed.push(a[a.indexOf(start)+1]);
+    var chips=Array.prototype.slice.call(sec.sectionEl.querySelectorAll('.schip[data-step-source]'));
+    return needed.every(function(index){return chips.some(function(chip){
+      return Number(chip.getAttribute('data-step-source'))===index && isRendered(chip);
+    });});
+  }
+  function planDefaultTour(){
+    var preferred=null;
+    var steps=config.steps.map(function(step){
+      if((step.kind || 'spot')!=='spot')return step;
+      var candidates=(preferred?[preferred.sec]:[]).concat(ctl.steppers,ctl.sections)
+        .filter(function(sec,i,all){return sec.hasDiagram && all.indexOf(sec)===i;});
+      for(var i=0;i<candidates.length;i++){
+        var sec=candidates[i], pres=sec.presentation, saved=sectionSnapshot(sec);
+        var ds=step.diagramState || {};
+        if(stateTokenMiss(sec,ds))continue;
+        var choices=[saved.view];
+        if(preferred && preferred.sec===sec)choices.unshift(preferred.view);
+        if(pres && pres.views)choices=choices.concat(pres.views().map(function(v){return v.id;}));
+        choices=choices.filter(function(id,j,all){return all.indexOf(id)===j;});
+        if(ds.presentation!=null)choices=pres && pres.views ? pres.views().filter(function(v){return v.presentation===ds.presentation;}).map(function(v){return v.id;}) : [];
+        for(var j=0;j<choices.length;j++){
+          var state=Object.assign({},ds,{section:sec.reference});
+          if(choices[j]!=null)state.view=choices[j];
+          var tabs=ctl.tabBlocks.map(function(tb){return tb.active();});
+          var targetState=ctl.activeTarget, detailsAt=openedDetails.length;
+          var scroll={x:win.scrollX,y:win.scrollY}, valid=false;
+          try{
+            selectSectionTab(sec);
+            if(applyDiagramState(sec,state)){
+              stageAdvance(step,sec);
+              var target=queryTarget(step,sec,step.demo && step.demo.click || step.target);
+              disclose(target);
+              valid=isRendered(target) && branchIsVisible(sec,ds);
+              // A story panel may first appear partway through the flow. Start
+              // this lesson at an actual visible stop instead of dropping it.
+              if(!valid && target && step.id==='panels' && sec.stepper){
+                var ids=sec.stepper.ids();
+                for(var k=0;k<ids.length && !valid;k++){
+                  sec.stepper.jump(k);
+                  target=queryTarget(step,sec,step.target);disclose(target);
+                  valid=isRendered(target);
+                  if(valid)state.step=sec.stepper.current().id || sec.stepper.current().n+1;
+                }
+              }
+              // Pin the path as well as the section/view. Later lessons must not
+              // depend on the path a reader happened to choose during practice.
+              if(valid && sec.stepper && (ds.path!=null || step.demo && step.demo.advance!=null))state.path=sec.stepper.path();
+            }
+          }finally{
+            openedDetails.splice(detailsAt).forEach(function(d){if(d.isConnected)d.open=false;});
+            restoreSection(sec,saved,false);
+            ctl.tabBlocks.forEach(function(tb,k){if(tb.active()!==tabs[k])tb.select(tabs[k],false,false);});
+            ctl.activeTarget=targetState;win.scrollTo(scroll.x,scroll.y);
+          }
+          if(valid){
+            preferred={sec:sec,view:choices[j]};
+            return Object.assign({},step,{diagramState:state});
+          }
+        }
+      }
+      return null;
+    }).filter(Boolean);
+    plannedConfig=Object.assign({},config,{steps:steps});
+  }
+
+  /* ---- state machine ---- */
+  /* Custom lists preserve authored numbering; the built-in list has already
+     been planned against available controls. Each target is resolved at entry,
+     where applying the step's own tab and diagram state has already revealed it; a miss is an
+     authoring bug, surfaced as a console warning and passed through. */
+  function buildList(){
+    var steps = tourStepsForPersona(plannedConfig, persona || 'both');
+    /* one chooser, always first; extras are dropped (lint warns) */
+    var choosers = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; });
+    return choosers.slice(0, 1).concat(steps.filter(function(step){
+      return (step.kind || 'spot') !== 'chooser';
+    }));
+  }
+  function choose(which){
+    persona = TOUR_PERSONAS.indexOf(which) >= 0 ? which : 'both';
+    list = buildList();
+    var next = 0;
+    while (next < list.length && (list[next].kind || 'spot') === 'chooser') next++;
+    go(next);
+  }
+  function go(index){
+    stopDemo();
+    closeDemoClick();
+    var myGen = ++gen; /* a newer entry invalidates every pending timer */
+    var dir = index >= at ? 1 : -1;
+    var from = at;
+    var step = null, sec = null, eff = null, target = null;
+    /* Entry-time resolution: entering a step applies its authored tab and
+       diagram state, which is what reveals its control (an ambient-hidden
+       transport, a panel in another tab). A control still missing or
+       unrendered then is an authoring bug: warn and pass through in the
+       walking direction — the timeline keeps the authored numbering. */
+    for (;;){
+      if (index >= list.length){ finish(true); return; }
+      if (index < 0){ index = from; dir = 1; } /* nothing enterable behind: stay */
+      step = list[index];
+      if ((step.kind || 'spot') !== 'spot') break;
+      sec = sectionFor(step);
+      if (step.diagramState && step.diagramState.section != null && !sec){
+        if (win.console) console.warn('flowspec: tour step "' + step.id +
+          '" target not found — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      selectSectionTab(sec);
+      if(!applyDiagramState(sec, step.diagramState)){
+        if(win.console)console.warn('flowspec: tour step "'+step.id+'" diagramState '+JSON.stringify(step.diagramState)+' did not resolve — check the tour config for this diagram');
+        index+=dir;continue;
+      }
+      /* an unresolved path/step token is an entry failure exactly like a
+         missing target: the step's authored state cannot exist on this
+         page, so it must never show over the wrong one (a non-rejoining
+         path under rejoin copy) */
+      var dsCheck = step.diagramState || {};
+      var tokenMiss=stateTokenMiss(sec,dsCheck);
+      if(tokenMiss){
+        if (win.console) console.warn('flowspec: tour step "' + step.id + '" diagramState ' +
+          tokenMiss +
+          ' did not resolve — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      stageAdvance(step,sec);
+      /* a click step's validity rests on its click control (which must have
+         a target to spotlight afterwards): the click is what puts the menu
+         on screen, and it fires only after the settle loop steadies layout */
+      pendingClick = null;
+      if (step.demo && step.demo.click){
+        var clickEl = (step.target && typeof step.target.selector === 'string') ?
+          queryTarget(step, sec, step.demo.click) : null;
+        disclose(clickEl);
+        if (!clickEl || !isRendered(clickEl)){
+          if (win.console) console.warn('flowspec: tour step "' + step.id +
+            '" target not found — check the tour config for this diagram');
+          index += dir; continue;
+        }
+        pendingClick = {el: clickEl,
+          node: (clickEl.closest && clickEl.closest('.node[data-dv-node]')) || clickEl};
+      }
+      /* validity is judged on the AUTHORED target — presentation swaps
+         (the reduced-motion transport fallback) never rescue a step whose
+         subject is missing from this page */
+      var authored = pendingClick ? pendingClick.node : queryTarget(step, sec, step.target);
+      disclose(authored);
+      if (!authored || !isRendered(authored)){
+        closeDemoClick(); /* a click that opened something must not outlive its step */
+        if (win.console) console.warn('flowspec: tour step "' + step.id +
+          '" target not found — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      lastSection = sec;
+      eff = effectiveTargets(step);
+      /* a click step's menu does not exist yet — spotlight its node until
+         the settled click opens it */
+      target = queryTarget(step, sec, eff.target) || authored;
+      break;
+    }
+    at = index;
+    unwatch();
+    settling = false;
+    showCard(); /* chooser/done cards are static; spot steps re-hold below */
+    parts.hint.hidden = (step.kind || 'spot') === 'chooser'; /* arrows do nothing there */
+    if ((step.kind || 'spot') === 'chooser'){
+      parts.ui.classList.remove('dv-tour-ui-center');
+      fullScrim(); renderTimeline(); renderChooser(step); return;
+    }
+    if ((step.kind || 'spot') === 'done'){
+      parts.ui.classList.add('dv-tour-ui-center');
+      fullScrim(); renderTimeline(); renderStep(step);
+      return;
+    }
+    parts.ui.classList.remove('dv-tour-ui-center');
+    var clickStep = !!(step.demo && step.demo.click);
+    /* one movement per step change: full dim first, move under it, reveal */
+    settling = true;
+    holdCard();
+    render([]);
+    if (target){
+      /* scrollIntoView first (it also centers inside the board's own
+         horizontal scroller), then correct the window explicitly — on SVG
+         children scrollIntoView may move only the inner scroller */
+      var spot = clickStep && pendingClick ? pendingClick.node :
+        (eff.target && eff.target.selector && eff.target.selector.indexOf('nrefs-trigger') >= 0 && target.closest ?
+          (target.closest('.node[data-dv-node]') || target) : target);
+      if (spot.scrollIntoView){
+        try { spot.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}); }
+        catch (ex) { spot.scrollIntoView(); }
+      }
+      recenter(spot);
+      /* engine step-change scrolling and freshly disclosed boards settle
+         asynchronously: keep correcting under the full dim until the target
+         rect is stable, then reveal the new spotlight in ONE movement */
+      var settleTries = 8, lastTop = null;
+      (function settle(){
+        if (!active || gen !== myGen) return;
+        recenter(spot);
+        if(sec && sec.presentation && sec.presentation.refreshViewport)sec.presentation.refreshViewport();
+        else if(sec && sec.viewport)sec.viewport.refresh();
+        var top = Math.round(spot.getBoundingClientRect().top);
+        var inView = top >= 0 && top <= win.innerHeight;
+        if ((inView && top === lastTop) || --settleTries <= 0){
+          settling = false;
+          if (inView && clickStep){
+            /* cause before effect: reveal the ringed trigger, hold a beat,
+               then let the viewer watch the click land — the card waits and
+               appears once, beside the opened menu */
+            guarded(position);
+            win.setTimeout(function(){ guarded(function(){
+              if (gen === myGen) firePendingClick(step, sec, eff);
+            }); }, 600);
+          }
+          else {
+            guarded(position);
+            showCard();
+            watch(target);
+            if (inView) startDemo(step, sec);
+          }
+          return;
+        }
+        lastTop = top;
+        win.setTimeout(function(){ guarded(settle); }, 80);
+      })();
+    } else { settling = false; showCard(); }
+    /* the engine closes its menu when focus leaves it: a click step leaves
+       focus where the engine put it (the menu's first link) */
+    renderTimeline(); renderStep(step, clickStep);
+    /* watch + position happen at reveal (settle completion); resize/scroll
+       reschedules stay armed for the revealed state */
+    schedule();
+  }
+  function focusable(node){
+    return isRendered(node) && !node.disabled && node.tabIndex>=0;
+  }
+  function spotControls(){
+    var step=list[at];if(!step || (step.kind || 'spot')!=='spot')return [];
+    var sec=sectionFor(step),eff=effectiveTargets(step),found=[];
+    [eff.target].concat(eff.secondaries.map(function(s){return s.target;})).forEach(function(target){
+      var root=queryTarget(step,sec,target);if(!root || !isRendered(root))return;
+      var nodes=[root].concat(Array.prototype.slice.call(root.querySelectorAll('button,a[href],input,select,textarea,summary,[tabindex]')));
+      nodes.forEach(function(node){if(focusable(node) && found.indexOf(node)<0)found.push(node);});
+    });
+    return found;
+  }
+  function keydown(ev){
+    if (!active) return;
+    if (ev.key === 'Escape'){
+      if (doc.querySelector('.node-link-menu:not([hidden])')) return;
+      stopDemo(); guarded(finish);
+      ev.preventDefault(); ev.stopImmediatePropagation(); return;
+    }
+    if (ev.key === 'Tab'){
+      var controls=Array.prototype.filter.call(overlay.querySelectorAll('button'),focusable).concat(spotControls());
+      if(controls.length){
+        var index=controls.indexOf(doc.activeElement);
+        var next=index<0?(ev.shiftKey?controls.length-1:0):(index+(ev.shiftKey?-1:1)+controls.length)%controls.length;
+        controls[next].focus({preventScroll:true});ev.preventDefault();ev.stopImmediatePropagation();
+      }
+      return;
+    }
+    /* Arrows on a spotlighted control belong to that control (panel drag,
+       resize, native inputs). Navigation shortcuts belong to the tour card. */
+    if(!overlay.contains(ev.target)){stopDemo();schedule();return;}
+    if (!parts.chooser.hidden) return; /* chooser: only Escape shortcuts apply */
+    if (ev.key === 'ArrowRight'){
+      stopDemo(); guarded(function(){ go(at + 1); });
+      /* the presenter's own arrow handler must never also advance the
+         diagram while the tour owns the keys */
+      ev.preventDefault(); ev.stopImmediatePropagation();
+    } else if (ev.key === 'ArrowLeft'){
+      stopDemo(); guarded(function(){ go(at - 1); });
+      ev.preventDefault(); ev.stopImmediatePropagation();
+    }
+  }
+  /* While the tour's ⋯ menu is open, focus moving onto the tour's own
+     controls (Tab, a click on the card) must not close it: the engine
+     closes its menu on any focusin outside it. A window-level capture
+     listener runs before the engine's document-level one and stops those
+     events — only for targets inside the overlay, only while the menu the
+     tour opened is still open. */
+  function guardFocus(ev){
+    if (clickedTrigger && clickedTrigger.getAttribute &&
+        clickedTrigger.getAttribute('aria-expanded') === 'true' &&
+        overlay && (overlay.contains(ev.target) || spotControls().indexOf(ev.target)>=0)) ev.stopImmediatePropagation();
+  }
+  function pagePointer(ev){
+    /* touching the page through the hole (the spotlit control) takes over
+       from a running demo, just like touching the tour's own controls */
+    if (demoTimer && overlay && !overlay.contains(ev.target)) stopDemo();
+  }
+  function pageMove(ev){if(overlay && !overlay.contains(ev.target))schedule();}
+  function fullscreenChanged(){
+    if(overlay){
+      var host=doc.fullscreenElement || doc.body;
+      if(overlay.parentNode!==host)host.appendChild(overlay);
+    }
+    schedule();
+  }
+  function attach(){
+    doc.addEventListener('keydown', keydown, true);
+    doc.addEventListener('pointerdown', pagePointer, true);
+    doc.addEventListener('pointermove', pageMove, true);
+    doc.addEventListener('click',schedule);
+    win.addEventListener('focusin', guardFocus, true);
+    win.addEventListener('resize', schedule);
+    doc.addEventListener('scroll', schedule, true);
+    doc.addEventListener('fullscreenchange', fullscreenChanged);
+  }
+  function detach(){
+    unwatch();
+    doc.removeEventListener('keydown', keydown, true);
+    doc.removeEventListener('pointerdown', pagePointer, true);
+    doc.removeEventListener('pointermove', pageMove, true);
+    doc.removeEventListener('click',schedule);
+    win.removeEventListener('focusin', guardFocus, true);
+    win.removeEventListener('resize', schedule);
+    doc.removeEventListener('scroll', schedule, true);
+    doc.removeEventListener('fullscreenchange', fullscreenChanged);
+  }
+  function start(){
+    if (active || disabled || restoring) return;
+    restoreFocus = doc.activeElement;
+    if (!overlay) buildOverlay();
+    overlay.hidden = false;
+    active = true;
+    persona = null;
+    fullScrim(); /* the overlay opens on a fully dimmed page */
+    ctl.suppressFragmentWrites = true;
+    takeSnapshot();
+    if(config===TOUR_DEFAULT_CONFIG)planDefaultTour();
+    fullscreenChanged();
+    list = buildList();
+    at = 0;
+    if (!list.length){ finish(); return; }
+    if ((list[0].kind || 'spot') !== 'chooser'){ persona = 'both'; list = buildList(); }
+    attach();
+    go(0);
+  }
+  function finish(done){
+    if (!active) return;
+    active = false;
+    settling = false;
+    stopDemo();
+    closeDemoClick();
+    markDone();
+    detach();
+    restoreReader();
+    if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
+    /* Done hands over control: the recap invites pressing ▶, so focus the
+       transport of the section the tour ran in (a step arrow under reduced
+       motion, where the engine disables ▶). Skip/Esc return the reader to
+       where they were. */
+    var home = done && lastSection && lastSection.sectionEl ? lastSection.sectionEl : null;
+    var handoff = home ? (home.querySelector('.playback-button:not([disabled])') ||
+      home.querySelector('.step-transport button:not([disabled])')) : null;
+    if (handoff && handoff.getClientRects().length){
+      try { handoff.focus({preventScroll: true}); } catch (ex) { handoff.focus(); }
+    }
+    else if (restoreFocus && restoreFocus.isConnected && restoreFocus.focus) restoreFocus.focus();
+    else if (replay && replay.isConnected) replay.focus();
+  }
+
+  /* ---- replay affordance + autostart ---- */
+  var replay = doc.createElement('button');
+  replay.type = 'button';
+  replay.className = 'tbtn dv-tour-replay';
+  replay.textContent = '?';
+  replay.setAttribute('aria-label', 'Replay the tour');
+  replay.addEventListener('click', function(){ disabled = false; guarded(start); });
+  var present = view.querySelector('.presentbtn');
+  if (present && present.parentNode === view) view.insertBefore(replay, present.nextSibling);
+  else view.insertBefore(replay, view.firstChild);
+
+  win.dvStartTour = function(){ disabled = false; guarded(start); return true; };
+
+  if (request === 'force') guarded(start);
+  else if (request !== 'suppress' && !options.deepLink && !storageDone()) guarded(start);
+
+  return {start: function(){ guarded(start); }, active: function(){ return active; }};
+}
 /* ---- src/boot.flowview.js ---- */
 /* boot.flowview.js — boots the standalone render target. The embedded JSON
    block is the primary source; when that block still holds the built-in demo
@@ -28700,6 +31045,20 @@ function fail(msgs){
    passes them as the preserved prefix, so the request must be read
    before that first rewrite */
 var embedRequest = embedRequestFromHash(window.location.hash);
+/* same trap as embed: the deep-link channel canonicalizes the hash during
+   wiring and drops unknown keys, so #tour=1/0 must be read before boot.
+   A hash that already targets something (a diagram, step, tab, card) means
+   the reader followed a shared link — the tour must not auto-start over it. */
+var tourRequest = (typeof tourHashRequest === 'function') ?
+  tourHashRequest(window.location.hash) : null;
+var tourDeferredByLink = (function(){
+  try {
+    /* parseHash only copies keys it understands, so any non-null field IS a
+       deep-link target — no hand-maintained key list to drift */
+    var st = parseHash(window.location.hash);
+    return !!st && Object.keys(st).some(function(key){ return st[key] != null; });
+  } catch (ex) { return false; }
+})();
 
 /* the embed flag is applied at load; a hash-only navigation (typing or
    pasting a fragment into an open page) never re-runs boot, so entering
@@ -28732,6 +31091,8 @@ function applyEmbedMode(ctl){
 
 function boot(raw){
   var page = normalize(raw);
+  if (raw && raw.tour && page && !page.tour && window.console)
+    console.warn('flowspec: top-level "tour" is ignored — the tour config belongs inside "page" (page.tour)');
   var v = validate(page);
   var lint = v.errors.length ? [] : lintPage(page);
   v.warnings.concat(lint).forEach(function(w){ if (window.console) console.warn('flowspec: ' + w); });
@@ -28764,6 +31125,15 @@ function boot(raw){
     pendingLinkBase = null;
   }
   wirePresenter(ctl, view, window);
+  /* First-run guided tour: a page's own page.tour replaces the built-in
+     default wholesale; an unusable override falls back to the default so a
+     typo never costs the tour. wireTour itself refuses embeds and #tour=0. */
+  if (typeof wireTour === 'function' && !embedRequest){
+    var tourConfig = tourUsableConfig(page.tour) ? page.tour :
+      (typeof TOUR_DEFAULT_CONFIG !== 'undefined' ? TOUR_DEFAULT_CONFIG : null);
+    wireTour(ctl, view, window, tourConfig,
+             {request: tourRequest, deepLink: tourDeferredByLink});
+  }
 }
 
 var raw = null, parseErr = null;

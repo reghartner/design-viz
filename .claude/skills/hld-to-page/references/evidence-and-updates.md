@@ -1,7 +1,7 @@
 # Coverage and source changes
 
 Keep the ledger beside the spec, using `<name>.ledger.md` for
-`<name>.spec.json` (or `<name>.json`). The storyboard may live in this same file.
+`<name>.spec.json` (or `<name>.json`). The storyboard worksheet lives in this same file.
 Source facts and operator amendments remain distinguishable from presentation
 choices. Paths in this file are relative to VIZ.
 
@@ -19,8 +19,12 @@ message, or flow). Every row ends in exactly one state:
 omission is the failure mode the ledger exists to kill.
 
 The ledger is a deliverable with the page's lifetime — a later update agent
-starts from it. Preserve the coverage/amendment tables below; add the storyboard,
-branch table, and checkable expectations after them:
+starts from it. Preserve the coverage/amendment tables below; add the filled
+[storyboard worksheet](storyboard-worksheet.md) and the self-audit after them.
+Illustrative values (clock times, dates, freshness ages, battery drift) get a
+`number` row whose fact says `illustrative`. Operator questions with no answer
+get an amendment row whose answer reads `no answer; assumed: <default>`.
+Ledger layout:
 
 ```markdown
 # Coverage ledger — <page title>
@@ -36,7 +40,16 @@ source: <source URL, path, or conversation label> | version: <vN or n/a> | updat
 | # | question | operator answer | date | applied at | status |
 |---|----------|-----------------|------|------------|--------|
 | A1 | transport for X→Y? | SQS | 09-08-2026 | blocks[0].diagram.edges[2] | active |
+
+## Decisions I made
+| # | decision | evidence or reason | applied at |
+|---|----------|--------------------|------------|
+| D1 | left `code-audit-log` unbound | not in supplied catalog | blocks[0].diagram.nodes.audit |
 ```
+
+"Decisions I made" lists the technical choices the author made without asking
+the operator (always at story and mixed level): catalog and code handling,
+unshown reports, protocols, delivery settings. An engineer reviews them here.
 
 Rules that keep it parseable and durable: `class` is one of flow / contract
 / failure / service / number / permalink / amendment. `HLD anchor` is a

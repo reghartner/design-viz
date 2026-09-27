@@ -18,7 +18,13 @@ function welcomeRepository(raw, revision){
     skill:repository + '/blob/' + encodeURIComponent(revision) + '/.claude/skills/hld-to-page/SKILL.md'};
 }
 
-function welcomeAgentPrompt(kind, brief, audience, repository){
+var WELCOME_TECHNICAL_LEVELS = {
+  business:'Technical level: story. Tell it in plain language: people, places, devices, app screens and outcomes, with the backend as a few plainly named boxes. Do not ask me technical questions; decide those from the evidence and list them in the ledger under “Decisions I made”.',
+  mixed:'Technical level: mixed. Tell the story and name the main services, with plain captions. Ask me technical questions only if the answer changes what the audience sees. Use the Backstage catalog and code you can find, and list gaps and your other technical decisions in the ledger under “Decisions I made”.',
+  engineering:'Technical level: engineering. Show every service hop, API, failure mode and code reference. If you need my Backstage catalog or code and I have not provided them, ask where they are.'
+};
+
+function welcomeAgentPrompt(kind, brief, audience, repository, level){
   var task = {
     design:'Create a Flowview diagram from the design, documentation, or system description I provide.',
     code:'Create a Flowview diagram explaining a specific flow in my codebase. Find and cite the implementation that supports each important step.',
@@ -28,10 +34,13 @@ function welcomeAgentPrompt(kind, brief, audience, repository){
     'Toolkit repository: ' + repository.repository + ' (revision: ' + repository.revision + ').',
     'Use an available checkout of that revision, or obtain one if needed. Resolve the skill’s referenced files in that checkout.', '',
     'Audience: ' + audience + '.',
+    WELCOME_TECHNICAL_LEVELS[level] || 'Technical level: not chosen. Ask me first whether this is a story, mixed, or engineering diagram.',
     brief.trim() ? 'My brief: ' + brief.trim() : 'Start by locating the source material I provide and identifying the question this diagram should answer.', '',
-    'Plan the story and meaningful outcomes before writing JSON. Ground actors, steps, state changes, failures, and numbers in the sources. Identify unknowns and label hypothetical behavior.',
-    'Use the pastel skin and target a readable desktop experience. Choose useful panels and alternate paths; keep shared events on one timeline when showing multiple perspectives.', '',
-    'Deliver a .spec.json file and a .ledger.md coverage ledger in my project. Validate with the toolkit’s tools/validate.js, build the standalone page with tools/page_build.py, and inspect the result as the skill directs. Keep the toolkit itself unchanged.',
+    'For a new diagram or a changed story, ask me your questions in one short batch in this conversation before you plan, and wait for my answers. Cover what my brief and sources leave open: audience and takeaway, the moments the viewer must see, the time span and start time, which outcomes to show, and the starting state. Do not ask again about what I already stated. For a small, fully specified edit, ask only about what blocks it.',
+    'Fill the skill’s storyboard worksheet before writing JSON: the story for this audience, what each panel shows, a time table for clocks and values that change over time, every edge each step uses, every panel on every step, and icons that follow state. Ground actors, steps, state changes, failures, and numbers in the sources. Label illustrative values and hypothetical behavior.',
+    'Bind services to my Backstage catalog and attach code references with full commit SHAs. Use only identities and code I provide or you can verify, and list any gaps.',
+    'Use the pastel skin and target a readable desktop experience. Keep shared events on one timeline when showing multiple perspectives.', '',
+    'Deliver a .spec.json file and a .ledger.md coverage ledger in my project. Validate with the toolkit’s tools/validate.js, build the standalone page with tools/page_build.py, run the skill’s walk script, and inspect the result as the skill directs. Keep the toolkit itself unchanged.',
     'Tell me which .spec.json to open in Flowview Workbench. If you cannot access the skill or run a check, say so clearly rather than claiming it passed.'
   ].join('\n');
 }
@@ -333,7 +342,7 @@ function initWorkbenchWelcome(opts){
     el('welcome-repo-link').href = repository.repository;
     var selected = root.querySelector('input[name="welcome-prompt-kind"]:checked');
     var audience = el('welcome-audience');
-    el('welcome-prompt').value = welcomeAgentPrompt(selected.value, el('welcome-brief').value, audience.options[audience.selectedIndex].text, repository);
+    el('welcome-prompt').value = welcomeAgentPrompt(selected.value, el('welcome-brief').value, audience.options[audience.selectedIndex].text, repository, audience.value);
     el('welcome-copy-status').textContent = 'Paste into your agent’s conversation.';
     try { localStorage.setItem(repositoryKey, JSON.stringify({repository:repository.repository,revision:repository.revision})); } catch (ex){}
   }

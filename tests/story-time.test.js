@@ -211,16 +211,19 @@ test('inspector provenance labels derived fields and new panels start with the c
   const field = (id, key) => model.find(p => p.id === id).fields.find(f => f.key === key);
   assert.equal(field('ph', 'clock').origin.label, 'Story time');
   assert.deepEqual(plain(field('ph', 'clock').origin.inputs[0].path), ['steps', 1, 'time']);
-  assert.equal(field('b', 'charge').origin.label, 'Story time · battery drift');
+  assert.equal(field('b', 'charge').origin.label, 'Story time · battery drift · built-in default rate', 'charge rate is the built-in placeholder');
+  const authored = {...d, deviceDefaults: {battery: {drainPerHour: 0.5, chargePerHour: 8}}};
+  assert.equal(C.builderEffectivePanelStates(authored, 1).panels[1].fields.find(f => f.key === 'charge').origin.label, 'Story time · battery drift');
   assert.equal(field('b', 'charge').value, 48);
   assert.deepEqual(plain(C.builderEffectivePanelStates(d, 0).panels[0].fields.find(f => f.key === 'clock').origin.inputs[0].path), ['storyTime', 'start']);
   const add = (raw, type) => JSON.parse(C.planAddPanel(JSON.stringify(raw), raw, 0, type).text).panels.at(-1);
   const bat = add(d, 'battery');
-  assert.equal(bat.drainPerHour, 0.5); assert.equal(bat.chargePerHour, 20);
+  assert.equal(bat.drainPerHour, 0.5, 'diagram rate copied');
+  assert.equal('chargePerHour' in bat, false, 'built-in placeholder is not copied as a device fact');
   assert.equal(add(d, 'phone').initial && add(d, 'phone').initial.clock, undefined);
   const legacy = {nodes: {a: {}}, rows: [['a']]};
   assert.equal(add(legacy, 'phone').initial.clock, '9:41');
-  assert.equal(add(legacy, 'battery').drainPerHour, 1);
+  assert.equal('drainPerHour' in add(legacy, 'battery'), false);
 });
 
 test('the story-time example builds cleanly and shows clocks and drift', () => {
@@ -229,4 +232,50 @@ test('the story-time example builds cleanly and shows clocks and drift', () => {
   const result = C.validate(C.normalize(raw));
   assert.deepEqual(plain(result.errors), []);
   assert.deepEqual(plain(result.warnings), []);
+});
+
+test('hostile and out-of-range times are rejected with warnings, never thrown', () => {
+  const huge = '+' + '9'.repeat(400) + 'h';
+  assert.equal(C.storyTimeDuration(huge, true), null, 'overflow to Infinity');
+  assert.equal(C.storyTimeDuration('+999999999d', true), null, 'finite but beyond the Date range');
+  const start = C.storyTimeAbsolute('2026-09-24T22:30');
+  assert.equal(C.storyTimeResolve(huge, start), null);
+  assert.equal(C.storyTimeResolve('+3000000d', start), null, 'lands after year 9999');
+  assert.equal(C.storyTimeResolve('+1h', NaN), null);
+  for (const early of ['0000-01-01T00:00', '0099-12-31T23:59']) assert.equal(C.storyTimeAbsolute(early), null, early);
+  assert.equal(new Date(C.storyTimeAbsolute('0100-03-01T10:00')).getUTCFullYear(), 100);
+  assert.equal(C.storyTimeAbsolute('10000-01-01T00:00'), null);
+  const d = diagram({
+    panels: [{id: 'ph', type: 'phone'}, {id: 'b', type: 'battery', initial: {charge: 50}}],
+    steps: [step({time: huge}), step({time: '+2000000d'}), step({time: '+2000000d'}), step({time: '+1h'})]
+  });
+  let result;
+  assert.doesNotThrow(() => { result = C.validate(C.normalize(d)); });
+  const text = result.warnings.join('\n');
+  assert.match(text, /steps\[0\]\.time: "\+9{20,}.*is not a time/);
+  assert.match(text, /steps\[2\]\.time: lands outside the supported range/, 'cumulative overflow on the path');
+  assert.doesNotMatch(text, /steps\[1\]\.time: lands outside/);
+  const clocks = pick(d, 'ph', 'clock'), charges = pick(d, 'b', 'charge');
+  assert.equal(clocks[0], '10:30', 'unparsable keeps start');
+  assert.equal(clocks[2], clocks[1], 'out-of-range keeps the previous time');
+  assert.ok(charges.every(v => typeof v === 'number' && v >= 0 && v <= 100), JSON.stringify(charges));
+  assert.doesNotThrow(() => C.validate(C.normalize(diagram({storyTime: {start: '2026-09-24T22:30', span: huge}, steps: [step()]}))));
+});
+
+test('span must be longer than zero; end warnings name the path; bad diagram rates say they are ignored', () => {
+  for (const span of ['0h', '0d0m']) {
+    assert.match(warnings(diagram({storyTime: {start: '2026-09-24T22:30', span}, steps: [step()]})).join(), /storyTime\.span: expected a duration longer than zero/);
+    assert.equal(C.storyTimeConfig(diagram({storyTime: {start: '2026-09-24T22:30', span}})).end, null);
+  }
+  assert.match(warnings(diagram({storyTime: {start: '9999-12-31T20:00', span: '1d'}, steps: [step()]})).join(), /span: ends after the supported range/);
+  const d = diagram({
+    storyTime: {start: '2026-09-24T22:30', span: '1h'},
+    steps: [step({id: 'a'}), step({id: 'shared', time: '+2h'}), step({id: 'b'})],
+    paths: [{id: 'one', steps: ['a', 'shared']}, {id: 'two', steps: ['a', 'shared', 'b']}]
+  });
+  const text = warnings(d).join('\n');
+  assert.match(text, /steps\[1\]\.time: .* is after the story end on path "one"/);
+  assert.match(text, /steps\[1\]\.time: .* is after the story end on path "two"/);
+  const bad = warnings(diagram({deviceDefaults: {battery: {drainPerHour: -1}}, panels: [{id: 'b', type: 'battery', drainPerHour: 2}], steps: [step()]})).join();
+  assert.match(bad, /drainPerHour: expected a number ≥ 0 \(percent per hour\) — this default is ignored; each battery panel uses its own drainPerHour or the built-in placeholder 1/);
 });

@@ -13,7 +13,8 @@
         "heading": "One night on a battery camera",
         "text": [
           "The story starts at 10:30 PM and each step moves the story clock. The phone and the app take their clock and date from the step, and the camera battery drains with the elapsed hours, loses extra charge for each recorded clip and recovers once solar charging starts at sunrise.",
-          "No clock, date or battery percentage is typed per panel except the app's battery card, which shows the last value the camera reported."
+          "No clock, date or battery percentage is typed per panel except the app's battery card, which shows the last value the camera reported.",
+          "Drain and charge rates are illustrative estimates, not measured device behavior."
         ],
         "diagram": {
           "view": "step",

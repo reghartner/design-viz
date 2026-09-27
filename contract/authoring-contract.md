@@ -1030,7 +1030,8 @@ perspectives" of one timeline). Types:
   load, a two-year drain forecast, or a cold snap limiting charge.
   With the diagram's `storyTime`, the charge follows elapsed step time:
   optional `drainPerHour`/`chargePerHour` (percent per hour, ≥ 0) override
-  `deviceDefaults.battery` and the built-in 1/20; patch `{"drain": 1.5}` for
+  `deviceDefaults.battery` and the built-in placeholder 1/20 (not device facts;
+  take rates from the source or label them as estimates); patch `{"drain": 1.5}` for
   extra drain at a step and `charge` only to anchor a known reading (see
   "Story time and device constants").
 - `buffer` — a segmented buffer strip for pre-roll rings, store-and-forward
@@ -1520,8 +1521,9 @@ Reserved per-step fields you may see but should only emit if asked: `sticky`,
 ### Story time and device constants
 
 Time is a property of the step. Declare the story's clock once on the diagram
-and let steps move it; never type per-panel clocks or battery percentages that
-follow from elapsed time. **Ask for the story's start date and time first.**
+and let steps move it; never type per-panel clocks. **The first time question
+is the story's span: its start date and time, and its end (or how long it
+lasts).** Then ask for each battery device's drain and charge rates.
 
 ```json
 "storyTime": {"start": "2026-09-24T22:30", "end": "2026-09-25T07:30", "clock": "12h", "date": "short"},
@@ -1543,6 +1545,12 @@ follow from elapsed time. **Ask for the story's start date and time first.**
   values last one step.
 - Battery constants resolve panel `drainPerHour`/`chargePerHour` → diagram
   `deviceDefaults.battery` → built-in `1`/`20` (percent per hour, numbers ≥ 0).
+  **The built-in values are placeholders, not device facts.** Take rates from
+  the source document or the user. If you rely on the built-in defaults (or
+  any estimate), say so in the ledger and on the page (for example in the
+  section text or the battery `note`: "illustrative drain estimate"). Drift
+  still runs with the placeholders; they exist so a sketch moves, not to
+  claim how a real device behaves.
   Between two steps the charge changes by elapsed hours × `chargePerHour`
   when the trend before the step was `charging`, else × −`drainPerHour`,
   clamped 0–100. A battery patch `{"drain": 1}` subtracts 1 more percent at
@@ -1762,8 +1770,11 @@ contract stays the authority; a recipe shows the working subset for one task.
    One to four panels per diagram; each panel must be patched by at least one
    step or it is dead weight.
 8. The story happens at a time (a phone clock, an overnight drain) → ask for
-   the start date and time, declare `storyTime`, and give steps a `time`
-   instead of patching clocks, dates or battery percentages per panel.
+   the story's span (start date and time, and end or duration), declare
+   `storyTime`, and give steps a `time` instead of patching clocks and dates
+   per panel. Take battery drain/charge rates from the source or the user; if
+   none are given, label the built-in placeholder rates as an illustrative
+   estimate in the ledger and on the page.
 
 ## Complete example
 

@@ -105,6 +105,11 @@ its trend is `charging`, and each `drain` patch subtracts a one-time cost.
 Phone, device-app and app-screens clocks follow the same step time. Type a
 `charge` only to anchor a known reading. See [story time](../docs/step-time.md).
 
+Ask for the story's span first (start, and end or duration), then the
+device's drain and charge rates. Rates must come from the source or the user.
+The built-in 1 and 20 %/h are placeholders, not device facts: if you use them
+or any estimate, say so in the ledger and on the page, as this recipe does.
+
 Complete working spec:
 
 ```json
@@ -115,7 +120,7 @@ Complete working spec:
     "sections": [
       {
         "heading": "A weekend away on one charge",
-        "text": ["The camera starts Friday evening at 72 percent, drains 0.6 percent an hour, and spends extra charge on each recorded clip."],
+        "text": ["The camera starts Friday evening at 72 percent, drains 0.6 percent an hour, and spends extra charge on each recorded clip.", "Drain and charge rates are illustrative estimates, not measured device behavior."],
         "diagram": {
           "view": "step",
           "storyTime": {"start": "2026-10-02T18:00", "span": "2d", "clock": "12h", "date": "short"},

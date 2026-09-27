@@ -427,11 +427,14 @@ body.sk-editorial .sk-daylight .btnub{background:var(--ed-rule-strong);}`,
 PanelRegistry.extend('battery', {
   authoring: {
     template: { title: 'Battery', low: 30, crit: 10, initial: { charge: 80 } },
-    /* New panels start with the constants in effect for their diagram. */
+    /* New panels start with the diagram's authored constants. Built-in
+       placeholders are not copied, so the inspector keeps showing them as
+       placeholders instead of passing them off as this device's rates. */
     instantiate: function (panel, diagram) {
-      var rates = storyBatteryConstants({}, diagram);
-      panel.drainPerHour = rates.drainPerHour;
-      panel.chargePerHour = rates.chargePerHour;
+      var rates = storyBatteryConstants({}, diagram), sources = storyBatteryConstantSources({}, diagram);
+      Object.keys(rates).forEach(function (key) {
+        if (sources[key] === 'diagram') panel[key] = rates[key];
+      });
       return panel;
     },
     setupFields: [
@@ -453,11 +456,18 @@ PanelRegistry.extend('battery', {
     editor: function (context) {
       var labels = { drainPerHour: 'Drain % per hour', chargePerHour: 'Charge % per hour' },
         short = { drainPerHour: 'Drain %/h', chargePerHour: 'Charge %/h' };
-      function inherited() {
-        var parsed = context.parse();
-        if (parsed.error) return storyBatteryConstants({}, null);
-        var rec = specSectionPaths(parsed.raw)[context.target().section];
-        return storyBatteryConstants({}, rec ? specValueAt(parsed.raw, rec.diagram) : null);
+      /* Say whether the fallback is the diagram's rate or the built-in
+         placeholder, which is not a device fact. */
+      function inherited(key) {
+        var parsed = context.parse(), d = null;
+        if (!parsed.error) {
+          var rec = specSectionPaths(parsed.raw)[context.target().section];
+          d = rec ? specValueAt(parsed.raw, rec.diagram) : null;
+        }
+        var value = storyBatteryConstants({}, d)[key];
+        return storyBatteryConstantSources({}, d)[key] === 'diagram'
+          ? 'Diagram default · ' + value + ' %/h'
+          : 'Built-in default · ' + value + ' %/h (placeholder)';
       }
       return {
         patchLabel: function (key) {
@@ -474,7 +484,7 @@ PanelRegistry.extend('battery', {
             return context.commit(key, value == null ? null : String(value));
           });
           input.classList.remove('fnum');
-          input.placeholder = 'Diagram default · ' + inherited()[key];
+          input.placeholder = inherited(key);
           input.setAttribute('aria-label', labels[key]);
           return context.controls.row(short[key], input);
         },

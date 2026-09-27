@@ -9,8 +9,9 @@
   follow the step automatically; explicit panel values still win at their step.
 - Battery panels drain with elapsed story time and charge while `charging`,
   using panel `drainPerHour`/`chargePerHour`, diagram `deviceDefaults.battery`
-  or the built-in 1 and 20 percent per hour. A step's `drain` adds a one-time
-  cost; `charge` anchors a known reading.
+  or built-in placeholders (1 and 20 percent per hour), which are not device
+  facts: take rates from the source or label them as estimates. A step's
+  `drain` adds a one-time cost; `charge` anchors a known reading.
 - The validator warns about unparsable times, time going backward on a path and
   steps after the story end. Diagrams using the feature declare
   `flow.story-time`, so older viewers show an upgrade notice. Specs without

@@ -1549,11 +1549,11 @@ function storyTimeGroup(diagram,target){
           return Object.keys(next).length?next:null;
         });
       });
-      input.classList.remove('fnum');input.placeholder='Built-in · '+STORY_BATTERY_DEFAULTS[pair[0]];input.setAttribute('aria-label',pair[1]);
+      input.classList.remove('fnum');input.placeholder='Built-in default · '+STORY_BATTERY_DEFAULTS[pair[0]]+' %/h (placeholder)';input.setAttribute('aria-label',pair[1]);
       box.appendChild(frow(pair[2]+' %/h',input));
     });
     var rateHelp=document.createElement('p');rateHelp.className='fnote';
-    rateHelp.textContent='Battery panels use their own rates first, then these, then the built-in values. New battery panels start with the rates in effect.';
+    rateHelp.textContent='Take rates from the device source or its owner. The built-in values are placeholders, not device facts: if you keep them, label the battery as an illustrative estimate on the page. Battery panels use their own rates first, then these, then the built-in placeholders. New battery panels start with these diagram rates.';
     box.appendChild(rateHelp);
     return box;
   }
@@ -1561,7 +1561,7 @@ function storyTimeGroup(diagram,target){
 /* The step's story time plus its resolved value on the selected path. */
 function stepTimeRows(val,ctx,t){
     var input=textControl(val.time,function(v){
-      if(v!=null && storyTimeResolve(v,0)==null){formError('Use +15m, 23:10 or 2026-09-24T23:10.');return false;}
+      if(v!=null && !storyTimeParsable(v)){formError('Use +15m, 23:10 or 2026-09-24T23:10 (years 100–9999).');return false;}
       var ok=commitSimple('time',v==null?null:JSON.stringify(v));
       if(ok)refreshFormSoon();
       return ok;

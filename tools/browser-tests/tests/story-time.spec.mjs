@@ -62,7 +62,7 @@ test('workbench story time, step time, battery constants and extra drain edit th
   await expect(root.locator('.pt-phone .phonedate')).toHaveText('2026-09-24');
   await page.locator('#docview h3').filter({hasText:'Night'}).click();
   const drain=guide.getByRole('textbox',{name:'Battery drain % per hour',exact:true});
-  await expect(drain).toHaveAttribute('placeholder','Built-in · 1');
+  await expect(drain).toHaveAttribute('placeholder','Built-in default · 1 %/h (placeholder)');
   await drain.fill('2');await drain.press('Tab');
   expect(d(await spec()).deviceDefaults).toEqual({battery:{drainPerHour:2}});
   expect(d(await spec()).storyTime).toEqual({start:'2026-09-24T22:30',clock:'24h',date:'iso'});
@@ -99,7 +99,7 @@ test('workbench story time, step time, battery constants and extra drain edit th
   // Panel constant overrides the diagram default.
   await root.locator('.pt-battery .ptitle').click();
   const own=guide.getByRole('textbox',{name:'Drain % per hour',exact:true});
-  await expect(own).toHaveAttribute('placeholder','Diagram default · 2');
+  await expect(own).toHaveAttribute('placeholder','Diagram default · 2 %/h');
   await own.fill('0');await own.press('Tab');
   await chip(root,1).click();await expect(root.locator('.pt-battery .btval')).toHaveText('49%');
   expect(d(await spec()).panels[1].drainPerHour).toBe(0);

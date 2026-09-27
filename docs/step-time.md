@@ -38,11 +38,15 @@ time.
 
 | Key | Meaning |
 | --- | --- |
-| `start` | **Required.** Absolute local date-time `YYYY-MM-DDTHH:MM` (optional `:SS`). The story clock before the first step. |
+| `start` | **Required.** Absolute local date-time `YYYY-MM-DDTHH:MM` (optional `:SS`), years 100–9999. The story clock before the first step. |
 | `end` | Optional absolute date-time. The expected end of the story; steps later than it warn. |
-| `span` | Optional duration such as `"9h"` or `"1d2h"`; an alternative to `end` (`end` wins when both are set). |
+| `span` | Optional duration longer than zero, such as `"9h"` or `"1d2h"`; an alternative to `end` (`end` wins when both are set). |
 | `clock` | `"12h"` (default, `10:30`) or `"24h"` (`22:30`). Status bars never show AM/PM. |
 | `date` | `"short"` (default, `Thu, Sep 24`), `"long"` (`Thursday, September 24`), `"iso"` (`2026-09-24`) or `"none"` (no date line). |
+
+**Ask about the span first.** The first time question for an author or agent
+is the story's span: when it starts, and when it ends or how long it lasts.
+Then ask for each battery device's drain and charge rates.
 
 `storyTime` is the switch for every automatic time behavior. A diagram without
 it renders exactly as before (see [Backward compatibility](#backward-compatibility)).
@@ -73,12 +77,17 @@ different paths. Use an absolute time when a shared step must show one time.
 - `storyTime` not an object, missing or unparsable `start`, bad `end`/`span`
   (or `end` not after `start`), unknown `clock`/`date` → story time is off or
   that option uses its default.
-- `step.time` unparsable → ignored; the step keeps the previous time.
+- `step.time` unparsable, or resolving outside years 100–9999 (for example an
+  enormous relative duration) → ignored; the step keeps the previous time.
+  Hostile values never throw.
+- `span` of zero, unparsable, or ending past year 9999 → ignored.
 - `step.time` without `storyTime` → ignored.
 - A step whose time is earlier than the previous step on the same path →
   "time goes backward on path …". It still renders as authored; battery drift
   never runs backward (negative intervals count as zero).
-- A step later than `end` (or `start + span`) → warning.
+- A step later than `end` (or `start + span`) → warning, once per step and path.
+- An invalid `deviceDefaults.battery` rate → that default is ignored; each
+  battery panel uses its own rate or the built-in placeholder.
 
 ## Time-bearing panels: inheritance and override order
 
@@ -111,11 +120,21 @@ Battery constants resolve in this order:
 2. The diagram: `deviceDefaults.battery.drainPerHour` / `.chargePerHour`.
 3. Built-in: **`drainPerHour: 1`**, **`chargePerHour: 20`** (percent per hour).
 
+**The built-in values are placeholders, not device facts.** They keep a sketch
+moving; they do not describe any real device. Take rates from the source
+document or the device owner. When a diagram relies on the built-in values, or
+on any estimate, label it: record it in the ledger and say it on the page (the
+section text or the battery `note`, for example "illustrative drain
+estimate"). The workbench shows built-in rates as *placeholder* text and the
+Effective state labels drift that uses one as *built-in default rate*.
+
 Values must be finite numbers ≥ 0; others warn and fall through to the next
 level. Use `0` to switch a direction off, for example `"drainPerHour": 0` for
-a wired or PoE device. The workbench writes the resolved constants into every
-new battery panel so the author sees and can edit them; a spec author may omit
-them to inherit.
+a wired or PoE device. The workbench copies the diagram's own
+`deviceDefaults.battery` rates into every new battery panel so the author sees
+and can edit them. It does not copy the built-in placeholders: those stay
+visible as placeholder text until someone enters a real rate. A spec author may
+omit the rates to inherit.
 
 ## Automatic battery drain
 
@@ -173,12 +192,16 @@ that step.
 
 - **Section inspector → Story time**: Start, End, Clock (12-hour or 24-hour)
   and Date format. **Battery defaults**: drain and charge percent per hour for
-  the whole diagram, with the built-in values as placeholders.
+  the whole diagram; empty fields read "Built-in default · 1 %/h
+  (placeholder)".
 - **Step inspector → Story time**: the step's `time` (relative, absolute or
   time of day) and the resolved date and time on the selected path.
-- **Battery panel**: `drainPerHour` and `chargePerHour` setup fields;
+- **Battery panel**: `drainPerHour` and `chargePerHour` setup fields, whose
+  placeholders say whether the diagram default or the built-in placeholder
+  applies;
   the step patch has **Extra drain %** (`drain`).
 - **Effective state** labels derived values as *Story time* or *Story time ·
-  battery drift*.
-- New battery panels start with the resolved constants; new phone panels omit
-  the starting clock when a story time exists.
+  battery drift* (plus *· built-in default rate* when a placeholder rate is in
+  use).
+- New battery panels start with the diagram's authored rates; new phone and
+  device app panels omit the starting clock when a story time exists.

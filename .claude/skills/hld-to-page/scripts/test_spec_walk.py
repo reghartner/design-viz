@@ -443,6 +443,26 @@ class WalkTest(unittest.TestCase):
         w = self.walk(spec)
         self.assertFalse(w.checked("built-in placeholder"), w.out)
 
+    def test_story_time_no_data_battery_does_not_use_placeholder_before_anchor(self):
+        spec = self.story_spec(rates=False)
+        d = spec["page"]["blocks"][0]["diagram"]
+        d["panels"][1]["initial"] = {"source": "cells", "trend": "draining"}   # NO DATA
+        for st in d["steps"]:
+            st.get("panels", {}).pop("batt", None)
+            if not st.get("panels"):
+                st.pop("panels", None)
+        w = self.walk(spec)
+        self.assertFalse(w.checked("built-in placeholder"), w.out)
+        # an anchor at the last step: still no elapsed interval with a charge
+        d["steps"][4]["panels"] = {"batt": {"charge": 60}}
+        w = self.walk(spec)
+        self.assertFalse(w.checked("built-in placeholder"), w.out)
+        # an anchor earlier: the intervals after it drift on the placeholder
+        d["steps"][4].pop("panels")
+        d["steps"][3]["panels"] = {"batt": {"charge": 60}}
+        w = self.walk(spec)
+        self.assertTrue(w.checked("battery batt drifts on the built-in placeholder drainPerHour 1 %/h"), w.out)
+
     def test_story_time_backward_is_a_warn(self):
         spec = self.story_spec()
         spec["page"]["blocks"][0]["diagram"]["steps"][4]["time"] = "2026-09-25T03:00"

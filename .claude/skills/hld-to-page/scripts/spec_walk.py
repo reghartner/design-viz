@@ -758,13 +758,17 @@ def walk(dg, rates, show_state, warn, check, note, expects):
     for bid, r in sorted((dg.get("batteryRates") or {}).items()):
         src = r.get("sources") or {}
         # which rate each elapsed interval applied: the trend before the step decides
+        # (a battery with no numeric charge, NO DATA, does not drift until an anchor)
         applied = set()
+        num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
         for p in dg["paths"]:
             before = dg["initial"].get(bid, {}).get("trend")
+            has_charge = num(dg["initial"].get(bid, {}).get("charge"))
             for st in p["steps"]:
-                if st["time"] > st["previous"]:
+                if st["time"] > st["previous"] and has_charge:
                     applied.add("chargePerHour" if before == "charging" else "drainPerHour")
                 before = st["state"].get(bid, {}).get("trend")
+                has_charge = num(st["state"].get(bid, {}).get("charge"))
         used = [k for k in ("drainPerHour", "chargePerHour") if src.get(k) == "built-in" and k in applied]
         if used:
             check("battery %s drifts on the built-in placeholder %s (not a device fact): take the rate from the "

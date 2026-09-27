@@ -103,7 +103,7 @@ class WalkTest(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def walk(self, spec, *args):
+    def walk(self, spec, *args, clean=True):
         path = os.path.join(self.tmp, "%s.spec.json" % self.id().split(".")[-1])
         with open(path, "w") as fh:
             json.dump(spec, fh)
@@ -111,8 +111,9 @@ class WalkTest(unittest.TestCase):
                            capture_output=True, text=True)
         self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
         lines = v.stdout.strip().splitlines()
-        self.assertTrue(len(lines) == 1 and lines[0].endswith(": 0 errors, 0 warnings"),
-                        "fixture must validate cleanly:\n" + v.stdout)
+        if clean:
+            self.assertTrue(len(lines) == 1 and lines[0].endswith(": 0 errors, 0 warnings"),
+                            "fixture must validate cleanly:\n" + v.stdout)
         r = subprocess.run([sys.executable, os.path.join(HERE, "spec_walk.py"), path] + list(args),
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -363,6 +364,119 @@ class WalkTest(unittest.TestCase):
             self.assertTrue(spec_walk.says_age(text), text)
         for text in ("Outdoor sensor", "Front door", "", None):
             self.assertFalse(spec_walk.says_age(text), text)
+
+    # ---- story time (diagram.storyTime + step.time) ----------------------
+
+    def story_spec(self, rates=True, **app_initial):
+        """Overnight story: no panel clocks, no battery charge patches."""
+        d = {"storyTime": {"start": "2026-09-24T22:30", "end": "2026-09-25T09:00", "clock": "12h"},
+             "panels": [app_panel(dict({"clip": {"value": "None", "status": "ready"}}, **app_initial)),
+                        batt_panel(50)],
+             "steps": [step("armed", nodes=["cam"]),
+                       step("motion", time="+2h10m", batt={"drain": 1.5}, edges=["cam->svc"]),
+                       step("push", time="+1m", edges=["svc->app"]),
+                       step("fox", time="04:15", batt={"drain": 1}),
+                       step("check", time="08:20")]}
+        if rates:
+            d["deviceDefaults"] = {"battery": {"drainPerHour": 0.5, "chargePerHour": 10}}
+        return page(d)
+
+    def test_story_time_drives_clocks_and_battery(self):
+        w = self.walk(self.story_spec(), "--rate", "batt=-0.5:0")
+        self.assertIn("  motion         12:40 AM", w.out)
+        self.assertIn("  fox            4:15 AM", w.out)       # 12-hour clock across midnight
+        self.assertIn("  check          8:20 AM", w.out)
+        self.assertFalse(w.checked("no clock on any"), w.out)
+        self.assertFalse(w.checked("never changes"), w.out)
+        self.assertFalse(w.checked("with no clock change"), w.out)   # drain at an unmoved clock
+        self.assertFalse(w.checked("pins the panel"), w.out)
+        self.assertFalse(w.checked("built-in placeholder"), w.out)
+        self.assertIn("motion batt: 50 -> 47.42 over 2h10 = -0.5/h after extra drain 1.5", w.out)
+        self.assertEqual(w.warns, [], w.out)
+
+    def test_story_time_rate_uses_resolved_clock(self):
+        w = self.walk(self.story_spec(), "--rate", "batt=-0.2:0")
+        self.assertTrue(w.warned("fox: batt rate -0.5/h is outside the stated -0.2..0/h"), w.out)
+
+    def test_story_time_explicit_panel_clock_is_a_check(self):
+        spec = self.story_spec()
+        spec["page"]["blocks"][0]["diagram"]["steps"][3]["panels"]["phone"] = {"clock": "4:10 AM"}
+        w = self.walk(spec)
+        self.assertTrue(w.checked("fox: phone shows clock '4:10 AM' but the story time is '4:15'"), w.out)
+        self.assertEqual(w.warns, [], w.out)
+
+    def test_story_time_builtin_rate_is_a_check(self):
+        w = self.walk(self.story_spec(rates=False))
+        self.assertIn("battery batt: drain 1 %/h (built-in placeholder)", w.out)
+        self.assertTrue(w.checked("battery batt drifts on the built-in placeholder drainPerHour 1 %/h"), w.out)
+
+    def test_story_time_charge_anchor_is_not_rate_checked(self):
+        # drift at 0.5 %/h would give ~44; the stated reading 30 overrides it on purpose
+        spec = self.story_spec()
+        spec["page"]["blocks"][0]["diagram"]["steps"][4]["panels"] = {"batt": {"charge": 30}}
+        w = self.walk(spec, "--rate", "batt=-0.5:0")
+        self.assertIn("check batt: 44.63 -> 30 over 4h05 = -3.58/h (anchor)", w.out)
+        self.assertFalse(w.warned("check: batt rate"), w.out)
+        self.assertEqual(w.warns, [], w.out)
+
+    def test_story_time_drift_after_anchor_is_still_rate_checked(self):
+        spec = self.story_spec()
+        spec["page"]["blocks"][0]["diagram"]["steps"][1]["panels"]["batt"] = {"charge": 40}
+        w = self.walk(spec, "--rate", "batt=-0.2:0")
+        self.assertFalse(w.warned("motion: batt rate"), w.out)          # the anchor itself
+        self.assertTrue(w.warned("check: batt rate -0.5/h is outside"), w.out)  # drift after it
+
+    def test_story_time_builtin_charge_only_when_every_interval_charges(self):
+        spec = self.story_spec(rates=False)
+        d = spec["page"]["blocks"][0]["diagram"]
+        d["panels"][1]["drainPerHour"] = 0.5          # drain is authored; charge is built-in
+        d["panels"][1]["initial"]["trend"] = "charging"
+        for st in d["steps"]:
+            st.get("panels", {}).get("batt", {}).pop("drain", None)
+        w = self.walk(spec)
+        self.assertTrue(w.checked("battery batt drifts on the built-in placeholder chargePerHour 20 %/h"), w.out)
+        self.assertFalse(w.checked("drainPerHour"), w.out)
+        # all intervals charging with an authored charge rate: no placeholder CHECK even though
+        # the drain rate is built-in
+        d["panels"][1].pop("drainPerHour")
+        d["panels"][1]["chargePerHour"] = 5
+        w = self.walk(spec)
+        self.assertFalse(w.checked("built-in placeholder"), w.out)
+
+    def test_story_time_no_data_battery_does_not_use_placeholder_before_anchor(self):
+        spec = self.story_spec(rates=False)
+        d = spec["page"]["blocks"][0]["diagram"]
+        d["panels"][1]["initial"] = {"source": "cells", "trend": "draining"}   # NO DATA
+        for st in d["steps"]:
+            st.get("panels", {}).pop("batt", None)
+            if not st.get("panels"):
+                st.pop("panels", None)
+        w = self.walk(spec)
+        self.assertFalse(w.checked("built-in placeholder"), w.out)
+        # an anchor at the last step: still no elapsed interval with a charge
+        d["steps"][4]["panels"] = {"batt": {"charge": 60}}
+        w = self.walk(spec)
+        self.assertFalse(w.checked("built-in placeholder"), w.out)
+        # an anchor earlier: the intervals after it drift on the placeholder
+        d["steps"][4].pop("panels")
+        d["steps"][3]["panels"] = {"batt": {"charge": 60}}
+        w = self.walk(spec)
+        self.assertTrue(w.checked("battery batt drifts on the built-in placeholder drainPerHour 1 %/h"), w.out)
+
+    def test_story_time_backward_is_a_warn(self):
+        spec = self.story_spec()
+        spec["page"]["blocks"][0]["diagram"]["steps"][4]["time"] = "2026-09-25T03:00"
+        w = self.walk(spec, clean=False)
+        self.assertTrue(w.warned("check: story time goes backward (4:15 AM -> 3:00 AM)"), w.out)
+
+    def test_story_time_rounded_battery_card_matches_panel(self):
+        spec = self.story_spec(battery={"value": 50, "status": "ready", "detail": "Battery level"})
+        d = spec["page"]["blocks"][0]["diagram"]
+        d["panels"][0]["fields"].append({"id": "battery", "label": "Battery", "kind": "battery"})
+        d["steps"][1]["panels"]["phone"] = {"battery": {"value": 47}}   # panel 47.42
+        w = self.walk(spec)
+        self.assertFalse(w.checked("motion: phone.battery shows 47"), w.out)
+        self.assertTrue(w.checked("fox: phone.battery shows 47 but battery panel batt shows 44.63"), w.out)
 
     # ---- review round 4: uppercase SHAs ---------------------------------
 

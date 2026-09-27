@@ -14,6 +14,13 @@
    the nodes this step sets or clears), the raw panel patch, and the folded
    state of every panel, i.e. what the viewer shows at that step.
 
+   With the diagram's `storyTime`, each step also carries its resolved story
+   time (`time`, `previous`: epoch milliseconds of floating local time;
+   `timeLabel`: e.g. "Fri, Sep 25 · 6:50 AM"; `timeRejected`), and the diagram
+   carries `storyTime` (start, end, clock, date) and each battery panel's
+   resolved drain/charge rates with where each came from (panel, diagram or
+   built-in placeholder).
+
    VIZ defaults to the directory four levels above this script
    (<VIZ>/.claude/skills/hld-to-page/scripts/). Output is JSON on stdout. */
 
@@ -42,7 +49,8 @@ function main(argv) {
   for (const name of ['compatibility.js', 'canon.js', 'validator.js', 'engine.js'])
     vm.runInContext(readSource(name), context, {filename: name});
   vm.runInContext('__api = {normalize, validate, sectionRecords, diagramPathList, diagramForPath,' +
-    ' foldPanelStates, foldNodeTones, stepKeys, stepFailures, stepNodes, stepPanelPatch, stepTonePatch};', context);
+    ' foldPanelStates, foldNodeTones, stepKeys, stepFailures, stepNodes, stepPanelPatch, stepTonePatch,' +
+    ' storyTimeConfig, storyTimeSequence, storyTimeLabel, storyBatteryConstants, storyBatteryConstantSources};', context);
   const C = context.__api;
 
   let raw;
@@ -62,9 +70,19 @@ function main(argv) {
     (d.panels || []).forEach(p => {
       if (p && p.id) initial[p.id] = plain((initialFold[p.id] || [])[0] || {});
     });
+    const config = C.storyTimeConfig(d);
+    const batteryRates = {};
+    if (config) (d.panels || []).forEach(p => {
+      if (p && p.id && p.type === 'battery')
+        batteryRates[p.id] = Object.assign(plain(C.storyBatteryConstants(p, d)),
+          {sources: plain(C.storyBatteryConstantSources(p, d))});
+    });
     const paths = C.diagramPathList(d).map(p => {
       const dp = C.diagramForPath(d, p.id);
       const folded = C.foldPanelStates(dp), tones = C.foldNodeTones(dp);
+      const story = config ? C.storyTimeSequence(dp, config) : null;
+      const timeOf = i => !story ? {} : {time: story.times[i], previous: story.previous[i],
+        timeLabel: C.storyTimeLabel(story.times[i], config), timeRejected: story.rejected[i]};
       return {
         id: p.id, label: p.label,
         declared: Array.isArray(d.paths) && d.paths.some(x => x && x.id === p.id),
@@ -78,13 +96,14 @@ function main(argv) {
             nodes: plain(C.stepNodes(st)), tones: plain(tones[i] || {}),
             tonePatch: plain(C.stepTonePatch(st) || {}),
             patch: plain(C.stepPanelPatch(st) || {}), codeRefs: plain(st.codeRefs || []),
-            state
+            state, ...timeOf(i)
           };
         })
       };
     });
     diagrams.push({name: sec.heading || sec.id || record.reference || ('section ' + record.number),
-      section: record.path, diagram: plain(d), initial, paths});
+      section: record.path, diagram: plain(d), initial, paths,
+      storyTime: config ? plain(config) : null, batteryRates});
   });
   process.stdout.write(JSON.stringify({spec, viz,
     validation: {errors: plain(v.errors), warnings: plain(v.warnings)}, diagrams}) + '\n');

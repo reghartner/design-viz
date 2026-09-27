@@ -46,8 +46,11 @@ WARN lines state what the spec plus the command-line inputs prove wrong (a
 written reason in the worksheet can still justify one). CHECK lines are
 prompts to re-read a step, not defects. NOTE lines are information.
 
-Story time: each clock panel's time is its `clock` plus its `date`. A date
-change is measured in real days when both dates parse ("Thu, Sep 24",
+Story time: with the diagram's `storyTime`, the walk uses each step's
+resolved story time (from the engine) as the clock for every check and rate,
+and prints it in the clock column. Panels then inherit clock and date, so no
+per-panel clock is needed. Without `storyTime`, each clock panel's time is its
+`clock` plus its `date`. A date change is measured in real days when both dates parse ("Thu, Sep 24",
 "Mon Oct 5", "Oct 12", "24 Sep", "2026-09-24"; no year means the previous
 date's year, and Nov/Dec to Jan/Feb rolls into the next year). When a date
 change cannot be measured ("Mon" -> "Tue", "Day 2"), the interval across it
@@ -57,8 +60,10 @@ not span it.
 WARN (provable from the spec and the command-line inputs):
   - validator errors (fix these first)
   - a clock-bearing panel (phone, deviceapp, appscreens) whose clock goes
-    backward
-  - a number that changes faster than --rate allows
+    backward; with storyTime, a step time that goes backward or is invalid
+  - a number that changes faster than --rate allows (a battery step's
+    authored extra `drain` is left out of the rate; with storyTime a battery
+    `charge` anchor is printed but not rate-checked: anchors win over drift)
   - a battery panel that never changes over a span where a --rate for it
     that excludes zero requires at least one point of change
   - codeRefs: not a full SHA, bad anchors, or on steps but not on a node
@@ -66,10 +71,15 @@ WARN (provable from the spec and the command-line inputs):
     service, API or operation the catalog does not have
   - a failed --expect, or an --expect whose path/step does not exist
 CHECK (re-read the step; not a defect by itself):
-  - no clock on any declared phone/deviceapp/appscreens panel
-  - one clock panel advancing while another stays put on a step
+  - no clock on any declared phone/deviceapp/appscreens panel (no storyTime)
+  - one clock panel advancing while another stays put on a step (no storyTime)
+  - with storyTime: a panel clock or date that differs from the story time
+    (an explicit value pins it; new specs let panels inherit)
+  - with storyTime: a battery panel that drifts on a built-in placeholder
+    rate over some elapsed interval (drain when the trend before the step
+    was not charging, charge when it was); label it illustrative
   - a number that changes with no time passing (the interval is known to be
-    zero)
+    zero), other than a battery step's own extra `drain`
   - battery charge that rises while the battery was not charging
   - a device-app battery card that starts to differ from the battery panel
     (declared through the card's `source` and that source's `node`, or the
@@ -102,7 +112,8 @@ CHECK (re-read the step; not a defect by itself):
   - fields refreshed by one report where a sibling field kept older freshness
   - at a screen change to/from unavailable or boot, or a card turning
     stale/error: every carried device-app state text
-  - a panel never patched on a path
+  - a panel never patched on a path whose shown state never changes either
+    (story time and battery drift count as changes)
 NOTE:
   - more than one diagram (each starts from its own initial state)
   - a codeRef on a node but on no step; catalog services bound to no node
@@ -141,6 +152,16 @@ def minutes(clock):
     if ap == "am" and h == 12:
         h = 0
     return h * 60 + mi
+
+
+def fmt_rate(rate):
+    """Signed rate with up to two decimals: -0.15, +6, -1.4."""
+    txt = ("%+.2f" % rate).rstrip("0").rstrip(".")
+    return "+0" if txt in ("+", "-", "-0") else txt
+
+
+def placeholder(source):
+    return "built-in placeholder" if source == "built-in" else source
 
 
 def hm(mins):
@@ -310,6 +331,40 @@ class Clock:
         return prev, self.now
 
 
+STORY_DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+STORY_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
+                "September", "October", "November", "December")
+
+
+def story_parts(ms):
+    """Floating local time from the engine's epoch milliseconds."""
+    import datetime
+    return datetime.datetime(1970, 1, 1) + datetime.timedelta(milliseconds=ms)
+
+
+def story_clock(ms, fmt):
+    t = story_parts(ms)
+    return "%02d:%02d" % (t.hour, t.minute) if fmt == "24h" else "%d:%02d" % (t.hour % 12 or 12, t.minute)
+
+
+def story_date(ms, fmt):
+    t = story_parts(ms)
+    if fmt == "none":
+        return None
+    if fmt == "iso":
+        return "%04d-%02d-%02d" % (t.year, t.month, t.day)
+    day, mon = STORY_DAYS[t.weekday()], STORY_MONTHS[t.month - 1]
+    if fmt == "long":
+        return "%s, %s %d" % (day, mon, t.day)
+    return "%s, %s %d" % (day[:3], mon[:3], t.day)
+
+
+def story_label(ms, cfg):
+    """Clock column text: always with AM/PM for a 12-hour story."""
+    c = story_clock(ms, cfg.get("clock"))
+    return c if cfg.get("clock") == "24h" else c + (" AM" if story_parts(ms).hour < 12 else " PM")
+
+
 def walk(dg, rates, show_state, warn, check, note, expects):
     d = dg["diagram"]
     panels = [p for p in d.get("panels", []) or [] if isinstance(p, dict) and p.get("id")]
@@ -329,7 +384,18 @@ def walk(dg, rates, show_state, warn, check, note, expects):
     batt_panels = [p for p in panels if p.get("type") == "battery"]
     clock_panels = [pid for pid, t in ptype.items() if t in CLOCK_PANELS]
     nodes = d.get("nodes") or {}
+    story = dg.get("storyTime")
     print("\n=== %s" % dg["name"])
+    if story:
+        print("story time: %s to %s; panels inherit clock and date from each step" % (
+            story_date(story["start"], "short") + " " + story_label(story["start"], story),
+            "open end" if story.get("end") is None else
+            story_date(story["end"], "short") + " " + story_label(story["end"], story)))
+        for bid, r in sorted((dg.get("batteryRates") or {}).items()):
+            src = r.get("sources") or {}
+            print("battery %s: drain %g %%/h (%s), charge %g %%/h (%s)" % (
+                bid, r["drainPerHour"], placeholder(src.get("drainPerHour")),
+                r["chargePerHour"], placeholder(src.get("chargePerHour"))))
     node_refs, step_refs, ref_owner = set(), set(), {}
     check_topology(d, check)
     for node_id, node in nodes.items():
@@ -340,7 +406,7 @@ def walk(dg, rates, show_state, warn, check, note, expects):
             node_refs.add(ref.get("id"))
             ref_owner.setdefault(ref.get("id"), set()).add(node_id)
             check_ref("node " + node_id, ref, warn)
-    if clock_panels:
+    if clock_panels and not story:
         has_clock = any(dg["initial"].get(pid, {}).get("clock") for pid in clock_panels) or any(
             s["state"].get(pid, {}).get("clock") for path in dg["paths"] for s in path["steps"] for pid in clock_panels)
         if not has_clock:
@@ -355,7 +421,14 @@ def walk(dg, rates, show_state, warn, check, note, expects):
         clocks = {pid: Clock() for pid in clock_panels}
         for pid in clock_panels:
             clocks[pid].update(state[pid])
-        story_now = lambda: next((clocks[p].now for p in clock_panels if clocks[p].now is not None), None)
+        if story:
+            # every panel shows the step's story time (minutes since start)
+            cur_ms = [story["start"]]
+            story_now = lambda: (0, (cur_ms[0] - story["start"]) / 60000.0)
+            pnow = lambda pid: now
+        else:
+            story_now = lambda: next((clocks[p].now for p in clock_panels if clocks[p].now is not None), None)
+            pnow = lambda pid: clocks[pid].now
         now = story_now()
         last_num = {}
         for pid, t in ptype.items():
@@ -363,15 +436,16 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                 last_num[k] = (now, v)
         # span: the story time the walk can measure on this path (a lower bound
         # when a date change could not be measured)
-        span, touched, batt_changes, drift = 0, set(), 0, []
+        span, touched, batt_changed, drift = 0, set(), set(), []
         batt_mismatch, lagging, fresh_flagged = set(), set(), set()
+        pinned_seen, moved_panels = set(), set()
         fresh_since = {}   # (panel, field) -> (freshness text, panel time it was first shown)
         for pid in fields:
             for fk in fields[pid]:
                 fv = state[pid].get(fk)
                 det = fv.get("detail") if isinstance(fv, dict) else None
                 if freshness_window(det) is not None:
-                    fresh_since[(pid, fk)] = (det, clocks[pid].now)
+                    fresh_since[(pid, fk)] = (det, pnow(pid))
         for idx, s in enumerate(seq):
             sid = s.get("id") or "step%d" % (idx + 1)
             pending = []
@@ -396,11 +470,30 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                     for key, val in p.items():
                         if isinstance(val, dict) and "icon" in val:
                             extras.append("%s.%s.icon=%s" % (pid, key, val["icon"]))
-                if ptype[pid] == "battery" and isinstance(p, dict) and "charge" in p:
-                    batt_changes += 1
             # per-panel clocks
             moved_by = {}
-            for pid in clock_panels:
+            if story:
+                cur_ms[0] = s["time"]
+                el = (s["time"] - s["previous"]) / 60000.0
+                if s.get("timeRejected"):
+                    swarn("%s: step time is not a valid story time and is ignored (the step keeps %s)" % (
+                        sid, story_label(s["time"], story)))
+                elif el < 0:
+                    swarn("%s: story time goes backward (%s -> %s)" % (
+                        sid, story_label(s["previous"], story), story_label(s["time"], story)))
+                want = {"clock": story_clock(s["time"], story.get("clock")),
+                        "date": story_date(s["time"], story.get("date"))}
+                for pid in clock_panels:
+                    moved_by[pid] = el
+                    for key in ("clock", "date"):
+                        got = state[pid].get(key)
+                        if got != want[key] and (pid, key, got) not in pinned_seen:
+                            pinned_seen.add((pid, key, got))
+                            scheck("%s: %s shows %s %r but the story time is %r; an explicit %s pins the panel "
+                                   "until story time moves. Drop it so the panel inherits the step time, unless "
+                                   "the panel really shows another %s" % (
+                                       sid, pid, key, got, want[key], key, key))
+            for pid in ([] if story else clock_panels):
                 c0 = clocks[pid].text
                 before, after = clocks[pid].update(state[pid])
                 el = elapsed(before, after)
@@ -417,7 +510,10 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                     sid, "/".join(advanced), clocks[advanced[0]].text, "/".join(held),
                     ", ".join(str(clocks[p].text) for p in held)))
             now = story_now()
-            clock_txt = next((clocks[p].text for p in clock_panels if clocks[p].now is not None), "") or ""
+            if story:
+                clock_txt = story_label(s["time"], story)
+            else:
+                clock_txt = next((clocks[p].text for p in clock_panels if clocks[p].now is not None), "") or ""
             if now is not None:
                 story_has_clock = True
             step_el = elapsed(prev_now, now)
@@ -425,23 +521,40 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                 span += step_el
             # numbers: jumps, rates, charging
             for pid, t in ptype.items():
+                bp = patches.get(pid) if t == "battery" and isinstance(patches.get(pid), dict) else {}
+                anchor = "charge" in bp
+                extra = bp.get("drain") if not anchor and isinstance(bp.get("drain"), (int, float)) \
+                    and not isinstance(bp.get("drain"), bool) else 0
                 for key, v in numbers(pid, t, state[pid], fields.get(pid, [])).items():
                     t0, v0 = last_num.get(key, (None, None))
                     last_num[key] = (now, v)
                     if v0 is None or v == v0:
                         continue
+                    if t == "battery":
+                        batt_changed.add(pid)
                     el = elapsed(t0, now)
-                    rate = None if not el else (v - v0) * 60.0 / el
-                    drift.append("%s %s: %s -> %s over %s%s" % (
+                    # the step's authored extra drain is a device operation, not a rate
+                    moved = v - v0 + (extra if key == pid else 0)
+                    rate = None if not el else moved * 60.0 / el
+                    drift.append("%s %s: %s -> %s over %s%s%s" % (
                         sid, key, v0, v,
                         hm(el) if el else ("0 min" if el == 0 else
                                            "(no clock)" if now is None else "an unknown interval"),
-                        "" if rate is None else " = %+.1f/h" % rate))
-                    if el == 0:
+                        "" if rate is None else " (two-decimal rounding)" if abs(moved) <= 0.011
+                        else " = %s/h" % fmt_rate(rate),
+                        " (anchor)" if anchor and key == pid else
+                        " after extra drain %g" % extra if extra and key == pid else ""))
+                    if el == 0 and abs(moved) >= 0.01:
                         scheck("%s: %s changes %s -> %s with no clock change" % (sid, key, v0, v))
                     lim = rates.get(key)
-                    if lim and rate is not None and not (lim[0] <= rate <= lim[1]):
-                        swarn("%s: %s rate %+.1f/h is outside the stated %g..%g/h" % (sid, key, rate, lim[0], lim[1]))
+                    # the engine stores charge to two decimals: allow that rounding
+                    tol = 0.011 * 60.0 / el if el else 0
+                    # with story time a `charge` patch is an anchor that overrides drift on
+                    # purpose (anchors first); without it, charge patches are the drift itself
+                    anchored = bool(story) and anchor and key == pid
+                    if lim and rate is not None and abs(moved) >= 0.01 and not anchored \
+                            and not (lim[0] - tol <= rate <= lim[1] + tol):
+                        swarn("%s: %s rate %s/h is outside the stated %g..%g/h" % (sid, key, fmt_rate(rate), lim[0], lim[1]))
                     if t == "battery" and v > v0 and state[pid].get("trend") != "charging" \
                             and prev_state[pid].get("trend") != "charging":
                         scheck("%s: %s charge rises %s -> %s but the trend is not charging before or at this "
@@ -460,7 +573,9 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                     bp, proven = battery_for_card(cnode, batt_panels)
                     bval = numbers(bp["id"], "battery", state[bp["id"]], []).get(bp["id"]) if bp else None
                     key = (ap, f)
-                    if bval is not None and isinstance(v, (int, float)) and not isinstance(v, bool) and v != bval:
+                    # the battery readout shows a whole percent (drift keeps fractions)
+                    if bval is not None and isinstance(v, (int, float)) and not isinstance(v, bool) \
+                            and v != bval and v != int(bval + 0.5):
                         # an older report is fine when the card's detail says when it was
                         if key not in batt_mismatch and not SAYS_WHEN.search(det):
                             msg = ("%s: %s.%s shows %s but battery panel %s shows %s (fine only if the app shows "
@@ -501,10 +616,10 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                     if win is None:
                         fresh_since.pop((pid, fk), None)
                     elif redetailed or (fresh_since.get((pid, fk)) or (None,))[0] != det:
-                        fresh_since[(pid, fk)] = (det, clocks[pid].now)
+                        fresh_since[(pid, fk)] = (det, pnow(pid))
                         fresh_flagged.discard((pid, fk, det))
                     else:
-                        shown = elapsed(fresh_since[(pid, fk)][1], clocks[pid].now)
+                        shown = elapsed(fresh_since[(pid, fk)][1], pnow(pid))
                         if shown is not None and shown >= win and (pid, fk, det) not in fresh_flagged:
                             fresh_flagged.add((pid, fk, det))
                             scheck("%s: %s.%s.detail %r has been shown unchanged for %s; that text stays "
@@ -613,15 +728,18 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                     print("  " + msg)
                 else:
                     (warn if kind == "WARN" else check)(msg)
+            for pid in ptype:
+                if visible(state[pid]) != visible(prev_state[pid]):
+                    moved_panels.add(pid)
             if show_state:
                 for pid in ptype:
                     changed = visible(state[pid]) != visible(prev_state[pid])
                     print("      %s %-8s %s" % ("*" if changed else " ", pid, compact(state[pid])[:400]))
         for pid in ptype:
-            if pid not in touched:
-                check("panel %s is never patched on path %s (holds everywhere? give each step a holds: reason)" % (pid, path["id"]))
+            if pid not in touched and pid not in moved_panels:
+                check("panel %s never changes on path %s (holds everywhere? give each step a holds: reason)" % (pid, path["id"]))
         for pid, t in ptype.items():
-            if t != "battery" or batt_changes or span <= 0:
+            if t != "battery" or pid in batt_changed or span <= 0:
                 continue
             lim = rates.get(pid)
             # the smallest change the stated rate allows over the span
@@ -637,6 +755,25 @@ def walk(dg, rates, show_state, warn, check, note, expects):
             print("  numeric changes (compare each rate with the source's stated rate):")
             for line in drift:
                 print("    " + line)
+    for bid, r in sorted((dg.get("batteryRates") or {}).items()):
+        src = r.get("sources") or {}
+        # which rate each elapsed interval applied: the trend before the step decides
+        # (a battery with no numeric charge, NO DATA, does not drift until an anchor)
+        applied = set()
+        num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
+        for p in dg["paths"]:
+            before = dg["initial"].get(bid, {}).get("trend")
+            has_charge = num(dg["initial"].get(bid, {}).get("charge"))
+            for st in p["steps"]:
+                if st["time"] > st["previous"] and has_charge:
+                    applied.add("chargePerHour" if before == "charging" else "drainPerHour")
+                before = st["state"].get(bid, {}).get("trend")
+                has_charge = num(st["state"].get(bid, {}).get("charge"))
+        used = [k for k in ("drainPerHour", "chargePerHour") if src.get(k) == "built-in" and k in applied]
+        if used:
+            check("battery %s drifts on the built-in placeholder %s (not a device fact): take the rate from the "
+                  "source, or label it illustrative in the ledger and on the page" % (
+                      bid, " and ".join("%s %g %%/h" % (k, r[k]) for k in used)))
     for pnl in panels:
         if pnl.get("type") == "screen" and pnl.get("scene") == "static-noise":
             modes = {st["state"].get(pnl["id"], {}).get("mode") for p in dg["paths"] for st in p["steps"]}

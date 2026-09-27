@@ -8,12 +8,16 @@ sparse: omitted fields carry forward along the selected path.
 
 ## Time-bearing fields
 
+With `diagram.storyTime`, the step's `time` drives the clocks and the
+battery (see `docs/step-time.md` in VIZ). The fields below are what is still
+yours at every clock move.
+
 | Panel type | Time-bearing fields to reconsider at every clock move | Notes |
 |---|---|---|
-| `phone` | `clock`, `date` (strings, in `initial` and step patches) | Rendered verbatim. `date: ""` hides the date. Notifications (`notify`) accumulate; `clear: true` removes them. |
-| `deviceapp` | `clock`, `date`, `note` (strings); each field's `detail` text | `detail` is where freshness lives ("Updated just now", "Last report 6:05 PM · 13 h ago"). `status` is explicit: `unknown`, `loading`, `ready`, `stale`, `error`. A new value does not change status or detail by itself. |
-| `appscreens` | `clock`, `date` | Shown on one status-bar line inside the phone frame. Pick screen images that fit the time of day. |
-| `battery` | `charge` (0 to 100), `trend` (`charging`, `draining`, `idle`), `note` | Drift slowly over hours; faster under load; rises while charging. `note` can say "illustrative drift" or a forecast from the source. |
+| `phone` | none: `clock`/`date` follow the step time | Do not set `clock`/`date` in new specs; an explicit value pins the panel until story time moves. Notifications (`notify`) accumulate; `clear: true` removes them. |
+| `deviceapp` | each field's `detail` text, `note` (`clock`/`date` follow the step time) | `detail` is where freshness lives ("Updated just now", "Last report 6:05 PM · 13 h ago"). `status` is explicit: `unknown`, `loading`, `ready`, `stale`, `error`. A new value does not change status or detail by itself. A `kind: "battery"` card is reported: patch it at report steps. |
+| `appscreens` | none: `clock`/`date` follow the step time | Pick screen images that fit the time of day. |
+| `battery` | `trend` (`charging`, `draining`, `idle`), extra `drain`, `charge` anchor, `note` | Charge drifts by itself: `drainPerHour`/`chargePerHour` on the panel, else `deviceDefaults.battery`, else built-in placeholders (1 and 20 %/h, never device facts). Charging applies from the step after `trend: "charging"`. `drain` subtracts a one-step operation cost; `charge` sets an exact anchor. `note` can say "illustrative drain estimate". |
 | `thermo` | `value` | Moves only with a cause. The zone is computed from `warn`/`crit` (and optional `lowWarn`/`lowCrit`). |
 | `dispatch` | `timeOfDay` (`day`, `dusk`, `night`), responder `eta` text | ETA is authored text, never a countdown. It holds until a source-backed update arrives; do not decrement it because time passed. If it has gone stale, age or qualify it ("ETA 8 min, as of 2:10 PM"). |
 | `screen` | declaration `scene` (not patchable per step) | Choose a scene that matches the story and its time, for example `person-at-door-night` only for a night story. Stock scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`, `doorbell-runners`, `package-drop`, `kitchen-fire`, `static-noise` (test pattern). If none fits, omit the screen. |
@@ -21,11 +25,11 @@ sparse: omitted fields carry forward along the selected path.
 | `homemap` | none | No day/night field. Time shows through subject positions, device states and captions. |
 | `log`, `table`, `state` | authored text | If you print timestamps, keep them consistent with the clock. |
 
-Clock rule per path: the clock never goes backward. When the date changes,
-patch `date` on the first step of the new day. Use one clock format across all
-panels (for example `6:05 PM`, or `18:05`) and the same time in the caption.
+Clock rule per path: story time never goes backward. The date changes by
+itself after midnight. Choose the format once in `storyTime.clock` and
+`.date`, and write the same time in the caption.
 
-Freshness rule: whenever the clock moves, recompute `detail` for every
+Freshness rule: whenever the story time moves, recompute `detail` for every
 device-app card that shows a report time or age. If a report is overdue by the
 source's rule, also set `status: "stale"` (cached) or `"error"` (unavailable)
 as the source supports. Never leave "Updated just now" on a card three hours
@@ -97,12 +101,12 @@ security`. Do not use any other ID.
 
 ## Checklist per step (use for worksheet section E)
 
-- [ ] Clock and date moved on every clock-bearing panel, or `holds: same minute`.
+- [ ] Step `time` set if story time passes (panels follow it); none for a beat within the same minute.
 - [ ] Freshness `detail` recomputed on every card that shows an age.
 - [ ] A reported card value changed only if this step lights the report.
 - [ ] At a state change, every carried card value (recording, thermal,
       connection) is still true, or rewritten.
-- [ ] Battery drift considered (holds only if minutes passed, not hours).
+- [ ] Battery: drift is automatic; `trend` patched where charging starts or stops, `drain` for an operation the source costs, `charge` only at an anchor.
 - [ ] Temperature considered (holds unless there is a cause).
 - [ ] Every icon whose state changed at this step is patched; every icon whose
       state cleared is restored.

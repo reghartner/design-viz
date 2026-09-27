@@ -12,16 +12,19 @@ every worksheet cell and every spec field. For longer discussion and examples
   No new arithmetic, no finer breakdowns, no invented IDs or sequence numbers.
 - Label hypothetical scenarios as hypothetical. Keep proposed design, reviewed
   behavior and observed traces separate, even on one page.
-- **Allowed illustrative values**: story clock times, dates, elapsed-time
-  freshness text, slow battery drift, and layout coordinates, when the source
-  gives none. Label each as `illus` in the worksheet and in a ledger row
-  ("clock times illustrative; source gives no times"). When such values are
-  visible on the page, also say so on the page: one line in the section
-  description, such as "Clock times and battery levels are illustrative." Any value the source
-  does state is used verbatim instead.
+- **Allowed illustrative values**: story start, end and step times,
+  elapsed-time freshness text, battery drain and charge rates (your estimate,
+  or the built-in placeholders, which are never device facts), and layout
+  coordinates, when the source gives none. Label each as `illus` in the
+  worksheet and in a ledger row ("step times illustrative; source gives no
+  times"). When such values are visible on the page, also say so on the page:
+  one line in the section description, such as "Clock times and the battery
+  drain rate are illustrative." Any value the source does state is used
+  verbatim instead.
 - Operator answers are facts too. A time or value the operator gives is an
-  anchor; never move or replace it to fit an approximate rate. Rate math fills
-  gaps between anchors only where a supplied rate applies.
+  anchor (an absolute step `time`, a `charge` patch); never move or replace
+  it to fit an approximate rate. Drift fills gaps between anchors only where
+  a supplied (or labeled illustrative) rate applies.
 - Do not invent other values to fill a widget (queue depth, temperature
   readings between anchors, latency). Use an honest qualitative
   representation or leave the field unknown.

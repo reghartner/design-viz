@@ -165,7 +165,8 @@ Without `storyTime`, keep authoring `detail` as above.
   (no freshness from this step on, even for an inherited report) and
   **Inherit** removes this step's report time.
   Effective state shows the computed text as *Story time · derived freshness*. Blank controls mean no override in that
-  patch; use raw JSON for an explicit null reset.
+  patch. **Clear report time** writes the report-time `null` for you; use raw
+  JSON only for other explicit `null` resets, such as a whole field.
 - Use a wide named-layout tile for phone + source map. The example's **App +
   sources** view emphasizes the UI; **End-to-end** also includes the backend
   diagram and attaches playback to it. Both use the same steps and paths.

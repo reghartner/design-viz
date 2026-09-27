@@ -1710,7 +1710,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       return false;
     },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
-    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,resetExplore:viewport.reset,
+    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
     destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 

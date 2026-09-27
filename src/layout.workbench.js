@@ -38,10 +38,10 @@ function initSectionLayoutEditor(opts){
   [['default','Responsive'],['backstage','Backstage'],['confluence','Confluence']].forEach(function(v){var o=el('option',null,v[1]);o.value=v[0];target.appendChild(o);});
   label.appendChild(target);toolbar.appendChild(label);
   var widthLabel=el('label',null,'Width '),width=el('input');width.type='number';width.min='320';width.max='1920';width.step='10';width.setAttribute('aria-label','Preview width in pixels');widthLabel.appendChild(width);toolbar.appendChild(widthLabel);
-  var note=el('span','fnote');toolbar.appendChild(note);
+  var note=el('span','fnote');note.setAttribute('role','status');toolbar.appendChild(note);
   var stage=el('div','layout-preview-stage'),frame=el('div','layout-preview-frame');
   view.parentNode.insertBefore(toolbar,view);view.parentNode.insertBefore(stage,view);stage.appendChild(frame);frame.appendChild(view);
-  function feedback(text){note.textContent=text;}
+  function feedback(text){note.textContent=text;note.title=text;}
   function setFrame(){
     var host=target.value;frame.setAttribute('data-target',host);
     width.disabled=host==='default';width.value=host==='default'?'':widths[host];

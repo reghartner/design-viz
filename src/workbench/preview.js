@@ -160,6 +160,28 @@ function createWorkbenchPreviewController(opts){
     opts.present(skin);
     return finish({ok:true,replaced:true,text:text,origin:request.origin});
   }
+  function retainExplore(next,text,request){
+    var hint=request.origin==='edit' && request.retention && request.retention.exploreLayout;
+    if(!hint || !page || !ctl || !Number.isInteger(hint.section) || hint.section<0 || typeof hint.id!=='string')return false;
+    function target(doc){
+      var record=sectionRecords(doc)[hint.section],d=record && record.section.diagram;
+      var matches=d && Array.isArray(d.layouts)?d.layouts.filter(function(v){return v.id===hint.id;}):[];
+      return matches.length===1 && matches[0].presentation==='explore'?matches[0]:null;
+    }
+    var before=target(page),after=target(next),rec=(ctl.sections || []).find(function(r){return r.number===hint.section+1;});
+    var presentation=rec && rec.presentation;
+    if(!before || !after || !presentation || !presentation.viewId || presentation.viewId()!==hint.id || !presentation.adoptExploreLayout)return false;
+    var candidate=JSON.parse(JSON.stringify(page)),candidateView=target(candidate);
+    if(Object.prototype.hasOwnProperty.call(after,'exploreLayout'))candidateView.exploreLayout=after.exploreLayout;
+    else delete candidateView.exploreLayout;
+    // The hint is only an optimization request, never permission to skip any
+    // other change. Keep the current model identity captured by live renderers.
+    if(JSON.stringify(candidate)!==JSON.stringify(next) || !presentation.adoptExploreLayout(hint.id,after.exploreLayout))return false;
+    if(Object.prototype.hasOwnProperty.call(after,'exploreLayout'))before.exploreLayout=JSON.parse(JSON.stringify(after.exploreLayout));
+    else delete before.exploreLayout;
+    renderedText=text;
+    return finish({ok:true,replaced:false,retained:'explore',text:text,origin:request.origin});
+  }
   return {
     render:function(text,request){
       request=request || {origin:'manual'};
@@ -171,6 +193,7 @@ function createWorkbenchPreviewController(opts){
       var next=normalize(raw),verdict=validate(next),lint=verdict.errors.length?[]:lintPage(next);
       opts.findings({errors:verdict.errors,warnings:verdict.warnings.concat(lint)});
       if(verdict.errors.length)return finish({ok:false,replaced:false,text:text,reason:'validation',origin:request.origin});
+      var retained=retainExplore(next,text,request);if(retained)return retained;
       return replace(next,text,opts.skin(next),request);
     },
     repaint:function(skin){

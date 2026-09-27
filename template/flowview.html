@@ -25800,6 +25800,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     setView:function(view,tiles){leave();definition=view;items=tiles || [];enter();},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
+    adoptLayout:function(id,value){
+      if(retired || !active || !author || definition.id!==id)return false;
+      var normalized=sectionExploreLayout(d,value);
+      if(JSON.stringify(normalized)!==JSON.stringify(sectionExploreLayout(d,memory.layout)))return false;
+      definition.exploreLayout=copy(normalized);return true;
+    },
     reset:function(){
       if(!active)return;var token=beginEdit();if(token===false)return;
       var id=definition.id;leave();delete memories[id];
@@ -27546,7 +27552,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       return false;
     },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
-    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,resetExplore:viewport.reset,
+    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
     destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 

@@ -1575,6 +1575,7 @@ body.sk-aurora.sk-blueprint{
 /* Host previews affect the preview frame, never the authored story. */
 .layout-preview-tools,.section-arrange-actions,.section-arrange-fields{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
 .layout-preview-tools{margin:10px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--ink);}
+.layout-preview-tools>.fnote{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .layout-preview-tools label,.section-arrange-fields label{display:flex;align-items:center;gap:5px;}
 .layout-preview-tools select,.layout-preview-tools input,.section-arrange-fields select,.section-arrange-fields input{box-sizing:border-box;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:6px;min-height:34px;font:inherit;}
 .layout-preview-tools input{width:88px;}
@@ -27394,6 +27395,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     setView:function(view,tiles){leave();definition=view;items=tiles || [];enter();},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
+    adoptLayout:function(id,value){
+      if(retired || !active || !author || definition.id!==id)return false;
+      var normalized=sectionExploreLayout(d,value);
+      if(JSON.stringify(normalized)!==JSON.stringify(sectionExploreLayout(d,memory.layout)))return false;
+      definition.exploreLayout=copy(normalized);return true;
+    },
     reset:function(){
       if(!active)return;var token=beginEdit();if(token===false)return;
       var id=definition.id;leave();delete memories[id];
@@ -29140,7 +29147,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       return false;
     },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
-    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,resetExplore:viewport.reset,
+    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
     destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 
@@ -39945,7 +39952,7 @@ function initWorkbenchBuilder(opts){
     formError('');
     return session.accept(plan,{
       snapshot:snapshot,
-      retention:{multi:true,addMode:!!interactions.adding()},
+      retention:{multi:true,addMode:!!interactions.adding(),exploreLayout:opt && opt.exploreLayout},
       afterRender:function(){
         if (opt && opt.after) opt.after(plan);
         rehighlight();syncBoardToSelectedStep();applyStepMarkers();
@@ -40121,7 +40128,7 @@ function initWorkbenchBuilder(opts){
       return commitCascade(function(raw){return planSectionLayoutName(session.text(),raw,section,name,id);});
     },
     setExploreLayout:function(section,id,value){
-      return commitCascade(function(raw){return planSectionExploreLayout(session.text(),raw,section,id,value);});
+      return commitCascade(function(raw){return planSectionExploreLayout(session.text(),raw,section,id,value);},{exploreLayout:{section:section,id:id}});
     },
     setPresentation:function(section,id,value){
       return commitCascade(function(raw){return planSectionViewPresentation(session.text(),raw,section,id,value);});
@@ -40151,6 +40158,7 @@ function initWorkbenchBuilder(opts){
   }
   function previewRendered(outcome){
     hideDiff();
+    if(outcome.ok && outcome.retained==='explore')return;
     if(addMenu)addMenu.refresh();
     if(outlineSearch)refreshOutline();
     if(!outcome.ok){
@@ -41577,6 +41585,28 @@ function createWorkbenchPreviewController(opts){
     opts.present(skin);
     return finish({ok:true,replaced:true,text:text,origin:request.origin});
   }
+  function retainExplore(next,text,request){
+    var hint=request.origin==='edit' && request.retention && request.retention.exploreLayout;
+    if(!hint || !page || !ctl || !Number.isInteger(hint.section) || hint.section<0 || typeof hint.id!=='string')return false;
+    function target(doc){
+      var record=sectionRecords(doc)[hint.section],d=record && record.section.diagram;
+      var matches=d && Array.isArray(d.layouts)?d.layouts.filter(function(v){return v.id===hint.id;}):[];
+      return matches.length===1 && matches[0].presentation==='explore'?matches[0]:null;
+    }
+    var before=target(page),after=target(next),rec=(ctl.sections || []).find(function(r){return r.number===hint.section+1;});
+    var presentation=rec && rec.presentation;
+    if(!before || !after || !presentation || !presentation.viewId || presentation.viewId()!==hint.id || !presentation.adoptExploreLayout)return false;
+    var candidate=JSON.parse(JSON.stringify(page)),candidateView=target(candidate);
+    if(Object.prototype.hasOwnProperty.call(after,'exploreLayout'))candidateView.exploreLayout=after.exploreLayout;
+    else delete candidateView.exploreLayout;
+    // The hint is only an optimization request, never permission to skip any
+    // other change. Keep the current model identity captured by live renderers.
+    if(JSON.stringify(candidate)!==JSON.stringify(next) || !presentation.adoptExploreLayout(hint.id,after.exploreLayout))return false;
+    if(Object.prototype.hasOwnProperty.call(after,'exploreLayout'))before.exploreLayout=JSON.parse(JSON.stringify(after.exploreLayout));
+    else delete before.exploreLayout;
+    renderedText=text;
+    return finish({ok:true,replaced:false,retained:'explore',text:text,origin:request.origin});
+  }
   return {
     render:function(text,request){
       request=request || {origin:'manual'};
@@ -41588,6 +41618,7 @@ function createWorkbenchPreviewController(opts){
       var next=normalize(raw),verdict=validate(next),lint=verdict.errors.length?[]:lintPage(next);
       opts.findings({errors:verdict.errors,warnings:verdict.warnings.concat(lint)});
       if(verdict.errors.length)return finish({ok:false,replaced:false,text:text,reason:'validation',origin:request.origin});
+      var retained=retainExplore(next,text,request);if(retained)return retained;
       return replace(next,text,opts.skin(next),request);
     },
     repaint:function(skin){
@@ -41798,10 +41829,10 @@ function initSectionLayoutEditor(opts){
   [['default','Responsive'],['backstage','Backstage'],['confluence','Confluence']].forEach(function(v){var o=el('option',null,v[1]);o.value=v[0];target.appendChild(o);});
   label.appendChild(target);toolbar.appendChild(label);
   var widthLabel=el('label',null,'Width '),width=el('input');width.type='number';width.min='320';width.max='1920';width.step='10';width.setAttribute('aria-label','Preview width in pixels');widthLabel.appendChild(width);toolbar.appendChild(widthLabel);
-  var note=el('span','fnote');toolbar.appendChild(note);
+  var note=el('span','fnote');note.setAttribute('role','status');toolbar.appendChild(note);
   var stage=el('div','layout-preview-stage'),frame=el('div','layout-preview-frame');
   view.parentNode.insertBefore(toolbar,view);view.parentNode.insertBefore(stage,view);stage.appendChild(frame);frame.appendChild(view);
-  function feedback(text){note.textContent=text;}
+  function feedback(text){note.textContent=text;note.title=text;}
   function setFrame(){
     var host=target.value;frame.setAttribute('data-target',host);
     width.disabled=host==='default';width.value=host==='default'?'':widths[host];

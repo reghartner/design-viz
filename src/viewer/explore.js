@@ -289,6 +289,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     setView:function(view,tiles){leave();definition=view;items=tiles || [];enter();},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
+    adoptLayout:function(id,value){
+      if(retired || !active || !author || definition.id!==id)return false;
+      var normalized=sectionExploreLayout(d,value);
+      if(JSON.stringify(normalized)!==JSON.stringify(sectionExploreLayout(d,memory.layout)))return false;
+      definition.exploreLayout=copy(normalized);return true;
+    },
     reset:function(){
       if(!active)return;var token=beginEdit();if(token===false)return;
       var id=definition.id;leave();delete memories[id];

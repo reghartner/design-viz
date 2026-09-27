@@ -30,6 +30,37 @@ test('controlled attempts report one outcome and retain the current preview for 
   assert.equal(h.outcomes.length,3);assert.equal(h.events.filter(e=>e[0]==='before').length,1);
   p.repaint('terminal');assert.equal(ctl.dead,true);assert.equal(p.renderedText(),SOURCE);assert.equal(h.outcomes.at(-1).origin,'skin');
 });
+test('Explore geometry acceptance keeps the live model and controller only for the verified active view edit',()=>{
+  const h=harness(),p=h.preview;
+  const source=JSON.parse(SOURCE),diagram=source.page.sections[0].diagram;
+  diagram.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}];
+  p.render(JSON.stringify(source));
+  const page=p.page(),live=page.sections[0].diagram.layouts[0],ctl=p.controller(),adopted=[];
+  ctl.sections=[{number:1,presentation:{viewId:()=> 'engineering',adoptExploreLayout:(id,value)=>{adopted.push([id,plain(value)]);return true;}}}];
+  const next=structuredClone(source);next.page.sections[0].diagram.layouts[0].exploreLayout={camera:{zoom:1,x:.3,y:.4}};
+  const text=JSON.stringify(next,null,2),request={origin:'edit',retention:{exploreLayout:{section:0,id:'engineering'}}};
+  const result=p.render(text,request);
+  assert.equal(result.ok,true);assert.equal(result.replaced,false);assert.equal(result.retained,'explore');
+  assert.equal(p.page(),page);assert.equal(p.controller(),ctl);assert.equal(ctl.dead,false);assert.equal(p.renderedText(),text);
+  assert.deepEqual(plain(live.exploreLayout),next.page.sections[0].diagram.layouts[0].exploreLayout);assert.equal(adopted.length,1);
+  p.repaint('pastel');assert.equal(ctl.dead,true);assert.deepEqual(plain(p.page()),next.page);
+});
+test('forged Explore hints, unrelated edits and invalid documents cannot bypass normal preview replacement or validation',()=>{
+  for(const variant of ['unrelated','inactive','differentGeometry','history','invalid','missing','duplicate']){
+    const h=harness(),p=h.preview,source=JSON.parse(SOURCE);
+    source.page.sections[0].diagram.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}];
+    p.render(JSON.stringify(source));const ctl=p.controller();
+    ctl.sections=[{number:1,presentation:{viewId:()=>variant==='inactive'?'other':'engineering',adoptExploreLayout:()=>variant!=='differentGeometry'}}];
+    const next=structuredClone(source);next.page.sections[0].diagram.layouts[0].exploreLayout={camera:{zoom:1,x:.3,y:.4}};
+    if(variant==='unrelated')next.page.title='Other';
+    if(variant==='invalid')next.page.sections[0].diagram.rows='broken';
+    if(variant==='duplicate')next.page.sections[0].diagram.layouts.push(structuredClone(next.page.sections[0].diagram.layouts[0]));
+    const result=p.render(JSON.stringify(next),{origin:variant==='history'?'history':'edit',retention:{exploreLayout:{section:variant==='missing'?99:0,id:'engineering'}}});
+    assert.notEqual(result.retained,'explore',variant);
+    if(!result.ok){assert.equal(ctl.dead,false);assert.equal(result.reason,'validation');}
+    else{assert.equal(result.replaced,true);assert.equal(ctl.dead,true);}
+  }
+});
 test('replacement failure invalidates retired preview identity; failure before teardown leaves the existing controller usable',()=>{
   const h=harness(),p=h.preview;p.render(SOURCE);const first=p.controller();
   h.fail('before');let outcome=p.render(SOURCE+' ');assert.equal(outcome.ok,false);assert.equal(outcome.replaced,false);

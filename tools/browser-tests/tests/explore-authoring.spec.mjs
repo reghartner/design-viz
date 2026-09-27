@@ -88,3 +88,30 @@ test('wheel panning saves once, while a pending pan cannot replace handwritten s
   await page.locator('#src').evaluate((el,text)=>{el.value=text;el.dispatchEvent(new Event('input',{bubbles:true}));},handwritten);
   await page.waitForTimeout(350);await expect(page.locator('#src')).toHaveValue(handwritten);
 });
+
+for(const mode of ['default','switched','expanded','fullscreen','arranged','selected','narrow','zoomed'])test('repeated canvas drags retain the released position: '+mode,async({page,server})=>{
+  if(mode==='narrow')await page.setViewportSize({width:1280,height:800});
+  const spec=structuredClone(named);if(mode==='default')spec.page.sections[0].diagram.defaultLayout='service-flow';
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));
+  if(mode!=='default')await section(page).getByRole('button',{name:'Service flow',exact:true}).click();
+  if(mode==='arranged')await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
+  if(mode==='selected')await section(page).locator('.schip').nth(2).click();
+  if(mode==='zoomed')await section(page).getByRole('button',{name:'Zoom in',exact:true}).click();
+  if(mode==='expanded'){await page.evaluate(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(Error('Test fallback'));});await section(page).getByRole('button',{name:'Expand diagram view',exact:true}).click();}
+  if(mode==='fullscreen'){await section(page).getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(true);}
+  const board=section(page).locator('.explore-board');await board.scrollIntoViewIfNeeded();
+  const originalBoard=await board.elementHandle();
+  const position=()=>board.evaluate(el=>{const r=el.querySelector('svg').getBoundingClientRect();return {x:el.scrollLeft,y:el.scrollTop,svgX:r.x,svgY:r.y,width:r.width,height:r.height};});
+  for(let i=0;i<3;i++){
+    const b=await board.evaluate(el=>{const r=el.getBoundingClientRect();for(let y=Math.max(100,r.top+100);y<Math.min(innerHeight-120,r.bottom-120);y+=50)for(let x=r.left+30;x<r.right-350;x+=50){const hit=document.elementFromPoint(x,y);if(hit && hit.closest('.explore-board')===el && !hit.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step]'))return {x,y};}throw Error('No empty graph area');});
+    const before=await position(),source=await page.locator('#src').inputValue();
+    await page.mouse.move(b.x,b.y);await page.mouse.down();await page.mouse.move(b.x+45,b.y+45,{steps:6});
+    const held=await position();expect(held.x).toBeCloseTo(before.x-45,0);expect(held.y).toBeCloseTo(before.y-45,0);
+    await page.waitForTimeout(150);expect(await position()).toEqual(held);
+    await page.mouse.up();await expect(page.locator('#src')).not.toHaveValue(source);
+    await page.waitForTimeout(350);expect(await position()).toEqual(held);
+    expect(await originalBoard.evaluate(el=>el.isConnected)).toBe(true);
+    if(mode==='fullscreen')expect(await page.evaluate(()=>!!document.fullscreenElement)).toBe(true);
+    if(mode==='expanded')await expect(section(page).locator('.section-viewport')).toHaveClass(/viewport-expanded/);
+  }
+});

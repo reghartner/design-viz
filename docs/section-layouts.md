@@ -169,7 +169,9 @@ sizes are independent of the profile's grid geometry.
 **In the workbench**, moving or resizing a panel or step controls, panning,
 zooming, and choosing **Stack at edge** save defaults in the selected view. Each
 completed gesture is one Undo/Redo action; Escape cancels a drag. **Arrange
-section** keeps Explore visible and exposes element visibility, step selection,
+section** keeps Explore visible. Saving a move, resize, pan, or zoom keeps the
+live viewport in place, including in expanded and browser fullscreen views. **Arrange
+section** exposes element visibility, step selection,
 and view settings. **Optimize layout** and **Reset layout** reset Explore
 positions and camera to the automatic stack and sizing, respecting hidden panels.
 Temporary Hide/Restore actions never change saved visibility; use **Visible

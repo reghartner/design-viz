@@ -422,6 +422,10 @@ function wireTour(ctl, view, win, config, options){
         var noteX = Math.max(16, Math.min(s.x + s.width - 260, vw - 276));
         note.style.cssText = 'left:' + noteX + 'px;top:' + (s.y + s.height + 10) + 'px';
         parts.extras.appendChild(note);
+        var noteRect=note.getBoundingClientRect();
+        note.style.left=Math.max(16,Math.min(s.x+s.width-noteRect.width,vw-noteRect.width-16))+'px';
+        if(noteRect.bottom>vh-16)
+          note.style.top=Math.max(16,s.y-noteRect.height-10)+'px';
       }
     });
     /* hit-blocking: complement of the union on the edge grid */

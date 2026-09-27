@@ -263,6 +263,9 @@ test('the default tour keeps the Explore player and highlighted panel on screen 
   await expect.poll(()=>page.locator('.explore-window:visible').first().evaluate(el=>{
     const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth;
   })).toBe(true);
+  await expect.poll(()=>page.locator('.dv-tour-note').evaluateAll(notes=>notes.every(el=>{
+    const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth;
+  }))).toBe(true);
 });
 
 

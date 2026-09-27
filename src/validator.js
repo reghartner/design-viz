@@ -162,6 +162,7 @@ function sectionLayoutWarnings(d, path, warnings){
         if(v.presentation!==undefined && v.presentation!=='standard' && v.presentation!=='explore')warnings.push(p+'.presentation: use "standard" or "explore"; omit for standard');
         if(!v.sectionLayout || !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))warnings.push(p+'.sectionLayout: declare at least one host profile');
         sectionLayoutProfileWarnings(d,v.sectionLayout,p,warnings);
+        sectionExploreLayout(d,v.exploreLayout,warnings,p+'.exploreLayout');
         if(v.steps!=null){
           var ids=(d.steps || []).map(function(st){return st && st.id;});
           if(!Array.isArray(v.steps) || !v.steps.length || v.steps.some(function(id,i){return typeof id!=='string' || ids.filter(function(s){return s===id;}).length!==1 || v.steps.indexOf(id)!==i;}))warnings.push(p+'.steps: use a nonempty list of unique existing step IDs; omit for all steps');

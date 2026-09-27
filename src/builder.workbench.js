@@ -852,6 +852,9 @@ function initWorkbenchBuilder(opts){
     rename:function(section,name,id){
       return commitCascade(function(raw){return planSectionLayoutName(session.text(),raw,section,name,id);});
     },
+    setExploreLayout:function(section,id,value){
+      return commitCascade(function(raw){return planSectionExploreLayout(session.text(),raw,section,id,value);});
+    },
     setPresentation:function(section,id,value){
       return commitCascade(function(raw){return planSectionViewPresentation(session.text(),raw,section,id,value);});
     },

@@ -1,4 +1,5 @@
-/* Preview position and layout never enter the spec or undo history. */
+/* Selected views and playback are preview state. Explore geometry is authored
+   separately through the layout editor and restored from the spec. */
 function workbenchPreviewSections(page){
   return sectionRecords(page).map(function(record){
     var sec=record.section,d=sec.diagram || {};

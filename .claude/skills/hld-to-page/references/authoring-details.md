@@ -111,9 +111,13 @@ for business storytelling and an Explore view for engineering inspection:
 Explore fills the workspace with the graph, floats independent draggable,
 resizable, hideable panels at its edges, and pins step controls. The setting
 belongs to the named view across every host profile. It does not duplicate
-story state or author runtime panel positions. In Arrange section, **Presentation**
-selects Standard/Explore; **Done arranging** returns from the saved tile grid to
-the reader presentation. Duplicate view preserves the setting.
+story state. In Arrange section, **Presentation** selects Standard/Explore and
+the workbench keeps Explore visible while editing. Panel and step-control moves
+and resizes, canvas pans and zoom changes save to `layouts[].exploreLayout` as
+one Undo action per gesture. Windows use viewport fractions; `camera` uses
+`zoom` plus center `x`/`y` as fractions of the SVG viewBox. Duplicate view keeps
+these defaults. Reader overrides and temporary Hide panels remain session-only.
+See `docs/section-layouts.md` for the contract and an example.
 Duplicate view and Swap places
 can replace Home with the diagram while retaining supporting panels and controls.
 Use explicit tile `hidden:true` for per-view visibility; all views share one set

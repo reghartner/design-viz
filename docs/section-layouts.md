@@ -138,12 +138,17 @@ authored default; deleting the selected view falls back to the remaining default
 
 ## Explore presentation
 
-Choose **Arrange section → Presentation → Explore**, then **Done arranging**.
+Choose **Arrange section → Presentation → Explore**. The workbench previews
+the actual Explore workspace, including while arranging.
 The data-flow graph becomes the full-height workspace. Each supporting panel
 starts in a stack at the right edge. Drag its header to move it, drag the corner
 to resize it, or use its **Hide** button. Tab to a header or resize handle and
 use arrow keys; hold Shift for larger changes. Escape cancels a drag. Step
-controls stay pinned and available as you inspect the graph. The same live
+controls stay pinned and available as you inspect the graph. Playback and step
+markers share the top row, with the caption below. Move the controls using the
+small grip on the left; resize their corner. Drag empty canvas to pan, including
+a quarter-screen beyond each edge to uncover content behind panels. The workspace
+height follows the viewport and does not depend on page scroll. The same live
 widgets, selected path and step continue across Standard/Explore switches.
 
 Use **Panels · N** to choose which available panels to show. Panels hidden by
@@ -158,9 +163,15 @@ state remembered independently for each view while the viewer is mounted.
 They do not rewrite the authored diagram or create Undo entries. Explore uses
 the selected host profile's saved visibility, while its floating positions and
 sizes are independent of the profile's grid geometry.
-**Arrange section** temporarily shows the saved grid so you can edit its
-profiles, element visibility and step selection; **Done arranging** returns
-to Explore. Returning a view to **Standard** restores its authored arrangement.
+**In the workbench**, moving or resizing a panel or step controls, panning,
+zooming, and choosing **Stack at edge** save defaults in the selected view. Each
+completed gesture is one Undo/Redo action; Escape cancels a drag. **Arrange
+section** keeps Explore visible and exposes element visibility, step selection,
+and view settings. **Optimize layout** and **Reset layout** reset Explore
+positions and camera to the automatic stack and sizing, respecting hidden panels.
+Temporary Hide/Restore actions never change saved visibility; use **Visible
+elements** for that. Defaults are shared across host profiles and scale to the
+available viewport. Duplicating a view preserves its defaults. Returning a view to **Standard** restores its authored arrangement.
 
 Keep Standard as the default for a business presentation and add an Explore
 view for engineering inspection. The Presentation setting belongs to the named
@@ -326,6 +337,28 @@ Optional `layouts[].presentation` is `"standard"` or `"explore"`; omission means
 and fall back to Standard without dropping the view. Legacy single arrangements
 always use Standard. Explore uses the same story, widgets and saved visibility;
 its reader panel movement and sizing do not alter tile coordinates.
+Optional `layouts[].exploreLayout` saves floating defaults separately from the
+grid. Positions and dimensions use fractions of the Explore viewport; camera
+`x`/`y` describe its center as fractions of the SVG viewBox width/height, and
+`zoom` is the rendered scale (0.15–4). Omitted entries use automatic placement.
+The renderer clamps windows to the available viewport and practical minimum sizes.
+Invalid optional entries warn and fall back independently.
+
+```json
+"exploreLayout": {
+  "panels": [
+    {"panel":"outcome", "x":0.72, "y":0.02, "w":0.26, "h":0.3, "stacked":true}
+  ],
+  "controls": {"x":0.02, "y":0.83, "w":0.68, "h":0.14},
+  "camera": {"zoom":1.2, "x":0.5, "y":0.45}
+}
+```
+
+Readers can move these windows and change framing for their own session without
+rewriting the spec. Only the workbench connects the renderer's authoring callback
+to source edits. The `layout.explore-defaults` capability identifies specs that
+need a viewer supporting saved defaults.
+
 Each uses the same host-profile and tile contract as `sectionLayout` above.
 When a named view lacks both the requested host and a default profile, it uses
 an automatic arrangement for that host. Invalid entries warn and are ignored.

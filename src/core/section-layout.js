@@ -59,6 +59,36 @@ function sectionLayoutPreset(d, target, excludedKeys){
   });
   return items;
 }
+/* Explore defaults are viewport fractions; camera center is in SVG coordinates.
+   Recover malformed optional entries independently without modifying source. */
+function sectionExploreLayout(d,value,warnings,path){
+  var out={},used=Object.create(null);path=path || 'exploreLayout';
+  function warn(at,message){if(warnings)warnings.push(at+': '+message);}
+  function object(v){return v && typeof v==='object' && !Array.isArray(v);}
+  function rect(v,at){
+    if(!object(v) || !['x','y','w','h'].every(function(k){return Number.isFinite(v[k]) && v[k]>=0 && v[k]<=1;}) || v.w===0 || v.h===0){warn(at,'use x/y/w/h viewport fractions from 0 to 1, with positive width and height');return null;}
+    return {x:v.x,y:v.y,w:v.w,h:v.h};
+  }
+  if(value===undefined)return out;
+  if(!object(value)){warn(path,'expected an object');return out;}
+  if(value.panels!==undefined){
+    if(!Array.isArray(value.panels))warn(path+'.panels','expected an array');
+    else out.panels=value.panels.reduce(function(list,v,i){
+      var at=path+'.panels['+i+']',r=rect(v,at);
+      if(!v || typeof v.panel!=='string' || !(d.panels || []).some(function(p){return p.id===v.panel;}) || used[v.panel]){warn(at+'.panel','use a unique existing panel ID');return list;}
+      used[v.panel]=true;
+      if(v.stacked!==undefined && typeof v.stacked!=='boolean'){warn(at+'.stacked','expected a boolean');return list;}
+      if(r)list.push(Object.assign({panel:v.panel},r,{stacked:v.stacked===true}));return list;
+    },[]);
+  }
+  if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
+  if(value.camera!==undefined){
+    var c=value.camera;
+    if(!object(c) || !Number.isFinite(c.zoom) || c.zoom<.15 || c.zoom>4 || !['x','y'].every(function(k){return Number.isFinite(c[k]) && Math.abs(c[k])<=100;}))warn(path+'.camera','use zoom 0.15–4 and finite x/y SVG center coordinates between -100 and 100');
+    else out.camera={zoom:c.zoom,x:c.x,y:c.y};
+  }
+  return out;
+}
 function diagramLayoutViews(d){
   var used=Object.create(null), views=[];
   (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
@@ -66,7 +96,7 @@ function diagramLayoutViews(d){
       typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
       !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
       !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
   if(views.length)return views;
   return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?

@@ -324,6 +324,15 @@ function planSectionViewPresentation(text,raw,section,layoutId,value){
   if(index<0)return {error:'Select a named view before changing its presentation.'};
   return planSetField(text,raw,got.path.concat(['layouts',index]),'presentation',JSON.stringify(value));
 }
+function planSectionExploreLayout(text,raw,section,layoutId,value){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;
+  if(index<0 || got.d.layouts[index].presentation!=='explore')return {error:'Select an Explore view before arranging it.'};
+  var warnings=[];
+  if(value!==null)sectionExploreLayout(got.d,value,warnings,'exploreLayout');
+  if(warnings.length)return {error:warnings.join('\n')};
+  return planSetField(text,raw,got.path.concat(['layouts',index]),'exploreLayout',value===null?null:JSON.stringify(value));
+}
 function planEnsureSectionView(text,raw,section,optimizeTarget){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   if(Array.isArray(got.d.layouts))return {error:'This diagram already has named views.'};
@@ -370,6 +379,7 @@ function planDuplicateSectionLayout(text,raw,section,layoutId){
   var copy={id:id,name:name,sectionLayout:profiles};if(source.steps)copy.steps=builderClone(source.steps);
   var original=d.layouts.find(function(v){return v.id===source.id;});
   if(original && original.presentation!==undefined)copy.presentation=original.presentation;
+  if(original && original.exploreLayout!==undefined)copy.exploreLayout=builderClone(original.exploreLayout);
   d.layouts.push(copy);
   var plan=planReplaceValue(text,raw,got.path,JSON.stringify(d));plan.layoutId=id;return plan;
 }

@@ -549,7 +549,10 @@ function wireTour(ctl, view, win, config, options){
     return {x: r.left, y: r.top, w: r.width, h: r.height};
   }
   function recenter(spot){
-    var sr = spot.getBoundingClientRect();
+    /* Explore is one viewport-sized workspace: keep its transport and panels
+       together when spotlighting any floating child. */
+    var workspace=spot.closest && spot.closest('.explore-stage');
+    var sr = (workspace || spot).getBoundingClientRect();
     var vh = win.innerHeight;
     if (sr.top < 80 || sr.bottom > vh - 80)
       win.scrollTo(0, win.scrollY + sr.top - (vh - sr.height) / 2);

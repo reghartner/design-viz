@@ -15,7 +15,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
+    'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
@@ -100,6 +100,7 @@ var FlowviewCompatibility = (function(){
         used['layout.named']=true;
         if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;
         if(d.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore']=true;
+        if(d.layouts.some(function(v){return v && v.exploreLayout!=null;}))used['layout.explore-defaults']=true;
       }
     }
     function contracts(s){if(object(s) && (Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null))used['content.contracts']=true;}
@@ -752,6 +753,7 @@ function sectionLayoutWarnings(d, path, warnings){
         if(v.presentation!==undefined && v.presentation!=='standard' && v.presentation!=='explore')warnings.push(p+'.presentation: use "standard" or "explore"; omit for standard');
         if(!v.sectionLayout || !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))warnings.push(p+'.sectionLayout: declare at least one host profile');
         sectionLayoutProfileWarnings(d,v.sectionLayout,p,warnings);
+        sectionExploreLayout(d,v.exploreLayout,warnings,p+'.exploreLayout');
         if(v.steps!=null){
           var ids=(d.steps || []).map(function(st){return st && st.id;});
           if(!Array.isArray(v.steps) || !v.steps.length || v.steps.some(function(id,i){return typeof id!=='string' || ids.filter(function(s){return s===id;}).length!==1 || v.steps.indexOf(id)!==i;}))warnings.push(p+'.steps: use a nonempty list of unique existing step IDs; omit for all steps');
@@ -1820,6 +1822,36 @@ function sectionLayoutPreset(d, target, excludedKeys){
   });
   return items;
 }
+/* Explore defaults are viewport fractions; camera center is in SVG coordinates.
+   Recover malformed optional entries independently without modifying source. */
+function sectionExploreLayout(d,value,warnings,path){
+  var out={},used=Object.create(null);path=path || 'exploreLayout';
+  function warn(at,message){if(warnings)warnings.push(at+': '+message);}
+  function object(v){return v && typeof v==='object' && !Array.isArray(v);}
+  function rect(v,at){
+    if(!object(v) || !['x','y','w','h'].every(function(k){return Number.isFinite(v[k]) && v[k]>=0 && v[k]<=1;}) || v.w===0 || v.h===0){warn(at,'use x/y/w/h viewport fractions from 0 to 1, with positive width and height');return null;}
+    return {x:v.x,y:v.y,w:v.w,h:v.h};
+  }
+  if(value===undefined)return out;
+  if(!object(value)){warn(path,'expected an object');return out;}
+  if(value.panels!==undefined){
+    if(!Array.isArray(value.panels))warn(path+'.panels','expected an array');
+    else out.panels=value.panels.reduce(function(list,v,i){
+      var at=path+'.panels['+i+']',r=rect(v,at);
+      if(!v || typeof v.panel!=='string' || !(d.panels || []).some(function(p){return p.id===v.panel;}) || used[v.panel]){warn(at+'.panel','use a unique existing panel ID');return list;}
+      used[v.panel]=true;
+      if(v.stacked!==undefined && typeof v.stacked!=='boolean'){warn(at+'.stacked','expected a boolean');return list;}
+      if(r)list.push(Object.assign({panel:v.panel},r,{stacked:v.stacked===true}));return list;
+    },[]);
+  }
+  if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
+  if(value.camera!==undefined){
+    var c=value.camera;
+    if(!object(c) || !Number.isFinite(c.zoom) || c.zoom<.15 || c.zoom>4 || !['x','y'].every(function(k){return Number.isFinite(c[k]) && Math.abs(c[k])<=100;}))warn(path+'.camera','use zoom 0.15–4 and finite x/y SVG center coordinates between -100 and 100');
+    else out.camera={zoom:c.zoom,x:c.x,y:c.y};
+  }
+  return out;
+}
 function diagramLayoutViews(d){
   var used=Object.create(null), views=[];
   (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
@@ -1827,7 +1859,7 @@ function diagramLayoutViews(d){
       typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
       !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
       !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
   if(views.length)return views;
   return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?

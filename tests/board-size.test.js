@@ -129,3 +129,10 @@ test('size choices survive edits independently of playback, including diagrams w
   next.ctl.setMode('auto'); after.title=page.title; after.sections.push(JSON.parse(JSON.stringify(after.sections[0])));
   h.context.restoreWorkbenchPreview(after,makeCtl(next.ctl),saved); assert.equal(next.ctl.mode(),'auto');
 });
+
+test('Explore owns its saved camera when overflow first appears',()=>{
+  const h=harness(1180,1180);h.board.classList.toggle('explore-board',true);
+  h.board.scrollWidth=2000;h.board.scrollLeft=123;h.observer.fn();
+  assert.equal(h.board.scrollLeft,123);
+  h.ctl.setMode('readable');assert.equal(h.board.scrollLeft,123);
+});

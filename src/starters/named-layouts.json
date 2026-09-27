@@ -447,6 +447,12 @@
               "id": "service-flow",
               "name": "Service flow",
               "presentation": "explore",
+              "exploreLayout": {
+                "panels": [
+                  {"panel": "outcome", "x": 0.72, "y": 0.02, "w": 0.26, "h": 0.2, "stacked": true},
+                  {"panel": "clip", "x": 0.72, "y": 0.24, "w": 0.26, "h": 0.3, "stacked": true}
+                ]
+              },
               "sectionLayout": {
                 "default": [
                   {

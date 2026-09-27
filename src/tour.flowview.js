@@ -1042,7 +1042,7 @@ function wireTour(ctl, view, win, config, options){
     }
     /* Arrows on a spotlighted control belong to that control (panel drag,
        resize, native inputs). Navigation shortcuts belong to the tour card. */
-    if(!overlay.contains(ev.target)){stopDemo();return;}
+    if(!overlay.contains(ev.target)){stopDemo();schedule();return;}
     if (!parts.chooser.hidden) return; /* chooser: only Escape shortcuts apply */
     if (ev.key === 'ArrowRight'){
       stopDemo(); guarded(function(){ go(at + 1); });
@@ -1070,6 +1070,7 @@ function wireTour(ctl, view, win, config, options){
        from a running demo, just like touching the tour's own controls */
     if (demoTimer && overlay && !overlay.contains(ev.target)) stopDemo();
   }
+  function pageMove(ev){if(overlay && !overlay.contains(ev.target))schedule();}
   function fullscreenChanged(){
     if(overlay){
       var host=doc.fullscreenElement || doc.body;
@@ -1080,6 +1081,7 @@ function wireTour(ctl, view, win, config, options){
   function attach(){
     doc.addEventListener('keydown', keydown, true);
     doc.addEventListener('pointerdown', pagePointer, true);
+    doc.addEventListener('pointermove', pageMove, true);
     doc.addEventListener('click',schedule);
     win.addEventListener('focusin', guardFocus, true);
     win.addEventListener('resize', schedule);
@@ -1090,6 +1092,7 @@ function wireTour(ctl, view, win, config, options){
     unwatch();
     doc.removeEventListener('keydown', keydown, true);
     doc.removeEventListener('pointerdown', pagePointer, true);
+    doc.removeEventListener('pointermove', pageMove, true);
     doc.removeEventListener('click',schedule);
     win.removeEventListener('focusin', guardFocus, true);
     win.removeEventListener('resize', schedule);

@@ -96,8 +96,24 @@ test('Try the controls gives keyboard arrows to the highlighted panel grip',asyn
   await page.getByRole('button',{name:'Try the controls',exact:true}).click();
   await expect(grip).toBeFocused();
   const before=await panel(page,'status').boundingBox();
+  const ringBefore=await page.locator('.dv-tour-ring').boundingBox();
+  const offset={x:ringBefore.x-before.x,y:ringBefore.y-before.y};
   await page.keyboard.press('ArrowRight');
   await expect.poll(async()=>(await panel(page,'status').boundingBox()).x).toBeGreaterThan(before.x);
+  // The spotlight must travel with the control while it moves, not only
+  // after a resize or a later page click.
+  await expect.poll(async()=>{
+    const frame=await panel(page,'status').boundingBox(),ring=await page.locator('.dv-tour-ring').boundingBox();
+    return Math.abs(ring.x-frame.x-offset.x);
+  }).toBeLessThan(1);
+  const handle=await grip.boundingBox();
+  await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);
+  await page.mouse.down();await page.mouse.move(handle.x+handle.width/2-30,handle.y+handle.height/2+30,{steps:4});
+  await expect.poll(async()=>{
+    const frame=await panel(page,'status').boundingBox(),ring=await page.locator('.dv-tour-ring').boundingBox();
+    return Math.abs(ring.x-frame.x-offset.x)+Math.abs(ring.y-frame.y-offset.y);
+  }).toBeLessThan(1);
+  await page.mouse.up();
   await expect(heading(page)).toHaveText('Move this panel');
   await expect(selectedStep(page)).toHaveText('1');
 });

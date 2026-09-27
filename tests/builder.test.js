@@ -303,7 +303,7 @@ test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and none
     waterfall: ['reveal', 'highlight', 'total'], orbit: ['state', 'via'],
     zoneframe: ['zones', 'subject', 'verdict'], xray: ['layers', 'hop'],
     queue: ['state', 'label', 'from', 'to', 'reason'],
-    thermo: ['value', 'label'], battery: ['charge', 'trend', 'source', 'cold', 'note', 'label'],
+    thermo: ['value', 'label'], battery: ['charge', 'drain', 'trend', 'source', 'cold', 'note', 'label'],
     buffer: ['cells', 'mark', 'head', 'note', 'label'], radar: ['subject', 'threshold', 'alert', 'status', 'banner'],
     signal: [], tiles: [], inflight: ['start', 'end', 'mark'], phone: ['clock', 'date', 'notify', 'clear', 'audio'],
     timeline: ['now', 'events', 'miss']

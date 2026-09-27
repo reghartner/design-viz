@@ -12,12 +12,73 @@ PanelRegistry.extend('battery', {
       );
     if (p.initial && p.initial.charge != null && !isFiniteNum(p.initial.charge))
       warnings.push(PP + '.initial.charge: must be a finite number — rendered as NO DATA');
+    if (panelObject(p.initial) && panelOwn(p.initial, 'drain'))
+      warnings.push(PP + '.initial.drain: drain is a step operation — ignored; set initial.charge instead');
+    Object.keys(STORY_BATTERY_DEFAULTS).forEach(function (key) {
+      if (p[key] != null && storyTimeRate(p[key]) == null)
+        warnings.push(PP + '.' + key + ': expected a number ≥ 0 (percent per hour) — using the diagram or built-in default');
+    });
   },
   validatePatch: function (patch, path, panel, warnings, context) {
     if (patch.charge != null && !isFiniteNum(patch.charge))
       warnings.push(path + '.charge: must be a finite number — rendered as NO DATA');
+    if (panelOwn(patch, 'drain')) {
+      if (!isFiniteNum(patch.drain) || patch.drain < 0)
+        warnings.push(path + '.drain: expected additional drain as a number ≥ 0 (percent) — ignored');
+      else if (panelOwn(patch, 'charge'))
+        warnings.push(path + '.drain: ignored because charge sets the value at this step');
+    }
   },
+  fold: function (panel, steps) {
+    /* drain is a one-step operation, never carried state. */
+    return foldCommonPanelStates(panel, steps).map(function (state) {
+      delete state.drain;
+      return state;
+    });
+  },
+  storyTime: batteryStoryStates,
 });
+
+/* Automatic charge from story time (docs/step-time.md). The interval before a
+   step uses the trend in effect before it; an authored charge anchors the
+   value exactly; `drain` subtracts extra percent at its step. Without story
+   time and without drain operations, the folded states are unchanged. */
+function batteryStoryStates(panel, states, steps, story, d) {
+  var patches = steps.map(function (st) {
+    var patch = (stepPanelPatch(st) || {})[panel.id];
+    return panelObject(patch) ? patch : {};
+  });
+  if (!story && !patches.some(function (patch) { return panelOwn(patch, 'drain'); })) return states;
+  var rates = storyBatteryConstants(panel, d),
+    initial = panelObject(panel.initial) ? panel.initial : {};
+  var charge = isFiniteNum(initial.charge) ? clamp(initial.charge, 0, 100) : null,
+    trend = initial.trend,
+    derived = false;
+  states.forEach(function (state, i) {
+    if (i >= steps.length) return;
+    var patch = patches[i], once = panelObject(patch.enterOnce) ? patch.enterOnce : null;
+    if (story && charge != null) {
+      var at = storyTimeAt(story, i), hours = Math.max(0, at.time - at.previous) / 3600000;
+      if (hours > 0) {
+        charge = clamp(charge + hours * (trend === 'charging' ? rates.chargePerHour : -rates.drainPerHour), 0, 100);
+        derived = true;
+      }
+    }
+    if (panelOwn(patch, 'charge')) {
+      charge = isFiniteNum(patch.charge) ? clamp(patch.charge, 0, 100) : null;
+      derived = false;
+    } else if (charge != null && isFiniteNum(patch.drain) && patch.drain >= 0) {
+      charge = clamp(charge - patch.drain, 0, 100);
+      derived = true;
+    }
+    if (panelOwn(patch, 'trend')) trend = patch.trend;
+    if (derived && !(once && panelOwn(once, 'charge'))) {
+      state.charge = Math.round(charge * 100) / 100;
+      storyTimeMark(state, 'charge', 'battery');
+    }
+  });
+  return states;
+}
 
 /* battery panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
 var BATTERY_ZONE_LABELS = {
@@ -366,19 +427,62 @@ body.sk-editorial .sk-daylight .btnub{background:var(--ed-rule-strong);}`,
 PanelRegistry.extend('battery', {
   authoring: {
     template: { title: 'Battery', low: 30, crit: 10, initial: { charge: 80 } },
+    /* New panels start with the constants in effect for their diagram. */
+    instantiate: function (panel, diagram) {
+      var rates = storyBatteryConstants({}, diagram);
+      panel.drainPerHour = rates.drainPerHour;
+      panel.chargePerHour = rates.chargePerHour;
+      return panel;
+    },
     setupFields: [
       ['low', 'num'],
       ['crit', 'num'],
+      ['drainPerHour', 'num'],
+      ['chargePerHour', 'num'],
       ['initial', 'json'],
     ],
     patchFields: [
       ['charge', 'num'],
+      ['drain', 'num'],
       ['trend', 'enum', ['charging', 'draining', 'idle']],
       ['source', 'enum', ['solar', 'wired', 'poe', 'cells']],
       ['cold', 'bool'],
       ['note', 'text'],
       ['label', 'text'],
     ],
+    editor: function (context) {
+      var labels = { drainPerHour: 'Drain % per hour', chargePerHour: 'Charge % per hour' },
+        short = { drainPerHour: 'Drain %/h', chargePerHour: 'Charge %/h' };
+      function inherited() {
+        var parsed = context.parse();
+        if (parsed.error) return storyBatteryConstants({}, null);
+        var rec = specSectionPaths(parsed.raw)[context.target().section];
+        return storyBatteryConstants({}, rec ? specValueAt(parsed.raw, rec.diagram) : null);
+      }
+      return {
+        patchLabel: function (key) {
+          return key === 'drain' ? 'Extra drain %' : key;
+        },
+        setupField: function (field, panel) {
+          var key = field[0];
+          if (!labels[key]) return;
+          var input = context.controls.number(panel[key], function (value) {
+            if (value != null && value < 0) {
+              context.error(labels[key] + ' must be 0 or more.');
+              return false;
+            }
+            return context.commit(key, value == null ? null : String(value));
+          });
+          input.classList.remove('fnum');
+          input.placeholder = 'Diagram default · ' + inherited()[key];
+          input.setAttribute('aria-label', labels[key]);
+          return context.controls.row(short[key], input);
+        },
+        patchField: function (field, input) {
+          if (field[0] === 'drain') input.placeholder = 'Extra % used at this step';
+        },
+      };
+    },
     picker: {
       order: 20,
       name: 'Battery',

@@ -273,6 +273,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!d) return;
   var DP = P + '.diagram';
   validatePaths(d, DP, errors);
+  storyTimeWarnings(d, DP, warnings);
   sectionLayoutWarnings(d, DP, warnings);
   if(d.layoutName != null && (typeof d.layoutName!=='string' || !d.layoutName.trim() || d.layoutName.trim().length>40))
     warnings.push(DP+'.layoutName: use a nonempty layout name of up to 40 characters');
@@ -411,8 +412,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(DP + '.steps[' + ti + '].id: duplicate step id "' + st.id + '" — deep links resolve to the first');
       else stepIds[st.id] = true;
     }
-    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch && !specObject(visibility))
-      warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, panels, tone, or panelVisibility — give it something to show');
+    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch && !specObject(visibility) && !(st && st.time != null))
+      warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, panels, tone, panelVisibility, or time — give it something to show');
     keys.forEach(function(k){
       if (!edgeKeys[k]) warnings.push(DP + '.steps[' + ti + ']: "' + k + '" matches no edge (format "from->to") — skipped');
     });

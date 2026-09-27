@@ -29,6 +29,7 @@ See the complete executable [extension fixture](../tests/fixtures/panel-extensio
 | `validateDeclaration(panel, path, warnings, errors, diagram)` | Validate configuration and initial state; optionally return per-instance validation context |
 | `validatePatch(patch, path, panel, warnings, context)` | Validate step patches using that instance's context |
 | `fold(panel, steps)` | Optional pure specialized folder returning absolute snapshots, including an initial snapshot for an empty story |
+| `storyTime(panel, states, steps, story, diagram)` | Optional pure post-fold step for time-derived fields; `story` is the path's resolved [story time](step-time.md) or null. Must return the states unchanged when it does not apply |
 | `render(host, panel, state, skin, states, stepIndex, animate)` | Describe presentation of an already-folded snapshot |
 | `presentation` | Shared traits: `growing`, `ambientInitial`, `historyRequiresSteps` |
 | `authoring` | Template, setup/step fields, picker description/example, provenance and custom editor hooks |

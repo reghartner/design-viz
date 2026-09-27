@@ -76,6 +76,9 @@ The authoring shape (fragment, not a complete spec) is:
 {"text":"Open Home","panels":{"product":{"screen":"home"}}}
 ```
 
+With the diagram's `storyTime`, omit `clock`/`date`: the status bar shows each
+step's story time (see [story time](../docs/step-time.md)).
+
 Encode actual image bytes; never invent base64. For a temporary selection use
 `enterOnce: {screen: "home"}` in the panel's step patch. Unknown IDs warn and
 leave the carried selection intact. The effective-state inspector links valid

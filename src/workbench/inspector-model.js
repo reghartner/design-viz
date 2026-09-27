@@ -87,7 +87,21 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
         label:source.step==null?'Initial state':source.step===stepIndex?'Set at this step':'Inherited from step '+(source.step+1),inputs:[source]}:
         {kind:'engine',label:'Engine default',inputs:[]};
     }
+    /* Story-time inputs: the latest step time on this path, else the start. */
+    function timeInputs(){
+      for(var i=stepIndex;i>=0;i--){
+        if(d.steps[i] && d.steps[i].time!=null && storyTimeResolve(d.steps[i].time,0)!=null)
+          return [{step:i,key:'time',path:['steps',d._sourceIndices ? d._sourceIndices[i] : i,'time'],label:'Step '+(i+1)+' · time'}];
+      }
+      return [{step:null,key:'start',path:['storyTime','start'],label:'Story start'}];
+    }
     function origin(key){
+      var derived=storyTimeDerived(snapshot,key);
+      if(derived==='story')return {kind:'story',label:'Story time',inputs:timeInputs()};
+      if(derived==='battery'){
+        var drift=history(['charge','drain'],true,'Story time · battery drift');
+        return {kind:'story',label:'Story time · battery drift',inputs:drift.inputs.concat(timeInputs())};
+      }
       var authoring=panelAuthoring(p.type), current=(stepPanelPatch(d.steps[stepIndex])||{})[p.id];
       var custom=authoring.origin && authoring.origin(p,key,snapshot,{assignment:assignment,history:history,input:input,own:own,currentPatch:current,stepIndex:stepIndex});
       if(custom) return custom;
@@ -150,6 +164,7 @@ var BUILDER_GUIDES = {
       ['edge', '"from->to" — the hop this step fires (or edges: [..] for hops that fire together)'],
       ['failures', 'edge outcomes: {"from->to":"dropped"}; use dropped for lost in transit or blocked for never sent'],
       ['text', 'caption shown in the step bar'],
+      ['time', 'story time: +45m from the previous step, 06:50 (next 6:50) or 2026-09-25T06:50; empty keeps the previous time. Needs the section\'s story start'],
       ['lane', 'lane pill on the caption line — declare colors in page.lanes'],
       ['nodes', 'node ids to light directly (allows an edgeless step)'],
       ['tone', 'node-color claims: {"gateway": "alert"} — alert warn ok dim; base (or null) clears; folds forward across steps'],
@@ -224,7 +239,9 @@ var BUILDER_GUIDES = {
       ['bullets', 'bullet list; entries may reveal/hide per step'],
       ['contract / contracts', 'legacy single card or an ordered array of sized contract blocks'],
       ['diagram', 'the board: nodes, rows, edges, panels, steps'],
-      ['diagram.routing', 'Edge routing: No lanes (default) or Lanes; applies to every view of this diagram']
+      ['diagram.routing', 'Edge routing: No lanes (default) or Lanes; applies to every view of this diagram'],
+      ['diagram.storyTime', 'Story time: start (and optional end), 12/24-hour clock and date format; steps move it, clocks follow it'],
+      ['diagram.deviceDefaults', 'battery drain/charge percent per hour for every battery panel without its own rates']
     ]
   }
 };

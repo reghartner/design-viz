@@ -7,6 +7,7 @@
     "core/document.js",
     "core/contracts.js",
     "core/paths.js",
+    "core/story-time.js",
     "core/section-layout.js",
     "core/state.js",
     "core/geometry.js",

@@ -1,0 +1,75 @@
+{
+  "page": {
+    "title": "Overnight on battery",
+    "skin": "pastel",
+    "lanes": {
+      "DEVICE": {"color": "#d97706"},
+      "CLOUD": {"color": "#0284c7"},
+      "RESIDENT": {"color": "#7c3aed"}
+    },
+    "sections": [
+      {
+        "id": "overnight",
+        "heading": "One night on a battery camera",
+        "text": [
+          "The story starts at 10:30 PM and each step moves the story clock. The phone and the app take their clock and date from the step, and the camera battery drains with the elapsed hours, loses extra charge for each recorded clip and recovers once solar charging starts at sunrise.",
+          "No clock, date or battery percentage is typed per panel except the app's battery card, which shows the last value the camera reported."
+        ],
+        "diagram": {
+          "view": "step",
+          "storyTime": {"start": "2026-09-24T22:30", "end": "2026-09-25T09:00", "clock": "12h", "date": "short"},
+          "deviceDefaults": {"battery": {"drainPerHour": 0.4, "chargePerHour": 6}},
+          "nodes": {
+            "camera": {"title": "Backyard camera", "sub": "battery · solar", "icon": "camera", "tint": "dev"},
+            "cloud": {"title": "Event service", "sub": "clips · notifications", "icon": "cloud", "tint": "data"},
+            "phone": {"title": "Resident phone", "sub": "home app", "icon": "phone", "tint": "cmd"}
+          },
+          "rows": [["camera", "cloud", "phone"]],
+          "edges": [
+            {"from": "camera", "to": "cloud", "kind": "https", "label": "upload clip"},
+            {"from": "cloud", "to": "phone", "kind": "https", "label": "push"},
+            {"from": "phone", "to": "cloud", "kind": "https", "label": "open app"}
+          ],
+          "panels": [
+            {"id": "battery", "type": "battery", "title": "Camera battery", "low": 20, "crit": 10,
+             "initial": {"charge": 38, "source": "solar", "trend": "idle", "note": "armed for the night"}},
+            {"id": "phone", "type": "phone", "title": "Resident phone"},
+            {"id": "app", "type": "deviceapp", "title": "Home app", "appName": "Homestead", "device": "Backyard camera",
+             "subtitle": "Reported by the camera",
+             "fields": [
+               {"id": "battery", "label": "Battery", "kind": "battery"},
+               {"id": "clip", "label": "Last recording", "icon": "camera"}
+             ],
+             "initial": {"battery": {"value": 38, "status": "ready", "detail": "Reported 10:30 PM"},
+                         "clip": {"value": "None tonight", "status": "ready"}}}
+          ],
+          "steps": [
+            {"id": "armed", "nodes": ["camera"], "lane": "DEVICE",
+             "text": "10:30 PM: the camera is armed. The story clock starts here."},
+            {"id": "motion", "time": "+2h10m", "nodes": ["camera"], "lane": "DEVICE",
+             "text": "Two hours later motion wakes the camera. Recording the clip costs an extra 1.5 percent.",
+             "panels": {"battery": {"drain": 1.5, "trend": "draining", "note": "recording"}}},
+            {"id": "upload", "time": "+1m", "edge": "camera->cloud", "lane": "CLOUD",
+             "text": "The clip uploads to the event service.",
+             "panels": {"battery": {"drain": 0.5, "trend": "idle", "note": "idle"}}},
+            {"id": "push", "edge": "cloud->phone", "lane": "RESIDENT",
+             "text": "The resident's phone shows the motion alert at the same minute.",
+             "panels": {"phone": {"notify": {"app": "Homestead", "title": "Motion in the backyard", "text": "Backyard camera recorded a clip"}}}},
+            {"id": "fox", "time": "04:15", "nodes": ["camera"], "lane": "DEVICE",
+             "text": "At 4:15 AM a fox crosses the yard; another short clip costs 1 percent.",
+             "panels": {"battery": {"drain": 1, "note": "short clip"}}},
+            {"id": "sunrise", "time": "06:50", "nodes": ["camera"], "lane": "DEVICE",
+             "text": "Sunrise at 6:50 AM. The panel starts charging, so the next interval adds charge instead of draining it.",
+             "panels": {"battery": {"trend": "charging", "note": "solar charging"}}},
+            {"id": "check", "time": "08:20", "edge": "phone->cloud", "lane": "RESIDENT",
+             "text": "At 8:20 AM the resident opens the app to review the night."},
+            {"id": "status", "time": "+1m", "nodes": ["phone"], "lane": "CLOUD",
+             "text": "The app receives the camera's latest report. It shows the rounded value the camera sent, not a live reading.",
+             "panels": {"app": {"battery": {"value": 41, "status": "ready", "detail": "Reported 8:21 AM"},
+                                "clip": {"value": "Fox · 4:15 AM", "status": "ready"}}}}
+          ]
+        }
+      }
+    ]
+  }
+}

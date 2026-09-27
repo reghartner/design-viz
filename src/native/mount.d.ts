@@ -1,4 +1,5 @@
 export interface DetailViewState {
+  view?: string;
   path?: string;
   step?: string;
   mode?: string;
@@ -27,6 +28,8 @@ export interface DiagramHandoffReference {
 }
 export interface NativeViewerTarget {
   section: string;
+  /** Named view ID. Applied before path/step; omission keeps the current view. */
+  view?: string;
   drilldown?: DetailNavigation;
   path?: string;
   step?: string;
@@ -44,7 +47,9 @@ export interface NativeViewerOptions {
   layoutTarget?: 'backstage' | 'confluence' | 'default';
   scrollIntoView?: boolean;
   backlinks?: Record<string, unknown>;
-  onChange?: () => void;
+  /** Current section/view and active step, or null for page-only changes.
+   * The host owns URL serialization and browser history. */
+  onChange?: (target: NativeViewerTarget | null) => void;
   onResize?: (height: number) => void;
   onWarning?: (message: string) => void;
 }

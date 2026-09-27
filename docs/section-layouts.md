@@ -1,5 +1,10 @@
 # Arrange a section and preview its host
 
+Each named view has a **Presentation** setting: **Standard** preserves the
+authored tile arrangement; **Explore** gives the graph a full-height workspace
+with independent floating panels and pinned step controls. Omitted settings use
+Standard, so existing diagrams keep their presentation.
+
 Open the workbench and select **Responsive**, **Backstage**, or **Confluence**
 above the preview. Host previews use adjustable content widths (1080 and 760
 pixels initially). They simulate available space; they do not connect to a host
@@ -84,9 +89,10 @@ removing their declarations.
 Use **Open file** with
 [`src/starters/named-layouts.json`](../src/starters/named-layouts.json)
 to try **Home story** and **Service flow**.
-Home story shows a shorter resident-facing sequence with controls attached to
-Home; Service flow includes every technical stop and attaches controls to the
-diagram. Both share the same step definitions, panels and execution paths.
+Home story opens in Standard with a shorter resident-facing sequence and controls
+attached to Home. Service flow uses Explore for every technical stop, with the
+graph filling the workspace, panels floating at its edges, and playback pinned
+in view. Both share the same step definitions, panels and execution paths.
 
 To build that from an existing arrangement:
 
@@ -102,11 +108,15 @@ To build that from an existing arrangement:
    the **Layout element** dropdown, which selects what to move, size or swap.
    To replace a visible Home with a hidden diagram directly, hide the diagram
    in the original layout before duplicating and swapping.
-4. Choose **Make default** for the view that should open on a fresh page, then
+4. Choose **Presentation → Explore** for the engineering view, or keep
+   **Standard** for the authored arrangement. Presentation applies to this view
+   across every host profile; changing it is one Undo/Redo operation.
+5. Choose **Make default** for the view that should open on a fresh page, then
    **Done arranging**. Readers switch using the named buttons above the section.
 
 Each layout owns its Responsive, Backstage and Confluence profiles. Duplication
-copies all profiles independently; swapping, moving, sizing and visibility edit
+copies its Presentation setting, step selection and all profiles independently;
+swapping, moving, sizing and visibility edit
 only the selected host profile in the active layout. Repeat a swap in other
 explicit host profiles as needed. Step controls stay available, attached or detached; they cannot be hidden or
 swapped with a panel. All authoring
@@ -125,6 +135,37 @@ retains the active named view or Home / Data flow choice across property edits,
 Undo/Redo, and skin/host preview changes. Renaming nodes, sections, the page, or
 the primary panel does not change that choice. Opening another project uses its
 authored default; deleting the selected view falls back to the remaining default.
+
+## Explore presentation
+
+Choose **Arrange section → Presentation → Explore**, then **Done arranging**.
+The data-flow graph becomes the full-height workspace. Each supporting panel
+starts in a stack at the right edge. Drag its header to move it, drag the corner
+to resize it, or use its **Hide** button. Tab to a header or resize handle and
+use arrow keys; hold Shift for larger changes. Escape cancels a drag. Step
+controls stay pinned and available as you inspect the graph. The same live
+widgets, selected path and step continue across Standard/Explore switches.
+
+Use **Panels · N** to choose which available panels to show. Panels hidden by
+the authored view or the current step are identified in that menu. **Hide
+panels** clears the graph; **Restore panels** brings the available panels back.
+**Stack at edge** puts them back into a column along the right side. **Expand**
+opens a larger view, using browser fullscreen when available and an expanded
+in-page view otherwise; **Exit expanded view** returns to the page.
+
+Panel positions, sizes and temporary visibility while reading are workspace
+state remembered independently for each view while the viewer is mounted.
+They do not rewrite the authored diagram or create Undo entries. Explore uses
+the selected host profile's saved visibility, while its floating positions and
+sizes are independent of the profile's grid geometry.
+**Arrange section** temporarily shows the saved grid so you can edit its
+profiles, element visibility and step selection; **Done arranging** returns
+to Explore. Returning a view to **Standard** restores its authored arrangement.
+
+Keep Standard as the default for a business presentation and add an Explore
+view for engineering inspection. The Presentation setting belongs to the named
+view, never to a Responsive, Backstage or Confluence profile. Duplicating the
+view preserves the setting; changing the preview host does not change it.
 
 ## Link to or capture a particular view
 
@@ -261,13 +302,13 @@ Confluence or Backstage. Check the installed host after deployment.
 ```json
 "defaultLayout": "home-story",
 "layouts": [
-  {"id":"home-story", "name":"Home story", "sectionLayout":{"default":[
+  {"id":"home-story", "name":"Home story", "presentation":"standard", "sectionLayout":{"default":[
     {"panel":"home","x":0,"y":0,"w":8,"h":12},
     {"x":0,"y":18,"w":8,"h":12,"hidden":true},
     {"controls":"steps","x":0,"y":12,"w":8,"h":6},
     {"panel":"phone","x":8,"y":0,"w":4,"h":12}
   ]}},
-  {"id":"service-flow", "name":"Service flow", "sectionLayout":{"default":[
+  {"id":"service-flow", "name":"Service flow", "presentation":"explore", "sectionLayout":{"default":[
     {"x":0,"y":0,"w":8,"h":12},
     {"panel":"home","x":0,"y":18,"w":8,"h":12,"hidden":true},
     {"controls":"steps","x":0,"y":12,"w":8,"h":6},
@@ -280,6 +321,11 @@ Layout IDs are unique within the diagram, begin with a letter and contain at
 most 64 letters, digits, underscores or hyphens. Names are nonempty, at most
 40 characters. `defaultLayout` is a layout ID; when omitted the first valid
 layout opens. Valid named layouts take precedence over legacy layout fields.
+Optional `layouts[].presentation` is `"standard"` or `"explore"`; omission means
+`"standard"`. It applies across the view's host profiles. Invalid values warn
+and fall back to Standard without dropping the view. Legacy single arrangements
+always use Standard. Explore uses the same story, widgets and saved visibility;
+its reader panel movement and sizing do not alter tile coordinates.
 Each uses the same host-profile and tile contract as `sectionLayout` above.
 When a named view lacks both the requested host and a default profile, it uses
 an automatic arrangement for that host. Invalid entries warn and are ignored.

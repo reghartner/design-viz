@@ -45,6 +45,40 @@ it('refreshes host diagram routing and reapplies the target without reloading th
   await waitFor(()=>expect(owners[2].navigate).toHaveBeenCalledWith(target));
   expect(load).toHaveBeenCalledTimes(1);
 });
+it('reacts to a changed view on the same target object without remounting or reloading',async()=>{
+  const load=vi.fn().mockResolvedValue(spec),target={section:'recording',view:'business',request:1};
+  const view=render(<InlineFlowview diagram={diagram} loadSpec={load} target={target}/>);
+  await waitFor(()=>expect(owners[0]?.navigate).toHaveBeenCalledWith(target));
+  target.view='operations';
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target}/>);
+  expect(owners[0].navigate).toHaveBeenLastCalledWith({section:'recording',view:'operations',request:1});
+  expect(owners[0].navigate).toHaveBeenCalledTimes(2);
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={{...target}}/>);
+  expect(owners[0].navigate).toHaveBeenCalledTimes(2);
+  target.request++;
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target}/>);
+  expect(owners[0].navigate).toHaveBeenCalledTimes(3);
+  expect(mount).toHaveBeenCalledTimes(1);expect(load).toHaveBeenCalledTimes(1);
+});
+it('retains the reader view and step on a router refresh, while new targets and revisions take precedence',async()=>{
+  const load=vi.fn().mockResolvedValue(spec),target={section:'recording',view:'business',step:'saved'};
+  const first=()=> 'https://designs.test/first',next=()=> 'https://designs.test/next';
+  const view=render(<InlineFlowview diagram={diagram} loadSpec={load} target={target} resolveDiagramLink={first}/>);
+  await waitFor(()=>expect(owners[0]?.navigate).toHaveBeenCalledWith(target));
+  const position={section:'recording',view:'operations',path:'failed',step:'timeout'};
+  const retiredChange=mount.mock.calls[0][2]?.onChange;
+  act(()=>retiredChange?.(position));
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={target} resolveDiagramLink={next}/>);
+  await waitFor(()=>expect(owners[1]?.navigate).toHaveBeenCalledWith(position));
+  expect(load).toHaveBeenCalledTimes(1);
+  act(()=>retiredChange?.({...position,view:'retired'}));
+  const requested={section:'recording',view:'business',step:'persist'};
+  view.rerender(<InlineFlowview diagram={diagram} loadSpec={load} target={requested} resolveDiagramLink={next}/>);
+  expect(owners[1].navigate).toHaveBeenLastCalledWith(requested);
+  view.rerender(<InlineFlowview diagram={{...diagram,revision:'r2'}} loadSpec={load} resolveDiagramLink={next}/>);
+  await waitFor(()=>expect(mount).toHaveBeenCalledTimes(3));
+  expect(owners[2].navigate).not.toHaveBeenCalled();expect(load).toHaveBeenCalledTimes(2);
+});
 it('warns before rendering a newer spec, lists unavailable features, and passes the original inert spec',async()=>{
   const future={...spec,page:{...spec.page,contract:'1',flowview:{minVersion:'9.0.0',features:['panel.future']}}};
   const load=vi.fn().mockResolvedValue(future);

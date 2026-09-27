@@ -96,6 +96,16 @@ Exact source jumps can preview an alternate omitted by the active named view;
 the mount calls `jumpSource()` directly, keeping the view filter intact. Path-only
 requests still require visible stops. Canon evidence indexes remain diagram-only.
 
+The native `NativeViewerTarget` and public `ViewerTarget` also accept `view`, the
+authored view ID. It selects that view's saved Standard or Explore presentation
+before path/step navigation; omission retains the active view. `onChange(target)`
+reports the canonical section/view and active source step/path, with any saved
+drill-down state. Unknown views remain recoverable errors. The Backstage consumer
+router must translate its own URL into these targets and decide how to store
+changes; the renderer does not update host history. Standalone `v=` fragments
+remain supported independently. This seam needs no Backstage platform API or
+company credentials; installed routing and package rollout belong to the host.
+
 Runtime maintainers regenerate it with `python3 tools/build.py` whenever the shared
 sources change, and commit the output. CI checks freshness and runs standalone
 CommonJS and ESM backend bundles with filesystem access restricted to the bundle

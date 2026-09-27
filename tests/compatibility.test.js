@@ -137,3 +137,16 @@ test('whole-panel visibility advertises a capability for older installed viewers
   const old={version:'0.1.0',contract:'1',features:{'panel.phone':{since:'0.1.0'}}};
   assert.ok(C.check(d,old).missingFeatures.includes('flow.panel-visibility'));
 });
+
+test('Explore named views advertise their capability without requiring it for Standard views',()=>{
+  const raw=spec(),d=raw.page.blocks[0].tabs[0].sections[0].diagram;
+  for(const presentation of [undefined,'standard','unknown']){
+    d.layouts[0].presentation=presentation;assert.ok(!C.detect(raw).includes('layout.explore'));
+  }
+  d.layouts[0].presentation='explore';assert.ok(C.detect(raw).includes('layout.explore'));
+  const stamped=C.stamp(raw);assert.ok(stamped.page.flowview.features.includes('layout.explore'));
+  const older={...C.features};delete older['layout.explore'];
+  const result=C.check(stamped,{version:C.version,contract:'1',features:older});
+  assert.deepEqual(plain(result.missingFeatures),['layout.explore']);
+  assert.match(result.messages.join(' '),/Explore view presentation/);
+});

@@ -11,9 +11,10 @@ The standalone HTML viewer and Forge boot paths remain compatible.
 const viewer = mountNativeViewer(hostElement, spec, {
   layoutTarget: 'backstage',
   scrollIntoView: true,
+  onChange: target => rememberViewerTarget(target),
   onWarning: message => showWarning(message),
 });
-viewer.navigate({section: 'delivery-2', path: 'failed', step: 'timeout'});
+viewer.navigate({section: 'delivery-2', view: 'operations', path: 'failed', step: 'timeout'});
 viewer.pause();
 viewer.destroy();
 ```
@@ -21,10 +22,30 @@ viewer.destroy();
 The handle exposes `root`, validation `warnings`, `navigate`, `pause` and
 idempotent `destroy`. `skin` selects a supported skin; an omitted skin uses the
 spec/default. Optional `backlinks` supplies already-derived evidence data.
-`onChange` reports viewer state changes, and `onResize` reports measured content
+`onChange(target)` reports the canonical section reference, active view ID and,
+in Step mode, the current source step/path. It includes active drill-down state
+and returns `null` for changes with no section target. Existing callbacks that
+ignore the argument remain valid. `onResize` reports measured content
 height when a host needs it. Backstage itself uses normal document layout.
 Types are authored in `src/native/mount.d.ts` and copied into the package.
 The host's existing `ViewerTarget` extends this type with its request counter.
+
+The optional `view` selects an authored named view before resolving `path` or
+`step`. Omitting it preserves the current view. An unknown ID raises a
+recoverable error rather than silently opening a different view. The view's saved
+Standard or Explore presentation follows that selection. The React hook reacts
+to a changed `target.view` without reloading the spec and retains the reader's
+latest section/view/step when a changed link resolver requires a fresh mount.
+Revision changes start from the new spec and host target.
+Plain diagrams without a presentation controller accept and report the canonical
+`flow` view ID.
+
+The consumer's router owns its URL format, query parsing and history updates.
+Use `onChange` to store native targets and pass parsed targets to `navigate`;
+the native renderer never changes the Backstage address bar. Standalone `v=`
+fragments remain the standalone viewer's separate URL contract. Saved drill-down
+frames include `view` and restore it before source steps; older `layout`/`focus`
+states remain readable.
 
 Mount into an empty, dedicated HTML element. Destroy before reusing it; a second
 simultaneous mount in the same root is rejected. A failed validation/render clears

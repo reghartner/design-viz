@@ -337,3 +337,62 @@ test('hidden attachment fallback and detached controls retain their custom heigh
     assert.equal(optimized.find(t=>t.controls).h,9);assert.equal(ctx.sectionLayoutDock(optimized),null);noOverlap(optimized.filter(t=>!t.hidden));
   }
 });
+
+test('view presentation normalizes independently of host profiles and falls back safely without discarding the view',()=>{
+  const d=diagram();d.layouts=[{id:'business',name:'Business',sectionLayout:{default:[board,phone]}},
+    {id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[board,phone],confluence:[{...board,w:12}]}}];
+  const before=JSON.stringify(d);
+  assert.deepEqual(plain(ctx.diagramLayoutViews(d)).map(v=>v.presentation),['standard','explore']);
+  assert.equal(ctx.sectionLayoutDefinition(d,'engineering').presentation,'explore');
+  assert.equal(ctx.sectionLayoutItems(d,'confluence','engineering')[0].w,12);
+  assert.equal(ctx.sectionLayoutItems(d,'backstage','engineering')[0].w,8);
+  assert.equal(JSON.stringify(d),before);
+  for(const value of ['standard','explore']){
+    d.layouts[0].presentation=value;const warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);assert.deepEqual(warnings,[]);
+  }
+  for(const value of [null,'cinema','Explore',true,42,[],{}]){
+    d.layouts[0].presentation=value;const warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);
+    assert.equal(warnings.filter(w=>w.includes('layouts[0].presentation')).length,1);
+    assert.equal(ctx.diagramLayoutViews(d).length,2);assert.equal(ctx.sectionLayoutDefinition(d,'business').presentation,'standard');
+  }
+  assert.equal(ctx.sectionLayoutDefinition({...diagram(),sectionLayout:{default:[board]}}).presentation,'standard');
+});
+
+test('presentation edits patch exactly one named view without altering profiles, state, default or surrounding source',()=>{
+  for(const wrap of [d=>d,d=>({sections:[{diagram:d}]}),d=>({page:{blocks:[{tabs:[{label:'Tab',sections:[{diagram:d}]}]}]}})]){
+    const d=diagram();d.layouts=[{id:'business',name:'Business',sectionLayout:{default:[board]}},
+      {id:'engineering',name:'Engineering',presentation:'standard',steps:['one'],sectionLayout:{default:[board,phone],confluence:[phone]}}];
+    d.defaultLayout='business';const raw=wrap(d),text=JSON.stringify(raw,null,3)+'\n';
+    const plan=ctx.planSectionViewPresentation(text,raw,0,'engineering','explore');assert.ok(!plan.error,plan.error);
+    assert.equal(plan.text,text.replace('"presentation": "standard"','"presentation": "explore"'));
+    assert.equal(ctx.sectionLayoutDefinition(ctx.builderDiagram(plan.text,JSON.parse(plan.text),0).d,'engineering').presentation,'explore');
+    const restored=ctx.planSectionViewPresentation(plan.text,JSON.parse(plan.text),0,'engineering','standard');assert.equal(restored.text,text);
+    const next=JSON.parse(plan.text),nextDiagram=ctx.builderDiagram(plan.text,next,0).d;delete nextDiagram.layouts[1].presentation;
+    const original=JSON.parse(text);delete ctx.builderDiagram(text,original,0).d.layouts[1].presentation;assert.deepEqual(next,original);
+    for(const value of ['',null,true,{},'cinema']){
+      const bad=ctx.planSectionViewPresentation(text,raw,0,'engineering',value);assert.ok(bad.error);assert.equal(bad.text,undefined);
+    }
+    assert.ok(ctx.planSectionViewPresentation(text,raw,0,'deleted','explore').error);
+  }
+  const d=diagram();assert.ok(ctx.planSectionViewPresentation(JSON.stringify(d),d,0,'default','explore').error);
+});
+
+test('duplicating a view preserves explicit presentations while older omitted settings remain omitted',()=>{
+  for(const value of [undefined,'standard','explore']){
+    const d=diagram(),view={id:'engineering',name:'Engineering',steps:['one'],sectionLayout:{default:[board,phone],confluence:[{...board,w:12}]}};
+    if(value!==undefined)view.presentation=value;d.layouts=[view];
+    const text=JSON.stringify(d),plan=ctx.planDuplicateSectionLayout(text,d,0,'engineering');assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text);assert.deepEqual(next.layouts[0],view);
+    assert.equal(next.layouts[1].presentation,value);assert.deepEqual(next.layouts[1].steps,['one']);
+    assert.equal(ctx.sectionLayoutDefinition(next,plan.layoutId).presentation,value || 'standard');
+    assert.equal(JSON.stringify(d),text);
+  }
+});
+
+test('named layouts starter opens Standard and offers Explore for the same technical story',()=>{
+  const spec=JSON.parse(fs.readFileSync(path.join(__dirname,'../src/starters/named-layouts.json'),'utf8'));
+  const d=spec.page.sections[0].diagram,warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);assert.deepEqual(warnings,[]);
+  assert.equal(ctx.sectionLayoutDefinition(d).presentation,'standard');
+  assert.equal(ctx.sectionLayoutDefinition(d,'service-flow').presentation,'explore');
+  assert.equal(ctx.sectionLayoutDefinition(d,'service-flow').steps,undefined);
+});

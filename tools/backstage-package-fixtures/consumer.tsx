@@ -46,14 +46,15 @@ export const loadSpec: SpecLoader = async (requested, signal) => {
   return { page: { title: requested.id, revision: requested.revision } };
 };
 export const target: ViewerTarget = {
-  section: section.reference, path: 'happy', step: step.id, request: 1,
+  section: section.reference, view: 'operations', path: 'happy', step: step.id, request: 1,
 };
 export function CompanyTab() {
   return <FlowviewEntityDiagrams entityRef={data.entityRef}
     loadDiagrams={loadDiagrams} loadSpec={loadSpec} refreshMs={60_000} />;
 }
 export function mount(host: HTMLElement, spec: unknown): NativeViewer {
-  const options: NativeViewerOptions = { scrollIntoView: false };
+  const options: NativeViewerOptions = { scrollIntoView: false,
+    onChange: current => { const view: string | undefined = current?.view; void view; } };
   const nativeTarget: NativeViewerTarget = target;
   const viewer = mountNativeViewer(host, spec, options);
   viewer.navigate(nativeTarget);

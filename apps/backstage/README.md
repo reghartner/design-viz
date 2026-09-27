@@ -58,7 +58,7 @@ Install a released version from your company registry in the existing Backstage
 frontend workspace:
 
 ```sh
-yarn workspace app add @flowview/backstage-plugin@1.0.0
+yarn workspace app add @flowview/backstage-plugin@1.1.0
 ```
 
 The company fork `backstage-diagrams` owns the package source in `apps/backstage`,
@@ -359,6 +359,22 @@ Workbench boot code is excluded. The reusable `mountNativeViewer(host, spec, opt
 before reusing the dedicated host. See the upstream
 [native renderer guide](../../docs/native-viewer.md) for implementation ownership.
 
+`NativeViewerTarget` and `ViewerTarget` accept an optional `view` ID alongside
+`section`, `path` and `step`. For example,
+`viewer.navigate({section:'recording',view:'operations',path:'failed',step:'timeout'})`
+selects the saved view (including its Standard or Explore presentation) before
+the source step. Omitting `view` keeps the reader's current view; a stale view ID
+reports a recoverable navigation error. `onChange(target)` reports the canonical
+section/view and active source step/path, plus drill-down state when present.
+Callbacks that ignore the new argument keep working.
+
+The company consumer router owns URL parsing, serialization and browser history;
+the native renderer does not read or modify the Backstage URL. Translate your
+route into native targets and store `onChange` targets as needed. Standalone
+`v=` links continue to use the standalone viewer's fragment format. Within the
+React integration, changing a target view keeps the native mount, and changing
+the link resolver restores the reader's latest view/step after replacing it.
+
 Refresh the repository provider when approved Git changes land, or read its current
 snapshot per request. Cache by published revision and authorization scope if
 needed. Never share an all-diagram index with a viewer who can only read a subset.
@@ -410,6 +426,9 @@ Package version 1.0.0 establishes the stable import paths and the loader, wire,
 native-viewer and backend contracts documented above. Removing/renaming an export,
 changing a loader signature, or requiring new wire fields needs a major version.
 Additive optional fields/exports use a minor version; compatible fixes use a patch.
+Version 1.1.0 adds optional named-view navigation targets and current-target
+arguments to `onChange`, including view-aware drill-down restoration. Existing
+targets and callbacks that ignore the argument remain compatible.
 The bundled renderer's `FlowviewCompatibility.version` and spec feature metadata
 remain distinct from package SemVer: check them to explain renderer upgrades.
 
@@ -422,7 +441,7 @@ npm run build --prefix apps/backstage
 node tools/verify-backstage-package.mjs --skip-build
 npm pack ./apps/backstage
 # Publish the resulting, reviewed .tgz to your configured company registry:
-# npm publish ./flowview-backstage-plugin-1.0.0.tgz --registry https://REGISTRY
+# npm publish ./flowview-backstage-plugin-1.1.0.tgz --registry https://REGISTRY
 ```
 
 For an explicit package path, run `npm pack ./apps/backstage` from the repository

@@ -229,10 +229,10 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .nbacklink{color:#4956C9;border-color:#C9CDE9;background:#EEF0FB;}
 .sk-daylight .nbacklink:hover,.sk-daylight .nbacklink:focus{color:#2A33A0;border-color:#4956C9;}
 .nrefs-trigger:focus-visible circle{stroke:currentColor;stroke-width:1.5;}
-.node-link-menu{inset:auto;margin:0;width:320px;max-height:min(420px,calc(100dvh - 16px));overflow:auto;flex-direction:column;align-items:stretch;gap:7px;padding:12px;font-size:12px;}
-.node-link-menu .node-link-title{padding-right:28px;font-size:14px;overflow-wrap:anywhere;}
+.node-link-menu{inset:auto;margin:0;width:280px;max-height:min(420px,calc(100dvh - 16px));overflow:auto;flex-direction:column;align-items:stretch;gap:5px;padding:10px;font-size:11px;font-weight:500;}
+.node-link-menu .node-link-title{padding-right:26px;font-size:12px;overflow-wrap:anywhere;}
 .node-link-menu .nbacklabel{margin-top:5px;font-size:10px;}
-.node-link-menu .node-reference-link{padding:9px 10px;border-radius:6px;overflow-wrap:anywhere;}
+.node-link-menu .node-reference-link{padding:6px 8px;border-radius:6px;font:inherit;overflow-wrap:anywhere;}
 .node-link-close{position:absolute;right:5px;top:5px;width:30px;height:30px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:22px;cursor:pointer;}
 .node-link-menu :focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 .srcchip{font:600 10px 'IBM Plex Mono',monospace; text-decoration:none; padding:2px 8px; border-radius:999px;

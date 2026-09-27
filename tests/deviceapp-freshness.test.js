@@ -187,6 +187,32 @@ test('validator: unparsable, future and unknown freshness; compatibility feature
   assert.deepEqual(plain(report.missingFeatures), ['content.deviceapp-freshness']);
 });
 
+test('validator: report times that parse but land outside years 100–9999 warn per field and path', () => {
+  const low = diagram({
+    storyTime: {start: '0100-01-01T00:00'},
+    panels: [app(null, {battery: {value: 60, reportedAt: '-1d'}})],
+    steps: [step({id: 'a'}), step({id: 'b', panels: {app: {battery: {reportedAt: '-2h'}}}}), step({id: 'c', time: '+3h', panels: {app: {battery: {reportedAt: '-2h'}}}})],
+    paths: [{id: 'one', steps: ['a', 'b', 'c']}, {id: 'two', steps: ['a', 'b']}]
+  });
+  const text = warnings(low).join('\n');
+  assert.match(text, /panels\[0\]\.initial\.battery\.reportedAt: lands outside the supported range \(years 100–9999\) — ignored/);
+  assert.equal((text.match(/initial\.battery\.reportedAt: lands outside/g) || []).length, 1, 'initial reports once');
+  assert.match(text, /steps\[1\]\.panels\.app\.battery\.reportedAt: lands outside the supported range \(years 100–9999\) on path "one"/);
+  assert.match(text, /steps\[1\]\.panels\.app\.battery\.reportedAt: lands outside the supported range \(years 100–9999\) on path "two"/);
+  assert.doesNotMatch(text, /steps\[2\]\.panels\.app\.battery\.reportedAt/, '01:00 on day one is in range');
+  assert.deepEqual(details(low, 'battery', 'one'), [undefined, undefined, 'Updated 2 h ago'], 'out-of-range times are ignored, never thrown');
+  const high = diagram({
+    storyTime: {start: '9999-12-31T22:00'},
+    panels: [app(null, {battery: {value: 60, reportedAt: '+3h'}})],
+    steps: [step({time: '+1h', panels: {app: {battery: {reportedAt: '+2h'}}}}), step({panels: {app: {battery: {reportedAt: 'now'}}}})]
+  });
+  const top = warnings(high).join('\n');
+  assert.match(top, /panels\[0\]\.initial\.battery\.reportedAt: lands outside the supported range/);
+  assert.match(top, /steps\[0\]\.panels\.app\.battery\.reportedAt: lands outside the supported range \(years 100–9999\) — ignored/);
+  assert.doesNotMatch(top, /steps\[1\]/);
+  assert.deepEqual(details(high), [undefined, 'Updated just now']);
+});
+
 test('the card renders the computed text; the inspector labels it as derived; the editor offers reportedAt', () => {
   const d = diagram({panels: [app(null, {battery: {value: 60, status: 'ready', reportedAt: 'now'}})], steps: [step(), step({time: '+12m'})]});
   const states = C.foldPanelStates(d).app;

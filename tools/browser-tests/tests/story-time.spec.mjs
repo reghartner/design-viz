@@ -169,7 +169,7 @@ test('workbench device app report time: mark reported at this step, derived fres
   await chip(root,1).click();await expect(detail).toHaveText('Updated 5 min ago');
   patch=await openPatch();
   await patch.getByRole('button',{name:'battery: clear report time',exact:true}).click();
-  await expect.poll(async()=>d(await spec()).steps[1].panels.app).toEqual({battery:{value:55}});
+  await expect.poll(async()=>d(await spec()).steps[1].panels.app).toEqual({battery:{value:55,reportedAt:null}});
   await chip(root,2).click();await expect(detail).toHaveCount(0);
   await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();await expect(src).toHaveValue(marked);
   await chip(root,2).click();await expect(detail).toHaveText('Updated 20 min ago');
@@ -182,4 +182,39 @@ test('workbench device app report time: mark reported at this step, derived fres
   await start.click();
   await expect.poll(async()=>d(await spec()).panels[0].initial.battery).toEqual({value:60,status:'ready',reportedAt:'now'});
   await chip(root,0).click();await expect(detail).toHaveText('Updated just now');
+});
+
+test('workbench Clear report time stops an inherited report on this and later steps; Inherit restores it with exact Undo/Redo',async({page,server})=>{
+  const raw={page:{title:'Inherited',sections:[{heading:'Night',diagram:{view:'step',storyTime:{start:'2026-09-24T22:30'},nodes:{cam:{title:'Camera'}},rows:[['cam']],
+    panels:[{id:'app',type:'deviceapp',title:'App',device:'Camera',fields:[{id:'battery',label:'Battery',kind:'battery'}],initial:{battery:{value:60,status:'ready',reportedAt:'now'}}}],
+    steps:[{id:'armed',nodes:['cam'],text:'Armed'},{id:'gap',time:'+1h',nodes:['cam'],text:'Gap',panels:{app:{}}},{id:'later',time:'+20m',nodes:['cam'],text:'Later'}]}}]}};
+  const source=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  const root=page.locator('#docview'),guide=page.locator('#guide'),src=page.locator('#src');
+  const spec=async()=>JSON.parse(await src.inputValue());
+  const detail=root.locator('.pt-deviceapp [data-da-field="battery"] .da-detail');
+  const shows=async texts=>{for(const [index,text] of texts.entries()){await chip(root,index).click();if(text==null)await expect(detail).toHaveCount(0);else await expect(detail).toHaveText(text);}};
+  await shows(['Updated just now','Updated 1 h ago','Updated 1 h ago']);
+  const openPatch=async()=>{
+    await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();
+    const patch=guide.locator('.patchedit').filter({has:page.locator(':scope > summary').filter({hasText:/^app ·/})});
+    if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();
+    return patch;
+  };
+  let patch=await openPatch();
+  await expect(patch.getByRole('button',{name:'battery: inherit report time',exact:true})).toHaveCount(0);
+  await patch.getByRole('button',{name:'battery: clear report time',exact:true}).click();
+  await expect.poll(async()=>d(await spec()).steps[1].panels.app).toEqual({battery:{reportedAt:null}});
+  const cleared=await src.inputValue();
+  await shows(['Updated just now',null,null]);
+  patch=await openPatch();
+  await expect(patch.getByRole('button',{name:'battery: clear report time',exact:true})).toBeDisabled();
+  await patch.getByRole('button',{name:'battery: inherit report time',exact:true}).click();
+  await expect.poll(async()=>d(await spec()).steps[1].panels.app).toEqual({});
+  await shows(['Updated just now','Updated 1 h ago','Updated 1 h ago']);
+  const inherited=await src.inputValue();
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(cleared);await shows(['Updated just now',null,null]);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(source);await shows(['Updated just now','Updated 1 h ago','Updated 1 h ago']);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(cleared);await shows(['Updated just now',null,null]);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(inherited);await shows(['Updated just now','Updated 1 h ago','Updated 1 h ago']);
 });

@@ -14,8 +14,8 @@
   exactly as before. The validator warns about unparsable report times,
   reports from the future and report times without story time; diagrams using
   the feature declare `content.deviceapp-freshness`.
-- The workbench adds **Report time**, **Reported at this step** and **Clear
-  report time** to each Device app card and a **freshness** column to its
+- The workbench adds **Report time**, **Reported at this step**, **Clear
+  report time** (`null`) and **Inherit** to each Device app card and a **freshness** column to its
   fields; Effective state labels the computed text as derived. See
   [story time](docs/step-time.md#device-app-report-times-and-freshness).
 

@@ -206,7 +206,7 @@ the field's other values.
 | After the previous step | `"+5m"` | The previous step's time on this path plus the duration, exactly like `step.time`. |
 | Time of day | `"06:05"` | The latest 06:05 at or before this step's time (rolls back over midnight). |
 | Absolute | `"2026-09-25T06:05"` | The exact date-time. |
-| Clear | `null` | No report time; the card shows its authored `detail`. |
+| Clear | `null` | No report time from this step on, even when an earlier step set one; the card shows its authored `detail`. |
 
 A `null` field patch (`{"battery": null}`) resets the field, including its
 report time. The folded state shows the resolved report time as
@@ -246,8 +246,10 @@ time but never writes text.
 
 ### Validation (report times, all warnings)
 
-- `reportedAt` that is not one of the forms above, or lands outside years
-  100–9999 → ignored.
+- `reportedAt` that is not one of the forms above → ignored.
+- `reportedAt` that parses but lands outside years 100–9999 (for example
+  `"-1d"` at a story start of `0100-01-01T00:00`) → "lands outside the
+  supported range", once per initial/step field and path; ignored.
 - `reportedAt` without `diagram.storyTime` → ignored; the card shows its
   authored detail exactly as before.
 - A report time later than its step's story time → "is later than the step's
@@ -292,7 +294,11 @@ time but never writes text.
 - **Device app field → Report time**: each card in *Starting state* and in a
   step's *Panel changes* has a **Report time** box (`now`, `-15m`, `06:05` or a
   date-time), a **Reported at this step** button (*Reported at story start* in
-  Starting state) that sets `"now"`, and **Clear report time**. The panel's
+  Starting state) that sets `"now"`, **Clear report time**, which writes
+  `reportedAt: null` so this and later steps show no computed freshness (also
+  when the report is inherited from an earlier step), and **Inherit**, which
+  removes this step's assignment so an earlier report applies again. In
+  Starting state, Clear simply removes the value. The panel's
   *fields* table has a **freshness** column (relative, absolute, off).
 - **Effective state** labels a computed detail as *Story time · derived
   freshness "Updated 5 min ago"*, with the field history and the step time as

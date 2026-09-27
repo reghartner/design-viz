@@ -5888,7 +5888,8 @@ function deviceAppWarnings(panel, d, path, warnings) {
 /* Walk one path's report times per field. Explicit detail pins its text
    until a later step delivers a newer report without detail; a null field
    patch resets the field. visit(fieldId, reportedMs, nowMs, stepIndex) runs
-   for every accepted report time (stepIndex -1 is initial). */
+   for every accepted report time (stepIndex -1 is initial), and with a null
+   reportedMs for a parsable one that lands outside the supported range. */
 function deviceAppReportWalk(panel, steps, story, each, visit) {
   var fields = deviceAppItems(panel, 'fields'),
     carried = Object.create(null);
@@ -5905,7 +5906,11 @@ function deviceAppReportWalk(panel, steps, story, each, visit) {
       if (!panelOwn(v, 'reportedAt')) return;
       if (v.reportedAt === null) { c.reported = null; c.at = null; return; }
       var ms = storyTimeReportResolve(v.reportedAt, now, previous);
-      if (ms == null) return;
+      if (ms == null) {
+        /* Parsable but outside years 100–9999: ignored, reported by the validator. */
+        if (visit && storyTimeReportParsable(v.reportedAt)) visit(f.id, null, now, index);
+        return;
+      }
       c.reported = ms;
       c.at = index;
       if (!hasDetail) c.pinned = false;
@@ -5931,11 +5936,15 @@ function deviceAppReportWarnings(panel, d, path, config, warnings) {
       story = storyTimeSequence({ steps: projected }, config),
       label = paths.length > 1 ? ' on path "' + route.id + '"' : '';
     deviceAppReportWalk(panel, projected, story, null, function (fieldId, ms, now, n) {
-      if (ms <= now) return;
+      if (ms != null && ms <= now) return;
       var where = n < 0 ? path + '.initial.' + fieldId : DP + '.steps[' + route.indices[n] + '].panels.' + panel.id + '.' + fieldId,
-        key = where + label;
-      if (reported[key] || (n < 0 && reported[where])) return;
-      reported[key] = reported[where] = true;
+        key = (ms == null ? 'range:' : 'future:') + where + label, once = (ms == null ? 'range:' : 'future:') + where;
+      if (reported[key] || (n < 0 && reported[once])) return;
+      reported[key] = reported[once] = true;
+      if (ms == null) {
+        warnings.push(where + '.reportedAt: lands outside the supported range (years 100–9999)' + (n < 0 ? '' : label) + ' — ignored');
+        return;
+      }
       warnings.push(where + '.reportedAt: ' + storyTimeLabel(ms, config) + ' is later than the step’s story time' + (n < 0 ? '' : label) + ' (' + storyTimeLabel(now, config) + ') — freshness treats it as just reported');
     });
   });
@@ -6554,12 +6563,20 @@ PanelRegistry.extend('deviceapp', {
         var mark=context.controls.action(initial?'Reported at story start':'Reported at this step',function(){return options.commit('now');});
         mark.setAttribute('aria-label',key+': '+(initial?'reported at story start':'reported at this step'));
         box.appendChild(mark);
-        if(options.value!==undefined){
-          var clear=context.controls.action('Clear report time',function(){return options.commit(undefined);});
-          clear.setAttribute('aria-label',key+': clear report time');box.appendChild(clear);
+        /* Clear writes reportedAt:null, which also drops an inherited report on
+           this and later steps; Inherit removes this step's assignment. The
+           starting state has nothing to inherit, so Clear just removes it. */
+        if(!initial || options.value!==undefined){
+          var clear=context.controls.action('Clear report time',function(){return options.commit(initial?undefined:null);});
+          clear.setAttribute('aria-label',key+': clear report time');clear.disabled=!initial && options.value===null;box.appendChild(clear);
+        }
+        if(!initial && options.value!==undefined){
+          var inherit=context.controls.action('Inherit',function(){return options.commit(undefined);});
+          inherit.setAttribute('aria-label',key+': inherit report time');box.appendChild(inherit);
         }
         var note=document.createElement('p');note.className='fnote';
-        note.textContent='With story time the card shows “Updated 5 min ago” from this report time on every later step. Detail text overrides it until a newer report.';
+        note.textContent=options.value===null?'Report time cleared at this step: this and later steps show no computed freshness. Inherit restores the earlier report.':
+          'With story time the card shows “Updated 5 min ago” from this report time on every later step. Detail text overrides it until a newer report. Clear stops freshness from this step on; Inherit removes this step’s report time.';
         box.appendChild(note);
         return box;
       },

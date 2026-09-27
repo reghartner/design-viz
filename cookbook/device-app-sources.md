@@ -161,7 +161,9 @@ Without `storyTime`, keep authoring `detail` as above.
   initially shown cards, sources and fields in the panel inspector. Keep IDs stable; changing them requires updating references/patches.
 - Select a step and expand the panel patch. Every declared field has value,
   status, source, detail, visibility and **Report time** controls; **Reported
-  at this step** sets `reportedAt: "now"` and **Clear report time** removes it.
+  at this step** sets `reportedAt: "now"`, **Clear report time** sets `null`
+  (no freshness from this step on, even for an inherited report) and
+  **Inherit** removes this step's report time.
   Effective state shows the computed text as *Story time · derived freshness*. Blank controls mean no override in that
   patch; use raw JSON for an explicit null reset.
 - Use a wide named-layout tile for phone + source map. The example's **App +

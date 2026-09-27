@@ -20,7 +20,20 @@ function mountNativeSpec(environment, spec, options){
     if(!FlowCanon.http(link.getAttribute('href'))){event.preventDefault();return;}
     link.setAttribute('target','_blank');link.setAttribute('rel','noopener noreferrer');
   }
-  function changed(){if(environment.disposed)return;protectLinks();if(options.onChange)options.onChange();}
+  var navigating=false;
+  function snapshot(){
+    var active=controller.activeTarget || {}, section=(controller.sections || []).find(function(s){return s.number===active.section;});
+    if(!section && active.kind==='tab')section=controller.sections.find(function(s){return s.tabBlock===active.tabBlock && s.tab===active.tab && s.hasDiagram;});
+    if(!section)return null;
+    var target={section:section.reference}, presentation=section.presentation, sp=section.stepper;
+    if(presentation && presentation.viewId)target.view=presentation.viewId();
+    else if(section.hasDiagram)target.view='flow';
+    if(sp && sp.mode()==='step'){target.path=sp.path();target.step=sp.current().id || String(sp.current().n+1);}
+    var drilldown=controller.details && controller.details.snapshot();
+    if(drilldown)target.drilldown=drilldown;
+    return target;
+  }
+  function changed(){if(environment.disposed || navigating)return;protectLinks();if(options.onChange)options.onChange(snapshot());}
   controller.onChange=changed;
   environment.listen(view,'click',linkClick,true);environment.listen(view,'auxclick',linkClick,true);
   var size=new ResizeObserver(function(){if(options.onResize)options.onResize(Math.ceil(view.getBoundingClientRect().height));});size.observe(view);
@@ -36,21 +49,27 @@ function mountNativeSpec(environment, spec, options){
       var destination=records.find(function(r){return r.reference===target.section;}) || records.find(function(r){return r.aliases && r.aliases.indexOf(target.section)>=0;});
       var section=destination && controller.sections.find(function(s){return s.reference===destination.reference;});
       if(!section)throw new Error('This section is no longer in the published diagram. Refresh diagrams.');
-      if(controller.details)controller.details.showSection(section.reference);
-      if(section.tabBlock!=null)controller.tabBlocks[section.tabBlock-1].select(section.tab,false,false);
-      var sp=section.stepper;
-      if(sp && (target.path || target.step)){
-        var source=records.find(function(record){return record.reference===section.reference;}).section.diagram;
-        var resolved=resolveSourceStep(source,target.path || sp.path(),target.step);
-        if(!resolved)throw new Error('This path is no longer in the published diagram. Refresh diagrams.');
-        if(target.step){
-          if(resolved.sourceIndex<0)throw new Error('This step is no longer in the published diagram. Refresh diagrams.');
-          if(!sp.jumpSource(resolved.sourceIndex,resolved.path.id))throw new Error('This step is unavailable in this diagram.');
-        }else if(!sp.selectPath(resolved.path.id))throw new Error('This path has no visible steps in the current view. Select a view that includes it.');
-      }
-      if(target.drilldown && controller.details)controller.details.restore(target.drilldown);
-      if(options.scrollIntoView!==false)section.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
-      changed();
+      navigating=true;
+      try{
+        if(controller.details)controller.details.showSection(section.reference);
+        if(section.tabBlock!=null)controller.tabBlocks[section.tabBlock-1].select(section.tab,false,false);
+        controller.activeTarget={kind:'diagram',section:section.number};
+        var presentation=section.presentation;
+        if(target.view!=null && (presentation ? !presentation.setView || !presentation.setView(target.view) : target.view!=='flow' || !section.hasDiagram))
+          throw new Error('This view is no longer in the published diagram. Refresh diagrams.');
+        var sp=section.stepper;
+        if(sp && (target.path || target.step)){
+          var source=records.find(function(record){return record.reference===section.reference;}).section.diagram;
+          var resolved=resolveSourceStep(source,target.path || sp.path(),target.step);
+          if(!resolved)throw new Error('This path is no longer in the published diagram. Refresh diagrams.');
+          if(target.step){
+            if(resolved.sourceIndex<0)throw new Error('This step is no longer in the published diagram. Refresh diagrams.');
+            if(!sp.jumpSource(resolved.sourceIndex,resolved.path.id))throw new Error('This step is unavailable in this diagram.');
+          }else if(!sp.selectPath(resolved.path.id))throw new Error('This path has no visible steps in the current view. Select a view that includes it.');
+        }
+        if(target.drilldown && controller.details)controller.details.restore(target.drilldown);
+        if(options.scrollIntoView!==false)section.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
+      }finally{navigating=false;changed();}
     },
     pause:function(){if(controller.details)controller.details.pause();if(!environment.disposed)controller.steppers.forEach(function(s){s.stepper.pause();});},
     destroy:function(){if(environment.disposed)return;try{controller.destroy();}finally{environment.destroy();}}

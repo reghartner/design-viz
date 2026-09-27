@@ -100,6 +100,8 @@ function createNativeEnvironment(host, assets){
     createComment:doc.createComment.bind(doc), getElementById:root.getElementById.bind(root),
     addEventListener:addDocumentListener, removeEventListener:removeDocumentListener,
     get activeElement(){return root.activeElement;}, get hidden(){return doc.hidden;},
+    get fullscreenElement(){return root.fullscreenElement || null;},
+    exitFullscreen(){return root.fullscreenElement && doc.exitFullscreen ? doc.exitFullscreen() : Promise.resolve();},
     get documentElement(){return doc.documentElement;}, get scrollingElement(){return doc.scrollingElement;},
     body
   };

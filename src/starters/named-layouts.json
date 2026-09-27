@@ -5,7 +5,7 @@
     "sections": [
       {
         "heading": "A visitor, from home to cloud",
-        "text": "Switch between Home story and Service flow. Home story shows the resident-facing moments; Service flow includes every technical stop. Both follow the same story, including state changes during skipped steps. Playback stays attached to the main view.",
+        "text": "Switch between Home story and Service flow. Home story opens in Standard presentation for the resident-facing moments. Service flow uses Explore for every technical stop: a full-height graph, floating panels and pinned playback. Both follow the same story, including state changes during skipped steps.",
         "diagram": {
           "primaryPanel": "home",
           "view": "step",
@@ -356,6 +356,7 @@
             {
               "id": "home-story",
               "name": "Home story",
+              "presentation": "standard",
               "sectionLayout": {
                 "default": [
                   {
@@ -445,6 +446,7 @@
             {
               "id": "service-flow",
               "name": "Service flow",
+              "presentation": "explore",
               "sectionLayout": {
                 "default": [
                   {

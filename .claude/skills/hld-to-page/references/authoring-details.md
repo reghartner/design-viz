@@ -105,7 +105,16 @@ do not modify the spec or routing. Overflowing diagrams show mouse-friendly
 **Scroll** arrows and a draggable position slider under the view choices;
 no spec field enables them. See `docs/workbench-workspace.md`.
 Use `diagram.layouts:[{id,name,sectionLayout}]` for several named views of one
-story; `defaultLayout` selects the opening ID. Duplicate view and Swap places
+story; `defaultLayout` selects the opening ID. Set `layouts[].presentation` to
+`"standard"` or `"explore"` (omitted means Standard). Use a default Standard view
+for business storytelling and an Explore view for engineering inspection:
+Explore fills the workspace with the graph, floats independent draggable,
+resizable, hideable panels at its edges, and pins step controls. The setting
+belongs to the named view across every host profile. It does not duplicate
+story state or author runtime panel positions. In Arrange section, **Presentation**
+selects Standard/Explore; **Done arranging** returns from the saved tile grid to
+the reader presentation. Duplicate view preserves the setting.
+Duplicate view and Swap places
 can replace Home with the diagram while retaining supporting panels and controls.
 Use explicit tile `hidden:true` for per-view visibility; all views share one set
 of steps and paths. The workbench's **Visible elements** checklist names the

@@ -22,6 +22,41 @@ test('native mount forwards host diagram routing independently of detail loading
   assert.equal(detailReads,0);
 });
 
+test('native targets select views before exact source jumps and publish the final canonical address',()=>{
+  const events=[], changes=[];
+  let selectedView='business',selectedPath='happy',selectedStep='persist';
+  const source={steps:[{id:'2'},{id:'persist'},{id:'failure'}]};
+  const section={number:1,reference:'recording',hasDiagram:true,sectionEl:{scrollIntoView(){}},
+    presentation:{viewId:()=>selectedView,setView(id){events.push(['view',id]);if(!['business','operations'].includes(id))return false;selectedView=id;controller.onChange();return true;}},
+    stepper:{mode:()=> 'step',path:()=>selectedPath,current:()=>({id:selectedStep,n:0}),
+      selectPath(id){events.push(['path',id]);if(id==='failed' && selectedView==='business')return false;selectedPath=id;return true;},
+      jumpSource(index,path){events.push(['source',index,path]);selectedPath=path;selectedStep=source.steps[index].id;controller.onChange();return true;}}};
+  const controller={sections:[section],activeTarget:{kind:'page'}};
+  const view={querySelectorAll:()=>[]};
+  const context={normalize:value=>value,validate:()=>({errors:[],warnings:[]}),resolveSkin:()=>({}),
+    document:{createElement:()=>view},applySkinClasses(){},
+    sectionRecords:()=>[{reference:'recording',aliases:['old-recording'],section:{diagram:source}}],
+    renderPage:()=>controller,ResizeObserver:class{observe(){}},
+    resolveSourceStep(_source,path,step){events.push(['resolve',path,step]);return {path:{id:path},sourceIndex:source.steps.findIndex(s=>s.id===step)};}};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../src/native/mount.js'),'utf8')+'\nthis.mount=mountNativeSpec;',context);
+  const viewer=context.mount({body:{appendChild(){}},listen(){},fontsReady:Promise.resolve()}, {},
+    {scrollIntoView:false,onChange:value=>changes.push(JSON.parse(JSON.stringify(value)))});
+  viewer.navigate({section:'old-recording',view:'operations',path:'failed',step:'failure'});
+  assert.deepEqual(events,[['view','operations'],['resolve','failed','failure'],['source',2,'failed']]);
+  assert.deepEqual(changes,[{section:'recording',view:'operations',path:'failed',step:'failure'}]);
+  events.length=0;
+  viewer.navigate({section:'recording',view:'business',path:'failed',step:'failure'});
+  assert.deepEqual(events,[['view','business'],['resolve','failed','failure'],['source',2,'failed']],'hidden exact targets never preselect an empty path');
+  assert.throws(()=>viewer.navigate({section:'recording',path:'failed'}),/no visible steps/);
+  assert.throws(()=>viewer.navigate({section:'recording',view:'removed'}),/view is no longer/);
+  viewer.navigate({section:'recording',path:'happy',step:'2'});
+  assert.deepEqual(changes.at(-1),{section:'recording',view:'business',path:'happy',step:'2'});
+  delete section.presentation;
+  viewer.navigate({section:'recording',view:'flow',path:'happy',step:'persist'});
+  assert.deepEqual(changes.at(-1),{section:'recording',view:'flow',path:'happy',step:'persist'});
+  assert.throws(()=>viewer.navigate({section:'recording',view:'business'}),/view is no longer/);
+});
+
 test('native CSS maps root type selectors without altering panel names, attributes, strings or keyframes',async()=>{
   const {scopeNativeCss}=await import('../tools/native-viewer-styles.mjs');
   const css='/* body html :root { } */\n:root{--label:"body { :root }";}\n'+

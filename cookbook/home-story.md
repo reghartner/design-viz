@@ -86,7 +86,12 @@ Duplicate view**, then **Swap places** to exchange Home and Data flow.
 **Visible elements** has a separate visibility checkbox for Data flow and each
 panel in the selected view. Use **Step controls → Attached to** to keep playback
 inside Home or Data flow. **Steps shown in this view** can skip technical stops
-while retaining their state changes. Start from **named layouts**
+while retaining their state changes. Keep the business view in **Presentation →
+Standard** and make it the default; use **Presentation → Explore** on the
+engineering view for a full-height graph, floating panels and pinned steps.
+This setting belongs to the view across all host previews. **Done arranging**
+opens the selected presentation; arranging itself uses the saved grid.
+Start from **named layouts**
 or read [multiple layouts](../docs/section-layouts.md#multiple-named-layouts-of-one-story).
 
 For a cramped workbench, use **Focus workspace**, the draggable divider,

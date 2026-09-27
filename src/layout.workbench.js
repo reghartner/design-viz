@@ -165,6 +165,20 @@ function initSectionLayoutEditor(opts){
       row.appendChild(swap);var swapButton=button('Swap places',function(){persist(index,sectionLayoutSwap(items,selected,swap.value));});
       swapButton.disabled=!swap.options.length;swapButton.title='Exchange position, size and visibility with the selected element.';row.appendChild(swapButton);
     }
+    if(definition && !definition.legacy){
+      var presentationLabel=el('label',null,'Presentation '),presentationSelect=el('select');
+      presentationSelect.setAttribute('aria-label','Presentation');
+      [['standard','Standard'],['explore','Explore']].forEach(function(choice){var option=el('option',null,choice[1]);option.value=choice[0];presentationSelect.appendChild(option);});
+      presentationSelect.value=definition.presentation;
+      presentationSelect.title='Applies to this view across all host profiles. Explore uses a full-height graph, floating panels and pinned step controls.';
+      fieldLife.listen(presentationSelect,'change',function(){
+        if(!ready() || activeLayout(index)!==id){presentationSelect.value=definition.presentation;return;}
+        cancel();
+        if(opts.setPresentation(index,id,presentationSelect.value))feedback('Saved view presentation · Done arranging previews it · Undo restores the previous setting.');
+        else presentationSelect.value=definition.presentation;
+      });
+      presentationLabel.appendChild(presentationSelect);row.insertBefore(presentationLabel,row.firstChild);
+    }
     var nameLabel=el('label',null,'View name '),name=el('input');name.type='text';name.maxLength=40;
     name.value=definition?definition.name:'';name.placeholder='View';name.setAttribute('aria-label','View name');
     fieldLife.listen(name,'change',function(){if(ready())opts.rename(index,name.value,id);});
@@ -213,7 +227,9 @@ function initSectionLayoutEditor(opts){
         var caption=el('span','fnote');caption.setAttribute('data-arrange-target','');controls.appendChild(caption);
         actions.appendChild(el('div','section-arrange-fields'));
         actionsLife.listen(actions,'click',function(ev){ev.stopPropagation();});actionsLife.listen(actions,'pointerdown',function(ev){ev.stopPropagation();});
-        var board=section.querySelector('.diagram-views,.boardgrid');section.insertBefore(actions,board);
+        var board=section.querySelector('.diagram-views,.boardgrid');
+        while(board && board.parentNode!==section)board=board.parentNode;
+        section.insertBefore(actions,board);
       }
       actions.querySelector('[data-arrange-toggle]').textContent=editing===index?'Done arranging':'Arrange section';
       actions.querySelector('[data-arrange-toggle]').setAttribute('aria-pressed',String(editing===index));
@@ -222,6 +238,7 @@ function initSectionLayoutEditor(opts){
       actions.querySelector('[data-arrange-target]').textContent='Editing '+(definition?'“'+definition.name+'” · ':'')+target.options[target.selectedIndex].text;
       actions.querySelector('.section-arrange-fields').hidden=editing!==index;
       section.classList.toggle('section-arranging',editing===index);
+      var p=presentation(index);if(p && p.setArranging)p.setArranging(editing===index);
       section.querySelectorAll('.section-controls-resize').forEach(function(handle){handle.remove();});
       if(editing===index){
         forceLayout(index);fields(section,d);
@@ -292,6 +309,7 @@ function initSectionLayoutEditor(opts){
   setFrame();return {refresh:life.guard(refresh),cancel:life.guard(cancel),
     beforeReplace:life.guard(function(){cancel();clearSections();}),
     destroy:function(){if(!life.alive())return;cancel();life.destroy();editing=null;
+      var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){if(rec.presentation && rec.presentation.setArranging)rec.presentation.setArranging(false);});
       view.querySelectorAll('.section-arranger,.section-tile-move,.section-tile-resize,.section-controls-resize').forEach(function(node){node.remove();});
       view.querySelectorAll('.section-arranging,.layout-selected').forEach(function(node){node.classList.remove('section-arranging','layout-selected');});
       view.style.removeProperty('--home-max-height');

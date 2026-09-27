@@ -66,11 +66,11 @@ function diagramLayoutViews(d){
       typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
       !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
       !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
   if(views.length)return views;
   return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
-    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',sectionLayout:d.sectionLayout,legacy:true}] : [];
+    [{id:'default',name:typeof d.layoutName==='string' && d.layoutName.trim()?d.layoutName.trim():'Layout',presentation:'standard',sectionLayout:d.sectionLayout,legacy:true}] : [];
 }
 function sectionLayoutDefinition(d, id){
   var views=diagramLayoutViews(d);

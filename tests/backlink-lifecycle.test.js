@@ -26,6 +26,7 @@ function harness() {
       setAttribute(name, value) { attrs[name] = String(value); }, getAttribute(name) { return attrs[name] ?? null; },
       removeAttribute(name) { delete attrs[name]; },
       appendChild(child) { child.remove(); child.parentNode = node; node.children.push(child); return child; },
+      insertBefore(child, reference) { if (reference == null) return node.appendChild(child); child.remove(); const i=node.children.indexOf(reference); if(i<0)throw new Error('Reference is not a child'); child.parentNode=node; node.children.splice(i,0,child); return child; },
       remove() { if (node.parentNode) node.parentNode.children = node.parentNode.children.filter(child => child !== node); node.parentNode = null; },
       replaceChildren() { for (const child of [...node.children]) child.remove(); },
       contains(target) { return target === node || node.children.some(child => child.contains(target)); },
@@ -146,10 +147,11 @@ test('section and page destruction release link menus even without a stepper', (
   for (const destroySection of [true, false]) {
     const h = harness(), view = h.element();
     const page = h.c.renderPage(view, {sections: [{diagram}]}, 'aurora', backlinks);
+    const baselineDocumentListeners=h.document.count();
     const host = view.querySelector('.boardcanvas'), trigger = host.querySelector('.nbackref');
     const pop = host.querySelector('.nbackpop'), refs = host.querySelector('.node-link-menu');
     trigger.emit('mouseenter'); trigger.emit('mouseleave'); host.querySelector('.nrefs-trigger').emit('click');
-    assert.equal(page.steppers.length, 0); assert.equal(h.timers.size, 1); assert.equal(h.document.count(), 5);
+    assert.equal(page.steppers.length, 0); assert.equal(h.timers.size, 1); assert.equal(h.document.count(), baselineDocumentListeners+4);
     if (destroySection) page.sections[0].destroy(); else page.destroy();
     page.destroy();
     assert.equal(h.document.count(), 0); assert.equal(h.window.count(), 0); assert.equal(h.timers.size, 0);

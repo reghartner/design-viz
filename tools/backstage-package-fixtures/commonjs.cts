@@ -7,4 +7,6 @@ const result: plugin.EntityDiagrams = backend.diagramsForEntity(
 );
 const entries: backend.CanonEntry[] = backend.parseCanonManifest({version: 1, diagrams: []});
 const materialize: (raw: unknown, entry: backend.CanonEntry) => unknown = backend.materializeCanonSpec;
-export { limit, result, entries, materialize };
+const target: plugin.NativeViewerTarget = {section:'recording',view:'operations'};
+const options: plugin.NativeViewerOptions = {onChange: current => { const view: string | undefined = current?.view; void view; }};
+export { limit, result, entries, materialize, target, options };

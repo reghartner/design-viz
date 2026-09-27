@@ -134,7 +134,8 @@ def main() -> int:
         assets = entrypoint_assets(name)
         styles = {style['key']: style['source'].rstrip() for style in assets['styles']}
         mapping = {
-            'STYLE_PAGE': font_css(entry['fonts']) + '\n' + styles['page' if name == 'standalone' else 'workbench'],
+            'STYLE_PAGE': font_css(entry['fonts']) + '\n' + '\n'.join(
+                style['source'].rstrip() for style in assets['styles'] if style['key'] != 'core'),
             'STYLE_CORE': styles['core'],
             'ICONS': assets['icons'].rstrip(),
             'JS': entry['source'],

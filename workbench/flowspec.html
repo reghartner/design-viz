@@ -1906,6 +1906,77 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .appscreen-card summary{cursor:pointer;overflow-wrap:anywhere;}
 .appscreen-card[open]{display:flex;flex-direction:column;gap:8px;}
 .appscreen-thumbnail{display:block;max-width:100%;max-height:160px;object-fit:contain;margin:8px auto;}
+/* Shared guided-tour chrome for the standalone and Canon readers. */
+.dv-tour{position:fixed; inset:0; z-index:900; pointer-events:none; font:15px/1.5 'IBM Plex Sans',system-ui,sans-serif;}
+.dv-tour[hidden]{display:none;}
+.dv-tour-dim{position:fixed; left:0; top:0; pointer-events:none;}
+.dv-tour-dim-fill{fill:rgba(11,18,32,.82);}
+.dv-tour-scrim{position:fixed; inset:0; pointer-events:none;}
+.dv-tour-block{position:fixed; pointer-events:auto;}
+/* rings: SVG rects sharing their hole's exact shape; stroke centered on the edge */
+.dv-tour-rings rect{fill:none; pointer-events:none;}
+.dv-tour-ring{stroke:#38E1FF; stroke-width:2;}
+.dv-tour-ring2{stroke:rgba(56,225,255,.85); stroke-width:2;}
+.dv-tour-glow{stroke:rgba(56,225,255,.45); stroke-width:8;}
+.dv-tour-note{position:fixed; max-width:260px; font:500 12px/1.5 'IBM Plex Sans',system-ui,sans-serif;
+  color:#F2F7FF; background:rgba(11,18,32,.92); border:1px solid rgba(56,225,255,.4);
+  border-radius:10px; padding:8px 12px; pointer-events:auto;}
+.dv-tour-timeline{position:fixed; top:10px; left:50%; transform:translateX(-50%);
+  display:flex; gap:6px; align-items:center; pointer-events:none;
+  /* its own dark pill: legible even over a revealed (bright) region */
+  background:rgba(11,18,32,.92); border:1px solid rgba(255,255,255,.18);
+  border-radius:999px; padding:7px 12px;}
+.dv-tour-timeline[hidden]{display:none;}
+.dv-tour-timeline-yield{visibility:hidden;} /* would sit on a ring this step */
+.dv-tour-seg{width:34px; height:3px; border-radius:2px; background:rgba(255,255,255,.18);}
+.dv-tour-seg.on{background:#38E1FF; box-shadow:0 0 8px rgba(56,225,255,.6);}
+.dv-tour-count{white-space:nowrap; font:600 11px 'IBM Plex Mono',monospace; color:rgba(242,247,255,.75); margin-left:8px;}
+.dv-tour-ui{position:fixed; left:44px; bottom:44px; max-width:360px; pointer-events:auto;
+  background:rgba(11,18,32,.94); border:1px solid rgba(56,225,255,.25); border-radius:14px; padding:18px 20px;}
+.dv-tour-ui[hidden]{display:none;}
+.dv-tour-ui-pending{visibility:hidden;} /* measured, placed, not yet shown */
+.dv-tour-ui-center{left:50%; bottom:auto; top:50%; transform:translate(-50%,-50%); text-align:center; max-width:460px;}
+.dv-tour-eyebrow{font:700 11px 'IBM Plex Mono',monospace; letter-spacing:2px; color:#38E1FF; text-transform:uppercase;}
+.dv-tour-heading{margin:8px 0 6px; font-family:'Sora',sans-serif; font-weight:700; font-size:28px; line-height:1.2; color:#F2F7FF;}
+.dv-tour-body{margin:0 0 16px; font-size:15px; line-height:1.55; color:rgba(242,247,255,.78);}
+.dv-tour-controls{display:flex; gap:10px; align-items:center;}
+.dv-tour-ui-center .dv-tour-controls{justify-content:center;}
+.dv-tour-btn{font:600 13px 'IBM Plex Sans',system-ui,sans-serif; border-radius:999px; padding:8px 20px; cursor:pointer;}
+.dv-tour-back{background:transparent; color:#F2F7FF; border:1px solid rgba(255,255,255,.5);}
+.dv-tour-back:disabled{opacity:.35; cursor:default;}
+.dv-tour-next{background:#38E1FF; color:#0B1220; border:1px solid #38E1FF;}
+.dv-tour-skip{background:none; border:none; font:500 13px 'IBM Plex Sans',system-ui,sans-serif;
+  color:rgba(255,255,255,.6); cursor:pointer; margin-left:6px; text-decoration:underline;}
+.dv-tour-exit{position:fixed; top:10px; left:16px; pointer-events:auto; background:rgba(11,18,32,.92);
+  border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:4px 12px; cursor:pointer;
+  font:600 12px 'IBM Plex Sans',system-ui,sans-serif; color:rgba(242,247,255,.85);}
+.dv-tour-exit:hover, .dv-tour-exit:focus-visible{border-color:#38E1FF; color:#F2F7FF;}
+/* narrow screens: the centered step counter would run under the exit —
+   stack it on its own row below */
+/* narrow screens: no counter row at all — the card's eyebrow already
+   reads "TOUR · STEP n OF m", and a second row would sit over rings */
+@media (max-width: 720px){ .dv-tour-timeline{display:none !important;} }
+.dv-tour-hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+  font:500 12px 'IBM Plex Mono',monospace; color:rgba(255,255,255,.55); pointer-events:none;}
+.dv-tour-card{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(720px, calc(100vw - 64px)); pointer-events:auto; text-align:center;}
+.dv-tour-card[hidden]{display:none;}
+.dv-tour-choices{display:flex; gap:14px; justify-content:center; margin:22px 0 18px; flex-wrap:wrap;}
+.dv-tour-choice{flex:1 1 180px; max-width:220px; background:#121C30; border:1px solid rgba(255,255,255,.14);
+  border-radius:16px; padding:18px 16px; cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:6px;}
+.dv-tour-choice:hover, .dv-tour-choice:focus-visible{border-color:#38E1FF; box-shadow:0 0 0 2px rgba(56,225,255,.35);}
+.dv-tour-choice-label{font:700 15px 'IBM Plex Sans',system-ui,sans-serif; color:#F2F7FF;}
+.dv-tour-choice-sub{font-size:12.5px; line-height:1.45; color:rgba(242,247,255,.7);}
+.dv-tour-choice-foot{display:flex; gap:14px; justify-content:center; align-items:center;}
+.dv-tour-choice-note{font-size:12px; color:rgba(242,247,255,.6);}
+.dv-tour-replay{float:right; margin-left:8px;}
+.dv-tour-btn:focus-visible, .dv-tour-skip:focus-visible, .dv-tour-choice:focus-visible{outline:2px solid #63D9F5; outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){
+    .dv-tour-seg.on{box-shadow:none;}
+}
+
+.dv-tour-practice{display:flex;flex-wrap:wrap;gap:16px;margin:14px 0;}
+.dv-tour-practice:has(> [hidden]):not(:has(> :not([hidden]))){display:none;}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -8733,7 +8804,7 @@ body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;d
       </section>
       <section id="hg-views" tabindex="-1"><p class="human-guide-eyebrow">08 / LAYOUTS & AUDIENCES</p><h3>One story. More than one useful view.</h3><p>Choose <b>Arrange section</b> to position and resize the diagram, panels, and step controls. Use <b>View name</b> for reader-facing names such as “At home” and “Service flow.” Duplicate a view, then tailor it for another audience.</p><p>Choose <b>Presentation → Standard</b> for your authored arrangement or <b>Explore</b> for a full-height graph with independent floating panels and pinned step controls. In Explore, drag a panel header, resize its corner or hide it while inspecting the story. <b>Panels</b> chooses available panels; <b>Hide panels / Restore panels</b> clears or restores them, and <b>Stack at edge</b> returns them to the right side. <b>Expand</b> gives the graph more room. Reader changes do not rewrite your diagram. <b>In the workbench</b>, panel and step-control positions and sizes, plus diagram pan and zoom, save to this view automatically. Each gesture is one Undo action; Escape cancels a drag. Use the small grip on the step bar to move it and its corner to resize it. Drag empty graph space to pan a quarter-screen past each edge. Keep Standard as the default business view and use Explore for an engineering view. Presentation belongs to the named view across all host previews, and duplicating a view keeps it. Changing Presentation is one Undo/Redo operation. Explore stays visible while arranging. <b>Optimize layout</b> or <b>Reset layout</b> restores its automatic edge stack and diagram sizing while keeping hidden panels hidden. Saved defaults scale to the viewer’s available space.</p><p>Under <b>Visible elements</b>, each panel and the data diagram has its own checkbox for the selected layout. Hide Home in the engineering view or hide Data flow in the customer view. <b>Optimize layout</b> arranges the visible elements and respects the hidden set. <b>Make default</b> chooses the opening view. Property edits, Undo/Redo, and host preview changes keep your current view selected. Opening another project uses its own default; deleting the selected view falls back to the remaining default. <b>Done arranging</b> returns to ordinary use.</p><p>Attach the step controls to Home or Data flow to keep them in the same outlined frame, or detach them for independent placement. Resize attached controls with their height adjustment. Under <b>Steps shown in this view</b>, select only the stops that audience needs. <strong>Skipped steps still happen:</strong> their effects carry forward. This shortens the presentation, not the story.</p><p>Preview <b>Responsive</b>, <b>Backstage</b>, or <b>Confluence</b> to tune space for the destination. These are layout previews, not live connections to those products. Named views are the complete set of view buttons; create a view named “Data flow” if you want one alongside your other arrangements.</p>
       </section>
-      <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Canon diagrams</b> on the home page opens the published library read-only. You can play steps, switch paths and views, and follow evidence links. <b>Copy link</b> shares a direct read-only URL to a published diagram, even before Backstage is connected. You can also open a library card in a new tab. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process. Keep maintained JSON specs and generated HTML together under <code>diagrams/&lt;name&gt;/</code>. After review, add the folder and its owner to root <code>canon.json</code>. The normal build publishes that list for the workbench; Backstage uses the same membership. Per-spec flags do not enroll a diagram. Saving an editor draft does not change canon membership.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships. A single connection lists all consumed APIs for that service pair, along with any explicit dependency. Existing connection labels stay as authored. These connections do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, choose <b>File → Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, choose <b>File → Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
+      <section id="hg-evidence" tabindex="-1"><p class="human-guide-eyebrow">09 / SERVICES & EVIDENCE</p><h3>Make the picture traceable.</h3><p><b>Canon diagrams</b> on the home page opens the published library read-only. You can play steps, switch paths and views, and follow evidence links. A guided tour offers a walkthrough on your first visit; choose the <b>?</b> button to replay it. Skip or finish the tour to return to reading. <b>Copy link</b> shares a direct read-only URL to a published diagram, even before Backstage is connected. You can also open a library card in a new tab. <b>Edit in Workbench</b> opens a local editable copy. It does not overwrite or approve the canonical source; save your changes and submit them through your team’s repository process. Keep maintained JSON specs and generated HTML together under <code>diagrams/&lt;name&gt;/</code>. After review, add the folder and its owner to root <code>canon.json</code>. The normal build publishes that list for the workbench; Backstage uses the same membership. Per-spec flags do not enroll a diagram. Saving an editor draft does not change canon membership.</p><p>To seed a graph, choose <b>From service catalog</b> on the home page or <b>Add to diagram → Services from catalog</b>. Pick the services you need. Optional connections come from declared dependencies and API relationships. A single connection lists all consumed APIs for that service pair, along with any explicit dependency. Existing connection labels stay as authored. These connections do not establish the runtime ordering of your feature.</p><p>On a node, choose <b>Company service</b>, then <b>Service API</b> and <b>API operation</b> where available. Selecting a service fills an empty name but preserves an authored one. The hosted editor loads its bundled catalog automatically. For a manual snapshot, choose <b>File → Company repository</b>, paste catalog JSON, and choose <b>Load catalog</b>.</p><p>Code references are a separate authoring task. Use <b>Code and trace evidence</b> on a step to reference the repository, file, and reviewed revision. Viewers can follow those links. A code change is drift evidence, not proof that behavior changed; a person reviews that decision.</p><p>For a trace-based starting point, choose <b>File → Import</b> and use the trace importer with pasted or exported trace JSON. Check the observed services and timings before treating it as the intended design. A missing span alone does not prove a failed communication.</p>
       </section>
       <section id="hg-reuse" tabindex="-1"><p class="human-guide-eyebrow">10 / COPY & REUSE</p><h3>Choose whether the relationship should stay shared.</h3><p>Use <b>Copy</b>, <b>Paste…</b>, and <b>Duplicate</b> for selected nodes, panels, or sections. Multi-select nodes to copy a group; internal connections travel with them when both endpoints are included. A copied section includes its story and alternate paths. A copied panel carries its layout and starting state, not the current step’s animation.</p><p>In Home’s shared layout inspector, use <b>Copy element</b> or <b>Duplicate element</b> for its contents. For story events, use <b>Reuse steps…</b>: copying creates an independent event, while sharing deliberately keeps one event on multiple paths. Consecutive shared events can form a common middle block or ending. Check <b>Destination preview</b> to see the state they receive from this path’s earlier steps. Undo reverses an operation as a unit.</p><p><kbd>⌘/Ctrl C</kbd>, <kbd>⌘/Ctrl V</kbd>, and <kbd>⌘/Ctrl D</kbd> operate on diagram objects outside text fields. Inside a text field, normal text editing takes priority. If clipboard permission is unavailable, <b>Paste…</b> provides a manual text option.</p>
       </section>
@@ -31358,6 +31429,1491 @@ function handoffNodeContent(node, position, id, prefix, options){
   if(options.authoring)return '<title>'+tooltip+'</title>'+body+'<a'+attrs+'><title>'+esc(hint)+'</title><path class="handoff-hit" d="M'+(w-tip-7)+' 0H'+(w-tip)+'L'+w+' '+h/2+'L'+(w-tip)+' '+h+'H'+(w-tip-7)+'Z"/></a>';
   return '<a'+attrs+'><title>'+tooltip+'</title>'+body+'</a>';
 }
+/* ---- src/tour.config.js ---- */
+/* Built-in default tour config. A page overrides it wholesale with page.tour
+   (no deep-merge). The shape and the authoring contract are documented in
+   docs/tour.md; tourLintConfig (core/tour-model.js) is the source of truth
+   for what validates. Selectors here name the viewer's stable controls;
+   tests/tour-config.test.js guards the pairing with their renderers.
+
+   Portable by design: the viewer selects suitable sections/views and omits
+   unavailable lessons before numbering this walkthrough. This shipped copy
+   never names page-specific widgets — a page-authored config may (docs/tour.md). */
+
+var TOUR_DEFAULT_CONFIG = {
+  version: 1,
+  personas: ['ux', 'eng', 'both'],
+  steps: [
+    {
+      id: 'welcome',
+      kind: 'chooser',
+      copy: {
+        eyebrow: 'WELCOME · FIRST VISIT',
+        heading: 'First time in a Flowview diagram?',
+        body: 'Pick a walkthrough. You can try the highlighted controls as you go.',
+        choices: [
+          {persona: 'ux', label: 'The user experience', sub: 'Reading views, story steps, and live panels.'},
+          {persona: 'eng', label: 'The engineering', sub: 'Calls, branching paths, source links, and room to explore.'},
+          {persona: 'both', label: 'Show me both', sub: 'The full walkthrough, at your pace.'}
+        ],
+        note: 'This walkthrough covers the controls available on this page. Replay anytime from ?.'
+      }
+    },
+    {
+      id: 'views',
+      target: {selector: '.diagram-view-choice', within: 'section'},
+      copy: {
+        heading: 'Choose your reading view',
+        body: 'Use these buttons to choose a view of this story. Each view can emphasize a different part of the same flow. Your steps and their effects stay connected as you switch.'
+      }
+    },
+    {
+      id: 'mode-ambient',
+      personas: ['eng', 'both'],
+      target: {selector: '.mtoggle', within: 'section'},
+      diagramState: {mode: 'ambient', diagramVisible: true},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'The big picture',
+        body: 'AMBIENT shows the calls together, with activity looping across the diagram.',
+        reducedMotionBody: 'AMBIENT shows the calls together. Animation stays off with reduced motion.'
+      }
+    },
+    {
+      id: 'mode-step',
+      personas: ['eng', 'both'],
+      target: {selector: '.step-transport', within: 'section'},
+      diagramState: {mode: 'step'},
+      demo: {advance: 2, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'One call at a time',
+        body: 'STEP follows the sequence one call at a time. Watch this example, replay it, or use ‹ › to move by hand.',
+        reducedMotionBody: 'STEP follows the sequence one call at a time. Choose Try controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
+      },
+      secondary: [
+        {
+          target: {selector: '.presentbtn', within: 'page'},
+          note: 'PRESENT gives a room the full-page presentation.'
+        }
+      ]
+    },
+    {
+      id: 'controls',
+      personas: ['ux'],
+      target: {selector: '.step-transport', within: 'section'},
+      diagramState: {mode: 'step'},
+      copy: {
+        heading: 'Play the story',
+        body: '▶ plays the flow one step every 3 seconds; ‹ › move by hand.',
+        reducedMotionBody: 'Use the ‹ › buttons to walk through the story at your own pace. Choose Try controls to reach them with the keyboard. Automatic playback is off.'
+      },
+      secondary: [
+        {
+          target: {selector: '.presentbtn', within: 'page'},
+          note: 'PRESENT gives a room the full-page presentation.'
+        }
+      ]
+    },
+    {
+      id: 'branching-split',
+      /* the engine draws paths as a packed timeline when they share and
+         rejoin, or as a plain path matrix when they never rejoin — the
+         split is real on both, so the authored target names both */
+      target: {selector: '.path-timeline, .path-matrix', within: 'section'},
+      /* '@fork' is the entry condition AND the demo's start: the step only
+         shows when the first two paths share an opening, and walks from
+         the fork into the branch (disjoint paths warn and skip) */
+      diagramState: {mode: 'step', path: '@alt', step: '@fork'},
+      demo: {advance: 3, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'Flows can split',
+        body: 'Each row is one scenario — its label names the path. Watch the walk leave the shared steps and take a different branch. Choose any chip to jump.',
+        reducedMotionBody: 'Each row is one scenario — its label names the path. Use the ‹ › buttons to leave the shared steps and follow this branch, or choose a chip to jump.'
+      }
+    },
+    {
+      id: 'branching-rejoin',
+      target: {selector: '.path-timeline', within: 'section'},
+      diagramState: {mode: 'step', path: '@alt', step: '@rejoin'},
+      demo: {advance: 2, intervalMs: 1600},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'And they come back together',
+        body: 'These paths meet again at shared steps. Watch this branch return to the common sequence.',
+        reducedMotionBody: 'These paths meet again at shared steps. Use the ‹ › buttons to follow this branch back into the common sequence.'
+      }
+    },
+    {
+      id: 'links',
+      diagramState: {diagramVisible: true},
+      personas: ['eng', 'both'],
+      demo: {click: {selector: '.nrefs-trigger', within: 'section'}},
+      target: {selector: '.node-link-menu', within: 'section'},
+      secondary: [
+        {target: {selector: '.nrefs-trigger', within: 'section'}}
+      ],
+      copy: {
+        heading: 'Nodes link to the real system',
+        body: 'The tour just opened this node’s ⋯ menu — every node with links has one: its Backstage entry, API definition, and code references, where available. Every ↗ jumps to the source.'
+      }
+    },
+    {
+      id: 'drill',
+      diagramState: {diagramVisible: true},
+      personas: ['eng', 'both'],
+      demo: {click: {selector: '.detail-trigger', within: 'section'}},
+      target: {selector: '.doc-sec[data-dv-detail-preview] .board', within: 'page'},
+      secondary: [
+        {target: {selector: '.doc-sec[data-dv-detail-preview] .detail-breadcrumb', within: 'page'}}
+      ],
+      copy: {
+        heading: 'Zoom into a part of the system',
+        body: 'The tour just pressed \u229e on a node: that part of the system opens as its own flow, with its own steps and paths. The breadcrumb takes you back.'
+      }
+    },
+    {
+      id: 'panels',
+      personas: ['ux', 'both'],
+      target: {selector: '.pwidget[data-dv-panel]', within: 'section'},
+      diagramState: {mode: 'step'},
+      demo: {advance: 3, intervalMs: 1800},
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'The panels tell the story',
+        body: 'The panels show what this moment means: a screen, a device state, or another part of the story. Watch for changes as the steps advance.',
+        reducedMotionBody: 'The panels show what this moment means: a screen, a device state, or another part of the story. Use the ‹ › buttons and look for changes between steps.'
+      }
+    },
+    {
+      id: 'explore-panels',
+      personas: ['eng', 'both'],
+      diagramState: {presentation: 'explore', mode: 'step'},
+      /* The menu is a fallback only when the reader has hidden every
+         panel. A plain selector union would pick it first in DOM order. */
+      target: {selector: '.explore-window:not([hidden]), .viewport-explore:not(:has(.explore-window:not([hidden]))) .explore-panel-menu', within: 'section'},
+      secondary: [
+        {target: {selector: '.explore-player', within: 'section'}, note: 'The step controls stay pinned while you inspect the graph.'}
+      ],
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'Make room to explore',
+        body: 'In Explore, panels float above the graph. Move one by its header, resize its corner, or hide it with ×. Try controls lets you use the header and resize handle with arrow keys. The next lesson shows how to bring hidden panels back.'
+      }
+    },
+    {
+      id: 'explore-recovery',
+      personas: ['eng', 'both'],
+      diagramState: {presentation: 'explore', mode: 'step'},
+      target: {selector: '.explore-panel-choices', within: 'section'},
+      secondary: [
+        {target: {selector: '.explore-stack', within: 'section'}, note: 'Stack at edge gathers available panels on the right.'}
+      ],
+      copy: {
+        heading: 'Bring a panel back',
+        body: 'Panels lists what this view can show. Tick an available panel to bring it back, or use Stack at edge to tidy up. Panels unavailable in this view or step are explained here. These changes affect your reading space; they do not edit the diagram.'
+      }
+    },
+    {
+      id: 'expand',
+      target: {selector: '[aria-label="Expand diagram view"], [aria-label="Exit expanded diagram view"]', within: 'section'},
+      copy: {
+        heading: 'Give this section more room',
+        body: 'Expand enlarges this section, using fullscreen when available. Your selected step stays put. Exit expanded view brings you back to the page.'
+      }
+    },
+    {
+      id: 'finish-ux',
+      personas: ['ux'],
+      kind: 'done',
+      copy: {
+        heading: 'Now try it',
+        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the ? button.',
+        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the ? button.'
+      }
+    },
+    {
+      id: 'finish-eng',
+      personas: ['eng', 'both'],
+      kind: 'done',
+      copy: {
+        heading: 'Now try it',
+        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.',
+        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.'
+      }
+    }
+  ]
+};
+/* ---- src/tour.flowview.js ---- */
+/* tour.flowview.js — first-run guided tour overlay for standalone and Canon readers.
+   Config-driven (core/tour-model.js owns the pure logic; docs/tour.md owns
+   the retargeting contract). Browser-only fragment shared by both reader entrypoints.
+
+   Design (approved "presenter cinema" mockups): dark scrim with a bright
+   ring-lit hole over the real control, subtitle narration in a corner card,
+   a segment timeline top-center, Back/Next/Skip, keyboard hints. The hole is
+   deliberately click-through — the copy invites trying the spotlit control —
+   so the dialog is non-modal (role=dialog without aria-modal).
+
+   Safety posture: the tour is decoration around a working page. It never
+   auto-starts over a shared deep link, it suppresses fragment writes while
+   it drives the page and restores the pre-tour state afterwards, and any
+   internal error tears the overlay down (fail-open) rather than leaving a
+   scrim over the content. */
+
+function wireTour(ctl, view, win, config, options){
+  var doc = win.document, destroyed = false, timers = new Set();
+  function later(fn, ms){
+    var id=win.setTimeout(function(){timers.delete(id);if(!destroyed)fn();},ms);
+    timers.add(id);return id;
+  }
+  if (doc.body.classList.contains('dv-embed')) return null;
+  if (!tourUsableConfig(config)) return null;
+  options = options || {};
+  var request = options.request !== undefined ? options.request :
+    tourHashRequest(win.location.hash);
+
+  function storageDone(){
+    try { if (win.localStorage && win.localStorage.getItem(TOUR_STORAGE_KEY) === 'done') return true; }
+    catch (ex) { /* storage denied: fall through to the cookie */ }
+    try { return tourDoneFromCookie(doc.cookie); }
+    catch (ex) { return false; }
+  }
+  function markDone(){
+    try { if (win.localStorage) win.localStorage.setItem(TOUR_STORAGE_KEY, 'done'); }
+    catch (ex) { /* storage denied */ }
+    try { doc.cookie = TOUR_COOKIE_NAME + '=1;path=/;max-age=31536000;samesite=lax'; }
+    catch (ex) { /* cookie denied: in-memory only, the tour re-offers next load */ }
+  }
+
+  /* ---- section + state resolution ---- */
+  function sectionFor(step){
+    var ds = step.diagramState;
+    if (ds && ds.section != null){
+      var key = String(ds.section);
+      for (var i = 0; i < ctl.sections.length; i++){
+        var sec = ctl.sections[i];
+        if (String(sec.reference) === key ||
+            (sec.aliases && sec.aliases.indexOf(key) >= 0)) return sec;
+      }
+      return null; /* named section missing: the step cannot resolve */
+    }
+    return ctl.steppers.length ? ctl.steppers[0] : (ctl.sections[0] || null);
+  }
+  function sharedSourceIndex(sp){
+    /* Last source step shared by the first two paths — the merge zone. */
+    var paths = sp.paths();
+    if (paths.length < 2) return -1;
+    var a = paths[0].indices, b = paths[1].indices, last = -1;
+    for (var i = 0; i < b.length; i++) if (a.indexOf(b[i]) >= 0) last = b[i];
+    return last;
+  }
+  function forkSourceIndex(sp){
+    /* The last step of the first two paths' COMMON PREFIX — where they
+       split. -1 when they share no opening step (disjoint paths, or a path
+       that merges in without ever forking): then there is no split. */
+    var paths = sp.paths();
+    if (paths.length < 2) return -1;
+    var a = paths[0].indices, b = paths[1].indices, last = -1, i = 0;
+    for (; i < Math.min(a.length, b.length) && a[i] === b[i]; i++) last = a[i];
+    /* a fork only if the walk stopped at a real difference — a path that is
+       a strict prefix of the other, or identical to it, never splits */
+    return (i < a.length && i < b.length) ? last : -1;
+  }
+  function rejoinSourceIndex(sp){
+    /* The alt path's FIRST own step whose successor is shared again — the
+       earliest place a branch flows back, leaving the longest shared tail
+       for the demo to walk. */
+    var paths = sp.paths();
+    if (paths.length < 2) return -1;
+    var a = paths[0].indices, b = paths[1].indices;
+    for (var i = 0; i < b.length - 1; i++)
+      if (a.indexOf(b[i]) < 0 && a.indexOf(b[i + 1]) >= 0) return b[i];
+    return -1;
+  }
+  function resolvePathId(sp, token){
+    var paths = sp.paths();
+    if (token === '@alt') return paths.length > 1 ? paths[1].id : null;
+    for (var i = 0; i < paths.length; i++) if (paths[i].id === token) return token;
+    return null;
+  }
+  function queryTarget(step, sec, target){
+    /* within:"section" is strict — a selector never leaks into other
+       sections or hidden tabs (majors: a page-wide fallback here matched
+       controls the step was not about) */
+    var root = (target && target.within === 'page') ? view :
+               (sec && sec.sectionEl ? sec.sectionEl : null);
+    if (!root || !target || typeof target.selector !== 'string') return null;
+    try { var matches=Array.prototype.slice.call(root.querySelectorAll(target.selector));
+      return matches.find(isRendered) || matches[0] || null; }
+    catch (ex) { return null; }
+  }
+  function isRendered(el){
+    try { return !!(el && el.getClientRects && el.getClientRects().length && win.getComputedStyle(el).visibility !== 'hidden'); }
+    catch (ex) { return false; }
+  }
+  function selectSectionTab(sec){
+    if (!sec || sec.tabBlock == null || sec.tab == null) return;
+    for (var i = 0; i < ctl.tabBlocks.length; i++)
+      if (ctl.tabBlocks[i].index === sec.tabBlock){
+        if (ctl.tabBlocks[i].active() !== sec.tab)
+          ctl.tabBlocks[i].select(sec.tab, false, false);
+        break;
+      }
+  }
+  function applyDiagramState(sec, ds){
+    if (!sec || !ds) return true;
+    var pres=sec.presentation, requested=ds.view;
+    if(requested == null && ds.presentation != null){
+      var choices=pres && pres.views ? pres.views() : [];
+      var match=choices.find(function(v){return v.presentation===ds.presentation;});
+      if(match)requested=match.id;
+      else if(ds.presentation!=='standard' || choices.length)return false;
+    }
+    /* Same order as the deep-link apply: view installs its visible-stop
+       filter before the path, the path before the step. */
+    if(requested != null && (!pres || !pres.setView || !pres.setView(requested)))return false;
+    if(ds.diagramVisible === true){
+      if(pres && pres.setDiagramVisible)pres.setDiagramVisible(true);
+      var board=sec.sectionEl.querySelector('.board');
+      for(var parent=board;parent && parent!==sec.sectionEl;parent=parent.parentElement){
+        if(parent.tagName==='DETAILS' && !parent.open){parent.open=true;openedDetails.push(parent);}
+      }
+    }
+    var sp = sec.stepper;
+    if (!sp) return ds.path == null && ds.step == null;
+    sp.pause();
+    var pathId = ds.path != null ? resolvePathId(sp, ds.path) : null;
+    if (pathId != null && sp.selectPath && sp.selectPath(pathId) === false)return false;
+    if (ds.mode === 'ambient'){ sp.enterAmbient(); return true; }
+    if (ds.mode === 'step' && sp.mode() !== 'step') sp.enterStep(false);
+    if (ds.step === '@shared' || ds.step === '@rejoin' || ds.step === '@fork'){
+      var src = ds.step === '@shared' ? sharedSourceIndex(sp) :
+        ds.step === '@fork' ? forkSourceIndex(sp) : rejoinSourceIndex(sp);
+      if (src >= 0) sp.jumpSource(src, pathId || undefined);
+      /* unresolved tokens are entry failures, judged before this runs */
+    } else if (ds.step != null){
+      var idx = sp.stepIndexOf(ds.step);
+      if (idx >= 0) sp.jump(idx);
+      else return false;
+    }
+    return true;
+  }
+
+  /* ---- pre-tour state snapshot: the page must come back exactly ---- */
+  var snapshot = null, openedDetails = [];
+  function sectionSnapshot(sec){
+    var sp=sec.stepper, board=sec.sectionEl.querySelector('.board'), cur=sp && sp.current();
+    var reader=sec.presentation && sec.presentation.snapshotReaderState ? sec.presentation : sec.viewport;
+    return {number:sec.number, mode:sp && sp.mode(), path:sp && sp.path(),
+      sourceIndex:sp && sp.sourceIndex(), reader:reader && reader.snapshotReaderState(),
+      size:sec.boardSize && sec.boardSize.mode(), scroll:board && {x:board.scrollLeft,y:board.scrollTop},
+      stepIndex:cur ? cur.n : 0, playing:!!(sp && sp.playing()),
+      view:sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null};
+  }
+  function restoreSection(sec,saved,resume){
+    var pres=sec.presentation, sp=sec.stepper;
+    if(pres && saved.view != null && pres.viewId()!==saved.view)pres.setView(saved.view);
+    if(sp){
+      sp.pause();
+      var cur=sp.current();
+      if(sp.path()!==saved.path || !cur || cur.n!==saved.stepIndex ||
+          (saved.mode==='step' && sp.mode()!=='step'))sp.jumpSource(saved.sourceIndex,saved.path);
+      if(saved.mode==='ambient' && sp.mode()!=='ambient')sp.enterAmbient();
+      if(resume && saved.playing && sp.mode()==='step')sp.toggleAuto();
+    }
+    if(sec.boardSize && saved.size)sec.boardSize.setMode(saved.size);
+    var reader=pres && pres.restoreReaderState ? pres : sec.viewport;
+    if(reader && saved.reader)reader.restoreReaderState(saved.reader);
+    var board=sec.sectionEl.querySelector('.board');
+    if(board && saved.scroll){board.scrollLeft=saved.scroll.x;board.scrollTop=saved.scroll.y;}
+  }
+  function takeSnapshot(){
+    /* an open drill-down: save it and return to the overview so the tour
+       walks the page from the top; it is restored exactly on finish */
+    var drill = ctl.details ? ctl.details.snapshot() : null;
+    snapshot = {
+      drill: drill,
+      activeTarget: ctl.activeTarget ? JSON.parse(JSON.stringify(ctl.activeTarget)) : null,
+      scrollX: win.scrollX || 0, scrollY: win.scrollY || 0,
+      tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
+      sections: ctl.sections.map(sectionSnapshot)
+    };
+    if (drill){ ctl.details.close(true); ctl.detailHistoryPush = false; }
+    ctl.steppers.forEach(function(sec){sec.stepper.pause();});
+    openedDetails = [];
+  }
+  function restoreSnapshot(){
+    if (!snapshot) return;
+    openedDetails.forEach(function(d){ if (d && d.isConnected) d.open = false; });
+    openedDetails = [];
+    snapshot.tabs.forEach(function(saved){
+      for (var i = 0; i < ctl.tabBlocks.length; i++)
+        if (ctl.tabBlocks[i].index === saved.index && ctl.tabBlocks[i].active() !== saved.tab)
+          ctl.tabBlocks[i].select(saved.tab, false, false);
+    });
+    var savedPage=snapshot;snapshot=null;
+    savedPage.sections.forEach(function(saved){
+      var sec=ctl.sections.find(function(s){return s.number===saved.number;});
+      if(!sec)return;
+      restoreSection(sec,saved,true);
+    });
+    var restoration;
+    if(ctl.details){
+      if(ctl.details.snapshot())ctl.details.close(true);
+      if(savedPage.drill)restoration=ctl.details.restore(savedPage.drill);
+    }
+    ctl.detailHistoryPush=false;
+    ctl.activeTarget=savedPage.activeTarget;
+    win.scrollTo(savedPage.scrollX,savedPage.scrollY);
+    return Promise.resolve(restoration).then(function(){
+      if(destroyed)return;
+      ctl.detailHistoryPush=false;
+      ctl.activeTarget=savedPage.activeTarget;
+      win.scrollTo(savedPage.scrollX,savedPage.scrollY);
+    });
+  }
+  var restoring=false;
+  function restoreReader(){
+    restoring=true;
+    var result;
+    try{result=restoreSnapshot();}catch(ex){snapshot=null;}
+    Promise.resolve(result).catch(function(){}).then(function(){
+      if(destroyed)return;
+      ctl.suppressFragmentWrites=false;restoring=false;
+    });
+  }
+
+  /* ---- overlay DOM ---- */
+  var overlay = null, parts = null, active = false, raf = 0, observer = null, settling = false, gen = 0;
+  var lastSection = null;
+  var persona = null, list = [], at = 0, restoreFocus = null, disabled = false;
+  var demoTimer = null, demoLeft = 0;
+
+  function el(tag, className, text){
+    var node = doc.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  function button(className, label, onClick){
+    var b = el('button', className, label);
+    b.type = 'button';
+    b.addEventListener('click', function(){ stopDemo(); guarded(onClick); });
+    return b;
+  }
+  /* fail-open: any tour error tears the overlay down and leaves the page
+     usable; the tour stays off for this load only (config authors see the
+     console warning; a fixed config works on the next load) */
+  function guarded(fn){
+    if(destroyed)return;
+    try { fn(); }
+    catch (ex){
+      if (win.console) console.warn('flowspec: tour error — ' + (ex && ex.message) + ' — tour dismissed');
+      teardown();
+    }
+  }
+  function teardown(){
+    disabled = true;
+    settling = false;
+    stopDemo();
+    closeDemoClick();
+    detach();
+    restoreReader();
+    active = false;
+    if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
+  }
+  function buildOverlay(){
+    overlay = el('div', 'dv-tour');
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-label', 'Guided tour');
+    /* The dim is an SVG mask: a white full rect with one black rounded rect
+       per hole. Overlapping holes stay black, so the un-dimmed region is
+       exactly the union of the rounded rects — no merging, no squared-off
+       strips. It never takes pointer events; click-blocking lives in a
+       separate layer of axis-aligned rects covering the complement. */
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var maskId = 'dv-tour-mask-' + Math.random().toString(36).slice(2, 8);
+    var dim = doc.createElementNS(SVG_NS, 'svg');
+    dim.setAttribute('class', 'dv-tour-dim');
+    dim.setAttribute('aria-hidden', 'true');
+    var defs = doc.createElementNS(SVG_NS, 'defs');
+    var mask = doc.createElementNS(SVG_NS, 'mask');
+    mask.setAttribute('id', maskId);
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    var maskBase = doc.createElementNS(SVG_NS, 'rect');
+    maskBase.setAttribute('fill', '#fff');
+    mask.appendChild(maskBase);
+    defs.appendChild(mask); dim.appendChild(defs);
+    /* glow: a blur filter on a rect with the SAME shape as the ring */
+    var glowId = 'dv-tour-glow-' + Math.random().toString(36).slice(2, 8);
+    var glow = doc.createElementNS(SVG_NS, 'filter');
+    glow.setAttribute('id', glowId);
+    glow.setAttribute('x', '-50%'); glow.setAttribute('y', '-50%');
+    glow.setAttribute('width', '200%'); glow.setAttribute('height', '200%');
+    var blur = doc.createElementNS(SVG_NS, 'feGaussianBlur');
+    blur.setAttribute('stdDeviation', '6');
+    glow.appendChild(blur); defs.appendChild(glow);
+    var dimRect = doc.createElementNS(SVG_NS, 'rect');
+    dimRect.setAttribute('class', 'dv-tour-dim-fill');
+    dimRect.setAttribute('mask', 'url(#' + maskId + ')');
+    dim.appendChild(dimRect);
+    /* rings are drawn in the SAME svg, from the SAME shape objects as the
+       mask holes (one geometry, one render path) */
+    var rings = doc.createElementNS(SVG_NS, 'g');
+    rings.setAttribute('class', 'dv-tour-rings');
+    dim.appendChild(rings);
+    overlay.appendChild(dim);
+    var scrim = el('div', 'dv-tour-scrim');
+    overlay.appendChild(scrim);
+    var extras = el('div', 'dv-tour-extras'); overlay.appendChild(extras);
+    /* a mouse way out that never waits for the card: fixed top-right from
+       the first frame, above the click blockers, never moved */
+    var exit = button('dv-tour-exit', 'Skip tour \u2715', function(){ finish(); });
+    exit.setAttribute('aria-label', 'Skip the tour');
+    overlay.appendChild(exit);
+    var timeline = el('div', 'dv-tour-timeline'); overlay.appendChild(timeline);
+    var ui = el('div', 'dv-tour-ui');
+    var eyebrow = el('div', 'dv-tour-eyebrow');
+    var heading = el('h2', 'dv-tour-heading');
+    var body = el('p', 'dv-tour-body');
+    var narration = el('div', 'dv-tour-narration');
+    narration.id = 'dv-tour-narration';
+    narration.setAttribute('aria-live', 'polite');
+    overlay.setAttribute('aria-describedby', 'dv-tour-narration');
+    narration.appendChild(eyebrow); narration.appendChild(heading); narration.appendChild(body);
+    var controls = el('div', 'dv-tour-controls');
+    var back = button('dv-tour-btn dv-tour-back', 'Back', function(){ go(at - 1); });
+    var next = button('dv-tour-btn dv-tour-next', 'Next', function(){ go(at + 1); });
+    var skip = button('dv-tour-skip', 'Skip tour', function(){ finish(); });
+    controls.appendChild(back); controls.appendChild(next); controls.appendChild(skip);
+    var practice=el('div','dv-tour-practice');
+    var replayExample=button('dv-tour-skip dv-tour-replay-example','Replay example',function(){go(at);});
+    var tryControls=button('dv-tour-skip dv-tour-try','Try the controls',function(){
+      var controls=spotControls();if(controls.length)controls[0].focus({preventScroll:true});
+    });
+    practice.appendChild(replayExample);practice.appendChild(tryControls);
+    ui.appendChild(narration);ui.appendChild(practice); ui.appendChild(controls);
+    overlay.appendChild(ui);
+    var chooser = el('div', 'dv-tour-card dv-tour-chooser'); chooser.hidden = true;
+    overlay.appendChild(chooser);
+    var hint = el('div', 'dv-tour-hint', '← → to move · Esc to skip');
+    overlay.appendChild(hint);
+    doc.body.appendChild(overlay);
+    parts = {scrim: scrim, dim: dim, mask: mask, maskBase: maskBase, dimRect: dimRect,
+             rings: rings, glowId: glowId, extras: extras, timeline: timeline,
+             ui: ui, eyebrow: eyebrow, heading: heading, body: body,
+             back: back, next: next, skip: skip, chooser: chooser, hint: hint, replayExample:replayExample, tryControls:tryControls};
+  }
+  /* One geometry, one render path. Every highlight is a single shape
+     object {x, y, width, height, rx}; that object writes the mask hole AND
+     (for ringed highlights) the ring rect — identical attributes, so hole
+     and ring cannot drift. The ring's 2px stroke is CENTERED on the hole
+     edge (1px inside, 1px outside); its glow is a blurred wider stroke on
+     a third rect with the same shape. The same list, in the same pass,
+     produces the click-blocker cells, so no layer lags another.
+       - visual: overlapping holes stay black in the mask, so the un-dimmed
+         region is exactly the union of the rounded rects;
+       - clicks: the complement of the union on the grid of distinct hole
+         edges (a cell blocks iff its centre lies in no hole). Rounded
+         corners resolve to the bounding rect for CLICKS only. */
+  var SVGNS_DIM = 'http://www.w3.org/2000/svg';
+  function shapeOf(h){
+    var rx = Math.min(h.r || 0, h.w / 2, h.h / 2);
+    return {x: h.x, y: h.y, width: h.w, height: h.h, rx: rx};
+  }
+  function setShape(node, s){
+    node.setAttribute('x', s.x); node.setAttribute('y', s.y);
+    node.setAttribute('width', s.width); node.setAttribute('height', s.height);
+    node.setAttribute('rx', s.rx); node.setAttribute('ry', s.rx);
+  }
+  function svgRect(cls){
+    var node = doc.createElementNS(SVGNS_DIM, 'rect');
+    if (cls) node.setAttribute('class', cls);
+    return node;
+  }
+  function render(highlights){
+    var vw = win.innerWidth, vh = win.innerHeight;
+    var visible = highlights.filter(function(h){ return h.w > 4 && h.h > 4; });
+    var base = parts.maskBase;
+    setShape(base, {x: 0, y: 0, width: vw, height: vh, rx: 0});
+    setShape(parts.dimRect, {x: 0, y: 0, width: vw, height: vh, rx: 0});
+    parts.dim.setAttribute('width', vw); parts.dim.setAttribute('height', vh);
+    parts.dim.setAttribute('viewBox', '0 0 ' + vw + ' ' + vh);
+    while (parts.mask.lastChild && parts.mask.lastChild !== base) parts.mask.removeChild(parts.mask.lastChild);
+    parts.rings.replaceChildren();
+    parts.extras.replaceChildren();
+    /* a ringed hole touching a viewport edge is inset 1px (half the 2px
+       stroke) on THAT edge only, so the centered stroke stays fully on
+       screen. The inset is applied to the highlight itself, before the
+       shape is built, so hole, ring and blockers all keep one geometry;
+       the cost is at most a 1px strip of target at a screen edge. */
+    visible.forEach(function(h){
+      if (h.kind === 'reveal') return;
+      var x2 = Math.min(h.x + h.w, vw - 1), y2 = Math.min(h.y + h.h, vh - 1);
+      h.x = Math.max(h.x, 1); h.y = Math.max(h.y, 1);
+      h.w = x2 - h.x; h.h = y2 - h.y;
+    });
+    visible.forEach(function(h){
+      var s = shapeOf(h);
+      var hole = svgRect(null);
+      setShape(hole, s); hole.setAttribute('fill', '#000');
+      hole.setAttribute('data-kind', h.kind);
+      parts.mask.appendChild(hole);
+      if (h.kind === 'reveal') return;
+      if (h.kind === 'primary'){
+        var halo = svgRect('dv-tour-glow');
+        setShape(halo, s); halo.setAttribute('filter', 'url(#' + parts.glowId + ')');
+        parts.rings.appendChild(halo);
+      }
+      var ring = svgRect(h.kind === 'primary' ? 'dv-tour-ring' : 'dv-tour-ring2');
+      setShape(ring, s);
+      parts.rings.appendChild(ring);
+      if (h.note){
+        var note = el('div', 'dv-tour-note', h.note);
+        var noteX = Math.max(16, Math.min(s.x + s.width - 260, vw - 276));
+        note.style.cssText = 'left:' + noteX + 'px;top:' + (s.y + s.height + 10) + 'px';
+        parts.extras.appendChild(note);
+        var noteRect=note.getBoundingClientRect();
+        note.style.left=Math.max(16,Math.min(s.x+s.width-noteRect.width,vw-noteRect.width-16))+'px';
+        if(noteRect.bottom>vh-16)
+          note.style.top=Math.max(16,s.y-noteRect.height-10)+'px';
+      }
+    });
+    /* hit-blocking: complement of the union on the edge grid */
+    parts.scrim.replaceChildren();
+    var xs = [0, vw], ys = [0, vh];
+    visible.forEach(function(r){
+      xs.push(Math.max(0, Math.min(vw, r.x)), Math.max(0, Math.min(vw, r.x + r.w)));
+      ys.push(Math.max(0, Math.min(vh, r.y)), Math.max(0, Math.min(vh, r.y + r.h)));
+    });
+    function uniq(a){ return a.sort(function(p, q){ return p - q; }).filter(function(v, i, arr){ return i === 0 || v !== arr[i - 1]; }); }
+    xs = uniq(xs); ys = uniq(ys);
+    function covered(cx, cy){
+      return visible.some(function(r){ return cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.h; });
+    }
+    for (var yi = 0; yi < ys.length - 1; yi++){
+      var y0 = ys[yi], y1 = ys[yi + 1], runStart = null;
+      for (var xi = 0; xi <= xs.length - 1; xi++){
+        var blocked = xi < xs.length - 1 && !covered((xs[xi] + xs[xi + 1]) / 2, (y0 + y1) / 2);
+        if (blocked && runStart === null) runStart = xs[xi];
+        if (!blocked && runStart !== null){
+          var cell = el('div', 'dv-tour-block');
+          cell.style.cssText = 'left:' + runStart + 'px;top:' + y0 + 'px;width:' +
+            (xs[xi] - runStart) + 'px;height:' + (y1 - y0) + 'px';
+          parts.scrim.appendChild(cell);
+          runStart = null;
+        }
+      }
+    }
+  }
+  /* The narration card appears ONCE, in its final position: on every spot
+     step it stays hidden (visibility only — still measurable) from entry
+     until the step's final target is resolved and placed, then it is shown
+     together with the rings. A click step's card waits through the
+     cause-before-effect hold and appears beside the opened menu. */
+  var focusOnShow = false;
+  function holdCard(){ parts.ui.classList.add('dv-tour-ui-pending'); }
+  function showCard(){
+    if (!parts.ui.classList.contains('dv-tour-ui-pending')) return;
+    parts.ui.classList.remove('dv-tour-ui-pending');
+    if (focusOnShow && active) focusNext();
+  }
+  function fullScrim(){
+    render([]);
+    placeUi(null);
+  }
+  /* the narration card defaults to the bottom-left corner and yields to the
+     spotlight: first corner that does not overlap the hole wins */
+  /* Card placement, from the FINAL layout (rings and notes already drawn,
+     card still held): candidates in a fixed order — bottom-left,
+     bottom-right, top-left, top-right, bottom-centre, top-centre.
+       1. the first candidate that covers no ring and no note;
+       2. else the first candidate clear of the PRIMARY ring that covers the
+          fewest secondary rings/notes;
+       3. else (the primary spans every candidate) the candidate covering
+          the least primary area.
+     The rule that applied is written to data-placement (clear | partial |
+     covers-primary) so it can be asserted; it never moves once shown. */
+  function placeUi(primary){
+    if (parts.ui.classList.contains('dv-tour-ui-center')){
+      parts.ui.style.left = ''; parts.ui.style.top = '';
+      parts.ui.style.right = ''; parts.ui.style.bottom = '';
+      parts.ui.removeAttribute('data-placement');
+      return;
+    }
+    var m = 44, uw = parts.ui.offsetWidth || 360, uh = parts.ui.offsetHeight || 200;
+    var vw = win.innerWidth, vh = win.innerHeight;
+    var cx = Math.max(m, (vw - uw) / 2);
+    function spots(mg){
+      return [
+        {x: mg, y: vh - mg - uh}, {x: vw - mg - uw, y: vh - mg - uh},
+        {x: mg, y: mg + 40}, {x: vw - mg - uw, y: mg + 40},
+        {x: cx, y: vh - mg - uh}, {x: cx, y: mg + 40}
+      ];
+    }
+    /* the comfortable 44px margin first, then the same six spots at 16px
+       — a hair of extra room often clears a ring outright */
+    var candidates = spots(m).concat(spots(16));
+    function area(c, r){
+      var w = Math.min(c.x + uw, r.x + r.w) - Math.max(c.x, r.x);
+      var h = Math.min(c.y + uh, r.y + r.h) - Math.max(c.y, r.y);
+      return (w > 0 && h > 0) ? w * h : 0;
+    }
+    var others = [];
+    Array.prototype.forEach.call(parts.rings.querySelectorAll('.dv-tour-ring2'), function(n){
+      var b = n.getBoundingClientRect(); others.push({x: b.left, y: b.top, w: b.width, h: b.height});
+    });
+    Array.prototype.forEach.call(parts.extras.querySelectorAll('.dv-tour-note'), function(n){
+      var b = n.getBoundingClientRect(); others.push({x: b.left, y: b.top, w: b.width, h: b.height});
+    });
+    var pick = null, mode = 'clear';
+    if (!primary || primary.w <= 0){ pick = candidates[0]; }
+    for (var i = 0; !pick && i < candidates.length; i++){
+      var c = candidates[i];
+      if (!area(c, primary) && others.every(function(r){ return !area(c, r); })) pick = c;
+    }
+    if (!pick){
+      /* least total AREA over secondary rings/notes (not the count): a
+         3px graze beats covering a whole breadcrumb */
+      var best = null, bestArea = Infinity;
+      candidates.forEach(function(c){
+        if (area(c, primary)) return;
+        var covered = others.reduce(function(sum, r){ return sum + area(c, r); }, 0);
+        if (covered < bestArea){ best = c; bestArea = covered; }
+      });
+      if (best){ pick = best; mode = 'partial'; }
+    }
+    if (!pick){
+      var least = Infinity;
+      candidates.forEach(function(c){ var a = area(c, primary); if (a < least){ least = a; pick = c; } });
+      mode = 'covers-primary';
+    }
+    parts.ui.setAttribute('data-placement', mode);
+    parts.ui.style.left = pick.x + 'px';
+    parts.ui.style.top = pick.y + 'px';
+    parts.ui.style.right = 'auto';
+    parts.ui.style.bottom = 'auto';
+  }
+  function viewport(){ return {w: win.innerWidth, h: win.innerHeight}; }
+  function rectOf(node){
+    var r = node.getBoundingClientRect();
+    return {x: r.left, y: r.top, w: r.width, h: r.height};
+  }
+  function recenter(spot){
+    /* Explore is one viewport-sized workspace: keep its transport and panels
+       together when spotlighting any floating child. */
+    var workspace=spot.closest && spot.closest('.explore-stage');
+    var sr = (workspace || spot).getBoundingClientRect();
+    var vh = win.innerHeight;
+    if (sr.top < 80 || sr.bottom > vh - 80)
+      win.scrollTo(0, win.scrollY + sr.top - (vh - sr.height) / 2);
+  }
+  /* `secondary` accepts one callout or a list of them */
+  function secondariesOf(value){
+    if (value == null) return [];
+    return (Array.isArray(value) ? value : [value]).filter(function(item){
+      return !!item && typeof item === 'object' && item.target;
+    });
+  }
+  /* an advancing demo under reduced motion swaps its spotlight to the
+     transport so the visitor walks the story with the real controls; a
+     click demo is one discrete action and runs as authored */
+  function effectiveTargets(step){
+    if (step.demo && step.demo.advance != null && RM){
+      var swapped = (step.target && step.target.selector !== '.step-transport') ?
+        [{target: step.target, note: ''}] : [];
+      return {target: {selector: '.step-transport', within: 'section'},
+              secondaries: swapped.concat(secondariesOf(step.secondary))};
+    }
+    return {target: step.target, secondaries: secondariesOf(step.secondary)};
+  }
+  /* demo.click bookkeeping: the tour clicked a real control (the node-links
+     trigger) to put something on screen; leaving the step un-clicks it via
+     the engine's own toggle so nothing stays open behind the tour's back */
+  var clickedTrigger = null, pendingClick = null;
+  function closeDemoClick(){
+    pendingClick = null;
+    if (!clickedTrigger) return;
+    var trigger = clickedTrigger;
+    clickedTrigger = null;
+    try {
+      /* a drill-down trigger: return to the parent level through the
+         engine's own silent close (no history entry, no fragment write) */
+      if (trigger.getAttribute && trigger.hasAttribute('data-dv-detail')){
+        if (ctl.details && ctl.details.snapshot()) ctl.details.close(true);
+        ctl.detailHistoryPush = false;
+        return;
+      }
+      /* a menu trigger: un-click through its own toggle, only if it is the
+         one expanded */
+      if (trigger.isConnected && trigger.getAttribute && trigger.getAttribute('aria-expanded') === 'true')
+        trigger.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
+    } catch (ex) { /* nothing to close */ }
+  }
+  /* the click fires only after the settle loop has centered its control on
+     stable layout: the engine's menu places itself near the trigger and
+     dismisses itself on any later scroll, so the order is scroll → settle →
+     click → ring the menu, never click-then-scroll */
+  function firePendingClick(step, sec, eff){
+    if (!pendingClick || !active || list[at] !== step) return;
+    var el = pendingClick.el;
+    pendingClick = null;
+    /* the viewer may have clicked ⋯ themselves during the hold: clicking
+       again would toggle the menu shut. Leave it open; it is theirs. */
+    var drill = !!(el.hasAttribute && el.hasAttribute('data-dv-detail'));
+    if (drill && ctl.details && ctl.details.snapshot()){
+      /* the viewer opened the detail during the hold: keep it, but it is
+         still closed when the step is left */
+      clickedTrigger = el;
+      settling = false;
+      guarded(position);
+      showCard();
+      watch(queryTarget(step, sec, eff.target) || el);
+      return;
+    }
+    if (el.getAttribute && el.getAttribute('aria-expanded') === 'true'){
+      settling = false;
+      guarded(position);
+      showCard();
+      watch(queryTarget(step, sec, eff.target) || el);
+      return;
+    }
+    el.dispatchEvent(new win.MouseEvent('click', {bubbles: true, cancelable: true}));
+    clickedTrigger = el;
+    if (drill){
+      /* a drill replaces the parent section with the detail: bring the new
+         flow to the top of the viewport (unlike a menu, which the engine
+         dismisses on scroll), let layout settle a frame, then place rings
+         and card once */
+      settling = true; /* nothing repaints mid-move (scroll events reschedule) */
+      render([]);
+      var host = doc.querySelector('.doc-sec[data-dv-detail-preview]');
+      if (host && host.scrollIntoView){
+        try { host.scrollIntoView({block: 'start', behavior: 'instant'}); } catch (ex) { host.scrollIntoView(); }
+        win.scrollBy(0, -16);
+      }
+      later(function(){ guarded(function(){
+        if (!active || list[at] !== step) return;
+        settling = false;
+        position();
+        showCard();
+        watch(queryTarget(step, sec, eff.target) || el);
+      }); }, 120);
+      return;
+    }
+    settling = false;
+    guarded(position);
+    showCard(); /* first and only appearance: already beside the menu */
+    watch(queryTarget(step, sec, eff.target) || el);
+  }
+  function position(){
+    if (!active) return;
+    if (settling) return; /* the move happens under the full dim; the new
+                             spotlight is revealed once the layout is stable */
+    var step = list[at];
+    if (!step || (step.kind || 'spot') !== 'spot'){ fullScrim(); return; }
+    var sec = sectionFor(step);
+    var eff = effectiveTargets(step);
+    var target = queryTarget(step, sec, eff.target);
+    if ((!target || !isRendered(target)) && step.demo && step.demo.click && pendingClick)
+      target = pendingClick.node; /* pre-click: ring the node the click will use */
+    if (!target || !isRendered(target)){ fullScrim(); return; }
+    var rect = rectOf(target);
+    /* the links step spotlights the whole node card, not the tiny trigger;
+       the menu itself is the viewer's click — the engine popover paints in
+       the browser top layer, above this overlay */
+    if (eff.target && eff.target.selector && eff.target.selector.indexOf('nrefs-trigger') >= 0){
+      var nodeEl = target.closest ? target.closest('.node[data-dv-node]') : null;
+      if (nodeEl && nodeEl.getBoundingClientRect) rect = rectOf(nodeEl);
+    }
+    var hole = tourCutoutRect(rect, step.offset, 8, viewport());
+    hole.r = 12; hole.kind = 'primary';
+    var holes = [hole];
+    /* every control the copy names is genuinely un-dimmed AND ringed */
+    eff.secondaries.forEach(function(item){
+      var second = queryTarget(step, sec, item.target);
+      if (!second || !isRendered(second)) return;
+      /* all or nothing: a secondary whose padded rect is not FULLY inside
+         the viewport gets no ring, no hole and no note — a clipped sliver
+         with a note floating beside it points at nothing */
+      var r2 = tourCutoutRect(rectOf(second), null, 6, null);
+      if (r2.x < 0 || r2.y < 0 || r2.x + r2.w > win.innerWidth || r2.y + r2.h > win.innerHeight) return;
+      r2.r = r2.h / 2; /* a pill: shapeOf clamps rx to half the height */
+      r2.kind = 'secondary'; r2.note = item.note || '';
+      holes.push(r2);
+    });
+    /* reveal-only cutouts: un-dimmed, no ring — a demo step shows the
+       diagram reacting, not just the ringed control */
+    (Array.isArray(step.reveal) ? step.reveal : []).forEach(function(item){
+      if (!item || typeof item !== 'object') return;
+      var shown = queryTarget(step, sec, item);
+      if (!shown || !isRendered(shown)) return;
+      var r3 = tourCutoutRect(rectOf(shown), null, 6, viewport());
+      r3.r = 12; r3.kind = 'reveal';
+      holes.push(r3);
+    });
+    render(holes);
+    parts.tryControls.hidden=!spotControls().length;
+    placeUi(hole); /* against every ring and note just drawn */
+    yieldCounter();
+  }
+  /* the step counter never sits on a ring: if it would, it steps aside for
+     this step (the card's eyebrow already carries "STEP n OF m") */
+  function yieldCounter(){
+    parts.timeline.classList.remove('dv-tour-timeline-yield');
+    if (parts.timeline.hidden) return;
+    var c = parts.timeline.getBoundingClientRect();
+    if (!c.width) return;
+    var clash = Array.prototype.some.call(parts.rings.querySelectorAll('.dv-tour-ring, .dv-tour-ring2'), function(n){
+      var r = n.getBoundingClientRect();
+      return c.left < r.right + 4 && r.left - 4 < c.right && c.top < r.bottom + 4 && r.top - 4 < c.bottom;
+    });
+    if (clash) parts.timeline.classList.add('dv-tour-timeline-yield');
+  }
+  function schedule(){
+    if (!active || destroyed || raf) return;
+    raf = win.requestAnimationFrame ? win.requestAnimationFrame(function(){ raf = 0; guarded(position); }) :
+          (guarded(position), 0);
+  }
+  function watch(target){
+    unwatch();
+    if (!active) return;
+    if (win.ResizeObserver && target){
+      observer = new win.ResizeObserver(schedule);
+      observer.observe(target);
+    }
+  }
+  function unwatch(){ if (observer){ observer.disconnect(); observer = null; } }
+
+  /* ---- playback demo (step.demo): the panels change while the ring holds ---- */
+  function stopDemo(){
+    if (demoTimer){ win.clearTimeout(demoTimer); timers.delete(demoTimer); demoTimer = null; }
+    demoLeft = 0;
+  }
+  function startDemo(step, sec){
+    stopDemo();
+    if (!step.demo || step.demo.advance == null || RM || !sec || !sec.stepper) return;
+    var advance = Math.max(1, Math.min(30, Number(step.demo.advance) || 3));
+    var interval = Math.max(400, Math.min(10000, Number(step.demo.intervalMs) || 1800));
+    /* the demo is a little story: play it from the selected path's first
+       stop (jump(0) — the current view's own step list) unless the step
+       AUTHORED a starting position via diagramState.step */
+    var sp = sec.stepper;
+    if (sp.mode() !== 'step') sp.enterStep(false);
+    if (!(step.diagramState && step.diagramState.step != null)) sp.jump(0);
+    schedule();
+    demoLeft = advance;
+    var tick = function(){
+      demoTimer = null;
+      if (!active || list[at] !== step || demoLeft <= 0) return;
+      if (sp.mode() !== 'step') sp.enterStep(false);
+      sp.advance(sp.current().n + 1);
+      demoLeft--;
+      schedule();
+      if (demoLeft > 0) demoTimer = later(tick, interval);
+    };
+    demoTimer = later(tick, interval);
+  }
+
+  /* ---- timeline + narration ---- */
+  function renderTimeline(){
+    var tl = tourTimeline(list, at);
+    parts.timeline.replaceChildren();
+    if (!tl.total || (list[at] && (list[at].kind || 'spot') === 'chooser')){
+      parts.timeline.hidden = true; return;
+    }
+    parts.timeline.hidden = false;
+    for (var i = 1; i <= tl.total; i++){
+      var seg = el('span', 'dv-tour-seg' + (i <= tl.current ? ' on' : ''));
+      parts.timeline.appendChild(seg);
+    }
+    parts.timeline.appendChild(el('span', 'dv-tour-count', tl.current + ' / ' + tl.total));
+  }
+  function chooserChoices(copy){
+    var raw = Array.isArray(copy.choices) ? copy.choices : [];
+    var safe = raw.filter(function(choice){
+      return !!choice && typeof choice === 'object' && !Array.isArray(choice);
+    });
+    return safe.length ? safe : [{persona: 'both', label: 'Show me around', sub: ''}];
+  }
+  function renderChooser(step){
+    parts.chooser.hidden = false;
+    parts.ui.hidden = true;
+    parts.chooser.replaceChildren();
+    var copy = (step.copy && typeof step.copy === 'object') ? step.copy : {};
+    if (copy.eyebrow) parts.chooser.appendChild(el('div', 'dv-tour-eyebrow', String(copy.eyebrow)));
+    parts.chooser.appendChild(el('h2', 'dv-tour-heading', String(copy.heading || 'Take the tour?')));
+    if (copy.body) parts.chooser.appendChild(el('p', 'dv-tour-body', String(copy.body)));
+    var row = el('div', 'dv-tour-choices');
+    chooserChoices(copy).forEach(function(choice){
+      var b = button('dv-tour-choice', '', function(){ choose(choice.persona); });
+      b.appendChild(el('span', 'dv-tour-choice-label', String(choice.label || choice.persona || 'Continue')));
+      if (choice.sub) b.appendChild(el('span', 'dv-tour-choice-sub', String(choice.sub)));
+      row.appendChild(b);
+    });
+    parts.chooser.appendChild(row);
+    var foot = el('div', 'dv-tour-choice-foot');
+    if (copy.note) foot.appendChild(el('span', 'dv-tour-choice-note', String(copy.note)));
+    foot.appendChild(button('dv-tour-skip', 'Skip', function(){ finish(); }));
+    parts.chooser.appendChild(foot);
+    var first = row.querySelector('button');
+    if (first) first.focus();
+  }
+  function renderStep(step, keepFocus){
+    parts.chooser.hidden = true;
+    parts.ui.hidden = false;
+    var copy = (step.copy && typeof step.copy === 'object') ? step.copy : {};
+    var tl = tourTimeline(list, at);
+    parts.eyebrow.textContent = copy.eyebrow != null ? String(copy.eyebrow) :
+      ('TOUR · STEP ' + tl.current + ' OF ' + tl.total);
+    parts.heading.textContent = String(copy.heading || '');
+    parts.body.textContent = String(RM && copy.reducedMotionBody != null ? copy.reducedMotionBody : copy.body || '') +
+      /* under reduced motion the engine disables ▶ too — the arrows remain */
+      (step.demo && step.demo.advance != null && RM && copy.reducedMotionBody == null ?
+        ' Auto-play is off — use the ‹ › step arrows to walk the story yourself.' : '');
+    parts.replayExample.hidden=RM || !step.demo || step.demo.advance == null;
+    parts.tryControls.hidden=(step.kind || 'spot') !== 'spot';
+    parts.back.disabled = at === 0;
+    parts.next.textContent = at >= list.length - 1 ? 'Done' : 'Next';
+    /* a held card cannot take focus yet (visibility:hidden): focus Next when
+       the card is shown instead */
+    focusOnShow = !keepFocus;
+    if (focusOnShow && !parts.ui.classList.contains('dv-tour-ui-pending')) focusNext();
+  }
+  function focusNext(){
+    focusOnShow = false;
+    try { parts.next.focus({preventScroll: true}); }
+    catch (ex) { parts.next.focus(); }
+  }
+
+  /* The portable tour teaches only features this page can demonstrate. Probe
+     real section/view states before showing its counter; never click a link or
+     fetch a drill-down while planning. Page-authored tours remain exact. */
+  var plannedConfig=config;
+  function disclose(node){
+    for(var anc=node;anc && anc!==doc.body;anc=anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
+      if(anc.tagName==='DETAILS' && !anc.open){anc.open=true;openedDetails.push(anc);}
+  }
+  function stateTokenMiss(sec,ds){
+    var sp=sec && sec.stepper;
+    if(ds.path != null && (!sp || resolvePathId(sp,ds.path)==null))return 'path "'+ds.path+'"';
+    var tokens={'@shared':sharedSourceIndex,'@rejoin':rejoinSourceIndex,'@fork':forkSourceIndex};
+    if(Object.prototype.hasOwnProperty.call(tokens,ds.step) && (!sp || tokens[ds.step](sp)<0))return 'step "'+ds.step+'"';
+    return null;
+  }
+  function stageAdvance(step,sec){
+    if(step.demo && step.demo.advance!=null && sec && sec.stepper &&
+       !(step.diagramState && step.diagramState.step!=null)){
+      if(sec.stepper.mode()!=='step')sec.stepper.enterStep(false);
+      sec.stepper.jump(0);
+    }
+  }
+  function branchIsVisible(sec,ds){
+    if(ds.step!=='@fork' && ds.step!=='@rejoin')return true;
+    var paths=sec.stepper.paths(), a=paths[0].indices,b=paths[1].indices;
+    var start=ds.step==='@fork'?forkSourceIndex(sec.stepper):rejoinSourceIndex(sec.stepper);
+    var needed=[start,b[b.indexOf(start)+1]];
+    if(ds.step==='@fork')needed.push(a[a.indexOf(start)+1]);
+    var chips=Array.prototype.slice.call(sec.sectionEl.querySelectorAll('.schip[data-step-source]'));
+    return needed.every(function(index){return chips.some(function(chip){
+      return Number(chip.getAttribute('data-step-source'))===index && isRendered(chip);
+    });});
+  }
+  function planDefaultTour(){
+    var preferred=null;
+    var steps=config.steps.map(function(step){
+      if((step.kind || 'spot')!=='spot')return step;
+      var candidates=(preferred?[preferred.sec]:[]).concat(ctl.steppers,ctl.sections)
+        .filter(function(sec,i,all){return sec.hasDiagram && all.indexOf(sec)===i;});
+      for(var i=0;i<candidates.length;i++){
+        var sec=candidates[i], pres=sec.presentation, saved=sectionSnapshot(sec);
+        var ds=step.diagramState || {};
+        if(stateTokenMiss(sec,ds))continue;
+        var choices=[saved.view];
+        if(preferred && preferred.sec===sec)choices.unshift(preferred.view);
+        if(pres && pres.views)choices=choices.concat(pres.views().map(function(v){return v.id;}));
+        choices=choices.filter(function(id,j,all){return all.indexOf(id)===j;});
+        if(ds.presentation!=null)choices=pres && pres.views ? pres.views().filter(function(v){return v.presentation===ds.presentation;}).map(function(v){return v.id;}) : [];
+        for(var j=0;j<choices.length;j++){
+          var state=Object.assign({},ds,{section:sec.reference});
+          if(choices[j]!=null)state.view=choices[j];
+          var tabs=ctl.tabBlocks.map(function(tb){return tb.active();});
+          var targetState=ctl.activeTarget, detailsAt=openedDetails.length;
+          var scroll={x:win.scrollX,y:win.scrollY}, valid=false;
+          try{
+            selectSectionTab(sec);
+            if(applyDiagramState(sec,state)){
+              stageAdvance(step,sec);
+              var target=queryTarget(step,sec,step.demo && step.demo.click || step.target);
+              disclose(target);
+              valid=isRendered(target) && branchIsVisible(sec,ds);
+              // A story panel may first appear partway through the flow. Start
+              // this lesson at an actual visible stop instead of dropping it.
+              if(!valid && target && step.id==='panels' && sec.stepper){
+                var ids=sec.stepper.ids();
+                for(var k=0;k<ids.length && !valid;k++){
+                  sec.stepper.jump(k);
+                  target=queryTarget(step,sec,step.target);disclose(target);
+                  valid=isRendered(target);
+                  if(valid)state.step=sec.stepper.current().id || sec.stepper.current().n+1;
+                }
+              }
+              // Pin the path as well as the section/view. Later lessons must not
+              // depend on the path a reader happened to choose during practice.
+              if(valid && sec.stepper && (ds.path!=null || step.demo && step.demo.advance!=null))state.path=sec.stepper.path();
+            }
+          }finally{
+            openedDetails.splice(detailsAt).forEach(function(d){if(d.isConnected)d.open=false;});
+            restoreSection(sec,saved,false);
+            ctl.tabBlocks.forEach(function(tb,k){if(tb.active()!==tabs[k])tb.select(tabs[k],false,false);});
+            ctl.activeTarget=targetState;win.scrollTo(scroll.x,scroll.y);
+          }
+          if(valid){
+            preferred={sec:sec,view:choices[j]};
+            return Object.assign({},step,{diagramState:state});
+          }
+        }
+      }
+      return null;
+    }).filter(Boolean);
+    plannedConfig=Object.assign({},config,{steps:steps});
+  }
+
+  /* ---- state machine ---- */
+  /* Custom lists preserve authored numbering; the built-in list has already
+     been planned against available controls. Each target is resolved at entry,
+     where applying the step's own tab and diagram state has already revealed it; a miss is an
+     authoring bug, surfaced as a console warning and passed through. */
+  function buildList(){
+    var steps = tourStepsForPersona(plannedConfig, persona || 'both');
+    /* one chooser, always first; extras are dropped (lint warns) */
+    var choosers = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; });
+    return choosers.slice(0, 1).concat(steps.filter(function(step){
+      return (step.kind || 'spot') !== 'chooser';
+    }));
+  }
+  function choose(which){
+    persona = TOUR_PERSONAS.indexOf(which) >= 0 ? which : 'both';
+    list = buildList();
+    var next = 0;
+    while (next < list.length && (list[next].kind || 'spot') === 'chooser') next++;
+    go(next);
+  }
+  function go(index){
+    stopDemo();
+    closeDemoClick();
+    var myGen = ++gen; /* a newer entry invalidates every pending timer */
+    var dir = index >= at ? 1 : -1;
+    var from = at;
+    var step = null, sec = null, eff = null, target = null;
+    /* Entry-time resolution: entering a step applies its authored tab and
+       diagram state, which is what reveals its control (an ambient-hidden
+       transport, a panel in another tab). A control still missing or
+       unrendered then is an authoring bug: warn and pass through in the
+       walking direction — the timeline keeps the authored numbering. */
+    for (;;){
+      if (index >= list.length){ finish(true); return; }
+      if (index < 0){ index = from; dir = 1; } /* nothing enterable behind: stay */
+      step = list[index];
+      if ((step.kind || 'spot') !== 'spot') break;
+      sec = sectionFor(step);
+      if (step.diagramState && step.diagramState.section != null && !sec){
+        if (win.console) console.warn('flowspec: tour step "' + step.id +
+          '" target not found — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      selectSectionTab(sec);
+      if(!applyDiagramState(sec, step.diagramState)){
+        if(win.console)console.warn('flowspec: tour step "'+step.id+'" diagramState '+JSON.stringify(step.diagramState)+' did not resolve — check the tour config for this diagram');
+        index+=dir;continue;
+      }
+      /* an unresolved path/step token is an entry failure exactly like a
+         missing target: the step's authored state cannot exist on this
+         page, so it must never show over the wrong one (a non-rejoining
+         path under rejoin copy) */
+      var dsCheck = step.diagramState || {};
+      var tokenMiss=stateTokenMiss(sec,dsCheck);
+      if(tokenMiss){
+        if (win.console) console.warn('flowspec: tour step "' + step.id + '" diagramState ' +
+          tokenMiss +
+          ' did not resolve — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      stageAdvance(step,sec);
+      /* a click step's validity rests on its click control (which must have
+         a target to spotlight afterwards): the click is what puts the menu
+         on screen, and it fires only after the settle loop steadies layout */
+      pendingClick = null;
+      if (step.demo && step.demo.click){
+        var clickEl = (step.target && typeof step.target.selector === 'string') ?
+          queryTarget(step, sec, step.demo.click) : null;
+        disclose(clickEl);
+        if (!clickEl || !isRendered(clickEl)){
+          if (win.console) console.warn('flowspec: tour step "' + step.id +
+            '" target not found — check the tour config for this diagram');
+          index += dir; continue;
+        }
+        pendingClick = {el: clickEl,
+          node: (clickEl.closest && clickEl.closest('.node[data-dv-node]')) || clickEl};
+      }
+      /* validity is judged on the AUTHORED target — presentation swaps
+         (the reduced-motion transport fallback) never rescue a step whose
+         subject is missing from this page */
+      var authored = pendingClick ? pendingClick.node : queryTarget(step, sec, step.target);
+      disclose(authored);
+      if (!authored || !isRendered(authored)){
+        closeDemoClick(); /* a click that opened something must not outlive its step */
+        if (win.console) console.warn('flowspec: tour step "' + step.id +
+          '" target not found — check the tour config for this diagram');
+        index += dir; continue;
+      }
+      lastSection = sec;
+      eff = effectiveTargets(step);
+      /* a click step's menu does not exist yet — spotlight its node until
+         the settled click opens it */
+      target = queryTarget(step, sec, eff.target) || authored;
+      break;
+    }
+    at = index;
+    unwatch();
+    settling = false;
+    showCard(); /* chooser/done cards are static; spot steps re-hold below */
+    parts.hint.hidden = (step.kind || 'spot') === 'chooser'; /* arrows do nothing there */
+    if ((step.kind || 'spot') === 'chooser'){
+      parts.ui.classList.remove('dv-tour-ui-center');
+      fullScrim(); renderTimeline(); renderChooser(step); return;
+    }
+    if ((step.kind || 'spot') === 'done'){
+      parts.ui.classList.add('dv-tour-ui-center');
+      fullScrim(); renderTimeline(); renderStep(step);
+      return;
+    }
+    parts.ui.classList.remove('dv-tour-ui-center');
+    var clickStep = !!(step.demo && step.demo.click);
+    /* one movement per step change: full dim first, move under it, reveal */
+    settling = true;
+    holdCard();
+    render([]);
+    if (target){
+      /* scrollIntoView first (it also centers inside the board's own
+         horizontal scroller), then correct the window explicitly — on SVG
+         children scrollIntoView may move only the inner scroller */
+      var spot = clickStep && pendingClick ? pendingClick.node :
+        (eff.target && eff.target.selector && eff.target.selector.indexOf('nrefs-trigger') >= 0 && target.closest ?
+          (target.closest('.node[data-dv-node]') || target) : target);
+      if (spot.scrollIntoView){
+        try { spot.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}); }
+        catch (ex) { spot.scrollIntoView(); }
+      }
+      recenter(spot);
+      /* engine step-change scrolling and freshly disclosed boards settle
+         asynchronously: keep correcting under the full dim until the target
+         rect is stable, then reveal the new spotlight in ONE movement */
+      var settleTries = 8, lastTop = null;
+      (function settle(){
+        if (!active || gen !== myGen) return;
+        recenter(spot);
+        if(sec && sec.presentation && sec.presentation.refreshViewport)sec.presentation.refreshViewport();
+        else if(sec && sec.viewport)sec.viewport.refresh();
+        var top = Math.round(spot.getBoundingClientRect().top);
+        var inView = top >= 0 && top <= win.innerHeight;
+        if ((inView && top === lastTop) || --settleTries <= 0){
+          settling = false;
+          if (inView && clickStep){
+            /* cause before effect: reveal the ringed trigger, hold a beat,
+               then let the viewer watch the click land — the card waits and
+               appears once, beside the opened menu */
+            guarded(position);
+            later(function(){ guarded(function(){
+              if (gen === myGen) firePendingClick(step, sec, eff);
+            }); }, 600);
+          }
+          else {
+            guarded(position);
+            showCard();
+            watch(target);
+            if (inView) startDemo(step, sec);
+          }
+          return;
+        }
+        lastTop = top;
+        later(function(){ guarded(settle); }, 80);
+      })();
+    } else { settling = false; showCard(); }
+    /* the engine closes its menu when focus leaves it: a click step leaves
+       focus where the engine put it (the menu's first link) */
+    renderTimeline(); renderStep(step, clickStep);
+    /* watch + position happen at reveal (settle completion); resize/scroll
+       reschedules stay armed for the revealed state */
+    schedule();
+  }
+  function focusable(node){
+    return isRendered(node) && !node.disabled && node.tabIndex>=0;
+  }
+  function spotControls(){
+    var step=list[at];if(!step || (step.kind || 'spot')!=='spot')return [];
+    var sec=sectionFor(step),eff=effectiveTargets(step),found=[];
+    [eff.target].concat(eff.secondaries.map(function(s){return s.target;})).forEach(function(target){
+      var root=queryTarget(step,sec,target);if(!root || !isRendered(root))return;
+      var nodes=[root].concat(Array.prototype.slice.call(root.querySelectorAll('button,a[href],input,select,textarea,summary,[tabindex]')));
+      nodes.forEach(function(node){if(focusable(node) && found.indexOf(node)<0)found.push(node);});
+    });
+    return found;
+  }
+  function keydown(ev){
+    if (!active) return;
+    if (ev.key === 'Escape'){
+      if (doc.querySelector('.node-link-menu:not([hidden])')) return;
+      stopDemo(); guarded(finish);
+      ev.preventDefault(); ev.stopImmediatePropagation(); return;
+    }
+    if (ev.key === 'Tab'){
+      var controls=Array.prototype.filter.call(overlay.querySelectorAll('button'),focusable).concat(spotControls());
+      if(controls.length){
+        var index=controls.indexOf(doc.activeElement);
+        var next=index<0?(ev.shiftKey?controls.length-1:0):(index+(ev.shiftKey?-1:1)+controls.length)%controls.length;
+        controls[next].focus({preventScroll:true});ev.preventDefault();ev.stopImmediatePropagation();
+      }
+      return;
+    }
+    /* Arrows on a spotlighted control belong to that control (panel drag,
+       resize, native inputs). Navigation shortcuts belong to the tour card. */
+    if(!overlay.contains(ev.target)){stopDemo();schedule();return;}
+    if (!parts.chooser.hidden) return; /* chooser: only Escape shortcuts apply */
+    if (ev.key === 'ArrowRight'){
+      stopDemo(); guarded(function(){ go(at + 1); });
+      /* the presenter's own arrow handler must never also advance the
+         diagram while the tour owns the keys */
+      ev.preventDefault(); ev.stopImmediatePropagation();
+    } else if (ev.key === 'ArrowLeft'){
+      stopDemo(); guarded(function(){ go(at - 1); });
+      ev.preventDefault(); ev.stopImmediatePropagation();
+    }
+  }
+  /* While the tour's ⋯ menu is open, focus moving onto the tour's own
+     controls (Tab, a click on the card) must not close it: the engine
+     closes its menu on any focusin outside it. A window-level capture
+     listener runs before the engine's document-level one and stops those
+     events — only for targets inside the overlay, only while the menu the
+     tour opened is still open. */
+  function guardFocus(ev){
+    if (clickedTrigger && clickedTrigger.getAttribute &&
+        clickedTrigger.getAttribute('aria-expanded') === 'true' &&
+        overlay && (overlay.contains(ev.target) || spotControls().indexOf(ev.target)>=0)) ev.stopImmediatePropagation();
+  }
+  function pagePointer(ev){
+    /* touching the page through the hole (the spotlit control) takes over
+       from a running demo, just like touching the tour's own controls */
+    if (demoTimer && overlay && !overlay.contains(ev.target)) stopDemo();
+  }
+  function pageMove(ev){if(overlay && !overlay.contains(ev.target))schedule();}
+  function fullscreenChanged(){
+    if(overlay){
+      var host=doc.fullscreenElement || doc.body;
+      if(overlay.parentNode!==host)host.appendChild(overlay);
+    }
+    schedule();
+  }
+  function attach(){
+    doc.addEventListener('keydown', keydown, true);
+    doc.addEventListener('pointerdown', pagePointer, true);
+    doc.addEventListener('pointermove', pageMove, true);
+    doc.addEventListener('click',schedule);
+    win.addEventListener('focusin', guardFocus, true);
+    win.addEventListener('resize', schedule);
+    doc.addEventListener('scroll', schedule, true);
+    doc.addEventListener('fullscreenchange', fullscreenChanged);
+  }
+  function detach(){
+    unwatch();
+    doc.removeEventListener('keydown', keydown, true);
+    doc.removeEventListener('pointerdown', pagePointer, true);
+    doc.removeEventListener('pointermove', pageMove, true);
+    doc.removeEventListener('click',schedule);
+    win.removeEventListener('focusin', guardFocus, true);
+    win.removeEventListener('resize', schedule);
+    doc.removeEventListener('scroll', schedule, true);
+    doc.removeEventListener('fullscreenchange', fullscreenChanged);
+  }
+  function start(){
+    if (active || disabled || restoring || destroyed) return;
+    restoreFocus = doc.activeElement;
+    if (!overlay) buildOverlay();
+    overlay.hidden = false;
+    active = true;
+    persona = null;
+    fullScrim(); /* the overlay opens on a fully dimmed page */
+    ctl.suppressFragmentWrites = true;
+    takeSnapshot();
+    if(config===TOUR_DEFAULT_CONFIG)planDefaultTour();
+    fullscreenChanged();
+    list = buildList();
+    at = 0;
+    if (!list.length){ finish(); return; }
+    if ((list[0].kind || 'spot') !== 'chooser'){ persona = 'both'; list = buildList(); }
+    attach();
+    go(0);
+  }
+  function finish(done){
+    if (!active) return;
+    active = false;
+    settling = false;
+    stopDemo();
+    closeDemoClick();
+    markDone();
+    detach();
+    restoreReader();
+    if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
+    /* Done hands over control: the recap invites pressing ▶, so focus the
+       transport of the section the tour ran in (a step arrow under reduced
+       motion, where the engine disables ▶). Skip/Esc return the reader to
+       where they were. */
+    var home = done && lastSection && lastSection.sectionEl ? lastSection.sectionEl : null;
+    var handoff = home ? (home.querySelector('.playback-button:not([disabled])') ||
+      home.querySelector('.step-transport button:not([disabled])')) : null;
+    if (handoff && handoff.getClientRects().length){
+      try { handoff.focus({preventScroll: true}); } catch (ex) { handoff.focus(); }
+    }
+    else if (restoreFocus && restoreFocus.isConnected && restoreFocus.focus) restoreFocus.focus();
+    else if (replay && replay.isConnected) replay.focus();
+  }
+
+  /* ---- replay affordance + autostart ---- */
+  var replay = doc.createElement('button');
+  replay.type = 'button';
+  replay.className = 'tbtn dv-tour-replay';
+  replay.textContent = '?';
+  replay.setAttribute('aria-label', 'Replay the tour');
+  replay.addEventListener('click', function(){ disabled = false; guarded(start); });
+  var present = view.querySelector('.presentbtn');
+  if (present && present.parentNode === view) view.insertBefore(replay, present.nextSibling);
+  else view.insertBefore(replay, view.firstChild);
+
+  var previousStart=win.dvStartTour;
+  var startPublic=function(){ if(destroyed)return false;disabled=false;guarded(start);return true; };
+  win.dvStartTour=startPublic;
+  function destroy(){
+    if(destroyed)return;
+    destroyed=true;active=false;settling=false;gen++;
+    stopDemo();timers.forEach(function(id){win.clearTimeout(id);});timers.clear();
+    if(raf && win.cancelAnimationFrame)win.cancelAnimationFrame(raf);raf=0;
+    closeDemoClick();detach();
+    /* The owning reader retires ctl next. Do not restore playback, focus or
+       scroll into a different screen, or mark an interrupted tour completed. */
+    snapshot=null;openedDetails=[];ctl.suppressFragmentWrites=false;
+    if(overlay)overlay.remove();replay.remove();
+    if(win.dvStartTour===startPublic){
+      if(previousStart===undefined)delete win.dvStartTour;else win.dvStartTour=previousStart;
+    }
+  }
+
+  if (request === 'force') guarded(start);
+  else if (request !== 'suppress' && !options.deepLink && !storageDone()) guarded(start);
+
+  return {start: function(){ guarded(start); }, active: function(){ return active; }, destroy: destroy};
+}
 /* ---- src/trace-import.js ---- */
 /* trace-import.js — pure Honeycomb event JSON → Flow Spec conversion.
    Shared by the workbench and tools/trace2spec.js. No network or secrets. */
@@ -43134,10 +44690,14 @@ function initWorkbenchLibrary(opts){
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
-  var pending=null,entries=[],origin='',published=false,ctl=null,active=null,sequence=0,current=null;
+  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,active=null,sequence=0,current=null;
+  function retireViewer(){
+    if(tour)tour.destroy();tour=null;
+    if(ctl)ctl.destroy();ctl=null;
+  }
   function stop(){
     sequence++;active=null;current=null;edit.disabled=true;copy.disabled=true;removeManualCopyField(copy);
-    if(ctl)ctl.destroy();ctl=null;reader.replaceChildren();
+    retireViewer();reader.replaceChildren();
   }
   function load(){
     if(pending)return pending;
@@ -43191,7 +44751,9 @@ function initWorkbenchLibrary(opts){
       title.textContent=current.title;
       document.getElementById('canon-reader-origin').textContent=origin+' · Reading does not change your draft.';
       var spec=JSON.parse(JSON.stringify(current.spec));
-      ctl=renderPage(reader,normalize(spec),spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
+      var page=normalize(spec);
+      ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
+      tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
     }catch(ex){
       if(token!==sequence)return;
       current=null;edit.disabled=true;
@@ -43207,7 +44769,7 @@ function initWorkbenchLibrary(opts){
     try{opts.edit(JSON.parse(JSON.stringify(current.spec)));}
     catch(ex){error.textContent=ex.message;error.hidden=false;}
   });
-  window.addEventListener('pagehide',function(){sequence++;if(ctl)ctl.destroy();ctl=null;});
+  window.addEventListener('pagehide',function(){sequence++;retireViewer();});
   window.addEventListener('pageshow',function(event){if(event.persisted && active)show(active,opts.selected());});
   return {show:show,hide:stop};
 }

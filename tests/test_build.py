@@ -46,14 +46,13 @@ class BuildTests(unittest.TestCase):
         self.assertIn('data:font/woff2;base64,', text)
 
     def test_flowview_ships_the_guided_tour_once(self):
-        # The standalone page carries the tour fragment and its built-in
-        # default config; the workbench page must not grow the overlay code.
-        text = self.texts["flowview.html"]
-        self.assertEqual(text.count("function wireTour("), 1)
-        self.assertEqual(text.count("var TOUR_DEFAULT_CONFIG"), 1)
-        self.assertIn("dv-tour-ring", text)          # presenter-cinema styles
-        self.assertIn("tourLintConfig", text)         # advisory lint rides along
-        self.assertNotIn("function wireTour(", self.texts["flowspec.html"])
+        # Both reader entrypoints share one implementation and one stylesheet.
+        for name in ("flowview.html", "flowspec.html"):
+            text = self.texts[name]
+            self.assertEqual(text.count("function wireTour("), 1)
+            self.assertEqual(text.count("var TOUR_DEFAULT_CONFIG"), 1)
+            self.assertEqual(text.count(".dv-tour-ring{stroke:"), 1)
+            self.assertIn("tourLintConfig", text)
 
     def test_flowview_carries_the_host_skin_message_listener(self):
         # An iframe shell posts {type:'dv_skin', skin} on theme change; the

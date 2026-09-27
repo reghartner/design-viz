@@ -1584,8 +1584,9 @@ Every edge-bearing step gets its own numbered coin on its FIRST delivered
 edge. Several steps may share a first edge — repeated heartbeats, retries,
 daily reports: their coins sit side by side along that edge in step order,
 centred on its midpoint and clear of the cards and arrowhead. An edge too
-short or too sharply bent for that row gets a compact grid across the edge
-instead. Do not reorder `edges` or drop real hops to give a
+short or too sharply bent for that row, or whose row would cover a card, gets
+a compact grid across the edge instead, placed off every card (floats
+included); the board grows if the grid needs the room. Do not reorder `edges` or drop real hops to give a
 step its own edge.
 
 ## Viewer features you get for free

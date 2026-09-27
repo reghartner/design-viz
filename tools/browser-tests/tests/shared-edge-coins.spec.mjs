@@ -89,13 +89,19 @@ const tight={page:{title:'Tight edges',sections:[
   edges:[{from:'a',to:'b',label:'retry',fromPort:{side:'right'},toPort:{side:'right'}}],steps:beats(4,'a->b')}},
  {id:'crowded',heading:'Crowded row, many beats',diagram:{view:'step',autoplay:false,nodes:five,rows:[['a','b','c','d','e']],
   edges:[{from:'b',to:'c',label:'tick'}],steps:beats(9,'b->c')}},
+ // A pinned float sits right above the short edge: the grid must pick an arrangement off its card.
+ {id:'float',heading:'Pinned float above a short edge',diagram:{view:'step',autoplay:false,nodes:{...five,f:{title:'Float'}},rows:[['a','b','c','d','e']],
+  floats:[{id:'f',side:'below',x:535,y:90}],edges:[{from:'b',to:'c',label:'tick'}],steps:beats(9,'b->c')}},
+ // Stacked neighbours on both sides of the short edge.
+ {id:'stacked-neighbours',heading:'Stacked neighbours beside a short edge',diagram:{view:'step',autoplay:false,nodes:{...five,f:{title:'F'},g:{title:'G'}},rows:[['a',['b','f'],['c','g'],'d','e']],
+  edges:[{from:'b',to:'c',label:'tick'}],steps:beats(6,'b->c')}},
 ]}};
 const intersects=(a,b)=>a.x<b.x+b.width && b.x<a.x+a.width && a.y<b.y+b.height && b.y<a.y+a.height;
 test('short and hairpin edges keep shared coins apart, off cards, labels and arrowheads, and inside the board',async({page,server},testInfo)=>{
  await writeFile(path.join(server.root,'tight-coins.json'),JSON.stringify(tight));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'tight-coins.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'tight-coins.html')]);
  await page.goto(server.origin+'/tight-coins.html');
- const counts=[3,4,9];
+ const counts=[3,4,9,9,6];
  for(let i=0;i<counts.length;i++){
   const sec=page.locator('.doc-sec').nth(i),svg=sec.locator('svg:has(.coin)').first();
   await svg.scrollIntoViewIfNeeded();

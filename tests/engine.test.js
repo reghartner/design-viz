@@ -4586,6 +4586,28 @@ test('coinSlots packs a bounded grid when the edge is too short or bends too tig
   const bent=C.coinSlots(hair,hair.len,hmid,4);
   assert.strictEqual(bent.length,4);assert.ok(minGap(bent)>=C.COIN_CLEAR);
 });
+test('coinSlots keeps grid coins off every card, trying each side and narrower arrangements',()=>{
+  const flat=linePath([{x:0,y:0},{x:50,y:0}]),fmid=flat.getPointAtLength(25);
+  const covers=(pts,rects)=>C.coinCover(pts,rects)>0;
+  /* a card just above the edge: the centred column would hit it, rows below do not */
+  const above=[{x:0,y:-80,w:50,h:65}];
+  const down=plain(C.coinSlots(flat,flat.len,fmid,3,above));
+  assert.deepStrictEqual(down,[{x:25,y:0},{x:25,y:30},{x:25,y:60}]);
+  /* a card below as well as above: rows go up past the upper card only when that side is clear */
+  const below=[{x:0,y:15,w:50,h:80}];
+  const up=plain(C.coinSlots(flat,flat.len,fmid,3,below));
+  assert.deepStrictEqual(up,[{x:25,y:0},{x:25,y:-30},{x:25,y:-60}]);
+  assert.ok(!covers(up,below));
+  /* along-path rows that would cross a card fall back to a clear grid */
+  const long=linePath([{x:0,y:0},{x:200,y:0}]),lmid=long.getPointAtLength(100);
+  const onRow=[{x:60,y:-5,w:20,h:10}];
+  const moved=C.coinSlots(long,long.len,lmid,3,onRow);
+  assert.ok(!covers(moved,onRow) && C.coinsApart(moved,C.COIN_CLEAR));
+  /* nowhere clear: the least-covering arrangement is still n distinct slots */
+  const boxed=[{x:-200,y:-200,w:400,h:190},{x:-200,y:10,w:400,h:190}];
+  const least=C.coinSlots(flat,flat.len,fmid,4,boxed);
+  assert.strictEqual(least.length,4);assert.ok(C.coinsApart(least,C.COIN_CLEAR));
+});
 test('coinsApart is exact and near-linear for large coin sets',()=>{
   const row=Array.from({length:3000},(_,i)=>({x:i*30,y:(i%7)*3}));
   const start=process.hrtime.bigint();

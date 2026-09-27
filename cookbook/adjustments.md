@@ -49,9 +49,8 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 2. Apply the smallest knob from the table. Prefer structure changes (row
    order, stacking) over pixel nudges; pixel nudges exist only where the table
    lists them (float/label offsets, bends, or map/sensor coordinates).
-3. Re-validate. The lint is layout-aware — it will name label overflows,
-   crowded corridors, and coin collisions with the numbers that justify the
-   fix.
+3. Re-validate. The lint is layout-aware — it will name label overflows and
+   crowded corridors with the numbers that justify the fix.
 4. Re-inject and reload. For Radar geometry changes, use the model check in
    `motion-detection.md` to verify distance and occupancy, then inspect wedge
    fit. Check the separately authored alert transitions against the source;

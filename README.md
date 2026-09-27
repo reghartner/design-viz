@@ -12,6 +12,11 @@ per diagram page with its JSON spec and generated HTML together. The directory
 guide covers building and moving existing diagrams. Root [`canon.json`](canon.json)
 is the shared canon membership list for Backstage and the nginx workbench.
 
+For live local authoring with a filesystem-only agent, build the workbench and run
+`node tools/agent-session.mjs`. It prints an editor URL and a scratch folder for
+document/selection snapshots and undoable agent proposals. See
+[local design sessions](docs/local-agent-session.md); no browser access is needed.
+
 ## Connected company flows
 
 For the complete reproducible integration, use the

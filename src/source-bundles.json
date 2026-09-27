@@ -52,6 +52,7 @@
     "workbench/field-values.js",
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
+    "workbench/agent-session.js",
     "workbench/controls.js",
     "workbench/notifications.js",
     "workbench/vocabulary.js",

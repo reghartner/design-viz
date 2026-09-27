@@ -8732,7 +8732,7 @@ body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;d
       </section>
       <section id="hg-save" tabindex="-1"><p class="human-guide-eyebrow">11 / SAVE & SHARE</p><h3>Keep the source. Share the experience.</h3><dl class="human-guide-glossary"><dt>save</dt><dd>Keep the editable JSON. Open it later to continue authoring.</dd><dt>export…</dt><dd>Write the JSON and a standalone viewer HTML page to a folder. Share or host the HTML for readers.</dd><dt>Export for Confluence</dt><dd>Download the payload for the Flowview Forge integration.</dd><dt>Copy JSON for Confluence</dt><dd>Copy that payload to paste into the integration’s configuration.</dd><dt>Copy link / Copy embed link</dt><dd>Link to a viewer’s selected section, view, path, and step. Share a hosted viewer URL your readers can reach.</dd></dl><p>The browser draft is convenient recovery, not a repository commit or a backup. Save JSON before clearing browser data or moving computers. Confluence and Backstage publication depend on your company’s integration and access controls; exporting or editing here does not publish to either one.</p>
       </section>
-      <section id="hg-agent" tabindex="-1"><p class="human-guide-eyebrow">12 / WORK WITH AN AGENT</p><h3>Give it the question, the evidence, and the audience.</h3><p>On the home page choose <b>Build it with your agent</b>. Select whether to explain a design, explore a codebase, or improve a diagram. Add your brief, choose the audience, and copy the prompt. It points your agent to the authoring skill in the selected repository. Use <b>Using a company fork?</b> to set your team’s repository and revision.</p><blockquote>Explain what happens from a doorbell press to a resident seeing the clip. Include the successful path, a recording timeout with recovery, and an outage that ends early. Give engineers a service view and business readers a Home view of the same steps. Use the attached design as evidence; identify anything it does not establish.</blockquote><p>Run the agent in your own tools with the relevant design or code. Bring its JSON back using <b>Paste JSON</b> or <b>Open file</b>, then walk every path. Ask it to check readability, animation, failure consequences, and shared-step behavior as well as JSON validity.</p>
+      <section id="hg-agent" tabindex="-1"><p class="human-guide-eyebrow">12 / WORK WITH AN AGENT</p><h3>Give it the question, the evidence, and the audience.</h3><p>On the home page choose <b>Build it with your agent</b>. Select whether to explain a design, explore a codebase, or improve a diagram. Add your brief, choose the audience, and copy the prompt. It points your agent to the authoring skill in the selected repository. Use <b>Using a company fork?</b> to set your team’s repository and revision.</p><blockquote>Explain what happens from a doorbell press to a resident seeing the clip. Include the successful path, a recording timeout with recovery, and an outage that ends early. Give engineers a service view and business readers a Home view of the same steps. Use the attached design as evidence; identify anything it does not establish.</blockquote><p>Run the agent in your own tools with the relevant design or code. Bring its JSON back using <b>Paste JSON</b> or <b>Open file</b>, then walk every path. For a local session, run <code>node tools/agent-session.mjs</code> in the built Flowview checkout and open the printed URL. Give the agent the scratch folder’s README. Your selections and source flow into local files; agent proposals apply automatically as one Undo action. Finish typing or dragging and click the canvas to let a waiting update apply. Use <b>Agent files · Disconnect</b> to stop sharing; <b>File → Local agent session</b> shows the folder and status. Ask it to check readability, animation, failure consequences, and shared-step behavior as well as JSON validity.</p>
       </section>
       <section id="hg-help" tabindex="-1"><p class="human-guide-eyebrow">13 / WHEN SOMETHING SURPRISES YOU</p><h3>Usually, it is the editing context.</h3><dl class="human-guide-fixes"><dt>“Editing the alternate changed the happy path.”</dt><dd>That event is shared. Use <b>Make independent here</b> before changing its content for one path.</dd><dt>“My new branch starts with the same event.”</dt><dd>Create it <em>after the last shared step</em>. The next step is the first independent outcome. The shared lead-in still plays from step 1.</dd><dt>“The camera is still recording on this step.”</dt><dd>State carries forward. Set recording off at the appropriate beat; changing a scene does not automatically end recording.</dd><dt>“I hid a step, but its result is still visible.”</dt><dd>A view skips presentation stops, not their effects. Use an alternate path to change what actually happens.</dd><dt>“I can’t move the house or edit its rooms.”</dt><dd>Choose <b>Edit shared home layout</b>; step editing changes the event rather than the floor plan.</dd><dt>“Clicks keep highlighting things instead of editing them.”</dt><dd>Finish <b>ADD TO STEP</b> or cancel a pending connection with <kbd>Esc</kbd>.</dd><dt>“The service dropdown is empty.”</dt><dd>The catalog has not loaded or has no matching services. Check <b>File → Company repository</b> for its status, then import a snapshot if needed.</dd><dt>“The editor or diagram feels squeezed.”</dt><dd>Drag the workspace divider, or choose File → Workspace preferences → Focus workspace. Try Readable size for a wide graph, and arrange the section for the target host.</dd></dl><p class="human-guide-end">Start small. Walk every outcome. Let every animation explain a change.</p>
       </section>
@@ -34262,6 +34262,105 @@ function createWorkbenchLifetime(){
   }
   return {alive:function(){return !disposed;},guard:guard,listen:listen,delay:delay,cancelDelay:cancelDelay,own:own,destroy:destroy};
 }
+/* ---- src/workbench/agent-session.js ---- */
+/* Optional local-file transport. No browser-control or script-execution commands. */
+function createWorkbenchAgentExchange(opts){
+  var lastSource=null,lastProject=null,sequence=0,pending=null;
+  function snapshot(){
+    var value=opts.snapshot();
+    if(value.source!==lastSource || value.project!==lastProject){lastSource=value.source;lastProject=value.project;sequence++;}
+    value.revision=opts.clientId+'-'+sequence;
+    return value;
+  }
+  return {
+    request:function(){return {clientId:opts.clientId,snapshot:snapshot(),result:pending};},
+    receive:function(reply,sent){
+      if(pending && sent.result && pending.id===sent.result.id && reply.acknowledged===pending.id)pending=null;
+      if(reply.occupied)return 'Another tab is connected. Disconnect it or close it and wait a few seconds.';
+      if(reply.fileError)return 'Proposal file: '+reply.fileError;
+      var proposal=reply.proposal;
+      if(!proposal)return null;
+      var current=snapshot();
+      function result(status,message){pending={id:proposal.id,baseRevision:proposal.baseRevision,status:status,message:message,revision:current.revision};return message;}
+      if(!current.open)return result('rejected','Open a project before applying agent changes.');
+      if(proposal.baseRevision!==current.revision)return result('rejected','Your document changed. The agent must reread state.json and revise its proposal.');
+      if(opts.busy())return 'Agent update waiting — finish editing or dragging, then click the canvas.';
+      if(typeof proposal.source!=='string' || proposal.source.length>4*1024*1024)return result('rejected','Invalid or oversized source.');
+      if(proposal.source===current.source)return result('unchanged','Agent proposal matches the current document.');
+      var outcome;
+      try{outcome=opts.apply(proposal.source,current);}
+      catch(ex){return result('rejected','Could not apply proposal: '+ex.message);}
+      if(!outcome || !outcome.ok)return result('rejected',outcome && outcome.error || 'Document changed before the proposal could apply.');
+      current=snapshot();
+      return result('applied',(proposal.summary || 'Agent update applied.')+(outcome.rendered===false?' Preview failed; use Undo or repair the source.':' Undo is available.'));
+    }
+  };
+}
+
+function initWorkbenchAgentSession(opts){
+  var doc=opts.document,configElement=doc.getElementById('flowview-local-agent');
+  if(!configElement)return {destroy:function(){}};
+  var config;
+  try{config=JSON.parse(configElement.textContent);}catch(ex){return {destroy:function(){}};}
+  if(config.protocolVersion!==1 || !/^[a-f0-9]{64}$/.test(config.token) ||
+     location.protocol!=='http:' || location.hostname!=='127.0.0.1')return {destroy:function(){}};
+  configElement.remove();
+  var life=createWorkbenchLifetime(),running=false,generation=0,controller=null,timer=null,pointerHeld=false;
+  var host=doc.querySelector('.workbench-header'),button=doc.createElement('button');
+  button.type='button';button.id='local-agent-toggle';button.className='bbtn';host.appendChild(button);
+  var details=doc.createElement('details');details.className='canon-tools';details.id='local-agent-details';
+  var summary=doc.createElement('summary');summary.textContent='Local agent session';details.appendChild(summary);
+  var status=doc.createElement('p');status.id='local-agent-status';status.setAttribute('role','status');details.appendChild(status);
+  var path=doc.createElement('code');path.textContent=config.scratch;path.style.overflowWrap='anywhere';details.appendChild(path);
+  var help=doc.createElement('p');help.textContent='Give your agent this folder’s README.md. It reads state.json and writes proposal.json. Updates apply automatically as one Undo action; click outside a field when you are ready. Save still writes your chosen project file.';details.appendChild(help);
+  doc.getElementById('editor-company').appendChild(details);
+  var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+  var clientId=Array.from(bytes,function(byte){return byte.toString(16).padStart(2,'0');}).join('');
+  var exchange=createWorkbenchAgentExchange({clientId:clientId,snapshot:opts.snapshot,busy:function(){return pointerHeld || opts.busy();},apply:opts.apply});
+  function label(message){status.textContent=message;button.title=message;}
+  function send(payload,signal){
+    return fetch('/__flowview_agent/sync',{method:'POST',headers:{'Content-Type':'application/json','X-Flowview-Session':config.token},
+      body:JSON.stringify(payload),signal:signal,credentials:'omit',cache:'no-store'}).then(function(response){
+        if(!response.ok)throw Error('Local helper returned '+response.status+'.');return response.json();
+      });
+  }
+  async function tick(epoch){
+    if(!running || !life.alive() || epoch!==generation)return;
+    var requestController=new AbortController();controller=requestController;
+    var deadline=life.delay(function(){requestController.abort();},5000);
+    try{
+      var sent=exchange.request(),reply=await send(sent,requestController.signal);
+      if(!running || !life.alive() || epoch!==generation)return;
+      var message=exchange.receive(reply,sent);
+      if(message)label(message);
+      else if(!sent.snapshot.open)label('Connected — open a project to share it with the agent.');
+      else if(!status.textContent || /Connecting|unavailable|open a project|Another tab/.test(status.textContent))label('Connected — document and selection are shared through local files.');
+    }catch(ex){if(running && life.alive() && epoch===generation)label('Helper unavailable; retrying. Your edits remain in the workbench.');}
+    finally{
+      life.cancelDelay(deadline);
+      if(running && life.alive() && epoch===generation)timer=life.delay(function(){tick(epoch);},750);
+    }
+  }
+  function start(){
+    if(running || !life.alive())return;
+    running=true;generation++;button.textContent='Agent files · Disconnect';button.setAttribute('aria-pressed','true');
+    label('Connecting to local files…');tick(generation);
+  }
+  function stop(){
+    if(!running)return;
+    running=false;generation++;life.cancelDelay(timer);if(controller)controller.abort();
+    button.textContent='Agent files · Connect';button.setAttribute('aria-pressed','false');label('Disconnected. Scratch retains the last shared snapshot.');
+    var payload=exchange.request();payload.disconnect=true;
+    send(payload).catch(function(){});
+  }
+  life.listen(button,'click',function(){if(running)stop();else start();});
+  life.listen(window,'pointerdown',function(){pointerHeld=true;},true);
+  ['pointerup','pointercancel','blur'].forEach(function(type){life.listen(window,type,function(){pointerHeld=false;},true);});
+  life.listen(window,'pagehide',stop);
+  life.own(function(){stop();button.remove();details.remove();});
+  start();
+  return {destroy:life.destroy};
+}
 /* ---- src/workbench/controls.js ---- */
 /* Shared commit discipline, with caller-selected blur and unchanged-value policy. */
 function wireBuilderCommit(input,commit,options){
@@ -40101,6 +40200,46 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(catalogPicker)catalogPicker.destroy();});
   life.own(function(){interactions.destroy();});
   life.own(function(){hideDiff();if(guide)guide.hidden=true;});
+  var agentSession=typeof initWorkbenchAgentSession==='function' ? initWorkbenchAgentSession({document:document,
+    snapshot:function(){
+      var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
+      var previewCurrent=snap.renderedText===snap.text;
+      var ctl=opts.ctl && opts.ctl();
+      return {project:snap.project,open:!!open,source:open?snap.text:'',parseError:open?snap.error || null:null,
+        previewCurrent:previewCurrent,selection:open && previewCurrent?clipboardSelection().map(function(target){
+          var clean={};['kind','section','id','index','block','tab','card','pathId','field','item'].forEach(function(key){
+            if(typeof target[key]==='string' || typeof target[key]==='number')clean[key]=target[key];
+          });if(Array.isArray(target.bulletPath))clean.bulletPath=target.bulletPath.slice();return clean;
+        }):[],
+        views:open && previewCurrent?((ctl && ctl.sections) || []).map(function(rec){
+          return {section:rec.number-1,view:rec.presentation && rec.presentation.viewId?rec.presentation.viewId():null,
+            mode:rec.stepper && rec.stepper.mode?rec.stepper.mode():null,
+            path:rec.stepper && rec.stepper.path?rec.stepper.path():null,
+            sourceStep:rec.stepper && rec.stepper.sourceIndex?rec.stepper.sourceIndex():null};
+        }):[]};
+    },
+    busy:function(){
+      var active=document.activeElement;
+      return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
+        !!(active && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
+    },
+    apply:function(text,expected){
+      var snapshot=session.snapshot();
+      if(snapshot.text!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'Document changed.'};
+      var raw;try{raw=JSON.parse(text);}catch(ex){return {ok:false,error:'Proposal is not valid JSON: '+ex.message};}
+      var findings=validate(normalize(raw));
+      if(findings.errors.length)return {ok:false,error:findings.errors.join('\n')};
+      var outcome;
+      var accepted=session.accept({text:text},{snapshot:snapshot,beforePublish:function(){
+        clearMultiSelect();session.target=null;clearStepMarkers();inspector.retire();if(guide)guide.hidden=true;
+      },afterRender:function(plan,result){
+        outcome=result;
+        rehighlight();if(stepList)stepList.sync();
+      }});
+      return {ok:accepted,rendered:!!(outcome && outcome.ok)};
+    }
+  }) : null;
+  if(agentSession)life.own(function(){agentSession.destroy();});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },

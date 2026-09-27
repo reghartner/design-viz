@@ -96,6 +96,7 @@ test('Try the controls gives keyboard arrows to the highlighted panel grip',asyn
   await page.getByRole('button',{name:'Try the controls',exact:true}).click();
   await expect(grip).toBeFocused();
   const before=await panel(page,'status').boundingBox();
+  await expect(page.locator('.dv-tour-ring')).toBeVisible();
   const ringBefore=await page.locator('.dv-tour-ring').boundingBox();
   const offset={x:ringBefore.x-before.x,y:ringBefore.y-before.y};
   await page.keyboard.press('ArrowRight');

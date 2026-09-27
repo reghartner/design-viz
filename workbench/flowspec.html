@@ -27223,8 +27223,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
       if(w.state.stacked){r.x=b.w-r.w-12;r.y=y;r.h=Math.max(1,w.state.h*scale);y+=r.h+gap;maxWidth=Math.max(maxWidth,r.w);}
       apply(w,r);
     });
-    var timeline=bar && bar.querySelector('.path-timeline,.path-matrix');
-    var tracks=timeline?Math.min(180,Math.max(34,timeline.offsetHeight)):34;
+    var chips=bar && bar.querySelector('.schips'),timeline=chips && chips.querySelector('.path-timeline,.path-matrix');
+    var padding=chips?getComputedStyle(chips):null;
+    var tracks=timeline?Math.min(180,Math.max(34,timeline.offsetHeight+(parseFloat(padding.paddingTop)||0)+(parseFloat(padding.paddingBottom)||0))):34;
     player.style.setProperty('--explore-tracks-height',tracks+'px');
     var controls=memory.controls;
     if(!controls){

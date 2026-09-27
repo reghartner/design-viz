@@ -1,4 +1,4 @@
-import {writeFile} from 'node:fs/promises';
+import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
@@ -82,6 +82,9 @@ test('steps sharing a first edge each get a distinct, non-overlapping coin that 
 // Edges too short or too bent for a row along the path get a bounded grid.
 const beats=(n,edge)=>Array.from({length:n},(_,i)=>({edge,text:'Beat '+(i+1)+'.'}));
 const five=Object.fromEntries(['a','b','c','d','e'].map(k=>[k,{title:k.toUpperCase()}]));
+const midFloat=n=>({view:'step',autoplay:false,nodes:{b:{title:'B'},c:{title:'C'},f:{title:'Float'}},rows:[[]],
+ floats:[{id:'b',side:'below',x:200,y:200},{id:'c',side:'below',x:600,y:200},{id:'f',side:'below',x:400,y:200}],
+ edges:[{from:'b',to:'c',label:'tick'}],steps:beats(n,'b->c')});
 const tight={page:{title:'Tight edges',sections:[
  {id:'short',heading:'Stacked cards, short edge',diagram:{view:'step',autoplay:false,nodes:five,rows:[[['a','b'],'c']],
   edges:[{from:'a',to:'b',label:'poll'}],steps:beats(3,'a->b')}},
@@ -95,13 +98,17 @@ const tight={page:{title:'Tight edges',sections:[
  // Stacked neighbours on both sides of the short edge.
  {id:'stacked-neighbours',heading:'Stacked neighbours beside a short edge',diagram:{view:'step',autoplay:false,nodes:{...five,f:{title:'F'},g:{title:'G'}},rows:[['a',['b','f'],['c','g'],'d','e']],
   edges:[{from:'b',to:'c',label:'tick'}],steps:beats(6,'b->c')}},
+ // Freely placed cards: a pinned float sits right on the edge midpoint, so every
+ // on-edge arrangement is covered and the whole block must move off the edge.
+ {id:'midpoint-float',heading:'Float over the edge midpoint',diagram:midFloat(3)},
+ {id:'midpoint-float-nine',heading:'Float over the edge midpoint, nine beats',diagram:midFloat(9)},
 ]}};
 const intersects=(a,b)=>a.x<b.x+b.width && b.x<a.x+a.width && a.y<b.y+b.height && b.y<a.y+a.height;
 test('short and hairpin edges keep shared coins apart, off cards, labels and arrowheads, and inside the board',async({page,server},testInfo)=>{
  await writeFile(path.join(server.root,'tight-coins.json'),JSON.stringify(tight));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'tight-coins.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'tight-coins.html')]);
  await page.goto(server.origin+'/tight-coins.html');
- const counts=[3,4,9,9,6];
+ const counts=[3,4,9,9,6,3,9];
  for(let i=0;i<counts.length;i++){
   const sec=page.locator('.doc-sec').nth(i),svg=sec.locator('svg:has(.coin)').first();
   await svg.scrollIntoViewIfNeeded();
@@ -118,6 +125,18 @@ test('short and hairpin edges keep shared coins apart, off cards, labels and arr
     view:{x:ctm.a*vb.x+ctm.e,y:ctm.d*vb.y+ctm.f,width:ctm.a*vb.width,height:ctm.d*vb.height}};
   });
   expect(g.coins.map(c=>c.text)).toEqual(Array.from({length:counts[i]},(_,j)=>String(j+1)));
+  const id=tight.page.sections[i].id;
+  if(id.startsWith('midpoint-float')){
+   // The fixture is only meaningful while the float really covers the path midpoint.
+   expect(await svg.evaluate(el=>{const p=el.querySelector('path.edge'),m=p.getPointAtLength(p.getTotalLength()/2),c=el.querySelector('[data-dv-node="f"] .card'),b=c.getBBox(),t=c.getCTM().inverse().multiply(p.getCTM()),q=new DOMPoint(m.x,m.y).matrixTransform(t);
+    return q.x>=b.x&&q.x<=b.x+b.width&&q.y>=b.y&&q.y<=b.y+b.height;})).toBe(true);
+  }
+  if(id==='float'){
+   // Nine coins beside the pinned float form a compact 3 x 3 block in reading order.
+   const cols=new Set(g.coins.map(c=>Math.round(c.box.x))),rows=new Set(g.coins.map(c=>Math.round(c.box.y)));
+   expect([cols.size,rows.size]).toEqual([3,3]);
+   g.coins.slice(1).forEach((c,j)=>{const p=g.coins[j].box;expect(c.box.y>p.y+1||(Math.abs(c.box.y-p.y)<=1&&c.box.x>p.x),'reading order at coin '+c.text).toBe(true);});
+  }
   g.coins.forEach((c,a)=>{
    g.coins.slice(a+1).forEach(o=>expect(intersects(c.box,o.box),'coins '+c.text+' and '+o.text+' overlap').toBe(false));
    g.cards.forEach(card=>expect(intersects(c.box,card),'coin '+c.text+' covers a card').toBe(false));
@@ -132,3 +151,29 @@ test('short and hairpin edges keep shared coins apart, off cards, labels and arr
   await svg.screenshot({path:testInfo.outputPath('tight-coins-'+tight.page.sections[i].id+'.png')});
  }
 });
+
+// Label placement regressions: in the Backstage and platform review diagrams,
+// "Link regression" must stay beside its edge and clear of "Atomic commit".
+for(const [name,file] of [['backstage','docs/diagrams/backstage/backstage.spec.json'],['platform','docs/diagrams/platform/flowview-platform.spec.json']]){
+ test('review diagram labels stay near their edges and clear of each other ('+name+')',async({page,server})=>{
+  const spec=JSON.parse(await readFile(path.join(repo,file),'utf8')),sec=spec.page.blocks[0].tabs[4].sections[0];
+  const meta=Object.fromEntries(Object.entries(spec.page).filter(([k])=>k!=='blocks'));
+  await writeFile(path.join(server.root,'labels-'+name+'.json'),JSON.stringify({page:{...meta,sections:[{heading:sec.heading,diagram:{...sec.diagram,autoplay:false}}]}}));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'labels-'+name+'.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'labels-'+name+'.html')]);
+  await page.goto(server.origin+'/labels-'+name+'.html');
+  const svg=page.locator('.doc-sec svg:has(.coin)').first();await svg.scrollIntoViewIfNeeded();
+  const g=await svg.evaluate(el=>{
+   const inv=el.getScreenCTM().inverse(),board=r=>{const a=new DOMPoint(r.left,r.top).matrixTransform(inv),b=new DOMPoint(r.right,r.bottom).matrixTransform(inv);return {x:a.x,y:a.y,width:b.x-a.x,height:b.y-a.y};};
+   return [...el.querySelectorAll('text.lbl')].map(t=>{const p=el.querySelector('path.edge[data-dv-edge="'+t.getAttribute('data-dv-edge')+'"]'),m=p.getPointAtLength(p.getTotalLength()/2);
+    return {text:t.textContent,box:board(t.getBoundingClientRect()),mid:{x:m.x,y:m.y}};});
+  });
+  // No label takes a wide sideways move: near nudges shift a label at most 28 px
+  // along x, and the regression moved "Link regression" 84-98 px onto "Atomic commit".
+  g.forEach(l=>expect(Math.abs(l.box.x+l.box.width/2-l.mid.x),'"'+l.text+'" stays beside its edge').toBeLessThanOrEqual(28.5));
+  // Labels do not cover each other. Backstage's review board has carried a
+  // 2.7 px overlap between these two labels since before shared coins; allow
+  // that, and nothing deeper.
+  const depth=(a,b)=>Math.max(0,Math.min(Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x),Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)));
+  g.forEach((l,a)=>g.slice(a+1).forEach(o=>expect(depth(l.box,o.box),'"'+l.text+'" covers "'+o.text+'"').toBeLessThanOrEqual(3)));
+ });
+}

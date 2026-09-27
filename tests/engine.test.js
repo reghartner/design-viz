@@ -1678,6 +1678,29 @@ test('resolveLabelCollisions leaves clean labels and fixed labels untouched', ()
   assert.deepStrictEqual([n[2].dx, n[2].dy], [0, 0], 'fixed label never moves');
 });
 
+test('wide label moves are only for labels stuck on a hard obstacle, and need clearance', () => {
+  const lb = {x: 100, y: 100, w: 40, h: 12, fixed: false};
+  const block = {x: 60, y: 40, w: 120, h: 130};   /* covers every near candidate */
+  /* soft (e.g. path dots, nodes): keep the least-overlapping near spot */
+  let n = C.resolveLabelCollisions([lb], [block]);
+  assert.ok(Math.abs(n[0].dx) <= 28 && Math.abs(n[0].dy) <= 54, 'no wide jump for soft overlap: ' + JSON.stringify(n[0]));
+  /* hard (a block of step coins): take the nearest clean spot among the wide
+     moves and the spots just outside the block (here: just below it) */
+  n = C.resolveLabelCollisions([lb], [{...block, hard: true}]);
+  assert.deepStrictEqual(plain(n[0]), {dx: 0, dy: 74});
+  /* a spot within LABEL_CLEAR (3px) of another label is not clean: go above */
+  const neighbour = {x: 100, y: 174 + 12 + 2, w: 40, h: 12, fixed: true};
+  n = C.resolveLabelCollisions([neighbour, lb], [{...block, hard: true}]);
+  assert.deepStrictEqual(plain(n[1]), {dx: 0, dy: -76});
+  /* separate coins within 12px of each other form one block to step around */
+  const coins = [0, 1, 2, 3].map(i => ({x: 90 + i * 30, y: 95, w: 22, h: 22, hard: true}));
+  n = C.resolveLabelCollisions([lb], coins);
+  const r = {x: lb.x + n[0].dx, y: lb.y + n[0].dy, w: lb.w, h: lb.h};
+  assert.ok(!coins.some(c => C.rectsOverlap(r, c)), 'label clears the whole coin block: ' + JSON.stringify(n[0]));
+  /* an exactly clean near spot still wins immediately */
+  assert.deepStrictEqual(plain(C.resolveLabelCollisions([lb], [{x: 60, y: 60, w: 10, h: 10, hard: true}])[0]), {dx: 0, dy: 0});
+});
+
 test('parseHash/buildHash round-trip every legacy shape and the composed canonical grammar', () => {
   const legacy = [
     [{}, ''],
@@ -4586,27 +4609,79 @@ test('coinSlots packs a bounded grid when the edge is too short or bends too tig
   const bent=C.coinSlots(hair,hair.len,hmid,4);
   assert.strictEqual(bent.length,4);assert.ok(minGap(bent)>=C.COIN_CLEAR);
 });
-test('coinSlots keeps grid coins off every card, trying each side and narrower arrangements',()=>{
+test('coinSlots keeps grid coins off every card, trying each side and displaced blocks',()=>{
   const flat=linePath([{x:0,y:0},{x:50,y:0}]),fmid=flat.getPointAtLength(25);
   const covers=(pts,rects)=>C.coinCover(pts,rects)>0;
   /* a card just above the edge: the centred column would hit it, rows below do not */
   const above=[{x:0,y:-80,w:50,h:65}];
-  const down=plain(C.coinSlots(flat,flat.len,fmid,3,above));
-  assert.deepStrictEqual(down,[{x:25,y:0},{x:25,y:30},{x:25,y:60}]);
-  /* a card below as well as above: rows go up past the upper card only when that side is clear */
+  assert.deepStrictEqual(plain(C.coinSlots(flat,flat.len,fmid,3,above)),[{x:25,y:0},{x:25,y:30},{x:25,y:60}]);
+  /* a card below: rows stack upward, still read top to bottom */
   const below=[{x:0,y:15,w:50,h:80}];
   const up=plain(C.coinSlots(flat,flat.len,fmid,3,below));
-  assert.deepStrictEqual(up,[{x:25,y:0},{x:25,y:-30},{x:25,y:-60}]);
-  assert.ok(!covers(up,below));
-  /* along-path rows that would cross a card fall back to a clear grid */
+  assert.deepStrictEqual(up,[{x:25,y:-60},{x:25,y:-30},{x:25,y:0}]);
+  /* along-path rows that would cross a card fall back to a clear block */
   const long=linePath([{x:0,y:0},{x:200,y:0}]),lmid=long.getPointAtLength(100);
   const onRow=[{x:60,y:-5,w:20,h:10}];
   const moved=C.coinSlots(long,long.len,lmid,3,onRow);
   assert.ok(!covers(moved,onRow) && C.coinsApart(moved,C.COIN_CLEAR));
   /* nowhere clear: the least-covering arrangement is still n distinct slots */
-  const boxed=[{x:-200,y:-200,w:400,h:190},{x:-200,y:10,w:400,h:190}];
+  const boxed=[{x:-600,y:-600,w:1200,h:590},{x:-600,y:10,w:1200,h:590}];
   const least=C.coinSlots(flat,flat.len,fmid,4,boxed);
   assert.strictEqual(least.length,4);assert.ok(C.coinsApart(least,C.COIN_CLEAR));
+});
+test('coinSlots clears a card that straddles the midpoint by displacing the whole block',()=>{
+  const flat=linePath([{x:0,y:0},{x:50,y:0}]),fmid=flat.getPointAtLength(25);
+  const straddle=[{x:10,y:-12,w:30,h:24}];
+  const pts=plain(C.coinSlots(flat,flat.len,fmid,3,straddle));
+  assert.strictEqual(C.coinCover(pts,straddle),0,'no coin covers the card: '+JSON.stringify(pts));
+  assert.ok(C.coinsApart(pts,C.COIN_CLEAR));
+  /* the nearest clear block: one row off the edge, two then one, read left to right */
+  assert.deepStrictEqual(pts,[{x:10,y:30},{x:40,y:30},{x:25,y:60}]);
+  assert.ok(pts.every(p=>Math.abs(p.y)>=30),'every coin is displaced off the edge');
+  /* a tall card over the midpoint pushes the block further out, on whichever side is nearer */
+  const tall=[{x:0,y:-100,w:50,h:170}];
+  const far=C.coinSlots(flat,flat.len,fmid,3,tall);
+  assert.strictEqual(C.coinCover(far,tall),0);
+  assert.ok(far.every(p=>p.y>=70+C.COIN_R),'the block clears the card on its shorter side');
+});
+test('coinSlots forms a compact square once the block leaves the endpoint cards',()=>{
+  /* nine coins on a short edge between two wide cards, with a card below the gap */
+  const gap=linePath([{x:0,y:0},{x:90,y:0}]),gmid=gap.getPointAtLength(45);
+  const cards=[{x:-300,y:-40,w:297,h:80},{x:93,y:-40,w:297,h:80},{x:10,y:20,w:70,h:80}];
+  const pts=C.coinSlots(gap,gap.len,gmid,9,cards);
+  assert.strictEqual(C.coinCover(pts,cards),0);
+  const xs=new Set(pts.map(p=>Math.round(p.x))),ys=new Set(pts.map(p=>Math.round(p.y)));
+  assert.strictEqual(xs.size,3,'three columns');assert.strictEqual(ys.size,3,'three rows');
+  /* reading order: left to right, then top to bottom */
+  for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];assert.ok(b.y>a.y+1 || (Math.abs(b.y-a.y)<=1 && b.x>a.x),'reading order at '+i);}
+});
+test('coin placement stays fast with thousands of coins and obstacles',()=>{
+  /* 3,000 coins on a short edge with 1,000 cards around it: the full fallback search runs */
+  const flat=linePath([{x:0,y:0},{x:50,y:0}]),fmid=flat.getPointAtLength(25);
+  const cards=[{x:10,y:-12,w:30,h:24}];
+  for(let i=0;i<999;i++)cards.push({x:(i%40)*120-2400,y:Math.floor(i/40)*160+2000,w:100,h:60});
+  let start=process.hrtime.bigint();
+  const pts=C.coinSlots(flat,flat.len,fmid,3000,cards);
+  let ms=Number(process.hrtime.bigint()-start)/1e6;
+  assert.strictEqual(pts.length,3000);assert.ok(C.coinsApart(pts,C.COIN_CLEAR));
+  assert.ok(ms<1500,'3,000 coins x 1,000 cards placed in '+ms.toFixed(0)+' ms');
+  /* a 100,000 px edge blocked at its midpoint: the straight-run walk is bounded */
+  const long=linePath([{x:0,y:0},{x:100000,y:0}]),lmid=long.getPointAtLength(50000);
+  let calls=0;const counted={len:long.len,getPointAtLength(t){calls++;return long.getPointAtLength(t);}};
+  start=process.hrtime.bigint();
+  const row=C.coinSlots(counted,long.len,lmid,40,[{x:49990,y:-5,w:20,h:10}]);
+  ms=Number(process.hrtime.bigint()-start)/1e6;
+  assert.strictEqual(C.coinCover(row,[{x:49990,y:-5,w:20,h:10}]),0);
+  assert.ok(calls<2000,'path sampling is bounded by what the block needs ('+calls+' samples)');
+  assert.ok(ms<500,'long edge placed in '+ms.toFixed(0)+' ms');
+});
+test('coinCover indexes obstacles: huge rectangles, duplicates across cells and early exit',()=>{
+  const idx=C.coinObstacleIndex([{x:-1e6,y:-1e6,w:2e6,h:2e6},{x:0,y:0,w:200,h:200}]);
+  assert.strictEqual(idx.big.length,1);
+  /* a coin inside both: counted once per rectangle even though the small one spans 16 cells */
+  assert.strictEqual(C.coinCover([{x:100,y:100}],idx),2*22*22);
+  assert.ok(C.coinCover([{x:100,y:100},{x:150,y:150}],idx,10)<2*2*22*22,'stops once past the limit');
+  assert.strictEqual(C.coinCover([{x:0,y:0}],[]),0);
 });
 test('coinsApart is exact and near-linear for large coin sets',()=>{
   const row=Array.from({length:3000},(_,i)=>({x:i*30,y:(i%7)*3}));

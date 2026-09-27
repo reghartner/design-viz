@@ -573,18 +573,25 @@ function destroyBoardLinks(el){
     if (controller) controller.destroy();
   });
 }
-/* Coin slots for n steps that share one edge. One coin sits on the midpoint.
-   Several spread along the path, COIN_STEP apart in step order (lowest number
-   nearest the source), centred on the midpoint and kept COIN_END clear of both
-   ends so they stay off the cards and the arrowhead. When the path is too
-   short, bends so tightly that path neighbours would touch, or the row would
-   cover a card, the coins form a compact grid on the midpoint instead:
-   columns along the straight run through the midpoint (bounded the same way),
-   extra rows stacked across the edge. Grid arrangements are tried widest
-   first, with rows centred on the edge, then all on one side, then the other;
-   the first that covers no card in `avoid` wins, else the one covering least.
-   The board grows to fit whatever is chosen. */
-var COIN_STEP = 30, COIN_CLEAR = 26, COIN_END = 22, COIN_R = 10;
+/* Coin slots for n steps that share one edge.
+
+   One coin sits on the midpoint. Several prefer a row along the path,
+   COIN_STEP apart in step order (lowest number nearest the source), centred
+   on the midpoint and kept COIN_END clear of both ends so they stay off the
+   cards and the arrowhead.
+
+   When that row does not fit, bends so tightly that neighbours touch, or
+   covers a card, the coins form a block in reading order (left to right, then
+   top to bottom). Candidate blocks are:
+   - on the edge: columns along the straight run through the midpoint (bounded
+     by COIN_END), rows centred on the edge or stacked out to either side;
+   - displaced: a roughly square block (or the on-edge width) moved one or
+     more rows off the edge on either side, so a card over the midpoint, or a
+     narrow gap between the endpoint cards, can be cleared.
+   Of the blocks that cover no card in `avoid`, the most compact (smallest
+   distance from the midpoint to its farthest coin) wins; if none is clear,
+   the one covering least. The board grows to fit whatever is chosen. */
+var COIN_STEP = 30, COIN_CLEAR = 26, COIN_END = 22, COIN_R = 10, COIN_CELL = 64, COIN_MAX_SHIFT = 16;
 /* true when no two points are closer than clear (grid bucketing: near-linear) */
 function coinsApart(pts, clear){
   var cells = {};
@@ -600,45 +607,75 @@ function coinsApart(pts, clear){
   }
   return true;
 }
-/* total area of the coins' boxes that falls on the rectangles to avoid */
-function coinCover(pts, avoid){
-  var total = 0, h = COIN_R + 1;
-  if (!avoid || !avoid.length) return 0;
-  pts.forEach(function(pt){
-    avoid.forEach(function(r){
-      var w = Math.min(pt.x + h, r.x + r.w) - Math.max(pt.x - h, r.x),
-          t = Math.min(pt.y + h, r.y + r.h) - Math.max(pt.y - h, r.y);
-      if (w > 0 && t > 0) total += w * t;
-    });
+/* Spatial index of rectangles to keep coins off. Each rectangle is filed in
+   every COIN_CELL cell it touches; a huge one goes on a list checked always. */
+function coinObstacleIndex(rects){
+  var cells = {}, big = [];
+  (rects || []).forEach(function(r, i){
+    var x0 = Math.floor(r.x / COIN_CELL), x1 = Math.floor((r.x + r.w) / COIN_CELL),
+        y0 = Math.floor(r.y / COIN_CELL), y1 = Math.floor((r.y + r.h) / COIN_CELL);
+    var item = {x: r.x, y: r.y, w: r.w, h: r.h, id: i};
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 1024){ big.push(item); return; }
+    for (var gx = x0; gx <= x1; gx++) for (var gy = y0; gy <= y1; gy++)
+      (cells[gx + ',' + gy] || (cells[gx + ',' + gy] = [])).push(item);
   });
+  return {cells: cells, big: big, size: (rects || []).length};
+}
+/* Area of the coins' boxes that falls on indexed rectangles. Stops early once
+   it exceeds `limit` (when given), since the caller only needs to beat it. */
+function coinCover(pts, avoid, limit){
+  var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
+  if (!index.size) return 0;
+  var total = 0, h = COIN_R + 1;
+  function add(pt, r){
+    var w = Math.min(pt.x + h, r.x + r.w) - Math.max(pt.x - h, r.x),
+        t = Math.min(pt.y + h, r.y + r.h) - Math.max(pt.y - h, r.y);
+    if (w > 0 && t > 0) total += w * t;
+  }
+  for (var i = 0; i < pts.length; i++){
+    var pt = pts[i], seen = {};
+    var x0 = Math.floor((pt.x - h) / COIN_CELL), x1 = Math.floor((pt.x + h) / COIN_CELL),
+        y0 = Math.floor((pt.y - h) / COIN_CELL), y1 = Math.floor((pt.y + h) / COIN_CELL);
+    for (var gx = x0; gx <= x1; gx++) for (var gy = y0; gy <= y1; gy++){
+      var bucket = index.cells[gx + ',' + gy];
+      if (bucket) for (var j = 0; j < bucket.length; j++){
+        if (seen[bucket[j].id]) continue;
+        seen[bucket[j].id] = true; add(pt, bucket[j]);
+      }
+    }
+    for (var k = 0; k < index.big.length; k++) add(pt, index.big[k]);
+    if (limit != null && total > limit) return total;
+  }
   return total;
 }
 function coinSlots(path, len, mid, n, avoid){
   if (n <= 1) return [{x: mid.x, y: mid.y}];
-  var best = null, bestCover = Infinity;
-  function consider(pts){
-    var cover = coinCover(pts, avoid);
-    if (cover < bestCover){ best = pts; bestCover = cover; }
-    return cover === 0;
-  }
-  var span = (n - 1) * COIN_STEP, lo = COIN_END + span / 2, hi = len - COIN_END - span / 2;
+  var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
+  var span = (n - 1) * COIN_STEP, lo = COIN_END + span / 2, hi = len - COIN_END - span / 2, row = null;
   if (lo <= hi){
-    var centre = Math.min(hi, Math.max(lo, len / 2)), pts = [];
+    var centre = Math.min(hi, Math.max(lo, len / 2));
+    row = [];
     for (var i = 0; i < n; i++){
       var p = path.getPointAtLength(centre + (i - (n - 1) / 2) * COIN_STEP);
-      pts.push({x: p.x, y: p.y});
+      row.push({x: p.x, y: p.y});
     }
-    if (coinsApart(pts, COIN_CLEAR) && consider(pts)) return pts;
+    if (!coinsApart(row, COIN_CLEAR)) row = null;
+    else if (coinCover(row, index, 0) === 0) return row;
   }
-  /* compact grid: tangent at the midpoint, and how far the path runs straight
-     along it (never closer than COIN_END to either end) */
+  /* block axes in reading order: along runs left to right (top to bottom when
+     vertical), across runs top to bottom (left to right when vertical) */
   var p0 = path.getPointAtLength(Math.max(0, len / 2 - 2)), p1 = path.getPointAtLength(Math.min(len, len / 2 + 2));
   var dx = p1.x - p0.x, dy = p1.y - p0.y, dl = Math.hypot(dx, dy);
   if (!(dl > 0)){ dx = 1; dy = 0; dl = 1; }
   dx /= dl; dy /= dl;
-  var reach = Infinity;
+  if (dx < -1e-6 || (Math.abs(dx) <= 1e-6 && dy < 0)){ dx = -dx; dy = -dy; }
+  var nx = -dy, ny = dx;
+  if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx < 0)){ nx = -nx; ny = -ny; }
+  /* how far the path runs straight through the midpoint (never within
+     COIN_END of an end, and never further than the widest block needs) */
+  var need = span / 2 + 2, reach = Infinity;
   [-1, 1].forEach(function(dir){
-    var run = 0, limit = len / 2 - COIN_END;
+    var run = 0, limit = Math.min(len / 2 - COIN_END, need);
     while (run + 2 <= limit){
       var q = path.getPointAtLength(len / 2 + dir * (run + 2));
       if (Math.abs((q.x - mid.x) * dy - (q.y - mid.y) * dx) > 1.5) break;
@@ -646,29 +683,57 @@ function coinSlots(path, len, mid, n, avoid){
     }
     reach = Math.min(reach, run);
   });
-  /* rows stack along the normal, first row on top (or left for a vertical edge) */
-  var nx = -dy, ny = dx;
-  if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx < 0)){ nx = -nx; ny = -ny; }
-  function grid(cols, side){
+  var maxCols = Math.max(1, Math.min(n, Math.floor(2 * reach / COIN_STEP) + 1));
+  function block(cols, near, side){
     var rows = Math.ceil(n / cols), out = [];
     for (var r = 0; r < rows; r++){
-      /* side 0: rows centred on the edge; +1 / -1: from the edge outward */
-      var across = (side === 0 ? r - (rows - 1) / 2 : side * r) * COIN_STEP;
+      /* side 0: rows centred on the edge; +1 / -1: rows from `near` outward */
+      var across = side === 0 ? r - (rows - 1) / 2 : side > 0 ? near + r : -(near + rows - 1 - r);
       var inRow = Math.min(cols, n - r * cols);
       for (var c = 0; c < inRow; c++){
         var along = (c - (inRow - 1) / 2) * COIN_STEP;
-        out.push({x: mid.x + dx * along + nx * across, y: mid.y + dy * along + ny * across});
+        out.push({x: mid.x + dx * along + nx * across * COIN_STEP, y: mid.y + dy * along + ny * across * COIN_STEP});
       }
     }
     return out;
   }
-  var maxCols = Math.max(1, Math.min(n, Math.floor(2 * reach / COIN_STEP) + 1));
-  for (var cols = maxCols; cols >= 1; cols--){
-    var sides = Math.ceil(n / cols) > 1 ? [0, 1, -1] : [0];
-    for (var si = 0; si < sides.length; si++){
-      var g = grid(cols, sides[si]);
-      if (consider(g)) return g;
-    }
+  /* on-edge widths halve from the widest the edge allows down to one column */
+  var cands = [], widths = [];
+  for (var w = maxCols; ; w = Math.ceil(w / 2)){
+    if (widths.indexOf(w) < 0) widths.push(w);
+    if (w === 1) break;
+  }
+  widths.forEach(function(cols){
+    cands.push(block(cols, 0, 0));
+    if (Math.ceil(n / cols) > 1){ cands.push(block(cols, 0, 1)); cands.push(block(cols, 0, -1)); }
+  });
+  var square = Math.ceil(Math.sqrt(n)), offFrom = cands.length;
+  [square, maxCols].filter(function(w, k, all){ return all.indexOf(w) === k; }).forEach(function(w){
+    for (var near = 1; near <= COIN_MAX_SHIFT; near++){ cands.push(block(w, near, 1)); cands.push(block(w, near, -1)); }
+  });
+  function reachOf(pts){
+    var far = 0;
+    pts.forEach(function(pt){ far = Math.max(far, Math.hypot(pt.x - mid.x, pt.y - mid.y)); });
+    return far;
+  }
+  var offTo = cands.length;
+  if (row) cands.push(row);
+  /* most compact first (to the pixel), then blocks touching the edge before
+     displaced ones, then the squarer block, then list order */
+  function lopsided(pts){
+    var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    pts.forEach(function(pt){ x1 = Math.min(x1, pt.x); y1 = Math.min(y1, pt.y); x2 = Math.max(x2, pt.x); y2 = Math.max(y2, pt.y); });
+    return Math.round(Math.abs((x2 - x1) - (y2 - y1)));
+  }
+  var order = cands.map(function(pts, k){
+    return {pts: pts, k: k, far: Math.round(reachOf(pts)), off: k >= offFrom && k < offTo ? 1 : 0, odd: lopsided(pts)};
+  });
+  order.sort(function(a, b){ return a.far - b.far || a.off - b.off || a.odd - b.odd || a.k - b.k; });
+  var best = null, bestCover = Infinity;
+  for (var ci = 0; ci < order.length; ci++){
+    var cover = coinCover(order[ci].pts, index, bestCover);
+    if (cover === 0) return order[ci].pts;
+    if (cover < bestCover){ best = order[ci].pts; bestCover = cover; }
   }
   return best;
 }
@@ -814,10 +879,10 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
 
   var coinRects = [], deltaRects = [], labelEls = [], pendingLabelBadges = [], coinGroups = [];
   /* every card (row nodes and floats, padded) is off limits for coins */
-  var coinAvoid = Object.keys(L.pos).map(function(id){
+  var coinAvoid = coinObstacleIndex(Object.keys(L.pos).map(function(id){
     var p = L.pos[id];
     return {x: p.cx - p.w / 2 - 3, y: p.cy - p.h / 2 - 3, w: p.w + 6, h: p.h + 6};
-  });
+  }));
   function deltaBadge(parent, x, y, w, h, unrecorded){
     var badge = document.createElementNS(SVGNS, 'polygon');
     badge.setAttribute('class', 'dvdelta');
@@ -885,7 +950,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       lt.textContent = e.label;
       markFragmentElement(lt, e);
       svg.appendChild(lt);
-      labelEls.push({el: lt, fixed: !!(e.labelDx || e.labelDy), badge: e.delta === true});
+      labelEls.push({el: lt, fixed: !!(e.labelDx || e.labelDy), badge: e.delta === true, coined: edgeSteps.length > 1});
       info.labelEl = lt; /* stepper lights the label together with its edge */
     }
     if (e.delta === true){
@@ -904,23 +969,6 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     }
   });
 
-  /* a compact coin grid on a short edge can reach past the layout's canvas;
-     grow the viewBox (and its ground) so no coin or badge is clipped */
-  (function(){
-    if (!coinRects.length) return;
-    var x1 = vb.x, y1 = vb.y, x2 = vb.x + vb.w, y2 = vb.y + vb.h;
-    coinRects.concat(deltaRects).forEach(function(r){
-      x1 = Math.min(x1, r.x - 4); y1 = Math.min(y1, r.y - 4);
-      x2 = Math.max(x2, r.x + r.w + 4); y2 = Math.max(y2, r.y + r.h + 4);
-    });
-    if (x1 === vb.x && y1 === vb.y && x2 === vb.x + vb.w && y2 === vb.y + vb.h) return;
-    vb = {x: x1, y: y1, w: x2 - x1, h: y2 - y1};
-    svg.setAttribute('viewBox', vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h);
-    svg.querySelectorAll('rect.dv-board-ground, rect.dv-board-grid').forEach(function(r){
-      r.setAttribute('x', vb.x); r.setAttribute('y', vb.y); r.setAttribute('width', vb.w); r.setAttribute('height', vb.h);
-    });
-  })();
-
   /* B1: measured label collision pass — nudge labels off nodes, coins, paths,
      and each other. Author-nudged labels are fixed obstacles. */
   (function(){
@@ -932,7 +980,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       if (p && d.nodes[id] && d.nodes[id].delta === true)
         obstacles.push({x:p.cx - p.w/2 - 4, y:p.cy - p.h/2 - 14, w:13, h:11});
     });
-    coinRects.forEach(function(r){ obstacles.push(r); });
+    coinRects.forEach(function(r){ obstacles.push({x: r.x, y: r.y, w: r.w, h: r.h, hard: true}); });
     deltaRects.forEach(function(r){ obstacles.push(r); });
     (d.edges || []).forEach(function(e){
       var info = edgeIds[e.from + '->' + e.to];
@@ -975,6 +1023,30 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
                  parseFloat(pb.lbl.getAttribute('y')) - 18, 9, 8);
     markFragmentElement(badge, pb.e);
   });
+
+  /* a compact coin grid on a short edge can reach past the layout's canvas;
+     grow the viewBox (and its ground) so no coin, badge, or the label of a
+     shared-coin edge is clipped */
+  (function(){
+    if (!coinRects.length) return;
+    var x1 = vb.x, y1 = vb.y, x2 = vb.x + vb.w, y2 = vb.y + vb.h, extra = [];
+    labelEls.forEach(function(le){
+      if (!le.coined) return;
+      var bb;
+      try { bb = le.el.getBBox(); } catch (ex){ bb = null; }
+      if (bb && bb.width) extra.push({x: bb.x, y: bb.y, w: bb.width, h: bb.height});
+    });
+    coinRects.concat(deltaRects, extra).forEach(function(r){
+      x1 = Math.min(x1, r.x - 4); y1 = Math.min(y1, r.y - 4);
+      x2 = Math.max(x2, r.x + r.w + 4); y2 = Math.max(y2, r.y + r.h + 4);
+    });
+    if (x1 === vb.x && y1 === vb.y && x2 === vb.x + vb.w && y2 === vb.y + vb.h) return;
+    vb = {x: x1, y: y1, w: x2 - x1, h: y2 - y1};
+    svg.setAttribute('viewBox', vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h);
+    svg.querySelectorAll('rect.dv-board-ground, rect.dv-board-grid').forEach(function(r){
+      r.setAttribute('x', vb.x); r.setAttribute('y', vb.y); r.setAttribute('width', vb.w); r.setAttribute('height', vb.h);
+    });
+  })();
 
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));

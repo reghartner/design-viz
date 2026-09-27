@@ -28,7 +28,7 @@
           "rows": [["camera", "cloud", "phone"]],
           "edges": [
             {"from": "camera", "to": "cloud", "kind": "https", "label": "upload clip"},
-            {"from": "cloud", "to": "phone", "kind": "https", "label": "push"},
+            {"from": "cloud", "to": "phone", "kind": "https", "label": "push · status"},
             {"from": "phone", "to": "cloud", "kind": "https", "label": "open app"}
           ],
           "panels": [
@@ -64,7 +64,7 @@
              "panels": {"battery": {"trend": "charging", "note": "solar charging"}}},
             {"id": "check", "time": "08:20", "edge": "phone->cloud", "lane": "RESIDENT",
              "text": "At 8:20 AM the resident opens the app to review the night."},
-            {"id": "status", "time": "+1m", "nodes": ["phone"], "lane": "CLOUD",
+            {"id": "status", "time": "+1m", "edge": "cloud->phone", "lane": "CLOUD",
              "text": "The app receives the camera's latest report. It shows the rounded value the camera sent, not a live reading.",
              "panels": {"app": {"battery": {"value": 41, "status": "ready", "detail": "Reported 8:21 AM"},
                                 "clip": {"value": "Fox · 4:15 AM", "status": "ready"}}}}

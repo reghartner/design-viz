@@ -16,7 +16,7 @@ PanelRegistry.extend('battery', {
       warnings.push(PP + '.initial.drain: drain is a step operation — ignored; set initial.charge instead');
     Object.keys(STORY_BATTERY_DEFAULTS).forEach(function (key) {
       if (p[key] != null && storyTimeRate(p[key]) == null)
-        warnings.push(PP + '.' + key + ': expected a number ≥ 0 (percent per hour) — using the diagram or built-in default');
+        warnings.push(PP + '.' + key + ': expected a number ≥ 0 (percent per hour) — using the diagram default or built-in placeholder');
     });
   },
   validatePatch: function (patch, path, panel, warnings, context) {

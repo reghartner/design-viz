@@ -2009,7 +2009,10 @@ function storyTimeWarnings(d, DP, warnings){
         reported['back:' + i + label] = true;
         warnings.push(DP + '.steps[' + i + '].time: time goes backward' + label + ' (' + storyTimeLabel(story.previous[n], config) + ' → ' + storyTimeLabel(t, config) + ')');
       }
-      if (config.end != null && t > config.end && !reported['end:' + i + label]){
+      /* Only an authored, accepted time is reported; later steps that merely
+         inherit it have no time field of their own. */
+      var authored = steps[i] && steps[i].time != null && !story.rejected[n];
+      if (authored && config.end != null && t > config.end && !reported['end:' + i + label]){
         reported['end:' + i + label] = true;
         warnings.push(DP + '.steps[' + i + '].time: ' + storyTimeLabel(t, config) + ' is after the story end' + label + ' (' + storyTimeLabel(config.end, config) + ')');
       }
@@ -4418,7 +4421,7 @@ PanelRegistry.extend('battery', {
       warnings.push(PP + '.initial.drain: drain is a step operation — ignored; set initial.charge instead');
     Object.keys(STORY_BATTERY_DEFAULTS).forEach(function (key) {
       if (p[key] != null && storyTimeRate(p[key]) == null)
-        warnings.push(PP + '.' + key + ': expected a number ≥ 0 (percent per hour) — using the diagram or built-in default');
+        warnings.push(PP + '.' + key + ': expected a number ≥ 0 (percent per hour) — using the diagram default or built-in placeholder');
     });
   },
   validatePatch: function (patch, path, panel, warnings, context) {

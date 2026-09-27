@@ -88,9 +88,12 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
         {kind:'engine',label:'Engine default',inputs:[]};
     }
     /* Story-time inputs: the latest step time on this path, else the start. */
+    /* Provenance follows the resolved sequence: a rejected time (unparsable or
+       out of range on this path) never supplied the value. */
+    var story=storyTimeSequence(d);
     function timeInputs(){
       for(var i=stepIndex;i>=0;i--){
-        if(d.steps[i] && d.steps[i].time!=null && storyTimeParsable(d.steps[i].time))
+        if(d.steps[i] && d.steps[i].time!=null && story && !story.rejected[i])
           return [{step:i,key:'time',path:['steps',d._sourceIndices ? d._sourceIndices[i] : i,'time'],label:'Step '+(i+1)+' · time'}];
       }
       return [{step:null,key:'start',path:['storyTime','start'],label:'Story start'}];

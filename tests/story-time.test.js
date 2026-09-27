@@ -279,3 +279,18 @@ test('span must be longer than zero; end warnings name the path; bad diagram rat
   const bad = warnings(diagram({deviceDefaults: {battery: {drainPerHour: -1}}, panels: [{id: 'b', type: 'battery', drainPerHour: 2}], steps: [step()]})).join();
   assert.match(bad, /drainPerHour: expected a number ≥ 0 \(percent per hour\) — this default is ignored; each battery panel uses its own drainPerHour or the built-in placeholder 1/);
 });
+
+test('end warnings name only authored times; provenance skips rejected times', () => {
+  const d = diagram({
+    storyTime: {start: '2026-09-24T22:30', span: '1h'},
+    steps: [step({time: '+2h'}), step(), step(), step({time: '+1m'}), step({time: 'soon'})]
+  });
+  const ends = warnings(d).filter(w => /after the story end/.test(w));
+  assert.equal(ends.length, 2, ends.join('\n'));
+  assert.match(ends[0], /steps\[0\]\.time/); assert.match(ends[1], /steps\[3\]\.time/);
+  const far = diagram({panels: [{id: 'ph', type: 'phone'}], steps: [step({time: '+2000000d'}), step({time: '+2000000d'}), step()]});
+  assert.match(warnings(far).join('\n'), /steps\[1\]\.time: lands outside the supported range/);
+  const clock = C.builderEffectivePanelStates(far, 2).panels[0].fields.find(f => f.key === 'clock');
+  assert.equal(clock.origin.label, 'Story time');
+  assert.deepEqual(plain(clock.origin.inputs[0].path), ['steps', 0, 'time'], 'the rejected step 2 time is not the source');
+});

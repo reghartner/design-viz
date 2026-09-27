@@ -253,7 +253,10 @@ function storyTimeWarnings(d, DP, warnings){
         reported['back:' + i + label] = true;
         warnings.push(DP + '.steps[' + i + '].time: time goes backward' + label + ' (' + storyTimeLabel(story.previous[n], config) + ' → ' + storyTimeLabel(t, config) + ')');
       }
-      if (config.end != null && t > config.end && !reported['end:' + i + label]){
+      /* Only an authored, accepted time is reported; later steps that merely
+         inherit it have no time field of their own. */
+      var authored = steps[i] && steps[i].time != null && !story.rejected[n];
+      if (authored && config.end != null && t > config.end && !reported['end:' + i + label]){
         reported['end:' + i + label] = true;
         warnings.push(DP + '.steps[' + i + '].time: ' + storyTimeLabel(t, config) + ' is after the story end' + label + ' (' + storyTimeLabel(config.end, config) + ')');
       }

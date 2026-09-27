@@ -80,7 +80,7 @@ folders, and escaping paths fail publication while preserving the prior snapshot
 ## Assets and distribution policies
 
 The manifest selects ordered page/core/workbench styles and the common SVG icon
-sprite. **Page CSS stays raw.** Core and workbench styles receive their registry
+sprite. **Page and tour CSS stay raw.** The standalone and workbench readers share `style.tour.css`; native/Forge mounts do not include tour chrome. Core and workbench styles receive their registry
 style contributions in their existing order. Appending panel CSS to page CSS
 would duplicate it when page and core are combined.
 

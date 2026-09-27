@@ -320,7 +320,8 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
 - **Maintained library.** Maintained pages live in `diagrams/<name>/` with the
   spec and HTML together; root `canon.json` controls publication. See
   [folder conventions](../../../diagrams/README.md).
-- **Reader tour.** Optional `page.tour` lessons are described in the
-  [tour guide](../../../docs/tour.md).
+- **Reader tour.** Standalone pages and the workbench’s read-only Canon reader
+  offer a first-visit walkthrough with a **?** replay button. Optional
+  `page.tour` lessons are described in the [tour guide](../../../docs/tour.md).
 - **Company evidence, drift and Confluence.** See
   [integrations](references/integrations.md).

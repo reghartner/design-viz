@@ -1,7 +1,7 @@
 # Authoring the first-run guided tour
 
-The standalone viewer ships a guided tour that runs once per browser the
-first time a person opens a Flowview page. It dims the page, cuts bright
+The standalone viewer and the workbench’s read-only Canon reader share a guided
+tour that runs once per browser the first time a person opens a Flowview page. It dims the page, cuts bright
 holes over real controls, and narrates. The built-in walkthrough finds a
 suitable section and view for each lesson, including diagrams in other tabs.
 It includes only features the page can demonstrate and numbers those lessons
@@ -12,7 +12,15 @@ A page-authored tour declares its own sequence, state and targets. The runtime
 filters that sequence by persona and warns and passes through when a declared
 control or state is missing, preserving authored numbering. It does not append
 lessons or search other sections for a page-authored target. The tour runs in
-the standalone viewer, not the workbench.
+the standalone viewer and Canon reader; it does not run in the editing workspace.
+
+Opening **Canon diagrams → View diagram** on the launch page offers the tour
+on the first visit. Published `?diagram=<id>` links and the offline bundled
+example behave the same way. Skip or finish once to dismiss automatic offers;
+the **?** button replays it. Add `#tour=1` before opening a diagram to force it,
+or `#tour=0` to suppress automatic opening. Leaving the reader, using browser
+Back, or choosing **Edit in Workbench** disposes the tour without changing the
+draft or marking an unfinished tour complete.
 
 ## Where the config lives
 

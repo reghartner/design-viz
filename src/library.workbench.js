@@ -18,10 +18,14 @@ function initWorkbenchLibrary(opts){
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
-  var pending=null,entries=[],origin='',published=false,ctl=null,active=null,sequence=0,current=null;
+  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,active=null,sequence=0,current=null;
+  function retireViewer(){
+    if(tour)tour.destroy();tour=null;
+    if(ctl)ctl.destroy();ctl=null;
+  }
   function stop(){
     sequence++;active=null;current=null;edit.disabled=true;copy.disabled=true;removeManualCopyField(copy);
-    if(ctl)ctl.destroy();ctl=null;reader.replaceChildren();
+    retireViewer();reader.replaceChildren();
   }
   function load(){
     if(pending)return pending;
@@ -75,7 +79,9 @@ function initWorkbenchLibrary(opts){
       title.textContent=current.title;
       document.getElementById('canon-reader-origin').textContent=origin+' · Reading does not change your draft.';
       var spec=JSON.parse(JSON.stringify(current.spec));
-      ctl=renderPage(reader,normalize(spec),spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
+      var page=normalize(spec);
+      ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
+      tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
     }catch(ex){
       if(token!==sequence)return;
       current=null;edit.disabled=true;
@@ -91,7 +97,7 @@ function initWorkbenchLibrary(opts){
     try{opts.edit(JSON.parse(JSON.stringify(current.spec)));}
     catch(ex){error.textContent=ex.message;error.hidden=false;}
   });
-  window.addEventListener('pagehide',function(){sequence++;if(ctl)ctl.destroy();ctl=null;});
+  window.addEventListener('pagehide',function(){sequence++;retireViewer();});
   window.addEventListener('pageshow',function(event){if(event.persisted && active)show(active,opts.selected());});
   return {show:show,hide:stop};
 }

@@ -96,6 +96,7 @@
       "boot": "boot.flowview.js",
       "styles": [
         "page",
+        "tour",
         "core"
       ],
       "fonts": "all",
@@ -107,6 +108,8 @@
         "canon.js",
         "validator.js",
         "engine.js",
+        "tour.config.js",
+        "tour.flowview.js",
         "trace-import.js",
         "confluence.js",
         "builder.workbench.js",
@@ -124,6 +127,7 @@
       "boot": "boot.workbench.js",
       "styles": [
         "workbench",
+        "tour",
         "core"
       ],
       "fonts": "all",
@@ -197,7 +201,8 @@
     "styles": {
       "page": "style.flowview.css",
       "core": "style.core.css",
-      "workbench": "style.workbench.css"
+      "workbench": "style.workbench.css",
+      "tour": "style.tour.css"
     },
     "icons": "icons.svg",
     "fonts": "fonts/manifest.json",

@@ -1,6 +1,6 @@
-/* tour.flowview.js — first-run guided tour overlay for the standalone page.
+/* tour.flowview.js — first-run guided tour overlay for standalone and Canon readers.
    Config-driven (core/tour-model.js owns the pure logic; docs/tour.md owns
-   the retargeting contract). Browser-only fragment, standalone bundle only.
+   the retargeting contract). Browser-only fragment shared by both reader entrypoints.
 
    Design (approved "presenter cinema" mockups): dark scrim with a bright
    ring-lit hole over the real control, subtitle narration in a corner card,
@@ -15,7 +15,11 @@
    scrim over the content. */
 
 function wireTour(ctl, view, win, config, options){
-  var doc = win.document;
+  var doc = win.document, destroyed = false, timers = new Set();
+  function later(fn, ms){
+    var id=win.setTimeout(function(){timers.delete(id);if(!destroyed)fn();},ms);
+    timers.add(id);return id;
+  }
   if (doc.body.classList.contains('dv-embed')) return null;
   if (!tourUsableConfig(config)) return null;
   options = options || {};
@@ -216,6 +220,7 @@ function wireTour(ctl, view, win, config, options){
     ctl.activeTarget=savedPage.activeTarget;
     win.scrollTo(savedPage.scrollX,savedPage.scrollY);
     return Promise.resolve(restoration).then(function(){
+      if(destroyed)return;
       ctl.detailHistoryPush=false;
       ctl.activeTarget=savedPage.activeTarget;
       win.scrollTo(savedPage.scrollX,savedPage.scrollY);
@@ -227,6 +232,7 @@ function wireTour(ctl, view, win, config, options){
     var result;
     try{result=restoreSnapshot();}catch(ex){snapshot=null;}
     Promise.resolve(result).catch(function(){}).then(function(){
+      if(destroyed)return;
       ctl.suppressFragmentWrites=false;restoring=false;
     });
   }
@@ -253,6 +259,7 @@ function wireTour(ctl, view, win, config, options){
      usable; the tour stays off for this load only (config authors see the
      console warning; a fixed config works on the next load) */
   function guarded(fn){
+    if(destroyed)return;
     try { fn(); }
     catch (ex){
       if (win.console) console.warn('flowspec: tour error — ' + (ex && ex.message) + ' — tour dismissed');
@@ -639,7 +646,7 @@ function wireTour(ctl, view, win, config, options){
         try { host.scrollIntoView({block: 'start', behavior: 'instant'}); } catch (ex) { host.scrollIntoView(); }
         win.scrollBy(0, -16);
       }
-      win.setTimeout(function(){ guarded(function(){
+      later(function(){ guarded(function(){
         if (!active || list[at] !== step) return;
         settling = false;
         position();
@@ -718,7 +725,7 @@ function wireTour(ctl, view, win, config, options){
     if (clash) parts.timeline.classList.add('dv-tour-timeline-yield');
   }
   function schedule(){
-    if (raf) return;
+    if (!active || destroyed || raf) return;
     raf = win.requestAnimationFrame ? win.requestAnimationFrame(function(){ raf = 0; guarded(position); }) :
           (guarded(position), 0);
   }
@@ -734,7 +741,7 @@ function wireTour(ctl, view, win, config, options){
 
   /* ---- playback demo (step.demo): the panels change while the ring holds ---- */
   function stopDemo(){
-    if (demoTimer){ win.clearTimeout(demoTimer); demoTimer = null; }
+    if (demoTimer){ win.clearTimeout(demoTimer); timers.delete(demoTimer); demoTimer = null; }
     demoLeft = 0;
   }
   function startDemo(step, sec){
@@ -757,9 +764,9 @@ function wireTour(ctl, view, win, config, options){
       sp.advance(sp.current().n + 1);
       demoLeft--;
       schedule();
-      if (demoLeft > 0) demoTimer = win.setTimeout(tick, interval);
+      if (demoLeft > 0) demoTimer = later(tick, interval);
     };
-    demoTimer = win.setTimeout(tick, interval);
+    demoTimer = later(tick, interval);
   }
 
   /* ---- timeline + narration ---- */
@@ -1071,7 +1078,7 @@ function wireTour(ctl, view, win, config, options){
                then let the viewer watch the click land — the card waits and
                appears once, beside the opened menu */
             guarded(position);
-            win.setTimeout(function(){ guarded(function(){
+            later(function(){ guarded(function(){
               if (gen === myGen) firePendingClick(step, sec, eff);
             }); }, 600);
           }
@@ -1084,7 +1091,7 @@ function wireTour(ctl, view, win, config, options){
           return;
         }
         lastTop = top;
-        win.setTimeout(function(){ guarded(settle); }, 80);
+        later(function(){ guarded(settle); }, 80);
       })();
     } else { settling = false; showCard(); }
     /* the engine closes its menu when focus leaves it: a click step leaves
@@ -1183,7 +1190,7 @@ function wireTour(ctl, view, win, config, options){
     doc.removeEventListener('fullscreenchange', fullscreenChanged);
   }
   function start(){
-    if (active || disabled || restoring) return;
+    if (active || disabled || restoring || destroyed) return;
     restoreFocus = doc.activeElement;
     if (!overlay) buildOverlay();
     overlay.hidden = false;
@@ -1236,10 +1243,26 @@ function wireTour(ctl, view, win, config, options){
   if (present && present.parentNode === view) view.insertBefore(replay, present.nextSibling);
   else view.insertBefore(replay, view.firstChild);
 
-  win.dvStartTour = function(){ disabled = false; guarded(start); return true; };
+  var previousStart=win.dvStartTour;
+  var startPublic=function(){ if(destroyed)return false;disabled=false;guarded(start);return true; };
+  win.dvStartTour=startPublic;
+  function destroy(){
+    if(destroyed)return;
+    destroyed=true;active=false;settling=false;gen++;
+    stopDemo();timers.forEach(function(id){win.clearTimeout(id);});timers.clear();
+    if(raf && win.cancelAnimationFrame)win.cancelAnimationFrame(raf);raf=0;
+    closeDemoClick();detach();
+    /* The owning reader retires ctl next. Do not restore playback, focus or
+       scroll into a different screen, or mark an interrupted tour completed. */
+    snapshot=null;openedDetails=[];ctl.suppressFragmentWrites=false;
+    if(overlay)overlay.remove();replay.remove();
+    if(win.dvStartTour===startPublic){
+      if(previousStart===undefined)delete win.dvStartTour;else win.dvStartTour=previousStart;
+    }
+  }
 
   if (request === 'force') guarded(start);
   else if (request !== 'suppress' && !options.deepLink && !storageDone()) guarded(start);
 
-  return {start: function(){ guarded(start); }, active: function(){ return active; }};
+  return {start: function(){ guarded(start); }, active: function(){ return active; }, destroy: destroy};
 }

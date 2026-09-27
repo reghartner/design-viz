@@ -186,10 +186,9 @@ Edge rules:
 - One edge per ordered node pair. A response is a separate `ret: true` edge in
   the opposite direction. A second different message on the same pair goes in
   the caption or a log panel.
-- Within one path, two edge-bearing steps must not start with the same first
-  edge (the validator warns: their step coins collide). Where the story allows,
-  split or restructure the beat; otherwise reorder that step's edge list and
-  keep the caption explicit about order.
+- Several steps may start with the same edge (a heartbeat every 30 minutes,
+  a retry): each step gets its own numbered circle on that edge. Never drop or
+  reorder a real hop to avoid repeating an edge; list hops in firing order.
 - Known non-delivery goes in `failures` (`dropped` = sent, never arrived;
   `blocked` = never sent). A timeout alone is not a failure edge.
 

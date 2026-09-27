@@ -200,10 +200,10 @@ new arithmetic, no new attributions.
   with the normal covered/out-of-scope disposition.
 - Pick 0-based index language and keep it; when the HLD's unit differs from
   the widget's cells, state the conversion once in a caption or bullet.
-- Step hygiene: every step carries an edge, nodes, a patch, or `failures`;
-  two edge-bearing steps must never share the same FIRST edge (reorder each step's `edges` list —
-  true firing order is preserved with `packets`); an overflowing edge
-  label gets shortened, not nudged.
+- Step hygiene: every step carries an edge, nodes, a patch, or `failures`.
+  Several steps may start with the same edge (a repeated heartbeat, a retry);
+  each gets its own numbered circle. Keep `edges` in true firing order; an
+  overflowing edge label gets shortened, not nudged.
 
 ## Row placement
 

@@ -62,7 +62,8 @@ WARN (provable from the spec and the command-line inputs):
   - a clock-bearing panel (phone, deviceapp, appscreens) whose clock goes
     backward; with storyTime, a step time that goes backward or is invalid
   - a number that changes faster than --rate allows (a battery step's
-    authored extra `drain` is left out of the rate)
+    authored extra `drain` is left out of the rate; with storyTime a battery
+    `charge` anchor is printed but not rate-checked: anchors win over drift)
   - a battery panel that never changes over a span where a --rate for it
     that excludes zero requires at least one point of change
   - codeRefs: not a full SHA, bad anchors, or on steps but not on a node
@@ -75,7 +76,8 @@ CHECK (re-read the step; not a defect by itself):
   - with storyTime: a panel clock or date that differs from the story time
     (an explicit value pins it; new specs let panels inherit)
   - with storyTime: a battery panel that drifts on a built-in placeholder
-    rate (label it illustrative in the ledger and on the page)
+    rate over some elapsed interval (drain when the trend before the step
+    was not charging, charge when it was); label it illustrative
   - a number that changes with no time passing (the interval is known to be
     zero), other than a battery step's own extra `drain`
   - battery charge that rises while the battery was not charging
@@ -547,7 +549,10 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                     lim = rates.get(key)
                     # the engine stores charge to two decimals: allow that rounding
                     tol = 0.011 * 60.0 / el if el else 0
-                    if lim and rate is not None and abs(moved) >= 0.01 \
+                    # with story time a `charge` patch is an anchor that overrides drift on
+                    # purpose (anchors first); without it, charge patches are the drift itself
+                    anchored = bool(story) and anchor and key == pid
+                    if lim and rate is not None and abs(moved) >= 0.01 and not anchored \
                             and not (lim[0] - tol <= rate <= lim[1] + tol):
                         swarn("%s: %s rate %s/h is outside the stated %g..%g/h" % (sid, key, fmt_rate(rate), lim[0], lim[1]))
                     if t == "battery" and v > v0 and state[pid].get("trend") != "charging" \
@@ -752,12 +757,16 @@ def walk(dg, rates, show_state, warn, check, note, expects):
                 print("    " + line)
     for bid, r in sorted((dg.get("batteryRates") or {}).items()):
         src = r.get("sources") or {}
-        trends = {st["state"].get(bid, {}).get("trend") for p in dg["paths"] for st in p["steps"]}
-        trends.add(dg["initial"].get(bid, {}).get("trend"))
-        used = [k for k in ("drainPerHour", "chargePerHour") if src.get(k) == "built-in"
-                and (k == "drainPerHour" or "charging" in trends)]
-        moves = any(st["time"] != st["previous"] for p in dg["paths"] for st in p["steps"])
-        if used and moves:
+        # which rate each elapsed interval applied: the trend before the step decides
+        applied = set()
+        for p in dg["paths"]:
+            before = dg["initial"].get(bid, {}).get("trend")
+            for st in p["steps"]:
+                if st["time"] > st["previous"]:
+                    applied.add("chargePerHour" if before == "charging" else "drainPerHour")
+                before = st["state"].get(bid, {}).get("trend")
+        used = [k for k in ("drainPerHour", "chargePerHour") if src.get(k) == "built-in" and k in applied]
+        if used:
             check("battery %s drifts on the built-in placeholder %s (not a device fact): take the rate from the "
                   "source, or label it illustrative in the ledger and on the page" % (
                       bid, " and ".join("%s %g %%/h" % (k, r[k]) for k in used)))

@@ -410,6 +410,39 @@ class WalkTest(unittest.TestCase):
         self.assertIn("battery batt: drain 1 %/h (built-in placeholder)", w.out)
         self.assertTrue(w.checked("battery batt drifts on the built-in placeholder drainPerHour 1 %/h"), w.out)
 
+    def test_story_time_charge_anchor_is_not_rate_checked(self):
+        # drift at 0.5 %/h would give ~44; the stated reading 30 overrides it on purpose
+        spec = self.story_spec()
+        spec["page"]["blocks"][0]["diagram"]["steps"][4]["panels"] = {"batt": {"charge": 30}}
+        w = self.walk(spec, "--rate", "batt=-0.5:0")
+        self.assertIn("check batt: 44.63 -> 30 over 4h05 = -3.58/h (anchor)", w.out)
+        self.assertFalse(w.warned("check: batt rate"), w.out)
+        self.assertEqual(w.warns, [], w.out)
+
+    def test_story_time_drift_after_anchor_is_still_rate_checked(self):
+        spec = self.story_spec()
+        spec["page"]["blocks"][0]["diagram"]["steps"][1]["panels"]["batt"] = {"charge": 40}
+        w = self.walk(spec, "--rate", "batt=-0.2:0")
+        self.assertFalse(w.warned("motion: batt rate"), w.out)          # the anchor itself
+        self.assertTrue(w.warned("check: batt rate -0.5/h is outside"), w.out)  # drift after it
+
+    def test_story_time_builtin_charge_only_when_every_interval_charges(self):
+        spec = self.story_spec(rates=False)
+        d = spec["page"]["blocks"][0]["diagram"]
+        d["panels"][1]["drainPerHour"] = 0.5          # drain is authored; charge is built-in
+        d["panels"][1]["initial"]["trend"] = "charging"
+        for st in d["steps"]:
+            st.get("panels", {}).get("batt", {}).pop("drain", None)
+        w = self.walk(spec)
+        self.assertTrue(w.checked("battery batt drifts on the built-in placeholder chargePerHour 20 %/h"), w.out)
+        self.assertFalse(w.checked("drainPerHour"), w.out)
+        # all intervals charging with an authored charge rate: no placeholder CHECK even though
+        # the drain rate is built-in
+        d["panels"][1].pop("drainPerHour")
+        d["panels"][1]["chargePerHour"] = 5
+        w = self.walk(spec)
+        self.assertFalse(w.checked("built-in placeholder"), w.out)
+
     def test_story_time_backward_is_a_warn(self):
         spec = self.story_spec()
         spec["page"]["blocks"][0]["diagram"]["steps"][4]["time"] = "2026-09-25T03:00"

@@ -206,6 +206,15 @@ identity; a failed replacement after teardown invalidates it. Rejected source
 does not make a stale board fresh. Existing geometry and dialog checks still guard their own render/selection
 identities; a project counter does not replace independent operation generations.
 
+The optional local agent transport lives in `workbench/agent-session.js`, loaded
+after the lifetime helper. It is inactive unless the localhost helper injects its
+configuration into the built page. The builder supplies source snapshots,
+sanitized selection/view context, a busy predicate, and one validated
+`session.accept()` transaction. The exchange owns revision identity and pending
+acknowledgements; its controller owns polling, connection controls and teardown.
+`tools/agent-session.mjs` owns loopback serving and atomic scratch-file exchange.
+See [local design sessions](local-agent-session.md) for the wire/file contract.
+
 `target` and `insertSection` hold authored addresses and section ordinals, without
 DOM references. The controller separately owns highlighted elements, field focus,
 selection ranges, multiselection and gesture state. `invalidateProject()` increments

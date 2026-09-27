@@ -1070,6 +1070,46 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(catalogPicker)catalogPicker.destroy();});
   life.own(function(){interactions.destroy();});
   life.own(function(){hideDiff();if(guide)guide.hidden=true;});
+  var agentSession=typeof initWorkbenchAgentSession==='function' ? initWorkbenchAgentSession({document:document,
+    snapshot:function(){
+      var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
+      var previewCurrent=snap.renderedText===snap.text;
+      var ctl=opts.ctl && opts.ctl();
+      return {project:snap.project,open:!!open,source:open?snap.text:'',parseError:open?snap.error || null:null,
+        previewCurrent:previewCurrent,selection:open && previewCurrent?clipboardSelection().map(function(target){
+          var clean={};['kind','section','id','index','block','tab','card','pathId','field','item'].forEach(function(key){
+            if(typeof target[key]==='string' || typeof target[key]==='number')clean[key]=target[key];
+          });if(Array.isArray(target.bulletPath))clean.bulletPath=target.bulletPath.slice();return clean;
+        }):[],
+        views:open && previewCurrent?((ctl && ctl.sections) || []).map(function(rec){
+          return {section:rec.number-1,view:rec.presentation && rec.presentation.viewId?rec.presentation.viewId():null,
+            mode:rec.stepper && rec.stepper.mode?rec.stepper.mode():null,
+            path:rec.stepper && rec.stepper.path?rec.stepper.path():null,
+            sourceStep:rec.stepper && rec.stepper.sourceIndex?rec.stepper.sourceIndex():null};
+        }):[]};
+    },
+    busy:function(){
+      var active=document.activeElement;
+      return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
+        !!(active && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
+    },
+    apply:function(text,expected){
+      var snapshot=session.snapshot();
+      if(snapshot.text!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'Document changed.'};
+      var raw;try{raw=JSON.parse(text);}catch(ex){return {ok:false,error:'Proposal is not valid JSON: '+ex.message};}
+      var findings=validate(normalize(raw));
+      if(findings.errors.length)return {ok:false,error:findings.errors.join('\n')};
+      var outcome;
+      var accepted=session.accept({text:text},{snapshot:snapshot,beforePublish:function(){
+        clearMultiSelect();session.target=null;clearStepMarkers();inspector.retire();if(guide)guide.hidden=true;
+      },afterRender:function(plan,result){
+        outcome=result;
+        rehighlight();if(stepList)stepList.sync();
+      }});
+      return {ok:accepted,rendered:!!(outcome && outcome.ok)};
+    }
+  }) : null;
+  if(agentSession)life.own(function(){agentSession.destroy();});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },

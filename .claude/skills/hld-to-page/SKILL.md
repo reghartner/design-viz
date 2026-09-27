@@ -20,6 +20,16 @@ storyboard and branch table in the ledger. The builder creates the HTML and
 manifest; screenshots and scratch scripts can stay in a scratch directory.
 For a small edit, update the affected story/ledger rows rather than restarting.
 
+When the user supplies a **local workbench session scratch directory**, read its
+`README.md` and [file-session protocol](../../../docs/local-agent-session.md).
+Read the current `state.json` before editing; its source and selection are the
+live authoring context. Read implementation evidence from the separately
+authorized source checkout. Submit one atomic `proposal.json` with the matching
+base revision and wait for `result.json`. Reconcile rejected stale proposals
+against the latest source; never merely replace their revision. This workflow
+needs filesystem access only, with no browser tools or engine edits. Normal
+file/HTML delivery still applies when the user has not started a local session.
+
 ## 1. Establish intent and evidence
 
 - State the audience, the question the diagram answers, its initiating event,

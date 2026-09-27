@@ -29038,9 +29038,9 @@ function handoffNodeContent(node, position, id, prefix, options){
    for what validates. Selectors here name the viewer's stable controls;
    tests/tour-config.test.js guards the pairing with their renderers.
 
-   Portable by design: steps whose selector or diagram state cannot resolve on
-   a page warn and pass through, and this shipped copy never names
-   page-specific widgets — a page-authored config may (docs/tour.md). */
+   Portable by design: the viewer selects suitable sections/views and omits
+   unavailable lessons before numbering this walkthrough. This shipped copy
+   never names page-specific widgets — a page-authored config may (docs/tour.md). */
 
 var TOUR_DEFAULT_CONFIG = {
   version: 1,
@@ -29058,7 +29058,7 @@ var TOUR_DEFAULT_CONFIG = {
           {persona: 'eng', label: 'The engineering', sub: 'Calls, branching paths, source links, and room to explore.'},
           {persona: 'both', label: 'Show me both', sub: 'The full walkthrough, at your pace.'}
         ],
-        note: 'You can rerun this anytime from the ? button.'
+        note: 'This walkthrough covers the controls available on this page. Replay anytime from ?.'
       }
     },
     {
@@ -29149,6 +29149,7 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'links',
+      diagramState: {diagramVisible: true},
       personas: ['eng', 'both'],
       demo: {click: {selector: '.nrefs-trigger', within: 'section'}},
       target: {selector: '.node-link-menu', within: 'section'},
@@ -29162,6 +29163,7 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'drill',
+      diagramState: {diagramVisible: true},
       personas: ['eng', 'both'],
       demo: {click: {selector: '.detail-trigger', within: 'section'}},
       target: {selector: '.doc-sec[data-dv-detail-preview] .board', within: 'page'},
@@ -29399,6 +29401,32 @@ function wireTour(ctl, view, win, config, options){
 
   /* ---- pre-tour state snapshot: the page must come back exactly ---- */
   var snapshot = null, openedDetails = [];
+  function sectionSnapshot(sec){
+    var sp=sec.stepper, board=sec.sectionEl.querySelector('.board'), cur=sp && sp.current();
+    var reader=sec.presentation && sec.presentation.snapshotReaderState ? sec.presentation : sec.viewport;
+    return {number:sec.number, mode:sp && sp.mode(), path:sp && sp.path(),
+      sourceIndex:sp && sp.sourceIndex(), reader:reader && reader.snapshotReaderState(),
+      size:sec.boardSize && sec.boardSize.mode(), scroll:board && {x:board.scrollLeft,y:board.scrollTop},
+      stepIndex:cur ? cur.n : 0, playing:!!(sp && sp.playing()),
+      view:sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null};
+  }
+  function restoreSection(sec,saved,resume){
+    var pres=sec.presentation, sp=sec.stepper;
+    if(pres && saved.view != null && pres.viewId()!==saved.view)pres.setView(saved.view);
+    if(sp){
+      sp.pause();
+      var cur=sp.current();
+      if(sp.path()!==saved.path || !cur || cur.n!==saved.stepIndex ||
+          (saved.mode==='step' && sp.mode()!=='step'))sp.jumpSource(saved.sourceIndex,saved.path);
+      if(saved.mode==='ambient' && sp.mode()!=='ambient')sp.enterAmbient();
+      if(resume && saved.playing && sp.mode()==='step')sp.toggleAuto();
+    }
+    if(sec.boardSize && saved.size)sec.boardSize.setMode(saved.size);
+    var reader=pres && pres.restoreReaderState ? pres : sec.viewport;
+    if(reader && saved.reader)reader.restoreReaderState(saved.reader);
+    var board=sec.sectionEl.querySelector('.board');
+    if(board && saved.scroll){board.scrollLeft=saved.scroll.x;board.scrollTop=saved.scroll.y;}
+  }
   function takeSnapshot(){
     /* an open drill-down: save it and return to the overview so the tour
        walks the page from the top; it is restored exactly on finish */
@@ -29408,20 +29436,7 @@ function wireTour(ctl, view, win, config, options){
       activeTarget: ctl.activeTarget ? JSON.parse(JSON.stringify(ctl.activeTarget)) : null,
       scrollX: win.scrollX || 0, scrollY: win.scrollY || 0,
       tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
-      sections: ctl.sections.map(function(sec){
-        var sp = sec.stepper, board=sec.sectionEl.querySelector('.board');
-        var cur = sp && sp.current();
-        var reader=sec.presentation && sec.presentation.snapshotReaderState ? sec.presentation : sec.viewport;
-        return {number: sec.number, mode: sp && sp.mode(), path: sp && sp.path(),
-                sourceIndex: sp && sp.sourceIndex(),
-                reader: reader && reader.snapshotReaderState(),
-                size: sec.boardSize && sec.boardSize.mode(),
-                scroll: board && {x:board.scrollLeft,y:board.scrollTop},
-                step: cur ? cur.id : null, /* authored id, may be null */
-                stepIndex: cur ? cur.n : 0,
-                playing: sp && sp.playing ? sp.playing() : false,
-                view: sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null};
-      })
+      sections: ctl.sections.map(sectionSnapshot)
     };
     if (drill){ ctl.details.close(true); ctl.detailHistoryPush = false; }
     ctl.steppers.forEach(function(sec){sec.stepper.pause();});
@@ -29440,22 +29455,7 @@ function wireTour(ctl, view, win, config, options){
     savedPage.sections.forEach(function(saved){
       var sec=ctl.sections.find(function(s){return s.number===saved.number;});
       if(!sec)return;
-      var pres=sec.presentation, sp=sec.stepper;
-      if(pres && saved.view != null && pres.viewId()!==saved.view)pres.setView(saved.view);
-      if(sp){
-        sp.pause();
-        if(saved.mode==='step'){
-          var cur=sp.current();
-          if(sp.mode()!=='step' || sp.path()!==saved.path || !cur || cur.n!==saved.stepIndex)
-            sp.jumpSource(saved.sourceIndex,saved.path);
-        }else if(sp.mode()!=='ambient')sp.enterAmbient();
-        if(saved.playing && sp.mode()==='step')sp.toggleAuto();
-      }
-      if(sec.boardSize && saved.size)sec.boardSize.setMode(saved.size);
-      var reader=pres && pres.restoreReaderState ? pres : sec.viewport;
-      if(reader && saved.reader)reader.restoreReaderState(saved.reader);
-      var board=sec.sectionEl.querySelector('.board');
-      if(board && saved.scroll){board.scrollLeft=saved.scroll.x;board.scrollTop=saved.scroll.y;}
+      restoreSection(sec,saved,true);
     });
     var restoration;
     if(ctl.details){
@@ -30083,13 +30083,106 @@ function wireTour(ctl, view, win, config, options){
     catch (ex) { parts.next.focus(); }
   }
 
+  /* The portable tour teaches only features this page can demonstrate. Probe
+     real section/view states before showing its counter; never click a link or
+     fetch a drill-down while planning. Page-authored tours remain exact. */
+  var plannedConfig=config;
+  function disclose(node){
+    for(var anc=node;anc && anc!==doc.body;anc=anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
+      if(anc.tagName==='DETAILS' && !anc.open){anc.open=true;openedDetails.push(anc);}
+  }
+  function stateTokenMiss(sec,ds){
+    var sp=sec && sec.stepper;
+    if(ds.path != null && (!sp || resolvePathId(sp,ds.path)==null))return 'path "'+ds.path+'"';
+    var tokens={'@shared':sharedSourceIndex,'@rejoin':rejoinSourceIndex,'@fork':forkSourceIndex};
+    if(Object.prototype.hasOwnProperty.call(tokens,ds.step) && (!sp || tokens[ds.step](sp)<0))return 'step "'+ds.step+'"';
+    return null;
+  }
+  function stageAdvance(step,sec){
+    if(step.demo && step.demo.advance!=null && sec && sec.stepper &&
+       !(step.diagramState && step.diagramState.step!=null)){
+      if(sec.stepper.mode()!=='step')sec.stepper.enterStep(false);
+      sec.stepper.jump(0);
+    }
+  }
+  function branchIsVisible(sec,ds){
+    if(ds.step!=='@fork' && ds.step!=='@rejoin')return true;
+    var paths=sec.stepper.paths(), a=paths[0].indices,b=paths[1].indices;
+    var start=ds.step==='@fork'?forkSourceIndex(sec.stepper):rejoinSourceIndex(sec.stepper);
+    var needed=[start,b[b.indexOf(start)+1]];
+    if(ds.step==='@fork')needed.push(a[a.indexOf(start)+1]);
+    var chips=Array.prototype.slice.call(sec.sectionEl.querySelectorAll('.schip[data-step-source]'));
+    return needed.every(function(index){return chips.some(function(chip){
+      return Number(chip.getAttribute('data-step-source'))===index && isRendered(chip);
+    });});
+  }
+  function planDefaultTour(){
+    var preferred=null;
+    var steps=config.steps.map(function(step){
+      if((step.kind || 'spot')!=='spot')return step;
+      var candidates=(preferred?[preferred.sec]:[]).concat(ctl.steppers,ctl.sections)
+        .filter(function(sec,i,all){return sec.hasDiagram && all.indexOf(sec)===i;});
+      for(var i=0;i<candidates.length;i++){
+        var sec=candidates[i], pres=sec.presentation, saved=sectionSnapshot(sec);
+        var ds=step.diagramState || {};
+        if(stateTokenMiss(sec,ds))continue;
+        var choices=[saved.view];
+        if(preferred && preferred.sec===sec)choices.unshift(preferred.view);
+        if(pres && pres.views)choices=choices.concat(pres.views().map(function(v){return v.id;}));
+        choices=choices.filter(function(id,j,all){return all.indexOf(id)===j;});
+        if(ds.presentation!=null)choices=pres && pres.views ? pres.views().filter(function(v){return v.presentation===ds.presentation;}).map(function(v){return v.id;}) : [];
+        for(var j=0;j<choices.length;j++){
+          var state=Object.assign({},ds,{section:sec.reference});
+          if(choices[j]!=null)state.view=choices[j];
+          var tabs=ctl.tabBlocks.map(function(tb){return tb.active();});
+          var targetState=ctl.activeTarget, detailsAt=openedDetails.length;
+          var scroll={x:win.scrollX,y:win.scrollY}, valid=false;
+          try{
+            selectSectionTab(sec);
+            if(applyDiagramState(sec,state)){
+              stageAdvance(step,sec);
+              var target=queryTarget(step,sec,step.demo && step.demo.click || step.target);
+              disclose(target);
+              valid=isRendered(target) && branchIsVisible(sec,ds);
+              // A story panel may first appear partway through the flow. Start
+              // this lesson at an actual visible stop instead of dropping it.
+              if(!valid && target && step.id==='panels' && sec.stepper){
+                var ids=sec.stepper.ids();
+                for(var k=0;k<ids.length && !valid;k++){
+                  sec.stepper.jump(k);
+                  target=queryTarget(step,sec,step.target);disclose(target);
+                  valid=isRendered(target);
+                  if(valid)state.step=sec.stepper.current().id || sec.stepper.current().n+1;
+                }
+              }
+              // Pin the path as well as the section/view. Later lessons must not
+              // depend on the path a reader happened to choose during practice.
+              if(valid && sec.stepper && (ds.path!=null || step.demo && step.demo.advance!=null))state.path=sec.stepper.path();
+            }
+          }finally{
+            openedDetails.splice(detailsAt).forEach(function(d){if(d.isConnected)d.open=false;});
+            restoreSection(sec,saved,false);
+            ctl.tabBlocks.forEach(function(tb,k){if(tb.active()!==tabs[k])tb.select(tabs[k],false,false);});
+            ctl.activeTarget=targetState;win.scrollTo(scroll.x,scroll.y);
+          }
+          if(valid){
+            preferred={sec:sec,view:choices[j]};
+            return Object.assign({},step,{diagramState:state});
+          }
+        }
+      }
+      return null;
+    }).filter(Boolean);
+    plannedConfig=Object.assign({},config,{steps:steps});
+  }
+
   /* ---- state machine ---- */
-  /* The list is the authored config filtered by persona — nothing else.
-     Whether a step's control exists is settled at entry, where applying the
-     step's own tab and diagram state has already revealed it; a miss is an
+  /* Custom lists preserve authored numbering; the built-in list has already
+     been planned against available controls. Each target is resolved at entry,
+     where applying the step's own tab and diagram state has already revealed it; a miss is an
      authoring bug, surfaced as a console warning and passed through. */
   function buildList(){
-    var steps = tourStepsForPersona(config, persona || 'both');
+    var steps = tourStepsForPersona(plannedConfig, persona || 'both');
     /* one chooser, always first; extras are dropped (lint warns) */
     var choosers = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; });
     return choosers.slice(0, 1).concat(steps.filter(function(step){
@@ -30136,19 +30229,14 @@ function wireTour(ctl, view, win, config, options){
          page, so it must never show over the wrong one (a non-rejoining
          path under rejoin copy) */
       var dsCheck = step.diagramState || {};
-      var spCheck = sec && sec.stepper;
-      var tokenMiss =
-        (dsCheck.path != null && (!spCheck || resolvePathId(spCheck, dsCheck.path) == null)) ||
-        (dsCheck.step === '@shared' && (!spCheck || sharedSourceIndex(spCheck) < 0)) ||
-        (dsCheck.step === '@rejoin' && (!spCheck || rejoinSourceIndex(spCheck) < 0)) ||
-        (dsCheck.step === '@fork' && (!spCheck || forkSourceIndex(spCheck) < 0));
-      if (tokenMiss){
-        var pathMiss = dsCheck.path != null && (!spCheck || resolvePathId(spCheck, dsCheck.path) == null);
+      var tokenMiss=stateTokenMiss(sec,dsCheck);
+      if(tokenMiss){
         if (win.console) console.warn('flowspec: tour step "' + step.id + '" diagramState ' +
-          (pathMiss ? 'path "' + dsCheck.path + '"' : 'step "' + dsCheck.step + '"') +
+          tokenMiss +
           ' did not resolve — check the tour config for this diagram');
         index += dir; continue;
       }
+      stageAdvance(step,sec);
       /* a click step's validity rests on its click control (which must have
          a target to spotlight afterwards): the click is what puts the menu
          on screen, and it fires only after the settle loop steadies layout */
@@ -30156,12 +30244,7 @@ function wireTour(ctl, view, win, config, options){
       if (step.demo && step.demo.click){
         var clickEl = (step.target && typeof step.target.selector === 'string') ?
           queryTarget(step, sec, step.demo.click) : null;
-        if (clickEl){
-          /* the control may sit inside a collapsed disclosure: open it
-             before judging visibility, exactly as the viewer would */
-          for (var canc = clickEl; canc && canc !== doc.body; canc = canc.parentElement || (canc.getRootNode && canc.getRootNode().host))
-            if (canc.tagName === 'DETAILS' && !canc.open){ canc.open = true; openedDetails.push(canc); }
-        }
+        disclose(clickEl);
         if (!clickEl || !isRendered(clickEl)){
           if (win.console) console.warn('flowspec: tour step "' + step.id +
             '" target not found — check the tour config for this diagram');
@@ -30174,12 +30257,7 @@ function wireTour(ctl, view, win, config, options){
          (the reduced-motion transport fallback) never rescue a step whose
          subject is missing from this page */
       var authored = pendingClick ? pendingClick.node : queryTarget(step, sec, step.target);
-      if (authored){
-        /* a collapsed disclosure hides its content until opened — disclose
-           before judging visibility, exactly as the viewer would */
-        for (var anc = authored; anc && anc !== doc.body; anc = anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
-          if (anc.tagName === 'DETAILS' && !anc.open){ anc.open = true; openedDetails.push(anc); }
-      }
+      disclose(authored);
       if (!authored || !isRendered(authored)){
         closeDemoClick(); /* a click that opened something must not outlive its step */
         if (win.console) console.warn('flowspec: tour step "' + step.id +
@@ -30364,6 +30442,7 @@ function wireTour(ctl, view, win, config, options){
     fullScrim(); /* the overlay opens on a fully dimmed page */
     ctl.suppressFragmentWrites = true;
     takeSnapshot();
+    if(config===TOUR_DEFAULT_CONFIG)planDefaultTour();
     fullscreenChanged();
     list = buildList();
     at = 0;

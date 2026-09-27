@@ -4,9 +4,9 @@
    for what validates. Selectors here name the viewer's stable controls;
    tests/tour-config.test.js guards the pairing with their renderers.
 
-   Portable by design: steps whose selector or diagram state cannot resolve on
-   a page warn and pass through, and this shipped copy never names
-   page-specific widgets — a page-authored config may (docs/tour.md). */
+   Portable by design: the viewer selects suitable sections/views and omits
+   unavailable lessons before numbering this walkthrough. This shipped copy
+   never names page-specific widgets — a page-authored config may (docs/tour.md). */
 
 var TOUR_DEFAULT_CONFIG = {
   version: 1,
@@ -24,7 +24,7 @@ var TOUR_DEFAULT_CONFIG = {
           {persona: 'eng', label: 'The engineering', sub: 'Calls, branching paths, source links, and room to explore.'},
           {persona: 'both', label: 'Show me both', sub: 'The full walkthrough, at your pace.'}
         ],
-        note: 'You can rerun this anytime from the ? button.'
+        note: 'This walkthrough covers the controls available on this page. Replay anytime from ?.'
       }
     },
     {
@@ -115,6 +115,7 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'links',
+      diagramState: {diagramVisible: true},
       personas: ['eng', 'both'],
       demo: {click: {selector: '.nrefs-trigger', within: 'section'}},
       target: {selector: '.node-link-menu', within: 'section'},
@@ -128,6 +129,7 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'drill',
+      diagramState: {diagramVisible: true},
       personas: ['eng', 'both'],
       demo: {click: {selector: '.detail-trigger', within: 'section'}},
       target: {selector: '.doc-sec[data-dv-detail-preview] .board', within: 'page'},

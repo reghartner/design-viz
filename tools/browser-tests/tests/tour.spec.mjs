@@ -78,10 +78,9 @@ test('#tour=1 auto-starts over a fresh profile',async({page,server})=>{
   await expect(page.locator('.dv-tour')).toBeHidden();
 });
 
-test('a missing target warns and passes through, keeping the authored count',async({page,server})=>{
-  // chime-radar has no bindings, paths or view choices: for the eng track
-  // the branching and links steps are authoring misses on this page — the
-  // tour must name them in the console and walk straight past them.
+test('the default tour omits unavailable lessons and numbers the available controls consecutively',async({page,server})=>{
+  // chime-radar has no paths or view choices. Normal default-tour
+  // omissions must not look like lost lessons or config errors.
   const warnings=[];
   page.on('console',m=>{if(m.type()==='warning')warnings.push(m.text());});
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
@@ -139,11 +138,10 @@ test('a missing target warns and passes through, keeping the authored count',asy
     requestAnimationFrame(tick);
   });
   await page.locator('.dv-tour-next').click();
-  // Both branching steps have no .path-timeline here: they warn and pass
-  // through to the links step (chime-radar does render node links).
+  // Branching is absent, so the next numbered lesson is source links.
   await expect(heading).toHaveText('Nodes link to the real system');
-  // pathless page: both branching steps name the unresolved @alt token
-  expect(warnings.filter(w=>w.includes('branching')&&w.includes('path "@alt" did not resolve')).length).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('.dv-tour-count')).toHaveText('3 / 5');
+  expect(warnings.filter(w=>w.includes('tour step'))).toEqual([]);
   // The links step CLICKED the ⋯ trigger (after its cause-before-effect
   // hold): the real menu opens and is the spotlit target; leaving closes it.
   await expect(page.locator('.node-link-menu:not([hidden])')).toBeVisible();
@@ -247,7 +245,7 @@ test.describe('with motion allowed',()=>{
     await expect(page.locator('.dv-tour')).toBeHidden();
   });
 
-  test('an unresolvable @rejoin token SKIPS the step instead of mis-narrating',async({page,server})=>{
+  test('the default tour omits a rejoin lesson when the alternate never rejoins',async({page,server})=>{
     const warnings=[];
     page.on('console',m=>{if(m.type()==='warning')warnings.push(m.text());});
     await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
@@ -263,7 +261,7 @@ test.describe('with motion allowed',()=>{
     // @alt never rejoins here: the rejoin step must pass through, never
     // showing its copy over a non-rejoining path.
     await expect(heading).not.toHaveText('And they come back together');
-    expect(warnings.some(w=>w.includes('branching-rejoin'))).toBe(true);
+    expect(warnings.some(w=>w.includes('branching-rejoin'))).toBe(false);
     await page.keyboard.press('Escape');
     await expect(page.locator('.dv-tour')).toBeHidden();
   });
@@ -391,7 +389,7 @@ test('disjoint paths never show the split step (no fork to narrate)',async({page
     await page.locator('.dv-tour-next').click();
   }
   expect(seen).not.toContain('Flows can split');
-  expect(warnings.some(w=>w.includes('branching-split')&&w.includes('@fork'))).toBe(true);
+  expect(warnings.some(w=>w.includes('branching-split'))).toBe(false);
   await page.keyboard.press('Escape');
 });
 

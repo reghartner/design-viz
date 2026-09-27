@@ -2,13 +2,17 @@
 
 The standalone viewer ships a guided tour that runs once per browser the
 first time a person opens a Flowview page. It dims the page, cuts bright
-holes over real controls, and narrates. **The tour is authored, not
-detected:** the config is written per diagram by someone (or some agent) who
-can see the rendered page. Each step declares the state it needs and the
-controls it shows. The runtime follows that sequence, filters it by persona,
-and warns and passes through when a declared control or state is missing.
-It does not infer lessons from view names or append steps to page-authored
-tours. The tour runs in the standalone viewer, not the workbench.
+holes over real controls, and narrates. The built-in walkthrough finds a
+suitable section and view for each lesson, including diagrams in other tabs.
+It includes only features the page can demonstrate and numbers those lessons
+consecutively. The chooser explains that the walkthrough is tailored to the
+page; a diagram without alternate paths has no branching lessons.
+
+A page-authored tour declares its own sequence, state and targets. The runtime
+filters that sequence by persona and warns and passes through when a declared
+control or state is missing, preserving authored numbering. It does not append
+lessons or search other sections for a page-authored target. The tour runs in
+the standalone viewer, not the workbench.
 
 ## Where the config lives
 
@@ -256,7 +260,7 @@ controls; workbench actions such as Arrange section do not belong here.
 
 ## What happens when a step cannot resolve
 
-Entering a step applies its authored state first, then resolves its
+For a page-authored tour, entering a step applies its authored state first, then resolves its
 controls. If the target, a click control, or a requested presentation or
 path/step token is missing, the viewer warns with the step ID and the
 unresolved control or state. A missing-target warning looks like:
@@ -266,6 +270,15 @@ unresolved control or state. A missing-target warning looks like:
 It then moves on in the walking direction (backwards too). The timeline keeps
 the authored count. Fix the config; don't rely on the skip. `chooser` and
 `done` steps always enter.
+
+The built-in tour checks applicability before presenting its counter. It
+prefers the previous lesson's section and view, then tries other sections and
+views. Branching lessons require visible branch stops; panel demonstrations
+start at a stop with a visible panel. Planning does not click source links or
+open drill-downs. It restores the reader's tabs, views, path, disclosure state,
+and workspace after each probe, keeping playback paused during the tour.
+Expected omissions do not produce missing-target warnings. The original state
+is restored when the tour finishes or is skipped.
 
 ## Authoring checklist (per diagram)
 

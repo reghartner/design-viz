@@ -60,6 +60,10 @@ paths below are relative to VIZ. Links to `references/` are relative to this fil
    never move it to fit a rate, and note any tension in the ledger. Rate math
    only fills the gaps between anchors, and only when a supplied rate and its
    start condition apply; otherwise hold the value or jump at the next anchor.
+   If two anchors cannot both be met at the stated rate, the rate does not
+   apply between them: show no in-between values (never invent a slower or
+   faster rate to connect them), jump at the next anchor, and say on the
+   page and in the ledger that the given times and the stated rate disagree.
    Write the arithmetic in the time table ("6:50 to 8:05 = 1.25 h x 3 %/h =
    +3.75, shown +4"). A value falls until charging (or cooling) starts and
    never changes while the clock stands still.
@@ -94,11 +98,12 @@ paths below are relative to VIZ. Links to `references/` are relative to this fil
    `reported` and never switch its meaning mid-story.
    Before writing steps, list every scheduled report across the whole span
    (e.g. every 30-minute heartbeat). A schedule is an opportunity, not
-   evidence of delivery. A reported card advances only (a) at a step that
-   lights that report's delivery path, or (b) when the source says reports
-   succeed on that schedule and nothing in the story (outage, offline)
-   prevents it: then later cards may show the latest scheduled report's value,
-   labeled illustrative, with freshness text naming its time. During an
+   evidence of delivery. A reported card advances (a) at a step that lights
+   that report's delivery path, and (b) when the source states a fixed report
+   schedule and nothing in the story (outage, offline) stops it: then every
+   later card **shows** the latest scheduled report's value and time
+   ("Updated 7:30 AM"), labeled illustrative. Do not leave "Last report
+   10:30 PM" on screen at 1:10 AM when reports run every 30 minutes. During an
    outage, keep the last known value and let its freshness age; an overdue
    card is `stale`. A delivered report with no push still updates every app
    card it carries (value, recording, thermal, connection, freshness).
@@ -154,7 +159,7 @@ states it):
 
 | Level | What the diagram shows | Who it suits |
 |---|---|---|
-| Story | People, places, devices, app screens and outcomes. The backend is a few plainly named boxes ("Kestrel cloud"). No protocols, API names or code in captions. | Business, product, support, leadership |
+| Story | People, places, devices, app screens and outcomes. The backend is a few plainly named boxes ("Kestrel cloud"). No protocols, API names, HTTP codes, service names or code anywhere the reader sees: captions, edge labels, the connection legend (name connection kinds in plain words, e.g. "internet", "phone alert"), panel text and section descriptions. Never show file paths such as `input/hld.md`. | Business, product, support, leadership |
 | Mixed | The story plus the main services by name, with plain captions. | Mixed rooms |
 | Engineering | Every service hop, API, failure mode and code reference. | Engineers and reviewers |
 

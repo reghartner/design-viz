@@ -95,9 +95,9 @@ Rules:
   opportunity, not evidence of delivery.
 - Keep two series: the physical value (battery or thermo panel) and the last
   report (device-app card). The report column changes at a step that lights
-  the report's delivery path. It may also change at the first step after an
-  unshown scheduled report, but only when the source says reports succeed on
-  that schedule and nothing in the story (outage, offline) prevents it: write
+  the report's delivery path. It also changes at the first step after an
+  unshown scheduled report whenever the source states a fixed report schedule
+  and nothing in the story (outage, offline) stops it: write
   "last report 7:30, not shown, illus" and use the physical value at 7:30.
   During an outage the report column keeps its last value and its freshness
   ages. Place reports on the source's cadence from the

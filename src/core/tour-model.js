@@ -24,7 +24,7 @@ function tourLintConfig(config){
     warn('.steps', 'must be a non-empty array of steps');
     return warnings;
   }
-  var seen = {}, choosersSeen = 0;
+  var seen = Object.create(null), choosersSeen = 0;
   config.steps.forEach(function(step, i){
     if (tourIsObject(step) && step.kind === 'chooser'){
       choosersSeen++;
@@ -91,6 +91,13 @@ function tourLintConfig(config){
     }
     if (step.diagramState != null && !tourIsObject(step.diagramState))
       warn(at + '.diagramState', 'must be an object');
+    if(tourIsObject(step.diagramState) && step.diagramState.presentation != null &&
+       ['standard','explore'].indexOf(step.diagramState.presentation)<0)
+      warn(at+'.diagramState.presentation','must be "standard" or "explore"');
+    if(tourIsObject(step.diagramState) && step.diagramState.diagramVisible != null && typeof step.diagramState.diagramVisible!=='boolean')
+      warn(at+'.diagramState.diagramVisible','must be a boolean');
+    if(tourIsObject(step.copy) && step.copy.reducedMotionBody != null && typeof step.copy.reducedMotionBody!=='string')
+      warn(at+'.copy.reducedMotionBody','must be a string');
     if (step.reveal != null){
       if (!Array.isArray(step.reveal) || !step.reveal.length)
         warn(at + '.reveal', 'must be a non-empty array of {selector, within} targets');

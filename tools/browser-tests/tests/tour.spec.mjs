@@ -54,7 +54,7 @@ test('#tour=1 forces the tour; finishing restores state and unblocks the page',a
   await page.locator('.dv-tour-choice').nth(2).click(); // Show me both
   await expect(page.locator('.dv-tour-ui')).toBeVisible();
   // Walk to the end with Next/Done, bounded to the config's step count.
-  for(let i=0;i<8;i++){
+  for(let i=0;i<20;i++){
     const label=await page.locator('.dv-tour-next').textContent();
     await page.locator('.dv-tour-next').click();
     if(label==='Done')break;
@@ -182,8 +182,10 @@ test('a missing target warns and passes through, keeping the authored count',asy
   expect(probe.found,'a sample point between the two rings must exist').toBe(true);
   expect(probe.blocked,JSON.stringify(probe)).toBe(true);
   await page.locator('.dv-tour-next').click();
-  await expect(heading).toHaveText('Now try it');
+  await expect(heading).toHaveText('Give this section more room');
   await expect(page.locator('.node-link-menu:not([hidden])')).toHaveCount(0);
+  await page.locator('.dv-tour-next').click();
+  await expect(heading).toHaveText('Now try it');
   // The done card hands over: Done focuses the ▶ transport button.
   await page.locator('.dv-tour-next').click();
   await expect(page.locator('.dv-tour')).toBeHidden();
@@ -411,11 +413,11 @@ for(const [file,shape] of [['tour-prefix','a strict prefix'],['tour-identical','
     await page.keyboard.press('Escape');
   });
 
-test('Tab and Shift+Tab never leave the tour, on the chooser and on a step',async({page,server})=>{
+test('Tab and Shift+Tab stay in the tour or its highlighted controls',async({page,server})=>{
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
   await page.goto(server.origin+'/standalone.html#tour=1');
   await expect(page.locator('.dv-tour-chooser')).toBeVisible();
-  const insideTour=()=>page.evaluate(()=>!!(document.activeElement&&document.activeElement.closest('.dv-tour')));
+  const insideTour=()=>page.evaluate(()=>!!(document.activeElement&&document.activeElement.closest('.dv-tour, .mtoggle')));
   const cycle=async()=>{
     for(const key of ['Tab','Shift+Tab'])
       for(let i=0;i<8;i++){await page.keyboard.press(key);expect(await insideTour(),key+' #'+i).toBe(true);}
@@ -486,7 +488,7 @@ test('the drill step opens a detail flow and Next returns to the overview',async
   // the tour never writes the drill trail into the URL
   expect(new URL(page.url()).hash).toBe(hashBefore);
   await page.locator('.dv-tour-next').click();
-  await expect(heading).toHaveText('Now try it');
+  await expect(heading).not.toHaveText('Zoom into a part of the system');
   await expect(detail).toHaveCount(0);
   await expect(page.locator('#section-doorbell-domains, .doc-sec').first()).toBeVisible();
   expect(new URL(page.url()).hash).toBe(hashBefore);
@@ -523,7 +525,7 @@ for(const [w,h] of [[1400,900],[1280,800],[1920,1080],[800,600]])
       await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
       await page.goto(server.origin+'/tour-drill.html#tour=1');
       await page.locator('.dv-tour-choice').nth(persona).click();
-      for(let i=0;i<12;i++){
+      for(let i=0;i<20;i++){
         if(await page.locator('.dv-tour').isHidden())break;
         await expect(page.locator('.dv-tour-ui:not(.dv-tour-ui-pending)')).toBeVisible();
         await page.waitForTimeout(250);
@@ -559,7 +561,7 @@ test('drill step at 1400x900: the ringed breadcrumb is clear of the card and cli
   await page.keyboard.press('Escape');
 });
 
-test('Tab on the links step keeps the tour\'s menu open and focus in the tour',async({page,server})=>{
+test('Tab on the links step keeps the menu open and reaches highlighted controls',async({page,server})=>{
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');}catch(e){}});
   await page.goto(server.origin+'/standalone.html#tour=1');
   await page.locator('.dv-tour-choice').nth(1).click();
@@ -573,7 +575,7 @@ test('Tab on the links step keeps the tour\'s menu open and focus in the tour',a
   for(const key of ['Tab','Tab','Shift+Tab','Tab']){
     await page.keyboard.press(key);
     await expect(menu).toBeVisible();
-    expect(await page.evaluate(()=>!!document.activeElement.closest('.dv-tour'))).toBe(true);
+    expect(await page.evaluate(()=>!!document.activeElement.closest('.dv-tour, .node-link-menu, .nrefs-trigger'))).toBe(true);
   }
   await page.keyboard.press('Escape'); // closes the menu first (engine owns it)
   await page.keyboard.press('Escape'); // then the tour

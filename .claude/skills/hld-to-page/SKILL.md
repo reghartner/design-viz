@@ -199,6 +199,11 @@ JSON specs and generated HTML together in `diagrams/<name>/`. Root `canon.json`
 selects reviewed folders and their owners for both the workbench and Backstage;
 standard builds publish that list. Per-spec flags do not enroll a document.
 
+Standalone reader onboarding uses the [tour guide](../../../docs/tour.md):
+use optional `page.tour` for diagram-specific lessons, explicit view IDs for
+authored demonstrations, and reduced-motion copy when describing playback.
+Standard/Explore lessons must target controls available in that diagram.
+
 Keep layout stable between beats. Open guided stories paused (`view:"step"`);
 set `autoplay:true` only when requested. Before publishing, stamp the spec with
 `node <VIZ>/tools/compatibility.js --stamp <spec.json> > <versioned.spec.json>`

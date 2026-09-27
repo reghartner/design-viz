@@ -93,11 +93,12 @@ function wireTour(ctl, view, win, config, options){
     var root = (target && target.within === 'page') ? view :
                (sec && sec.sectionEl ? sec.sectionEl : null);
     if (!root || !target || typeof target.selector !== 'string') return null;
-    try { return root.querySelector(target.selector); }
+    try { var matches=Array.prototype.slice.call(root.querySelectorAll(target.selector));
+      return matches.find(isRendered) || matches[0] || null; }
     catch (ex) { return null; }
   }
   function isRendered(el){
-    try { return !!(el && el.getClientRects && el.getClientRects().length); }
+    try { return !!(el && el.getClientRects && el.getClientRects().length && win.getComputedStyle(el).visibility !== 'hidden'); }
     catch (ex) { return false; }
   }
   function selectSectionTab(sec){
@@ -110,18 +111,30 @@ function wireTour(ctl, view, win, config, options){
       }
   }
   function applyDiagramState(sec, ds){
-    if (!sec || !ds) return;
+    if (!sec || !ds) return true;
+    var pres=sec.presentation, requested=ds.view;
+    if(requested == null && ds.presentation != null){
+      var choices=pres && pres.views ? pres.views() : [];
+      var match=choices.find(function(v){return v.presentation===ds.presentation;});
+      if(match)requested=match.id;
+      else if(ds.presentation!=='standard' || choices.length)return false;
+    }
     /* Same order as the deep-link apply: view installs its visible-stop
        filter before the path, the path before the step. */
-    if (ds.view != null && sec.presentation && sec.presentation.setView){
-      if (!sec.presentation.setView(ds.view))
-        sec.presentation.setView(sec.presentation.defaultView());
+    if(requested != null && (!pres || !pres.setView || !pres.setView(requested)))return false;
+    if(ds.diagramVisible === true){
+      if(pres && pres.setDiagramVisible)pres.setDiagramVisible(true);
+      var board=sec.sectionEl.querySelector('.board');
+      for(var parent=board;parent && parent!==sec.sectionEl;parent=parent.parentElement){
+        if(parent.tagName==='DETAILS' && !parent.open){parent.open=true;openedDetails.push(parent);}
+      }
     }
     var sp = sec.stepper;
-    if (!sp) return;
+    if (!sp) return ds.path == null && ds.step == null;
+    sp.pause();
     var pathId = ds.path != null ? resolvePathId(sp, ds.path) : null;
-    if (pathId != null && sp.selectPath) sp.selectPath(pathId);
-    if (ds.mode === 'ambient'){ sp.enterAmbient(); return; }
+    if (pathId != null && sp.selectPath && sp.selectPath(pathId) === false)return false;
+    if (ds.mode === 'ambient'){ sp.enterAmbient(); return true; }
     if (ds.mode === 'step' && sp.mode() !== 'step') sp.enterStep(false);
     if (ds.step === '@shared' || ds.step === '@rejoin' || ds.step === '@fork'){
       var src = ds.step === '@shared' ? sharedSourceIndex(sp) :
@@ -130,8 +143,10 @@ function wireTour(ctl, view, win, config, options){
       /* unresolved tokens are entry failures, judged before this runs */
     } else if (ds.step != null){
       var idx = sp.stepIndexOf(ds.step);
-      if (idx >= 0) sp.jump(idx); /* unresolved explicit step: stay in place */
+      if (idx >= 0) sp.jump(idx);
+      else return false;
     }
+    return true;
   }
 
   /* ---- pre-tour state snapshot: the page must come back exactly ---- */
@@ -140,22 +155,28 @@ function wireTour(ctl, view, win, config, options){
     /* an open drill-down: save it and return to the overview so the tour
        walks the page from the top; it is restored exactly on finish */
     var drill = ctl.details ? ctl.details.snapshot() : null;
-    if (drill){ ctl.details.close(true); ctl.detailHistoryPush = false; }
     snapshot = {
       drill: drill,
       activeTarget: ctl.activeTarget ? JSON.parse(JSON.stringify(ctl.activeTarget)) : null,
-      scrollY: win.scrollY || 0,
+      scrollX: win.scrollX || 0, scrollY: win.scrollY || 0,
       tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
-      sections: ctl.sections.filter(function(sec){ return sec.stepper; }).map(function(sec){
-        var sp = sec.stepper;
-        var cur = sp.current();
-        return {number: sec.number, mode: sp.mode(), path: sp.path(),
+      sections: ctl.sections.map(function(sec){
+        var sp = sec.stepper, board=sec.sectionEl.querySelector('.board');
+        var cur = sp && sp.current();
+        var reader=sec.presentation && sec.presentation.snapshotReaderState ? sec.presentation : sec.viewport;
+        return {number: sec.number, mode: sp && sp.mode(), path: sp && sp.path(),
+                sourceIndex: sp && sp.sourceIndex(),
+                reader: reader && reader.snapshotReaderState(),
+                size: sec.boardSize && sec.boardSize.mode(),
+                scroll: board && {x:board.scrollLeft,y:board.scrollTop},
                 step: cur ? cur.id : null, /* authored id, may be null */
                 stepIndex: cur ? cur.n : 0,
-                playing: sp.playing ? sp.playing() : false,
+                playing: sp && sp.playing ? sp.playing() : false,
                 view: sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null};
       })
     };
+    if (drill){ ctl.details.close(true); ctl.detailHistoryPush = false; }
+    ctl.steppers.forEach(function(sec){sec.stepper.pause();});
     openedDetails = [];
   }
   function restoreSnapshot(){
@@ -167,49 +188,49 @@ function wireTour(ctl, view, win, config, options){
         if (ctl.tabBlocks[i].index === saved.index && ctl.tabBlocks[i].active() !== saved.tab)
           ctl.tabBlocks[i].select(saved.tab, false, false);
     });
-    snapshot.sections.forEach(function(saved){
-      var sec = null;
-      for (var i = 0; i < ctl.sections.length; i++)
-        if (ctl.sections[i].number === saved.number){ sec = ctl.sections[i]; break; }
-      if (!sec || !sec.stepper) return;
-      var sp = sec.stepper;
-      /* Restore ONLY what actually changed: driving an untouched diagram
-         through selectPath/enterAmbient is not a neutral round trip (it can
-         mark hidden chips current and stop autoplay). Field-by-field. */
-      var cur = sp.current();
-      var touched = false;
-      var liveView = sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : null;
-      if (saved.view != null && liveView !== saved.view && sec.presentation && sec.presentation.setView){
-        sec.presentation.setView(saved.view); touched = true;
+    var savedPage=snapshot;snapshot=null;
+    savedPage.sections.forEach(function(saved){
+      var sec=ctl.sections.find(function(s){return s.number===saved.number;});
+      if(!sec)return;
+      var pres=sec.presentation, sp=sec.stepper;
+      if(pres && saved.view != null && pres.viewId()!==saved.view)pres.setView(saved.view);
+      if(sp){
+        sp.pause();
+        if(saved.mode==='step'){
+          var cur=sp.current();
+          if(sp.mode()!=='step' || sp.path()!==saved.path || !cur || cur.n!==saved.stepIndex)
+            sp.jumpSource(saved.sourceIndex,saved.path);
+        }else if(sp.mode()!=='ambient')sp.enterAmbient();
+        if(saved.playing && sp.mode()==='step')sp.toggleAuto();
       }
-      if (saved.path != null && sp.path() !== saved.path && sp.selectPath){
-        sp.selectPath(saved.path); touched = true;
-      }
-      if (saved.mode === 'step'){
-        if (sp.mode() !== 'step'){ sp.enterStep(false); touched = true; }
-        var idx = saved.step != null ? sp.stepIndexOf(saved.step) : -1;
-        if (idx < 0 && saved.stepIndex >= 0 && saved.stepIndex < sp.ids().length)
-          idx = saved.stepIndex; /* pages without authored step ids */
-        /* cur is pre-restore: trust it only when nothing above moved */
-        if (idx >= 0 && (touched || !(cur && cur.n === idx))) sp.jump(idx);
-      } else if (saved.mode === 'ambient' && sp.mode() !== 'ambient') sp.enterAmbient();
-      /* a diagram that was auto-playing keeps (or regains) its playback */
-      if (saved.playing && sp.playing && !sp.playing() && sp.mode() === 'step') sp.toggleAuto();
+      if(sec.boardSize && saved.size)sec.boardSize.setMode(saved.size);
+      var reader=pres && pres.restoreReaderState ? pres : sec.viewport;
+      if(reader && saved.reader)reader.restoreReaderState(saved.reader);
+      var board=sec.sectionEl.querySelector('.board');
+      if(board && saved.scroll){board.scrollLeft=saved.scroll.x;board.scrollTop=saved.scroll.y;}
     });
-    /* drill state last: the tour always leaves the overview showing, so
-       only a pre-tour drill needs re-opening (async, via the engine's own
-       restore path; fragment writes stay suppressed until finish) */
-    var drill = snapshot.drill;
-    if (ctl.details){
-      if (ctl.details.snapshot()) ctl.details.close(true);
-      if (drill){ try { ctl.details.restore(drill); } catch (ex) { /* stays at overview */ } }
+    var restoration;
+    if(ctl.details){
+      if(ctl.details.snapshot())ctl.details.close(true);
+      if(savedPage.drill)restoration=ctl.details.restore(savedPage.drill);
     }
-    ctl.detailHistoryPush = false;
-    /* the tour's own drill set activeTarget; the next user-driven fragment
-       write must name the section the reader actually had */
-    if (snapshot.activeTarget) ctl.activeTarget = snapshot.activeTarget;
-    win.scrollTo(0, snapshot.scrollY);
-    snapshot = null;
+    ctl.detailHistoryPush=false;
+    ctl.activeTarget=savedPage.activeTarget;
+    win.scrollTo(savedPage.scrollX,savedPage.scrollY);
+    return Promise.resolve(restoration).then(function(){
+      ctl.detailHistoryPush=false;
+      ctl.activeTarget=savedPage.activeTarget;
+      win.scrollTo(savedPage.scrollX,savedPage.scrollY);
+    });
+  }
+  var restoring=false;
+  function restoreReader(){
+    restoring=true;
+    var result;
+    try{result=restoreSnapshot();}catch(ex){snapshot=null;}
+    Promise.resolve(result).catch(function(){}).then(function(){
+      ctl.suppressFragmentWrites=false;restoring=false;
+    });
   }
 
   /* ---- overlay DOM ---- */
@@ -246,10 +267,9 @@ function wireTour(ctl, view, win, config, options){
     stopDemo();
     closeDemoClick();
     detach();
-    if (snapshot){ try { restoreSnapshot(); } catch (ex) { snapshot = null; } }
-    ctl.suppressFragmentWrites = false;
+    restoreReader();
     active = false;
-    if (overlay) overlay.hidden = true;
+    if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
   }
   function buildOverlay(){
     overlay = el('div', 'dv-tour');
@@ -315,7 +335,13 @@ function wireTour(ctl, view, win, config, options){
     var next = button('dv-tour-btn dv-tour-next', 'Next', function(){ go(at + 1); });
     var skip = button('dv-tour-skip', 'Skip tour', function(){ finish(); });
     controls.appendChild(back); controls.appendChild(next); controls.appendChild(skip);
-    ui.appendChild(narration); ui.appendChild(controls);
+    var practice=el('div','dv-tour-practice');
+    var replayExample=button('dv-tour-skip dv-tour-replay-example','Replay example',function(){go(at);});
+    var tryControls=button('dv-tour-skip dv-tour-try','Try the controls',function(){
+      var controls=spotControls();if(controls.length)controls[0].focus({preventScroll:true});
+    });
+    practice.appendChild(replayExample);practice.appendChild(tryControls);
+    ui.appendChild(narration);ui.appendChild(practice); ui.appendChild(controls);
     overlay.appendChild(ui);
     var chooser = el('div', 'dv-tour-card dv-tour-chooser'); chooser.hidden = true;
     overlay.appendChild(chooser);
@@ -325,7 +351,7 @@ function wireTour(ctl, view, win, config, options){
     parts = {scrim: scrim, dim: dim, mask: mask, maskBase: maskBase, dimRect: dimRect,
              rings: rings, glowId: glowId, extras: extras, timeline: timeline,
              ui: ui, eyebrow: eyebrow, heading: heading, body: body,
-             back: back, next: next, skip: skip, chooser: chooser, hint: hint};
+             back: back, next: next, skip: skip, chooser: chooser, hint: hint, replayExample:replayExample, tryControls:tryControls};
   }
   /* One geometry, one render path. Every highlight is a single shape
      object {x, y, width, height, rx}; that object writes the mask hole AND
@@ -669,6 +695,7 @@ function wireTour(ctl, view, win, config, options){
       holes.push(r3);
     });
     render(holes);
+    parts.tryControls.hidden=!spotControls().length;
     placeUi(hole); /* against every ring and note just drawn */
     yieldCounter();
   }
@@ -782,10 +809,12 @@ function wireTour(ctl, view, win, config, options){
     parts.eyebrow.textContent = copy.eyebrow != null ? String(copy.eyebrow) :
       ('TOUR · STEP ' + tl.current + ' OF ' + tl.total);
     parts.heading.textContent = String(copy.heading || '');
-    parts.body.textContent = String(copy.body || '') +
+    parts.body.textContent = String(RM && copy.reducedMotionBody != null ? copy.reducedMotionBody : copy.body || '') +
       /* under reduced motion the engine disables ▶ too — the arrows remain */
-      (step.demo && step.demo.advance != null && RM ?
+      (step.demo && step.demo.advance != null && RM && copy.reducedMotionBody == null ?
         ' Auto-play is off — use the ‹ › step arrows to walk the story yourself.' : '');
+    parts.replayExample.hidden=RM || !step.demo || step.demo.advance == null;
+    parts.tryControls.hidden=(step.kind || 'spot') !== 'spot';
     parts.back.disabled = at === 0;
     parts.next.textContent = at >= list.length - 1 ? 'Done' : 'Next';
     /* a held card cannot take focus yet (visibility:hidden): focus Next when
@@ -843,7 +872,10 @@ function wireTour(ctl, view, win, config, options){
         index += dir; continue;
       }
       selectSectionTab(sec);
-      applyDiagramState(sec, step.diagramState);
+      if(!applyDiagramState(sec, step.diagramState)){
+        if(win.console)console.warn('flowspec: tour step "'+step.id+'" diagramState '+JSON.stringify(step.diagramState)+' did not resolve — check the tour config for this diagram');
+        index+=dir;continue;
+      }
       /* an unresolved path/step token is an entry failure exactly like a
          missing target: the step's authored state cannot exist on this
          page, so it must never show over the wrong one (a non-rejoining
@@ -945,6 +977,8 @@ function wireTour(ctl, view, win, config, options){
       (function settle(){
         if (!active || gen !== myGen) return;
         recenter(spot);
+        if(sec && sec.presentation && sec.presentation.refreshViewport)sec.presentation.refreshViewport();
+        else if(sec && sec.viewport)sec.viewport.refresh();
         var top = Math.round(spot.getBoundingClientRect().top);
         var inView = top >= 0 && top <= win.innerHeight;
         if ((inView && top === lastTop) || --settleTries <= 0){
@@ -977,33 +1011,38 @@ function wireTour(ctl, view, win, config, options){
        reschedules stay armed for the revealed state */
     schedule();
   }
+  function focusable(node){
+    return isRendered(node) && !node.disabled && node.tabIndex>=0;
+  }
+  function spotControls(){
+    var step=list[at];if(!step || (step.kind || 'spot')!=='spot')return [];
+    var sec=sectionFor(step),eff=effectiveTargets(step),found=[];
+    [eff.target].concat(eff.secondaries.map(function(s){return s.target;})).forEach(function(target){
+      var root=queryTarget(step,sec,target);if(!root || !isRendered(root))return;
+      var nodes=[root].concat(Array.prototype.slice.call(root.querySelectorAll('button,a[href],input,select,textarea,summary,[tabindex]')));
+      nodes.forEach(function(node){if(focusable(node) && found.indexOf(node)<0)found.push(node);});
+    });
+    return found;
+  }
   function keydown(ev){
     if (!active) return;
-    if (ev.target && ev.target.closest &&
-        (ev.target.closest('.prose-code') || ev.target.closest('input, textarea, select'))) return;
     if (ev.key === 'Escape'){
-      /* an open node-link menu owns its own Escape (engine, capture) */
       if (doc.querySelector('.node-link-menu:not([hidden])')) return;
       stopDemo(); guarded(finish);
       ev.preventDefault(); ev.stopImmediatePropagation(); return;
     }
     if (ev.key === 'Tab'){
-      /* keep keyboard focus inside the tour: wrap over the buttons that are
-         actually rendered and visible now (the held card and the hidden
-         chooser/card don't count; the fixed Skip control does) */
-      var focusable = Array.prototype.filter.call(overlay.querySelectorAll('button:not([disabled])'), function(b){
-        if (!b.getClientRects().length) return false;
-        try { return win.getComputedStyle(b).visibility !== 'hidden'; } catch (ex) { return true; }
-      });
-      if (focusable.length){
-        var first = focusable[0], last = focusable[focusable.length - 1];
-        var inside = focusable.indexOf(doc.activeElement) >= 0;
-        if (!inside){ (ev.shiftKey ? last : first).focus(); ev.preventDefault(); }
-        else if (ev.shiftKey && doc.activeElement === first){ last.focus(); ev.preventDefault(); }
-        else if (!ev.shiftKey && doc.activeElement === last){ first.focus(); ev.preventDefault(); }
+      var controls=Array.prototype.filter.call(overlay.querySelectorAll('button'),focusable).concat(spotControls());
+      if(controls.length){
+        var index=controls.indexOf(doc.activeElement);
+        var next=index<0?(ev.shiftKey?controls.length-1:0):(index+(ev.shiftKey?-1:1)+controls.length)%controls.length;
+        controls[next].focus({preventScroll:true});ev.preventDefault();ev.stopImmediatePropagation();
       }
       return;
     }
+    /* Arrows on a spotlighted control belong to that control (panel drag,
+       resize, native inputs). Navigation shortcuts belong to the tour card. */
+    if(!overlay.contains(ev.target)){stopDemo();return;}
     if (!parts.chooser.hidden) return; /* chooser: only Escape shortcuts apply */
     if (ev.key === 'ArrowRight'){
       stopDemo(); guarded(function(){ go(at + 1); });
@@ -1024,40 +1063,50 @@ function wireTour(ctl, view, win, config, options){
   function guardFocus(ev){
     if (clickedTrigger && clickedTrigger.getAttribute &&
         clickedTrigger.getAttribute('aria-expanded') === 'true' &&
-        overlay && overlay.contains(ev.target)) ev.stopImmediatePropagation();
+        overlay && (overlay.contains(ev.target) || spotControls().indexOf(ev.target)>=0)) ev.stopImmediatePropagation();
   }
   function pagePointer(ev){
     /* touching the page through the hole (the spotlit control) takes over
        from a running demo, just like touching the tour's own controls */
     if (demoTimer && overlay && !overlay.contains(ev.target)) stopDemo();
   }
+  function fullscreenChanged(){
+    if(overlay){
+      var host=doc.fullscreenElement || doc.body;
+      if(overlay.parentNode!==host)host.appendChild(overlay);
+    }
+    schedule();
+  }
   function attach(){
     doc.addEventListener('keydown', keydown, true);
     doc.addEventListener('pointerdown', pagePointer, true);
+    doc.addEventListener('click',schedule);
     win.addEventListener('focusin', guardFocus, true);
     win.addEventListener('resize', schedule);
     doc.addEventListener('scroll', schedule, true);
-    doc.addEventListener('fullscreenchange', schedule);
+    doc.addEventListener('fullscreenchange', fullscreenChanged);
   }
   function detach(){
     unwatch();
     doc.removeEventListener('keydown', keydown, true);
     doc.removeEventListener('pointerdown', pagePointer, true);
+    doc.removeEventListener('click',schedule);
     win.removeEventListener('focusin', guardFocus, true);
     win.removeEventListener('resize', schedule);
     doc.removeEventListener('scroll', schedule, true);
-    doc.removeEventListener('fullscreenchange', schedule);
+    doc.removeEventListener('fullscreenchange', fullscreenChanged);
   }
   function start(){
-    if (active || disabled) return;
+    if (active || disabled || restoring) return;
     restoreFocus = doc.activeElement;
     if (!overlay) buildOverlay();
     overlay.hidden = false;
     active = true;
     persona = null;
     fullScrim(); /* the overlay opens on a fully dimmed page */
-    takeSnapshot();
     ctl.suppressFragmentWrites = true;
+    takeSnapshot();
+    fullscreenChanged();
     list = buildList();
     at = 0;
     if (!list.length){ finish(); return; }
@@ -1073,10 +1122,8 @@ function wireTour(ctl, view, win, config, options){
     closeDemoClick();
     markDone();
     detach();
-    try { restoreSnapshot(); }
-    catch (ex) { snapshot = null; }
-    ctl.suppressFragmentWrites = false;
-    if (overlay) overlay.hidden = true;
+    restoreReader();
+    if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
     /* Done hands over control: the recap invites pressing ▶, so focus the
        transport of the section the tour ran in (a step arrow under reduced
        motion, where the engine disables ▶). Skip/Esc return the reader to

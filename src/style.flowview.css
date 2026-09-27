@@ -83,3 +83,6 @@ body.sk-daylight{background:#F4F2EC;}
 @media (prefers-reduced-motion: reduce){
     .dv-tour-seg.on{box-shadow:none;}
 }
+
+.dv-tour-practice{display:flex;flex-wrap:wrap;gap:16px;margin:14px 0;}
+.dv-tour-practice:has(> [hidden]):not(:has(> :not([hidden]))){display:none;}

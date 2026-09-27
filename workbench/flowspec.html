@@ -11919,7 +11919,7 @@ function tourLintConfig(config){
     warn('.steps', 'must be a non-empty array of steps');
     return warnings;
   }
-  var seen = {}, choosersSeen = 0;
+  var seen = Object.create(null), choosersSeen = 0;
   config.steps.forEach(function(step, i){
     if (tourIsObject(step) && step.kind === 'chooser'){
       choosersSeen++;
@@ -11986,6 +11986,13 @@ function tourLintConfig(config){
     }
     if (step.diagramState != null && !tourIsObject(step.diagramState))
       warn(at + '.diagramState', 'must be an object');
+    if(tourIsObject(step.diagramState) && step.diagramState.presentation != null &&
+       ['standard','explore'].indexOf(step.diagramState.presentation)<0)
+      warn(at+'.diagramState.presentation','must be "standard" or "explore"');
+    if(tourIsObject(step.diagramState) && step.diagramState.diagramVisible != null && typeof step.diagramState.diagramVisible!=='boolean')
+      warn(at+'.diagramState.diagramVisible','must be a boolean');
+    if(tourIsObject(step.copy) && step.copy.reducedMotionBody != null && typeof step.copy.reducedMotionBody!=='string')
+      warn(at+'.copy.reducedMotionBody','must be a string');
     if (step.reveal != null){
       if (!Array.isArray(step.reveal) || !step.reveal.length)
         warn(at + '.reveal', 'must be a non-empty array of {selector, within} targets');
@@ -27083,7 +27090,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   var summary=document.createElement('summary');summary.textContent='Panels';menu.appendChild(summary);
   var choices=document.createElement('div');choices.className='explore-panel-choices';menu.appendChild(choices);actions.appendChild(menu);
   var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
-  var stack=button('Stack at edge',function(){windows.forEach(function(w){w.state.stacked=true;w.state.hidden=false;});memory.focus=false;paint();});stack.hidden=true;
+  var stack=button('Stack at edge',function(){windows.forEach(function(w){w.state.stacked=true;w.state.hidden=false;});memory.focus=false;paint();});stack.classList.add('explore-stack');stack.hidden=true;
   var expand=button('Expand',toggleExpanded);expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
   var status=document.createElement('span');status.className='viewport-status';status.setAttribute('role','status');actions.appendChild(status);
   var zoomOut=button('−',function(){changeZoom(.8);},tools);zoomOut.setAttribute('aria-label','Zoom out');
@@ -27238,8 +27245,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     if(isFullscreen() && document.exitFullscreen){var result=document.exitFullscreen();if(result && result.catch)result.catch(function(){});}
     if(!retired)expand.focus({preventScroll:true});
   }
-  function toggleExpanded(){
-    if(expanded){exitExpanded();return;}setExpanded(true);
+  function toggleExpanded(){if(expanded)exitExpanded();else enterExpanded();}
+  function enterExpanded(){
+    setExpanded(true);
     var token=++pendingFullscreen;
     function failed(){if(retired || token!==pendingFullscreen)return;status.textContent='Expanded in this page. Browser fullscreen is unavailable.';}
     try{
@@ -27266,6 +27274,26 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     setView:function(view,tiles){leave();definition=view;items=tiles || [];enter();},
     setArranging:function(value){if(arranging===value)return;arranging=value;if(value){leave();if(expanded)exitExpanded();}else enter();expand.hidden=value;},
     scrollTarget:function(){return active?stage:grid;},
+    refresh:resized,
+    snapshotReaderState:function(){
+      if(active){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}
+      return {memories:JSON.parse(JSON.stringify(memories)),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open};
+    },
+    restoreReaderState:function(saved){
+      if(!saved || retired)return;
+      leave();memories=JSON.parse(JSON.stringify(saved.memories));enter();
+      if(!saved.expanded){if(expanded)exitExpanded();}
+      else if(saved.fullscreen){if(!isFullscreen())enterExpanded();else setExpanded(true);}
+      else {
+        var token=++pendingFullscreen;setExpanded(true);
+        if(isFullscreen() && document.exitFullscreen){
+          var result=document.exitFullscreen();
+          if(result && result.then)result.then(function(){if(!retired && pendingFullscreen===token)setExpanded(true);},function(){});
+        }
+      }
+      stage.style.height=saved.stageHeight;paint();
+      menu.open=saved.menuOpen;
+    },
     suspend:leave,
     destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);}
   };
@@ -28971,6 +28999,9 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
     layoutId:function(){return layoutId;},setLayout:setLayout,
+    views:function(){return views.map(function(v){return {id:v.legacy?'layout':v.id,presentation:v.presentation};});},
+    snapshotReaderState:function(){return {visibility:Object.assign({},visibility),showDiagram:showDiagram,viewport:viewport.snapshotReaderState()};},
+    restoreReaderState:function(saved){if(saved){visibility=Object.assign(Object.create(null),saved.visibility);showDiagram=saved.showDiagram;paintFlow();viewport.restoreReaderState(saved.viewport);}},
     viewId:function(){return active?(named?layoutId:'layout'):'flow';},
     defaultView:function(){return defaultView;},
     setView:function(id){
@@ -28980,7 +29011,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       return false;
     },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
-    setArranging:viewport.setArranging,
+    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,
     destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 
@@ -29297,6 +29328,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       var toolbar=boardLayout.viewChoicesHost && boardLayout.viewChoicesHost.parentNode;
       if(!toolbar){toolbar=document.createElement('div');toolbar.className='diagram-views';box.insertBefore(toolbar,surface);}
       standardViewport=createSectionViewport(box,toolbar,surface,boardDiv,bar,d,result.boardSize);
+      result.viewport=standardViewport;
     }
     ready=true;
     box.setAttribute('data-view-id',result.presentation?result.presentation.viewId():'flow');
@@ -29471,7 +29503,7 @@ function renderPage(view, page, skin, backlinks, options){
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
-               flowDisclosure:built.flowDisclosure, presentation:built.presentation,
+               flowDisclosure:built.flowDisclosure, presentation:built.presentation, viewport:built.viewport,
                contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);

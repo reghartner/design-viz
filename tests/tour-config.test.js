@@ -18,7 +18,7 @@ test('the shipped default config lints clean and is usable',()=>{
 
 test('the default flow covers chooser, controls, branching, both personas, done',()=>{
   const ids=plain(config.steps.map(s=>s.id));
-  assert.deepEqual(ids,['welcome','mode-ambient','mode-step','controls','branching-split','branching-rejoin','links','drill','story','panels','finish-ux','finish-eng']);
+  assert.deepEqual(ids,['welcome','views','mode-ambient','mode-step','controls','branching-split','branching-rejoin','links','drill','panels','explore-panels','explore-recovery','expand','finish-ux','finish-eng']);
   const panels=config.steps.find(s=>s.id==='panels');
   assert.deepEqual(plain(panels.demo),{advance:3,intervalMs:1800});
   assert.deepEqual(plain(panels.personas),['ux','both']);
@@ -54,21 +54,21 @@ test('the default flow covers chooser, controls, branching, both personas, done'
   const ux=plain(context.tourStepsForPersona(config,'ux').map(s=>s.id));
   const both=plain(context.tourStepsForPersona(config,'both').map(s=>s.id));
   // eng: the mode pair (map, then sequence), branching, links, its recap
-  assert.deepEqual(eng,['welcome','mode-ambient','mode-step','branching-split','branching-rejoin','links','drill','finish-eng']);
+  assert.deepEqual(eng,['welcome','views','mode-ambient','mode-step','branching-split','branching-rejoin','links','drill','explore-panels','explore-recovery','expand','finish-eng']);
   // ux: one simple controls step, no AMBIENT anywhere in its copy
-  assert.deepEqual(ux,['welcome','controls','branching-split','branching-rejoin','story','panels','finish-ux']);
+  assert.deepEqual(ux,['welcome','views','controls','branching-split','branching-rejoin','panels','expand','finish-ux']);
   context.tourStepsForPersona(config,'ux').forEach(s=>{
     const text=(s.copy&&(s.copy.heading+' '+s.copy.body))||'';
     assert.ok(!text.includes('AMBIENT'),'ux copy never mentions AMBIENT: '+s.id);
   });
   // both: the eng mode pair plus the ux story/panels — an authored union
-  assert.deepEqual(both,['welcome','mode-ambient','mode-step','branching-split','branching-rejoin','links','drill','story','panels','finish-eng']);
+  assert.deepEqual(both,['welcome','views','mode-ambient','mode-step','branching-split','branching-rejoin','links','drill','panels','explore-panels','explore-recovery','expand','finish-eng']);
   // the mode pair is adjacent: the map, then the sequence
   assert.equal(eng.indexOf('mode-step'),eng.indexOf('mode-ambient')+1);
 });
 
 test('every selector class the default config names is rendered by the engine',()=>{
-  const engine=readSource('engine.js');
+  const engine=readSource('engine.js')+readSource('viewer/explore.js');
   const selectors=[];
   config.steps.forEach(step=>{
     if(step.target)selectors.push(step.target.selector);

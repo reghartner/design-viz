@@ -1698,6 +1698,9 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
     layoutId:function(){return layoutId;},setLayout:setLayout,
+    views:function(){return views.map(function(v){return {id:v.legacy?'layout':v.id,presentation:v.presentation};});},
+    snapshotReaderState:function(){return {visibility:Object.assign({},visibility),showDiagram:showDiagram,viewport:viewport.snapshotReaderState()};},
+    restoreReaderState:function(saved){if(saved){visibility=Object.assign(Object.create(null),saved.visibility);showDiagram=saved.showDiagram;paintFlow();viewport.restoreReaderState(saved.viewport);}},
     viewId:function(){return active?(named?layoutId:'layout'):'flow';},
     defaultView:function(){return defaultView;},
     setView:function(id){
@@ -1707,7 +1710,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       return false;
     },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
-    setArranging:viewport.setArranging,
+    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,
     destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 
@@ -2024,6 +2027,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       var toolbar=boardLayout.viewChoicesHost && boardLayout.viewChoicesHost.parentNode;
       if(!toolbar){toolbar=document.createElement('div');toolbar.className='diagram-views';box.insertBefore(toolbar,surface);}
       standardViewport=createSectionViewport(box,toolbar,surface,boardDiv,bar,d,result.boardSize);
+      result.viewport=standardViewport;
     }
     ready=true;
     box.setAttribute('data-view-id',result.presentation?result.presentation.viewId():'flow');
@@ -2198,7 +2202,7 @@ function renderPage(view, page, skin, backlinks, options){
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
     var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
-               flowDisclosure:built.flowDisclosure, presentation:built.presentation,
+               flowDisclosure:built.flowDisclosure, presentation:built.presentation, viewport:built.viewport,
                contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};
     ctl.sections.push(rec);
     if (built.stepper) ctl.steppers.push(rec);

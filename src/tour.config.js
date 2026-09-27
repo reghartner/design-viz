@@ -1,8 +1,8 @@
 /* Built-in default tour config. A page overrides it wholesale with page.tour
    (no deep-merge). The shape and the authoring contract are documented in
    docs/tour.md; tourLintConfig (core/tour-model.js) is the source of truth
-   for what validates. Selectors here name controls the engine always renders
-   with these exact class names — tests/tour-config.test.js guards the pairing.
+   for what validates. Selectors here name the viewer's stable controls;
+   tests/tour-config.test.js guards the pairing with their renderers.
 
    Portable by design: steps whose selector or diagram state cannot resolve on
    a page warn and pass through, and this shipped copy never names
@@ -18,24 +18,33 @@ var TOUR_DEFAULT_CONFIG = {
       copy: {
         eyebrow: 'WELCOME · FIRST VISIT',
         heading: 'First time in a Flowview diagram?',
-        body: 'Pick what you’d like to see. Takes under a minute.',
+        body: 'Pick a walkthrough. You can try the highlighted controls as you go.',
         choices: [
-          {persona: 'ux', label: 'The user experience', sub: 'The story view, screens, and where this design is documented.'},
-          {persona: 'eng', label: 'The engineering', sub: 'The live diagram, branching paths, Backstage and the code.'},
-          {persona: 'both', label: 'Show me both', sub: 'The full walkthrough, about two minutes.'}
+          {persona: 'ux', label: 'The user experience', sub: 'Reading views, story steps, and live panels.'},
+          {persona: 'eng', label: 'The engineering', sub: 'Calls, branching paths, source links, and room to explore.'},
+          {persona: 'both', label: 'Show me both', sub: 'The full walkthrough, at your pace.'}
         ],
         note: 'You can rerun this anytime from the ? button.'
+      }
+    },
+    {
+      id: 'views',
+      target: {selector: '.diagram-view-choice', within: 'section'},
+      copy: {
+        heading: 'Choose your reading view',
+        body: 'Use these buttons to choose a view of this story. Each view can emphasize a different part of the same flow. Your steps and their effects stay connected as you switch.'
       }
     },
     {
       id: 'mode-ambient',
       personas: ['eng', 'both'],
       target: {selector: '.mtoggle', within: 'section'},
-      diagramState: {mode: 'ambient'},
+      diagramState: {mode: 'ambient', diagramVisible: true},
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'The big picture',
-        body: 'AMBIENT: every box and call in this flow, lit at once and looping.'
+        body: 'AMBIENT shows the calls together, with activity looping across the diagram.',
+        reducedMotionBody: 'AMBIENT shows the calls together. Animation stays off with reduced motion.'
       }
     },
     {
@@ -47,12 +56,13 @@ var TOUR_DEFAULT_CONFIG = {
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'One call at a time',
-        body: 'STEP: the same diagram, one call at a time, in order — watch it walk; ‹ › move by hand.'
+        body: 'STEP follows the sequence one call at a time. Watch this example, replay it, or use ‹ › to move by hand.',
+        reducedMotionBody: 'STEP follows the sequence one call at a time. Choose Try controls, then use the ‹ › buttons to move by hand. Automatic playback is off.'
       },
       secondary: [
         {
           target: {selector: '.presentbtn', within: 'page'},
-          note: 'Presenting to a room? PRESENT goes fullscreen — arrows and Space work there.'
+          note: 'PRESENT gives a room the full-page presentation.'
         }
       ]
     },
@@ -63,12 +73,13 @@ var TOUR_DEFAULT_CONFIG = {
       diagramState: {mode: 'step'},
       copy: {
         heading: 'Play the story',
-        body: '▶ plays the flow one step every 3 seconds; ‹ › move by hand.'
+        body: '▶ plays the flow one step every 3 seconds; ‹ › move by hand.',
+        reducedMotionBody: 'Use the ‹ › buttons to walk through the story at your own pace. Choose Try controls to reach them with the keyboard. Automatic playback is off.'
       },
       secondary: [
         {
           target: {selector: '.presentbtn', within: 'page'},
-          note: 'Presenting to a room? PRESENT goes fullscreen — arrows and Space work there.'
+          note: 'PRESENT gives a room the full-page presentation.'
         }
       ]
     },
@@ -86,7 +97,8 @@ var TOUR_DEFAULT_CONFIG = {
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'Flows can split',
-        body: 'Each row is one scenario — its label names the path. Watch the walk leave the shared steps and take the branch where behavior differs. Click any chip to jump.'
+        body: 'Each row is one scenario — its label names the path. Watch the walk leave the shared steps and take a different branch. Choose any chip to jump.',
+        reducedMotionBody: 'Each row is one scenario — its label names the path. Use the ‹ › buttons to leave the shared steps and follow this branch, or choose a chip to jump.'
       }
     },
     {
@@ -97,7 +109,8 @@ var TOUR_DEFAULT_CONFIG = {
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'And they come back together',
-        body: 'The branch flows back — the last steps are shared by every path.'
+        body: 'These paths meet again at shared steps. Watch this branch return to the common sequence.',
+        reducedMotionBody: 'These paths meet again at shared steps. Use the ‹ › buttons to follow this branch back into the common sequence.'
       }
     },
     {
@@ -127,24 +140,53 @@ var TOUR_DEFAULT_CONFIG = {
       }
     },
     {
-      id: 'story',
-      personas: ['ux', 'both'],
-      target: {selector: '.diagram-view-choice', within: 'section'},
-      copy: {
-        heading: 'Two ways to read it',
-        body: 'Switch to the story view for the human side of the same steps. The “Generated from” line at the top links to the document this page was built from.'
-      }
-    },
-    {
       id: 'panels',
       personas: ['ux', 'both'],
-      target: {selector: '.panelcol', within: 'section'},
+      target: {selector: '.pwidget[data-dv-panel]', within: 'section'},
       diagramState: {mode: 'step'},
       demo: {advance: 3, intervalMs: 1800},
       reveal: [{selector: '.board', within: 'section'}],
       copy: {
         heading: 'The panels tell the story',
-        body: 'Watch the side panels follow the diagram — every widget updates as each step plays.'
+        body: 'The panels show what this moment means: a screen, a device state, or another part of the story. Watch for changes as the steps advance.',
+        reducedMotionBody: 'The panels show what this moment means: a screen, a device state, or another part of the story. Use the ‹ › buttons and look for changes between steps.'
+      }
+    },
+    {
+      id: 'explore-panels',
+      personas: ['eng', 'both'],
+      diagramState: {presentation: 'explore', mode: 'step'},
+      /* The menu is a fallback only when the reader has hidden every
+         panel. A plain selector union would pick it first in DOM order. */
+      target: {selector: '.explore-window:not([hidden]), .viewport-explore:not(:has(.explore-window:not([hidden]))) .explore-panel-menu', within: 'section'},
+      secondary: [
+        {target: {selector: '.explore-player', within: 'section'}, note: 'The step controls stay pinned while you inspect the graph.'}
+      ],
+      reveal: [{selector: '.board', within: 'section'}],
+      copy: {
+        heading: 'Make room to explore',
+        body: 'In Explore, panels float above the graph. Move one by its header, resize its corner, or hide it with ×. Try controls lets you use the header and resize handle with arrow keys. The next lesson shows how to bring hidden panels back.'
+      }
+    },
+    {
+      id: 'explore-recovery',
+      personas: ['eng', 'both'],
+      diagramState: {presentation: 'explore', mode: 'step'},
+      target: {selector: '.explore-panel-choices', within: 'section'},
+      secondary: [
+        {target: {selector: '.explore-stack', within: 'section'}, note: 'Stack at edge gathers available panels on the right.'}
+      ],
+      copy: {
+        heading: 'Bring a panel back',
+        body: 'Panels lists what this view can show. Tick an available panel to bring it back, or use Stack at edge to tidy up. Panels unavailable in this view or step are explained here. These changes affect your reading space; they do not edit the diagram.'
+      }
+    },
+    {
+      id: 'expand',
+      target: {selector: '[aria-label="Expand diagram view"], [aria-label="Exit expanded diagram view"]', within: 'section'},
+      copy: {
+        heading: 'Give this section more room',
+        body: 'Expand enlarges this section, using fullscreen when available. Your selected step stays put. Exit expanded view brings you back to the page.'
       }
     },
     {
@@ -153,7 +195,8 @@ var TOUR_DEFAULT_CONFIG = {
       kind: 'done',
       copy: {
         heading: 'Now try it',
-        body: 'Click any numbered chip to jump to that step, then press ▶. Replay this tour anytime from the ? button.'
+        body: 'Choose a numbered step, then use ▶ or the ‹ › buttons to follow the story. Replay this tour anytime from the ? button.',
+        reducedMotionBody: 'Choose a numbered step, then use the ‹ › buttons to follow the story. Automatic playback stays off. Replay this tour anytime from the ? button.'
       }
     },
     {
@@ -162,7 +205,8 @@ var TOUR_DEFAULT_CONFIG = {
       kind: 'done',
       copy: {
         heading: 'Now try it',
-        body: 'Click any numbered chip to jump to that step, then press ▶ — then open ⋯ on any node. Replay this tour anytime from the ? button.'
+        body: 'Choose a numbered step and follow the calls with ▶ or ‹ ›. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.',
+        reducedMotionBody: 'Choose a numbered step and follow the calls with the ‹ › buttons. A node’s ⋯ menu, where available, connects the diagram to its sources. Replay this tour anytime from the ? button.'
       }
     }
   ]

@@ -128,3 +128,9 @@ PRs against the host adapter; avoid copying or rewriting the shared renderer.
 See [section arrangements and host previews](section-layouts.md) for saved
 placement and size of diagram/panel tiles, host selection and deployment notes.
 Preview dimensions simulate the content area; verify the actual installed host.
+
+Explore views use a 760px workspace in the content-sized Forge macro (1000px
+for in-page expansion). Their height is independent of the iframe viewport,
+so automatic host resizing cannot repeatedly enlarge the content. Browser
+fullscreen still fills the available screen. Standalone and workbench Explore
+views use the viewport height.

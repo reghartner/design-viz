@@ -148,7 +148,10 @@ controls stay pinned and available as you inspect the graph. Playback and step
 markers share the top row, with the caption below. Move the controls using the
 small grip on the left; resize their corner. Drag empty canvas to pan, including
 a quarter-screen beyond each edge to uncover content behind panels. The workspace
-height follows the viewport and does not depend on page scroll. The same live
+height follows the viewport and does not depend on page scroll. Content-sized
+Forge macros use a fixed 760px workspace to avoid iframe sizing feedback; their
+in-page expansion uses 1000px. Other content-sized hosts can set the pixel CSS
+variables `--explore-height` and `--explore-expanded-height` on their viewer. The same live
 widgets, selected path and step continue across Standard/Explore switches.
 
 Use **Panels · N** to choose which available panels to show. Panels hidden by

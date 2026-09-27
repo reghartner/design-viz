@@ -86,8 +86,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function fitHeight(){
     if(!active || retired)return;
     /* Stable across page scroll and refresh; no document-position feedback. */
-    var inset=parseFloat(getComputedStyle(shell).getPropertyValue('--workspace-toolbar')) || 0;
-    stage.style.height=Math.max(340,window.innerHeight-inset-toolbar.getBoundingClientRect().height-36)+'px';
+    var styles=getComputedStyle(shell),inset=parseFloat(styles.getPropertyValue('--workspace-toolbar')) || 0;
+    var fixed=parseFloat(styles.getPropertyValue('--explore-height'));
+    stage.style.height=Math.max(340,Number.isFinite(fixed) && fixed>0?fixed:window.innerHeight-inset-toolbar.getBoundingClientRect().height-36)+'px';
   }
   function minimum(w){
     /* Portrait screens can become much narrower than charts and maps. */

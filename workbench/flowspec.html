@@ -8499,9 +8499,9 @@ body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;d
 .section-viewport:fullscreen{box-sizing:border-box;width:100%;height:100%;padding:12px;background:var(--explore-bg);display:flex;flex-direction:column;overflow:auto;}
 .section-viewport:fullscreen>.diagram-views{flex:none;margin:0 0 10px;}
 .section-viewport:fullscreen>.explore-stage{flex:1;height:auto!important;min-height:0;}
-.section-viewport.viewport-expanded:not(:fullscreen)>.explore-stage{height:max(520px,calc(100dvh - 90px))!important;}
+.section-viewport.viewport-expanded:not(:fullscreen)>.explore-stage{height:var(--explore-expanded-height,max(520px,calc(100dvh - 90px)))!important;}
 .section-viewport.viewport-expanded:not(:fullscreen)>.standard-view-surface,
-.section-viewport.viewport-expanded:not(:fullscreen)>.section-layout-grid{height:max(520px,calc(100dvh - 120px));overflow:auto;border:1px solid var(--explore-border);border-radius:12px;}
+.section-viewport.viewport-expanded:not(:fullscreen)>.section-layout-grid{height:var(--explore-expanded-height,max(520px,calc(100dvh - 120px)));overflow:auto;border:1px solid var(--explore-border);border-radius:12px;}
 .section-viewport:fullscreen>.section-layout-grid{flex:1;overflow:auto;}
 .section-viewport:fullscreen>.standard-view-surface{flex:1;overflow:auto;min-height:0;}
 @container diagram-section (max-width:640px){
@@ -27191,8 +27191,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function fitHeight(){
     if(!active || retired)return;
     /* Stable across page scroll and refresh; no document-position feedback. */
-    var inset=parseFloat(getComputedStyle(shell).getPropertyValue('--workspace-toolbar')) || 0;
-    stage.style.height=Math.max(340,window.innerHeight-inset-toolbar.getBoundingClientRect().height-36)+'px';
+    var styles=getComputedStyle(shell),inset=parseFloat(styles.getPropertyValue('--workspace-toolbar')) || 0;
+    var fixed=parseFloat(styles.getPropertyValue('--explore-height'));
+    stage.style.height=Math.max(340,Number.isFinite(fixed) && fixed>0?fixed:window.innerHeight-inset-toolbar.getBoundingClientRect().height-36)+'px';
   }
   function minimum(w){
     /* Portrait screens can become much narrower than charts and maps. */

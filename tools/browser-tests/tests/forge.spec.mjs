@@ -35,3 +35,28 @@ test('copied production Forge resource imports, saves and reloads through only t
   await published.locator('.playback-button').click();await expect(published.locator('.playback-status')).toContainText('Playing');
   await published.locator('.playback-button').click();await expect(published.locator('.playback-status')).toHaveText('Paused');
 });
+
+test('Forge Explore height converges when the host resizes its iframe to content',async({page,server})=>{
+  const raw=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
+  raw.page.sections[0].diagram.defaultLayout='service-flow';raw.page.sections[0].diagram.autoplay=false;
+  await page.addInitScript(config=>{
+    window.__bridge={callBridge:async method=>{if(method==='getContext')return {siteUrl:'https://company.atlassian.net',extension:{config,macro:{isConfiguring:false}}};throw Error('Unexpected bridge call '+method);}};
+  },{specJson:JSON.stringify(raw)});
+  await page.setViewportSize({width:1600,height:600});await page.goto(server.origin+'/forge/index.html');
+  const stage=page.locator('.explore-stage');await expect(stage).toBeVisible();
+  const initial=(await stage.boundingBox()).height;expect(initial).toBeGreaterThan(740);expect(initial).toBeLessThan(780);
+  async function settle(){
+    const heights=[];
+    for(let i=0;i<3;i++){
+      const h=await page.evaluate(()=>document.documentElement.scrollHeight);heights.push(h);
+      await page.setViewportSize({width:1600,height:h});
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    }
+    expect(heights[2]).toBeCloseTo(heights[1],0);
+  }
+  await settle();expect((await stage.boundingBox()).height).toBeCloseTo(initial,0);
+  await page.evaluate(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(new Error('Host policy'));});
+  await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect(page.locator('.viewport-status')).toContainText('unavailable');
+  expect((await stage.boundingBox()).height).toBeGreaterThan(990);await settle();
+  await page.getByRole('button',{name:'Exit expanded diagram view',exact:true}).click();expect((await stage.boundingBox()).height).toBeCloseTo(initial,0);
+});

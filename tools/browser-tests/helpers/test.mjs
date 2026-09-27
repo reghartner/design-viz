@@ -32,7 +32,11 @@ export const test=base.extend({
     finally{await new Promise(resolve=>server.close(resolve));}
   },{scope:'worker'}],
   audit:[async({context,server},use,testInfo)=>{
-    const failures=[];
+    const failures=[],allowedAborts=new WeakSet(),expectedAborts=[];
+    // A test may deliberately cancel a particular in-flight request. Only that
+    // identity's ERR_ABORTED is allowed; timeouts, HTTP errors and other requests
+    // remain failures. Keep cancellations visible in the audit artifact.
+    failures.allowAbort=request=>allowedAborts.add(request);
     function watch(page){
       page.on('pageerror',error=>failures.push('page: '+error.message));
       page.on('console',message=>{if(message.type()==='error')failures.push('console: '+message.text());});
@@ -42,7 +46,11 @@ export const test=base.extend({
       const url=request.url();
       if(!url.startsWith(server.origin+'/')&&!url.startsWith('file:')&&!url.startsWith('data:')&&!url.startsWith('blob:'))failures.push('outbound: '+url);
     });
-    context.on('requestfailed',request=>failures.push('request failed: '+request.url()+' '+request.failure()?.errorText));
+    context.on('requestfailed',request=>{
+      const reason=request.failure()?.errorText;
+      if(allowedAborts.has(request) && reason==='net::ERR_ABORTED'){allowedAborts.delete(request);expectedAborts.push(request.url());return;}
+      failures.push('request failed: '+request.url()+' '+reason);
+    });
     context.on('response',response=>{if(response.status()>=400)failures.push('HTTP '+response.status()+': '+response.url());});
     await context.route('**/*',route=>{
       const url=route.request().url();
@@ -53,6 +61,8 @@ export const test=base.extend({
     if(testInfo.status!==testInfo.expectedStatus||failures.length){
       for(const [index,page] of context.pages().entries())if(!page.isClosed())await testInfo.attach('page-'+index,{body:await page.screenshot(),contentType:'image/png'});
     }
+    if(expectedAborts.length)await testInfo.attach('intentional-request-cancellations',{body:JSON.stringify(expectedAborts,null,2),contentType:'application/json'});
+    delete failures.allowAbort;
     await testInfo.attach('browser-audit',{body:JSON.stringify(failures,null,2),contentType:'application/json'});
     expect(failures,'No page/console/request errors or outbound requests').toEqual([]);
   },{auto:true}],

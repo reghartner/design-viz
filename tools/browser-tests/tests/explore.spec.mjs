@@ -6,7 +6,7 @@ import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 async function build(server){
  const spec=structuredClone(named),sec=spec.page.sections[0],d=sec.diagram;sec.id='doorbell';d.autoplay=false;
- d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
+ delete d.layouts[1].exploreLayout;d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
  d.panels.push({id:'queue',type:'queue',title:'Upload queue',initial:{depth:3}});
  d.steps[1].panelVisibility={queue:false};d.steps[1].text='A deliberately long engineering caption. '.repeat(60);
  for(let r=0;r<8;r++){const row=[];for(let c=0;c<8;c++){const id='extra'+r+'_'+c;d.nodes[id]={title:'Service '+r+'.'+c};row.push(id);}d.rows.push(row);}
@@ -70,4 +70,20 @@ test('ordinary diagrams can expand without named views, with a bounded fallback'
  await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();
  await expect(page.locator('.viewport-status')).toContainText('unavailable');expect((await rect(surface)).height).toBeGreaterThan(before.height+100);
  await page.getByRole('button',{name:'Exit expanded diagram view',exact:true}).click();expect((await rect(surface)).height).toBeCloseTo(before.height,0);
+});
+
+test('Explore height is scroll-independent, controls share the top row and canvas has quarter-screen margins',async({page,server})=>{
+ const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
+ const stage=page.locator('.explore-stage'),board=page.locator('.explore-board');
+ const initial=(await stage.boundingBox()).height;expect(initial).toBeGreaterThan(1000);
+ for(let n=0;n<2;n++){await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));await page.reload();await expect(stage).toBeVisible();expect((await stage.boundingBox()).height).toBeCloseTo(initial,0);}
+ const transport=await page.locator('.explore-player .step-transport').boundingBox(),chips=await page.locator('.explore-player .schips').boundingBox(),caption=await page.locator('.explore-player .stepline').boundingBox();
+ expect(chips.y).toBeCloseTo(transport.y,0);expect(chips.x).toBeGreaterThan(transport.x+transport.width);expect(caption.y).toBeGreaterThan(transport.y+transport.height);
+ expect((await page.locator('.explore-player').boundingBox()).height).toBeLessThan(190);
+ const margins=await board.evaluate(el=>{
+  const svg=el.querySelector('.boardcanvas>svg');el.scrollLeft=0;el.scrollTop=0;const start=svg.getBoundingClientRect(),b=el.getBoundingClientRect();
+  el.scrollLeft=el.scrollWidth;el.scrollTop=el.scrollHeight;const end=svg.getBoundingClientRect();
+  return {left:start.left-b.left,top:start.top-b.top,right:b.left+el.clientWidth-end.right,bottom:b.top+el.clientHeight-end.bottom,w:el.clientWidth,h:el.clientHeight};
+ });
+ expect(margins.left).toBeGreaterThan(margins.w*.24);expect(margins.right,JSON.stringify(margins)).toBeGreaterThan(margins.w*.24);expect(margins.top).toBeGreaterThan(margins.h*.24);expect(margins.bottom).toBeGreaterThan(margins.h*.24);
 });

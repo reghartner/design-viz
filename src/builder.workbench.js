@@ -677,7 +677,7 @@ function initWorkbenchBuilder(opts){
     formError('');
     return session.accept(plan,{
       snapshot:snapshot,
-      retention:{multi:true,addMode:!!interactions.adding()},
+      retention:{multi:true,addMode:!!interactions.adding(),exploreLayout:opt && opt.exploreLayout},
       afterRender:function(){
         if (opt && opt.after) opt.after(plan);
         rehighlight();syncBoardToSelectedStep();applyStepMarkers();
@@ -852,6 +852,9 @@ function initWorkbenchBuilder(opts){
     rename:function(section,name,id){
       return commitCascade(function(raw){return planSectionLayoutName(session.text(),raw,section,name,id);});
     },
+    setExploreLayout:function(section,id,value){
+      return commitCascade(function(raw){return planSectionExploreLayout(session.text(),raw,section,id,value);},{exploreLayout:{section:section,id:id}});
+    },
     setPresentation:function(section,id,value){
       return commitCascade(function(raw){return planSectionViewPresentation(session.text(),raw,section,id,value);});
     },
@@ -880,6 +883,7 @@ function initWorkbenchBuilder(opts){
   }
   function previewRendered(outcome){
     hideDiff();
+    if(outcome.ok && outcome.retained==='explore')return;
     if(addMenu)addMenu.refresh();
     if(outlineSearch)refreshOutline();
     if(!outcome.ok){

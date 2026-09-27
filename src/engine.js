@@ -1710,7 +1710,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       return false;
     },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
-    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,
+    setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
     destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 
@@ -1882,7 +1882,7 @@ function createBoardSizeControl(board, legend, label){
   function syncOverflow(){
     if (destroyed || !board.clientWidth) return;
     var scrollable = board.scrollWidth > board.clientWidth + 1;
-    if (scrollable && !wasScrollable) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
+    if (scrollable && !wasScrollable && !board.classList.contains('explore-board')) board.scrollLeft = (board.scrollWidth - board.clientWidth) / 2;
     board.classList.toggle('board-overflow', scrollable);
     pan.hidden = !scrollable; syncPan();
     wasScrollable = scrollable;

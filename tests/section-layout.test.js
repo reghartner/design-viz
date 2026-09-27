@@ -396,3 +396,31 @@ test('named layouts starter opens Standard and offers Explore for the same techn
   assert.equal(ctx.sectionLayoutDefinition(d,'service-flow').presentation,'explore');
   assert.equal(ctx.sectionLayoutDefinition(d,'service-flow').steps,undefined);
 });
+
+test('Explore defaults validate independently and remain view-local through duplicate, rename and delete',()=>{
+  const d=diagram();d.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[board,phone]}}];
+  const value={panels:[{panel:'home',x:.6,y:.05,w:.3,h:.45,stacked:false}],controls:{x:.05,y:.8,w:.7,h:.12},camera:{zoom:1.25,x:.6,y:.4}};
+  const text=JSON.stringify({page:{sections:[{diagram:d}]}} ,null,2),raw=JSON.parse(text);
+  const plan=ctx.planSectionExploreLayout(text,raw,0,'engineering',value);assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text),nd=next.page.sections[0].diagram;
+  assert.deepEqual(nd.layouts[0].exploreLayout,value);assert.deepEqual(nd.steps,d.steps);assert.deepEqual(nd.layouts[0].sectionLayout,d.layouts[0].sectionLayout);
+  assert.deepEqual(plain(ctx.diagramLayoutViews(nd)[0].exploreLayout),value);
+  const dup=ctx.planDuplicateSectionLayout(plan.text,next,0,'engineering');assert.ok(!dup.error,dup.error);
+  assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
+  const rename=ctx.planRenamePanel(dup.text,JSON.parse(dup.text),0,0,'house');assert.ok(!rename.error,rename.error);
+  assert.equal(JSON.parse(rename.text).page.sections[0].diagram.layouts[0].exploreLayout.panels[0].panel,'house');
+  const remove=ctx.planDeletePanel(rename.text,JSON.parse(rename.text),0,0);assert.ok(!remove.error,remove.error);
+  assert.deepEqual(JSON.parse(remove.text).page.sections[0].diagram.layouts.map(v=>v.exploreLayout.panels),[[],[]]);
+  const reset=ctx.planSectionExploreLayout(plan.text,next,0,'engineering',null);assert.ok(!reset.error,reset.error);assert.equal(JSON.parse(reset.text).page.sections[0].diagram.layouts[0].exploreLayout,undefined);
+  assert.ok(ctx.planSectionExploreLayout(text,raw,0,'missing',value).error);
+  d.layouts[0].presentation='standard';assert.ok(ctx.planSectionExploreLayout(JSON.stringify(d),d,0,'engineering',value).error);
+});
+test('malformed Explore geometry warns and falls back without hiding the view or altering source',()=>{
+  const d=diagram();const value={panels:[{panel:'home',x:0,y:0,w:.3,h:.4},{panel:'home',x:0,y:0,w:.3,h:.4},{panel:'missing',x:0,y:0,w:.3,h:.4},{panel:'phone',x:0,y:0,w:0,h:1}],controls:{x:0,y:0,w:1,h:2},camera:{zoom:0,x:0,y:0}};
+  d.layouts=[{id:'eng',name:'Eng',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
+  const source=JSON.stringify(d),warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);
+  assert.equal(warnings.length,5);assert.equal(JSON.stringify(d),source);
+  const view=ctx.diagramLayoutViews(d)[0];assert.equal(view.id,'eng');assert.equal(view.exploreLayout.panels.length,1);assert.equal(view.exploreLayout.camera,undefined);assert.equal(view.exploreLayout.controls,undefined);
+  assert.ok(ctx.planSectionExploreLayout(source,d,0,'eng',value).error);
+  for(const invalid of [null,[],42]){const w=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,invalid,w)),{});assert.equal(w.length,1);}
+});

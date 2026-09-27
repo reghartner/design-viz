@@ -9,11 +9,11 @@ import {repo} from '../helpers/prepare.mjs';
 const spot=(id,selector,diagramState={},extra={})=>({id,target:{selector,within:'section'},
   diagramState:{mode:'step',...diagramState},copy:{heading:id,body:'Try this control.'},...extra});
 const done={id:'finished',kind:'done',copy:{heading:'Finished',body:'Return to the diagram.'}};
-async function build(server,steps,{explore=true}={}){
+async function build(server,steps,{explore=true,exploreId="engineering"}={}){
   const tiles=[{x:0,y:0,w:8,h:18},{controls:'steps',x:0,y:14,w:8,h:4,attachTo:'diagram'},
     {panel:'status',x:8,y:0,w:4,h:6},{panel:'queue',x:8,y:6,w:4,h:6}];
   const layouts=[{id:'business',name:'Business view',presentation:'standard',sectionLayout:{default:tiles}}];
-  if(explore)layouts.push({id:'engineering',name:'Engineering view',presentation:'explore',sectionLayout:{default:tiles}},
+  if(explore)layouts.push({id:exploreId,name:'Engineering view',presentation:'explore',sectionLayout:{default:tiles}},
     {id:'other-engineering',name:'Other engineering view',presentation:'explore',sectionLayout:{default:tiles}});
   const spec={page:{title:'Tour controls',skin:'pastel',tour:{version:1,steps:[...steps,done]},sections:[{
     id:'flow',heading:'One service story',diagram:{view:'step',autoplay:false,nodes:{a:{title:'Camera'},b:{title:'Service'}},
@@ -263,4 +263,16 @@ test('the default tour keeps the Explore player and highlighted panel on screen 
   await expect.poll(()=>page.locator('.explore-window:visible').first().evaluate(el=>{
     const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth;
   })).toBe(true);
+});
+
+
+test('tour restoration preserves unvisited views with prototype-name IDs',async({page,server})=>{
+  const url=await build(server,[spot('Controls','.step-transport')],{exploreId:'constructor'});
+  await page.goto(url+'#tour=1');
+  await expect(heading(page)).toHaveText('Controls');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Engineering view',exact:true}).click();
+  await expect(panel(page,'status')).toBeVisible();
+  await page.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await expect(page.locator('.explore-zoom')).not.toHaveText('');
 });

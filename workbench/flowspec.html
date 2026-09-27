@@ -27281,7 +27281,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     },
     restoreReaderState:function(saved){
       if(!saved || retired)return;
-      leave();memories=JSON.parse(JSON.stringify(saved.memories));enter();
+      leave();
+      memories=Object.assign(Object.create(null),JSON.parse(JSON.stringify(saved.memories)));
+      Object.keys(memories).forEach(function(id){memories[id].panels=Object.assign(Object.create(null),memories[id].panels);});
+      enter();
       if(!saved.expanded){if(expanded)exitExpanded();}
       else if(saved.fullscreen){if(!isFullscreen())enterExpanded();else setExpanded(true);}
       else {

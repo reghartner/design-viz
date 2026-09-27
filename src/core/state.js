@@ -41,11 +41,16 @@ function foldPanelStates(d){
   var panels = d.panels || [];
   var steps = d.steps || [];
   var out = {};
+  /* Story time is resolved once per selected path; panels that declare a
+     storyTime facet derive time-dependent fields after their own fold. */
+  var story = storyTimeSequence(d);
   panels.forEach(function(panel){
     if (!panel || !panel.id) return;
     var descriptor = PanelRegistry.get(panel.type);
     var fold = descriptor && descriptor.fold || foldCommonPanelStates;
-    out[panel.id] = fold(panel, steps);
+    var states = fold(panel, steps);
+    if (descriptor && descriptor.storyTime) states = descriptor.storyTime(panel, states, steps, story, d) || states;
+    out[panel.id] = states;
   });
   return out;
 }

@@ -301,6 +301,7 @@
     },
     validatePatch:function (patch, path, panel, warnings) { clean(panel, patch, true, path, warnings); },
     fold:function (panel, steps) { return foldSanitizedPanelStates(panel, steps, function (raw, once) { return clean(panel, raw, once); }); },
+    storyTime:function (panel, states, steps, story) { return story ? storyTimeClockOverlay(panel, states, steps, story) : states; },
     authoring:{
       template:{title:'App screens', screens:[], frame:'phone', transition:'cut', initial:{screen:null}},
       setupFields:[['screens','jsonArr'],['frame','text'],['transition','text'],['initial','json']],

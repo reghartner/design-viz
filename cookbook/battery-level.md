@@ -95,3 +95,64 @@ Adaptation notes:
 - Two-year AA-cell architectures: patch `note` with the drain forecast per
   step ("~700 days left" → "~640 days") — the note row is fixed-height and
   never reflows the panel.
+
+## Drain from story time instead of typing every charge
+
+When the story happens over hours (an overnight camera, a weekend away),
+declare the diagram's `storyTime` and give steps a `time`. The battery then
+drains by elapsed hours × `drainPerHour`, charges by × `chargePerHour` while
+its trend is `charging`, and each `drain` patch subtracts a one-time cost.
+Phone, device-app and app-screens clocks follow the same step time. Type a
+`charge` only to anchor a known reading. See [story time](../docs/step-time.md).
+
+Ask for the story's span first (start, and end or duration), then the
+device's drain and charge rates. Rates must come from the source or the user.
+The built-in 1 and 20 %/h are placeholders, not device facts: if you use them
+or any estimate, say so in the ledger and on the page, as this recipe does.
+
+Complete working spec:
+
+```json
+{
+  "page": {
+    "title": "Recipe — battery drain from story time",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "A weekend away on one charge",
+        "text": ["The camera starts Friday evening at 72 percent, drains 0.6 percent an hour, and spends extra charge on each recorded clip.", "Drain and charge rates are illustrative estimates, not measured device behavior."],
+        "diagram": {
+          "view": "step",
+          "storyTime": {"start": "2026-10-02T18:00", "span": "2d", "clock": "12h", "date": "short"},
+          "deviceDefaults": {"battery": {"drainPerHour": 0.6, "chargePerHour": 8}},
+          "nodes": {
+            "cam": {"title": "Driveway camera", "sub": "battery", "icon": "camera", "tint": "dev"},
+            "phone": {"title": "Phone", "sub": "home app", "icon": "phone", "tint": "cmd"}
+          },
+          "rows": [["cam", "phone"]],
+          "edges": [{"from": "cam", "to": "phone", "kind": "https", "label": "alert"}],
+          "panels": [
+            {"id": "batt", "type": "battery", "title": "Camera battery", "low": 20, "crit": 10,
+             "initial": {"charge": 72, "source": "cells", "trend": "idle"}},
+            {"id": "phone", "type": "phone", "title": "Phone"}
+          ],
+          "steps": [
+            {"nodes": ["cam"], "text": "Friday 6 PM: the house is empty."},
+            {"time": "+14h", "edge": "cam->phone", "text": "Saturday 8 AM: a delivery; the clip costs 2 percent.",
+             "panels": {"batt": {"drain": 2}}},
+            {"time": "+1d", "nodes": ["cam"], "text": "Sunday 8 AM: the fuel gauge reports 49 percent.",
+             "panels": {"batt": {"charge": 49, "note": "gauge reading"}}},
+            {"time": "18:00", "nodes": ["cam"], "text": "Sunday 6 PM: the owners return."}
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+- The phone never gets a `clock` or `date`; it shows Fri, Oct 2 · 6:00, then
+  Sat · 8:00, Sun · 8:00 and Sun · 6:00 from the step times.
+- Charge: 72 → 72 − 14 × 0.6 − 2 = 61.6 (shows 62%) → anchored 49 → 49 − 10 ×
+  0.6 = 43.
+- `drainPerHour: 0` on a panel (for wired or PoE power) keeps it flat.

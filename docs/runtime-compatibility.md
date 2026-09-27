@@ -45,8 +45,8 @@ use a new release number when compatibility changes.
 
 Workbench **Save**, **Export**, **Export for Confluence**, **Copy JSON for
 Confluence**, and **Propose spec update** stamp their output snapshots. They
-detect panel types, alternate paths, failed communications, custom/named layouts
-and view-specific step stops, including diagrams in tabs. The live JSON editor
+detect panel types, alternate paths, failed communications, story time and
+battery drain, custom/named layouts and view-specific step stops, including diagrams in tabs. The live JSON editor
 and undo history are preserved. Incomplete JSON can still be saved as-is.
 
 Declared minimums and feature IDs are retained, including ones unknown to an

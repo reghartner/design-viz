@@ -45,6 +45,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | a temperature readout with warning / shutdown thresholds | `temperature.md` |
 | a hot or frozen Home device, charging pause, camera unavailability and thermal recovery | [thermal-protection.md](thermal-protection.md) — complete interactive teaching flow |
 | a battery / charge level that drains and raises a low event | `battery-level.md` |
+| clocks, dates and battery drain that follow the story's time (overnight, a weekend) | [battery-level.md](battery-level.md#drain-from-story-time-instead-of-typing-every-charge) and [story time](../docs/step-time.md) |
 | motion detection — sensing geometry, an approach, and an authored event | `motion-detection.md` |
 | Radar range, zones, targets, occupancy, or manual alert transitions | `radar-range.md` |
 | Wi-Fi/link health, retries, or a weak connection | `link-health.md` |

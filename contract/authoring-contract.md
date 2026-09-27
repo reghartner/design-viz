@@ -660,7 +660,8 @@ perspectives" of one timeline). Types:
   by ID; omission carries, null clears, and unknown IDs warn and are ignored.
   `enterOnce: {"screen":"error"}` selects a screen for that beat only.
   Optional `initial.clock`/`initial.date` and step `clock`/`date` strings show
-  authored time and date together on one status-bar line inside the phone frame.
+  authored time and date together on one status-bar line inside the phone frame
+  (with the diagram's `storyTime`, the step's story time fills both).
   Omission inherits; an empty string hides that field. `frame: "none"` hides the bar.
   Export app content without a baked-in status bar when using this native header;
   imported images are preserved and their pixels cannot be edited as text.
@@ -1027,6 +1028,12 @@ perspectives" of one timeline). Types:
   validator warning and render as NO DATA; a no-data step leaves a gap in
   the sparkline. Use it to argue an energy budget: solar input vs event
   load, a two-year drain forecast, or a cold snap limiting charge.
+  With the diagram's `storyTime`, the charge follows elapsed step time:
+  optional `drainPerHour`/`chargePerHour` (percent per hour, ≥ 0) override
+  `deviceDefaults.battery` and the built-in placeholder 1/20 (not device facts;
+  take rates from the source or label them as estimates); patch `{"drain": 1.5}` for
+  extra drain at a step and `charge` only to anchor a known reading (see
+  "Story time and device constants").
 - `buffer` — a segmented buffer strip for pre-roll rings, store-and-forward
   queues, and storage rotation: `{"id":"ring","type":"buffer","title":
   "Pre-roll ring","segments":12,"capacity":"6 s"}`. Patched via
@@ -1378,7 +1385,8 @@ perspectives" of one timeline). Types:
   Up to three cards are shown with a remaining-count indicator. Step jumps and
   alternate paths recompute the stack from initial state. Notifications need no
   sources and can be used without data tiles.
-  Optional `clock`, `date` and `note` strings carry forward. `initial.date`
+  Optional `clock`, `date` and `note` strings carry forward (with the
+  diagram's `storyTime`, clock and date follow the step instead). `initial.date`
   or step `date` shows authored date text in the status bar on both Home and App
   screens. Omission inherits; `date: ""` hides it. Without the source map,
   the note appears inside the app. Changed fields show an
@@ -1393,7 +1401,8 @@ perspectives" of one timeline). Types:
 - `phone` — a small generic smartphone frame for flows that end by notifying
   a resident's phone: `{"id":"resident","type":"phone","title":"Resident
   phone","initial":{"clock":"9:41"}}`. `clock` is optional status-bar time
-  text; it must be a string and is rendered verbatim. Optional `initial.date`
+  text; it must be a string and is rendered verbatim. With the diagram's
+  `storyTime`, omit `clock`/`date`: the phone shows each step's story time. Optional `initial.date`
   and step `date` strings add a status-bar date (for example `"Thu, Sep 24"`).
   Omission inherits; `date: ""` hides it. Patch with `{"notify":
   {"app":"Homestead","title":"Front entry","text":"A visitor was
@@ -1480,6 +1489,14 @@ An ordered array walking the flow. Each step:
   keep their opacity, and the current-step ring remains visible. Use a caption
   to explain each phase, so color is not the only cue. See
   [step colors](../docs/step-colors.md) for editor controls and an example.
+- `time` — optional **story time** for this step (requires the diagram's
+  `storyTime`, see "Story time and device constants"): relative to the
+  previous step on the same path (`"+3h19m"`, `"+45m"`, `"+1d2h"`, `"+90s"`),
+  absolute (`"2026-09-25T06:50"`), or a time of day (`"06:50"` = the next time
+  the clock reads 06:50, rolling over midnight). Omitted, the step keeps the
+  previous step's time; time never moves unless a step moves it. Every phone,
+  device-app and app-screens clock and date follows it, and batteries drain
+  with the elapsed hours. Earlier than the previous step or unparsable warns.
 - `lane` — optional lane tag (declare colors in `page.lanes`).
 - `text` — caption for the step (shown during click-through playback).
   Supports the prose markup and fenced code blocks described above. Prefer a
@@ -1500,6 +1517,54 @@ sequence should have steps; a pure topology diagram may omit them (then use
 
 Reserved per-step fields you may see but should only emit if asked: `sticky`,
 `packets`. Stable `id` values are required for steps referenced by paths.
+
+### Story time and device constants
+
+Time is a property of the step. Declare the story's clock once on the diagram
+and let steps move it; never type per-panel clocks. **The first time question
+is the story's span: its start date and time, and its end (or how long it
+lasts).** Then ask for each battery device's drain and charge rates.
+
+```json
+"storyTime": {"start": "2026-09-24T22:30", "end": "2026-09-25T07:30", "clock": "12h", "date": "short"},
+"deviceDefaults": {"battery": {"drainPerHour": 0.5, "chargePerHour": 12}}
+```
+
+- `storyTime.start` (required, `YYYY-MM-DDTHH:MM`, optional `:SS`) is the time
+  before the first step. `end` (date-time) or `span` (`"9h"`, `"1d2h"`) is the
+  expected end; later steps warn. `clock`: `"12h"` (default, `10:30`) or
+  `"24h"` (`22:30`). `date`: `"short"` (default, `Thu, Sep 24`), `"long"`
+  (`Thursday, September 24`), `"iso"` (`2026-09-24`) or `"none"`. Times are
+  floating local wall-clock times: no time zones or daylight saving.
+- Steps set `time` (see "steps"). Paths fold separately: a shared step with a
+  relative time resolves against the previous step on each path; use an
+  absolute time when a shared beat must show one clock.
+- `phone`, `deviceapp` and `appscreens` show the step time as `clock`/`date`.
+  An explicit `clock`/`date` (initial or patch; `""` hides) still wins at its
+  step and stays pinned until a later step moves story time; `enterOnce`
+  values last one step.
+- Battery constants resolve panel `drainPerHour`/`chargePerHour` → diagram
+  `deviceDefaults.battery` → built-in `1`/`20` (percent per hour, numbers ≥ 0).
+  **The built-in values are placeholders, not device facts.** Take rates from
+  the source document or the user. If you rely on the built-in defaults (or
+  any estimate), say so in the ledger and on the page (for example in the
+  section text or the battery `note`: "illustrative drain estimate"). Drift
+  still runs with the placeholders; they exist so a sketch moves, not to
+  claim how a real device behaves.
+  Between two steps the charge changes by elapsed hours × `chargePerHour`
+  when the trend before the step was `charging`, else × −`drainPerHour`,
+  clamped 0–100. A battery patch `{"drain": 1}` subtracts 1 more percent at
+  that step (a recorded clip, a firmware update); it is never carried. A
+  `charge` patch is an anchor: shown exactly, with drift continuing from it.
+  Values are kept to two decimals; the readout shows whole percent.
+- Without `storyTime`, nothing is automatic (only an explicit `drain`
+  applies); existing specs render unchanged. Diagrams using story time or
+  `drain` declare the `flow.story-time` compatibility feature.
+- `deviceapp` battery cards are what the app *reports*; patch them explicitly
+  at the step the app receives a report.
+
+See [story time](../docs/step-time.md) for the full rules and
+`examples/story-time/story-time.spec.json` for an overnight battery camera.
 
 ### paths — alternate outcomes on the same board
 
@@ -1704,6 +1769,12 @@ contract stays the authority; a recipe shows the working subset for one task.
 
    One to four panels per diagram; each panel must be patched by at least one
    step or it is dead weight.
+8. The story happens at a time (a phone clock, an overnight drain) → ask for
+   the story's span (start date and time, and end or duration), declare
+   `storyTime`, and give steps a `time` instead of patching clocks and dates
+   per panel. Take battery drain/charge rates from the source or the user; if
+   none are given, label the built-in placeholder rates as an illustrative
+   estimate in the ledger and on the page.
 
 ## Complete example
 

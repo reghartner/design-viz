@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
-  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set();
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=true;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,url:''};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
@@ -658,7 +658,7 @@ function stepForm(val, ctx){
         return commitCascade(function(raw){return planRenameStep(session.text(),raw,t.section,t.index,v);});
       },{placeholder:'optional stable-step-id'})),
       frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
-    ];
+    ].concat(stepTimeRows(val,ctx,t));
     var colorBox=document.createElement('div');colorBox.className='step-color-control';
     function commitColor(value){
       if(value!=null && !stepCircleColor({color:value})){formError('Use a color like #38bdf8 or #abc.');return false;}
@@ -1494,6 +1494,97 @@ function contractForm(val,ctx){
       frowBlock('Section',actionButton('All contract blocks',function(){selectTarget({kind:'section',section:t.section,el:findTargetEl({kind:'section',section:t.section})},false);}))
     ];
   }
+/* Diagram-level story time and device constants (docs/step-time.md). Each
+   control rewrites one declaration object, so partial edits never leave
+   stray keys behind. */
+function storyTimeGroup(diagram,target){
+    var box=document.createElement('details');box.className='patchedit story-time-group';box.open=OPEN_STORY_TIME;
+    formLife.listen(box,'toggle',function(ev){if(ev.target===box && guide.contains(box))OPEN_STORY_TIME=box.open;});
+    var summary=document.createElement('summary');summary.textContent='Story time and device defaults';box.appendChild(summary);
+    var story=specObject(diagram.storyTime)?diagram.storyTime:{},config=storyTimeConfig(diagram);
+    function commitDiagram(key,update){
+      return commitCascade(function(raw){
+        var got=builderDiagram(session.text(),raw,target.section);if(got.error)return got;
+        var next=update(specObject(got.d[key])?JSON.parse(JSON.stringify(got.d[key])):{});
+        return planSetField(session.text(),raw,got.path,key,next==null?null:JSON.stringify(next));
+      },{after:refreshFormSoon});
+    }
+    function setStory(key,value){
+      return commitDiagram('storyTime',function(next){
+        if(value==null)delete next[key];else next[key]=value;
+        return key==='start' && value==null?null:(Object.keys(next).length?next:null);
+      });
+    }
+    var start=textControl(story.start,function(v){
+      if(v!=null && storyTimeAbsolute(v)==null){formError('Use a start such as 2026-09-24T22:30.');return false;}
+      return setStory('start',v);
+    },{placeholder:'2026-09-24T22:30'});
+    start.setAttribute('aria-label','Story start');box.appendChild(frow('Start',start));
+    var end=textControl(story.end,function(v){
+      if(v!=null && storyTimeAbsolute(v)==null){formError('Use an end such as 2026-09-25T07:00.');return false;}
+      if(v!=null && config && storyTimeAbsolute(v)<=config.start){formError('The end must be after the start.');return false;}
+      return setStory('end',v);
+    },{placeholder:'Optional · 2026-09-25T07:00'});
+    end.setAttribute('aria-label','Story end');end.disabled=!config;box.appendChild(frow('End',end));
+    var clock=selectControl(STORY_CLOCK_FORMATS,config?config.clock:'12h',function(v){return setStory('clock',v==='12h'?null:v);});
+    Array.from(clock.options).forEach(function(o){o.textContent=o.value==='24h'?'24-hour · 22:30':'12-hour · 10:30';});
+    clock.setAttribute('aria-label','Clock format');clock.disabled=!config;box.appendChild(frow('Clock',clock));
+    var date=selectControl(STORY_DATE_FORMATS,config?config.date:'short',function(v){return setStory('date',v==='short'?null:v);});
+    Array.from(date.options).forEach(function(o){o.textContent={short:'Short · Thu, Sep 24',long:'Long · Thursday, September 24',iso:'ISO · 2026-09-24',none:'No date'}[o.value];});
+    date.setAttribute('aria-label','Date format');date.disabled=!config;box.appendChild(frow('Date',date));
+    var help=document.createElement('p');help.className='fnote';
+    help.textContent=config?'Steps set their time in the step inspector (+15m, 23:10 or a date-time); phone, device app and app screen clocks follow it, and batteries drain with elapsed time. Clear Start to turn story time off.':
+      'Set a start to give the story a clock. Steps then move time forward; phone, device app and app screen clocks follow it and batteries drain with elapsed time.';
+    box.appendChild(help);
+    var battery=specObject(diagram.deviceDefaults) && specObject(diagram.deviceDefaults.battery)?diagram.deviceDefaults.battery:{};
+    var rateHeading=document.createElement('p');rateHeading.className='fnote';rateHeading.textContent='Battery defaults for this diagram (percent per hour):';
+    box.appendChild(rateHeading);
+    [['drainPerHour','Battery drain % per hour','Drain'],['chargePerHour','Battery charge % per hour','Charge']].forEach(function(pair){
+      var input=numberControl(battery[pair[0]],function(v){
+        if(v!=null && v<0){formError(pair[1]+' must be 0 or more.');return false;}
+        return commitDiagram('deviceDefaults',function(next){
+          var rates=specObject(next.battery)?next.battery:{};
+          if(v==null)delete rates[pair[0]];else rates[pair[0]]=v;
+          if(Object.keys(rates).length)next.battery=rates;else delete next.battery;
+          return Object.keys(next).length?next:null;
+        });
+      });
+      input.classList.remove('fnum');input.placeholder='Built-in default · '+STORY_BATTERY_DEFAULTS[pair[0]]+' %/h (placeholder)';input.setAttribute('aria-label',pair[1]);
+      box.appendChild(frow(pair[2]+' %/h',input));
+    });
+    var rateHelp=document.createElement('p');rateHelp.className='fnote';
+    rateHelp.textContent='Take rates from the device source or its owner. The built-in values are placeholders, not device facts: if you keep them, label the battery as an illustrative estimate on the page. Battery panels use their own rates first, then these, then the built-in placeholders. New battery panels start with these diagram rates.';
+    box.appendChild(rateHelp);
+    return box;
+  }
+
+/* The step's story time plus its resolved value on the selected path. */
+function stepTimeRows(val,ctx,t){
+    var input=textControl(val.time,function(v){
+      if(v!=null && !storyTimeParsable(v)){formError('Use +15m, 23:10 or 2026-09-24T23:10 (years 100–9999).');return false;}
+      var ok=commitSimple('time',v==null?null:JSON.stringify(v));
+      if(ok)refreshFormSoon();
+      return ok;
+    },{placeholder:'Keep previous · +15m, 23:10, 2026-09-24T23:10'});
+    input.setAttribute('aria-label','Step time');
+    var note=document.createElement('p');note.className='fnote step-time-note';
+    var config=storyTimeConfig(ctx.diagram);
+    if(!config){
+      note.textContent='Set a story start in the section inspector to give steps a time.';input.disabled=val.time==null;
+    }else{
+      var sp=stepperFor(t.section),paths=diagramPathList(ctx.diagram);
+      var route=paths.find(function(p){return sp && p.id===sp.path() && p.indices.indexOf(t.index)>=0;}) ||
+        paths.find(function(p){return p.indices.indexOf(t.index)>=0;});
+      if(!route)note.textContent='This step is not on a path, so it has no story time.';
+      else{
+        var story=storyTimeSequence(diagramForPath(ctx.diagram,route.id),config),at=route.indices.indexOf(t.index);
+        note.textContent='Shows '+storyTimeLabel(story.times[at],config)+(paths.length>1?' on '+route.label:'')+
+          (story.times[at]===story.previous[at]?' · unchanged from the previous step':'')+'.';
+      }
+    }
+    return [frow('Story time',input),note];
+  }
+
 function sectionForm(val, ctx){
     ensureAccentDatalist();
     var target=session.target;
@@ -1515,6 +1606,7 @@ function sectionForm(val, ctx){
       help.textContent='Lanes reserve tracks for connections between rows. Requires 1–5 unstacked nodes per row, no floats or self-loops. Applies to every view of this diagram; story lane labels are separate.';
       help.textContent+=' Unsupported layouts use curves.';
       routingRows.push(frow('Edge routing',routing),help);
+      routingRows.push(storyTimeGroup(ctx.diagram,target));
     }
     if(builderTargetPath(parseEditor().raw,target).length===0)return routingRows;
     return [

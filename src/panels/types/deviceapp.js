@@ -213,6 +213,9 @@ PanelRegistry.extend('deviceapp', {
     deviceAppPatchWarnings(patch, path, panel, warnings);
   },
   fold: foldDeviceAppStates,
+  storyTime: function (panel, states, steps, story) {
+    return story ? storyTimeClockOverlay(panel, states, steps, story) : states;
+  },
 });
 
 /* deviceapp panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
@@ -652,6 +655,11 @@ PanelRegistry.extend('deviceapp', {
         firmware: { value: 'v2.4.1', status: 'ready' },
         clock: '9:41',
       },
+    },
+    /* With story time the step clock drives the status bar. */
+    instantiate: function (panel, diagram) {
+      if (storyTimeConfig(diagram) && panel.initial) delete panel.initial.clock;
+      return panel;
     },
     initialFields: true,
     setupFields: [

@@ -10,7 +10,9 @@ then covers the workspace, rows and free placement, quick connections, step
 playback, alternate paths, panels, Home editing, named views, catalogs and code
 evidence, copying, sharing, and working with an agent. The **Alternate outcomes**
 chapter illustrates a shared prefix, independent failure/recovery beats, and a
-shared suffix, and explains when to make a step independent.
+shared suffix, and explains when to make a step independent. **Steps & playback**
+explains story time: the section's start and formats, each step's time, and
+battery drain rates (see [story time](step-time.md)).
 
 Choose a chapter to jump within the guide. **Close** or Escape returns to your
 previous work. Reading does not change the spec, selection, undo history, or

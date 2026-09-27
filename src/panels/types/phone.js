@@ -80,6 +80,9 @@ PanelRegistry.extend('phone', {
     phonePatchWarnings(patch, path, warnings, true);
   },
   fold: foldPhoneStates,
+  storyTime: function (panel, states, steps, story) {
+    return story ? storyTimeClockOverlay(panel, states, steps, story) : states;
+  },
 });
 
 /* phone panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
@@ -577,6 +580,11 @@ PanelRegistry.extend('phone', {
     initialFields: true,
     transientFields: ['audio'],
     template: { title: 'Phone', initial: { clock: '9:41' } },
+    /* With story time the step clock drives the status bar. */
+    instantiate: function (panel, diagram) {
+      if (storyTimeConfig(diagram) && panel.initial) delete panel.initial.clock;
+      return panel;
+    },
     setupFields: [
       ['initial', 'json'],
     ],

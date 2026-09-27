@@ -81,6 +81,8 @@ function planAddPanel(text, raw, sectionIdx, type){
   var tpl = builderClone(PANEL_TEMPLATES[tplKey]);
   var entry = {id: id, type: tplKey};
   Object.keys(tpl).forEach(function(k){ entry[k] = tpl[k]; });
+  var instantiate = panelAuthoring(tplKey).instantiate;
+  if (instantiate) entry = instantiate(entry, got.d) || entry;
   var r = jsonInsertListItemOrCreate(text, got.path, 'panels', JSON.stringify(entry, null, 2));
   if (!r) return {error: 'could not edit panels in the editor text'};
   return {text: r.text, start: r.start, end: r.end, kind: 'panel',

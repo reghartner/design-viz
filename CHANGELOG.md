@@ -1,5 +1,25 @@
 # Changelog
 
+## Story time, step clocks and battery drain (2026-09-27)
+
+- A diagram can declare `storyTime` (start, optional end or span, 12/24-hour
+  clock and date format), and each step may set `time` as `+3h19m`, `06:50` or
+  `2026-09-25T06:50`. Steps without a time keep the previous time; each path
+  keeps its own sequence. Phone, Device app and App screens clocks and dates
+  follow the step automatically; explicit panel values still win at their step.
+- Battery panels drain with elapsed story time and charge while `charging`,
+  using panel `drainPerHour`/`chargePerHour`, diagram `deviceDefaults.battery`
+  or built-in placeholders (1 and 20 percent per hour), which are not device
+  facts: take rates from the source or label them as estimates. A step's
+  `drain` adds a one-time cost; `charge` anchors a known reading.
+- The validator warns about unparsable times, time going backward on a path and
+  steps after the story end. Diagrams using the feature declare
+  `flow.story-time`, so older viewers show an upgrade notice. Specs without
+  `storyTime` render exactly as before.
+- The workbench adds **Story time and device defaults** to the section
+  inspector, **Story time** with the resolved time to the step inspector, battery
+  rate fields and **Extra drain %**. See [story time](docs/step-time.md).
+
 ## Every step keeps its number on shared edges (2026-09-27)
 
 - Steps that start on the same edge (repeated heartbeats, retries, daily

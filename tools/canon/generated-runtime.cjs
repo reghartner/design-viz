@@ -16,7 +16,7 @@ var FlowviewCompatibility = (function(){
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
-    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding' };
+    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -90,6 +90,11 @@ var FlowviewCompatibility = (function(){
           var patches=s && (object(s.panels)?s.panels:s.patch);
           if(object(patches) && Object.prototype.hasOwnProperty.call(patches,p.id))patch(patches[p.id]);
         });
+      });
+      if(d.storyTime!=null)used['flow.story-time']=true;
+      (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
+        if(!p || p.type!=='battery')return;
+        if((Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (object(s.panels)?s.panels:s.patch);return object(patches) && object(patches[p.id]) && Object.prototype.hasOwnProperty.call(patches[p.id],'drain');}))used['flow.story-time']=true;
       });
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.color!=null;}))used['flow.step-colors']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.panelVisibility!=null;}))used['flow.panel-visibility']=true;
@@ -864,6 +869,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!d) return;
   var DP = P + '.diagram';
   validatePaths(d, DP, errors);
+  storyTimeWarnings(d, DP, warnings);
   sectionLayoutWarnings(d, DP, warnings);
   if(d.layoutName != null && (typeof d.layoutName!=='string' || !d.layoutName.trim() || d.layoutName.trim().length>40))
     warnings.push(DP+'.layoutName: use a nonempty layout name of up to 40 characters');
@@ -1002,8 +1008,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
         warnings.push(DP + '.steps[' + ti + '].id: duplicate step id "' + st.id + '" — deep links resolve to the first');
       else stepIds[st.id] = true;
     }
-    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch && !specObject(visibility))
-      warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, panels, tone, or panelVisibility — give it something to show');
+    if (!keys.length && !Object.keys(failures).length && !nds.length && !patch && !tonePatch && !specObject(visibility) && !(st && st.time != null))
+      warnings.push(DP + '.steps[' + ti + ']: no edge/edges, nodes, panels, tone, panelVisibility, or time — give it something to show');
     keys.forEach(function(k){
       if (!edgeKeys[k]) warnings.push(DP + '.steps[' + ti + ']: "' + k + '" matches no edge (format "from->to") — skipped');
     });
@@ -1747,6 +1753,272 @@ function pathTimelineGraph(paths,shownPaths){
   }
   return {nodes:nodes,edges:edges,blocks:blocks,hasShared:nodes.some(function(node){return node.shared;}),columns:columns};
 }
+/* ---- src/core/story-time.js ---- */
+/* Story time: a diagram-level clock that steps move and time-bearing panels
+   inherit. Pure and DOM-free. Times are floating local wall-clock values kept
+   as UTC milliseconds so calendar arithmetic never sees time zones or DST.
+   Uses specObject() and diagramPathList() at call time. See docs/step-time.md. */
+
+var STORY_CLOCK_FORMATS = ['12h', '24h'];
+var STORY_DATE_FORMATS = ['short', 'long', 'iso', 'none'];
+var STORY_BATTERY_DEFAULTS = {drainPerHour: 1, chargePerHour: 20};
+var STORY_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+var STORY_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+  'August', 'September', 'October', 'November', 'December'];
+
+/* Supported story instants: years 100 through 9999. Date.UTC maps years
+   0–99 to 1900–1999, and hostile durations can overflow; both are rejected
+   (callers warn and keep the previous time), never thrown. */
+var STORY_TIME_MIN = Date.UTC(100, 0, 1);
+var STORY_TIME_MAX = Date.UTC(9999, 11, 31, 23, 59, 59);
+function storyTimeInRange(ms){
+  return typeof ms === 'number' && isFinite(ms) && ms >= STORY_TIME_MIN && ms <= STORY_TIME_MAX;
+}
+function storyTimeAbsolute(value){
+  if (typeof value !== 'string') return null;
+  var m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value.trim());
+  if (!m) return null;
+  var y = +m[1], mo = +m[2], d = +m[3], h = +m[4], mi = +m[5], s = m[6] == null ? 0 : +m[6];
+  if (y < 100 || mo < 1 || mo > 12 || d < 1 || h > 23 || mi > 59 || s > 59) return null;
+  var ms = Date.UTC(y, mo - 1, d, h, mi, s);
+  return new Date(ms).getUTCDate() === d && storyTimeInRange(ms) ? ms : null;
+}
+/* "+1d2h30m15s": ordered units, at least one, whole numbers. Durations
+   longer than the supported range (or overflowing to Infinity) are null. */
+function storyTimeDuration(value, signed){
+  if (typeof value !== 'string') return null;
+  var m = (signed ? /^\+(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/ : /^(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/).exec(value.trim());
+  if (!m || (m[1] == null && m[2] == null && m[3] == null && m[4] == null)) return null;
+  var ms = (((+(m[1] || 0) * 24 + +(m[2] || 0)) * 60 + +(m[3] || 0)) * 60 + +(m[4] || 0)) * 1000;
+  return isFinite(ms) && ms <= STORY_TIME_MAX - STORY_TIME_MIN ? ms : null;
+}
+/* Recognized forms, independent of the previous time. */
+function storyTimeParsable(value){
+  if (typeof value !== 'string') return false;
+  if (storyTimeDuration(value, true) != null || storyTimeAbsolute(value) != null) return true;
+  var m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value.trim());
+  return !!m && +m[1] <= 23 && +m[2] <= 59 && (m[3] == null || +m[3] <= 59);
+}
+/* Resolve one step's time against the previous time. Returns null when the
+   value is not a recognized form or lands outside the supported range (the
+   caller keeps the previous time). */
+function storyTimeResolve(value, previous){
+  if (typeof value !== 'string' || !storyTimeInRange(previous)) return null;
+  var out = null, rel = storyTimeDuration(value, true);
+  if (rel != null) out = previous + rel;
+  else {
+    out = storyTimeAbsolute(value);
+    if (out == null){
+      var m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value.trim());
+      if (!m || +m[1] > 23 || +m[2] > 59 || (m[3] != null && +m[3] > 59)) return null;
+      var day = 86400000, of = ((+m[1] * 60 + +m[2]) * 60 + +(m[3] || 0)) * 1000;
+      var base = Math.floor(previous / day) * day + of;
+      out = base >= previous ? base : base + day;
+    }
+  }
+  return storyTimeInRange(out) ? out : null;
+}
+function storyTimeSpan(value){
+  var ms = storyTimeDuration(value, false);
+  return ms != null && ms > 0 ? ms : null;
+}
+
+/* The normalized diagram-level declaration, or null when story time is off. */
+function storyTimeConfig(d){
+  var raw = d && d.storyTime;
+  if (!specObject(raw)) return null;
+  var start = storyTimeAbsolute(raw.start);
+  if (start == null) return null;
+  var end = storyTimeAbsolute(raw.end), span = storyTimeSpan(raw.span);
+  if (end == null && span != null && storyTimeInRange(start + span)) end = start + span;
+  if (end != null && end <= start) end = null;
+  return {
+    start: start, end: end,
+    clock: STORY_CLOCK_FORMATS.indexOf(raw.clock) >= 0 ? raw.clock : '12h',
+    date: STORY_DATE_FORMATS.indexOf(raw.date) >= 0 ? raw.date : 'short'
+  };
+}
+
+/* Per-step times for the (already path-projected) steps. `times[i]` is the
+   story time at step i; `previous[i]` the time before it (start for step 0). */
+function storyTimeSequence(d, config){
+  config = config || storyTimeConfig(d);
+  if (!config) return null;
+  var now = config.start, times = [], previous = [], rejected = [];
+  (Array.isArray(d.steps) ? d.steps : []).forEach(function(st){
+    previous.push(now);
+    var next = st && st.time != null ? storyTimeResolve(st.time, now) : null;
+    rejected.push(st != null && st.time != null && next == null);
+    if (next != null) now = next;
+    times.push(now);
+  });
+  return {config: config, times: times, previous: previous, rejected: rejected};
+}
+
+function storyTimeParts(ms){
+  var t = new Date(ms);
+  return {y: t.getUTCFullYear(), mo: t.getUTCMonth(), d: t.getUTCDate(), wd: t.getUTCDay(),
+    h: t.getUTCHours(), mi: t.getUTCMinutes()};
+}
+function storyTimePad(n){ return (n < 10 ? '0' : '') + n; }
+function storyTimeClock(ms, format){
+  var p = storyTimeParts(ms);
+  return (format === '24h' ? storyTimePad(p.h) : String(p.h % 12 || 12)) + ':' + storyTimePad(p.mi);
+}
+function storyTimeDate(ms, format){
+  var p = storyTimeParts(ms);
+  if (format === 'none') return null;
+  if (format === 'iso') return p.y + '-' + storyTimePad(p.mo + 1) + '-' + storyTimePad(p.d);
+  if (format === 'long') return STORY_DAYS[p.wd] + ', ' + STORY_MONTHS[p.mo] + ' ' + p.d;
+  return STORY_DAYS[p.wd].slice(0, 3) + ', ' + STORY_MONTHS[p.mo].slice(0, 3) + ' ' + p.d;
+}
+/* An empty story still previews one snapshot: the start. */
+function storyTimeAt(story, i){
+  return i < story.times.length ? {time: story.times[i], previous: story.previous[i]}
+    : {time: story.config.start, previous: story.config.start};
+}
+/* Author-facing summary, e.g. "Thu, Sep 24 · 22:30". */
+function storyTimeLabel(ms, config){
+  config = config || {};
+  var date = storyTimeDate(ms, config.date === 'none' || config.date == null ? 'short' : config.date);
+  return date + ' · ' + storyTimeClock(ms, config.clock || '12h') + (config.clock === '24h' ? '' : (storyTimeParts(ms).h < 12 ? ' AM' : ' PM'));
+}
+
+/* Derived-field provenance for inspectors. Snapshots are fresh per fold, so a
+   WeakMap attaches metadata without changing any snapshot's shape. */
+var STORY_TIME_DERIVED = typeof WeakMap === 'function' ? new WeakMap() : null;
+function storyTimeMark(snapshot, key, kind){
+  if (!STORY_TIME_DERIVED || !snapshot || typeof snapshot !== 'object') return;
+  var marks = STORY_TIME_DERIVED.get(snapshot);
+  if (!marks){ marks = Object.create(null); STORY_TIME_DERIVED.set(snapshot, marks); }
+  marks[key] = kind;
+}
+function storyTimeDerived(snapshot, key){
+  var marks = STORY_TIME_DERIVED && snapshot && typeof snapshot === 'object' ? STORY_TIME_DERIVED.get(snapshot) : null;
+  return marks && marks[key] || null;
+}
+
+/* Shared clock/date overlay for time-bearing panels. Explicit values pin a
+   field until a later step moves story time; enterOnce values last one step. */
+function storyTimeClockOverlay(panel, states, steps, story){
+  var own = function(o, k){ return specObject(o) && Object.prototype.hasOwnProperty.call(o, k) && typeof o[k] === 'string'; };
+  var pinned = {clock: false, date: false};
+  ['clock', 'date'].forEach(function(key){ if (own(panel.initial, key)) pinned[key] = true; });
+  states.forEach(function(state, i){
+    if (!state) return;
+    var at = storyTimeAt(story, i);
+    var patch = (stepPanelPatch(steps[i]) || {})[panel.id], once = specObject(patch) ? patch.enterOnce : null;
+    if (at.time !== at.previous) pinned = {clock: false, date: false};
+    ['clock', 'date'].forEach(function(key){
+      if (own(patch, key)) pinned[key] = true;
+      if (pinned[key] || own(once, key)) return;
+      var value = key === 'clock' ? storyTimeClock(at.time, story.config.clock) : storyTimeDate(at.time, story.config.date);
+      if (value == null) delete state[key];
+      else { state[key] = value; storyTimeMark(state, key, 'story'); }
+    });
+  });
+  return states;
+}
+
+function storyTimeRate(value){ return typeof value === 'number' && isFinite(value) && value >= 0 ? value : null; }
+/* Panel → diagram → built-in, per constant. */
+function storyBatteryConstants(panel, d){
+  var shared = d && specObject(d.deviceDefaults) && specObject(d.deviceDefaults.battery) ? d.deviceDefaults.battery : {};
+  var out = {};
+  Object.keys(STORY_BATTERY_DEFAULTS).forEach(function(key){
+    var own = storyTimeRate(panel && panel[key]), diagram = storyTimeRate(shared[key]);
+    out[key] = own != null ? own : diagram != null ? diagram : STORY_BATTERY_DEFAULTS[key];
+  });
+  return out;
+}
+
+/* Where each constant came from: 'panel', 'diagram' or 'built-in'. */
+function storyBatteryConstantSources(panel, d){
+  var shared = d && specObject(d.deviceDefaults) && specObject(d.deviceDefaults.battery) ? d.deviceDefaults.battery : {};
+  var out = {};
+  Object.keys(STORY_BATTERY_DEFAULTS).forEach(function(key){
+    out[key] = storyTimeRate(panel && panel[key]) != null ? 'panel' : storyTimeRate(shared[key]) != null ? 'diagram' : 'built-in';
+  });
+  return out;
+}
+
+/* Diagram-level warnings; `d.steps` is the complete source registry. */
+function storyTimeWarnings(d, DP, warnings){
+  var raw = d.storyTime, steps = Array.isArray(d.steps) ? d.steps : [];
+  var config = null;
+  if (raw != null){
+    var SP = DP + '.storyTime';
+    if (!specObject(raw)) warnings.push(SP + ': expected {start, end?, span?, clock?, date?} — story time is off');
+    else {
+      if (storyTimeAbsolute(raw.start) == null)
+        warnings.push(SP + '.start: expected a date-time such as "2026-09-24T22:30" (years 100–9999) — story time is off');
+      if (raw.end != null && storyTimeAbsolute(raw.end) == null)
+        warnings.push(SP + '.end: expected a date-time such as "2026-09-25T07:00" (years 100–9999) — ignored');
+      else if (raw.end != null && storyTimeAbsolute(raw.start) != null && storyTimeAbsolute(raw.end) <= storyTimeAbsolute(raw.start))
+        warnings.push(SP + '.end: must be after start — ignored');
+      if (raw.span != null && storyTimeSpan(raw.span) == null)
+        warnings.push(SP + '.span: expected a duration longer than zero such as "9h" or "1d2h30m" — ignored');
+      else if (raw.span != null && raw.end == null && storyTimeAbsolute(raw.start) != null && !storyTimeInRange(storyTimeAbsolute(raw.start) + storyTimeSpan(raw.span)))
+        warnings.push(SP + '.span: ends after the supported range (year 9999) — ignored');
+      if (raw.clock != null && STORY_CLOCK_FORMATS.indexOf(raw.clock) < 0)
+        warnings.push(SP + '.clock: unknown clock "' + raw.clock + '" — using 12h (valid: ' + STORY_CLOCK_FORMATS.join(' ') + ')');
+      if (raw.date != null && STORY_DATE_FORMATS.indexOf(raw.date) < 0)
+        warnings.push(SP + '.date: unknown date format "' + raw.date + '" — using short (valid: ' + STORY_DATE_FORMATS.join(' ') + ')');
+      Object.keys(raw).forEach(function(key){
+        if (['start', 'end', 'span', 'clock', 'date'].indexOf(key) < 0)
+          warnings.push(SP + '.' + key + ': unknown story time field — ignored (valid: start end span clock date)');
+      });
+      config = storyTimeConfig(d);
+    }
+  }
+  var defaults = d.deviceDefaults;
+  if (defaults != null){
+    if (!specObject(defaults)) warnings.push(DP + '.deviceDefaults: expected {battery: {drainPerHour?, chargePerHour?}} — ignored');
+    else Object.keys(defaults).forEach(function(kind){
+      var KP = DP + '.deviceDefaults.' + kind;
+      if (kind !== 'battery'){ warnings.push(KP + ': unknown device kind — ignored (valid: battery)'); return; }
+      if (!specObject(defaults.battery)){ warnings.push(KP + ': expected {drainPerHour?, chargePerHour?} — ignored'); return; }
+      Object.keys(defaults.battery).forEach(function(key){
+        if (!Object.prototype.hasOwnProperty.call(STORY_BATTERY_DEFAULTS, key))
+          warnings.push(KP + '.' + key + ': unknown battery constant — ignored (valid: drainPerHour chargePerHour)');
+        else if (storyTimeRate(defaults.battery[key]) == null)
+          warnings.push(KP + '.' + key + ': expected a number ≥ 0 (percent per hour) — this default is ignored; each battery panel uses its own ' + key + ' or the built-in placeholder ' + STORY_BATTERY_DEFAULTS[key]);
+      });
+    });
+  }
+  steps.forEach(function(st, i){
+    if (!st || st.time == null) return;
+    var TP = DP + '.steps[' + i + '].time';
+    if (!config) warnings.push(TP + ': ignored — declare diagram.storyTime.start to give steps a time');
+    else if (!storyTimeParsable(st.time))
+      warnings.push(TP + ': "' + String(st.time).slice(0, 80) + '" is not a time — use "+3h19m", "23:10" or "2026-09-24T23:10" (years 100–9999); the previous time is kept');
+  });
+  if (!config) return;
+  /* Paths fold separately, so ordering is checked per path; a shared step
+     reports each path once, and an unlisted registry step not at all. */
+  var paths = diagramPathList(d), reported = Object.create(null);
+  paths.forEach(function(path){
+    var story = storyTimeSequence({steps: path.indices.map(function(i){ return steps[i]; })}, config);
+    story.times.forEach(function(t, n){
+      var i = path.indices[n], label = paths.length > 1 ? ' on path "' + path.id + '"' : '';
+      if (story.rejected[n] && storyTimeParsable(steps[i].time) && !reported['range:' + i + label]){
+        reported['range:' + i + label] = true;
+        warnings.push(DP + '.steps[' + i + '].time: lands outside the supported range (years 100–9999)' + label + ' — the previous time is kept');
+      }
+      if (t < story.previous[n] && !reported['back:' + i + label]){
+        reported['back:' + i + label] = true;
+        warnings.push(DP + '.steps[' + i + '].time: time goes backward' + label + ' (' + storyTimeLabel(story.previous[n], config) + ' → ' + storyTimeLabel(t, config) + ')');
+      }
+      /* Only an authored, accepted time is reported; later steps that merely
+         inherit it have no time field of their own. */
+      var authored = steps[i] && steps[i].time != null && !story.rejected[n];
+      if (authored && config.end != null && t > config.end && !reported['end:' + i + label]){
+        reported['end:' + i + label] = true;
+        warnings.push(DP + '.steps[' + i + '].time: ' + storyTimeLabel(t, config) + ' is after the story end' + label + ' (' + storyTimeLabel(config.end, config) + ')');
+      }
+    });
+  });
+}
 /* ---- src/core/section-layout.js ---- */
 /* Pure section/view layout. Uses diagramPathList() and panelCapability() at
    call time, after panel definitions have registered; no DOM measurements. */
@@ -1931,11 +2203,16 @@ function foldPanelStates(d){
   var panels = d.panels || [];
   var steps = d.steps || [];
   var out = {};
+  /* Story time is resolved once per selected path; panels that declare a
+     storyTime facet derive time-dependent fields after their own fold. */
+  var story = storyTimeSequence(d);
   panels.forEach(function(panel){
     if (!panel || !panel.id) return;
     var descriptor = PanelRegistry.get(panel.type);
     var fold = descriptor && descriptor.fold || foldCommonPanelStates;
-    out[panel.id] = fold(panel, steps);
+    var states = fold(panel, steps);
+    if (descriptor && descriptor.storyTime) states = descriptor.storyTime(panel, states, steps, story, d) || states;
+    out[panel.id] = states;
   });
   return out;
 }
@@ -4064,6 +4341,7 @@ var FlowAudio = (function () {
     },
     validatePatch:function (patch, path, panel, warnings) { clean(panel, patch, true, path, warnings); },
     fold:function (panel, steps) { return foldSanitizedPanelStates(panel, steps, function (raw, once) { return clean(panel, raw, once); }); },
+    storyTime:function (panel, states, steps, story) { return story ? storyTimeClockOverlay(panel, states, steps, story) : states; },
     authoring:{
       template:{title:'App screens', screens:[], frame:'phone', transition:'cut', initial:{screen:null}},
       setupFields:[['screens','jsonArr'],['frame','text'],['transition','text'],['initial','json']],
@@ -4139,12 +4417,73 @@ PanelRegistry.extend('battery', {
       );
     if (p.initial && p.initial.charge != null && !isFiniteNum(p.initial.charge))
       warnings.push(PP + '.initial.charge: must be a finite number — rendered as NO DATA');
+    if (panelObject(p.initial) && panelOwn(p.initial, 'drain'))
+      warnings.push(PP + '.initial.drain: drain is a step operation — ignored; set initial.charge instead');
+    Object.keys(STORY_BATTERY_DEFAULTS).forEach(function (key) {
+      if (p[key] != null && storyTimeRate(p[key]) == null)
+        warnings.push(PP + '.' + key + ': expected a number ≥ 0 (percent per hour) — using the diagram default or built-in placeholder');
+    });
   },
   validatePatch: function (patch, path, panel, warnings, context) {
     if (patch.charge != null && !isFiniteNum(patch.charge))
       warnings.push(path + '.charge: must be a finite number — rendered as NO DATA');
+    if (panelOwn(patch, 'drain')) {
+      if (!isFiniteNum(patch.drain) || patch.drain < 0)
+        warnings.push(path + '.drain: expected additional drain as a number ≥ 0 (percent) — ignored');
+      else if (panelOwn(patch, 'charge'))
+        warnings.push(path + '.drain: ignored because charge sets the value at this step');
+    }
   },
+  fold: function (panel, steps) {
+    /* drain is a one-step operation, never carried state. */
+    return foldCommonPanelStates(panel, steps).map(function (state) {
+      delete state.drain;
+      return state;
+    });
+  },
+  storyTime: batteryStoryStates,
 });
+
+/* Automatic charge from story time (docs/step-time.md). The interval before a
+   step uses the trend in effect before it; an authored charge anchors the
+   value exactly; `drain` subtracts extra percent at its step. Without story
+   time and without drain operations, the folded states are unchanged. */
+function batteryStoryStates(panel, states, steps, story, d) {
+  var patches = steps.map(function (st) {
+    var patch = (stepPanelPatch(st) || {})[panel.id];
+    return panelObject(patch) ? patch : {};
+  });
+  if (!story && !patches.some(function (patch) { return panelOwn(patch, 'drain'); })) return states;
+  var rates = storyBatteryConstants(panel, d),
+    initial = panelObject(panel.initial) ? panel.initial : {};
+  var charge = isFiniteNum(initial.charge) ? clamp(initial.charge, 0, 100) : null,
+    trend = initial.trend,
+    derived = false;
+  states.forEach(function (state, i) {
+    if (i >= steps.length) return;
+    var patch = patches[i], once = panelObject(patch.enterOnce) ? patch.enterOnce : null;
+    if (story && charge != null) {
+      var at = storyTimeAt(story, i), hours = Math.max(0, at.time - at.previous) / 3600000;
+      if (hours > 0) {
+        charge = clamp(charge + hours * (trend === 'charging' ? rates.chargePerHour : -rates.drainPerHour), 0, 100);
+        derived = true;
+      }
+    }
+    if (panelOwn(patch, 'charge')) {
+      charge = isFiniteNum(patch.charge) ? clamp(patch.charge, 0, 100) : null;
+      derived = false;
+    } else if (charge != null && isFiniteNum(patch.drain) && patch.drain >= 0) {
+      charge = clamp(charge - patch.drain, 0, 100);
+      derived = true;
+    }
+    if (panelOwn(patch, 'trend')) trend = patch.trend;
+    if (derived && !(once && panelOwn(once, 'charge'))) {
+      state.charge = Math.round(charge * 100) / 100;
+      storyTimeMark(state, 'charge', 'battery');
+    }
+  });
+  return states;
+}
 
 /* battery panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
 var BATTERY_ZONE_LABELS = {
@@ -4493,19 +4832,72 @@ body.sk-editorial .sk-daylight .btnub{background:var(--ed-rule-strong);}`,
 PanelRegistry.extend('battery', {
   authoring: {
     template: { title: 'Battery', low: 30, crit: 10, initial: { charge: 80 } },
+    /* New panels start with the diagram's authored constants. Built-in
+       placeholders are not copied, so the inspector keeps showing them as
+       placeholders instead of passing them off as this device's rates. */
+    instantiate: function (panel, diagram) {
+      var rates = storyBatteryConstants({}, diagram), sources = storyBatteryConstantSources({}, diagram);
+      Object.keys(rates).forEach(function (key) {
+        if (sources[key] === 'diagram') panel[key] = rates[key];
+      });
+      return panel;
+    },
     setupFields: [
       ['low', 'num'],
       ['crit', 'num'],
+      ['drainPerHour', 'num'],
+      ['chargePerHour', 'num'],
       ['initial', 'json'],
     ],
     patchFields: [
       ['charge', 'num'],
+      ['drain', 'num'],
       ['trend', 'enum', ['charging', 'draining', 'idle']],
       ['source', 'enum', ['solar', 'wired', 'poe', 'cells']],
       ['cold', 'bool'],
       ['note', 'text'],
       ['label', 'text'],
     ],
+    editor: function (context) {
+      var labels = { drainPerHour: 'Drain % per hour', chargePerHour: 'Charge % per hour' },
+        short = { drainPerHour: 'Drain %/h', chargePerHour: 'Charge %/h' };
+      /* Say whether the fallback is the diagram's rate or the built-in
+         placeholder, which is not a device fact. */
+      function inherited(key) {
+        var parsed = context.parse(), d = null;
+        if (!parsed.error) {
+          var rec = specSectionPaths(parsed.raw)[context.target().section];
+          d = rec ? specValueAt(parsed.raw, rec.diagram) : null;
+        }
+        var value = storyBatteryConstants({}, d)[key];
+        return storyBatteryConstantSources({}, d)[key] === 'diagram'
+          ? 'Diagram default · ' + value + ' %/h'
+          : 'Built-in default · ' + value + ' %/h (placeholder)';
+      }
+      return {
+        patchLabel: function (key) {
+          return key === 'drain' ? 'Extra drain %' : key;
+        },
+        setupField: function (field, panel) {
+          var key = field[0];
+          if (!labels[key]) return;
+          var input = context.controls.number(panel[key], function (value) {
+            if (value != null && value < 0) {
+              context.error(labels[key] + ' must be 0 or more.');
+              return false;
+            }
+            return context.commit(key, value == null ? null : String(value));
+          });
+          input.classList.remove('fnum');
+          input.placeholder = inherited(key);
+          input.setAttribute('aria-label', labels[key]);
+          return context.controls.row(short[key], input);
+        },
+        patchField: function (field, input) {
+          if (field[0] === 'drain') input.placeholder = 'Extra % used at this step';
+        },
+      };
+    },
     picker: {
       order: 20,
       name: 'Battery',
@@ -5493,6 +5885,9 @@ PanelRegistry.extend('deviceapp', {
     deviceAppPatchWarnings(patch, path, panel, warnings);
   },
   fold: foldDeviceAppStates,
+  storyTime: function (panel, states, steps, story) {
+    return story ? storyTimeClockOverlay(panel, states, steps, story) : states;
+  },
 });
 
 /* deviceapp panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
@@ -5932,6 +6327,11 @@ PanelRegistry.extend('deviceapp', {
         firmware: { value: 'v2.4.1', status: 'ready' },
         clock: '9:41',
       },
+    },
+    /* With story time the step clock drives the status bar. */
+    instantiate: function (panel, diagram) {
+      if (storyTimeConfig(diagram) && panel.initial) delete panel.initial.clock;
+      return panel;
     },
     initialFields: true,
     setupFields: [
@@ -10665,6 +11065,9 @@ PanelRegistry.extend('phone', {
     phonePatchWarnings(patch, path, warnings, true);
   },
   fold: foldPhoneStates,
+  storyTime: function (panel, states, steps, story) {
+    return story ? storyTimeClockOverlay(panel, states, steps, story) : states;
+  },
 });
 
 /* phone panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
@@ -11162,6 +11565,11 @@ PanelRegistry.extend('phone', {
     initialFields: true,
     transientFields: ['audio'],
     template: { title: 'Phone', initial: { clock: '9:41' } },
+    /* With story time the step clock drives the status bar. */
+    instantiate: function (panel, diagram) {
+      if (storyTimeConfig(diagram) && panel.initial) delete panel.initial.clock;
+      return panel;
+    },
     setupFields: [
       ['initial', 'json'],
     ],

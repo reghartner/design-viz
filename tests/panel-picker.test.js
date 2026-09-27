@@ -36,7 +36,8 @@ test('preview samples are independently cloned and never leak into added panel d
     const raw={nodes:{},rows:[[]]},plan=context.planAddPanel(JSON.stringify(raw),raw,0,type);
     assert.equal(plan.error,undefined,type);
     const added=JSON.parse(plan.text).panels[0];delete added.id;delete added.type;
-    assert.deepEqual(added,original[type],type);
+    const instantiate=context.panelAuthoring(type).instantiate;
+    assert.deepEqual(added,instantiate?plain(instantiate(plain(original[type]),raw)):original[type],type);
   }
   assert.deepEqual(plain(context.PANEL_TEMPLATES),original);
 });

@@ -89,7 +89,10 @@ test('wheel panning saves once, while a pending pan cannot replace handwritten s
   await page.waitForTimeout(350);await expect(page.locator('#src')).toHaveValue(handwritten);
 });
 
-for(const mode of ['default','switched','expanded','fullscreen','arranged','selected','narrow','zoomed'])test('repeated canvas drags retain the released position: '+mode,async({page,server})=>{
+for(const mode of ['default','switched','expanded','fullscreen','arranged','selected','narrow','zoomed','lost-release','lost-held','other-pointer'])test('repeated canvas drags retain the released position: '+mode,async({page,server})=>{
+  // Some hosts consume pointerup before the viewport receives it, but still
+  // deliver the browser's implicit lostpointercapture with buttons === 0.
+  if(mode==='lost-release')await page.addInitScript(()=>window.addEventListener('pointerup',ev=>{if(ev.target.closest('.explore-board'))ev.stopImmediatePropagation();},true));
   if(mode==='narrow')await page.setViewportSize({width:1280,height:800});
   const spec=structuredClone(named);if(mode==='default')spec.page.sections[0].diagram.defaultLayout='service-flow';
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));
@@ -108,6 +111,19 @@ for(const mode of ['default','switched','expanded','fullscreen','arranged','sele
     await page.mouse.move(b.x,b.y);await page.mouse.down();await page.mouse.move(b.x+45,b.y+45,{steps:6});
     const held=await position();expect(held.x).toBeCloseTo(before.x-45,0);expect(held.y).toBeCloseTo(before.y-45,0);
     await page.waitForTimeout(150);expect(await position()).toEqual(held);
+    if(mode==='other-pointer'){
+      await board.evaluate(el=>{
+        el.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:1,button:2,buttons:1}));
+        el.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:2,buttons:0}));
+      });
+      await expect(section(page).locator('.section-viewport')).toHaveClass(/viewport-gesturing/);
+      await expect(page.locator('#src')).toHaveValue(source);expect(await position()).toEqual(held);
+    }
+    if(mode==='lost-held'){
+      await board.evaluate(el=>el.releasePointerCapture(1));await page.mouse.move(b.x+46,b.y+46);
+      await expect(section(page).locator('.section-viewport')).not.toHaveClass(/viewport-gesturing/);
+      expect(await position()).toEqual(before);await page.mouse.up();await expect(page.locator('#src')).toHaveValue(source);break;
+    }
     await page.mouse.up();await expect(page.locator('#src')).not.toHaveValue(source);
     await page.waitForTimeout(350);expect(await position()).toEqual(held);
     expect(await originalBoard.evaluate(el=>el.isConnected)).toBe(true);

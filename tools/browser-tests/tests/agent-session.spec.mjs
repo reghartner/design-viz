@@ -8,13 +8,23 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..')
 const test=base.extend({server:[async({},use)=>{
   const session=await startAgentSession({root});
   try{await use({...session,root});}finally{await session.close();await rm(session.scratch,{recursive:true,force:true});}
-},{scope:'worker'}]});
+},{scope:'worker'}],disconnect:async({page,server,audit},use)=>{
+  const pending=new Set();let disconnecting=false;
+  const started=request=>{if(request.url()!==server.origin+'/__flowview_agent/sync' || request.postDataJSON()?.disconnect)return;pending.add(request);if(disconnecting)audit.allowAbort(request);};
+  const ended=request=>pending.delete(request);
+  page.on('request',started);page.on('requestfinished',ended);page.on('requestfailed',ended);
+  try{await use(async()=>{
+    disconnecting=true;pending.forEach(request=>audit.allowAbort(request));
+    try{await page.locator('#local-agent-toggle').click();return await state(server,s=>!s.connected);}
+    finally{disconnecting=false;}
+  });}finally{page.off('request',started);page.off('requestfinished',ended);page.off('requestfailed',ended);}
+}});
 const read=(server,name)=>readFile(path.join(server.scratch,name+'.json'),'utf8').then(JSON.parse);
 async function state(server,predicate){let value;await expect.poll(async()=>{value=await read(server,'state');return predicate(value);}).toBe(true);return value;}
 async function propose(server,value){const temp=path.join(server.scratch,'proposal.tmp');await writeFile(temp,JSON.stringify(value));await rename(temp,path.join(server.scratch,'proposal.json'));}
 async function result(server,id,status){await expect.poll(async()=>{try{const r=await read(server,'result');return [r.id,r.status];}catch{return null;}}).toEqual([id,status]);}
 
-test('files exchange selected nodes and live edits with one Undo, preserved view and no browser-agent calls',async({page,server})=>{
+test('files exchange selected nodes and live edits with one Undo, preserved view and no browser-agent calls',async({page,server,disconnect})=>{
   await page.goto(server.origin+'/workbench/flowspec.html');await paste(page,source);
   await page.locator('[data-dv-node="a"]').click();
   const current=await state(server,s=>s.open && s.selection.some(t=>t.id==='a'));
@@ -26,10 +36,16 @@ test('files exchange selected nodes and live edits with one Undo, preserved view
   const after=await state(server,s=>s.source===edited);expect(after.views[0].view).toBe(current.views[0].view);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
-  await page.locator('#local-agent-toggle').click();await state(server,s=>!s.connected);
+  let release,arrived;const held=new Promise(resolve=>{release=resolve;}),pending=new Promise(resolve=>{arrived=resolve;});
+  await page.route(server.origin+'/__flowview_agent/sync',async route=>{
+    if(route.request().postDataJSON()?.disconnect){await route.continue();return;}
+    const response=await route.fetch();arrived();await held;await route.fulfill({response});
+  });
+  await pending;await disconnect();release();
+  await expect(page.locator('#src')).toHaveValue(edited);
 });
 
-test('stale and invalid edits are rejected, focused typing waits, disconnect stops file updates',async({page,server})=>{
+test('stale and invalid edits are rejected, focused typing waits, disconnect stops file updates',async({page,server,disconnect})=>{
   await page.goto(server.origin+'/workbench/flowspec.html');await paste(page,source);
   const current=await state(server,s=>s.open && s.source===source);
   await page.locator('[data-dv-node="a"]').click();
@@ -48,11 +64,11 @@ test('stale and invalid edits are rejected, focused typing waits, disconnect sto
   await expect(page.locator('#local-agent-toggle')).toHaveAttribute('title',/waiting/);
   await expect(page.locator('#src')).toHaveValue(human);
   await page.locator('[data-dv-node="a"]').click();await result(server,'wait','applied');
-  await page.locator('#local-agent-toggle').click();const stopped=await state(server,s=>!s.connected);
+  const stopped=await disconnect();
   await propose(server,{id:'paused',baseRevision:stopped.revision,source});
   await page.locator('#editor-tab-json').click();await page.locator('#src').fill(next+'\n');
   expect((await read(server,'state')).source).toBe(next);
   await page.locator('#local-agent-toggle').click();await result(server,'paused','rejected');
   await expect(page.locator('#src')).toHaveValue(next+'\n');
-  await page.locator('#local-agent-toggle').click();await state(server,s=>!s.connected);
+  await disconnect();
 });

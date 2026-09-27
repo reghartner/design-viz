@@ -49,24 +49,30 @@ paths below are relative to VIZ. Links to `references/` are relative to this fil
    fits, omit the screen and say so.
 3. **Every step decides every panel.** In the step x panel matrix each cell is
    either `patch: ...` or `holds: <reason>`. An empty cell is not allowed.
-4. **Time moves on the panels, not only in captions.** Every panel that shows
-   time moves with the story: phone and device-app `clock`/`date`,
-   app-screens `clock`/`date`, device-app field `detail` freshness ("Updated
-   3 h ago"), battery charge, temperatures, day/night choices. A clock never
-   goes backward on a path. A caption that says "8:15 AM" while the phone
-   still shows 8:05 AM is a defect.
-5. **Anchors first, then the clock.** A time or value the operator or source
-   states ("about 5:00 AM", "reports 35%") is an anchor: use it exactly,
-   never move it to fit a rate, and note any tension in the ledger. Rate math
-   only fills the gaps between anchors, and only when a supplied rate and its
-   start condition apply; otherwise hold the value or jump at the next anchor.
-   If two anchors cannot both be met at the stated rate, the rate does not
-   apply between them: show no in-between values (never invent a slower or
-   faster rate to connect them), jump at the next anchor, and say on the
-   page and in the ledger that the given times and the stated rate disagree.
-   Write the arithmetic in the time table ("6:50 to 8:05 = 1.25 h x 3 %/h =
-   +3.75, shown +4"). A value falls until charging (or cooling) starts and
-   never changes while the clock stands still.
+4. **Time is a property of the step.** Declare `diagram.storyTime` (start,
+   end or span, clock, date) and give every step that moves the clock a
+   `time`; a step without one keeps the previous time. Phone, device-app and
+   app-screens panels show the step's time: never set `clock`/`date` on them
+   in a new spec (an explicit value pins the panel). What still moves by hand
+   at each clock move: device-app `detail` freshness ("Updated 3 h ago"),
+   temperatures, day/night choices. Time never goes backward on a path. A
+   caption that says "8:15 AM" at a step whose time is 8:05 AM is a defect.
+5. **Anchors first; battery drift is automatic.** A time or value the
+   operator or source states ("about 5:00 AM", "reports 35%") is an anchor:
+   a stated time becomes an absolute step `time`, a stated charge a `charge`
+   patch at its step. Never move an anchor to fit a rate; note any tension
+   in the ledger. Between steps a battery drains by elapsed hours x
+   `drainPerHour`, or charges by `chargePerHour` when the trend before the
+   step was `charging`: set those rates from the source (on the panel or in
+   `deviceDefaults.battery`), set `trend: "charging"` at the step charging
+   starts, and add `drain` for a device operation the source costs (a
+   recorded clip). Never hand-compute or patch a charge at every step. The
+   built-in rates (1 %/h drain, 20 %/h charge) are placeholders, not device
+   facts. If two anchors cannot both be met at the stated rate, the rate does
+   not apply between them: hold the earlier value with `charge` patches on
+   the steps between (no invented in-between values), jump at the next
+   anchor, and say on the page and in the ledger that the given times and
+   the stated rate disagree.
 6. **Every hop the caption claims is lit in that step.** For each message
    clause, list the hops from the originating device to the last receiver:
    the route the source gives, including each relay the source puts on that
@@ -126,10 +132,11 @@ paths below are relative to VIZ. Links to `references/` are relative to this fil
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the
 clip, noticing the alert) the source does not describe. Edge kinds, node
-tones, notifications and outcomes need evidence. Clock times and slow battery
-drift (within the source's rates) are allowed as **illustrative** values when the source gives none (never in place of a stated value), and
-the ledger must label them illustrative; when they show on the page, one line
-in the section description says so. Details:
+tones, notifications and outcomes need evidence. Story times and battery
+rates (your estimate or the built-in placeholders) are allowed as
+**illustrative** values when the source gives none (never in place of a
+stated value), and the ledger must label them illustrative; when they show
+on the page, one line in the section description says so. Details:
 [honesty rules](references/honesty-rules.md).
 
 ## Phase 1: Inventory the source
@@ -163,16 +170,24 @@ states it):
 | Mixed | The story plus the main services by name, with plain captions. | Mixed rooms |
 | Engineering | Every service hop, API, failure mode and code reference. | Engineers and reviewers |
 
+**Right after the level, the first time question is the story's span**
+(skip it only if the request states it): when it starts (date and time),
+when it ends or how long it lasts, and the clock and date style
+(default: 12-hour clock, short date such as "Fri, Oct 2"). **Then battery
+rates**, for each battery device the source gives no rate for: at
+engineering level ask its drain (and charge, if it charges) per hour; at
+story or mixed level choose them yourself (an illustrative estimate, or 0
+for a wired device) and list them under **Decisions I made**.
+
 Then ask only what the source and request leave open, from this list:
 audience and the one-sentence takeaway; the moments the viewer must see;
-which outcomes (paths) to show; when the story starts and how long it runs;
-the starting situation (battery, connectivity, what is already on the phone).
-At engineering level you may also ask about rates, thresholds, missing
-catalog services and code locations.
+which outcomes (paths) to show; the starting situation (battery,
+connectivity, what is already on the phone). At engineering level you may
+also ask about thresholds, missing catalog services and code locations.
 
 **Do not ask a story-level or mixed-level operator technical questions**
-(catalog entries, code SHAs or anchors, protocols, report timing edge cases,
-delivery or renderer settings). Decide those yourself from the evidence,
+(catalog entries, code SHAs or anchors, protocols, battery rates, report
+timing edge cases, delivery or renderer settings). Decide those yourself from the evidence,
 choose the option that claims least, and list each one in the ledger under
 **Decisions I made** so an engineer can review them. Ask only when a missing
 technical fact would change what the audience sees, and then ask it as a
@@ -201,7 +216,7 @@ into the ledger and fill every section in order:
 A. Story paragraph, audience, takeaway
 B. Panel plan: panel -> question it answers -> best moment -> what it must never show
 C. Paths table
-D. Time table (clock, date, elapsed, freshness, drift arithmetic) per path
+D. Time table (story time, step times, battery rates, anchors and extra drain, freshness) per path
 E. Step x panel matrix (one block per step: beat, hops claimed, edges, every panel, state cleared, icons, tones, code/binding, evidence)
 F. Coverage grid (steps x panels, P or H) and the "boring panel" check
 G. Icon state plan (set step, restore step)
@@ -233,6 +248,9 @@ Translation is mechanical once the worksheet is done:
   become `diagram.paths`.
 - The edges line becomes `step.edges` in the same order. Each pair of nodes has
   one edge per direction; a response is its own opposite edge with `ret: true`.
+- The time table header becomes `diagram.storyTime` and the battery rates
+  (`drainPerHour`/`chargePerHour` on the panel, or `deviceDefaults.battery`);
+  each row's `time` becomes `steps[].time`.
 - Each `patch:` cell becomes a sparse patch under `steps[].panels.<panel-id>`.
   Each `holds:` cell becomes nothing in JSON (the state carries forward).
 - Icon plan rows become `icon` patches. A restore row becomes exactly its
@@ -272,7 +290,8 @@ Follow [self-audit](references/self-audit.md). In short:
    Pass `--catalog` when a catalog was supplied and one `--rate` per numeric
    panel or card with the source's rate per hour (for example
    `--rate batt=-1:4 --rate app.battery=-1:4 --rate therm=-20:16`). It prints
-   each path as steps x panels (P = patched, . = holds), clocks, edges, icons,
+   each path as steps x panels (P = patched, . = holds), the resolved story
+   time, each battery's rates and where they come from, edges, icons,
    code references, every numeric change with its rate per hour, and (with
    `--state`) the full visible state after each step. It needs Node, because
    it folds each path with the engine's own code. Its `WARN`, `CHECK` and
@@ -281,7 +300,7 @@ Follow [self-audit](references/self-audit.md). In short:
    provable error, not a judgment call. For each `CHECK`, fix it or write in
    the self-audit why it is correct. Add one `--expect`
    per operator anchor (for example `--expect '*/lowbatt:batt.charge=20'`);
-   compare anchor times with the spec clocks yourself.
+   compare anchor times with the walk's clock column yourself.
 2. With the `--state` output, read every step where something changed state
    (rule 8): does any panel still show the old state? Then compare the output
    line by line with worksheet sections D to H. Every

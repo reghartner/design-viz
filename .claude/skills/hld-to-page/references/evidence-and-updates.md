@@ -21,7 +21,7 @@ omission is the failure mode the ledger exists to kill.
 The ledger is a deliverable with the page's lifetime — a later update agent
 starts from it. Preserve the coverage/amendment tables below; add the filled
 [storyboard worksheet](storyboard-worksheet.md) and the self-audit after them.
-Illustrative values (clock times, dates, freshness ages, battery drift) get a
+Illustrative values (story times, freshness ages, battery rates) get a
 `number` row whose fact says `illustrative`. Operator questions with no answer
 get an amendment row whose answer reads `no answer; assumed: <default>`.
 Ledger layout:

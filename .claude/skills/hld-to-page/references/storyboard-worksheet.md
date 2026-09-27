@@ -64,70 +64,84 @@ concurrency.
 
 ## D. Time table
 
-One row per step, per path (shared steps appear once per path they are on,
-with the same values). Fill it even when the source gives no times: then pick
-plausible times, and mark them `illus`.
+Time belongs to the step. Fill the header first; it becomes
+`diagram.storyTime` and the battery rates.
 
-| Path | Step | Clock | Date | Elapsed since previous | Anchor, source or illus | Physical value, with arithmetic | Last report (time, value) and freshness text | Day or night |
-|---|---|---|---|---|---|---|---|---|
-| | | | | | | | | |
+**Story time:** start `<YYYY-MM-DDTHH:MM>`; end `<YYYY-MM-DDTHH:MM>` or span
+`<9h, 1d2h>`; clock `12h|24h`; date `short|long|iso|none` (operator answer,
+or `illus`).
+**Battery rates:** per battery panel: drain %/h, charge %/h, and where each
+comes from (source, operator, or `illus` estimate). Wired devices drain `0`.
 
-Arithmetic example: `20 -> 18 (4:00 to 6:50 = 2.8 h x -0.7 %/h = -2.0,
-still on cells; solar starts at 6:50)`, then `18 -> 22 (6:50 to 8:05 =
-1.25 h x +3 %/h = +3.75, shown +4, charging)`.
+Then one row per step, per path (shared steps appear once per path they are
+on). Fill it even when the source gives no times: then pick plausible times
+and mark them `illus`.
+
+| Path | Step | `time` as written (blank keeps the previous) | Story time shown | Anchor, source or illus | Battery: trend change, extra `drain`, `charge` anchor | Last report (time, value) and freshness text | Day or night |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |
 
 First list the **anchors**: every clock time and value the operator or source
-states (for example "the 5:00 AM report shows 35%"). Write each in the
-row where it happens, marked `anchor`, and never change it. Then fill the rows
+states (for example "the 5:00 AM report shows 35%"). Write each in the row
+where it happens, marked `anchor`, and never change it. Then fill the rows
 between anchors.
 
 Rules:
+- `time` forms: a relative duration (`+15m`) where the source states one
+  ("after 15 minutes"); an absolute date-time (`2026-10-02T21:40`) for an
+  anchor, and for a shared step that must show one time on every path (a
+  relative time resolves per path); a time of day (`06:50`) for other clock
+  times. Seconds-long beats need no `time`. Time never goes backward on a
+  path.
+- Do not plan per-panel clocks or dates: phone, device-app and app-screens
+  panels show the story time, including the date change after midnight.
 - An anchor wins over arithmetic. If a rate implies 3:10 AM but the operator
   said about 5:00 AM, the step is at 5:00 AM showing the stated value; write
   the tension in the ledger ("rate implies 3:10; operator time kept").
-- Show an intermediate value only when a supplied rate applies over that whole
-  interval (its start condition is met: sun is up, load is on). Otherwise hold
-  the last anchor and change at the next one. Never invent an "effective rate"
-  to reach a number. Round only at the end, and the shown value must be the
-  rounded arithmetic (12.4 shows 12, not 13).
+- Battery values are computed, not typed: the engine drains elapsed hours x
+  drain rate and charges x charge rate when the trend **before** the step was
+  `charging`. So write only what changes the physics: a `trend` change at the
+  step it happens (charging starts at sunrise, so the rise shows from the
+  next step), an extra `drain` for a device operation the source costs (a
+  recorded clip), and a `charge` anchor only where the operator or source
+  states a value. The walk prints the resulting value at every step; copy it
+  into checks, never compute it by hand.
+- A rate applies only where its condition holds. If two anchors cannot both
+  be met at the stated rate, hold the earlier value with `charge` patches on
+  the steps between (no invented in-between values), jump at the next
+  anchor, and say so on the page and in the ledger. Never invent an
+  "effective rate" to connect anchors.
+- When the source gives no rate, choose a slow illustrative estimate (for
+  example 0.1 to 0.2 %/h for a low-power sensor), set it explicitly, and
+  label it illustrative in the ledger and on the page. The built-in rates
+  (1 %/h, 20 %/h) are placeholders; leaving them counts as illustrative too.
 - Before the rows, write the full **report schedule** for the whole span
   (for example heartbeats at 10:30, 11:00, 11:30 ... 8:00). A schedule is an
   opportunity, not evidence of delivery.
 - Keep two series: the physical value (battery or thermo panel) and the last
   report (device-app card). The report column changes at a step that lights
   the report's delivery path. It also changes at the first step after an
-  unshown scheduled report whenever the source states a fixed report schedule
-  and nothing in the story (outage, offline) stops it: write
+  unshown scheduled report whenever the source states a fixed report
+  schedule and nothing in the story (outage, offline) stops it: write
   "last report 7:30, not shown, illus" and use the physical value at 7:30.
   During an outage the report column keeps its last value and its freshness
-  ages. Place reports on the source's cadence from the
-  last depicted report (every 15 min from 5:00 means 5:15, 5:30, not a
-  sunrise at 5:22).
-  A physical event (sunrise, a courier arrives) is its own row, not a report,
-  unless the source says they coincide.
-- The clock never goes backward on a path. If the date changes, write the new
-  date in the Date column and patch `date` in the spec.
-- Every clock-bearing panel (phone, deviceapp, appscreens) gets a new clock
-  whenever story time passes. Seconds-long beats may keep the same minute:
-  write `holds: same minute` in the matrix.
-- Freshness text is relative to the current clock and the last report time:
-  last report 6:05 PM, clock 9:40 PM gives "Last report 6:05 PM" or
-  "Updated 3 h ago". Recompute it on every step where the clock moves, for
-  every visible card whose freshness is shown.
-- Every numeric change is elapsed hours x the source's rate, written in the
-  cell. Use the rate that applied during the interval: a value keeps falling
-  until the step where charging starts, so the first charging step cannot
-  show a rise. Over a few minutes a value holds (at 3 %/h, 10 minutes is
-  +0.5, which rounds to no change); write that reason. When the source gives
-  no battery rate, drift slowly (for example 1 to 2 points over a night for a
-  low-power sensor) and mark it `illus`. Never invent a temperature reading
-  between anchors: hold, or use the stated rate.
+  ages. Place reports on the source's cadence from the last depicted report
+  (every 15 min from 5:00 means 5:15, 5:30, not a sunrise at 5:22). A
+  device-app battery card shows the whole percent the battery panel showed
+  at the report time. A physical event (sunrise, a courier arrives) is its
+  own row, not a report, unless the source says they coincide.
+- Freshness text is authored: it is relative to the story time and the last
+  report time. Last report 6:05 PM at 9:40 PM gives "Last report 6:05 PM" or
+  "Updated 3 h ago". Recompute it on every step where the story time moves,
+  for every visible card whose freshness is shown.
 - A number crosses a threshold (low battery, re-arm level, warn, shutdown,
   restart gate) only at the step the source says it does, and the value on
   each side of the threshold must be consistent with that.
-- Temperatures change only with a cause (weather over hours, a heater, load,
-  cooling after shutdown). A device that is off still cools; the app card
-  keeps the last reported value until a report arrives.
+- Temperatures are authored and change only with a cause (weather over
+  hours, a heater, load, cooling after shutdown). Never invent a reading
+  between anchors: hold, or use the stated rate and write the arithmetic. A
+  device that is off still cools; the app card keeps the last reported value
+  until a report arrives.
 - Day or night: there is no global day/night switch. Pick the camera `scene`
   that matches the time (for example `person-at-door-night` only at night),
   patch dispatch `timeOfDay` (`day|dusk|night`), pick app screen images that
@@ -145,7 +159,7 @@ paths). Every line is required. Each panel line starts with `patch:` or
 in the house", "holds: resident is not looking at the phone yet").
 
 ```
-### <step-id>   paths: <path ids>   clock: <time>
+### <step-id>   paths: <path ids>   time: <story time shown>
 Beat: <one sentence: what happens, told to the audience>
 Hops claimed: <for each message clause in the caption: every hop from the originating device to the last receiver, through each relay node (router, bridge)>
 Edges: <every hop above, in firing order: a->b (request), b->a (response, ret, only with evidence), b->c, b->d (fan-out) ...>
@@ -194,9 +208,11 @@ Edge rules:
 
 Panel rules:
 - Consider every panel on every step, including panels the beat does not seem
-  to be about: the phone clock, the battery, the map.
+  to be about: freshness text, the battery, the map.
 - Patches are sparse and carry forward. A `holds:` line means "the previous
-  state is still true at this moment". Check that it really is.
+  state is still true at this moment". Check that it really is. Story time
+  and battery drift move without a patch: write `holds: clock follows story
+  time` or `holds: drift only`.
 - A value change does not change freshness or icons. If a card's value is new,
   also patch its `status` and `detail`; if a state changed, also patch its
   `icon` (section G).

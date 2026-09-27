@@ -33,14 +33,18 @@ code (`scripts/fold_states.cjs`), so `--state` shows what the viewer shows.
 Pass `--viz <VIZ>` if the skill is installed outside VIZ.
 
 Output lines have three levels:
-- `WARN` (provable error): a clock that goes backward; a number outside a
-  `--rate` range you gave, or a battery that never changes while such a rate
+- `WARN` (provable error): a clock or step time that goes backward, or a
+  step time the engine rejects; a number outside a `--rate` range you gave
+  (a battery step's own extra `drain` is left out of the rate), or a battery that never changes while such a rate
   excludes zero; a codeRef on steps but not on its node, or without a full
   immutable commit SHA (40 to 64 hex characters) or distinct anchors; a
   binding with no `entityRef`; with `--catalog`, an `entityRef` or API
   operation that the catalog does not list; a failed `--expect`; a validator
   error.
-- `CHECK` (re-read; the spec alone cannot decide it): one clock-bearing panel
+- `CHECK` (re-read; the spec alone cannot decide it): with `storyTime`, a
+  panel clock or date that differs from the story time (an explicit value
+  pins it: drop it) and a battery drifting on a built-in placeholder rate
+  (label it illustrative); without `storyTime`, one clock-bearing panel
   that stays put while another advances; a number that changes while the
   displayed minute stays the same; freshness text that may no longer be true
   ("just now" unchanged for 15 minutes or more, "3 h ago" unchanged for two
@@ -52,7 +56,7 @@ Output lines have three levels:
   from `unavailable`/`boot`, or a card turning `stale`/`error`, a card whose
   state text ("Online", "Paused", "Shutdown") is carried unchanged; a caption with a clear
   send verb ("sends", "posts", "uploads") on a step with no lit edge; no clock
-  on any clock-bearing panel; battery charge that rises while the trend is not
+  on any clock-bearing panel (without `storyTime`); battery charge that rises while the trend is not
   charging; a battery unchanged for two hours or more; a device-app value or
   "just now" detail that changes on a step that delivers no edge (correct for
   an unshown scheduled report the source says succeeds: label it illustrative
@@ -69,8 +73,9 @@ is a provable error. A `CHECK` is a prompt to re-read the worksheet; fix it
 or write the reason it is correct.
 
 The script cannot check anchors or cadence. By hand: every operator-given
-time and value appears exactly at its step; every report step sits on the
-source's cadence; every intermediate value has its arithmetic in section D.
+time is an absolute step `time` and every given value a `charge` (or card)
+patch at its step; every report step sits on the source's cadence; every
+battery rate matches section D's header and its source or `illus` label.
 
 ## 2. Transition check
 
@@ -90,7 +95,7 @@ worksheet, and write down which.
 | Worksheet | Check in the spec |
 |---|---|
 | C. Paths | Same path IDs, same step order, same endings. |
-| D. Time table | Clock and date on every clock-bearing panel match the table; never backward; `detail` freshness text matches the elapsed time and the report cadence; battery `charge` and temperatures match, and every rate in the walk's numeric list is within the source's rate; the camera scene / `timeOfDay` match day or night. |
+| D. Time table | `storyTime` and battery rates match the header; the walk's clock column matches the Story time column, never backward; no panel `clock`/`date` patches; `detail` freshness text matches the elapsed time and the report cadence; battery `trend`, extra `drain` and `charge` anchors sit at their steps, every rate in the walk's numeric list is within the source's rate, and each reported battery card shows the value the walk printed for the report time; temperatures match; the camera scene / `timeOfDay` match day or night. |
 | E. Edges line | `step.edges` contains exactly the listed hops, including every evidenced response (`ret` edge; none without evidence) and every fan-out and relay hop. Failures match. |
 | E. Panel lines | `P` in the walk output exactly where the matrix says `patch:`; `.` exactly where it says `holds:`. Open the patch and confirm the values. |
 | E. Tones | `step.tone` matches, and carried tones are cleared where the source says recovery. |

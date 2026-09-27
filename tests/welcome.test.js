@@ -23,6 +23,8 @@ test('briefs preserve user sources and audience and route each task to the autho
     assert.match(prompt,/coverage ledger/);assert.match(prompt,/cannot access the skill/);
     assert.match(prompt,/ask me your questions in one short batch/);assert.match(prompt,/Do not ask again about what I already stated/);
     assert.match(prompt,/small, fully specified edit, ask only about what blocks it/);assert.match(prompt,/storyboard worksheet/);
+    assert.match(prompt,/story time span and each step’s time/);assert.match(prompt,/do not set per-panel clocks/);
+    assert.match(prompt,/battery drain and charge rates from the sources/);assert.doesNotMatch(prompt,/time table for clocks/);
     assert.match(prompt,/Backstage catalog/);assert.match(prompt,/full commit SHAs/);assert.match(prompt,/walk script/);
   }
   assert.match(context.welcomeAgentPrompt('code','','Engineers',repo),/cite the implementation/);

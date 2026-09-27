@@ -61,6 +61,10 @@ viewers. The [example](examples/app-screens/app-screens.spec.json) includes four
 illustrative screens with connected/offline paths.
 
 
+Standalone pages offer a first-visit tour and a **?** replay button. The
+[tour authoring guide](docs/tour.md) explains audience tracks, named views,
+Explore practice, demonstrations, and optional `page.tour` customization.
+
 ## The pipeline
 
 For agents, start with the [HLD-to-page skill](.claude/skills/hld-to-page/SKILL.md)

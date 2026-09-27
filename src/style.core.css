@@ -702,7 +702,7 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
   .sec-eyebrow{color:#555555;}
 }
 @media print{
-  .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink{display:none !important;}
+  .tabbar, .mtoggle, .termbar, .presentbtn, .srcchip, .copychip, .prosetoggle, .nlink, .nbackref, .nbackpop, .ctlink, .dv-tour, .dv-tour-replay{display:none !important;}
 }
 @media print{
   .sec-prose[hidden]{display:block !important;}

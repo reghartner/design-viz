@@ -4678,41 +4678,82 @@ test('coinSlots forms a compact square once the block leaves the endpoint cards'
   /* reading order: left to right, then top to bottom */
   for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];assert.ok(b.y>a.y+1 || (Math.abs(b.y-a.y)<=1 && b.x>a.x),'reading order at '+i);}
 });
-test('coin placement stays fast with thousands of coins and obstacles',()=>{
-  /* 3,000 coins on a short edge with 1,000 cards around it: the full fallback search runs */
+/* Work counting for the coin scaling tests. Wall-clock limits flaked when the
+   full suite ran test files in parallel, so these tests count work instead:
+   a second copy of the core runs with a Math whose every call is counted, and
+   obstacles can be getter objects that count every field read. The counts are
+   deterministic, so comparing a run at n with one at 4n catches a return to
+   quadratic behaviour (about 16x the work) without depending on CPU load. */
+let workCore=null;
+function coinWork(){
+  if (!workCore){
+    const counter={n:0},M=Object.create(null);
+    for (const k of Object.getOwnPropertyNames(Math)){
+      const v=Math[k];
+      M[k]=typeof v==='function'?function(){counter.n++;return v.apply(Math,arguments);}:v;
+    }
+    workCore={C:loadCore({Math:M}),counter};
+  }
+  return workCore;
+}
+/* rectangles whose field reads count as work (one read = one look at the obstacle) */
+function countedRects(rects,counter){
+  return rects.map(r=>{
+    const o={};
+    for (const k of Object.keys(r)) Object.defineProperty(o,k,{enumerable:true,get(){counter.n++;return r[k];}});
+    return o;
+  });
+}
+function measureWork(counter,fn){counter.n=0;const result=fn();return {work:counter.n,result};}
+/* Linear work quadruples from n to 4n; quadratic work grows about 16x. The
+   margin allows log factors (on-edge widths halve) without admitting n^2. */
+const NEAR_LINEAR_4X=6;
+function assertNearLinear(small,large,what){
+  assert.ok(small.work>0,what+': the counter saw the work');
+  const ratio=large.work/small.work;
+  assert.ok(ratio<NEAR_LINEAR_4X,what+' grows near-linearly: '+small.work+' -> '+large.work+' work for 4x the input (x'+ratio.toFixed(2)+')');
+}
+test('coin placement work grows near-linearly with thousands of coins and obstacles',()=>{
+  const {C:W,counter}=coinWork();
+  /* n coins on a short edge with n/3 cards around it: the full fallback search runs */
   const flat=linePath([{x:0,y:0},{x:50,y:0}]),fmid=flat.getPointAtLength(25);
-  const cards=[{x:10,y:-12,w:30,h:24}];
-  for(let i=0;i<999;i++)cards.push({x:(i%40)*120-2400,y:Math.floor(i/40)*160+2000,w:100,h:60});
-  let start=process.hrtime.bigint();
-  const pts=C.coinSlots(flat,flat.len,fmid,3000,cards);
-  let ms=Number(process.hrtime.bigint()-start)/1e6;
-  assert.strictEqual(pts.length,3000);assert.ok(C.coinsApart(pts,C.COIN_CLEAR));
-  assert.ok(ms<1500,'3,000 coins x 1,000 cards placed in '+ms.toFixed(0)+' ms');
+  function place(coins){
+    const cards=[{x:10,y:-12,w:30,h:24}];
+    for(let i=0;i<coins/3-1;i++)cards.push({x:(i%40)*120-2400,y:Math.floor(i/40)*160+2000,w:100,h:60});
+    return measureWork(counter,()=>W.coinSlots(flat,flat.len,fmid,coins,cards));
+  }
+  const small=place(750),large=place(3000);
+  assert.strictEqual(small.result.length,750);
+  assert.strictEqual(large.result.length,3000);assert.ok(C.coinsApart(large.result,C.COIN_CLEAR));
+  assertNearLinear(small,large,'750 -> 3,000 coins with 250 -> 1,000 cards');
   /* a 100,000 px edge blocked at its midpoint: the straight-run walk is bounded */
   const long=linePath([{x:0,y:0},{x:100000,y:0}]),lmid=long.getPointAtLength(50000);
   let calls=0;const counted={len:long.len,getPointAtLength(t){calls++;return long.getPointAtLength(t);}};
-  start=process.hrtime.bigint();
   const row=C.coinSlots(counted,long.len,lmid,40,[{x:49990,y:-5,w:20,h:10}]);
-  ms=Number(process.hrtime.bigint()-start)/1e6;
   assert.strictEqual(C.coinCover(row,[{x:49990,y:-5,w:20,h:10}]),0);
   assert.ok(calls<2000,'path sampling is bounded by what the block needs ('+calls+' samples)');
-  assert.ok(ms<500,'long edge placed in '+ms.toFixed(0)+' ms');
 });
-test('the complete coin-plus-label layout stays fast for a 3,000-coin block with a covered label',()=>{
+test('the complete coin-plus-label layout work grows near-linearly for a large coin block with a covered label',()=>{
+  const {C:W,counter}=coinWork();
   const flat=linePath([{x:0,y:0},{x:50,y:0}]),fmid=flat.getPointAtLength(25);
   const cards=[{x:-200,y:-30,w:197,h:60},{x:53,y:-30,w:197,h:60}];
-  const start=process.hrtime.bigint();
-  const pts=C.coinSlots(flat,flat.len,fmid,3000,cards);
-  /* the renderer's label obstacles: cards, then every coin as a hard rect */
-  const obstacles=cards.map(c=>({...c})).concat(pts.map(p=>({x:p.x-11,y:p.y-11,w:22,h:22,hard:true})));
-  const block=pts.reduce((b,p)=>({x1:Math.min(b.x1,p.x),y1:Math.min(b.y1,p.y),x2:Math.max(b.x2,p.x),y2:Math.max(b.y2,p.y)}),{x1:Infinity,y1:Infinity,x2:-Infinity,y2:-Infinity});
-  /* the label starts in the middle of the coin block */
-  const lb={x:(block.x1+block.x2)/2-20,y:(block.y1+block.y2)/2-6,w:40,h:12,fixed:false};
-  const n=C.resolveLabelCollisions([lb],obstacles);
-  const ms=Number(process.hrtime.bigint()-start)/1e6;
-  const r={x:lb.x+n[0].dx,y:lb.y+n[0].dy,w:lb.w,h:lb.h};
-  assert.ok(!obstacles.some(o=>C.rectsOverlap(r,o)),'the label escapes the whole block: '+JSON.stringify(n[0]));
-  assert.ok(ms<1500,'coins and label placed in '+ms.toFixed(0)+' ms');
+  function layout(coins){
+    return measureWork(counter,()=>{
+      const pts=W.coinSlots(flat,flat.len,fmid,coins,cards);
+      /* the renderer's label obstacles: cards, then every coin as a hard rect */
+      const plainObstacles=cards.map(c=>({...c})).concat(pts.map(p=>({x:p.x-11,y:p.y-11,w:22,h:22,hard:true})));
+      const block=pts.reduce((b,p)=>({x1:Math.min(b.x1,p.x),y1:Math.min(b.y1,p.y),x2:Math.max(b.x2,p.x),y2:Math.max(b.y2,p.y)}),{x1:Infinity,y1:Infinity,x2:-Infinity,y2:-Infinity});
+      /* the label starts in the middle of the coin block */
+      const lb={x:(block.x1+block.x2)/2-20,y:(block.y1+block.y2)/2-6,w:40,h:12,fixed:false};
+      const n=W.resolveLabelCollisions([lb],countedRects(plainObstacles,counter));
+      return {obstacles:plainObstacles,rect:{x:lb.x+n[0].dx,y:lb.y+n[0].dy,w:lb.w,h:lb.h},move:n[0]};
+    });
+  }
+  const small=layout(750),large=layout(3000);
+  for (const {result} of [small,large]){
+    assert.ok(!result.obstacles.some(o=>C.rectsOverlap(result.rect,o)),'the label escapes the whole block: '+JSON.stringify(result.move));
+  }
+  assertNearLinear(small,large,'coins and label for 750 -> 3,000 coins');
 });
 test('coinCover indexes obstacles: huge rectangles, duplicates across cells and early exit',()=>{
   const idx=C.coinObstacleIndex([{x:-1e6,y:-1e6,w:2e6,h:2e6},{x:0,y:0,w:200,h:200}]);
@@ -4723,10 +4764,14 @@ test('coinCover indexes obstacles: huge rectangles, duplicates across cells and 
   assert.strictEqual(C.coinCover([{x:0,y:0}],[]),0);
 });
 test('coinsApart is exact and near-linear for large coin sets',()=>{
-  const row=Array.from({length:3000},(_,i)=>({x:i*30,y:(i%7)*3}));
-  const start=process.hrtime.bigint();
+  const {C:W,counter}=coinWork();
+  const rowOf=k=>Array.from({length:k},(_,i)=>({x:i*30,y:(i%7)*3}));
+  const small=measureWork(counter,()=>W.coinsApart(countedRects(rowOf(750),counter),26));
+  const large=measureWork(counter,()=>W.coinsApart(countedRects(rowOf(3000),counter),26));
+  assert.strictEqual(small.result,true);assert.strictEqual(large.result,true);
+  assertNearLinear(small,large,'coinsApart for 750 -> 3,000 coins');
+  const row=rowOf(3000);
   assert.strictEqual(C.coinsApart(row,26),true);
-  assert.ok(Number(process.hrtime.bigint()-start)/1e6<200,'3000 coins check quickly');
   row.push({x:1500+20,y:0});
   assert.strictEqual(C.coinsApart(row,26),false);
   assert.strictEqual(C.coinsApart([{x:0,y:0},{x:25.9,y:0}],26),false);

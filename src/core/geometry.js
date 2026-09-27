@@ -641,23 +641,51 @@ function resolveLabelCollisions(labels, obstacles){
     [-56, 56, -70, 70, -84, 84].forEach(function(dx){ WIDE.push({dx: dx, dy: dy}); });
   });
   WIDE.sort(function(a, b){ return (Math.abs(a.dx) + Math.abs(a.dy)) - (Math.abs(b.dx) + Math.abs(b.dy)); });
+  /* obstacles filed in a LABEL_CELL grid; a query returns the indices of
+     obstacles whose cells meet r, in original order, so sums match a full scan */
+  var LABEL_CELL = 48, grid = {}, huge = [];
+  function cellsOf(r, g, visit){
+    var x0 = Math.floor((r.x - g) / LABEL_CELL), x1 = Math.floor((r.x + r.w + g) / LABEL_CELL),
+        y0 = Math.floor((r.y - g) / LABEL_CELL), y1 = Math.floor((r.y + r.h + g) / LABEL_CELL);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 4096) return false;
+    for (var gx = x0; gx <= x1; gx++) for (var gy = y0; gy <= y1; gy++) visit(gx + ',' + gy);
+    return true;
+  }
+  obstacles.forEach(function(o, i){
+    if (!cellsOf(o, 0, function(key){ (grid[key] || (grid[key] = [])).push(i); })) huge.push(i);
+  });
+  function nearby(r, g){
+    var seen = new Set(huge);
+    if (!cellsOf(r, g, function(key){ (grid[key] || []).forEach(function(i){ seen.add(i); }); })){
+      return obstacles.map(function(o, i){ return i; });
+    }
+    return Array.from(seen).sort(function(a, b){ return a - b; });
+  }
   function overlap(r, hardOnly){
-    var total = 0, oi;
-    for (oi = 0; oi < obstacles.length; oi++) if (!hardOnly || obstacles[oi].hard) total += overlapArea(r, obstacles[oi]);
+    var total = 0, oi, ids = nearby(r, 0);
+    for (var k = 0; k < ids.length; k++){
+      var o = obstacles[ids[k]];
+      if (!hardOnly || o.hard) total += overlapArea(r, o);
+    }
     if (!hardOnly) for (oi = 0; oi < placed.length; oi++) total += overlapArea(r, placed[oi]);
     return total;
   }
   /* bounding box of the hard obstacles touching r, grown through any hard
      obstacle within 12px of the cluster (a block of coins is one cluster) */
   function hardCluster(r){
-    var hard = obstacles.filter(function(o){ return o.hard; }), inside = [], box = null, grew = true;
+    /* flood fill through the obstacle grid: each hard obstacle joins once */
     function near(a, b, g){ return a.x - g < b.x + b.w && b.x - g < a.x + a.w && a.y - g < b.y + b.h && b.y - g < a.y + a.h; }
-    hard.forEach(function(o){ if (overlapArea(r, o) > 0) inside.push(o); });
-    while (grew){
-      grew = false;
-      hard.forEach(function(o){
-        if (inside.indexOf(o) >= 0) return;
-        if (inside.some(function(q){ return near(o, q, 12); })){ inside.push(o); grew = true; }
+    var member = new Set(), queue = [], inside = [], box = null;
+    nearby(r, 0).forEach(function(i){
+      if (obstacles[i].hard && overlapArea(r, obstacles[i]) > 0){ member.add(i); queue.push(i); }
+    });
+    while (queue.length){
+      var q = obstacles[queue.pop()];
+      inside.push(q);
+      nearby(q, 12).forEach(function(i){
+        var o = obstacles[i];
+        if (!o.hard || member.has(i) || !near(o, q, 12)) return;
+        member.add(i); queue.push(i);
       });
     }
     inside.forEach(function(o){

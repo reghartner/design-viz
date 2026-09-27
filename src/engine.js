@@ -591,7 +591,7 @@ function destroyBoardLinks(el){
    Of the blocks that cover no card in `avoid`, the most compact (smallest
    distance from the midpoint to its farthest coin) wins; if none is clear,
    the one covering least. The board grows to fit whatever is chosen. */
-var COIN_STEP = 30, COIN_CLEAR = 26, COIN_END = 22, COIN_R = 10, COIN_CELL = 64, COIN_MAX_SHIFT = 16;
+var COIN_STEP = 30, COIN_CLEAR = 26, COIN_END = 22, COIN_R = 10, COIN_CELL = 64, COIN_MAX_SHIFT = 16, COIN_PAD = 3;
 /* true when no two points are closer than clear (grid bucketing: near-linear) */
 function coinsApart(pts, clear){
   var cells = {};
@@ -648,9 +648,20 @@ function coinCover(pts, avoid, limit){
   }
   return total;
 }
+/* is pt inside an indexed card itself (its rectangle less the COIN_PAD margin)? */
+function coinPointOnCard(pt, index){
+  var key = Math.floor(pt.x / COIN_CELL) + ',' + Math.floor(pt.y / COIN_CELL);
+  return (index.cells[key] || []).concat(index.big).some(function(r){
+    return pt.x > r.x + COIN_PAD && pt.x < r.x + r.w - COIN_PAD && pt.y > r.y + COIN_PAD && pt.y < r.y + r.h - COIN_PAD;
+  });
+}
 function coinSlots(path, len, mid, n, avoid){
-  if (n <= 1) return [{x: mid.x, y: mid.y}];
+  if (n < 1) return [];
   var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
+  /* a lone coin sits on the midpoint, exactly as before shared rows, unless
+     the midpoint itself lies on a card (e.g. a view leaves one coin on an edge
+     that runs under a float); a coin merely grazing a card stays put */
+  if (n === 1 && !coinPointOnCard(mid, index)) return [{x: mid.x, y: mid.y}];
   var span = (n - 1) * COIN_STEP, lo = COIN_END + span / 2, hi = len - COIN_END - span / 2, row = null;
   if (lo <= hi){
     var centre = Math.min(hi, Math.max(lo, len / 2));
@@ -881,7 +892,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   /* every card (row nodes and floats, padded) is off limits for coins */
   var coinAvoid = coinObstacleIndex(Object.keys(L.pos).map(function(id){
     var p = L.pos[id];
-    return {x: p.cx - p.w / 2 - 3, y: p.cy - p.h / 2 - 3, w: p.w + 6, h: p.h + 6};
+    return {x: p.cx - p.w / 2 - COIN_PAD, y: p.cy - p.h / 2 - COIN_PAD, w: p.w + 2 * COIN_PAD, h: p.h + 2 * COIN_PAD};
   }));
   function deltaBadge(parent, x, y, w, h, unrecorded){
     var badge = document.createElementNS(SVGNS, 'polygon');

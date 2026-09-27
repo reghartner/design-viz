@@ -10543,23 +10543,51 @@ function resolveLabelCollisions(labels, obstacles){
     [-56, 56, -70, 70, -84, 84].forEach(function(dx){ WIDE.push({dx: dx, dy: dy}); });
   });
   WIDE.sort(function(a, b){ return (Math.abs(a.dx) + Math.abs(a.dy)) - (Math.abs(b.dx) + Math.abs(b.dy)); });
+  /* obstacles filed in a LABEL_CELL grid; a query returns the indices of
+     obstacles whose cells meet r, in original order, so sums match a full scan */
+  var LABEL_CELL = 48, grid = {}, huge = [];
+  function cellsOf(r, g, visit){
+    var x0 = Math.floor((r.x - g) / LABEL_CELL), x1 = Math.floor((r.x + r.w + g) / LABEL_CELL),
+        y0 = Math.floor((r.y - g) / LABEL_CELL), y1 = Math.floor((r.y + r.h + g) / LABEL_CELL);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 4096) return false;
+    for (var gx = x0; gx <= x1; gx++) for (var gy = y0; gy <= y1; gy++) visit(gx + ',' + gy);
+    return true;
+  }
+  obstacles.forEach(function(o, i){
+    if (!cellsOf(o, 0, function(key){ (grid[key] || (grid[key] = [])).push(i); })) huge.push(i);
+  });
+  function nearby(r, g){
+    var seen = new Set(huge);
+    if (!cellsOf(r, g, function(key){ (grid[key] || []).forEach(function(i){ seen.add(i); }); })){
+      return obstacles.map(function(o, i){ return i; });
+    }
+    return Array.from(seen).sort(function(a, b){ return a - b; });
+  }
   function overlap(r, hardOnly){
-    var total = 0, oi;
-    for (oi = 0; oi < obstacles.length; oi++) if (!hardOnly || obstacles[oi].hard) total += overlapArea(r, obstacles[oi]);
+    var total = 0, oi, ids = nearby(r, 0);
+    for (var k = 0; k < ids.length; k++){
+      var o = obstacles[ids[k]];
+      if (!hardOnly || o.hard) total += overlapArea(r, o);
+    }
     if (!hardOnly) for (oi = 0; oi < placed.length; oi++) total += overlapArea(r, placed[oi]);
     return total;
   }
   /* bounding box of the hard obstacles touching r, grown through any hard
      obstacle within 12px of the cluster (a block of coins is one cluster) */
   function hardCluster(r){
-    var hard = obstacles.filter(function(o){ return o.hard; }), inside = [], box = null, grew = true;
+    /* flood fill through the obstacle grid: each hard obstacle joins once */
     function near(a, b, g){ return a.x - g < b.x + b.w && b.x - g < a.x + a.w && a.y - g < b.y + b.h && b.y - g < a.y + a.h; }
-    hard.forEach(function(o){ if (overlapArea(r, o) > 0) inside.push(o); });
-    while (grew){
-      grew = false;
-      hard.forEach(function(o){
-        if (inside.indexOf(o) >= 0) return;
-        if (inside.some(function(q){ return near(o, q, 12); })){ inside.push(o); grew = true; }
+    var member = new Set(), queue = [], inside = [], box = null;
+    nearby(r, 0).forEach(function(i){
+      if (obstacles[i].hard && overlapArea(r, obstacles[i]) > 0){ member.add(i); queue.push(i); }
+    });
+    while (queue.length){
+      var q = obstacles[queue.pop()];
+      inside.push(q);
+      nearby(q, 12).forEach(function(i){
+        var o = obstacles[i];
+        if (!o.hard || member.has(i) || !near(o, q, 12)) return;
+        member.add(i); queue.push(i);
       });
     }
     inside.forEach(function(o){
@@ -26816,7 +26844,7 @@ function destroyBoardLinks(el){
    Of the blocks that cover no card in `avoid`, the most compact (smallest
    distance from the midpoint to its farthest coin) wins; if none is clear,
    the one covering least. The board grows to fit whatever is chosen. */
-var COIN_STEP = 30, COIN_CLEAR = 26, COIN_END = 22, COIN_R = 10, COIN_CELL = 64, COIN_MAX_SHIFT = 16;
+var COIN_STEP = 30, COIN_CLEAR = 26, COIN_END = 22, COIN_R = 10, COIN_CELL = 64, COIN_MAX_SHIFT = 16, COIN_PAD = 3;
 /* true when no two points are closer than clear (grid bucketing: near-linear) */
 function coinsApart(pts, clear){
   var cells = {};
@@ -26873,9 +26901,20 @@ function coinCover(pts, avoid, limit){
   }
   return total;
 }
+/* is pt inside an indexed card itself (its rectangle less the COIN_PAD margin)? */
+function coinPointOnCard(pt, index){
+  var key = Math.floor(pt.x / COIN_CELL) + ',' + Math.floor(pt.y / COIN_CELL);
+  return (index.cells[key] || []).concat(index.big).some(function(r){
+    return pt.x > r.x + COIN_PAD && pt.x < r.x + r.w - COIN_PAD && pt.y > r.y + COIN_PAD && pt.y < r.y + r.h - COIN_PAD;
+  });
+}
 function coinSlots(path, len, mid, n, avoid){
-  if (n <= 1) return [{x: mid.x, y: mid.y}];
+  if (n < 1) return [];
   var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
+  /* a lone coin sits on the midpoint, exactly as before shared rows, unless
+     the midpoint itself lies on a card (e.g. a view leaves one coin on an edge
+     that runs under a float); a coin merely grazing a card stays put */
+  if (n === 1 && !coinPointOnCard(mid, index)) return [{x: mid.x, y: mid.y}];
   var span = (n - 1) * COIN_STEP, lo = COIN_END + span / 2, hi = len - COIN_END - span / 2, row = null;
   if (lo <= hi){
     var centre = Math.min(hi, Math.max(lo, len / 2));
@@ -27106,7 +27145,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   /* every card (row nodes and floats, padded) is off limits for coins */
   var coinAvoid = coinObstacleIndex(Object.keys(L.pos).map(function(id){
     var p = L.pos[id];
-    return {x: p.cx - p.w / 2 - 3, y: p.cy - p.h / 2 - 3, w: p.w + 6, h: p.h + 6};
+    return {x: p.cx - p.w / 2 - COIN_PAD, y: p.cy - p.h / 2 - COIN_PAD, w: p.w + 2 * COIN_PAD, h: p.h + 2 * COIN_PAD};
   }));
   function deltaBadge(parent, x, y, w, h, unrecorded){
     var badge = document.createElementNS(SVGNS, 'polygon');

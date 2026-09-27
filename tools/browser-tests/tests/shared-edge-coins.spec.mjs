@@ -177,3 +177,37 @@ for(const [name,file] of [['backstage','docs/diagrams/backstage/backstage.spec.j
   g.forEach((l,a)=>g.slice(a+1).forEach(o=>expect(depth(l.box,o.box),'"'+l.text+'" covers "'+o.text+'"').toBeLessThanOrEqual(3)));
  });
 }
+
+// Filtering a shared edge down to one visible step must still keep that coin
+// off a card covering the midpoint, through a view and through a path.
+test('a lone coin left by a view or path filter stays off a card over the midpoint',async({page,server},testInfo)=>{
+ const d=midFloat(3);
+ d.steps=['b0','b1','b2'].map((id,i)=>({id,edge:'b->c',text:'Beat '+(i+1)+'.'}));
+ d.paths=[{id:'all',label:'All beats',steps:['b0','b1','b2']},{id:'solo',label:'Solo',steps:['b1']}];
+ d.layouts=[{id:'full',name:'Full',sectionLayout:composition},{id:'one',name:'One',steps:['b2'],sectionLayout:composition}];d.defaultLayout='full';
+ await writeFile(path.join(server.root,'lone-coin.json'),JSON.stringify({page:{title:'Lone coin',sections:[{id:'lone',heading:'Lone coin',diagram:d}]}}));
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'lone-coin.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'lone-coin.html')]);
+ await page.goto(server.origin+'/lone-coin.html');const root=page.locator('.docview');
+ async function clear(count,texts){
+  const shown=root.locator('.coin:not(.view-step-hidden)');await expect(shown).toHaveCount(count);
+  const g=await root.locator('svg:has(.coin)').first().evaluate(el=>{
+   const card=el.querySelector('[data-dv-node="f"] .card').getBoundingClientRect(),p=el.querySelector('path.edge'),m=p.getPointAtLength(p.getTotalLength()/2),c=p.getScreenCTM();
+   return {card:{x:card.x,y:card.y,width:card.width,height:card.height},mid:{x:c.a*m.x+c.c*m.y+c.e,y:c.b*m.x+c.d*m.y+c.f},
+    coins:[...el.querySelectorAll('.coin:not(.view-step-hidden)')].map(k=>{const b=k.querySelector('circle').getBoundingClientRect();return {text:k.querySelector('text').textContent,box:{x:b.x,y:b.y,width:b.width,height:b.height}};})};
+  });
+  // The float really covers the path midpoint in every state.
+  expect(g.mid.x>=g.card.x&&g.mid.x<=g.card.x+g.card.width&&g.mid.y>=g.card.y&&g.mid.y<=g.card.y+g.card.height).toBe(true);
+  expect(g.coins.map(c=>c.text)).toEqual(texts);
+  g.coins.forEach(c=>expect(intersects(c.box,g.card),'coin '+c.text+' covers the float').toBe(false));
+ }
+ await clear(3,['1','2','3']);
+ await root.getByRole('button',{name:'One',exact:true}).click();
+ await expect(root.locator('.coin[data-dv-step="2"]')).not.toHaveClass(/view-step-hidden/);
+ await clear(1,['1']);
+ await page.screenshot({path:testInfo.outputPath('lone-coin-view.png')});
+ await root.getByRole('button',{name:'Full',exact:true}).click();await clear(3,['1','2','3']);
+ await root.locator('.path-chip[data-dv-path="solo"]').click();
+ await expect(root.locator('.coin')).toHaveCount(1);
+ await clear(1,['1']);
+ await page.screenshot({path:testInfo.outputPath('lone-coin-path.png')});
+});

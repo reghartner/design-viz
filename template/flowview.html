@@ -30146,7 +30146,7 @@ function wireTour(ctl, view, win, config, options){
               valid=isRendered(target) && branchIsVisible(sec,ds);
               // A story panel may first appear partway through the flow. Start
               // this lesson at an actual visible stop instead of dropping it.
-              if(!valid && step.id==='panels' && sec.stepper){
+              if(!valid && target && step.id==='panels' && sec.stepper){
                 var ids=sec.stepper.ids();
                 for(var k=0;k<ids.length && !valid;k++){
                   sec.stepper.jump(k);
@@ -30178,8 +30178,8 @@ function wireTour(ctl, view, win, config, options){
 
   /* ---- state machine ---- */
   /* Custom lists preserve authored numbering; the built-in list has already
-     been planned against available controls. For either list, whether a step's control exists is settled at entry, where applying the
-     step's own tab and diagram state has already revealed it; a miss is an
+     been planned against available controls. Each target is resolved at entry,
+     where applying the step's own tab and diagram state has already revealed it; a miss is an
      authoring bug, surfaced as a console warning and passed through. */
   function buildList(){
     var steps = tourStepsForPersona(plannedConfig, persona || 'both');
